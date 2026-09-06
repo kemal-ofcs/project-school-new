@@ -24,8 +24,13 @@ export interface SiswaInput {
 
 export async function getDaftarSiswa(id_rombel?: string) {
   if (isDesktopRuntime()) {
+    // Nama argumennya WAJIB camelCase. Tauri v2 memetakan argumen command
+    // snake_case (`id_rombel`) ke camelCase di sisi JS; mengirim `id_rombel`
+    // membuat argumennya tidak dikenali dan — karena tipenya `Option<String>` —
+    // diam-diam bernilai `None`, sehingga filter rombel tidak pernah berlaku
+    // tanpa satu pun pesan galat.
     return invokeDesktop<Record<string, unknown>[]>("desktop_get_students", {
-      id_rombel: id_rombel || null,
+      idRombel: id_rombel || null,
     });
   }
   const response = await requestWebApi<{

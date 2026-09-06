@@ -4,34 +4,34 @@ Dokumen ini mendefinisikan kontrak resmi komunikasi sinkronisasi dua arah antara
 
 ---
 
-## 1. 37 Route Kanonik Outbox (The 37 Canonical Hyphen Routes)
+## 1. 57 Route Kanonik Outbox (The 57 Canonical Hyphen Routes)
 
-Hanya 37 pasangan `(domain, operation)` berikut yang diizinkan untuk diproduksi oleh outbox dan diproses oleh consumer backend/Turso:
+Hanya 57 pasangan `(domain, operation)` berikut yang diizinkan untuk diproduksi oleh outbox dan diproses oleh consumer backend/Turso:
 
 ```text
-1.  attendance/create            20. id-card-template/save
-2.  attendance/delete            21. id-card/update
-3.  attendance/scan              22. log-scan/delete
-4.  attendance/update            23. offline-import/delete
-5.  backup/cancel                24. offline-import/row
-6.  backup/create                25. payroll/bpjs-rule
-7.  company-profile/update       26. payroll/create-run
-8.  correction/create            27. payroll/delete
-9.  correction/delete            28. payroll/overtime-rule
-10. employee/create              29. payroll/payroll-component
-11. employee/status              30. payroll/salary-config
-12. employee/token               31. payroll/tax-rule
-13. employee/update              32. payroll/transition-status
-14. holiday-whitelist/create     33. setting/update
-15. holiday-whitelist/delete     34. setting/upsert
-16. holiday-whitelist/update     35. shift/create
-17. holiday/create               36. shift/delete
-18. holiday/delete               37. shift/update
-19. holiday/update
+1.  academic-assignment/create       20. backup/create                    39. payroll/bpjs-rule
+2.  academic-assignment/delete       21. company-profile/update           40. payroll/create-run
+3.  academic-class/create            22. correction/create                41. payroll/delete
+4.  academic-class/delete            23. correction/delete                42. payroll/overtime-rule
+5.  academic-class/update            24. employee/create                  43. payroll/payroll-component
+6.  academic-department/create       25. employee/status                  44. payroll/salary-config
+7.  academic-department/delete       26. employee/token                   45. payroll/tax-rule
+8.  academic-department/update       27. employee/update                  46. payroll/transition-status
+9.  academic-subject/create          28. holiday/create                   47. setting/update
+10. academic-subject/delete          29. holiday/delete                   48. setting/upsert
+11. academic-subject/update          30. holiday/update                   49. shift/create
+12. academic-year/create             31. holiday-whitelist/create         50. shift/delete
+13. academic-year/delete             32. holiday-whitelist/delete         51. shift/update
+14. academic-year/update             33. holiday-whitelist/update         52. student/create
+15. attendance/create                34. id-card/update                   53. student/delete
+16. attendance/delete                35. id-card-template/save            54. student/update
+17. attendance/scan                  36. log-scan/delete                  55. teacher/create
+18. attendance/update                37. offline-import/delete            56. teacher/delete
+19. backup/cancel                    38. offline-import/row               57. teacher/update
 ```
 
 ### Aturan Penamaan & Boundary Compatibility:
-- **Format Kanonik:** Seluruh nama domain majemuk menggunakan format **hyphen-case** (misal: `company-profile`, `id-card-template`, `offline-import`, `log-scan`).
+- **Format Kanonik:** Seluruh nama domain majemuk menggunakan format **hyphen-case** (misal: `company-profile`, `id-card-template`, `offline-import`, `log-scan`, `academic-year`, `academic-department`, `academic-class`, `academic-subject`, `academic-assignment`).
 - **Normalisasi Boundary:** Alias lama seperti `company_profile`, `id_card_template`, `offline_import`, atau `scan_log` HANYA dinormalisasi pada pintu masuk boundary Turso.
 - Setelah normalisasi, nama yang disimpan ke `sync_changelog` dan `sync_operation_receipt` **WAJIB berbentuk nama kanonik**.
 
@@ -103,8 +103,11 @@ outbox bekerja, lalu tetap menjalankan pull.
 - Kunci payload yang **tidak dikirim** berarti "tabel ini tidak berubah", BUKAN
   "tabel ini kosong". `apply_table` wajib berhenti lebih awal untuk kunci yang
   absen, termasuk melewatkan blok `delete_missing`.
-- Menambah tabel snapshot baru cukup di `SNAPSHOT_SOURCES` (turso.rs) — daftar
-  itu sekaligus menentukan tabel mana yang dipasangi trigger pulse.
+- Menambah tabel snapshot baru WAJIB didaftarkan di KEDUA tempat: `SNAPSHOT_TABLES`
+  di `sync.rs` DAN `SNAPSHOT_SOURCES` di `turso.rs:625`. `SNAPSHOT_SOURCES` adalah sumber
+  tunggal untuk menyusun query SELECT snapshot pembacaan Turso DAN memasang trigger SQLite
+  `sync_pulse` di cloud. Jika absen di `SNAPSHOT_SOURCES`, klien tidak pernah menarik tabel
+  tersebut dan mutasi Web tidak memicu pulsa sinkronisasi.
 
 ### 4.1.1 Yang TIDAK Boleh Ikut Sinkronisasi
 
@@ -192,3 +195,54 @@ sudah tahu jawabannya.
 > Setiap field baru pada `DesktopSyncStatus` wajib ditambahkan manual di
 > `mobile/src-tauri/src/mobile/models.rs`, atau build Mobile gagal begitu
 > salinan `sync.rs` yang baru masuk.
+
+---
+
+## 6. Larangan UNIQUE Constraint pada Kolom Bisnis Tabel Sinkronisasi
+
+### Dampak Fatal Constraint Unik di Sinkronisasi:
+- Pada arsitektur offline-first multi-perangkat, dua operator dapat mendaftarkan entitas bisnis yang sama secara independen dalam kondisi offline (misal: dua operator memasukkan siswa dengan NIS atau NISN yang sama, atau mendaftarkan kode mapel yang sama).
+- Jika kolom bisnis tersebut dipasangi `UNIQUE` constraint pada DDL database (SQLite lokal maupun LibSQL cloud):
+  1. Perangkat pertama berhasil melakukan push outbox ke cloud.
+  2. Perangkat kedua gagal melakukan push outbox karena bentrok constraint `UNIQUE`.
+  3. Status event di outbox berubah menjadi `failed` dengan `next_retry_at = NULL` (`sync.rs:2035`).
+  4. Antrean sinkronisasi pada perangkat kedua macet permanen sampai ada intervensi database manual.
+
+### Standar Penegakan Keunikan (Application-Layer Unique Checks):
+- Seluruh tabel yang ikut disinkronkan DILARANG memiliki `UNIQUE` constraint pada kolom bisnis selain Primary Key.
+- Penegakan keunikan wajib dilakukan di **lapisan aplikasi**:
+  - Di Rust: periksa keberadaan entitas sebelum mutasi (`assert_unique`).
+  - Di TypeScript: periksa keberadaan duplikat pada service sebelum eksekusi SQL.
+  - Berikan pesan error yang ramah dan informatif ke pengguna, bukan membiarkan database menolak transaksi secara kasar di level driver.
+
+---
+
+## 7. Idempotensi Handler Cloud & Status Aktif Tunggal
+
+### Anomali Status Aktif Ganda di Cloud:
+- Entitas yang hanya boleh memiliki satu baris aktif dalam satu waktu (misalnya `akademik_tahun_ajaran.is_aktif = 1`) rawan mengalami status aktif ganda jika klien hanya meng-enqueue mutasi untuk baris yang diaktifkan.
+- Jika klien menjalankan `UPDATE ... SET is_aktif = 0` secara lokal saja lalu hanya meng-enqueue event `academic-year/update` untuk tahun baru yang diaktifkan, maka Turso Cloud tidak pernah mengetahui bahwa tahun ajaran lama harus dimatikan. Hasilnya: cloud memiliki dua baris dengan `is_aktif = 1`.
+
+### Solusi Idempoten Wajib di Handler Cloud:
+- Handler cloud untuk domain terkait WAJIB idempoten dan mematikan record aktif lainnya dalam transaksi atomik yang sama:
+  ```sql
+  -- Saat is_aktif = 1
+  UPDATE akademik_tahun_ajaran SET is_aktif = 0 WHERE id_tahun_ajaran <> ?;
+  UPDATE akademik_tahun_ajaran SET is_aktif = 1 WHERE id_tahun_ajaran = ?;
+  ```
+
+---
+
+## 8. Atomisitas Mutasi Multi-Tabel & Perlindungan Anti-Zombie Resurrection
+
+### Gejala Zombie Resurrection:
+- Entitas personil (`guru_data`, `siswa_data`) berelasi 1-to-1 dengan `master_data`.
+- Jika operasi `delete_student` atau `delete_teacher` hanya menghapus baris di tabel profil anak (`siswa_data`) atau hanya mengubah status lokal tanpa memperbarui status di `master_data` (`status_aktif = 'Nonaktif'`) di cloud:
+  1. Baris `master_data` di cloud tetap berstatus `Aktif`.
+  2. Karena `master_data` ikut snapshot dengan `delete_missing: false`, siklus pull snapshot berikutnya akan menarik kembali `master_data` berstatus `Aktif`.
+  3. Personil yang telah dinonaktifkan/dihapus bangkit kembali ("zombie resurrection") dan kartu QR-nya kembali dapat digunakan untuk scan absensi.
+
+### Aturan Mutasi Relasional Wajib:
+1. **Atomisitas Mutasi:** Penonaktifan personil WAJIB memperbarui `master_data.status_aktif = 'Nonaktif'` dan tabel profil dalam satu transaksi atomik.
+2. **Paritas Handler Cloud:** Handler cloud DILARANG meng-hardcode `status_aktif = 'Aktif'` pada operasi upsert dan DILARANG menghilangkan kolom relasi penting (`id_shift`, `no_hp`, `lp`).
+3. **Audit Konsistensi:** Setiap mutasi relasional wajib memiliki tes integrasi yang memverifikasi bahwa penonaktifan di satu sisi tidak dibatalkan oleh snapshot pull di sisi lain.

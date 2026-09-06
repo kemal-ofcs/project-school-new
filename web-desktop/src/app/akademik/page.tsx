@@ -1,12 +1,13 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { redirect } from "next/navigation";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { AppShell } from "@/components/AppShell";
 import { FeedbackBanner } from "@/components/ui/FeedbackBanner";
 import { Icon } from "@/components/ui/Icon";
 import { Modal } from "@/components/ui/Modal";
 import { PageHeader } from "@/components/ui/PageHeader";
-import { hasPermission } from "@/lib/auth/access";
+import { canAccessArea, hasPermission } from "@/lib/auth/access";
 import { useAuth } from "@/lib/context/AuthContext";
 import {
   aktifkanTahunAjaran,
@@ -36,7 +37,7 @@ import { getDaftarGuru } from "@/lib/gateways/teacher";
 type TabKey = "tahun_ajaran" | "jurusan" | "rombel" | "mapel" | "penugasan";
 
 export default function AkademikPage() {
-  const { user } = useAuth();
+  const { user, isAuthenticated, isLoading: authLoading } = useAuth();
   const canManage = hasPermission(user, "academic.manage");
 
   const [activeTab, setActiveTab] = useState<TabKey>("tahun_ajaran");
@@ -62,6 +63,17 @@ export default function AkademikPage() {
   const [selectedTaForRombel, setSelectedTaForRombel] = useState<string>("");
   const [selectedRombelForPenugasan, setSelectedRombelForPenugasan] =
     useState<string>("");
+
+  // Pilihan filter dibaca `loadAllData` lewat ref, bukan lewat dependency.
+  // Menjadikannya dependency akan membuat `useCallback` lahir ulang setiap kali
+  // filter berubah, dan efek `sppg:sync-completed` ikut terpasang ulang di
+  // setiap perubahan itu.
+  const selectedTaRef = useRef(selectedTaForRombel);
+  const selectedRombelRef = useRef(selectedRombelForPenugasan);
+  useEffect(() => {
+    selectedTaRef.current = selectedTaForRombel;
+    selectedRombelRef.current = selectedRombelForPenugasan;
+  });
 
   // Modal states
   const [modalType, setModalType] = useState<TabKey | null>(null);
@@ -127,19 +139,36 @@ export default function AkademikPage() {
       setMapelList(mapData);
       setGuruList(gData);
 
+      // Pilihan filter yang sedang dipakai operator WAJIB dipertahankan.
+      // `loadAllData` juga berjalan pada setiap `sppg:sync-completed`, dan versi
+      // sebelumnya selalu memuat ulang rombel untuk tahun ajaran AKTIF —
+      // dropdown-nya tetap menampilkan pilihan lama sementara tabelnya sudah
+      // berganti isi. Pilihan lama hanya dilepas bila barisnya memang hilang.
       const activeTa = taData.find((t) => Number(t.is_aktif) === 1);
-      const taId = activeTa
+      const fallbackTa = activeTa
         ? String(activeTa.id_tahun_ajaran)
         : taData[0]
           ? String(taData[0].id_tahun_ajaran)
           : "";
-      setSelectedTaForRombel((prev) => (prev ? prev : taId));
+      const chosenTa = selectedTaRef.current;
+      const taId =
+        chosenTa && taData.some((t) => String(t.id_tahun_ajaran) === chosenTa)
+          ? chosenTa
+          : fallbackTa;
+      setSelectedTaForRombel(taId);
 
       const romData = await getDaftarRombel(taId || undefined);
       setRombelList(romData);
 
-      const rId = romData[0] ? String(romData[0].id_rombel) : "";
-      setSelectedRombelForPenugasan((prev) => (prev ? prev : rId));
+      const chosenRombel = selectedRombelRef.current;
+      const rId =
+        chosenRombel &&
+        romData.some((r) => String(r.id_rombel) === chosenRombel)
+          ? chosenRombel
+          : romData[0]
+            ? String(romData[0].id_rombel)
+            : "";
+      setSelectedRombelForPenugasan(rId);
 
       const penData = await getDaftarPenugasanGuru(rId || undefined);
       setPenugasanList(penData);
@@ -260,6 +289,25 @@ export default function AkademikPage() {
       setSaving(false);
     }
   };
+
+  // Gerbang area: setiap halaman lain melakukan hal yang sama. Backend sudah
+  // menegakkan izinnya lewat require_permission/requireWebPermission, tetapi
+  // tanpa ini halaman struktur akademik tetap terbuka lewat URL bagi role yang tidak
+  // berhak dan hanya menampilkan banner error.
+  if (authLoading) {
+    return (
+      <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center p-6 text-slate-100 font-sans">
+        <div className="flex flex-col items-center gap-3">
+          <div className="w-10 h-10 border-4 border-sky-500 border-t-transparent rounded-full animate-spin"></div>
+          <p className="text-xs text-slate-400 font-mono animate-pulse">
+            Memuat Struktur Akademik...
+          </p>
+        </div>
+      </div>
+    );
+  }
+  if (!isAuthenticated) redirect("/login");
+  if (!canAccessArea(user, "akademik")) redirect("/forbidden");
 
   return (
     <AppShell>

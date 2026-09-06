@@ -138,3 +138,265 @@ describe("operational sync schema", () => {
     ).toBe(false);
   });
 });
+
+/**
+ * Payload akademik dieja PERSIS seperti yang diproduksi `academic.rs`.
+ *
+ * Sejak validatornya `.strict()`, satu kunci yang ada di produsen tetapi tidak
+ * ada di skema akan menolak SETIAP push domain itu — dan penolakan cloud
+ * menghentikan event di `failed` dengan `next_retry_at = NULL`, yaitu gagal
+ * permanen. Test ini yang menjaga kedua sisi tetap sepadan; memperbarui payload
+ * di `academic.rs` tanpa memperbarui skema akan menggagalkannya di sini, bukan
+ * di perangkat pengguna.
+ */
+const ACADEMIC_PAYLOADS: [string, string, Record<string, unknown>][] = [
+  [
+    "academic-year",
+    "create",
+    {
+      id_tahun_ajaran: "ta_1",
+      nama_tahun: "2026/2027",
+      semester: "Ganjil",
+      tanggal_mulai: "2026-07-01",
+      tanggal_selesai: "2027-06-30",
+      is_aktif: 1,
+      created_at: "2026-09-07 03:00:00",
+      updated_at: "2026-09-07 03:00:00",
+    },
+  ],
+  [
+    "academic-year",
+    "update",
+    {
+      id_tahun_ajaran: "ta_1",
+      nama_tahun: "2026/2027",
+      semester: "Genap",
+      tanggal_mulai: "2026-07-01",
+      tanggal_selesai: "2027-06-30",
+      is_aktif: 1,
+      created_at: "2026-09-07 03:00:00",
+      updated_at: "2026-09-07 03:10:00",
+    },
+  ],
+  ["academic-year", "delete", { id_tahun_ajaran: "ta_1" }],
+  [
+    "academic-department",
+    "create",
+    {
+      id_jurusan: "jur_1",
+      kode_jurusan: "RPL",
+      nama_jurusan: "Rekayasa Perangkat Lunak",
+      deskripsi: null,
+      is_aktif: 1,
+    },
+  ],
+  [
+    "academic-department",
+    "update",
+    {
+      id_jurusan: "jur_1",
+      kode_jurusan: "RPL",
+      nama_jurusan: "Rekayasa Perangkat Lunak",
+      deskripsi: "Program keahlian",
+      is_aktif: 0,
+    },
+  ],
+  ["academic-department", "delete", { id_jurusan: "jur_1" }],
+  [
+    "academic-class",
+    "create",
+    {
+      id_rombel: "rom_1",
+      id_tahun_ajaran: "ta_1",
+      tingkat: 10,
+      id_jurusan: "jur_1",
+      nama_rombel: "X RPL 1",
+      id_wali_kelas: "ptk_1",
+      kapasitas: 36,
+      ruang_kelas: "R-101",
+      is_aktif: 1,
+    },
+  ],
+  [
+    "academic-class",
+    "update",
+    {
+      id_rombel: "rom_1",
+      id_tahun_ajaran: "ta_1",
+      tingkat: 11,
+      id_jurusan: null,
+      nama_rombel: "XI RPL 1",
+      id_wali_kelas: null,
+      kapasitas: 32,
+      ruang_kelas: null,
+      is_aktif: 1,
+    },
+  ],
+  ["academic-class", "delete", { id_rombel: "rom_1" }],
+  [
+    "academic-subject",
+    "create",
+    {
+      id_mapel: "map_1",
+      kode_mapel: "MTK",
+      nama_mapel: "Matematika",
+      tingkat: 10,
+      kelompok: "Wajib",
+      beban_jam: 4,
+      kkm: 75,
+      is_aktif: 1,
+    },
+  ],
+  [
+    "academic-subject",
+    "update",
+    {
+      id_mapel: "map_1",
+      kode_mapel: "MTK",
+      nama_mapel: "Matematika",
+      tingkat: null,
+      kelompok: "Kejuruan",
+      beban_jam: 2,
+      kkm: 70,
+      is_aktif: 0,
+    },
+  ],
+  ["academic-subject", "delete", { id_mapel: "map_1" }],
+  [
+    "academic-assignment",
+    "create",
+    {
+      id_penugasan: "gm_1",
+      id_tahun_ajaran: "ta_1",
+      id_rombel: "rom_1",
+      id_mapel: "map_1",
+      id_guru: "ptk_1",
+    },
+  ],
+  ["academic-assignment", "delete", { id_penugasan: "gm_1" }],
+  [
+    "teacher",
+    "create",
+    {
+      id_guru: "ptk_1",
+      nip: "1987",
+      nuptk: null,
+      gelar: "S.Pd.",
+      spesialisasi_mapel: "Matematika",
+      status_kepegawaian: "Honorer",
+      created_at: "2026-09-07 03:00:00",
+      updated_at: "2026-09-07 03:00:00",
+    },
+  ],
+  [
+    "teacher",
+    "update",
+    {
+      id_guru: "ptk_1",
+      nip: null,
+      nuptk: "998877",
+      gelar: null,
+      spesialisasi_mapel: null,
+      status_kepegawaian: "PNS",
+      created_at: "2026-09-07 03:00:00",
+      updated_at: "2026-09-07 03:20:00",
+    },
+  ],
+  ["teacher", "delete", { id_guru: "ptk_1" }],
+  [
+    "student",
+    "create",
+    {
+      id_siswa: "sis_1",
+      nis: "12345",
+      nisn: "0098765432",
+      nama_lengkap: "Siswa Uji",
+      jenis_kelamin: "P",
+      id_rombel: "rom_1",
+      nama_wali: "Wali Uji",
+      no_whatsapp_wali: "+6281234567890",
+      alamat: "Jalan Uji 1",
+      angkatan: 2026,
+      status: "Aktif",
+      created_at: "2026-09-07 03:00:00",
+      updated_at: "2026-09-07 03:00:00",
+    },
+  ],
+  [
+    "student",
+    "update",
+    {
+      id_siswa: "sis_1",
+      nis: null,
+      nisn: null,
+      nama_lengkap: "Siswa Uji",
+      jenis_kelamin: "L",
+      id_rombel: "rom_1",
+      nama_wali: null,
+      no_whatsapp_wali: null,
+      alamat: null,
+      angkatan: 2025,
+      status: "Lulus",
+      created_at: "2026-09-07 03:00:00",
+      updated_at: "2026-09-07 03:30:00",
+    },
+  ],
+  ["student", "delete", { id_siswa: "sis_1" }],
+];
+
+function academicEvent(
+  domain: string,
+  operation: string,
+  payload: Record<string, unknown>,
+) {
+  return {
+    eventId: `evt-${"a".repeat(64)}`,
+    clientId: `desktop-${"b".repeat(64)}`,
+    domain,
+    operation,
+    entityKey: "akademik-uji",
+    payload,
+    baseRevision: null,
+    createdAt: 1_786_300_000,
+  };
+}
+
+describe("skema sinkronisasi akademik", () => {
+  for (const [domain, operation, payload] of ACADEMIC_PAYLOADS) {
+    test(`menerima payload ${domain}/${operation} apa adanya`, () => {
+      const result = operationalSyncEventSchema.safeParse(
+        academicEvent(domain, operation, payload),
+      );
+      expect(result.success).toBe(true);
+    });
+  }
+
+  test("menolak kunci asing — inilah guna .strict()", () => {
+    expect(
+      operationalSyncEventSchema.safeParse(
+        academicEvent("academic-year", "delete", {
+          id_tahun_ajaran: "ta_1",
+          kunci_yang_tidak_dikenal: "x",
+        }),
+      ).success,
+    ).toBe(false);
+  });
+
+  test("menolak nilai di luar CHECK constraint cloud", () => {
+    for (const payload of [
+      { ...ACADEMIC_PAYLOADS[17]?.[2], jenis_kelamin: "X" },
+      { ...ACADEMIC_PAYLOADS[17]?.[2], status: "Cuti" },
+      { ...ACADEMIC_PAYLOADS[0]?.[2], semester: "Pendek" },
+    ]) {
+      expect(
+        operationalSyncEventSchema.safeParse(
+          academicEvent(
+            payload === undefined ? "student" : "student",
+            "create",
+            payload as Record<string, unknown>,
+          ),
+        ).success,
+      ).toBe(false);
+    }
+  });
+});

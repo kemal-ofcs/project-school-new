@@ -100,13 +100,13 @@ Setiap perubahan kolom atau tabel wajib diselaraskan pada **4 layer sekaligus**:
 
 ---
 
-## 2. Daftar 21 Tabel Snapshot Terdistribusi
+## 2. Daftar 28 Tabel Snapshot Terdistribusi
 
-Terdapat **21 tabel** yang termasuk dalam siklus snapshot klien (identik di `web-desktop` dan `mobile`):
+Terdapat **28 tabel** yang termasuk dalam siklus snapshot klien (identik di `web-desktop` dan `mobile`):
 
 | No | Nama Tabel SQLite | Domain Sync | Payload Key di Snapshot | Keterangan |
 | :--- | :--- | :--- | :--- | :--- |
-| 1 | `master_data` | `employee` | `employees` | Data master pegawai |
+| 1 | `master_data` | `employee` | `employees` | Data master pegawai/guru/siswa |
 | 2 | `id_card` | `id-card` | `idCards` | Data kartu ID & barcode |
 | 3 | `tbl_shift` | `shift` | `shifts` | Master jadwal shift |
 | 4 | `tbl_hari_libur` | `holiday` | `holidays` | Kalender hari libur nasional |
@@ -127,8 +127,15 @@ Terdapat **21 tabel** yang termasuk dalam siklus snapshot klien (identik di `web
 | 19 | `payroll_runs` | `payroll` | `payrollRuns` | Master proses penggajian bulanan |
 | 20 | `payroll_items` | `payroll` | `payrollItems` | Rincian slip gaji per karyawan |
 | 21 | `payroll_audit_logs` | `payroll` | `payrollAuditLogs` | Log audit approval & status payroll |
+| 22 | `akademik_tahun_ajaran` | `academic-year` | `akademikTahunAjaran` | Master tahun ajaran & semester |
+| 23 | `akademik_jurusan` | `academic-department` | `akademikJurusan` | Master jurusan / program keahlian |
+| 24 | `akademik_rombel` | `academic-class` | `akademikRombel` | Rombongan belajar / kelas |
+| 25 | `akademik_mapel` | `academic-subject` | `akademikMapel` | Master mata pelajaran |
+| 26 | `akademik_guru_mapel` | `academic-assignment` | `akademikGuruMapel` | Penugasan guru mata pelajaran per rombel |
+| 27 | `guru_data` | `teacher` | `guruData` | Data profil guru & tenaga pendidik |
+| 28 | `siswa_data` | `student` | `siswaData` | Data profil siswa & wali |
 
-### ⚠️ PERHATIAN KHUSUS: `master_operator` BUKAN Snapshot Operasional
+### PERHATIAN KHUSUS: `master_operator` BUKAN Snapshot Operasional
 - Tabel `master_operator` (beserta hash password, role, permission, dan status bootstrap) dikelola secara terpisah sebagai **Boundary Autentikasi / RBAC Cloud**.
 - **DILARANG** memasukkan `master_operator` ke dalam `SNAPSHOT_TABLES` perangkat operasional untuk mencegah kebocoran hash password ke perangkat klien dan konflik multi-terminal.
 
@@ -147,3 +154,40 @@ Terdapat **21 tabel** yang termasuk dalam siklus snapshot klien (identik di `web
   2. Update kolom `id_shift` di tabel `absensi_harian` (rekap absensi yang memakai shift terkait).
   3. Menyelesaikan update pada tabel `tbl_shift`.
 - Seluruh langkah rekonsiliasi wajib dijalankan dalam satu transaksi SQLite atomik sebelum snapshot shift dinyatakan selesai.
+
+---
+
+## 4. Paritas Mutlak SNAPSHOT_SOURCES (turso.rs) & SNAPSHOT_TABLES (sync.rs)
+
+`turso.rs:625` mendefinisikan array `SNAPSHOT_SOURCES` yang menjadi sumber tunggal bagi:
+1. Pembangkitan query `SELECT` snapshot saat klien memanggil `pull_snapshot_tables`.
+2. Pemasangan trigger SQLite `AFTER INSERT/UPDATE/DELETE` untuk memutakhirkan `sync_pulse` di cloud.
+
+Jika sebuah tabel terdaftar di `SNAPSHOT_TABLES` (sync.rs) tetapi absen dari `SNAPSHOT_SOURCES` (turso.rs):
+- `pull_snapshot_tables` tidak akan pernah menghasilkan JSON key untuk tabel tersebut.
+- Klien menganggap kunci yang absen sebagai "tabel tidak berubah", sehingga tabel tidak pernah terisi data cloud.
+- Trigger `sync_pulse` tidak terpasang di cloud untuk tabel tersebut, sehingga perubahan dari Web route handler tidak pernah menaikkan pulsa sync dan tidak pernah memicu pull di klien.
+
+---
+
+## 5. Larangan UNIQUE Constraint pada Skema Sinkronisasi
+
+- Seluruh tabel yang ikut disinkronkan DILARANG memiliki `UNIQUE` constraint pada kolom selain Primary Key.
+- Tabrakan data offline pada constraint unik menyebabkan outbox status `failed` permanen (`next_retry_at = NULL`).
+- Penegakan keunikan (misal NIS, NISN, kode jurusan, kode mapel) wajib ditegakkan di lapisan aplikasi sebelum penyimpanan (`assert_unique`), bukan di skema database DDL.
+
+---
+
+## 6. Validasi Zod Ketat Tanpa .passthrough()
+
+- Skema Zod pada `sync-schema.ts` adalah gerbang validasi payload sinkronisasi.
+- DILARANG menggunakan `.passthrough()`; WAJIB menggunakan `.strict()` pada seluruh skema event dan entitas.
+- Kolom bertipe terbatas (misalnya `jenis_kelamin`, `semester`, `status`) WAJIB divalidasi dengan `z.enum([...])` yang presisi sesuai CHECK constraint cloud.
+- Objek bersarang (misal: nested profile `master_data`) WAJIB didefinisikan skemanya secara penuh, bukan diketik `z.record()` atau `z.unknown()`.
+
+---
+
+## 7. Konvensi IPC Tauri v2 & Keamanan String Rust
+
+- **camelCase IPC Mapping:** Tauri v2 memetakan argumen Rust `snake_case` (misal: `id_rombel: Option<String>`) menjadi `camelCase` di JavaScript (`{ idRombel }`). Jangan pernah mengirim kunci `snake_case` dari JavaScript karena nilainya akan menjadi `None` secara diam-diam.
+- **Safe Character Slicing di Rust:** DILARANG menggunakan byte-slice mentah `&id[start..end]`. Gunakan iterator karakter yang aman terhadap batas UTF-8: `id.chars().skip(offset).take(count).collect::<String>()`.

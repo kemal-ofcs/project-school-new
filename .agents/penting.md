@@ -18,10 +18,9 @@ Dokumen ini memuat rangkuman prinsip, guard code, batasan terlarang, arsitektur 
 
 ## 2. Guard Code yang Wajib Ada
 
-- **Auth Guard di Frontend:** Menggunakan wrapper `<AuthGuard>` di komponen React karena Next.js middleware tidak berjalan pada mode static export.
+- **Auth Guard & Area Guard di Frontend:** Menggunakan wrapper `<AuthGuard>` di komponen React karena Next.js middleware tidak berjalan pada mode static export. Setiap halaman privat WAJIB memeriksa `if (!canAccessArea(user, area)) redirect("/forbidden");` di awal render.
 - **Role Guard Dinamis:** Hook `useRole()` untuk memfilter antarmuka berdasarkan peran (misal: HR/Superadmin yang berhak mengelola payroll/koreksi).
-- **Rust Backend Guard:** Setiap `#[tauri::command]` sensitif wajib memverifikasi permission dan sesi di Rust. Jangan mengandalkan proteksi frontend semata karena IPC `invoke()` dapat dipanggil langsung dari DevTools.
-- **Database Level Constraints:** Pasang constraint ketat di DDL: `UNIQUE(employee_id, date)` untuk cegah absen ganda, `CHECK(jam_keluar >= jam_masuk)`, `CHECK(gaji >= 0)`.
+- **Rust Backend Guard:** Setiap `#[tauri::command]` sensitif wajib memverifikasi permission dan sesi di Rust via `require_permission`. Jangan mengandalkan proteksi frontend semata karena IPC `invoke()` dapat dipanggil langsung dari DevTools.
 - **Idempotency Guard:** Mencegah double-processing pada kalkulasi dan pembukuan payroll saat tombol ditekan berulang kali.
 - **Conflict Guard Sync:** Strategi resolusi data terdistribusi (last-write-wins dengan versioning `updated_at` / monotonic revisions).
 
@@ -48,6 +47,11 @@ Dokumen ini memuat rangkuman prinsip, guard code, batasan terlarang, arsitektur 
 - DILARANG memuat aset 3D/animasi (`.glb`, `.splinecode`, `.riv`, `.wasm`, benchmark `detect-gpu`) dari CDN; aplikasi ini offline-first sehingga seluruh aset wajib di-bundle di `public/3d/`.
 - DILARANG memount canvas 3D (WebGL) di halaman scanner saat kamera aktif, dan dilarang menjalankan lebih dari satu konteks WebGL sekaligus.
 - DILARANG menyimpan preferensi kualitas visual/3D di tabel tersinkron (`setting_gex_system`); preferensi itu bersifat per-perangkat dan disimpan di `localStorage`.
+- DILARANG memasang database-level `UNIQUE` constraint pada kolom bisnis (seperti NIS, kode mapel, kode karyawan) di tabel yang disinkronkan multi-device offline-first; pelanggaran ini menyebabkan tabrakan push outbox macet permanen (*permanent outbox jam*). Uniqueness wajib dijaga di application-level.
+- DILARANG melonggarkan atau menambahkan whitelist palsu pada skrip audit (`audit-sync-contract.ts` atau `schema-audit.ts`) agar audit tampak lulus.
+- DILARANG membiarkan `SNAPSHOT_SOURCES` di `turso.rs` tertinggal dari `SNAPSHOT_TABLES` di `sync.rs`. Keduanya wajib memiliki daftar tabel yang sama persis agar trigger `sync_pulse` dan query pull snapshot terpasang sempurna.
+- DILARANG membuat entitas personil baru (`GURU`, `SISWA`, `PEGAWAI`) tanpa men-generate `token_absensi` kriptografis dan `qr_code = format!("{id}|{token}")`. Scanner menolak QR tanpa token dengan error "Format QR tidak valid".
+- DILARANG menuliskan tautan absolut sistem lokal (seperti `file:///e:/...` atau `C:\...`) ke dalam berkas dokumentasi markdown repositori. Gunakan tautan relatif Markdown.
 
 ---
 
@@ -78,6 +82,8 @@ Dokumen ini memuat rangkuman prinsip, guard code, batasan terlarang, arsitektur 
   - *Repository Layer:* Query dan manipulasi SQLite lokal / Turso pipeline.
 - **State Machine Approval:** Alur status transaksi (Draft -> Review -> Approved -> Paid) dikelola menggunakan `enum` Rust dan `match` yang exhaustive.
 - **Outbox Pattern:** Pencatatan mutasi ke tabel antrean outbox lokal sebelum dikirim ke cloud untuk menjamin keandalan saat jaringan offline/flaky.
+- **Konvensi Parameter IPC:** Tauri v2 IPC secara otomatis mengubah parameter snake_case di Rust menjadi camelCase di JavaScript. Frontend wajib memanggil `invokeDesktop("cmd", { camelCaseKey })` agar argumen tidak terbuang diam-diam sebagai `None`.
+- **Rust String Slicing Aman:** DILARANG melakukan byte-slicing mentah seperti `&id[4..10]` yang dapat memicu panic runtime saat karakter multi-byte atau ID pendek. Gunakan iterator karakter aman: `id.chars().skip(4).take(6).collect::<String>()`.
 
 ---
 
@@ -118,19 +124,19 @@ Dokumen ini memuat rangkuman prinsip, guard code, batasan terlarang, arsitektur 
 - **Offline-First Mutlak:** seluruh aset dan runtime WASM di-bundle di `public/3d/`; tidak boleh ada satupun request keluar saat aplikasi berjalan tanpa internet.
 - **Graceful Degradation:** tier kualitas `high | medium | low | off` ditentukan `detect-gpu` (default aman `low` bila deteksi gagal), disimpan device-local, dan turun otomatis saat frame rate di bawah target. Seluruh alur inti wajib tetap berfungsi penuh pada tier `off`.
 - **Hemat Baterai:** `frameloop="demand"` untuk scene statis, render loop berhenti saat aplikasi tidak terlihat, `prefers-reduced-motion` dihormati.
-- Kontrak lengkap: [07-immersive-3d-ui-ux.md](file:///e:/Freelance/Project%20Meksa/.agents/skills/absensi-sppg-rules/references/07-immersive-3d-ui-ux.md).
+- Kontrak lengkap: [07-immersive-3d-ui-ux.md](./skills/absensi-sppg-rules/references/07-immersive-3d-ui-ux.md).
 
 ---
 
-## 9. Indeks Dokumen Rujukan Lengkap (Klik Langsung)
+## 9. Indeks Dokumen Rujukan Lengkap
 
-Berikut adalah tautan cepat ke seluruh berkas referensi teknis yang dapat dibuka langsung dengan 1 kali klik:
+Berikut adalah tautan cepat ke seluruh berkas referensi teknis:
 
-1. [01-bootstrap-and-security.md](file:///e:/Freelance/Project%20Meksa/.agents/skills/absensi-sppg-rules/references/01-bootstrap-and-security.md) — Keamanan Vault Argon2id, AES-GCM, Zero-Secret Build, RBAC, dan Rate Limiting.
-2. [02-sync-canonical-and-outbox.md](file:///e:/Freelance/Project%20Meksa/.agents/skills/absensi-sppg-rules/references/02-sync-canonical-and-outbox.md) — 37 Rute Kanonik, Idempotensi, Atomic Receipt, dan Empty-Cloud Safety.
-3. [03-schema-4layer-consistency.md](file:///e:/Freelance/Project%20Meksa/.agents/skills/absensi-sppg-rules/references/03-schema-4layer-consistency.md) — 21 Snapshot Tables, Konsistensi DDL SQLite vs Rust vs Zod, dan Rekonsiliasi Shift.
-4. [04-hardware-and-android-lifecycle.md](file:///e:/Freelance/Project%20Meksa/.agents/skills/absensi-sppg-rules/references/04-hardware-and-android-lifecycle.md) — Siklus Hidup Kamera Android WebView, WebPki TLS, Scoped Storage SAF, dan GPS Caching.
-5. [05-business-logic-edge-cases.md](file:///e:/Freelance/Project%20Meksa/.agents/skills/absensi-sppg-rules/references/05-business-logic-edge-cases.md) — Shift Malam Lintas Hari, Auto-Alfa, Koreksi Admin, dan Geofencing.
-6. [06-payroll-and-system-hardening.md](file:///e:/Freelance/Project%20Meksa/.agents/skills/absensi-sppg-rules/references/06-payroll-and-system-hardening.md) — Payroll Engine, PPh 21 TER, BPJS, rust_decimal, dan Layered Guards.
-7. [07-immersive-3d-ui-ux.md](file:///e:/Freelance/Project%20Meksa/.agents/skills/absensi-sppg-rules/references/07-immersive-3d-ui-ux.md) — Stack 3D/Motion Resmi, Zero-CDN Assets, Prasyarat CSP, Tier Kualitas Adaptif, dan Checklist Visual.
-8. [sync-contract.md](file:///e:/Freelance/Project%20Meksa/.agents/skills/absensi-sppg-rules/references/sync-contract.md) — Kontrak Outbox dan Daftar Rute Sinkronisasi.
+1. [01-bootstrap-and-security.md](./skills/absensi-sppg-rules/references/01-bootstrap-and-security.md) — Keamanan Vault Argon2id, AES-GCM, Zero-Secret Build, RBAC, dan Rate Limiting.
+2. [02-sync-canonical-and-outbox.md](./skills/absensi-sppg-rules/references/02-sync-canonical-and-outbox.md) — Rute Kanonik, Idempotensi, Atomic Receipt, dan Empty-Cloud Safety.
+3. [03-schema-4layer-consistency.md](./skills/absensi-sppg-rules/references/03-schema-4layer-consistency.md) — Tabel Snapshot, Konsistensi DDL SQLite vs Rust vs Zod, dan Rekonsiliasi Shift.
+4. [04-hardware-and-android-lifecycle.md](./skills/absensi-sppg-rules/references/04-hardware-and-android-lifecycle.md) — Siklus Hidup Kamera Android WebView, WebPki TLS, Scoped Storage SAF, dan GPS Caching.
+5. [05-business-logic-edge-cases.md](./skills/absensi-sppg-rules/references/05-business-logic-edge-cases.md) — Shift Malam Lintas Hari, Auto-Alfa, Koreksi Admin, dan Geofencing.
+6. [06-payroll-and-system-hardening.md](./skills/absensi-sppg-rules/references/06-payroll-and-system-hardening.md) — Payroll Engine, PPh 21 TER, BPJS, rust_decimal, dan Layered Guards.
+7. [07-immersive-3d-ui-ux.md](./skills/absensi-sppg-rules/references/07-immersive-3d-ui-ux.md) — Stack 3D/Motion Resmi, Zero-CDN Assets, Prasyarat CSP, Tier Kualitas Adaptif, dan Checklist Visual.
+8. [sync-contract.md](./skills/absensi-sppg-rules/references/sync-contract.md) — Kontrak Outbox dan Daftar Rute Sinkronisasi.

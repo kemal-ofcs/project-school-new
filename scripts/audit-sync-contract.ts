@@ -166,6 +166,157 @@ function walk(directory: string): string[] {
 	return files;
 }
 
+/** Ubah `@/x/y` menjadi path berkas di dalam sebuah workspace. */
+function resolveAliasImport(workspace: string, spec: string) {
+	if (!spec.startsWith("@/")) return null;
+	const base = resolve(projectRoot, workspace, "src", spec.slice(2));
+	for (const candidate of [
+		`${base}.ts`,
+		`${base}.tsx`,
+		join(base, "index.ts"),
+		join(base, "index.tsx"),
+	]) {
+		if (existsSync(candidate)) return candidate;
+	}
+	return null;
+}
+
+/**
+ * Bagian sebuah fungsi gateway yang benar-benar dieksekusi di Mobile.
+ *
+ * Gateway bersama bercabang `if (isMobileRuntime()) { … }`; segala sesuatu di
+ * LUAR blok itu adalah jalur Desktop/Web yang tidak pernah berjalan di Mobile.
+ * Tanpa pemisahan ini setiap command Desktop di gateway bersama tampak seperti
+ * "command hantu" di Mobile — dan menutupinya dengan whitelist berarti
+ * mematikan pemeriksaannya sekalian.
+ *
+ * Hanya guard POSITIF yang dikenali. Bentuk `if (!isMobileRuntime()) throw`
+ * sengaja tidak dihitung: ia tidak memisahkan jalur, hanya menolak salah satu.
+ */
+function splitMobileBranch(body: string) {
+	const guard = /if\s*\(\s*isMobileRuntime\(\)\s*\)\s*\{/g;
+	const blocks: string[] = [];
+	for (const match of body.matchAll(guard)) {
+		const open = (match.index as number) + (match[0] as string).length - 1;
+		let depth = 0;
+		for (let i = open; i < body.length; i++) {
+			if (body[i] === "{") depth++;
+			else if (body[i] === "}") {
+				depth--;
+				if (depth === 0) {
+					blocks.push(body.slice(open, i + 1));
+					break;
+				}
+			}
+		}
+	}
+	return blocks.length > 0 ? blocks.join("\n") : body;
+}
+
+/**
+ * Peta nama ekspor → badan kodenya.
+ *
+ * `null` bila modulnya tidak punya ekspor yang bisa dipilah; pemanggil WAJIB
+ * memperlakukan itu sebagai "periksa seluruh modul", supaya kegagalan pemilahan
+ * membuat audit lebih galak alih-alih diam-diam melewatkan sesuatu.
+ */
+function exportBodies(source: string) {
+	const starts: { name: string; index: number }[] = [];
+	const pattern =
+		/export\s+(?:async\s+)?function\s+([A-Za-z0-9_$]+)|export\s+const\s+([A-Za-z0-9_$]+)\s*=/g;
+	for (const match of source.matchAll(pattern)) {
+		starts.push({
+			name: (match[1] ?? match[2]) as string,
+			index: match.index as number,
+		});
+	}
+	if (starts.length === 0) return null;
+	// Kode sebelum ekspor pertama (helper modul seperti `kickDesktopSync`) ikut
+	// disertakan ke setiap badan: lebih baik terlalu banyak daripada terlewat.
+	const prologue = source.slice(0, starts[0]?.index ?? 0);
+	const bodies = new Map<string, string>();
+	for (let i = 0; i < starts.length; i++) {
+		const from = starts[i]?.index as number;
+		const to = i + 1 < starts.length ? (starts[i + 1]?.index as number) : source.length;
+		bodies.set(starts[i]?.name as string, prologue + source.slice(from, to));
+	}
+	return bodies;
+}
+
+/**
+ * Command yang benar-benar TERJANGKAU dari UI sebuah workspace.
+ *
+ * Penelusuran dimulai dari `src/app` dan `src/components`, mengikuti import
+ * `@/…`, dan di dalam modul tujuan hanya membaca fungsi yang memang diimpor.
+ * Ini yang dijanjikan CLAUDE.md ("the contract audit walks gateway call graphs
+ * from `src/app`/`src/components`") — memindai seluruh `src/` secara datar akan
+ * menuduh setiap command Desktop di dalam gateway bersama yang disalin ke
+ * Mobile, padahal tidak satu pun halaman Mobile memanggilnya.
+ */
+function reachableCommands(workspace: string) {
+	const found = new Set<string>();
+	const seen = new Set<string>();
+	const queue: { file: string; name: string | null }[] = [];
+	for (const directory of ["app", "components"]) {
+		for (const file of walk(resolve(projectRoot, workspace, "src", directory))) {
+			queue.push({ file, name: null });
+		}
+	}
+
+	while (queue.length > 0) {
+		const job = queue.pop();
+		if (!job) break;
+		const key = `${job.file}#${job.name ?? "*"}`;
+		if (seen.has(key) || !existsSync(job.file)) continue;
+		seen.add(key);
+
+		const source = readFileSync(job.file, "utf8");
+		let scope = source;
+		if (job.name !== null) {
+			const bodies = exportBodies(source);
+			if (bodies) scope = bodies.get(job.name) ?? "";
+		}
+		if (workspace === "mobile") scope = splitMobileBranch(scope);
+
+		for (const match of scope.matchAll(
+			/invokeDesktop(?:<[\s\S]*?>)?\(\s*"([a-z0-9_]+)"/g,
+		)) {
+			found.add(match[1] as string);
+		}
+
+		// Fungsi tetangga di modul yang sama ikut terjangkau bila namanya dipakai.
+		const siblings = exportBodies(source);
+		if (siblings) {
+			for (const name of siblings.keys()) {
+				if (name !== job.name && new RegExp(`\\b${name}\\s*\\(`).test(scope)) {
+					queue.push({ file: job.file, name });
+				}
+			}
+		}
+
+		for (const match of source.matchAll(/import\s+([\s\S]*?)\s+from\s+"([^"]+)"/g)) {
+			const clause = match[1] as string;
+			const target = resolveAliasImport(workspace, match[2] as string);
+			if (!target) continue;
+			const named = clause.match(/\{([\s\S]*?)\}/);
+			// Import default atau namespace tidak bisa dipetakan ke satu ekspor,
+			// jadi modulnya diperiksa utuh.
+			if (!named || clause.includes("*")) {
+				queue.push({ file: target, name: null });
+				continue;
+			}
+			for (const raw of (named[1] as string).split(",")) {
+				const name = raw
+					.replace(/\btype\b/, "")
+					.split(/\sas\s/)[0]
+					?.trim();
+				if (name) queue.push({ file: target, name });
+			}
+		}
+	}
+	return found;
+}
+
 /** Rute yang benar-benar diproduksi outbox di dalam sumber Rust. */
 function producedRoutes(source: string) {
 	return [
@@ -181,16 +332,13 @@ const desktopSync = read("web-desktop/src-tauri/src/desktop/sync.rs");
 const mobileSync = read("mobile/src-tauri/src/mobile/sync.rs");
 const desktopLib = read("web-desktop/src-tauri/src/lib.rs");
 const mobileLib = read("mobile/src-tauri/src/lib.rs");
-const desktopPayrollCommandsSource = read(
-	"web-desktop/src-tauri/src/desktop/payroll/commands.rs",
-);
+// `commands.rs` DITAMBAH modul payroll: administrasi penggajian Desktop hidup
+// di `payroll/commands.rs`, dan audit yang hanya membaca commands.rs akan
+// menuduh command-nya "terdaftar tetapi fungsinya tidak ada".
 const desktopCommands = [
 	read("web-desktop/src-tauri/src/desktop/commands.rs"),
-	desktopPayrollCommandsSource,
+	read("web-desktop/src-tauri/src/desktop/payroll/commands.rs"),
 ].join("\n");
-const desktopPayrollCommands = new Set(
-	definedCommands(desktopPayrollCommandsSource),
-);
 
 // `commands.rs` DITAMBAH modul khusus Mobile (share.rs dan payroll.rs).
 // Perintah yang tidak punya padanan Desktop hidup di luar berkas yang disalin
@@ -303,23 +451,20 @@ for (const [label, workspace, lib] of [
 	["mobile", "mobile", mobileLib],
 ] as [string, string, string][]) {
 	const registered = new Set(registeredCommands(lib));
-	const invoked = new Set<string>();
-	for (const file of walk(resolve(projectRoot, workspace, "src"))) {
-		for (const match of readFileSync(file, "utf8").matchAll(
-			/invokeDesktop(?:<[\s\S]*?>)?\(\s*"([a-z0-9_]+)"/g,
-		)) {
-			invoked.add(match[1] as string);
-		}
-	}
+	const invoked = reachableCommands(workspace);
 	// Command berawalan `mobile_` hanya dipanggil di balik
 	// `if (isMobileRuntime()) { … }` pada gateway bersama, jadi wajar tidak
-	// terdaftar di biner Desktop/Web. Begitu juga perintah administrasi payroll
-	// Desktop yang ada di gateway bersama tidak pernah dipanggil oleh UI Mobile.
+	// terdaftar di biner Desktop/Web.
+	//
+	// TIDAK ADA pengecualian lain. Command Desktop yang hanya "menumpang" di
+	// gateway bersama sudah tersaring oleh `reachableCommands`, yang menelusuri
+	// dari halaman dan hanya membaca cabang `isMobileRuntime()` di Mobile —
+	// jadi command yang tetap muncul di sini memang dipanggil UI dan memang
+	// tidak terdaftar di binernya.
 	const unknown = [...invoked].filter(
 		(name) =>
 			!registered.has(name) &&
-			!(workspace === "web-desktop" && name.startsWith("mobile_")) &&
-			!(workspace === "mobile" && desktopPayrollCommands.has(name)),
+			!(workspace === "web-desktop" && name.startsWith("mobile_")),
 	);
 	if (unknown.length > 0) {
 		fail(

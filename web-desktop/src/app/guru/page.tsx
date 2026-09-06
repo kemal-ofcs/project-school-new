@@ -1,14 +1,15 @@
 "use client";
 
 import Image from "next/image";
+import { redirect } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { AppShell } from "@/components/AppShell";
 import { FeedbackBanner } from "@/components/ui/FeedbackBanner";
 import { Icon } from "@/components/ui/Icon";
 import { Modal } from "@/components/ui/Modal";
 import { PageHeader } from "@/components/ui/PageHeader";
-import { hasPermission } from "@/lib/auth/access";
-import { createQrPng } from "@/lib/client/qr-code";
+import { canAccessArea, hasPermission } from "@/lib/auth/access";
+import { createQrPng, employeeQrPayload } from "@/lib/client/qr-code";
 import { useAuth } from "@/lib/context/AuthContext";
 import { getDaftarShift } from "@/lib/gateways/shift";
 import {
@@ -19,7 +20,7 @@ import {
 } from "@/lib/gateways/teacher";
 
 export default function GuruPage() {
-  const { user } = useAuth();
+  const { user, isAuthenticated, isLoading: authLoading } = useAuth();
   const canManage = hasPermission(user, "teachers.manage");
 
   const [guruList, setGuruList] = useState<Record<string, unknown>[]>([]);
@@ -181,10 +182,12 @@ export default function GuruPage() {
   };
 
   const handleShowQr = async (item: Record<string, unknown>) => {
-    const rawQr = String(item.qr_code || "").trim();
-    const token = String(item.token_absensi || "").trim();
-    const id = String(item.id_guru || "").trim();
-    const payload = rawQr || (token ? `${id}|${token}` : id);
+    // Isi QR dibangun helper kanonik yang sama dengan kartu karyawan dan
+    // Mobile — jangan menyusunnya sendiri. Ia mengembalikan "" ketika token
+    // belum ada, sehingga `createQrPng` melempar pesan jelas alih-alih
+    // menghasilkan QR berisi id telanjang yang PASTI ditolak scanner (formatnya
+    // wajib `id|token`).
+    const payload = employeeQrPayload({ ...item, id_unik: item.id_guru });
 
     try {
       const png = await createQrPng(payload, 400);
@@ -220,6 +223,25 @@ export default function GuruPage() {
       setSaving(false);
     }
   };
+
+  // Gerbang area: setiap halaman lain melakukan hal yang sama. Backend sudah
+  // menegakkan izinnya lewat require_permission/requireWebPermission, tetapi
+  // tanpa ini halaman data guru tetap terbuka lewat URL bagi role yang tidak
+  // berhak dan hanya menampilkan banner error.
+  if (authLoading) {
+    return (
+      <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center p-6 text-slate-100 font-sans">
+        <div className="flex flex-col items-center gap-3">
+          <div className="w-10 h-10 border-4 border-sky-500 border-t-transparent rounded-full animate-spin"></div>
+          <p className="text-xs text-slate-400 font-mono animate-pulse">
+            Memuat Data Guru & PTK...
+          </p>
+        </div>
+      </div>
+    );
+  }
+  if (!isAuthenticated) redirect("/login");
+  if (!canAccessArea(user, "guru")) redirect("/forbidden");
 
   return (
     <AppShell>

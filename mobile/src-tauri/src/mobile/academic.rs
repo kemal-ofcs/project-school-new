@@ -265,7 +265,7 @@ pub fn save_academic_year(state: &MobileState, draft: &Value) -> Result<Value, C
     sync::enqueue(&tx, &client_id, "academic-year", op, &id, &payload, None)?;
     tx.commit().map_err(|_| CommandError::internal())?;
 
-    Ok(json!({ "success": true, "id_tahun_ajaran": id }))
+    Ok(json!({ "sukses": true, "id_tahun_ajaran": id }))
 }
 
 pub fn delete_academic_year(state: &MobileState, id: &str) -> Result<Value, CommandError> {
@@ -290,7 +290,7 @@ pub fn delete_academic_year(state: &MobileState, id: &str) -> Result<Value, Comm
     )?;
     tx.commit().map_err(|_| CommandError::internal())?;
 
-    Ok(json!({ "success": true }))
+    Ok(json!({ "sukses": true }))
 }
 
 pub fn set_active_academic_year(state: &MobileState, id: &str) -> Result<Value, CommandError> {
@@ -333,7 +333,7 @@ pub fn set_active_academic_year(state: &MobileState, id: &str) -> Result<Value, 
     sync::enqueue(&tx, &client_id, "academic-year", "update", id, &row, None)?;
     tx.commit().map_err(|_| CommandError::internal())?;
 
-    Ok(json!({ "success": true }))
+    Ok(json!({ "sukses": true }))
 }
 
 // ── 2. Jurusan ──────────────────────────────────────────────────────────────
@@ -427,7 +427,7 @@ pub fn save_academic_department(state: &MobileState, draft: &Value) -> Result<Va
     sync::enqueue(&tx, &client_id, "academic-department", op, &id, &payload, None)?;
     tx.commit().map_err(|_| CommandError::internal())?;
 
-    Ok(json!({ "success": true, "id_jurusan": id }))
+    Ok(json!({ "sukses": true, "id_jurusan": id }))
 }
 
 pub fn delete_academic_department(state: &MobileState, id: &str) -> Result<Value, CommandError> {
@@ -452,7 +452,7 @@ pub fn delete_academic_department(state: &MobileState, id: &str) -> Result<Value
     )?;
     tx.commit().map_err(|_| CommandError::internal())?;
 
-    Ok(json!({ "success": true }))
+    Ok(json!({ "sukses": true }))
 }
 
 // ── 3. Rombel (Kelas) ───────────────────────────────────────────────────────
@@ -565,7 +565,7 @@ pub fn save_academic_class(state: &MobileState, draft: &Value) -> Result<Value, 
     sync::enqueue(&tx, &client_id, "academic-class", op, &id, &payload, None)?;
     tx.commit().map_err(|_| CommandError::internal())?;
 
-    Ok(json!({ "success": true, "id_rombel": id }))
+    Ok(json!({ "sukses": true, "id_rombel": id }))
 }
 
 pub fn delete_academic_class(state: &MobileState, id: &str) -> Result<Value, CommandError> {
@@ -590,7 +590,7 @@ pub fn delete_academic_class(state: &MobileState, id: &str) -> Result<Value, Com
     )?;
     tx.commit().map_err(|_| CommandError::internal())?;
 
-    Ok(json!({ "success": true }))
+    Ok(json!({ "sukses": true }))
 }
 
 // ── 4. Mata Pelajaran (Mapel) ───────────────────────────────────────────────
@@ -698,7 +698,7 @@ pub fn save_academic_subject(state: &MobileState, draft: &Value) -> Result<Value
     sync::enqueue(&tx, &client_id, "academic-subject", op, &id, &payload, None)?;
     tx.commit().map_err(|_| CommandError::internal())?;
 
-    Ok(json!({ "success": true, "id_mapel": id }))
+    Ok(json!({ "sukses": true, "id_mapel": id }))
 }
 
 pub fn delete_academic_subject(state: &MobileState, id: &str) -> Result<Value, CommandError> {
@@ -723,7 +723,7 @@ pub fn delete_academic_subject(state: &MobileState, id: &str) -> Result<Value, C
     )?;
     tx.commit().map_err(|_| CommandError::internal())?;
 
-    Ok(json!({ "success": true }))
+    Ok(json!({ "sukses": true }))
 }
 
 // ── 5. Penugasan Guru Mapel (Akademik Guru Mapel) ───────────────────────────
@@ -842,7 +842,7 @@ pub fn save_academic_assignment(state: &MobileState, draft: &Value) -> Result<Va
     sync::enqueue(&tx, &client_id, "academic-assignment", "create", &id, &payload, None)?;
     tx.commit().map_err(|_| CommandError::internal())?;
 
-    Ok(json!({ "success": true, "id_penugasan": id }))
+    Ok(json!({ "sukses": true, "id_penugasan": id }))
 }
 
 pub fn delete_academic_assignment(state: &MobileState, id: &str) -> Result<Value, CommandError> {
@@ -867,7 +867,7 @@ pub fn delete_academic_assignment(state: &MobileState, id: &str) -> Result<Value
     )?;
     tx.commit().map_err(|_| CommandError::internal())?;
 
-    Ok(json!({ "success": true }))
+    Ok(json!({ "sukses": true }))
 }
 
 // ── 6. Guru (PTK) ───────────────────────────────────────────────────────────
@@ -1024,7 +1024,7 @@ pub fn save_teacher(state: &MobileState, draft: &Value) -> Result<Value, Command
     enqueue_personnel_events(&tx, &client_id, &id, &token, &qr_code, token_is_new)?;
     tx.commit().map_err(|_| CommandError::internal())?;
 
-    Ok(json!({ "success": true, "id_guru": id }))
+    Ok(json!({ "sukses": true, "id_guru": id }))
 }
 
 pub fn delete_teacher(state: &MobileState, id: &str) -> Result<Value, CommandError> {
@@ -1057,7 +1057,7 @@ pub fn delete_teacher(state: &MobileState, id: &str) -> Result<Value, CommandErr
     )?;
     tx.commit().map_err(|_| CommandError::internal())?;
 
-    Ok(json!({ "success": true }))
+    Ok(json!({ "sukses": true }))
 }
 
 // ── 7. Siswa ────────────────────────────────────────────────────────────────
@@ -1126,7 +1126,23 @@ pub fn save_student(state: &MobileState, draft: &Value) -> Result<Value, Command
     let jk = optional_text(draft, "jenis_kelamin").unwrap_or_else(|| "L".to_owned());
     let id_rombel = text(draft, "id_rombel");
     let nama_wali = optional_text(draft, "nama_wali");
-    let wa_wali = optional_text(draft, "no_whatsapp_wali");
+    // Nomor wali disimpan kanonik `+62…` lewat normalizer yang SAMA dengan
+    // kontak operator — jangan menulis ulang aturannya di sini. Tanpa itu satu
+    // nomor bisa tersimpan sebagai `0812…`, `62812…`, dan `+62 812-…`
+    // sekaligus, dan tautan WhatsApp-nya tidak selalu terbuka.
+    let wa_wali = match optional_text(draft, "no_whatsapp_wali") {
+        None => None,
+        Some(raw) => {
+            let normalized = super::turso::normalize_operator_phone(&raw);
+            if normalized.is_empty() {
+                return Err(CommandError::new(
+                    "VALIDATION_ERROR",
+                    "Nomor WhatsApp wali tidak valid. Gunakan format 08xxxxxxxxxx atau +62xxxxxxxxxx.",
+                ));
+            }
+            Some(normalized)
+        }
+    };
     let alamat = optional_text(draft, "alamat");
     let angkatan = integer(draft, "angkatan", 2026);
     let status = optional_text(draft, "status").unwrap_or_else(|| "Aktif".to_owned());
@@ -1258,7 +1274,7 @@ pub fn save_student(state: &MobileState, draft: &Value) -> Result<Value, Command
     enqueue_personnel_events(&tx, &client_id, &id, &token, &qr_code, token_is_new)?;
     tx.commit().map_err(|_| CommandError::internal())?;
 
-    Ok(json!({ "success": true, "id_siswa": id }))
+    Ok(json!({ "sukses": true, "id_siswa": id }))
 }
 
 pub fn delete_student(state: &MobileState, id: &str) -> Result<Value, CommandError> {
@@ -1291,5 +1307,5 @@ pub fn delete_student(state: &MobileState, id: &str) -> Result<Value, CommandErr
     )?;
     tx.commit().map_err(|_| CommandError::internal())?;
 
-    Ok(json!({ "success": true }))
+    Ok(json!({ "sukses": true }))
 }

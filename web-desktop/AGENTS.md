@@ -60,3 +60,14 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
    - Pada jalur `in_app`, `verify` TIDAK membuat token; token lahir di layar peninjau saat `approve`. Versi yang selalu mengirim email membuat "Lupa Password" mati total di setiap pemasangan tanpa konfigurasi email.
    - `password_reset.approve` masuk `SENSITIVE_MUTATION_PERMISSIONS` bersama `password_reset.delete`.
    - `generateRecoveryCodes`/`normalizeRecoveryCode` (TS) dan padanan Rust-nya wajib tetap identik, termasuk membuang setiap karakter non-alfanumerik.
+13. **Invarian Kritis Arsitektur Sinkronisasi & Keamanan**:
+    - **Paritas SNAPSHOT_SOURCES**: Seluruh 28 tabel snapshot wajib terdaftar di `SNAPSHOT_SOURCES` (`turso.rs:625`) dan `SNAPSHOT_TABLES` (`sync.rs`).
+    - **Format Scanner `id|token`**: Scanner strictly expects `id|token`. Setiap entitas personil wajib menghasilkan token acak dan menyimpan `qr_code = format!("{id}|{token}")`.
+    - **Larangan UNIQUE Constraint**: Dilarang memasang `UNIQUE` constraint pada kolom bisnis tabel yang disinkronkan selain PK (cegah outbox macet permanen).
+    - **Mutasi Multi-Tabel Atomik**: Hapus/nonaktifkan personil wajib memperbarui `master_data.status_aktif = 'Nonaktif'` secara atomik (cegah zombie resurrection).
+    - **Idempotensi Single-Active**: Toggle status aktif tunggal wajib mematikan baris lain di cloud: `UPDATE ... SET is_aktif = 0 WHERE id <> ?`.
+    - **Integritas Audit**: Dilarang me-whitelist atau melonggarkan assertion di skrip audit (`audit-sync-contract.ts`).
+    - **Guard Area Halaman**: Setiap halaman private wajib memanggil `canAccessArea(user, area)`.
+    - **Validasi Zod Ketat**: Gunakan `.strict()` tanpa `.passthrough()`, validasi enum persis CHECK constraint cloud.
+    - **camelCase IPC Tauri v2**: Argumen Rust snake_case dipanggil dengan camelCase dari frontend JS/TS.
+    - **Verifikasi Menyeluruh**: Jalankan `bun run check` penuh (termasuk cargo test) sebelum menyatakan pekerjaan selesai.

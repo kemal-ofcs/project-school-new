@@ -623,7 +623,7 @@ export const operationalSyncEventSchema = z.union([
         created_at: optionalShortText,
         updated_at: optionalShortText,
       })
-      .passthrough(),
+      .strict(),
   ),
   eventSchema(
     "academic-year",
@@ -636,9 +636,13 @@ export const operationalSyncEventSchema = z.union([
         tanggal_mulai: optionalShortText,
         tanggal_selesai: optionalShortText,
         is_aktif: optionalNumber,
+        // `save_academic_year` memakai satu payload yang sama untuk create dan
+        // update, dan `set_active_academic_year` membacakan barisnya utuh —
+        // keduanya ikut membawa `created_at`.
+        created_at: optionalShortText,
         updated_at: optionalShortText,
       })
-      .passthrough(),
+      .strict(),
   ),
   eventSchema(
     "academic-year",
@@ -647,7 +651,7 @@ export const operationalSyncEventSchema = z.union([
       .object({
         id_tahun_ajaran: optionalShortText,
       })
-      .passthrough(),
+      .strict(),
   ),
   eventSchema(
     "academic-department",
@@ -660,7 +664,7 @@ export const operationalSyncEventSchema = z.union([
         deskripsi: optionalLongText,
         is_aktif: optionalNumber,
       })
-      .passthrough(),
+      .strict(),
   ),
   eventSchema(
     "academic-department",
@@ -673,7 +677,7 @@ export const operationalSyncEventSchema = z.union([
         deskripsi: optionalLongText,
         is_aktif: optionalNumber,
       })
-      .passthrough(),
+      .strict(),
   ),
   eventSchema(
     "academic-department",
@@ -682,7 +686,7 @@ export const operationalSyncEventSchema = z.union([
       .object({
         id_jurusan: optionalShortText,
       })
-      .passthrough(),
+      .strict(),
   ),
   eventSchema(
     "academic-class",
@@ -699,7 +703,7 @@ export const operationalSyncEventSchema = z.union([
         ruang_kelas: optionalShortText,
         is_aktif: optionalNumber,
       })
-      .passthrough(),
+      .strict(),
   ),
   eventSchema(
     "academic-class",
@@ -716,7 +720,7 @@ export const operationalSyncEventSchema = z.union([
         ruang_kelas: optionalShortText,
         is_aktif: optionalNumber,
       })
-      .passthrough(),
+      .strict(),
   ),
   eventSchema(
     "academic-class",
@@ -725,7 +729,7 @@ export const operationalSyncEventSchema = z.union([
       .object({
         id_rombel: optionalShortText,
       })
-      .passthrough(),
+      .strict(),
   ),
   eventSchema(
     "academic-subject",
@@ -743,7 +747,7 @@ export const operationalSyncEventSchema = z.union([
         kkm: optionalNumber,
         is_aktif: optionalNumber,
       })
-      .passthrough(),
+      .strict(),
   ),
   eventSchema(
     "academic-subject",
@@ -761,7 +765,7 @@ export const operationalSyncEventSchema = z.union([
         kkm: optionalNumber,
         is_aktif: optionalNumber,
       })
-      .passthrough(),
+      .strict(),
   ),
   eventSchema(
     "academic-subject",
@@ -770,7 +774,7 @@ export const operationalSyncEventSchema = z.union([
       .object({
         id_mapel: optionalShortText,
       })
-      .passthrough(),
+      .strict(),
   ),
   eventSchema(
     "academic-assignment",
@@ -783,7 +787,7 @@ export const operationalSyncEventSchema = z.union([
         id_mapel: shortText.min(1),
         id_guru: shortText.min(1),
       })
-      .passthrough(),
+      .strict(),
   ),
   eventSchema(
     "academic-assignment",
@@ -792,7 +796,7 @@ export const operationalSyncEventSchema = z.union([
       .object({
         id_penugasan: optionalShortText,
       })
-      .passthrough(),
+      .strict(),
   ),
   eventSchema(
     "teacher",
@@ -808,7 +812,7 @@ export const operationalSyncEventSchema = z.union([
         created_at: optionalShortText,
         updated_at: optionalShortText,
       })
-      .passthrough(),
+      .strict(),
   ),
   eventSchema(
     "teacher",
@@ -824,7 +828,7 @@ export const operationalSyncEventSchema = z.union([
         created_at: optionalShortText,
         updated_at: optionalShortText,
       })
-      .passthrough(),
+      .strict(),
   ),
   eventSchema(
     "teacher",
@@ -833,7 +837,7 @@ export const operationalSyncEventSchema = z.union([
       .object({
         id_guru: optionalShortText,
       })
-      .passthrough(),
+      .strict(),
   ),
   eventSchema(
     "student",
@@ -844,17 +848,19 @@ export const operationalSyncEventSchema = z.union([
         nis: optionalShortText,
         nisn: optionalShortText,
         nama_lengkap: optionalShortText,
-        jenis_kelamin: optionalShortText,
+        jenis_kelamin: z.enum(["L", "P"]).nullable().optional(),
         id_rombel: optionalShortText,
         nama_wali: optionalShortText,
         no_whatsapp_wali: optionalShortText,
         alamat: optionalLongText,
         angkatan: optionalNumber,
-        status: optionalShortText,
+        status: z
+          .enum(["Aktif", "Lulus", "Pindah", "Keluar", "Drop Out"])
+          .optional(),
         created_at: optionalShortText,
         updated_at: optionalShortText,
       })
-      .passthrough(),
+      .strict(),
   ),
   eventSchema(
     "student",
@@ -865,17 +871,19 @@ export const operationalSyncEventSchema = z.union([
         nis: optionalShortText,
         nisn: optionalShortText,
         nama_lengkap: optionalShortText,
-        jenis_kelamin: optionalShortText,
+        jenis_kelamin: z.enum(["L", "P"]).nullable().optional(),
         id_rombel: optionalShortText,
         nama_wali: optionalShortText,
         no_whatsapp_wali: optionalShortText,
         alamat: optionalLongText,
         angkatan: optionalNumber,
-        status: optionalShortText,
+        status: z
+          .enum(["Aktif", "Lulus", "Pindah", "Keluar", "Drop Out"])
+          .optional(),
         created_at: optionalShortText,
         updated_at: optionalShortText,
       })
-      .passthrough(),
+      .strict(),
   ),
   eventSchema(
     "student",
@@ -884,7 +892,7 @@ export const operationalSyncEventSchema = z.union([
       .object({
         id_siswa: optionalShortText,
       })
-      .passthrough(),
+      .strict(),
   ),
 ]);
 

@@ -1,8 +1,30 @@
 import "server-only";
 
 import { db, ensureDbInitialized } from "@/lib/db";
+import { normalizeOperatorPhone } from "@/lib/operators/contact";
 import { ApiRequestError } from "@/lib/server/http/api-response";
 import { generateRandomToken } from "@/lib/services/employee";
+
+/**
+ * Nomor WhatsApp wali murid, dinormalkan ke bentuk kanonik `+62…`.
+ *
+ * Memakai normalizer yang SAMA dengan kontak operator — aturannya hidup di satu
+ * tempat (`@/lib/operators/contact`) dan punya cerminan Rust yang diuji. Tanpa
+ * ini satu nomor bisa tersimpan sebagai `0812…`, `62812…`, dan `+62 812-…`
+ * sekaligus, dan tautan `wa.me` tidak selalu terbuka.
+ */
+function normalizeWaliPhone(value: string | null | undefined) {
+  const raw = String(value ?? "").trim();
+  if (!raw) return null;
+  const normalized = normalizeOperatorPhone(raw);
+  if (!normalized) {
+    throw new ApiRequestError(
+      "Nomor WhatsApp wali tidak valid. Gunakan format 08xxxxxxxxxx atau +62xxxxxxxxxx.",
+      400,
+    );
+  }
+  return normalized;
+}
 
 /**
  * Tolak nilai yang seharusnya unik, di lapisan aplikasi — bukan lewat UNIQUE.
@@ -72,7 +94,6 @@ export async function saveAcademicYear(draft: {
   is_aktif?: number;
 }) {
   await ensureDbInitialized();
-  const now = new Date().toISOString();
   const id =
     draft.id_tahun_ajaran || `ta_${crypto.randomUUID().replace(/-/g, "")}`;
   const isAktif = draft.is_aktif ? 1 : 0;
@@ -86,7 +107,7 @@ export async function saveAcademicYear(draft: {
       INSERT INTO akademik_tahun_ajaran (
         id_tahun_ajaran, nama_tahun, semester, tanggal_mulai, tanggal_selesai,
         is_aktif, created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      ) VALUES (?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))
       ON CONFLICT(id_tahun_ajaran) DO UPDATE SET
         nama_tahun = excluded.nama_tahun,
         semester = excluded.semester,
@@ -102,8 +123,6 @@ export async function saveAcademicYear(draft: {
         draft.tanggal_mulai,
         draft.tanggal_selesai,
         isAktif,
-        now,
-        now,
       ] as (string | number)[],
     },
   ];
@@ -133,12 +152,11 @@ export async function deleteAcademicYear(id: string) {
 
 export async function setActiveAcademicYear(id: string) {
   await ensureDbInitialized();
-  const now = new Date().toISOString();
   await db.batch(
     [
       {
-        sql: "UPDATE akademik_tahun_ajaran SET is_aktif = 1, updated_at = ? WHERE id_tahun_ajaran = ?;",
-        args: [now, id],
+        sql: "UPDATE akademik_tahun_ajaran SET is_aktif = 1, updated_at = datetime('now') WHERE id_tahun_ajaran = ?;",
+        args: [id],
       },
       {
         sql: "UPDATE akademik_tahun_ajaran SET is_aktif = 0 WHERE id_tahun_ajaran <> ? AND is_aktif = 1;",
@@ -481,7 +499,6 @@ export async function saveTeacher(draft: {
   status_aktif?: string;
 }) {
   await ensureDbInitialized();
-  const now = new Date().toISOString();
   const id = draft.id_guru || `ptk_${crypto.randomUUID().replace(/-/g, "")}`;
   const statusAktif = draft.status_aktif || "Aktif";
   const kode = draft.kode_karyawan || draft.nip || `G-${id.slice(4, 10)}`;
@@ -536,7 +553,7 @@ export async function saveTeacher(draft: {
         sql: `
       INSERT INTO guru_data (
         id_guru, nip, nuptk, gelar, spesialisasi_mapel, status_kepegawaian, created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      ) VALUES (?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))
       ON CONFLICT(id_guru) DO UPDATE SET
         nip = excluded.nip,
         nuptk = excluded.nuptk,
@@ -552,8 +569,6 @@ export async function saveTeacher(draft: {
           draft.gelar || null,
           draft.spesialisasi_mapel || null,
           draft.status_kepegawaian || "Honorer",
-          now,
-          now,
         ],
       },
     ],
@@ -621,7 +636,6 @@ export async function saveStudent(draft: {
   status?: string;
 }) {
   await ensureDbInitialized();
-  const now = new Date().toISOString();
   const id = draft.id_siswa || `sis_${crypto.randomUUID().replace(/-/g, "")}`;
   const kode = draft.nis || `S-${id.slice(4, 10)}`;
   await assertUniqueValue({
@@ -686,7 +700,7 @@ export async function saveStudent(draft: {
       INSERT INTO siswa_data (
         id_siswa, nis, nisn, nama_lengkap, jenis_kelamin, id_rombel,
         nama_wali, no_whatsapp_wali, alamat, angkatan, status, created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))
       ON CONFLICT(id_siswa) DO UPDATE SET
         nis = excluded.nis,
         nisn = excluded.nisn,
@@ -708,12 +722,10 @@ export async function saveStudent(draft: {
           draft.jenis_kelamin || "L",
           draft.id_rombel,
           draft.nama_wali || null,
-          draft.no_whatsapp_wali || null,
+          normalizeWaliPhone(draft.no_whatsapp_wali),
           draft.alamat || null,
           draft.angkatan || 2026,
           status,
-          now,
-          now,
         ],
       },
     ],

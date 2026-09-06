@@ -49,7 +49,7 @@ Dokumen ini adalah **standar tertinggi (Golden Standard)** pengembangan pada pro
 
 ## 3. Matriks Anti-Pattern & Fatal Pitfalls
 
-| ❌ Pola Terlarang (Anti-Pattern) | 💥 Dampak / Risiko Fatal | ✅ Pola Wajib (Standar SPPG) |
+| Pola Terlarang (Anti-Pattern) | Dampak / Risiko Fatal | Pola Wajib (Standar SPPG) |
 | :--- | :--- | :--- |
 | **Menebak `role_id = 1` untuk Superadmin** | Role salah jika database hasil migrasi memiliki ID berbeda | Query dinamis: `WHERE role_key = 'superadmin' AND is_superadmin = 1 AND is_active = 1` |
 | **Menanam Secret URL/Token di Release Binary** | Token database dapat diekstrak pihak ketiga dari APK/Installer | `option_env!` hanya di `#[cfg(debug_assertions)]`, release wajib `None` |
@@ -61,7 +61,7 @@ Dokumen ini adalah **standar tertinggi (Golden Standard)** pengembangan pada pro
 | **Mutasi kosong ditandai `applied`** | Sinkronisasi tampak sukses padahal data di server tidak berubah | Jika statement mutasi kosong (`is_empty()`), tandai `conflict`/`rejected` |
 | **Akses IPC mentah `invoke()` langsung dari UI React** | Logika duplikat, tidak portabel antara Desktop, Web, dan Mobile | Wajib lewat modul Gateway di `@/lib/gateways/*` via `isDesktopRuntime()` |
 | **Pakai timestamp JavaScript untuk absensi** | Manipulasi jam perangkat oleh user dapat memalsukan kehadiran | Jam server divalidasi via hardware monotonic clock (`time_policy.rs`) |
-| **Jalankan unit test berulang di tengah modifikasi** | Pemborosan waktu dan looping context tanpa arah | Test **HANYA SATU KALI** di akhir via `bun run check:quick` setelah selesai |
+| **Jalankan unit test berulang di tengah modifikasi** | Pemborosan waktu dan looping context tanpa arah | Test HANYA SATU KALI di akhir via `bun run check:quick` setelah selesai |
 | **Muat aset 3D/WASM dari CDN (unpkg, `prod.spline.design`)** | Aplikasi offline-first gagal render dan request diblokir CSP Tauri | Bundle `.glb`/`.riv`/`.wasm`/benchmark di `public/3d/` dengan path relatif |
 | **Import `three`/R3F di server component atau `src/lib/*` tersinkron** | Build `output: "export"` pecah dan bundle mobile membengkak | `"use client"` + `dynamic(..., { ssr: false })` di `src/components/visual/` |
 | **Mount `<Canvas>` 3D saat kamera scanner aktif** | GPU dan kamera berebut resource: panas, frame drop, stream kamera mati | Halaman Scanner hanya boleh efek Motion/CSS 2D tanpa konteks WebGL |
@@ -70,6 +70,18 @@ Dokumen ini adalah **standar tertinggi (Golden Standard)** pengembangan pada pro
 | **Menaruh kelas base `bg-white` di JSX untuk tema terang** | Tema gelap rusak dan menjadi terlalu terang / silau | Tulis base JSX dalam dark mode (`bg-slate-900`), kelola tema terang via `html[data-theme="light"]` di `globals.css` |
 | **Tidak mengatur warna `<select option>` eksplisit** | Teks dropdown tema hilang/tidak terbaca di Windows WebView | Berikan styling warna eksplisit untuk `select option` pada dark dan light mode |
 | **Menaruh `focus()` di `useEffect` dengan dependensi callback (`onClose`/`onChange`) atau tanpa guard activeElement** | Setiap pengetikan 1 karakter di input form memicu re-render parent yang merebut paksa fokus kursor (*focus stealing*) | Ikat callback prop ke `useRef` (`onCloseRef`), isolasi fokus hanya saat open transition (`[isOpen, mounted]`), dan pasang guard `!dialogRef.current?.contains(document.activeElement)` |
+| **Tabel snapshot absen di `SNAPSHOT_SOURCES` (turso.rs:625)** | Klien tidak pernah menarik data dari cloud dan trigger `sync_pulse` tidak dipasang di cloud (perubahan Web tidak memicu sync) | Daftarkan seluruh 28 tabel ke `SNAPSHOT_SOURCES` di `turso.rs` dan `SNAPSHOT_TABLES` di `sync.rs` secara identik |
+| **QR scanner hanya berisi `id` tanpa token (`save_teacher`/`save_student` tidak mengisi `token_absensi`)** | Pemindai menolak scan dengan error "Format QR tidak valid" karena scanner mewajibkan format `id\|token` | Generate `token_absensi` acak saat membuat personil, simpan `qr_code = format!("{id}\|{token}")` ke `master_data` |
+| **Memasang `UNIQUE` constraint pada tabel tersinkron** | Dua perangkat mendaftarkan data sama secara offline memicu outbox status `failed` permanen (`next_retry_at = NULL`) | Hindari `UNIQUE` selain PK di DDL; tegakkan keunikan di lapisan aplikasi (`assert_unique`) |
+| **Hapus data anak tanpa update `master_data` (`delete_student` hanya hapus `siswa_data`)** | Personil nonaktif hidup kembali saat pull snapshot cloud ("zombie resurrection") | Mutasi relasional WAJIB atomik: set `master_data.status_aktif = 'Nonaktif'` dan sinkronkan perubahan status ke cloud |
+| **Toggle status aktif tunggal tanpa mematikan baris lama di cloud** | Terjadi dua baris `is_aktif = 1` secara bersamaan di cloud | Handler cloud wajib idempoten: `UPDATE ... SET is_aktif = 0 WHERE id <> ?` saat mengaktifkan baris |
+| **Melucuti / me-whitelist audit kontrak (`audit-sync-contract.ts`) demi kelulusan semu** | Crash runtime saat frontend mobile memanggil command Rust yang tidak terdaftar di biner mobile | Kurung pemanggil mobile dengan `if (isMobileRuntime())` di gateway, jangan pernah melonggarkan skrip audit |
+| **Halaman privat tanpa route guard (`canAccessArea`)** | Pengguna unauthorized dapat mengakses direktori privat via direct URL | Pasang `if (!canAccessArea(user, area)) redirect("/forbidden");` di setiap halaman private |
+| **Zod schema memakai `.passthrough()` dan melonggarkan tipe** | Nilai cacat lolos validasi lalu gagal permanen di CHECK constraint cloud | Gunakan `.strict()`, validasi enum persis CHECK constraint, dan validasi nested object secara ketat |
+| **Memanggil Tauri IPC dengan snake_case (`{ id_rombel }`)** | Tauri v2 memetakan ke camelCase sehingga nilai menjadi `None` secara diam-diam tanpa error | Panggil dengan camelCase dari frontend JS/TS (`{ idRombel }`) |
+| **String slice mentah `&id[4..10]` di Rust** | Panic saat string kurang dari 10 byte atau indeks memotong boundary karakter UTF-8 | Gunakan iterator aman: `id.chars().skip(4).take(6).collect::<String>()` |
+| **Menulis ulang regex normalisasi WhatsApp di halaman UI** | Format nomor tidak standar dan tautan wa.me rusak | Gunakan modul kanonik terpusat `src/lib/operators/contact.ts` |
+| **Menyatakan fase selesai hanya dengan `check:quick`** | Bug kompilasi Rust dan 20+ command baru tidak terdeteksi | Jalankan `bun run check` (mencakup `cargo test` kedua workspace) sebelum checkpoint selesai |
 
 ---
 
@@ -137,10 +149,12 @@ Dokumen ini adalah **standar tertinggi (Golden Standard)** pengembangan pada pro
   2. DDL SQLite di `storage.rs` (Rust)
   3. Skema Server di `db-schema.ts` & `db-migrations.ts` (LibSQL)
   4. Validator Zod di `sync-schema.ts` (TypeScript)
-- Daftar 21 tabel snapshot terdistribusi (identik di `web-desktop` dan `mobile`):
+- Daftar 28 tabel snapshot terdistribusi (identik di `web-desktop` dan `mobile`):
   - 12 Operasional Inti: `master_data`, `id_card`, `tbl_shift`, `tbl_hari_libur`, `setting_gex_system`, `company_profile`, `id_card_template`, `backup_karyawan`, `koreksi_admin`, `import_offline`, `absensi_harian`, `log_scan`.
   - 1 Whitelist Libur: `hari_libur_whitelist`.
   - 8 Payroll Engine: `salary_configs`, `overtime_tier_rules`, `payroll_components`, `tax_rules`, `bpjs_rules`, `payroll_runs`, `payroll_items`, `payroll_audit_logs`.
+  - 7 Entitas Akademik: `akademik_tahun_ajaran`, `akademik_jurusan`, `akademik_rombel`, `akademik_mapel`, `akademik_guru_mapel`, `guru_data`, `siswa_data`.
+- `SNAPSHOT_SOURCES` di `turso.rs` WAJIB memuat ke-28 tabel ini secara identik dengan `SNAPSHOT_TABLES` di `sync.rs`.
 - `master_operator` dikelola terpisah sebagai data autentikasi/RBAC cloud dan bukan bagian dari snapshot operasional perangkat.
 - **Rekonsiliasi Foreign Key (`reconcile_shift_ids`):** Shift offline direkonsiliasi menggunakan `kode_shift`. Setelah server memberikan `id_shift`, foreign key pada `master_data` dan `absensi_harian` dicascade sebelum tabel shift lokal diselesaikan.
 
@@ -280,14 +294,61 @@ Dokumen ini adalah **standar tertinggi (Golden Standard)** pengembangan pada pro
 - **Verifikasi Kontrak Seluruh Workspace:**
   - Setiap perubahan arsitektur, gateway, DDL, atau skema WAJIB diverifikasi menyeluruh melalui `bun run check:quick` di root proyek untuk memastikan kedua workspace tetap 100% konsisten, bebas drift, dan lulus linter Biome & TypeScript.
 
+### 4.31 Paritas SNAPSHOT_SOURCES (turso.rs) & SNAPSHOT_TABLES (sync.rs)
+- `SNAPSHOT_SOURCES` di `turso.rs:625` adalah sumber tunggal untuk query SELECT snapshot Turso DAN pemasangan trigger SQLite `sync_pulse` di cloud.
+- Seluruh 28 tabel snapshot WAJIB terdaftar di `SNAPSHOT_SOURCES` di `turso.rs` dan `SNAPSHOT_TABLES` di `sync.rs`.
+- Tabel yang tertinggal di `SNAPSHOT_SOURCES` mengakibatkan klien tidak pernah menarik data (`pull_snapshot_tables` tidak memancarkan payload key) dan penulisan dari Web tidak pernah memicu pulsa sinkronisasi karena ketiadaan trigger.
+
+### 4.32 Kontrak Payload Scanner & Token Personil (id|token)
+- Terminal pemindai (`scanner.rs:1138`) mewajibkan format QR `id|token` dan memverifikasi kesesuaian token terhadap `master_data.token_absensi`.
+- Seluruh alur pembuatan atau pembaruan personil (`GURU`, `SISWA`, `PEGAWAI`) baik di Rust (`save_teacher`, `save_student`) maupun service Web WAJIB menghasilkan token acak jika belum ada dan menyimpan format kanonik `qr_code = format!("{id}|{token}")`.
+- DILARANG membuat QR yang hanya berisi `id` mentah tanpa token.
+
+### 4.33 Larangan UNIQUE Constraint pada Kolom Bisnis Tabel Sinkronisasi
+- DILARANG menambahkan `UNIQUE` constraint pada tabel SQLite lokal maupun cloud yang ikut disinkronkan selain Primary Key.
+- Tabrakan data offline (misalnya dua perangkat mendaftarkan NIS, NISN, atau kode jurusan/mapel yang sama) akan memicu kegagalan push permanen di outbox (`next_retry_at = NULL`), menyebabkan antrean sinkronisasi macet selamanya.
+- Penegakan keunikan bisnis wajib dilakukan pada lapisan aplikasi (`assert_unique` di Rust dan service Web) dengan pesan validasi ramah pengguna.
+
+### 4.34 Mutasi Multi-Tabel Atomik & Pencegahan Zombie Resurrection
+- Mutasi relasional antara `master_data` dan tabel profil anak (`siswa_data`, `guru_data`) WAJIB atomik dan sinkron statusnya di seluruh layer.
+- Penonaktifan personil melalui `delete_student` atau `delete_teacher` WAJIB meng-update `master_data.status_aktif = 'Nonaktif'`.
+- Handler cloud DILARANG meng-hardcode `status_aktif = 'Aktif'` atau menghilangkan kolom relasi (`id_shift`, `no_hp`, `lp`), karena snapshot pull berikutnya akan membangkitkan personil nonaktif kembali menjadi aktif ("zombie resurrection").
+
+### 4.35 Idempotensi Toggle Status Aktif Tunggal di Cloud
+- Saat mengaktifkan sebuah record yang berstatus aktif tunggal (misalnya `akademik_tahun_ajaran.is_aktif = 1`), handler cloud WAJIB mematikan baris aktif lainnya secara idempoten:
+  `UPDATE ... SET is_aktif = 0 WHERE id <> ?`.
+- Hal ini mencegah anomali dua baris aktif sekaligus di cloud yang disebabkan oleh perbedaan eksekusi lokal vs cloud.
+
+### 4.36 Integritas Skrip Audit (Zero-Bypass Standard)
+- DILARANG KERAS melucuti, mematikan, atau me-whitelist sembarangan assertion di skrip audit integritas (`audit-sync-contract.ts` atau `schema-audit.ts`) demi membuat pengujian lewat secara semu.
+- Jika skrip audit mendeteksi pemanggilan command Rust yang tidak terdaftar di biner mobile, perbaiki kode sumber pemanggilnya di gateway dengan mengurungnya di balik guard `if (isMobileRuntime())` atau memisahkan modulnya.
+
+### 4.37 Route Guard Level Halaman (canAccessArea)
+- Setiap halaman privat/dashboard WAJIB memanggil guard area di level komponen halaman:
+  `if (!canAccessArea(user, area)) redirect("/forbidden");`.
+- Meskipun backend Rust dan route handler Web telah memproteksi endpoint via `require_permission` / `requireWebPermission`, guard halaman tetap wajib untuk mencegah UI menampilkan halaman kosong atau banner error bagi peran yang tidak berhak.
+
+### 4.38 Validasi Ketat Zod Tanpa .passthrough()
+- Skema sinkronisasi Zod di `sync-schema.ts` WAJIB menggunakan `.strict()` dan DILARANG menggunakan `.passthrough()`.
+- Seluruh nilai kolom yang memiliki CHECK constraint di database (misal `jenis_kelamin`, `status`) WAJIB divalidasi dengan `z.enum([...])`.
+- Objek bersarang (misal payload personil dan profil) WAJIB divalidasi secara rekursif agar data cacat ditolak sebelum masuk antrean outbox.
+
+### 4.39 Konvensi Parameter IPC Tauri v2 (camelCase)
+- Tauri v2 secara default memetakan nama argumen Rust berformat `snake_case` (misal `id_rombel: Option<String>`) menjadi `camelCase` di JavaScript/TypeScript (`{ idRombel }`).
+- Mengirim objek dengan kunci `snake_case` dari JavaScript akan mengakibatkan nilai menjadi `None` secara diam-diam tanpa memunculkan pesan error, sehingga filter database tidak pernah berlaku.
+
+### 4.40 Pemotongan String Aman di Rust & Normalisasi Kontak Terpusat
+- DILARANG memotong string di Rust menggunakan byte-slicing mentah `&id[start..end]` yang dapat memicu runtime panic jika panjang string kurang dari indeks atau indeks memotong boundary karakter UTF-8. Gunakan iterator karakter aman: `id.chars().skip(offset).take(count).collect::<String>()`.
+- Normalisasi nomor WhatsApp/HP WAJIB menggunakan fungsi terpusat dari `src/lib/operators/contact.ts` (format kanonik `+62...`), bukan regex manual ad-hoc di komponen UI.
+
 ---
 
 ## 5. Modul Referensi Mendalam (`references/`)
 
 Untuk detail implementasi teknis setiap area, rujuk file referensi berikut:
 1. [references/01-bootstrap-and-security.md](references/01-bootstrap-and-security.md) — Vault Argon2id, AES-GCM, Zero-Secret Build, RBAC, & Rate Limiting.
-2. [references/02-sync-canonical-and-outbox.md](references/02-sync-canonical-and-outbox.md) — 37 Route Kanonik, Idempotensi, Atomic Receipt, & Empty-Cloud Safety.
-3. [references/03-schema-4layer-consistency.md](references/03-schema-4layer-consistency.md) — 21 Snapshot Tables, DDL vs Zod vs Rust, & Shift Rekonsiliasi.
+2. [references/02-sync-canonical-and-outbox.md](references/02-sync-canonical-and-outbox.md) — 57 Route Kanonik, Idempotensi, Atomic Receipt, & Empty-Cloud Safety.
+3. [references/03-schema-4layer-consistency.md](references/03-schema-4layer-consistency.md) — 28 Snapshot Tables, DDL vs Zod vs Rust, & Shift Rekonsiliasi.
 4. [references/04-hardware-and-android-lifecycle.md](references/04-hardware-and-android-lifecycle.md) — Lifecycle Kamera Android WebView, WebPki TLS, ProGuard R8, & GPS Cache.
 5. [references/05-business-logic-edge-cases.md](references/05-business-logic-edge-cases.md) — Shift Malam Lintas Hari, Auto-Alfa, Koreksi Admin, & Geofence.
 6. [references/06-payroll-and-system-hardening.md](references/06-payroll-and-system-hardening.md) — Payroll Engine, PPh 21 TER, BPJS, rust_decimal, Layered Guards, & Platform Hardening.
@@ -304,7 +365,7 @@ flowchart TD
     
     subgraph Phase1 [Tahap 1: Investigasi Tanpa Asumsi]
         A1[Periksa DDL storage.rs, db-schema.ts, sync-schema.ts]
-        A2[Periksa 37 Canonical Routes & 21 Snapshot Tables]
+        A2[Periksa 57 Canonical Routes & 28 Snapshot Tables]
         A3[Reuse fungsi di gateways/ dan backend Rust]
     end
     
@@ -315,7 +376,7 @@ flowchart TD
     end
     
     subgraph Phase3 [Tahap 3: Verifikasi Komprehensif Satu Langkah]
-        C1[bun run check:quick di root workspace]
+        C1[bun run check di root workspace]
         C2[Verifikasi exit code 0 tanpa error/drift]
         C3[Sajikan laporan final yang jelas & ringkas]
     end
@@ -329,21 +390,21 @@ flowchart TD
 # =========================================================
 # 1. QUALITY CHECK CEPAT (Audit Skema + Kontrak + TS + Biome)
 # =========================================================
-cd e:\Freelance\absensi-sppg-app && bun run check:quick
+bun run check:quick
 
 # =========================================================
 # 2. FULL QUALITY CHECK (Mencakup Rust Cargo Tests)
 # =========================================================
-cd e:\Freelance\absensi-sppg-app && bun run check
+bun run check
 
 # =========================================================
 # 3. BUILD RELEASE PRODUKSI
 # =========================================================
 # Build Desktop Windows Installer
-cd e:\Freelance\absensi-sppg-app\web-desktop && bun run tauri:build
+cd web-desktop && bun run tauri:build
 
 # Build APK Android ARM64
-cd e:\Freelance\absensi-sppg-app\mobile && bun run tauri:android:build:arm64
+cd mobile && bun run tauri:android:build:arm64
 ```
 
 ---

@@ -57,6 +57,9 @@ export default function SettingsPage() {
   const canOperational = canAccessArea(user, "operational");
   const canShift = canAccessArea(user, "shift");
   const canPayroll = canAccessArea(user, "payroll");
+  const canAkademik = canAccessArea(user, "akademik");
+  const canGuru = canAccessArea(user, "guru");
+  const canSiswa = canAccessArea(user, "siswa");
   const canAudit = canAccessArea(user, "audit");
   const canManageGeofence = Boolean(
     user?.isSuperadmin || hasPermission(user, "branding.manage"),
@@ -607,6 +610,90 @@ export default function SettingsPage() {
                 className="rounded-xl bg-sky-500 px-3.5 py-1.5 text-xs font-black text-slate-950 shadow-md hover:bg-sky-400 active:scale-95 transition whitespace-nowrap"
               >
                 Kelola &rarr;
+              </Link>
+            </div>
+          </div>
+        ) : null}
+
+        {/* Struktur Akademik */}
+        {canAkademik ? (
+          <div className="rounded-3xl border border-amber-500/20 bg-gradient-to-br from-amber-950/30 via-slate-900/80 to-slate-900/90 p-4 backdrop-blur-md">
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2.5">
+                <div className="grid size-9 place-items-center rounded-xl bg-amber-500/20 text-amber-300">
+                  <Icon name="calendar" className="size-5" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-white">
+                    Struktur Akademik
+                  </h3>
+                  <p className="text-[11px] text-slate-400">
+                    Tahun ajaran, rombel, mapel &amp; jurusan
+                  </p>
+                </div>
+              </div>
+              <Link
+                href="/akademik"
+                onClick={() => triggerHaptic("light")}
+                className="rounded-xl bg-amber-500 px-3.5 py-1.5 text-xs font-black text-on-accent shadow-md active:scale-95 transition whitespace-nowrap"
+              >
+                Buka &rarr;
+              </Link>
+            </div>
+          </div>
+        ) : null}
+
+        {/* Guru &amp; PTK */}
+        {canGuru ? (
+          <div className="rounded-3xl border border-indigo-500/20 bg-gradient-to-br from-indigo-950/30 via-slate-900/80 to-slate-900/90 p-4 backdrop-blur-md">
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2.5">
+                <div className="grid size-9 place-items-center rounded-xl bg-indigo-500/20 text-indigo-300">
+                  <Icon name="user" className="size-5" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-white">
+                    Guru &amp; PTK
+                  </h3>
+                  <p className="text-[11px] text-slate-400">
+                    Direktori pendidik &amp; barcode absensi
+                  </p>
+                </div>
+              </div>
+              <Link
+                href="/guru"
+                onClick={() => triggerHaptic("light")}
+                className="rounded-xl bg-indigo-500 px-3.5 py-1.5 text-xs font-black text-on-accent shadow-md active:scale-95 transition whitespace-nowrap"
+              >
+                Buka &rarr;
+              </Link>
+            </div>
+          </div>
+        ) : null}
+
+        {/* Peserta Didik */}
+        {canSiswa ? (
+          <div className="rounded-3xl border border-sky-500/20 bg-gradient-to-br from-sky-950/30 via-slate-900/80 to-slate-900/90 p-4 backdrop-blur-md">
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2.5">
+                <div className="grid size-9 place-items-center rounded-xl bg-sky-500/20 text-sky-300">
+                  <Icon name="users" className="size-5" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-white">
+                    Peserta Didik
+                  </h3>
+                  <p className="text-[11px] text-slate-400">
+                    Direktori siswa, wali murid &amp; barcode
+                  </p>
+                </div>
+              </div>
+              <Link
+                href="/siswa"
+                onClick={() => triggerHaptic("light")}
+                className="rounded-xl bg-sky-500 px-3.5 py-1.5 text-xs font-black text-on-accent shadow-md active:scale-95 transition whitespace-nowrap"
+              >
+                Buka &rarr;
               </Link>
             </div>
           </div>

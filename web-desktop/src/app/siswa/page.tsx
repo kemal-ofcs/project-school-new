@@ -1,14 +1,15 @@
 "use client";
 
 import Image from "next/image";
+import { redirect } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { AppShell } from "@/components/AppShell";
 import { FeedbackBanner } from "@/components/ui/FeedbackBanner";
 import { Icon } from "@/components/ui/Icon";
 import { Modal } from "@/components/ui/Modal";
 import { PageHeader } from "@/components/ui/PageHeader";
-import { hasPermission } from "@/lib/auth/access";
-import { createQrPng } from "@/lib/client/qr-code";
+import { canAccessArea, hasPermission } from "@/lib/auth/access";
+import { createQrPng, employeeQrPayload } from "@/lib/client/qr-code";
 import { useAuth } from "@/lib/context/AuthContext";
 import { getDaftarRombel } from "@/lib/gateways/academic";
 import {
@@ -17,9 +18,10 @@ import {
   type SiswaInput,
   simpanSiswa,
 } from "@/lib/gateways/student";
+import { normalizeOperatorPhone } from "@/lib/operators/contact";
 
 export default function SiswaPage() {
-  const { user } = useAuth();
+  const { user, isAuthenticated, isLoading: authLoading } = useAuth();
   const canManage = hasPermission(user, "students.manage");
 
   const [siswaList, setSiswaList] = useState<Record<string, unknown>[]>([]);
@@ -176,10 +178,12 @@ export default function SiswaPage() {
   };
 
   const handleShowQr = async (item: Record<string, unknown>) => {
-    const rawQr = String(item.qr_code || "").trim();
-    const token = String(item.token_absensi || "").trim();
-    const id = String(item.id_siswa || "").trim();
-    const payload = rawQr || (token ? `${id}|${token}` : id);
+    // Isi QR dibangun helper kanonik yang sama dengan kartu karyawan dan
+    // Mobile — jangan menyusunnya sendiri. Ia mengembalikan "" ketika token
+    // belum ada, sehingga `createQrPng` melempar pesan jelas alih-alih
+    // menghasilkan QR berisi id telanjang yang PASTI ditolak scanner (formatnya
+    // wajib `id|token`).
+    const payload = employeeQrPayload({ ...item, id_unik: item.id_siswa });
 
     try {
       const png = await createQrPng(payload, 400);
@@ -219,6 +223,25 @@ export default function SiswaPage() {
       setSaving(false);
     }
   };
+
+  // Gerbang area: setiap halaman lain melakukan hal yang sama. Backend sudah
+  // menegakkan izinnya lewat require_permission/requireWebPermission, tetapi
+  // tanpa ini halaman data siswa tetap terbuka lewat URL bagi role yang tidak
+  // berhak dan hanya menampilkan banner error.
+  if (authLoading) {
+    return (
+      <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center p-6 text-slate-100 font-sans">
+        <div className="flex flex-col items-center gap-3">
+          <div className="w-10 h-10 border-4 border-sky-500 border-t-transparent rounded-full animate-spin"></div>
+          <p className="text-xs text-slate-400 font-mono animate-pulse">
+            Memuat Data Siswa...
+          </p>
+        </div>
+      </div>
+    );
+  }
+  if (!isAuthenticated) redirect("/login");
+  if (!canAccessArea(user, "siswa")) redirect("/forbidden");
 
   return (
     <AppShell>
@@ -356,12 +379,14 @@ export default function SiswaPage() {
                   filteredStudents.map((item) => {
                     const id = String(item.id_siswa);
                     const isAktif = String(item.status) === "Aktif";
-                    const cleanPhone = String(
-                      item.no_whatsapp_wali || "",
-                    ).replace(/\D/g, "");
-                    const waNumber = cleanPhone.startsWith("0")
-                      ? `62${cleanPhone.slice(1)}`
-                      : cleanPhone;
+                    // Nomor sudah tersimpan kanonik `+62…` oleh backend lewat
+                    // `normalizeOperatorPhone`; jangan menulis ulang aturannya
+                    // di sini. `wa.me` hanya menerima digit, jadi `+`-nya
+                    // dilepas. Baris lama yang belum ternormalisasi tetap
+                    // dinormalkan sekali di sini agar tautannya tidak rusak.
+                    const waNumber = normalizeOperatorPhone(
+                      String(item.no_whatsapp_wali || ""),
+                    ).replace(/^\+/, "");
 
                     return (
                       <tr key={id} className="transition hover:bg-white/[0.02]">

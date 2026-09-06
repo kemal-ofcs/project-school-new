@@ -163,6 +163,46 @@ untuk database baru, dan `ALTER TABLE` (`ensure_column` di Rust,
     baru mendorong "Nama Perusahaan" ke cloud lewat outbox, dan perangkat yang
     sinkron belakangan menimpa identitas asli yang sudah diisi orang lain. Ia
     dibuat saat pertama kali DISUNTING, bukan saat pertama kali dibaca.
+30. `SNAPSHOT_SOURCES` di `turso.rs` WAJIB identik dan lengkap dengan `SNAPSHOT_TABLES` di `sync.rs`.
+    `SNAPSHOT_SOURCES` adalah sumber tunggal untuk menyusun query SELECT snapshot DAN memasang
+    trigger `sync_pulse` di cloud. Tabel yang absen dari `SNAPSHOT_SOURCES` tidak akan pernah
+    ditarik oleh perangkat lain dan mutasi dari Web tidak akan pernah memicu pulsa sinkronisasi.
+31. Kontrak payload QR Scanner mewajibkan format `id|token`. Scanner memeriksa token absensi
+    terhadap `master_data.token_absensi`. Setiap pembuatan guru, siswa, atau personil baru WAJIB
+    menghasilkan token acak dan menyimpan `qr_code = format!("{id}|{token}")`. DILARANG membuat QR
+    hanya berisi `id` tanpa token, karena terminal pemindai dijamin menolaknya.
+32. DILARANG menambahkan `UNIQUE` constraint pada kolom bisnis di tabel lokal/cloud yang ikut
+    disinkronkan (selain Primary Key). Tabrakan data offline pada constraint unik akan menggagalkan
+    push outbox secara PERMANEN (`next_retry_at = NULL`). Penegakan keunikan (seperti NIS, NISN,
+    kode jurusan/mapel) WAJIB dilakukan di lapisan aplikasi (`assert_unique`), bukan skema database.
+33. Mutasi multi-tabel relasional (seperti `master_data` dan tabel profil `siswa_data`/`guru_data`)
+    WAJIB atomik dan sinkron statusnya. Menghapus/menonaktifkan personil wajib memperbarui `master_data.status_aktif = 'Nonaktif'`.
+    Handler cloud DILARANG meng-hardcode `status_aktif = 'Aktif'` atau mengabaikan field relasi (`id_shift`, `no_hp`, `lp`),
+    karena pull snapshot berikutnya akan membangkitkan personil nonaktif kembali aktif ("zombie resurrection").
+34. Toggle status aktif tunggal (seperti tahun ajaran aktif) WAJIB idempoten di cloud.
+    Saat mengaktifkan satu baris (`is_aktif = 1`), handler cloud WAJIB mematikan baris aktif lainnya:
+    `UPDATE ... SET is_aktif = 0 WHERE id <> ?` dalam satu transaksi atomik.
+35. DILARANG KERAS memodifikasi, me-whitelist, atau melonggarkan skrip audit integritas
+    (`audit-sync-contract.ts`, `schema-audit.ts`) demi membuat pengujian lewat secara semu.
+    Jika audit gagal, masalahnya ada pada pemanggil (misal: bungkus perintah mobile dengan `if (isMobileRuntime())`),
+    bukan pada skrip auditnya.
+36. Setiap halaman privat/dashboard WAJIB memasang guard area level halaman:
+    `if (!canAccessArea(user, area)) redirect("/forbidden");`. Backend `require_permission` adalah
+    jaring pengaman akhir, tetapi UI tetap wajib mencegah navigasi ke area yang tidak diizinkan.
+37. Skema Zod di `sync-schema.ts` WAJIB memakai `.strict()`, DILARANG memakai `.passthrough()`.
+    Nilai enum wajib divalidasi presisi terhadap CHECK constraint cloud, dan objek bersarang
+    wajib divalidasi secara rekursif agar data cacat tidak pernah lolos ke antrean sinkronisasi.
+38. Pemanggilan IPC Tauri v2 dari frontend WAJIB menggunakan penamaan parameter `camelCase`
+    untuk parameter Rust berformat `snake_case` (contoh: `id_rombel: Option<String>` di Rust
+    dipanggil dengan `{ idRombel }` di JS). Mengirim `snake_case` membuat Tauri v2 mengisi `None`
+    secara diam-diam tanpa melempar error.
+39. Pemotongan string di Rust DILARANG menggunakan byte slicing mentah `&str[start..end]` yang rawan
+    panic jika string kurang panjang atau indeks memotong karakter multi-byte UTF-8.
+    Gunakan iterator karakter yang aman: `s.chars().skip(offset).take(count).collect::<String>()`.
+40. Normalisasi nomor telepon dan kontak WAJIB menggunakan modul terpusat `src/lib/operators/contact.ts`
+    (format kanonik `+62...`). DILARANG membuat regex atau pembersih manual ad-hoc di komponen UI.
+41. Verifikasi fase selesai WAJIB menjalankan `bun run check` penuh (mencakup `cargo test` kedua workspace).
+    `bun run check:quick` tidak mengompilasi Rust dan tidak memvalidasi perintah Tauri baru.
 
 ## Pemulihan password & verifikasi dua langkah
 

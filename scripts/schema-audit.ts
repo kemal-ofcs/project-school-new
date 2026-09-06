@@ -341,6 +341,13 @@ const expectedDomains: [string, string][] = [
 	["holiday", "tbl_hari_libur"],
 	["setting", "setting_gex_system"],
 	["attendance", "absensi_harian"],
+	["academic-year", "akademik_tahun_ajaran"],
+	["academic-department", "akademik_jurusan"],
+	["academic-class", "akademik_rombel"],
+	["academic-subject", "akademik_mapel"],
+	["academic-assignment", "akademik_guru_mapel"],
+	["teacher", "guru_data"],
+	["student", "siswa_data"],
 ];
 
 const missingDomains = expectedDomains.filter(
