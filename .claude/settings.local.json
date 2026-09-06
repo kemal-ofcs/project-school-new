@@ -1,0 +1,50 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(bun -e ' *)",
+      "PowerShell(Get-ChildItem *)",
+      "Bash(bun run lint)",
+      "Bash(bun run typecheck)",
+      "Bash(bun run test)",
+      "Bash(bun run test:rust)",
+      "Bash(bun run check)",
+      "Bash(bun run check:quick)",
+      "Bash(bun run format*)",
+      "Bash(bun run audit:schema)",
+      "Bash(bun run audit:contract)",
+      "Bash(bun test *)",
+      "Bash(bunx tsc --noEmit)",
+      "Bash(bunx biome *)",
+      "Bash(cargo test *)",
+      "PowerShell(bun run lint)",
+      "PowerShell(bun run typecheck)",
+      "PowerShell(bun run test)",
+      "PowerShell(bun run test:rust)",
+      "PowerShell(bun run check)",
+      "PowerShell(bun run check:quick)",
+      "PowerShell(bun run format*)",
+      "PowerShell(bun run audit:schema)",
+      "PowerShell(bun run audit:contract)",
+      "PowerShell(bun test *)",
+      "PowerShell(bunx tsc --noEmit)",
+      "PowerShell(bunx biome *)",
+      "PowerShell(cargo test *)"
+    ]
+  },
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "shell": "bash",
+            "command": "bash \"E:/Freelance/absensi-sppg-app/.claude/hooks/biome-format.sh\" >/dev/null 2>&1 || true",
+            "timeout": 30,
+            "statusMessage": "Formatting with biome..."
+          }
+        ]
+      }
+    ]
+  }
+}

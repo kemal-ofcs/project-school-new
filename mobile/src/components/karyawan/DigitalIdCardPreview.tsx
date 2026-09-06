@@ -1,0 +1,628 @@
+"use client";
+
+import { useCallback, useEffect, useState } from "react";
+import { QrFullscreenDialog } from "@/components/karyawan/QrFullscreenDialog";
+import { Icon } from "@/components/ui/Icon";
+import { downloadDataUrl } from "@/lib/client/download";
+import { triggerHaptic } from "@/lib/client/haptics";
+import {
+  DEFAULT_ID_CARD_ELEMENTS,
+  preloadCardAssets,
+  renderIdCardSideToCanvas,
+} from "@/lib/client/id-card-renderer";
+import { createQrPng, employeeQrPayload } from "@/lib/client/qr-code";
+import { shareDataUrl } from "@/lib/client/share";
+import { BRANDING } from "@/lib/constants/branding";
+import {
+  type CompanyProfile,
+  getCompanyProfile,
+} from "@/lib/gateways/company-profile";
+import {
+  getIdCardTemplate,
+  type IdCardTemplateConfig,
+} from "@/lib/gateways/id-card-template";
+import { syncNow } from "@/lib/gateways/sync-status";
+import { useAppLogo } from "@/lib/hooks/useAppLogo";
+import type { CardSide } from "@/types/id-card";
+
+interface DigitalIdCardPreviewProps {
+  /** Data lengkap satu baris karyawan dari SQLite. */
+  employee: Record<string, unknown>;
+}
+
+type QrStatus = "loading" | "ready" | "no-token" | "error";
+
+/**
+ * Pratinjau ID Card digital karyawan dengan toggle Sisi Depan dan Sisi Belakang.
+ * Mendukung template kustom resmi dari Desktop/Cloud dengan rendering Canvas 300 DPI,
+ * serta fungsi Bagikan (Native Android Share Sheet) dan Simpan (MediaStore & Notifikasi).
+ */
+export function DigitalIdCardPreview({ employee }: DigitalIdCardPreviewProps) {
+  const logoDataUrl = useAppLogo();
+
+  // Template State
+  const [template, setTemplate] = useState<IdCardTemplateConfig | null>(null);
+  const [companyProfile, setCompanyProfile] = useState<CompanyProfile | null>(
+    null,
+  );
+  const [cardSide, setCardSide] = useState<CardSide>("front");
+  const [templateRendering, setTemplateRendering] = useState(true);
+  const [renderedCardUrl, setRenderedCardUrl] = useState<string | null>(null);
+  const [downloadingCard, setDownloadingCard] = useState(false);
+  const [sharingCard, setSharingCard] = useState(false);
+  const [feedback, setFeedback] = useState<{
+    type: "success" | "error";
+    text: string;
+  } | null>(null);
+
+  // QR Code State
+  const [qrDataUrl, setQrDataUrl] = useState<string | null>(null);
+  const [qrStatus, setQrStatus] = useState<QrStatus>("loading");
+  const [qrFullscreen, setQrFullscreen] = useState(false);
+  const [copied, setCopied] = useState(false);
+
+  const nama = String(employee.nama ?? "Karyawan SPPG");
+  const tokenAbsensi = employee.token_absensi
+    ? String(employee.token_absensi)
+    : "";
+  // Payload yang dipakai absensi manual (sama persis dengan isi QR Code): "ID_Unik|token".
+  const absensiPayload = employeeQrPayload(employee);
+
+  // 1. Muat Template ID Card Resmi & Profil Instansi dari SQLite lokal
+  const loadTemplateAndCompany = useCallback(async () => {
+    try {
+      const [tpl, comp] = await Promise.all([
+        getIdCardTemplate().catch(() => null),
+        getCompanyProfile().catch(() => null),
+      ]);
+      if (tpl) {
+        const safeElements =
+          Array.isArray(tpl.elements) && tpl.elements.length > 0
+            ? tpl.elements
+            : DEFAULT_ID_CARD_ELEMENTS;
+        setTemplate({
+          ...tpl,
+          elements: safeElements,
+        });
+      }
+      if (comp) setCompanyProfile(comp);
+    } catch {
+      // Fallback jika belum ada template
+    }
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    // Muat dari SQLite lokal dahulu agar preview tampil instan (0ms).
+    void loadTemplateAndCompany();
+    // Picu sinkronisasi latar belakang, lalu muat ulang begitu snapshot terbaru
+    // benar-benar diterapkan ke database lokal (bukan menebak jeda waktu tetap).
+    void syncNow()
+      .then(() => {
+        if (!cancelled) void loadTemplateAndCompany();
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, [loadTemplateAndCompany]);
+
+  // Reaktif terhadap event sync selesai (latar belakang Turso Cloud)
+  useEffect(() => {
+    const onSyncCompleted = () => {
+      void loadTemplateAndCompany();
+    };
+    window.addEventListener("sppg:sync-completed", onSyncCompleted);
+    return () => {
+      window.removeEventListener("sppg:sync-completed", onSyncCompleted);
+    };
+  }, [loadTemplateAndCompany]);
+
+  // 2. Generate QR Code Data URL on-demand
+  useEffect(() => {
+    let cancelled = false;
+    async function generateQr() {
+      if (!tokenAbsensi) {
+        setQrStatus("no-token");
+        setQrDataUrl(null);
+        return;
+      }
+      setQrStatus("loading");
+      try {
+        const payload = employeeQrPayload(employee);
+        const url = await createQrPng(payload, 380);
+        if (!cancelled) {
+          setQrDataUrl(url);
+          setQrStatus("ready");
+        }
+      } catch {
+        if (!cancelled) {
+          setQrStatus("error");
+          setQrDataUrl(null);
+        }
+      }
+    }
+    void generateQr();
+    return () => {
+      cancelled = true;
+    };
+  }, [employee, tokenAbsensi]);
+
+  // 3. Render Canvas Template saat template, company, atau sisi kartu berubah
+  useEffect(() => {
+    let cancelled = false;
+    async function renderTemplateCanvas() {
+      const effectiveTemplate: IdCardTemplateConfig = template || {
+        id: "default_template",
+        name: "Template Standar SPPG",
+        orientation: "landscape",
+        elements: DEFAULT_ID_CARD_ELEMENTS,
+        isActive: true,
+      };
+
+      const activeCompany =
+        companyProfile ||
+        (logoDataUrl
+          ? {
+              id: "default",
+              company_name: "SPPG",
+              branch_name: null,
+              logo_url: logoDataUrl,
+              signature_url: null,
+              address: null,
+              phone: null,
+              email: null,
+              website: null,
+              leader_name: null,
+              leader_title: null,
+              leader_nip: null,
+              card_terms: null,
+              timezone: "Asia/Jakarta",
+              updated_at: "",
+            }
+          : null);
+
+      setTemplateRendering(true);
+      try {
+        await preloadCardAssets({
+          template: effectiveTemplate,
+          company: activeCompany,
+          employee,
+        });
+
+        const url = await renderIdCardSideToCanvas({
+          template: effectiveTemplate,
+          side: cardSide,
+          employee,
+          company: activeCompany,
+          qrPngOverride: qrDataUrl || undefined,
+          dpiScale: 1,
+        });
+        if (!cancelled) {
+          setRenderedCardUrl(url);
+        }
+      } catch (renderErr) {
+        console.warn(
+          "Render canvas ID card failed, attempting simple draw:",
+          renderErr,
+        );
+        if (!cancelled) {
+          try {
+            const fallbackUrl = await renderIdCardSideToCanvas({
+              template: {
+                ...effectiveTemplate,
+                elements: DEFAULT_ID_CARD_ELEMENTS,
+              },
+              side: cardSide,
+              employee,
+              company: activeCompany,
+              qrPngOverride: qrDataUrl || undefined,
+              dpiScale: 1,
+            });
+            if (!cancelled) setRenderedCardUrl(fallbackUrl);
+          } catch {
+            if (!cancelled) setRenderedCardUrl(null);
+          }
+        }
+      } finally {
+        if (!cancelled) setTemplateRendering(false);
+      }
+    }
+
+    void renderTemplateCanvas();
+    return () => {
+      cancelled = true;
+    };
+  }, [template, companyProfile, cardSide, employee, logoDataUrl, qrDataUrl]);
+
+  const getCardDataUrl = async (side: CardSide): Promise<string> => {
+    if (renderedCardUrl && side === cardSide) {
+      return renderedCardUrl;
+    }
+    const activeCompany =
+      companyProfile ||
+      (logoDataUrl
+        ? {
+            id: "default",
+            company_name: "SPPG",
+            branch_name: null,
+            logo_url: logoDataUrl,
+            signature_url: null,
+            address: null,
+            phone: null,
+            email: null,
+            website: null,
+            leader_name: null,
+            leader_title: null,
+            leader_nip: null,
+            card_terms: null,
+            timezone: "Asia/Jakarta",
+            updated_at: "",
+          }
+        : null);
+
+    const effectiveTemplate: IdCardTemplateConfig = template || {
+      id: "default_template",
+      name: "Template Standar SPPG",
+      orientation: "landscape",
+      elements: DEFAULT_ID_CARD_ELEMENTS,
+      isActive: true,
+    };
+
+    return await renderIdCardSideToCanvas({
+      template: effectiveTemplate,
+      side,
+      employee,
+      company: activeCompany,
+      qrPngOverride: qrDataUrl || undefined,
+      dpiScale: 1,
+    });
+  };
+
+  const handleCopyToken = async () => {
+    if (!absensiPayload) return;
+    try {
+      await navigator.clipboard.writeText(absensiPayload);
+      setCopied(true);
+      triggerHaptic("success");
+      setFeedback({
+        type: "success",
+        text: "Kode absensi (ID|Token) berhasil disalin ke clipboard.",
+      });
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      triggerHaptic("error");
+      setFeedback({
+        type: "error",
+        text: "Gagal menyalin token ke clipboard.",
+      });
+    } finally {
+      setTimeout(
+        () => setFeedback((f) => (f?.type === "success" ? null : f)),
+        3000,
+      );
+    }
+  };
+
+  const handleDownloadCard = async () => {
+    setDownloadingCard(true);
+    setFeedback(null);
+    const sideLabel = cardSide === "front" ? "Depan" : "Belakang";
+    const filename = `ID-Card-${sideLabel}-${nama.replace(/[^a-zA-Z0-9_-]/g, "_")}.png`;
+    try {
+      const dataUrl = await getCardDataUrl(cardSide);
+      const res = await downloadDataUrl(dataUrl, filename);
+      triggerHaptic("success");
+      setFeedback({
+        type: "success",
+        text: `ID Card (${sideLabel}) berhasil disimpan ke ${res.path || "perangkat"}!`,
+      });
+    } catch (err) {
+      triggerHaptic("error");
+      setFeedback({
+        type: "error",
+        text:
+          err instanceof Error
+            ? err.message
+            : "Gagal menyimpan ID Card ke media penyimpanan.",
+      });
+    } finally {
+      setDownloadingCard(false);
+      setTimeout(
+        () => setFeedback((f) => (f?.type === "success" ? null : f)),
+        4000,
+      );
+    }
+  };
+
+  const handleShareCard = async () => {
+    setSharingCard(true);
+    setFeedback(null);
+    const sideLabel = cardSide === "front" ? "Depan" : "Belakang";
+    const filename = `ID-Card-${sideLabel}-${nama.replace(/[^a-zA-Z0-9_-]/g, "_")}.png`;
+    const title = `ID Card SPPG (${sideLabel}) - ${nama}`;
+    const text = `ID Card Digital SPPG (${sideLabel}) untuk ${nama}`;
+    try {
+      const dataUrl = await getCardDataUrl(cardSide);
+      const res = await shareDataUrl(dataUrl, filename, title, text);
+      if (res.sukses) {
+        triggerHaptic("success");
+        setFeedback({
+          type: "success",
+          text: res.message || `ID Card (${sideLabel}) berhasil dibagikan!`,
+        });
+      } else if (!res.cancelled) {
+        triggerHaptic("error");
+        setFeedback({
+          type: "error",
+          text: res.message || "Gagal membagikan ID Card.",
+        });
+      }
+    } catch (err) {
+      triggerHaptic("error");
+      setFeedback({
+        type: "error",
+        text: err instanceof Error ? err.message : "Gagal membagikan ID Card.",
+      });
+    } finally {
+      setSharingCard(false);
+      setTimeout(
+        () => setFeedback((f) => (f?.type === "success" ? null : f)),
+        4000,
+      );
+    }
+  };
+
+  const isPortrait = template?.orientation === "portrait";
+  const [previewMode, setPreviewMode] = useState<"card" | "qr">("card");
+
+  return (
+    <>
+      {/* Selector: Mode Tampilan (Kartu ID vs QR Absensi) & Sisi Kartu */}
+      <div className="flex items-center justify-between gap-2 mb-3">
+        {/* Toggle Mode Kartu vs QR */}
+        <div className="flex rounded-xl bg-slate-950/80 p-1 border border-white/10">
+          <button
+            type="button"
+            onClick={() => {
+              triggerHaptic("light");
+              setPreviewMode("card");
+            }}
+            className={`rounded-lg px-2.5 py-1 text-[11px] font-bold transition-all ${
+              previewMode === "card"
+                ? "bg-sky-500 text-slate-950 shadow"
+                : "text-slate-400 hover:text-slate-200"
+            }`}
+          >
+            Kartu ID
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              triggerHaptic("light");
+              setPreviewMode("qr");
+            }}
+            className={`rounded-lg px-2.5 py-1 text-[11px] font-bold transition-all ${
+              previewMode === "qr"
+                ? "bg-sky-500 text-slate-950 shadow"
+                : "text-slate-400 hover:text-slate-200"
+            }`}
+          >
+            QR Scanner
+          </button>
+        </div>
+
+        {/* Toggle Sisi Kartu Depan / Belakang (hanya jika mode card) */}
+        {previewMode === "card" ? (
+          <div className="flex rounded-xl bg-slate-950/80 p-1 border border-white/10">
+            <button
+              type="button"
+              onClick={() => {
+                triggerHaptic("light");
+                setCardSide("front");
+              }}
+              className={`rounded-lg px-2.5 py-1 text-[11px] font-bold transition-all ${
+                cardSide === "front"
+                  ? "bg-white/20 text-white shadow-sm"
+                  : "text-slate-400 hover:text-slate-200"
+              }`}
+            >
+              Depan
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                triggerHaptic("light");
+                setCardSide("back");
+              }}
+              className={`rounded-lg px-2.5 py-1 text-[11px] font-bold transition-all ${
+                cardSide === "back"
+                  ? "bg-white/20 text-white shadow-sm"
+                  : "text-slate-400 hover:text-slate-200"
+              }`}
+            >
+              Belakang
+            </button>
+          </div>
+        ) : null}
+      </div>
+
+      {/* Frame Pratinjau (Kartu ID Canvas atau QR Code Langsung) */}
+      {previewMode === "card" ? (
+        <div
+          className={`relative w-full overflow-hidden rounded-3xl border border-white/15 bg-slate-950 shadow-2xl transition-all ${
+            isPortrait
+              ? "aspect-[54/85.6] max-w-[240px] max-h-[300px] mx-auto"
+              : "aspect-[85.6/54] max-w-[340px] max-h-[215px] mx-auto"
+          }`}
+        >
+          {templateRendering && !renderedCardUrl ? (
+            <div className="flex size-full flex-col items-center justify-center gap-2 bg-slate-900 animate-pulse p-4">
+              <Icon name="id-card" className="size-8 text-sky-400/60" />
+              <span className="text-xs text-slate-400 font-medium">
+                Me-render kartu resolusi tinggi...
+              </span>
+            </div>
+          ) : renderedCardUrl ? (
+            // biome-ignore lint/performance/noImgElement: Pratinjau ID card hasil render canvas
+            <img
+              src={renderedCardUrl}
+              alt={`ID Card ${nama} (${cardSide === "front" ? "Depan" : "Belakang"})`}
+              className="size-full object-contain rounded-3xl"
+            />
+          ) : (
+            <div className="flex size-full flex-col items-center justify-center gap-2 p-4 text-center bg-slate-900">
+              <Icon name="alert" className="size-6 text-amber-400" />
+              <span className="text-xs text-slate-400">
+                Sedang memuat pratinjau kartu...
+              </span>
+            </div>
+          )}
+        </div>
+      ) : (
+        /* Mode Quick QR Scanner */
+        <div className="relative mx-auto flex max-w-[240px] flex-col items-center justify-center rounded-3xl border border-white/15 bg-white p-4 shadow-2xl animate-in zoom-in-95 duration-150">
+          {qrStatus === "ready" && qrDataUrl ? (
+            // biome-ignore lint/performance/noImgElement: QR Code base64
+            <img
+              src={qrDataUrl}
+              alt={`QR Code Absensi ${nama}`}
+              className="size-full max-h-[190px] object-contain rounded-xl"
+            />
+          ) : qrStatus === "loading" ? (
+            <div className="flex size-44 items-center justify-center">
+              <span className="text-xs text-slate-500 font-medium">
+                Membuat QR Code...
+              </span>
+            </div>
+          ) : (
+            <div className="flex size-44 flex-col items-center justify-center gap-1 text-center p-2">
+              <Icon name="alert" className="size-6 text-amber-500" />
+              <span className="text-[11px] font-semibold text-slate-700">
+                Token Absensi Belum Dibuat
+              </span>
+            </div>
+          )}
+          <span className="mt-1 text-[10px] font-bold text-slate-800 uppercase tracking-wider">
+            QR {BRANDING.appDisplayName}
+          </span>
+        </div>
+      )}
+
+      {/* Banner Notifikasi Feedback Operasional */}
+      {feedback ? (
+        <div
+          className={`mt-2.5 flex items-center gap-2 rounded-xl p-2.5 text-xs font-semibold animate-in fade-in duration-150 ${
+            feedback.type === "success"
+              ? "bg-emerald-500/15 border border-emerald-500/30 text-emerald-300"
+              : "bg-rose-500/15 border border-rose-500/30 text-rose-300"
+          }`}
+        >
+          <Icon
+            name={feedback.type === "success" ? "check" : "alert"}
+            className="size-4 shrink-0"
+          />
+          <span className="flex-1 leading-tight">{feedback.text}</span>
+        </div>
+      ) : null}
+
+      {/* Tombol Aksi di Bawah Kartu */}
+      <div className="grid grid-cols-2 gap-2 mt-3">
+        {/* Bagikan Gambar Kartu */}
+        <button
+          type="button"
+          disabled={sharingCard || templateRendering}
+          onClick={() => void handleShareCard()}
+          className="flex items-center justify-center gap-1.5 rounded-xl bg-gradient-to-r from-sky-500 to-blue-600 px-3 py-2.5 text-xs font-bold text-slate-950 hover:brightness-110 active:scale-95 transition disabled:opacity-40 shadow-sm"
+        >
+          <Icon name="share" className="size-4" />
+          <span className="truncate">
+            {sharingCard ? "Membagikan..." : "Bagikan Kartu"}
+          </span>
+        </button>
+
+        {/* Unduh Gambar Kartu */}
+        <button
+          type="button"
+          disabled={downloadingCard || templateRendering}
+          onClick={() => void handleDownloadCard()}
+          className="flex items-center justify-center gap-1.5 rounded-xl border border-emerald-500/40 bg-emerald-500/10 px-3 py-2.5 text-xs font-bold text-emerald-300 hover:bg-emerald-500/20 active:scale-95 transition disabled:opacity-40 shadow-sm"
+        >
+          <Icon
+            name={downloadingCard ? "check" : "download"}
+            className="size-4"
+          />
+          <span className="truncate">
+            {downloadingCard
+              ? "Tersimpan!"
+              : `Unduh ${cardSide === "front" ? "Depan" : "Belakang"}`}
+          </span>
+        </button>
+
+        {/* Perbesar QR */}
+        <button
+          type="button"
+          disabled={qrStatus !== "ready"}
+          onClick={() => {
+            if (qrStatus !== "ready") return;
+            triggerHaptic("light");
+            setQrFullscreen(true);
+          }}
+          className="flex items-center justify-center gap-1.5 rounded-xl border border-sky-500/40 bg-sky-500/10 px-3 py-2.5 text-xs font-bold text-sky-300 hover:bg-sky-500/20 active:scale-95 transition disabled:opacity-40 disabled:cursor-not-allowed shadow-sm"
+        >
+          <Icon name="scanner" className="size-4" />
+          <span className="truncate">Layar Penuh QR</span>
+        </button>
+
+        {/* Salin Token */}
+        <button
+          type="button"
+          disabled={!absensiPayload}
+          onClick={() => void handleCopyToken()}
+          className="flex items-center justify-center gap-1.5 rounded-xl border border-white/10 bg-white/[0.05] px-3 py-2.5 text-xs font-bold text-slate-300 hover:bg-white/10 active:scale-95 transition disabled:opacity-40 disabled:cursor-not-allowed shadow-sm"
+        >
+          <Icon name={copied ? "check" : "document"} className="size-4" />
+          <span className="truncate">
+            {copied ? "Tersalin!" : "Salin ID|Token"}
+          </span>
+        </button>
+      </div>
+
+      {/* Informasi Token Tersembunyi */}
+      {tokenAbsensi ? (
+        <div className="mt-3 rounded-2xl border border-white/10 bg-slate-950/60 p-3 shadow-inner">
+          <div className="flex items-center justify-between gap-2 mb-1">
+            <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">
+              Kode Absensi Manual (ID|Token)
+            </span>
+            <button
+              type="button"
+              onClick={() => void handleCopyToken()}
+              className="text-[10px] font-bold text-sky-400 hover:text-sky-300 transition active:scale-95"
+            >
+              {copied ? "Tersalin!" : "Salin"}
+            </button>
+          </div>
+          <p className="text-xs font-mono text-slate-200 break-all select-all">
+            {absensiPayload || tokenAbsensi}
+          </p>
+        </div>
+      ) : (
+        <div className="mt-3 rounded-2xl border border-amber-500/20 bg-amber-500/5 p-3">
+          <p className="text-xs text-amber-300 leading-relaxed">
+            Token absensi belum dibuat. Gunakan fitur Generate Token di aplikasi
+            Desktop untuk mengaktifkan QR Code karyawan ini.
+          </p>
+        </div>
+      )}
+
+      {/* Dialog QR Fullscreen */}
+      <QrFullscreenDialog
+        qrDataUrl={qrDataUrl ?? ""}
+        employeeName={nama}
+        isOpen={qrFullscreen && qrStatus === "ready"}
+        onClose={() => setQrFullscreen(false)}
+      />
+    </>
+  );
+}
