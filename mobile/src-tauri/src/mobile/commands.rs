@@ -12,7 +12,7 @@ use super::{
         CommandError, MobileLoginResult, MobileRuntimeStatus, MobileSession, MobileSyncStatus,
         OperatorUser, SessionMode,
     },
-    operational,
+    academic, operational,
     remote::{self, RemoteLoginError},
     scanner, secrets, storage, sync, turso,
 };
@@ -2289,6 +2289,198 @@ pub fn desktop_clear_turso_config(state: State<'_, MobileState>) -> Result<(), C
         .write()
         .map_err(|_| CommandError::internal())? = None;
     Ok(())
+}
+
+// ── Perintah Struktur Akademik & Master Data Sekolah (Fase 1) ──────────────
+
+#[tauri::command]
+pub fn desktop_get_academic_years(state: State<'_, MobileState>) -> Result<Value, CommandError> {
+    require_permission(&state, "academic.view")?;
+    academic::list_academic_years(&state)
+}
+
+#[tauri::command]
+pub fn desktop_save_academic_year(
+    state: State<'_, MobileState>,
+    draft: Value,
+) -> Result<Value, CommandError> {
+    require_permission(&state, "academic.manage")?;
+    academic::save_academic_year(&state, &draft)
+}
+
+#[tauri::command]
+pub fn desktop_delete_academic_year(
+    state: State<'_, MobileState>,
+    id: String,
+) -> Result<Value, CommandError> {
+    require_permission(&state, "academic.manage")?;
+    academic::delete_academic_year(&state, &id)
+}
+
+#[tauri::command]
+pub fn desktop_set_active_academic_year(
+    state: State<'_, MobileState>,
+    id: String,
+) -> Result<Value, CommandError> {
+    require_permission(&state, "academic.manage")?;
+    academic::set_active_academic_year(&state, &id)
+}
+
+#[tauri::command]
+pub fn desktop_get_academic_departments(
+    state: State<'_, MobileState>,
+) -> Result<Value, CommandError> {
+    require_permission(&state, "academic.view")?;
+    academic::list_academic_departments(&state)
+}
+
+#[tauri::command]
+pub fn desktop_save_academic_department(
+    state: State<'_, MobileState>,
+    draft: Value,
+) -> Result<Value, CommandError> {
+    require_permission(&state, "academic.manage")?;
+    academic::save_academic_department(&state, &draft)
+}
+
+#[tauri::command]
+pub fn desktop_delete_academic_department(
+    state: State<'_, MobileState>,
+    id: String,
+) -> Result<Value, CommandError> {
+    require_permission(&state, "academic.manage")?;
+    academic::delete_academic_department(&state, &id)
+}
+
+#[tauri::command]
+pub fn desktop_get_academic_classes(
+    state: State<'_, MobileState>,
+    id_tahun_ajaran: Option<String>,
+) -> Result<Value, CommandError> {
+    require_permission(&state, "academic.view")?;
+    academic::list_academic_classes(&state, id_tahun_ajaran.as_deref())
+}
+
+#[tauri::command]
+pub fn desktop_save_academic_class(
+    state: State<'_, MobileState>,
+    draft: Value,
+) -> Result<Value, CommandError> {
+    require_permission(&state, "academic.manage")?;
+    academic::save_academic_class(&state, &draft)
+}
+
+#[tauri::command]
+pub fn desktop_delete_academic_class(
+    state: State<'_, MobileState>,
+    id: String,
+) -> Result<Value, CommandError> {
+    require_permission(&state, "academic.manage")?;
+    academic::delete_academic_class(&state, &id)
+}
+
+#[tauri::command]
+pub fn desktop_get_academic_subjects(
+    state: State<'_, MobileState>,
+) -> Result<Value, CommandError> {
+    require_permission(&state, "academic.view")?;
+    academic::list_academic_subjects(&state)
+}
+
+#[tauri::command]
+pub fn desktop_save_academic_subject(
+    state: State<'_, MobileState>,
+    draft: Value,
+) -> Result<Value, CommandError> {
+    require_permission(&state, "academic.manage")?;
+    academic::save_academic_subject(&state, &draft)
+}
+
+#[tauri::command]
+pub fn desktop_delete_academic_subject(
+    state: State<'_, MobileState>,
+    id: String,
+) -> Result<Value, CommandError> {
+    require_permission(&state, "academic.manage")?;
+    academic::delete_academic_subject(&state, &id)
+}
+
+#[tauri::command]
+pub fn desktop_get_academic_assignments(
+    state: State<'_, MobileState>,
+    id_rombel: Option<String>,
+) -> Result<Value, CommandError> {
+    require_permission(&state, "academic.view")?;
+    academic::list_academic_assignments(&state, id_rombel.as_deref())
+}
+
+#[tauri::command]
+pub fn desktop_save_academic_assignment(
+    state: State<'_, MobileState>,
+    draft: Value,
+) -> Result<Value, CommandError> {
+    require_permission(&state, "academic.manage")?;
+    academic::save_academic_assignment(&state, &draft)
+}
+
+#[tauri::command]
+pub fn desktop_delete_academic_assignment(
+    state: State<'_, MobileState>,
+    id: String,
+) -> Result<Value, CommandError> {
+    require_permission(&state, "academic.manage")?;
+    academic::delete_academic_assignment(&state, &id)
+}
+
+#[tauri::command]
+pub fn desktop_get_teachers(state: State<'_, MobileState>) -> Result<Value, CommandError> {
+    require_permission(&state, "teachers.view")?;
+    academic::list_teachers(&state)
+}
+
+#[tauri::command]
+pub fn desktop_save_teacher(
+    state: State<'_, MobileState>,
+    draft: Value,
+) -> Result<Value, CommandError> {
+    require_permission(&state, "teachers.manage")?;
+    academic::save_teacher(&state, &draft)
+}
+
+#[tauri::command]
+pub fn desktop_delete_teacher(
+    state: State<'_, MobileState>,
+    id: String,
+) -> Result<Value, CommandError> {
+    require_permission(&state, "teachers.manage")?;
+    academic::delete_teacher(&state, &id)
+}
+
+#[tauri::command]
+pub fn desktop_get_students(
+    state: State<'_, MobileState>,
+    id_rombel: Option<String>,
+) -> Result<Value, CommandError> {
+    require_permission(&state, "students.view")?;
+    academic::list_students(&state, id_rombel.as_deref())
+}
+
+#[tauri::command]
+pub fn desktop_save_student(
+    state: State<'_, MobileState>,
+    draft: Value,
+) -> Result<Value, CommandError> {
+    require_permission(&state, "students.manage")?;
+    academic::save_student(&state, &draft)
+}
+
+#[tauri::command]
+pub fn desktop_delete_student(
+    state: State<'_, MobileState>,
+    id: String,
+) -> Result<Value, CommandError> {
+    require_permission(&state, "students.manage")?;
+    academic::delete_student(&state, &id)
 }
 
 #[cfg(test)]

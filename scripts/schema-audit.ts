@@ -27,7 +27,7 @@ import {
 } from "./lib/cloud-schema";
 import { parseSnapshotTables } from "./lib/snapshot-tables";
 
-const rootDir = path.resolve(__dirname, "..");
+const rootDir = path.resolve(import.meta.dir, "..");
 
 /**
  * Tabel yang memang hanya lahir di salah satu jalur provisioning.
@@ -336,9 +336,11 @@ heading("7. Handler domain masih terdaftar di turso.rs");
 // Perbarui daftar ini setiap kali sebuah domain baru ditambahkan — ia
 // memastikan handler-nya tidak pernah terhapus diam-diam dari `turso.rs`.
 const expectedDomains: [string, string][] = [
-	["item", "master_item"],
-	["activity", "log_aktivitas"],
+	["employee", "master_data"],
+	["shift", "tbl_shift"],
+	["holiday", "tbl_hari_libur"],
 	["setting", "setting_gex_system"],
+	["attendance", "absensi_harian"],
 ];
 
 const missingDomains = expectedDomains.filter(

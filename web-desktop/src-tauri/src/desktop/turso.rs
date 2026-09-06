@@ -611,6 +611,86 @@ fn is_recoverable_schema_error(message: &str) -> bool {
         || lower.contains("no such table")
 }
 
+/// Satu tabel akademik yang harus dibangun ulang tanpa UNIQUE (migrasi v17).
+///
+/// DDL-nya sengaja hidup DI LUAR `ensure_schema`. `bun run audit:schema`
+/// mengikis setiap literal `CREATE TABLE` di dalam fungsi itu dan menjalankannya
+/// untuk merekonstruksi skema cloud; template pembangunan ulang yang ikut
+/// terbaca di sana akan tampak sebagai pembuatan tabel kedua dan menggagalkan
+/// audit dengan "table already exists".
+struct UniqueRelaxation {
+    table: &'static str,
+    create_sql: &'static str,
+    columns: &'static str,
+    indexes: &'static [&'static str],
+}
+
+const ACADEMIC_UNIQUE_RELAXATIONS: &[UniqueRelaxation] = &[
+    UniqueRelaxation {
+        table: "akademik_jurusan",
+        create_sql: "CREATE TABLE akademik_jurusan (
+            id_jurusan TEXT PRIMARY KEY,
+            kode_jurusan TEXT NOT NULL,
+            nama_jurusan TEXT NOT NULL,
+            deskripsi TEXT,
+            is_aktif INTEGER NOT NULL DEFAULT 1 CHECK (is_aktif IN (0, 1))
+        );",
+        columns: "id_jurusan, kode_jurusan, nama_jurusan, deskripsi, is_aktif",
+        indexes: &[],
+    },
+    UniqueRelaxation {
+        table: "akademik_mapel",
+        create_sql: "CREATE TABLE akademik_mapel (
+            id_mapel TEXT PRIMARY KEY,
+            kode_mapel TEXT NOT NULL,
+            nama_mapel TEXT NOT NULL,
+            tingkat INTEGER,
+            kelompok TEXT NOT NULL DEFAULT 'Wajib' CHECK (kelompok IN ('Wajib', 'Peminatan', 'Muatan Lokal', 'Kejuruan')),
+            beban_jam INTEGER NOT NULL DEFAULT 2 CHECK (beban_jam > 0),
+            kkm INTEGER NOT NULL DEFAULT 75,
+            is_aktif INTEGER NOT NULL DEFAULT 1 CHECK (is_aktif IN (0, 1))
+        );",
+        columns: "id_mapel, kode_mapel, nama_mapel, tingkat, kelompok, beban_jam, kkm, is_aktif",
+        indexes: &[],
+    },
+    UniqueRelaxation {
+        table: "akademik_guru_mapel",
+        create_sql: "CREATE TABLE akademik_guru_mapel (
+            id_penugasan TEXT PRIMARY KEY,
+            id_tahun_ajaran TEXT NOT NULL,
+            id_rombel TEXT NOT NULL,
+            id_mapel TEXT NOT NULL,
+            id_guru TEXT NOT NULL
+        );",
+        columns: "id_penugasan, id_tahun_ajaran, id_rombel, id_mapel, id_guru",
+        indexes: &[
+            "CREATE INDEX IF NOT EXISTS idx_guru_mapel_lookup ON akademik_guru_mapel(id_rombel, id_mapel);",
+        ],
+    },
+    UniqueRelaxation {
+        table: "siswa_data",
+        create_sql: "CREATE TABLE siswa_data (
+            id_siswa TEXT PRIMARY KEY,
+            nis TEXT,
+            nisn TEXT,
+            nama_lengkap TEXT NOT NULL,
+            jenis_kelamin TEXT CHECK (jenis_kelamin IN ('L', 'P')),
+            id_rombel TEXT NOT NULL,
+            nama_wali TEXT,
+            no_whatsapp_wali TEXT,
+            alamat TEXT,
+            angkatan INTEGER NOT NULL,
+            status TEXT NOT NULL DEFAULT 'Aktif' CHECK (status IN ('Aktif', 'Lulus', 'Pindah', 'Keluar', 'Drop Out')),
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL
+        );",
+        columns: "id_siswa, nis, nisn, nama_lengkap, jenis_kelamin, id_rombel, nama_wali, no_whatsapp_wali, alamat, angkatan, status, created_at, updated_at",
+        indexes: &[
+            "CREATE INDEX IF NOT EXISTS idx_siswa_rombel ON siswa_data(id_rombel, status);",
+        ],
+    },
+];
+
 /// Satu tabel operasional cloud yang ikut ditarik ke SQLite lokal.
 ///
 /// Daftar ini adalah sumber tunggal untuk dua hal sekaligus: query pembacaan
@@ -722,6 +802,55 @@ const SNAPSHOT_SOURCES: &[SnapshotSource] = &[
         payload_key: "payrollAuditLogs",
         table: "payroll_audit_logs",
         sql: "SELECT * FROM payroll_audit_logs ORDER BY created_at;",
+    },
+    // Whitelist hari libur ikut disinkronkan (`SNAPSHOT_TABLES` mendaftarkannya
+    // dengan `delete_missing: true`), tetapi sempat tidak punya sumber di sini —
+    // sehingga kunci payload-nya tidak pernah dikirim, `apply_table` selalu
+    // membacanya sebagai "tidak berubah", dan daftarnya tidak pernah turun ke
+    // perangkat lain.
+    SnapshotSource {
+        payload_key: "holidayWhitelists",
+        table: "hari_libur_whitelist",
+        sql: "SELECT * FROM hari_libur_whitelist ORDER BY scope_type, scope_value;",
+    },
+    // ── Struktur akademik & master data sekolah ──
+    // Urutan `ORDER BY` sengaja disamakan dengan `readOperationalSnapshot`
+    // (`src/lib/server/operational/snapshot.ts`) supaya kedua jalur pembacaan
+    // menghasilkan payload yang identik.
+    SnapshotSource {
+        payload_key: "akademikTahunAjaran",
+        table: "akademik_tahun_ajaran",
+        sql: "SELECT * FROM akademik_tahun_ajaran ORDER BY tanggal_mulai DESC;",
+    },
+    SnapshotSource {
+        payload_key: "akademikJurusan",
+        table: "akademik_jurusan",
+        sql: "SELECT * FROM akademik_jurusan ORDER BY kode_jurusan;",
+    },
+    SnapshotSource {
+        payload_key: "akademikRombel",
+        table: "akademik_rombel",
+        sql: "SELECT * FROM akademik_rombel ORDER BY tingkat, nama_rombel;",
+    },
+    SnapshotSource {
+        payload_key: "akademikMapel",
+        table: "akademik_mapel",
+        sql: "SELECT * FROM akademik_mapel ORDER BY kode_mapel;",
+    },
+    SnapshotSource {
+        payload_key: "akademikGuruMapel",
+        table: "akademik_guru_mapel",
+        sql: "SELECT * FROM akademik_guru_mapel;",
+    },
+    SnapshotSource {
+        payload_key: "guruData",
+        table: "guru_data",
+        sql: "SELECT * FROM guru_data ORDER BY created_at;",
+    },
+    SnapshotSource {
+        payload_key: "siswaData",
+        table: "siswa_data",
+        sql: "SELECT * FROM siswa_data ORDER BY nama_lengkap;",
     },
 ];
 
@@ -1115,6 +1244,68 @@ impl TursoClient {
         self.query_one("SELECT 1 AS ping_val;", vec![]).await?;
         let elapsed = start.elapsed().as_millis() as u64;
         Ok(elapsed)
+    }
+
+    /// Buang UNIQUE yang terlanjur ikut terbuat pada tabel akademik.
+    ///
+    /// SQLite tidak punya `DROP CONSTRAINT`, dan `CREATE TABLE IF NOT EXISTS`
+    /// tidak pernah memperbaiki tabel yang sudah ada — jadi satu-satunya cara
+    /// adalah membangun ulang tabelnya. Dijalankan hanya bila DDL tersimpan
+    /// masih memuat `UNIQUE`, sehingga aman dipanggil setiap kali `ensure_schema`
+    /// berjalan.
+    ///
+    /// UNIQUE pada tabel yang ikut sinkronisasi berbahaya: dua perangkat yang
+    /// sedang offline boleh mendaftarkan NIS atau penugasan yang sama, lalu
+    /// push kedua ditolak cloud dan event-nya berhenti di `failed` dengan
+    /// `next_retry_at = NULL` — gagal PERMANEN, datanya hilang tanpa jalan
+    /// pulih dari UI. Keunikannya kini ditegakkan di lapisan aplikasi, pola
+    /// yang sama dengan `hari_libur_whitelist`.
+    async fn rebuild_without_unique(
+        &self,
+        spec: &UniqueRelaxation,
+    ) -> Result<(), CommandError> {
+        let UniqueRelaxation {
+            table,
+            create_sql,
+            columns,
+            indexes,
+        } = spec;
+        let result = self
+            .query_one(
+                "SELECT sql FROM sqlite_master WHERE type = 'table' AND name = ?;",
+                vec![json!(table)],
+            )
+            .await?;
+        let existing = result
+            .to_objects()
+            .first()
+            .and_then(|row| row.get("sql").and_then(Value::as_str).map(str::to_owned));
+        let Some(existing) = existing else {
+            return Ok(());
+        };
+        if !existing.to_ascii_uppercase().contains("UNIQUE") {
+            return Ok(());
+        }
+
+        let staging = format!("{table}__rebuild");
+        let mut statements = vec![
+            Statement::new(format!("DROP TABLE IF EXISTS {staging};"), vec![]),
+            Statement::new(create_sql.replace(table, &staging), vec![]),
+            Statement::new(
+                format!("INSERT INTO {staging} ({columns}) SELECT {columns} FROM {table};"),
+                vec![],
+            ),
+            Statement::new(format!("DROP TABLE {table};"), vec![]),
+            Statement::new(format!("ALTER TABLE {staging} RENAME TO {table};"), vec![]),
+        ];
+        // Menghapus tabel ikut menghapus index dan trigger `sync_pulse` miliknya.
+        // Index dipasang ulang di sini; trigger dipasang ulang oleh
+        // `ensure_sync_pulse` yang berjalan setelah fungsi ini.
+        for index in indexes.iter() {
+            statements.push(Statement::new((*index).to_owned(), vec![]));
+        }
+        self.execute_pipeline(statements).await?;
+        Ok(())
     }
 
     async fn ensure_column(
@@ -1730,7 +1921,13 @@ impl TursoClient {
                 ('payroll.run.approve', 'Setujui Batch Payroll', 'Penggajian', 'Menyetujui batch payroll yang telah direview.', 1, 302),
                 ('payroll.run.disburse', 'Tandai Dibayar & Kunci Slip', 'Penggajian', 'Menandai batch payroll sebagai dibayar dan mengunci slip.', 1, 303),
                 ('payroll.config.manage', 'Kelola Aturan Penggajian', 'Penggajian', 'Mengatur rate gaji, lembur, PPh 21, dan BPJS.', 1, 310),
-                ('payroll.export', 'Ekspor Laporan & Slip Gaji', 'Penggajian', 'Mengunduh rekap penggajian dan slip gaji.', 1, 320);"#,
+                ('payroll.export', 'Ekspor Laporan & Slip Gaji', 'Penggajian', 'Mengunduh rekap penggajian dan slip gaji.', 1, 320),
+                ('academic.view', 'Lihat Struktur Akademik', 'Akademik', 'Melihat tahun ajaran, jurusan, rombel, dan mapel.', 1, 400),
+                ('academic.manage', 'Kelola Struktur Akademik', 'Akademik', 'Menambah, mengubah, dan menghapus struktur akademik.', 1, 401),
+                ('students.view', 'Lihat Data Siswa', 'Akademik', 'Melihat daftar dan profil siswa.', 1, 410),
+                ('students.manage', 'Kelola Data Siswa', 'Akademik', 'Menambah, mengedit, dan menghapus data siswa.', 1, 411),
+                ('teachers.view', 'Lihat Data Guru & PTK', 'Akademik', 'Melihat data guru dan tenaga kependidikan.', 1, 420),
+                ('teachers.manage', 'Kelola Data Guru & PTK', 'Akademik', 'Mengelola data guru dan penugasan mapel.', 1, 421);"#,
                 vec![],
             ),
             // Seed Default Role Permissions untuk Role Superadmin (Role 1)
@@ -1901,6 +2098,100 @@ impl TursoClient {
             Statement::new("CREATE INDEX IF NOT EXISTS idx_payroll_runs_periode ON payroll_runs(period_start, period_end, status);", vec![]),
             Statement::new("CREATE INDEX IF NOT EXISTS idx_payroll_items_run ON payroll_items(payroll_run_id);", vec![]),
             Statement::new("CREATE INDEX IF NOT EXISTS idx_payroll_items_karyawan ON payroll_items(id_karyawan);", vec![]),
+            Statement::new(
+                r#"CREATE TABLE IF NOT EXISTS akademik_tahun_ajaran (
+                    id_tahun_ajaran TEXT PRIMARY KEY,
+                    nama_tahun TEXT NOT NULL,
+                    semester TEXT NOT NULL CHECK (semester IN ('Ganjil', 'Genap')),
+                    tanggal_mulai TEXT NOT NULL,
+                    tanggal_selesai TEXT NOT NULL,
+                    is_aktif INTEGER NOT NULL DEFAULT 0 CHECK (is_aktif IN (0, 1)),
+                    created_at TEXT NOT NULL,
+                    updated_at TEXT NOT NULL
+                );"#,
+                vec![],
+            ),
+            Statement::new(
+                r#"CREATE TABLE IF NOT EXISTS akademik_jurusan (
+                    id_jurusan TEXT PRIMARY KEY,
+                    kode_jurusan TEXT NOT NULL,
+                    nama_jurusan TEXT NOT NULL,
+                    deskripsi TEXT,
+                    is_aktif INTEGER NOT NULL DEFAULT 1 CHECK (is_aktif IN (0, 1))
+                );"#,
+                vec![],
+            ),
+            Statement::new(
+                r#"CREATE TABLE IF NOT EXISTS akademik_rombel (
+                    id_rombel TEXT PRIMARY KEY,
+                    id_tahun_ajaran TEXT NOT NULL,
+                    tingkat INTEGER NOT NULL,
+                    id_jurusan TEXT,
+                    nama_rombel TEXT NOT NULL,
+                    id_wali_kelas TEXT,
+                    kapasitas INTEGER NOT NULL DEFAULT 36,
+                    ruang_kelas TEXT,
+                    is_aktif INTEGER NOT NULL DEFAULT 1 CHECK (is_aktif IN (0, 1))
+                );"#,
+                vec![],
+            ),
+            Statement::new(
+                r#"CREATE TABLE IF NOT EXISTS akademik_mapel (
+                    id_mapel TEXT PRIMARY KEY,
+                    kode_mapel TEXT NOT NULL,
+                    nama_mapel TEXT NOT NULL,
+                    tingkat INTEGER,
+                    kelompok TEXT NOT NULL DEFAULT 'Wajib' CHECK (kelompok IN ('Wajib', 'Peminatan', 'Muatan Lokal', 'Kejuruan')),
+                    beban_jam INTEGER NOT NULL DEFAULT 2 CHECK (beban_jam > 0),
+                    kkm INTEGER NOT NULL DEFAULT 75,
+                    is_aktif INTEGER NOT NULL DEFAULT 1 CHECK (is_aktif IN (0, 1))
+                );"#,
+                vec![],
+            ),
+            Statement::new(
+                r#"CREATE TABLE IF NOT EXISTS akademik_guru_mapel (
+                    id_penugasan TEXT PRIMARY KEY,
+                    id_tahun_ajaran TEXT NOT NULL,
+                    id_rombel TEXT NOT NULL,
+                    id_mapel TEXT NOT NULL,
+                    id_guru TEXT NOT NULL
+                );"#,
+                vec![],
+            ),
+            Statement::new(
+                r#"CREATE TABLE IF NOT EXISTS guru_data (
+                    id_guru TEXT PRIMARY KEY,
+                    nip TEXT,
+                    nuptk TEXT,
+                    gelar TEXT,
+                    spesialisasi_mapel TEXT,
+                    status_kepegawaian TEXT DEFAULT 'Honorer',
+                    created_at TEXT NOT NULL,
+                    updated_at TEXT NOT NULL
+                );"#,
+                vec![],
+            ),
+            Statement::new(
+                r#"CREATE TABLE IF NOT EXISTS siswa_data (
+                    id_siswa TEXT PRIMARY KEY,
+                    nis TEXT,
+                    nisn TEXT,
+                    nama_lengkap TEXT NOT NULL,
+                    jenis_kelamin TEXT CHECK (jenis_kelamin IN ('L', 'P')),
+                    id_rombel TEXT NOT NULL,
+                    nama_wali TEXT,
+                    no_whatsapp_wali TEXT,
+                    alamat TEXT,
+                    angkatan INTEGER NOT NULL,
+                    status TEXT NOT NULL DEFAULT 'Aktif' CHECK (status IN ('Aktif', 'Lulus', 'Pindah', 'Keluar', 'Drop Out')),
+                    created_at TEXT NOT NULL,
+                    updated_at TEXT NOT NULL
+                );"#,
+                vec![],
+            ),
+            Statement::new("CREATE INDEX IF NOT EXISTS idx_rombel_ta ON akademik_rombel(id_tahun_ajaran);", vec![]),
+            Statement::new("CREATE INDEX IF NOT EXISTS idx_siswa_rombel ON siswa_data(id_rombel, status);", vec![]),
+            Statement::new("CREATE INDEX IF NOT EXISTS idx_guru_mapel_lookup ON akademik_guru_mapel(id_rombel, id_mapel);", vec![]),
             // Seed Default Overtime Rules
             Statement::new(crate::desktop::payroll_seed::OVERTIME_TIER_RULES_SEED_SQL, vec![]),
             // Seed Default Tax Rules (Pasal 17 & TER Baseline)
@@ -1914,7 +2205,9 @@ impl TursoClient {
                 (11, 'operator-contact-and-password-reset', datetime('now')),
                 (12, 'two-factor-totp', datetime('now')),
                 (14, 'holiday-whitelist-and-holiday-overtime', datetime('now')),
-                (15, 'superadmin-password-recovery-codes', datetime('now'));"#,
+                (15, 'superadmin-password-recovery-codes', datetime('now')),
+                (16, 'academic-foundation-v1', datetime('now')),
+                (17, 'academic-unique-relaxation', datetime('now'));"#,
                 vec![],
             ),
         ];
@@ -2094,6 +2387,13 @@ impl TursoClient {
             vec![],
         )
         .await?;
+
+        // v17: melepas UNIQUE dari tabel akademik yang ikut sinkronisasi.
+        // WAJIB sebelum `ensure_sync_pulse`, karena membangun ulang tabel ikut
+        // membuang trigger pulse-nya dan pemasangan ulang terjadi di sana.
+        for spec in ACADEMIC_UNIQUE_RELAXATIONS {
+            self.rebuild_without_unique(spec).await?;
+        }
 
         self.ensure_sync_pulse().await?;
         self.purge_legacy_rate_rows().await?;
@@ -4687,6 +4987,36 @@ fn canonical_sync_route(domain: &str, operation: &str) -> Option<(&'static str, 
         ("payroll", "delete") => ("payroll", "delete"),
         ("payroll", "create-run") => ("payroll", "create-run"),
         ("payroll", "transition-status") => ("payroll", "transition-status"),
+        ("academic_year" | "academic-year", "create") => ("academic-year", "create"),
+        ("academic_year" | "academic-year", "update") => ("academic-year", "update"),
+        ("academic_year" | "academic-year", "delete") => ("academic-year", "delete"),
+        ("academic_department" | "academic-department" | "department" | "jurusan", "create") => {
+            ("academic-department", "create")
+        }
+        ("academic_department" | "academic-department" | "department" | "jurusan", "update") => {
+            ("academic-department", "update")
+        }
+        ("academic_department" | "academic-department" | "department" | "jurusan", "delete") => {
+            ("academic-department", "delete")
+        }
+        ("academic_class" | "academic-class" | "rombel", "create") => ("academic-class", "create"),
+        ("academic_class" | "academic-class" | "rombel", "update") => ("academic-class", "update"),
+        ("academic_class" | "academic-class" | "rombel", "delete") => ("academic-class", "delete"),
+        ("academic_subject" | "academic-subject" | "mapel", "create") => ("academic-subject", "create"),
+        ("academic_subject" | "academic-subject" | "mapel", "update") => ("academic-subject", "update"),
+        ("academic_subject" | "academic-subject" | "mapel", "delete") => ("academic-subject", "delete"),
+        ("academic_assignment" | "academic-assignment" | "guru_mapel" | "guru-mapel", "create") => {
+            ("academic-assignment", "create")
+        }
+        ("academic_assignment" | "academic-assignment" | "guru_mapel" | "guru-mapel", "delete") => {
+            ("academic-assignment", "delete")
+        }
+        ("teacher" | "guru", "create") => ("teacher", "create"),
+        ("teacher" | "guru", "update") => ("teacher", "update"),
+        ("teacher" | "guru", "delete") => ("teacher", "delete"),
+        ("student" | "siswa", "create") => ("student", "create"),
+        ("student" | "siswa", "update") => ("student", "update"),
+        ("student" | "siswa", "delete") => ("student", "delete"),
         _ => return None,
     };
     sync::is_canonical_sync_route(route.0, route.1).then_some(route)
@@ -6393,6 +6723,306 @@ async fn apply_event_to_turso(
             }
             if let Some(audit) = payload.get("audit") {
                 insert_payroll_audit_log(turso, audit).await?;
+            }
+        }
+        ("academic-year", "create" | "update") => {
+            let row = payload.get("academic_year").or_else(|| payload.get("akademikTahunAjaran")).unwrap_or(payload);
+            let id = row.get("id_tahun_ajaran").and_then(Value::as_str).filter(|v| !v.is_empty()).unwrap_or(entity_key);
+            if !id.is_empty() {
+                let nama = row.get("nama_tahun").and_then(Value::as_str).unwrap_or("");
+                let semester = row.get("semester").and_then(Value::as_str).unwrap_or("Ganjil");
+                let tgl_mulai = row.get("tanggal_mulai").and_then(Value::as_str).unwrap_or("");
+                let tgl_selesai = row.get("tanggal_selesai").and_then(Value::as_str).unwrap_or("");
+                let is_aktif = row.get("is_aktif").and_then(Value::as_i64).unwrap_or(0);
+                let created_at = row.get("created_at").and_then(Value::as_str).unwrap_or("");
+                let updated_at = row.get("updated_at").and_then(Value::as_str).unwrap_or("");
+
+                turso.query_one(
+                    r#"INSERT INTO akademik_tahun_ajaran (
+                        id_tahun_ajaran, nama_tahun, semester, tanggal_mulai, tanggal_selesai, is_aktif, created_at, updated_at
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                    ON CONFLICT(id_tahun_ajaran) DO UPDATE SET
+                        nama_tahun = excluded.nama_tahun,
+                        semester = excluded.semester,
+                        tanggal_mulai = excluded.tanggal_mulai,
+                        tanggal_selesai = excluded.tanggal_selesai,
+                        is_aktif = excluded.is_aktif,
+                        updated_at = excluded.updated_at;"#,
+                    vec![
+                        json!(id), json!(nama), json!(semester), json!(tgl_mulai), json!(tgl_selesai),
+                        json!(is_aktif), json!(created_at), json!(updated_at)
+                    ],
+                ).await?;
+
+                // Eksklusivitas "tahun ajaran aktif" ditegakkan DI SINI, bukan
+                // hanya di perangkat pengirim.
+                //
+                // Klien menonaktifkan tahun lain lewat satu `UPDATE ... SET
+                // is_aktif = 0` lokal, tetapi hanya meng-antre event untuk
+                // tahun yang diaktifkan — cloud tidak pernah tahu tahun lama
+                // harus turun, lalu tarikan berikutnya menyebarkan DUA baris
+                // aktif ke semua perangkat. Menegakkannya di sisi cloud membuat
+                // aturan ini idempoten dan tidak bergantung pada jumlah event.
+                if is_aktif == 1 {
+                    turso.query_one(
+                        "UPDATE akademik_tahun_ajaran SET is_aktif = 0 WHERE id_tahun_ajaran <> ? AND is_aktif = 1;",
+                        vec![json!(id)],
+                    ).await?;
+                }
+            }
+        }
+        ("academic-year", "delete") => {
+            let id = payload.get("id_tahun_ajaran").and_then(Value::as_str).filter(|v| !v.is_empty()).unwrap_or(entity_key);
+            if !id.is_empty() {
+                turso.query_one(
+                    "DELETE FROM akademik_tahun_ajaran WHERE id_tahun_ajaran = ?;",
+                    vec![json!(id)],
+                ).await?;
+            }
+        }
+        ("academic-department", "create" | "update") => {
+            let row = payload.get("academic_department").or_else(|| payload.get("akademikJurusan")).unwrap_or(payload);
+            let id = row.get("id_jurusan").and_then(Value::as_str).filter(|v| !v.is_empty()).unwrap_or(entity_key);
+            if !id.is_empty() {
+                let kode = row.get("kode_jurusan").and_then(Value::as_str).unwrap_or("");
+                let nama = row.get("nama_jurusan").and_then(Value::as_str).unwrap_or("");
+                let deskripsi = row.get("deskripsi").and_then(Value::as_str);
+                let is_aktif = row.get("is_aktif").and_then(Value::as_i64).unwrap_or(1);
+
+                turso.query_one(
+                    r#"INSERT INTO akademik_jurusan (
+                        id_jurusan, kode_jurusan, nama_jurusan, deskripsi, is_aktif
+                    ) VALUES (?, ?, ?, ?, ?)
+                    ON CONFLICT(id_jurusan) DO UPDATE SET
+                        kode_jurusan = excluded.kode_jurusan,
+                        nama_jurusan = excluded.nama_jurusan,
+                        deskripsi = excluded.deskripsi,
+                        is_aktif = excluded.is_aktif;"#,
+                    vec![json!(id), json!(kode), json!(nama), json!(deskripsi), json!(is_aktif)],
+                ).await?;
+            }
+        }
+        ("academic-department", "delete") => {
+            let id = payload.get("id_jurusan").and_then(Value::as_str).filter(|v| !v.is_empty()).unwrap_or(entity_key);
+            if !id.is_empty() {
+                turso.query_one(
+                    "DELETE FROM akademik_jurusan WHERE id_jurusan = ?;",
+                    vec![json!(id)],
+                ).await?;
+            }
+        }
+        ("academic-class", "create" | "update") => {
+            let row = payload.get("academic_class").or_else(|| payload.get("akademikRombel")).unwrap_or(payload);
+            let id = row.get("id_rombel").and_then(Value::as_str).filter(|v| !v.is_empty()).unwrap_or(entity_key);
+            if !id.is_empty() {
+                let id_ta = row.get("id_tahun_ajaran").and_then(Value::as_str).unwrap_or("");
+                let tingkat = row.get("tingkat").and_then(Value::as_i64).unwrap_or(10);
+                let id_jurusan = row.get("id_jurusan").and_then(Value::as_str);
+                let nama = row.get("nama_rombel").and_then(Value::as_str).unwrap_or("");
+                let id_wali = row.get("id_wali_kelas").and_then(Value::as_str);
+                let kapasitas = row.get("kapasitas").and_then(Value::as_i64).unwrap_or(36);
+                let ruang = row.get("ruang_kelas").and_then(Value::as_str);
+                let is_aktif = row.get("is_aktif").and_then(Value::as_i64).unwrap_or(1);
+
+                turso.query_one(
+                    r#"INSERT INTO akademik_rombel (
+                        id_rombel, id_tahun_ajaran, tingkat, id_jurusan, nama_rombel, id_wali_kelas, kapasitas, ruang_kelas, is_aktif
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    ON CONFLICT(id_rombel) DO UPDATE SET
+                        id_tahun_ajaran = excluded.id_tahun_ajaran,
+                        tingkat = excluded.tingkat,
+                        id_jurusan = excluded.id_jurusan,
+                        nama_rombel = excluded.nama_rombel,
+                        id_wali_kelas = excluded.id_wali_kelas,
+                        kapasitas = excluded.kapasitas,
+                        ruang_kelas = excluded.ruang_kelas,
+                        is_aktif = excluded.is_aktif;"#,
+                    vec![
+                        json!(id), json!(id_ta), json!(tingkat), json!(id_jurusan),
+                        json!(nama), json!(id_wali), json!(kapasitas), json!(ruang), json!(is_aktif)
+                    ],
+                ).await?;
+            }
+        }
+        ("academic-class", "delete") => {
+            let id = payload.get("id_rombel").and_then(Value::as_str).filter(|v| !v.is_empty()).unwrap_or(entity_key);
+            if !id.is_empty() {
+                turso.query_one(
+                    "DELETE FROM akademik_rombel WHERE id_rombel = ?;",
+                    vec![json!(id)],
+                ).await?;
+            }
+        }
+        ("academic-subject", "create" | "update") => {
+            let row = payload.get("academic_subject").or_else(|| payload.get("akademikMapel")).unwrap_or(payload);
+            let id = row.get("id_mapel").and_then(Value::as_str).filter(|v| !v.is_empty()).unwrap_or(entity_key);
+            if !id.is_empty() {
+                let kode = row.get("kode_mapel").and_then(Value::as_str).unwrap_or("");
+                let nama = row.get("nama_mapel").and_then(Value::as_str).unwrap_or("");
+                let tingkat = row.get("tingkat").and_then(Value::as_i64);
+                let kelompok = row.get("kelompok").and_then(Value::as_str).unwrap_or("Wajib");
+                let beban = row.get("beban_jam").and_then(Value::as_i64).unwrap_or(2);
+                let kkm = row.get("kkm").and_then(Value::as_i64).unwrap_or(75);
+                let is_aktif = row.get("is_aktif").and_then(Value::as_i64).unwrap_or(1);
+
+                turso.query_one(
+                    r#"INSERT INTO akademik_mapel (
+                        id_mapel, kode_mapel, nama_mapel, tingkat, kelompok, beban_jam, kkm, is_aktif
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                    ON CONFLICT(id_mapel) DO UPDATE SET
+                        kode_mapel = excluded.kode_mapel,
+                        nama_mapel = excluded.nama_mapel,
+                        tingkat = excluded.tingkat,
+                        kelompok = excluded.kelompok,
+                        beban_jam = excluded.beban_jam,
+                        kkm = excluded.kkm,
+                        is_aktif = excluded.is_aktif;"#,
+                    vec![
+                        json!(id), json!(kode), json!(nama), json!(tingkat),
+                        json!(kelompok), json!(beban), json!(kkm), json!(is_aktif)
+                    ],
+                ).await?;
+            }
+        }
+        ("academic-subject", "delete") => {
+            let id = payload.get("id_mapel").and_then(Value::as_str).filter(|v| !v.is_empty()).unwrap_or(entity_key);
+            if !id.is_empty() {
+                turso.query_one(
+                    "DELETE FROM akademik_mapel WHERE id_mapel = ?;",
+                    vec![json!(id)],
+                ).await?;
+            }
+        }
+        ("academic-assignment", "create") => {
+            let row = payload.get("academic_assignment").or_else(|| payload.get("akademikGuruMapel")).unwrap_or(payload);
+            let id = row.get("id_penugasan").and_then(Value::as_str).filter(|v| !v.is_empty()).unwrap_or(entity_key);
+            if !id.is_empty() {
+                let id_ta = row.get("id_tahun_ajaran").and_then(Value::as_str).unwrap_or("");
+                let id_rombel = row.get("id_rombel").and_then(Value::as_str).unwrap_or("");
+                let id_mapel = row.get("id_mapel").and_then(Value::as_str).unwrap_or("");
+                let id_guru = row.get("id_guru").and_then(Value::as_str).unwrap_or("");
+
+                turso.query_one(
+                    r#"INSERT INTO akademik_guru_mapel (
+                        id_penugasan, id_tahun_ajaran, id_rombel, id_mapel, id_guru
+                    ) VALUES (?, ?, ?, ?, ?)
+                    ON CONFLICT(id_penugasan) DO UPDATE SET
+                        id_tahun_ajaran = excluded.id_tahun_ajaran,
+                        id_rombel = excluded.id_rombel,
+                        id_mapel = excluded.id_mapel,
+                        id_guru = excluded.id_guru;"#,
+                    vec![json!(id), json!(id_ta), json!(id_rombel), json!(id_mapel), json!(id_guru)],
+                ).await?;
+            }
+        }
+        ("academic-assignment", "delete") => {
+            let id = payload.get("id_penugasan").and_then(Value::as_str).filter(|v| !v.is_empty()).unwrap_or(entity_key);
+            if !id.is_empty() {
+                turso.query_one(
+                    "DELETE FROM akademik_guru_mapel WHERE id_penugasan = ?;",
+                    vec![json!(id)],
+                ).await?;
+            }
+        }
+        ("teacher", "create" | "update") => {
+            let row = payload.get("teacher").or_else(|| payload.get("guruData")).unwrap_or(payload);
+            let id = row.get("id_guru").and_then(Value::as_str).filter(|v| !v.is_empty()).unwrap_or(entity_key);
+            if !id.is_empty() {
+                let nip = row.get("nip").and_then(Value::as_str);
+                let nuptk = row.get("nuptk").and_then(Value::as_str);
+                let gelar = row.get("gelar").and_then(Value::as_str);
+                let spesialisasi = row.get("spesialisasi_mapel").and_then(Value::as_str);
+                let status_peg = row.get("status_kepegawaian").and_then(Value::as_str).unwrap_or("Honorer");
+                let created_at = row.get("created_at").and_then(Value::as_str).unwrap_or("");
+                let updated_at = row.get("updated_at").and_then(Value::as_str).unwrap_or("");
+
+                turso.query_one(
+                    r#"INSERT INTO guru_data (
+                        id_guru, nip, nuptk, gelar, spesialisasi_mapel, status_kepegawaian, created_at, updated_at
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                    ON CONFLICT(id_guru) DO UPDATE SET
+                        nip = excluded.nip,
+                        nuptk = excluded.nuptk,
+                        gelar = excluded.gelar,
+                        spesialisasi_mapel = excluded.spesialisasi_mapel,
+                        status_kepegawaian = excluded.status_kepegawaian,
+                        updated_at = excluded.updated_at;"#,
+                    vec![
+                        json!(id), json!(nip), json!(nuptk), json!(gelar),
+                        json!(spesialisasi), json!(status_peg), json!(created_at), json!(updated_at)
+                    ],
+                ).await?;
+
+                // `master_data` TIDAK ditulis dari sini. Barisnya diurus rute
+                // kanonik `employee/update` + `employee/token` yang dikirim
+                // berdampingan oleh `academic.rs`. Versi sebelumnya menulisnya
+                // di sini dengan `status_aktif` dan `jabatan_status` yang
+                // dipaku, tanpa `id_shift`, `no_hp`, maupun `lp` — sehingga
+                // penonaktifan guru selalu dibatalkan tarikan berikutnya dan
+                // perpindahan shift tidak pernah sampai ke perangkat lain.
+            }
+        }
+        ("teacher", "delete") => {
+            let id = payload.get("id_guru").and_then(Value::as_str).filter(|v| !v.is_empty()).unwrap_or(entity_key);
+            if !id.is_empty() {
+                turso.query_one(
+                    "DELETE FROM guru_data WHERE id_guru = ?;",
+                    vec![json!(id)],
+                ).await?;
+            }
+        }
+        ("student", "create" | "update") => {
+            let row = payload.get("student").or_else(|| payload.get("siswaData")).unwrap_or(payload);
+            let id = row.get("id_siswa").and_then(Value::as_str).filter(|v| !v.is_empty()).unwrap_or(entity_key);
+            if !id.is_empty() {
+                let nis = row.get("nis").and_then(Value::as_str);
+                let nisn = row.get("nisn").and_then(Value::as_str);
+                let nama = row.get("nama_lengkap").and_then(Value::as_str).unwrap_or("");
+                let jk = row.get("jenis_kelamin").and_then(Value::as_str);
+                let id_rombel = row.get("id_rombel").and_then(Value::as_str).unwrap_or("");
+                let nama_wali = row.get("nama_wali").and_then(Value::as_str);
+                let wa_wali = row.get("no_whatsapp_wali").and_then(Value::as_str);
+                let alamat = row.get("alamat").and_then(Value::as_str);
+                let angkatan = row.get("angkatan").and_then(Value::as_i64).unwrap_or(2026);
+                let status = row.get("status").and_then(Value::as_str).unwrap_or("Aktif");
+                let created_at = row.get("created_at").and_then(Value::as_str).unwrap_or("");
+                let updated_at = row.get("updated_at").and_then(Value::as_str).unwrap_or("");
+
+                turso.query_one(
+                    r#"INSERT INTO siswa_data (
+                        id_siswa, nis, nisn, nama_lengkap, jenis_kelamin, id_rombel, nama_wali,
+                        no_whatsapp_wali, alamat, angkatan, status, created_at, updated_at
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    ON CONFLICT(id_siswa) DO UPDATE SET
+                        nis = excluded.nis,
+                        nisn = excluded.nisn,
+                        nama_lengkap = excluded.nama_lengkap,
+                        jenis_kelamin = excluded.jenis_kelamin,
+                        id_rombel = excluded.id_rombel,
+                        nama_wali = excluded.nama_wali,
+                        no_whatsapp_wali = excluded.no_whatsapp_wali,
+                        alamat = excluded.alamat,
+                        angkatan = excluded.angkatan,
+                        status = excluded.status,
+                        updated_at = excluded.updated_at;"#,
+                    vec![
+                        json!(id), json!(nis), json!(nisn), json!(nama), json!(jk),
+                        json!(id_rombel), json!(nama_wali), json!(wa_wali), json!(alamat),
+                        json!(angkatan), json!(status), json!(created_at), json!(updated_at)
+                    ],
+                ).await?;
+
+                // Sama seperti pada guru: baris `master_data` siswa diurus rute
+                // `employee/update` + `employee/token`, bukan ditulis di sini.
+            }
+        }
+        ("student", "delete") => {
+            let id = payload.get("id_siswa").and_then(Value::as_str).filter(|v| !v.is_empty()).unwrap_or(entity_key);
+            if !id.is_empty() {
+                turso.query_one(
+                    "DELETE FROM siswa_data WHERE id_siswa = ?;",
+                    vec![json!(id)],
+                ).await?;
             }
         }
         _ => {
@@ -9221,7 +9851,7 @@ mod tests {
 
         let connection = rusqlite::Connection::open(&hub).expect("buka hub");
 
-        // Ke-35 tabel yang dituntut `isDatabaseSchemaReady` di `db-schema.ts`.
+        // Ke-42 tabel yang dituntut `isDatabaseSchemaReady` di `db-schema.ts`.
         // Daftar ini sengaja dieja ulang di sini: kalau salah satunya berhenti
         // dibuat, aplikasi Web akan menganggap database selamanya belum siap.
         for table in [
@@ -9236,6 +9866,8 @@ mod tests {
             "payroll_components", "tax_rules", "bpjs_rules", "payroll_runs",
             "payroll_items", "payroll_audit_logs", "password_reset_request",
             "app_mail_config", "absensi_foto", "hari_libur_whitelist",
+            "akademik_tahun_ajaran", "akademik_jurusan", "akademik_rombel",
+            "akademik_mapel", "akademik_guru_mapel", "guru_data", "siswa_data",
         ] {
             let ada: i64 = connection
                 .query_row(

@@ -83,6 +83,56 @@ fn ensure_column(
     Ok(())
 }
 
+/// Bangun ulang tabel untuk melepas UNIQUE yang terlanjur ikut terbuat.
+///
+/// SQLite tidak punya `DROP CONSTRAINT`, dan `CREATE TABLE IF NOT EXISTS` tidak
+/// pernah memperbaiki tabel yang sudah ada. Hanya berjalan bila DDL tersimpan
+/// masih memuat `UNIQUE`, jadi aman dipanggil di setiap `initialize`.
+///
+/// Cerminan `TursoClient::rebuild_without_unique`; keduanya WAJIB menghasilkan
+/// bentuk tabel yang sama, karena satu database bisa dibangun jalur mana pun.
+fn rebuild_without_unique(
+    connection: &Connection,
+    table: &str,
+    create_sql: &str,
+    columns: &str,
+    indexes: &[&str],
+) -> Result<(), String> {
+    let existing: Option<String> = connection
+        .query_row(
+            "SELECT sql FROM sqlite_master WHERE type = 'table' AND name = ?;",
+            [table],
+            |row| row.get(0),
+        )
+        .optional()
+        .map_err(|_| format!("Skema tabel {table} tidak dapat diperiksa."))?;
+    let Some(existing) = existing else {
+        return Ok(());
+    };
+    if !existing.to_ascii_uppercase().contains("UNIQUE") {
+        return Ok(());
+    }
+
+    let staging = format!("{table}__rebuild");
+    let mut script = String::new();
+    script.push_str(&format!("DROP TABLE IF EXISTS {staging};\n"));
+    script.push_str(&create_sql.replace(table, &staging));
+    script.push('\n');
+    script.push_str(&format!(
+        "INSERT INTO {staging} ({columns}) SELECT {columns} FROM {table};\n"
+    ));
+    script.push_str(&format!("DROP TABLE {table};\n"));
+    script.push_str(&format!("ALTER TABLE {staging} RENAME TO {table};\n"));
+    for index in indexes {
+        script.push_str(index);
+        script.push('\n');
+    }
+    connection
+        .execute_batch(&format!("BEGIN;\n{script}COMMIT;"))
+        .map_err(|_| format!("Tabel {table} tidak dapat dibangun ulang tanpa UNIQUE."))?;
+    Ok(())
+}
+
 /// Menanam tarif default payroll dan membersihkan sisa seed versi lama.
 ///
 /// Seed lokal dan seed cloud dulu ditulis terpisah dengan id, kode komponen,
@@ -587,6 +637,79 @@ pub fn initialize(path: &Path) -> Result<(), String> {
       CREATE INDEX IF NOT EXISTS idx_local_payroll_items_karyawan ON payroll_items(id_karyawan);
       CREATE INDEX IF NOT EXISTS idx_local_payroll_runs_status ON payroll_runs(status, period_start);
       CREATE INDEX IF NOT EXISTS idx_local_salary_configs_karyawan ON salary_configs(id_karyawan, effective_date DESC);
+      CREATE TABLE IF NOT EXISTS akademik_tahun_ajaran (
+        id_tahun_ajaran TEXT PRIMARY KEY,
+        nama_tahun TEXT NOT NULL,
+        semester TEXT NOT NULL CHECK (semester IN ('Ganjil', 'Genap')),
+        tanggal_mulai TEXT NOT NULL,
+        tanggal_selesai TEXT NOT NULL,
+        is_aktif INTEGER NOT NULL DEFAULT 0 CHECK (is_aktif IN (0, 1)),
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      );
+      CREATE TABLE IF NOT EXISTS akademik_jurusan (
+        id_jurusan TEXT PRIMARY KEY,
+        kode_jurusan TEXT NOT NULL,
+        nama_jurusan TEXT NOT NULL,
+        deskripsi TEXT,
+        is_aktif INTEGER NOT NULL DEFAULT 1 CHECK (is_aktif IN (0, 1))
+      );
+      CREATE TABLE IF NOT EXISTS akademik_rombel (
+        id_rombel TEXT PRIMARY KEY,
+        id_tahun_ajaran TEXT NOT NULL,
+        tingkat INTEGER NOT NULL,
+        id_jurusan TEXT,
+        nama_rombel TEXT NOT NULL,
+        id_wali_kelas TEXT,
+        kapasitas INTEGER NOT NULL DEFAULT 36,
+        ruang_kelas TEXT,
+        is_aktif INTEGER NOT NULL DEFAULT 1 CHECK (is_aktif IN (0, 1))
+      );
+      CREATE TABLE IF NOT EXISTS akademik_mapel (
+        id_mapel TEXT PRIMARY KEY,
+        kode_mapel TEXT NOT NULL,
+        nama_mapel TEXT NOT NULL,
+        tingkat INTEGER,
+        kelompok TEXT NOT NULL DEFAULT 'Wajib' CHECK (kelompok IN ('Wajib', 'Peminatan', 'Muatan Lokal', 'Kejuruan')),
+        beban_jam INTEGER NOT NULL DEFAULT 2 CHECK (beban_jam > 0),
+        kkm INTEGER NOT NULL DEFAULT 75,
+        is_aktif INTEGER NOT NULL DEFAULT 1 CHECK (is_aktif IN (0, 1))
+      );
+      CREATE TABLE IF NOT EXISTS akademik_guru_mapel (
+        id_penugasan TEXT PRIMARY KEY,
+        id_tahun_ajaran TEXT NOT NULL,
+        id_rombel TEXT NOT NULL,
+        id_mapel TEXT NOT NULL,
+        id_guru TEXT NOT NULL
+      );
+      CREATE TABLE IF NOT EXISTS guru_data (
+        id_guru TEXT PRIMARY KEY,
+        nip TEXT,
+        nuptk TEXT,
+        gelar TEXT,
+        spesialisasi_mapel TEXT,
+        status_kepegawaian TEXT DEFAULT 'Honorer',
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      );
+      CREATE TABLE IF NOT EXISTS siswa_data (
+        id_siswa TEXT PRIMARY KEY,
+        nis TEXT,
+        nisn TEXT,
+        nama_lengkap TEXT NOT NULL,
+        jenis_kelamin TEXT CHECK (jenis_kelamin IN ('L', 'P')),
+        id_rombel TEXT NOT NULL,
+        nama_wali TEXT,
+        no_whatsapp_wali TEXT,
+        alamat TEXT,
+        angkatan INTEGER NOT NULL,
+        status TEXT NOT NULL DEFAULT 'Aktif' CHECK (status IN ('Aktif', 'Lulus', 'Pindah', 'Keluar', 'Drop Out')),
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS idx_local_rombel_ta ON akademik_rombel(id_tahun_ajaran);
+      CREATE INDEX IF NOT EXISTS idx_local_siswa_rombel ON siswa_data(id_rombel, status);
+      CREATE INDEX IF NOT EXISTS idx_local_guru_mapel_lookup ON akademik_guru_mapel(id_rombel, id_mapel);
       -- Tarif default payroll di-seed terpisah dari `super::payroll_seed`, satu
       -- sumber bersama dengan seed cloud di `turso.rs`. Jangan tulis ulang di sini.
       INSERT OR IGNORE INTO desktop_schema_migration (version, name, applied_at)
@@ -597,11 +720,81 @@ pub fn initialize(path: &Path) -> Result<(), String> {
       VALUES (3, 'desktop-offline-import-foundation', unixepoch());
       INSERT OR IGNORE INTO desktop_schema_migration (version, name, applied_at)
       VALUES (4, 'desktop-payroll-foundation', unixepoch());
+      INSERT OR IGNORE INTO desktop_schema_migration (version, name, applied_at)
+      VALUES (5, 'desktop-academic-foundation', unixepoch());
+      INSERT OR IGNORE INTO desktop_schema_migration (version, name, applied_at)
+      VALUES (6, 'desktop-academic-unique-relaxation', unixepoch());
       "#,
         )
         .map_err(|_| "Schema keamanan Desktop tidak dapat diinisialisasi.".to_owned())?;
 
     seed_payroll_rate_tables(&connection)?;
+
+    // v17: melepas UNIQUE dari tabel akademik yang ikut sinkronisasi. Cerminan
+    // `TursoClient::rebuild_without_unique` — lihat alasan lengkapnya di sana.
+    rebuild_without_unique(
+        &connection,
+        "akademik_jurusan",
+        "CREATE TABLE akademik_jurusan (
+            id_jurusan TEXT PRIMARY KEY,
+            kode_jurusan TEXT NOT NULL,
+            nama_jurusan TEXT NOT NULL,
+            deskripsi TEXT,
+            is_aktif INTEGER NOT NULL DEFAULT 1 CHECK (is_aktif IN (0, 1))
+        );",
+        "id_jurusan, kode_jurusan, nama_jurusan, deskripsi, is_aktif",
+        &[],
+    )?;
+    rebuild_without_unique(
+        &connection,
+        "akademik_mapel",
+        "CREATE TABLE akademik_mapel (
+            id_mapel TEXT PRIMARY KEY,
+            kode_mapel TEXT NOT NULL,
+            nama_mapel TEXT NOT NULL,
+            tingkat INTEGER,
+            kelompok TEXT NOT NULL DEFAULT 'Wajib' CHECK (kelompok IN ('Wajib', 'Peminatan', 'Muatan Lokal', 'Kejuruan')),
+            beban_jam INTEGER NOT NULL DEFAULT 2 CHECK (beban_jam > 0),
+            kkm INTEGER NOT NULL DEFAULT 75,
+            is_aktif INTEGER NOT NULL DEFAULT 1 CHECK (is_aktif IN (0, 1))
+        );",
+        "id_mapel, kode_mapel, nama_mapel, tingkat, kelompok, beban_jam, kkm, is_aktif",
+        &[],
+    )?;
+    rebuild_without_unique(
+        &connection,
+        "akademik_guru_mapel",
+        "CREATE TABLE akademik_guru_mapel (
+            id_penugasan TEXT PRIMARY KEY,
+            id_tahun_ajaran TEXT NOT NULL,
+            id_rombel TEXT NOT NULL,
+            id_mapel TEXT NOT NULL,
+            id_guru TEXT NOT NULL
+        );",
+        "id_penugasan, id_tahun_ajaran, id_rombel, id_mapel, id_guru",
+        &["CREATE INDEX IF NOT EXISTS idx_local_guru_mapel_lookup ON akademik_guru_mapel(id_rombel, id_mapel);"],
+    )?;
+    rebuild_without_unique(
+        &connection,
+        "siswa_data",
+        "CREATE TABLE siswa_data (
+            id_siswa TEXT PRIMARY KEY,
+            nis TEXT,
+            nisn TEXT,
+            nama_lengkap TEXT NOT NULL,
+            jenis_kelamin TEXT CHECK (jenis_kelamin IN ('L', 'P')),
+            id_rombel TEXT NOT NULL,
+            nama_wali TEXT,
+            no_whatsapp_wali TEXT,
+            alamat TEXT,
+            angkatan INTEGER NOT NULL,
+            status TEXT NOT NULL DEFAULT 'Aktif' CHECK (status IN ('Aktif', 'Lulus', 'Pindah', 'Keluar', 'Drop Out')),
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL
+        );",
+        "id_siswa, nis, nisn, nama_lengkap, jenis_kelamin, id_rombel, nama_wali, no_whatsapp_wali, alamat, angkatan, status, created_at, updated_at",
+        &["CREATE INDEX IF NOT EXISTS idx_local_siswa_rombel ON siswa_data(id_rombel, status);"],
+    )?;
 
     ensure_column(
         &connection,
@@ -1164,7 +1357,7 @@ mod tests {
                 |row| row.get(0),
             )
             .expect("migration count");
-        assert_eq!(migrations, 4);
+        assert_eq!(migrations, 6);
     }
 
     /// Pindah database cloud harus membuang seluruh cache database lama, tetapi

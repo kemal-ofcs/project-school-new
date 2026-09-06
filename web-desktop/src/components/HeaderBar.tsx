@@ -52,6 +52,24 @@ const NAVIGATION: NavigationItem[] = [
     label: "Penggajian",
   },
   {
+    area: "akademik",
+    href: "/akademik",
+    icon: "calendar",
+    label: "Akademik",
+  },
+  {
+    area: "guru",
+    href: "/guru",
+    icon: "user",
+    label: "Guru / PTK",
+  },
+  {
+    area: "siswa",
+    href: "/siswa",
+    icon: "users",
+    label: "Siswa",
+  },
+  {
     area: "audit",
     href: "/audit-absensi",
     icon: "alert",

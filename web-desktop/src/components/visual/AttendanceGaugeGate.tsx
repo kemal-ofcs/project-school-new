@@ -94,7 +94,9 @@ function SvgDonutFallback({
         viewBox="0 0 160 160"
         className="size-48 -rotate-90 transform select-none"
         aria-label="Distribusi Kehadiran Hari Ini"
+        role="img"
       >
+        <title>Distribusi Kehadiran Hari Ini</title>
         {/* Background Track */}
         <circle
           cx="80"

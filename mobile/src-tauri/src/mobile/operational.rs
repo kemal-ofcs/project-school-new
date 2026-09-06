@@ -34,7 +34,13 @@ fn base_revision(
         .flatten()
 }
 
-fn token_from_event(event_id: &str) -> String {
+/// Token absensi diturunkan dari id event, bukan diacak sendiri.
+///
+/// `academic.rs` ikut memakainya supaya guru dan siswa mendapat token dengan
+/// bentuk yang sama persis dengan karyawan — scanner membandingkan
+/// `token_absensi` apa adanya, jadi dua cara pembuatan token akan membuat
+/// salah satunya ditolak terminal.
+pub(super) fn token_from_event(event_id: &str) -> String {
     let mut hasher = Sha256::new();
     hasher.update(event_id.as_bytes());
     hex::encode_upper(hasher.finalize())[..10].to_owned()

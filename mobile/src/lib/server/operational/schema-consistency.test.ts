@@ -37,7 +37,9 @@ describe("Schema Consistency & Zero-Drift Guard", () => {
         'salary_configs', 'overtime_tier_rules', 'payroll_components',
         'tax_rules', 'bpjs_rules', 'payroll_runs', 'payroll_items', 'payroll_audit_logs',
         'password_reset_request', 'app_mail_config', 'absensi_foto',
-        'hari_libur_whitelist'
+        'hari_libur_whitelist',
+        'akademik_tahun_ajaran', 'akademik_jurusan', 'akademik_rombel',
+        'akademik_mapel', 'akademik_guru_mapel', 'guru_data', 'siswa_data'
       );
     `);
     const tableCount = Number(tablesRes.rows[0]?.count ?? 0);
@@ -72,5 +74,12 @@ describe("Schema Consistency & Zero-Drift Guard", () => {
     expect(snapshot).toHaveProperty("imports");
     expect(snapshot).toHaveProperty("attendance");
     expect(snapshot).toHaveProperty("scanLogs");
+    expect(snapshot).toHaveProperty("akademikTahunAjaran");
+    expect(snapshot).toHaveProperty("akademikJurusan");
+    expect(snapshot).toHaveProperty("akademikRombel");
+    expect(snapshot).toHaveProperty("akademikMapel");
+    expect(snapshot).toHaveProperty("akademikGuruMapel");
+    expect(snapshot).toHaveProperty("guruData");
+    expect(snapshot).toHaveProperty("siswaData");
   });
 });

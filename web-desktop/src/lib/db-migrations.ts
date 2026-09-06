@@ -19,6 +19,47 @@ const TWO_FACTOR_MIGRATION_VERSION = 12;
 const SCAN_SECURITY_MIGRATION_VERSION = 13;
 const HOLIDAY_WHITELIST_MIGRATION_VERSION = 14;
 const PASSWORD_RECOVERY_MIGRATION_VERSION = 15;
+const ACADEMIC_FOUNDATION_MIGRATION_VERSION = 16;
+const ACADEMIC_UNIQUE_RELAXATION_MIGRATION_VERSION = 17;
+
+/**
+ * Bangun ulang sebuah tabel untuk melepas UNIQUE yang terlanjur ikut terbuat.
+ *
+ * Cerminan `rebuild_without_unique` di `turso.rs` dan `storage.rs`; ketiganya
+ * WAJIB menghasilkan bentuk tabel yang sama, karena satu database yang sama
+ * bisa dibangun oleh jalur mana pun.
+ */
+async function rebuildWithoutUnique(
+  client: Client,
+  spec: {
+    table: string;
+    createSql: string;
+    columns: string;
+    indexes: string[];
+  },
+) {
+  const current = await client.execute({
+    sql: "SELECT sql FROM sqlite_master WHERE type = 'table' AND name = ?;",
+    args: [spec.table],
+  });
+  const ddl = String(current.rows[0]?.sql ?? "");
+  if (!ddl || !ddl.toUpperCase().includes("UNIQUE")) return;
+
+  const staging = `${spec.table}__rebuild`;
+  // Menghapus tabel ikut menghapus index dan trigger `sync_pulse` miliknya;
+  // index dipasang ulang di sini, trigger oleh `ensure_sync_pulse` di `turso.rs`.
+  await client.batch(
+    [
+      `DROP TABLE IF EXISTS ${staging};`,
+      spec.createSql.replaceAll(spec.table, staging),
+      `INSERT INTO ${staging} (${spec.columns}) SELECT ${spec.columns} FROM ${spec.table};`,
+      `DROP TABLE ${spec.table};`,
+      `ALTER TABLE ${staging} RENAME TO ${spec.table};`,
+      ...spec.indexes,
+    ],
+    "write",
+  );
+}
 
 const SYSTEM_ROLES = [
   {
@@ -909,6 +950,198 @@ export async function runDatabaseMigrations(client: Client) {
           VALUES (?, 'superadmin-password-recovery-codes', ?);`,
     args: [PASSWORD_RECOVERY_MIGRATION_VERSION, now],
   });
+
+  // ── v16: Struktur Akademik & Master Data Sekolah (Fase 1) ──
+  await client.execute(`
+    CREATE TABLE IF NOT EXISTS akademik_tahun_ajaran (
+      id_tahun_ajaran TEXT PRIMARY KEY,
+      nama_tahun TEXT NOT NULL,
+      semester TEXT NOT NULL CHECK (semester IN ('Ganjil', 'Genap')),
+      tanggal_mulai TEXT NOT NULL,
+      tanggal_selesai TEXT NOT NULL,
+      is_aktif INTEGER NOT NULL DEFAULT 0 CHECK (is_aktif IN (0, 1)),
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+  `);
+
+  await client.execute(`
+    CREATE TABLE IF NOT EXISTS akademik_jurusan (
+      id_jurusan TEXT PRIMARY KEY,
+      kode_jurusan TEXT NOT NULL,
+      nama_jurusan TEXT NOT NULL,
+      deskripsi TEXT,
+      is_aktif INTEGER NOT NULL DEFAULT 1 CHECK (is_aktif IN (0, 1))
+    );
+  `);
+
+  await client.execute(`
+    CREATE TABLE IF NOT EXISTS akademik_rombel (
+      id_rombel TEXT PRIMARY KEY,
+      id_tahun_ajaran TEXT NOT NULL,
+      tingkat INTEGER NOT NULL,
+      id_jurusan TEXT,
+      nama_rombel TEXT NOT NULL,
+      id_wali_kelas TEXT,
+      kapasitas INTEGER NOT NULL DEFAULT 36,
+      ruang_kelas TEXT,
+      is_aktif INTEGER NOT NULL DEFAULT 1 CHECK (is_aktif IN (0, 1))
+    );
+  `);
+
+  await client.execute(`
+    CREATE TABLE IF NOT EXISTS akademik_mapel (
+      id_mapel TEXT PRIMARY KEY,
+      kode_mapel TEXT NOT NULL,
+      nama_mapel TEXT NOT NULL,
+      tingkat INTEGER,
+      kelompok TEXT NOT NULL DEFAULT 'Wajib' CHECK (kelompok IN ('Wajib', 'Peminatan', 'Muatan Lokal', 'Kejuruan')),
+      beban_jam INTEGER NOT NULL DEFAULT 2 CHECK (beban_jam > 0),
+      kkm INTEGER NOT NULL DEFAULT 75,
+      is_aktif INTEGER NOT NULL DEFAULT 1 CHECK (is_aktif IN (0, 1))
+    );
+  `);
+
+  await client.execute(`
+    CREATE TABLE IF NOT EXISTS akademik_guru_mapel (
+      id_penugasan TEXT PRIMARY KEY,
+      id_tahun_ajaran TEXT NOT NULL,
+      id_rombel TEXT NOT NULL,
+      id_mapel TEXT NOT NULL,
+      id_guru TEXT NOT NULL
+    );
+  `);
+
+  await client.execute(`
+    CREATE TABLE IF NOT EXISTS guru_data (
+      id_guru TEXT PRIMARY KEY,
+      nip TEXT,
+      nuptk TEXT,
+      gelar TEXT,
+      spesialisasi_mapel TEXT,
+      status_kepegawaian TEXT DEFAULT 'Honorer',
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+  `);
+
+  await client.execute(`
+    CREATE TABLE IF NOT EXISTS siswa_data (
+      id_siswa TEXT PRIMARY KEY,
+      nis TEXT,
+      nisn TEXT,
+      nama_lengkap TEXT NOT NULL,
+      jenis_kelamin TEXT CHECK (jenis_kelamin IN ('L', 'P')),
+      id_rombel TEXT NOT NULL,
+      nama_wali TEXT,
+      no_whatsapp_wali TEXT,
+      alamat TEXT,
+      angkatan INTEGER NOT NULL,
+      status TEXT NOT NULL DEFAULT 'Aktif' CHECK (status IN ('Aktif', 'Lulus', 'Pindah', 'Keluar', 'Drop Out')),
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+  `);
+
+  await client.execute({
+    sql: `INSERT OR IGNORE INTO schema_migration (version, name, applied_at)
+          VALUES (?, 'academic-foundation-v1', ?);`,
+    args: [ACADEMIC_FOUNDATION_MIGRATION_VERSION, now],
+  });
+
+  // ── v17: Lepas UNIQUE dari tabel akademik yang ikut sinkronisasi ──
+  //
+  // UNIQUE pada tabel tersinkronisasi membuat push gagal PERMANEN: dua
+  // perangkat offline boleh mendaftarkan NIS atau penugasan yang sama, dan
+  // penolakan cloud menghentikan event-nya di `failed` dengan
+  // `next_retry_at = NULL` — datanya hilang tanpa jalan pulih dari UI. Pelajaran
+  // yang sama sudah dieja untuk `hari_libur_whitelist`; keunikannya kini
+  // ditegakkan di lapisan aplikasi agar pesannya ramah dan bisa dikoreksi.
+  //
+  // SQLite tidak punya `DROP CONSTRAINT` dan `CREATE TABLE IF NOT EXISTS` tidak
+  // memperbaiki tabel yang sudah ada, jadi tabelnya dibangun ulang — hanya bila
+  // DDL tersimpan masih memuat `UNIQUE`, sehingga aman dijalankan berulang.
+  await rebuildWithoutUnique(client, {
+    table: "akademik_jurusan",
+    createSql: `CREATE TABLE akademik_jurusan (
+      id_jurusan TEXT PRIMARY KEY,
+      kode_jurusan TEXT NOT NULL,
+      nama_jurusan TEXT NOT NULL,
+      deskripsi TEXT,
+      is_aktif INTEGER NOT NULL DEFAULT 1 CHECK (is_aktif IN (0, 1))
+    );`,
+    columns: "id_jurusan, kode_jurusan, nama_jurusan, deskripsi, is_aktif",
+    indexes: [],
+  });
+  await rebuildWithoutUnique(client, {
+    table: "akademik_mapel",
+    createSql: `CREATE TABLE akademik_mapel (
+      id_mapel TEXT PRIMARY KEY,
+      kode_mapel TEXT NOT NULL,
+      nama_mapel TEXT NOT NULL,
+      tingkat INTEGER,
+      kelompok TEXT NOT NULL DEFAULT 'Wajib' CHECK (kelompok IN ('Wajib', 'Peminatan', 'Muatan Lokal', 'Kejuruan')),
+      beban_jam INTEGER NOT NULL DEFAULT 2 CHECK (beban_jam > 0),
+      kkm INTEGER NOT NULL DEFAULT 75,
+      is_aktif INTEGER NOT NULL DEFAULT 1 CHECK (is_aktif IN (0, 1))
+    );`,
+    columns:
+      "id_mapel, kode_mapel, nama_mapel, tingkat, kelompok, beban_jam, kkm, is_aktif",
+    indexes: [],
+  });
+  await rebuildWithoutUnique(client, {
+    table: "akademik_guru_mapel",
+    createSql: `CREATE TABLE akademik_guru_mapel (
+      id_penugasan TEXT PRIMARY KEY,
+      id_tahun_ajaran TEXT NOT NULL,
+      id_rombel TEXT NOT NULL,
+      id_mapel TEXT NOT NULL,
+      id_guru TEXT NOT NULL
+    );`,
+    columns: "id_penugasan, id_tahun_ajaran, id_rombel, id_mapel, id_guru",
+    indexes: [
+      "CREATE INDEX IF NOT EXISTS idx_guru_mapel_lookup ON akademik_guru_mapel(id_rombel, id_mapel);",
+    ],
+  });
+  await rebuildWithoutUnique(client, {
+    table: "siswa_data",
+    createSql: `CREATE TABLE siswa_data (
+      id_siswa TEXT PRIMARY KEY,
+      nis TEXT,
+      nisn TEXT,
+      nama_lengkap TEXT NOT NULL,
+      jenis_kelamin TEXT CHECK (jenis_kelamin IN ('L', 'P')),
+      id_rombel TEXT NOT NULL,
+      nama_wali TEXT,
+      no_whatsapp_wali TEXT,
+      alamat TEXT,
+      angkatan INTEGER NOT NULL,
+      status TEXT NOT NULL DEFAULT 'Aktif' CHECK (status IN ('Aktif', 'Lulus', 'Pindah', 'Keluar', 'Drop Out')),
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );`,
+    columns:
+      "id_siswa, nis, nisn, nama_lengkap, jenis_kelamin, id_rombel, nama_wali, no_whatsapp_wali, alamat, angkatan, status, created_at, updated_at",
+    indexes: [
+      "CREATE INDEX IF NOT EXISTS idx_siswa_rombel ON siswa_data(id_rombel, status);",
+    ],
+  });
+
+  await client.execute({
+    sql: `INSERT OR IGNORE INTO schema_migration (version, name, applied_at)
+          VALUES (?, 'academic-unique-relaxation', ?);`,
+    args: [ACADEMIC_UNIQUE_RELAXATION_MIGRATION_VERSION, now],
+  });
+
+  await client.execute(
+    "CREATE INDEX IF NOT EXISTS idx_rombel_ta ON akademik_rombel(id_tahun_ajaran);",
+  );
+  await client.execute(
+    "CREATE INDEX IF NOT EXISTS idx_siswa_rombel ON siswa_data(id_rombel, status);",
+  );
+  await client.execute(
+    "CREATE INDEX IF NOT EXISTS idx_guru_mapel_lookup ON akademik_guru_mapel(id_rombel, id_mapel);",
+  );
 
   await client.execute(
     "CREATE INDEX IF NOT EXISTS idx_master_operator_role_id ON master_operator(role_id);",

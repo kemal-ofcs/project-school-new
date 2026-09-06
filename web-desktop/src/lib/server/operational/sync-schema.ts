@@ -609,6 +609,283 @@ export const operationalSyncEventSchema = z.union([
       })
       .strict(),
   ),
+  eventSchema(
+    "academic-year",
+    "create",
+    z
+      .object({
+        id_tahun_ajaran: shortText.min(1),
+        nama_tahun: shortText.min(1),
+        semester: z.enum(["Ganjil", "Genap"]),
+        tanggal_mulai: shortText.min(1),
+        tanggal_selesai: shortText.min(1),
+        is_aktif: optionalNumber,
+        created_at: optionalShortText,
+        updated_at: optionalShortText,
+      })
+      .passthrough(),
+  ),
+  eventSchema(
+    "academic-year",
+    "update",
+    z
+      .object({
+        id_tahun_ajaran: optionalShortText,
+        nama_tahun: optionalShortText,
+        semester: z.enum(["Ganjil", "Genap"]).optional(),
+        tanggal_mulai: optionalShortText,
+        tanggal_selesai: optionalShortText,
+        is_aktif: optionalNumber,
+        updated_at: optionalShortText,
+      })
+      .passthrough(),
+  ),
+  eventSchema(
+    "academic-year",
+    "delete",
+    z
+      .object({
+        id_tahun_ajaran: optionalShortText,
+      })
+      .passthrough(),
+  ),
+  eventSchema(
+    "academic-department",
+    "create",
+    z
+      .object({
+        id_jurusan: shortText.min(1),
+        kode_jurusan: shortText.min(1),
+        nama_jurusan: shortText.min(1),
+        deskripsi: optionalLongText,
+        is_aktif: optionalNumber,
+      })
+      .passthrough(),
+  ),
+  eventSchema(
+    "academic-department",
+    "update",
+    z
+      .object({
+        id_jurusan: optionalShortText,
+        kode_jurusan: optionalShortText,
+        nama_jurusan: optionalShortText,
+        deskripsi: optionalLongText,
+        is_aktif: optionalNumber,
+      })
+      .passthrough(),
+  ),
+  eventSchema(
+    "academic-department",
+    "delete",
+    z
+      .object({
+        id_jurusan: optionalShortText,
+      })
+      .passthrough(),
+  ),
+  eventSchema(
+    "academic-class",
+    "create",
+    z
+      .object({
+        id_rombel: shortText.min(1),
+        id_tahun_ajaran: shortText.min(1),
+        tingkat: finiteNumber,
+        id_jurusan: optionalShortText,
+        nama_rombel: shortText.min(1),
+        id_wali_kelas: optionalShortText,
+        kapasitas: optionalNumber,
+        ruang_kelas: optionalShortText,
+        is_aktif: optionalNumber,
+      })
+      .passthrough(),
+  ),
+  eventSchema(
+    "academic-class",
+    "update",
+    z
+      .object({
+        id_rombel: optionalShortText,
+        id_tahun_ajaran: optionalShortText,
+        tingkat: optionalNumber,
+        id_jurusan: optionalShortText,
+        nama_rombel: optionalShortText,
+        id_wali_kelas: optionalShortText,
+        kapasitas: optionalNumber,
+        ruang_kelas: optionalShortText,
+        is_aktif: optionalNumber,
+      })
+      .passthrough(),
+  ),
+  eventSchema(
+    "academic-class",
+    "delete",
+    z
+      .object({
+        id_rombel: optionalShortText,
+      })
+      .passthrough(),
+  ),
+  eventSchema(
+    "academic-subject",
+    "create",
+    z
+      .object({
+        id_mapel: shortText.min(1),
+        kode_mapel: shortText.min(1),
+        nama_mapel: shortText.min(1),
+        tingkat: optionalNumber,
+        kelompok: z
+          .enum(["Wajib", "Peminatan", "Muatan Lokal", "Kejuruan"])
+          .optional(),
+        beban_jam: optionalNumber,
+        kkm: optionalNumber,
+        is_aktif: optionalNumber,
+      })
+      .passthrough(),
+  ),
+  eventSchema(
+    "academic-subject",
+    "update",
+    z
+      .object({
+        id_mapel: optionalShortText,
+        kode_mapel: optionalShortText,
+        nama_mapel: optionalShortText,
+        tingkat: optionalNumber,
+        kelompok: z
+          .enum(["Wajib", "Peminatan", "Muatan Lokal", "Kejuruan"])
+          .optional(),
+        beban_jam: optionalNumber,
+        kkm: optionalNumber,
+        is_aktif: optionalNumber,
+      })
+      .passthrough(),
+  ),
+  eventSchema(
+    "academic-subject",
+    "delete",
+    z
+      .object({
+        id_mapel: optionalShortText,
+      })
+      .passthrough(),
+  ),
+  eventSchema(
+    "academic-assignment",
+    "create",
+    z
+      .object({
+        id_penugasan: shortText.min(1),
+        id_tahun_ajaran: shortText.min(1),
+        id_rombel: shortText.min(1),
+        id_mapel: shortText.min(1),
+        id_guru: shortText.min(1),
+      })
+      .passthrough(),
+  ),
+  eventSchema(
+    "academic-assignment",
+    "delete",
+    z
+      .object({
+        id_penugasan: optionalShortText,
+      })
+      .passthrough(),
+  ),
+  eventSchema(
+    "teacher",
+    "create",
+    z
+      .object({
+        id_guru: optionalShortText,
+        nip: optionalShortText,
+        nuptk: optionalShortText,
+        gelar: optionalShortText,
+        spesialisasi_mapel: optionalShortText,
+        status_kepegawaian: optionalShortText,
+        created_at: optionalShortText,
+        updated_at: optionalShortText,
+      })
+      .passthrough(),
+  ),
+  eventSchema(
+    "teacher",
+    "update",
+    z
+      .object({
+        id_guru: optionalShortText,
+        nip: optionalShortText,
+        nuptk: optionalShortText,
+        gelar: optionalShortText,
+        spesialisasi_mapel: optionalShortText,
+        status_kepegawaian: optionalShortText,
+        created_at: optionalShortText,
+        updated_at: optionalShortText,
+      })
+      .passthrough(),
+  ),
+  eventSchema(
+    "teacher",
+    "delete",
+    z
+      .object({
+        id_guru: optionalShortText,
+      })
+      .passthrough(),
+  ),
+  eventSchema(
+    "student",
+    "create",
+    z
+      .object({
+        id_siswa: optionalShortText,
+        nis: optionalShortText,
+        nisn: optionalShortText,
+        nama_lengkap: optionalShortText,
+        jenis_kelamin: optionalShortText,
+        id_rombel: optionalShortText,
+        nama_wali: optionalShortText,
+        no_whatsapp_wali: optionalShortText,
+        alamat: optionalLongText,
+        angkatan: optionalNumber,
+        status: optionalShortText,
+        created_at: optionalShortText,
+        updated_at: optionalShortText,
+      })
+      .passthrough(),
+  ),
+  eventSchema(
+    "student",
+    "update",
+    z
+      .object({
+        id_siswa: optionalShortText,
+        nis: optionalShortText,
+        nisn: optionalShortText,
+        nama_lengkap: optionalShortText,
+        jenis_kelamin: optionalShortText,
+        id_rombel: optionalShortText,
+        nama_wali: optionalShortText,
+        no_whatsapp_wali: optionalShortText,
+        alamat: optionalLongText,
+        angkatan: optionalNumber,
+        status: optionalShortText,
+        created_at: optionalShortText,
+        updated_at: optionalShortText,
+      })
+      .passthrough(),
+  ),
+  eventSchema(
+    "student",
+    "delete",
+    z
+      .object({
+        id_siswa: optionalShortText,
+      })
+      .passthrough(),
+  ),
 ]);
 
 export type OperationalSyncEvent = {

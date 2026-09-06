@@ -1,0 +1,1711 @@
+"use client";
+
+import { useCallback, useEffect, useState } from "react";
+import { AppShell } from "@/components/AppShell";
+import { FeedbackBanner } from "@/components/ui/FeedbackBanner";
+import { Icon } from "@/components/ui/Icon";
+import { Modal } from "@/components/ui/Modal";
+import { PageHeader } from "@/components/ui/PageHeader";
+import { hasPermission } from "@/lib/auth/access";
+import { useAuth } from "@/lib/context/AuthContext";
+import {
+  aktifkanTahunAjaran,
+  type GuruMapelInput,
+  getDaftarJurusan,
+  getDaftarMapel,
+  getDaftarPenugasanGuru,
+  getDaftarRombel,
+  getDaftarTahunAjaran,
+  hapusJurusan,
+  hapusMapel,
+  hapusPenugasanGuru,
+  hapusRombel,
+  hapusTahunAjaran,
+  type JurusanInput,
+  type MapelInput,
+  type RombelInput,
+  simpanJurusan,
+  simpanMapel,
+  simpanPenugasanGuru,
+  simpanRombel,
+  simpanTahunAjaran,
+  type TahunAjaranInput,
+} from "@/lib/gateways/academic";
+import { getDaftarGuru } from "@/lib/gateways/teacher";
+
+type TabKey = "tahun_ajaran" | "jurusan" | "rombel" | "mapel" | "penugasan";
+
+export default function AkademikPage() {
+  const { user } = useAuth();
+  const canManage = hasPermission(user, "academic.manage");
+
+  const [activeTab, setActiveTab] = useState<TabKey>("tahun_ajaran");
+  const [loading, setLoading] = useState(true);
+  const [feedback, setFeedback] = useState<{
+    tone: "success" | "error" | "warning";
+    message: string;
+  } | null>(null);
+
+  // Data states
+  const [tahunAjaranList, setTahunAjaranList] = useState<
+    Record<string, unknown>[]
+  >([]);
+  const [jurusanList, setJurusanList] = useState<Record<string, unknown>[]>([]);
+  const [rombelList, setRombelList] = useState<Record<string, unknown>[]>([]);
+  const [mapelList, setMapelList] = useState<Record<string, unknown>[]>([]);
+  const [penugasanList, setPenugasanList] = useState<Record<string, unknown>[]>(
+    [],
+  );
+  const [guruList, setGuruList] = useState<Record<string, unknown>[]>([]);
+
+  // Filter states
+  const [selectedTaForRombel, setSelectedTaForRombel] = useState<string>("");
+  const [selectedRombelForPenugasan, setSelectedRombelForPenugasan] =
+    useState<string>("");
+
+  // Modal states
+  const [modalType, setModalType] = useState<TabKey | null>(null);
+  const [saving, setSaving] = useState(false);
+
+  // Form states
+  const [formTA, setFormTA] = useState<TahunAjaranInput>({
+    nama_tahun: "2026/2027",
+    semester: "Ganjil",
+    tanggal_mulai: new Date().toLocaleDateString("en-CA"),
+    tanggal_selesai: new Date(Date.now() + 180 * 86400000).toLocaleDateString(
+      "en-CA",
+    ),
+    is_aktif: 1,
+  });
+
+  const [formJurusan, setFormJurusan] = useState<JurusanInput>({
+    kode_jurusan: "",
+    nama_jurusan: "",
+    deskripsi: "",
+    is_aktif: 1,
+  });
+
+  const [formRombel, setFormRombel] = useState<RombelInput>({
+    id_tahun_ajaran: "",
+    tingkat: 10,
+    id_jurusan: "",
+    nama_rombel: "",
+    id_wali_kelas: "",
+    kapasitas: 36,
+    ruang_kelas: "",
+    is_aktif: 1,
+  });
+
+  const [formMapel, setFormMapel] = useState<MapelInput>({
+    kode_mapel: "",
+    nama_mapel: "",
+    tingkat: 10,
+    kelompok: "Wajib",
+    beban_jam: 2,
+    kkm: 75,
+    is_aktif: 1,
+  });
+
+  const [formPenugasan, setFormPenugasan] = useState<GuruMapelInput>({
+    id_tahun_ajaran: "",
+    id_rombel: "",
+    id_mapel: "",
+    id_guru: "",
+  });
+
+  const loadAllData = useCallback(async () => {
+    setLoading(true);
+    try {
+      const [taData, jurData, mapData, gData] = await Promise.all([
+        getDaftarTahunAjaran(),
+        getDaftarJurusan(),
+        getDaftarMapel(),
+        getDaftarGuru(),
+      ]);
+      setTahunAjaranList(taData);
+      setJurusanList(jurData);
+      setMapelList(mapData);
+      setGuruList(gData);
+
+      const activeTa = taData.find((t) => Number(t.is_aktif) === 1);
+      const taId = activeTa
+        ? String(activeTa.id_tahun_ajaran)
+        : taData[0]
+          ? String(taData[0].id_tahun_ajaran)
+          : "";
+      setSelectedTaForRombel((prev) => (prev ? prev : taId));
+
+      const romData = await getDaftarRombel(taId || undefined);
+      setRombelList(romData);
+
+      const rId = romData[0] ? String(romData[0].id_rombel) : "";
+      setSelectedRombelForPenugasan((prev) => (prev ? prev : rId));
+
+      const penData = await getDaftarPenugasanGuru(rId || undefined);
+      setPenugasanList(penData);
+    } catch (err) {
+      setFeedback({
+        tone: "error",
+        message:
+          err instanceof Error ? err.message : "Gagal memuat data akademik.",
+      });
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void loadAllData();
+  }, [loadAllData]);
+
+  // Handle reload on sync
+  useEffect(() => {
+    const handleSync = () => {
+      void loadAllData();
+    };
+    window.addEventListener("sppg:sync-completed", handleSync);
+    return () => window.removeEventListener("sppg:sync-completed", handleSync);
+  }, [loadAllData]);
+
+  // Filter Rombel change
+  const handleTaFilterChange = async (taId: string) => {
+    setSelectedTaForRombel(taId);
+    try {
+      const res = await getDaftarRombel(taId || undefined);
+      setRombelList(res);
+    } catch {
+      // ignore
+    }
+  };
+
+  // Filter Penugasan change
+  const handleRombelFilterChange = async (rombelId: string) => {
+    setSelectedRombelForPenugasan(rombelId);
+    try {
+      const res = await getDaftarPenugasanGuru(rombelId || undefined);
+      setPenugasanList(res);
+    } catch {
+      // ignore
+    }
+  };
+
+  // Actions
+  const handleSetActiveTA = async (id: string) => {
+    if (!canManage) return;
+    try {
+      await aktifkanTahunAjaran(id);
+      setFeedback({
+        tone: "success",
+        message: "Tahun ajaran aktif berhasil diperbarui.",
+      });
+      void loadAllData();
+    } catch (err) {
+      setFeedback({
+        tone: "error",
+        message:
+          err instanceof Error
+            ? err.message
+            : "Gagal mengaktifkan tahun ajaran.",
+      });
+    }
+  };
+
+  const handleDeleteItem = async (type: TabKey, id: string) => {
+    if (!canManage) return;
+    const ok = window.confirm("Apakah Anda yakin ingin menghapus data ini?");
+    if (!ok) return;
+
+    try {
+      if (type === "tahun_ajaran") await hapusTahunAjaran(id);
+      else if (type === "jurusan") await hapusJurusan(id);
+      else if (type === "rombel") await hapusRombel(id);
+      else if (type === "mapel") await hapusMapel(id);
+      else if (type === "penugasan") await hapusPenugasanGuru(id);
+
+      setFeedback({ tone: "success", message: "Data berhasil dihapus." });
+      void loadAllData();
+    } catch (err) {
+      setFeedback({
+        tone: "error",
+        message: err instanceof Error ? err.message : "Gagal menghapus data.",
+      });
+    }
+  };
+
+  const handleSaveForm = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!canManage) return;
+    setSaving(true);
+    try {
+      if (modalType === "tahun_ajaran") {
+        await simpanTahunAjaran(formTA);
+      } else if (modalType === "jurusan") {
+        await simpanJurusan(formJurusan);
+      } else if (modalType === "rombel") {
+        await simpanRombel(formRombel);
+      } else if (modalType === "mapel") {
+        await simpanMapel(formMapel);
+      } else if (modalType === "penugasan") {
+        await simpanPenugasanGuru(formPenugasan);
+      }
+      setFeedback({ tone: "success", message: "Data berhasil disimpan." });
+      setModalType(null);
+      void loadAllData();
+    } catch (err) {
+      setFeedback({
+        tone: "error",
+        message: err instanceof Error ? err.message : "Gagal menyimpan data.",
+      });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <AppShell>
+      <div className="mx-auto flex w-full max-w-7xl flex-1 flex-col gap-6 px-4 py-6 sm:px-6">
+        <PageHeader
+          eyebrow="Akademik"
+          title="Struktur Akademik"
+          description="Manajemen tahun ajaran, jurusan, rombel, mata pelajaran, dan penugasan pengajar."
+          actions={
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => void loadAllData()}
+                className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-4 py-2 text-sm font-semibold text-slate-200 transition hover:bg-white/10"
+              >
+                <Icon name="refresh" className="size-4" />
+                <span>Muat Ulang</span>
+              </button>
+              {canManage ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (activeTab === "tahun_ajaran") {
+                      setFormTA({
+                        nama_tahun: "2026/2027",
+                        semester: "Ganjil",
+                        tanggal_mulai: new Date().toLocaleDateString("en-CA"),
+                        tanggal_selesai: new Date(
+                          Date.now() + 180 * 86400000,
+                        ).toLocaleDateString("en-CA"),
+                        is_aktif: 1,
+                      });
+                    } else if (activeTab === "jurusan") {
+                      setFormJurusan({
+                        kode_jurusan: "",
+                        nama_jurusan: "",
+                        deskripsi: "",
+                        is_aktif: 1,
+                      });
+                    } else if (activeTab === "rombel") {
+                      setFormRombel({
+                        id_tahun_ajaran:
+                          selectedTaForRombel ||
+                          (tahunAjaranList[0]
+                            ? String(tahunAjaranList[0].id_tahun_ajaran)
+                            : ""),
+                        tingkat: 10,
+                        id_jurusan: jurusanList[0]
+                          ? String(jurusanList[0].id_jurusan)
+                          : "",
+                        nama_rombel: "",
+                        id_wali_kelas: "",
+                        kapasitas: 36,
+                        ruang_kelas: "",
+                        is_aktif: 1,
+                      });
+                    } else if (activeTab === "mapel") {
+                      setFormMapel({
+                        kode_mapel: "",
+                        nama_mapel: "",
+                        tingkat: 10,
+                        kelompok: "Wajib",
+                        beban_jam: 2,
+                        kkm: 75,
+                        is_aktif: 1,
+                      });
+                    } else if (activeTab === "penugasan") {
+                      setFormPenugasan({
+                        id_tahun_ajaran:
+                          selectedTaForRombel ||
+                          (tahunAjaranList[0]
+                            ? String(tahunAjaranList[0].id_tahun_ajaran)
+                            : ""),
+                        id_rombel:
+                          selectedRombelForPenugasan ||
+                          (rombelList[0]
+                            ? String(rombelList[0].id_rombel)
+                            : ""),
+                        id_mapel: mapelList[0]
+                          ? String(mapelList[0].id_mapel)
+                          : "",
+                        id_guru: guruList[0] ? String(guruList[0].id_guru) : "",
+                      });
+                    }
+                    setModalType(activeTab);
+                  }}
+                  className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-sky-500 px-4 py-2 text-sm font-bold text-slate-950 shadow-lg shadow-sky-500/20 transition hover:bg-sky-400"
+                >
+                  <Icon name="add" className="size-4" />
+                  <span>Tambah Data</span>
+                </button>
+              ) : null}
+            </div>
+          }
+        />
+
+        {feedback ? (
+          <FeedbackBanner
+            tone={feedback.tone}
+            onDismiss={() => setFeedback(null)}
+          >
+            {feedback.message}
+          </FeedbackBanner>
+        ) : null}
+
+        {/* Tab Navigation */}
+        <div className="flex flex-wrap items-center gap-1 rounded-2xl border border-white/10 bg-slate-900/60 p-1.5 backdrop-blur-xl">
+          <button
+            type="button"
+            onClick={() => setActiveTab("tahun_ajaran")}
+            className={`flex min-h-10 items-center gap-2 rounded-xl px-4 text-xs font-bold transition sm:text-sm ${
+              activeTab === "tahun_ajaran"
+                ? "bg-sky-500 text-slate-950 shadow-md shadow-sky-500/20"
+                : "text-slate-300 hover:bg-white/5 hover:text-white"
+            }`}
+          >
+            <Icon name="calendar" className="size-4" />
+            <span>Tahun Ajaran</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab("jurusan")}
+            className={`flex min-h-10 items-center gap-2 rounded-xl px-4 text-xs font-bold transition sm:text-sm ${
+              activeTab === "jurusan"
+                ? "bg-sky-500 text-slate-950 shadow-md shadow-sky-500/20"
+                : "text-slate-300 hover:bg-white/5 hover:text-white"
+            }`}
+          >
+            <Icon name="tools" className="size-4" />
+            <span>Jurusan</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab("rombel")}
+            className={`flex min-h-10 items-center gap-2 rounded-xl px-4 text-xs font-bold transition sm:text-sm ${
+              activeTab === "rombel"
+                ? "bg-sky-500 text-slate-950 shadow-md shadow-sky-500/20"
+                : "text-slate-300 hover:bg-white/5 hover:text-white"
+            }`}
+          >
+            <Icon name="users" className="size-4" />
+            <span>Rombel / Kelas</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab("mapel")}
+            className={`flex min-h-10 items-center gap-2 rounded-xl px-4 text-xs font-bold transition sm:text-sm ${
+              activeTab === "mapel"
+                ? "bg-sky-500 text-slate-950 shadow-md shadow-sky-500/20"
+                : "text-slate-300 hover:bg-white/5 hover:text-white"
+            }`}
+          >
+            <Icon name="document" className="size-4" />
+            <span>Mata Pelajaran</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab("penugasan")}
+            className={`flex min-h-10 items-center gap-2 rounded-xl px-4 text-xs font-bold transition sm:text-sm ${
+              activeTab === "penugasan"
+                ? "bg-sky-500 text-slate-950 shadow-md shadow-sky-500/20"
+                : "text-slate-300 hover:bg-white/5 hover:text-white"
+            }`}
+          >
+            <Icon name="user" className="size-4" />
+            <span>Penugasan Guru</span>
+          </button>
+        </div>
+
+        {/* Tab 1: Tahun Ajaran */}
+        {activeTab === "tahun_ajaran" ? (
+          <div className="overflow-hidden rounded-2xl border border-white/10 bg-slate-900/60 shadow-xl backdrop-blur-xl">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-sm text-slate-200">
+                <thead className="border-b border-white/10 bg-white/[0.03] text-xs uppercase tracking-wider text-slate-400">
+                  <tr>
+                    <th className="px-6 py-4">Tahun Ajaran</th>
+                    <th className="px-6 py-4">Semester</th>
+                    <th className="px-6 py-4">Periode</th>
+                    <th className="px-6 py-4">Status</th>
+                    <th className="px-6 py-4 text-right">Aksi</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-white/5">
+                  {loading ? (
+                    <tr>
+                      <td
+                        colSpan={5}
+                        className="px-6 py-8 text-center text-slate-400"
+                      >
+                        Memuat data tahun ajaran...
+                      </td>
+                    </tr>
+                  ) : tahunAjaranList.length === 0 ? (
+                    <tr>
+                      <td
+                        colSpan={5}
+                        className="px-6 py-8 text-center text-slate-400"
+                      >
+                        Belum ada data tahun ajaran. Silakan tambahkan data
+                        baru.
+                      </td>
+                    </tr>
+                  ) : (
+                    tahunAjaranList.map((item) => {
+                      const id = String(item.id_tahun_ajaran);
+                      const isAktif = Number(item.is_aktif) === 1;
+                      return (
+                        <tr
+                          key={id}
+                          className="transition hover:bg-white/[0.02]"
+                        >
+                          <td className="px-6 py-4 font-bold text-white">
+                            {String(item.nama_tahun)}
+                          </td>
+                          <td className="px-6 py-4">{String(item.semester)}</td>
+                          <td className="px-6 py-4 text-xs text-slate-400">
+                            {String(item.tanggal_mulai)} s/d{" "}
+                            {String(item.tanggal_selesai)}
+                          </td>
+                          <td className="px-6 py-4">
+                            {isAktif ? (
+                              <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-400/10 px-3 py-1 text-xs font-semibold text-emerald-400 border border-emerald-400/20">
+                                <span className="size-1.5 rounded-full bg-emerald-400" />
+                                Aktif Berjalan
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center gap-1.5 rounded-full bg-slate-800 px-3 py-1 text-xs font-semibold text-slate-400 border border-white/5">
+                                Nonaktif
+                              </span>
+                            )}
+                          </td>
+                          <td className="px-6 py-4 text-right">
+                            <div className="flex items-center justify-end gap-2">
+                              {!isAktif && canManage ? (
+                                <button
+                                  type="button"
+                                  onClick={() => void handleSetActiveTA(id)}
+                                  className="rounded-lg bg-sky-500/10 px-2.5 py-1 text-xs font-bold text-sky-400 border border-sky-500/20 hover:bg-sky-500/20"
+                                >
+                                  Jadikan Aktif
+                                </button>
+                              ) : null}
+                              {canManage ? (
+                                <>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setFormTA({
+                                        id_tahun_ajaran: id,
+                                        nama_tahun: String(item.nama_tahun),
+                                        semester:
+                                          String(item.semester) === "Genap"
+                                            ? "Genap"
+                                            : "Ganjil",
+                                        tanggal_mulai: String(
+                                          item.tanggal_mulai,
+                                        ),
+                                        tanggal_selesai: String(
+                                          item.tanggal_selesai,
+                                        ),
+                                        is_aktif: Number(item.is_aktif),
+                                      });
+                                      setModalType("tahun_ajaran");
+                                    }}
+                                    className="rounded-lg bg-white/5 p-1.5 text-slate-300 hover:bg-white/10 hover:text-white"
+                                    title="Edit"
+                                  >
+                                    <Icon name="tools" className="size-4" />
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() =>
+                                      void handleDeleteItem("tahun_ajaran", id)
+                                    }
+                                    className="rounded-lg bg-rose-500/10 p-1.5 text-rose-400 hover:bg-rose-500/20"
+                                    title="Hapus"
+                                  >
+                                    <Icon name="trash" className="size-4" />
+                                  </button>
+                                </>
+                              ) : null}
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        ) : null}
+
+        {/* Tab 2: Jurusan */}
+        {activeTab === "jurusan" ? (
+          <div className="overflow-hidden rounded-2xl border border-white/10 bg-slate-900/60 shadow-xl backdrop-blur-xl">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-sm text-slate-200">
+                <thead className="border-b border-white/10 bg-white/[0.03] text-xs uppercase tracking-wider text-slate-400">
+                  <tr>
+                    <th className="px-6 py-4">Kode</th>
+                    <th className="px-6 py-4">Nama Jurusan</th>
+                    <th className="px-6 py-4">Deskripsi</th>
+                    <th className="px-6 py-4">Status</th>
+                    <th className="px-6 py-4 text-right">Aksi</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-white/5">
+                  {loading ? (
+                    <tr>
+                      <td
+                        colSpan={5}
+                        className="px-6 py-8 text-center text-slate-400"
+                      >
+                        Memuat data jurusan...
+                      </td>
+                    </tr>
+                  ) : jurusanList.length === 0 ? (
+                    <tr>
+                      <td
+                        colSpan={5}
+                        className="px-6 py-8 text-center text-slate-400"
+                      >
+                        Belum ada data program keahlian/jurusan.
+                      </td>
+                    </tr>
+                  ) : (
+                    jurusanList.map((item) => {
+                      const id = String(item.id_jurusan);
+                      return (
+                        <tr
+                          key={id}
+                          className="transition hover:bg-white/[0.02]"
+                        >
+                          <td className="px-6 py-4 font-mono font-bold text-sky-400">
+                            {String(item.kode_jurusan)}
+                          </td>
+                          <td className="px-6 py-4 font-bold text-white">
+                            {String(item.nama_jurusan)}
+                          </td>
+                          <td className="px-6 py-4 text-xs text-slate-400 max-w-xs truncate">
+                            {String(item.deskripsi || "-")}
+                          </td>
+                          <td className="px-6 py-4">
+                            {Number(item.is_aktif) === 1 ? (
+                              <span className="rounded-full bg-emerald-400/10 px-2.5 py-0.5 text-xs font-semibold text-emerald-400">
+                                Aktif
+                              </span>
+                            ) : (
+                              <span className="rounded-full bg-slate-800 px-2.5 py-0.5 text-xs font-semibold text-slate-400">
+                                Nonaktif
+                              </span>
+                            )}
+                          </td>
+                          <td className="px-6 py-4 text-right">
+                            {canManage ? (
+                              <div className="flex items-center justify-end gap-2">
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setFormJurusan({
+                                      id_jurusan: id,
+                                      kode_jurusan: String(item.kode_jurusan),
+                                      nama_jurusan: String(item.nama_jurusan),
+                                      deskripsi: item.deskripsi
+                                        ? String(item.deskripsi)
+                                        : "",
+                                      is_aktif: Number(item.is_aktif),
+                                    });
+                                    setModalType("jurusan");
+                                  }}
+                                  className="rounded-lg bg-white/5 p-1.5 text-slate-300 hover:bg-white/10 hover:text-white"
+                                >
+                                  <Icon name="tools" className="size-4" />
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    void handleDeleteItem("jurusan", id)
+                                  }
+                                  className="rounded-lg bg-rose-500/10 p-1.5 text-rose-400 hover:bg-rose-500/20"
+                                >
+                                  <Icon name="trash" className="size-4" />
+                                </button>
+                              </div>
+                            ) : null}
+                          </td>
+                        </tr>
+                      );
+                    })
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        ) : null}
+
+        {/* Tab 3: Rombel */}
+        {activeTab === "rombel" ? (
+          <div className="flex flex-col gap-4">
+            <div className="flex items-center gap-3">
+              <label
+                htmlFor="ta-filter-rombel"
+                className="text-xs font-semibold text-slate-400"
+              >
+                Filter Tahun Ajaran:
+              </label>
+              <select
+                id="ta-filter-rombel"
+                value={selectedTaForRombel}
+                onChange={(e) => void handleTaFilterChange(e.target.value)}
+                className="rounded-xl border border-white/10 bg-slate-900 px-3 py-2 text-sm text-slate-100 shadow-inner focus:border-sky-500 focus:outline-none"
+              >
+                {tahunAjaranList.map((ta) => (
+                  <option
+                    key={String(ta.id_tahun_ajaran)}
+                    value={String(ta.id_tahun_ajaran)}
+                    className="bg-slate-900 text-slate-100"
+                  >
+                    {String(ta.nama_tahun)} ({String(ta.semester)})
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="overflow-hidden rounded-2xl border border-white/10 bg-slate-900/60 shadow-xl backdrop-blur-xl">
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-sm text-slate-200">
+                  <thead className="border-b border-white/10 bg-white/[0.03] text-xs uppercase tracking-wider text-slate-400">
+                    <tr>
+                      <th className="px-6 py-4">Tingkat</th>
+                      <th className="px-6 py-4">Nama Rombel</th>
+                      <th className="px-6 py-4">Jurusan</th>
+                      <th className="px-6 py-4">Wali Kelas</th>
+                      <th className="px-6 py-4">Ruang & Siswa</th>
+                      <th className="px-6 py-4 text-right">Aksi</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-white/5">
+                    {loading ? (
+                      <tr>
+                        <td
+                          colSpan={6}
+                          className="px-6 py-8 text-center text-slate-400"
+                        >
+                          Memuat data rombel...
+                        </td>
+                      </tr>
+                    ) : rombelList.length === 0 ? (
+                      <tr>
+                        <td
+                          colSpan={6}
+                          className="px-6 py-8 text-center text-slate-400"
+                        >
+                          Belum ada rombel pada tahun ajaran ini.
+                        </td>
+                      </tr>
+                    ) : (
+                      rombelList.map((item) => {
+                        const id = String(item.id_rombel);
+                        return (
+                          <tr
+                            key={id}
+                            className="transition hover:bg-white/[0.02]"
+                          >
+                            <td className="px-6 py-4 font-mono font-bold text-sky-400">
+                              Kelas {String(item.tingkat)}
+                            </td>
+                            <td className="px-6 py-4 font-bold text-white">
+                              {String(item.nama_rombel)}
+                            </td>
+                            <td className="px-6 py-4 text-xs text-slate-300">
+                              {String(
+                                item.nama_jurusan || item.kode_jurusan || "-",
+                              )}
+                            </td>
+                            <td className="px-6 py-4 text-sm text-slate-300">
+                              {String(
+                                item.nama_wali_kelas || "Belum ditentukan",
+                              )}
+                            </td>
+                            <td className="px-6 py-4 text-xs text-slate-400">
+                              {String(item.ruang_kelas || "-")} |{" "}
+                              {String(item.jumlah_siswa || 0)} /{" "}
+                              {String(item.kapasitas || 36)} Siswa
+                            </td>
+                            <td className="px-6 py-4 text-right">
+                              {canManage ? (
+                                <div className="flex items-center justify-end gap-2">
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setFormRombel({
+                                        id_rombel: id,
+                                        id_tahun_ajaran: String(
+                                          item.id_tahun_ajaran,
+                                        ),
+                                        tingkat: Number(item.tingkat),
+                                        id_jurusan: item.id_jurusan
+                                          ? String(item.id_jurusan)
+                                          : "",
+                                        nama_rombel: String(item.nama_rombel),
+                                        id_wali_kelas: item.id_wali_kelas
+                                          ? String(item.id_wali_kelas)
+                                          : "",
+                                        kapasitas: Number(item.kapasitas),
+                                        ruang_kelas: item.ruang_kelas
+                                          ? String(item.ruang_kelas)
+                                          : "",
+                                        is_aktif: Number(item.is_aktif),
+                                      });
+                                      setModalType("rombel");
+                                    }}
+                                    className="rounded-lg bg-white/5 p-1.5 text-slate-300 hover:bg-white/10 hover:text-white"
+                                  >
+                                    <Icon name="tools" className="size-4" />
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() =>
+                                      void handleDeleteItem("rombel", id)
+                                    }
+                                    className="rounded-lg bg-rose-500/10 p-1.5 text-rose-400 hover:bg-rose-500/20"
+                                  >
+                                    <Icon name="trash" className="size-4" />
+                                  </button>
+                                </div>
+                              ) : null}
+                            </td>
+                          </tr>
+                        );
+                      })
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        ) : null}
+
+        {/* Tab 4: Mapel */}
+        {activeTab === "mapel" ? (
+          <div className="overflow-hidden rounded-2xl border border-white/10 bg-slate-900/60 shadow-xl backdrop-blur-xl">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-sm text-slate-200">
+                <thead className="border-b border-white/10 bg-white/[0.03] text-xs uppercase tracking-wider text-slate-400">
+                  <tr>
+                    <th className="px-6 py-4">Kode</th>
+                    <th className="px-6 py-4">Mata Pelajaran</th>
+                    <th className="px-6 py-4">Kelompok</th>
+                    <th className="px-6 py-4">Beban Jam</th>
+                    <th className="px-6 py-4">KKM</th>
+                    <th className="px-6 py-4 text-right">Aksi</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-white/5">
+                  {loading ? (
+                    <tr>
+                      <td
+                        colSpan={6}
+                        className="px-6 py-8 text-center text-slate-400"
+                      >
+                        Memuat data mata pelajaran...
+                      </td>
+                    </tr>
+                  ) : mapelList.length === 0 ? (
+                    <tr>
+                      <td
+                        colSpan={6}
+                        className="px-6 py-8 text-center text-slate-400"
+                      >
+                        Belum ada kurikulum mata pelajaran.
+                      </td>
+                    </tr>
+                  ) : (
+                    mapelList.map((item) => {
+                      const id = String(item.id_mapel);
+                      return (
+                        <tr
+                          key={id}
+                          className="transition hover:bg-white/[0.02]"
+                        >
+                          <td className="px-6 py-4 font-mono font-bold text-sky-400">
+                            {String(item.kode_mapel)}
+                          </td>
+                          <td className="px-6 py-4 font-bold text-white">
+                            {String(item.nama_mapel)}
+                          </td>
+                          <td className="px-6 py-4">
+                            <span className="rounded-full bg-slate-800 px-2.5 py-0.5 text-xs font-semibold text-slate-300">
+                              {String(item.kelompok)}
+                            </span>
+                          </td>
+                          <td className="px-6 py-4 text-sm text-slate-300">
+                            {String(item.beban_jam)} JP/Minggu
+                          </td>
+                          <td className="px-6 py-4 font-semibold text-amber-400">
+                            {String(item.kkm)}
+                          </td>
+                          <td className="px-6 py-4 text-right">
+                            {canManage ? (
+                              <div className="flex items-center justify-end gap-2">
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const rawKelompok = String(item.kelompok);
+                                    const kelompokVal = (
+                                      rawKelompok === "Peminatan" ||
+                                      rawKelompok === "Muatan Lokal" ||
+                                      rawKelompok === "Kejuruan"
+                                        ? rawKelompok
+                                        : "Wajib"
+                                    ) as
+                                      | "Wajib"
+                                      | "Peminatan"
+                                      | "Muatan Lokal"
+                                      | "Kejuruan";
+
+                                    setFormMapel({
+                                      id_mapel: id,
+                                      kode_mapel: String(item.kode_mapel),
+                                      nama_mapel: String(item.nama_mapel),
+                                      tingkat: item.tingkat
+                                        ? Number(item.tingkat)
+                                        : undefined,
+                                      kelompok: kelompokVal,
+                                      beban_jam: Number(item.beban_jam),
+                                      kkm: Number(item.kkm),
+                                      is_aktif: Number(item.is_aktif),
+                                    });
+                                    setModalType("mapel");
+                                  }}
+                                  className="rounded-lg bg-white/5 p-1.5 text-slate-300 hover:bg-white/10 hover:text-white"
+                                >
+                                  <Icon name="tools" className="size-4" />
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    void handleDeleteItem("mapel", id)
+                                  }
+                                  className="rounded-lg bg-rose-500/10 p-1.5 text-rose-400 hover:bg-rose-500/20"
+                                >
+                                  <Icon name="trash" className="size-4" />
+                                </button>
+                              </div>
+                            ) : null}
+                          </td>
+                        </tr>
+                      );
+                    })
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        ) : null}
+
+        {/* Tab 5: Penugasan Guru */}
+        {activeTab === "penugasan" ? (
+          <div className="flex flex-col gap-4">
+            <div className="flex items-center gap-3">
+              <label
+                htmlFor="rombel-filter-penugasan"
+                className="text-xs font-semibold text-slate-400"
+              >
+                Filter Rombel:
+              </label>
+              <select
+                id="rombel-filter-penugasan"
+                value={selectedRombelForPenugasan}
+                onChange={(e) => void handleRombelFilterChange(e.target.value)}
+                className="rounded-xl border border-white/10 bg-slate-900 px-3 py-2 text-sm text-slate-100 shadow-inner focus:border-sky-500 focus:outline-none"
+              >
+                {rombelList.map((rom) => (
+                  <option
+                    key={String(rom.id_rombel)}
+                    value={String(rom.id_rombel)}
+                    className="bg-slate-900 text-slate-100"
+                  >
+                    Kelas {String(rom.tingkat)} - {String(rom.nama_rombel)}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="overflow-hidden rounded-2xl border border-white/10 bg-slate-900/60 shadow-xl backdrop-blur-xl">
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-sm text-slate-200">
+                  <thead className="border-b border-white/10 bg-white/[0.03] text-xs uppercase tracking-wider text-slate-400">
+                    <tr>
+                      <th className="px-6 py-4">Rombel</th>
+                      <th className="px-6 py-4">Mata Pelajaran</th>
+                      <th className="px-6 py-4">Guru Pengampu</th>
+                      <th className="px-6 py-4">NIP / Gelar</th>
+                      <th className="px-6 py-4 text-right">Aksi</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-white/5">
+                    {loading ? (
+                      <tr>
+                        <td
+                          colSpan={5}
+                          className="px-6 py-8 text-center text-slate-400"
+                        >
+                          Memuat data penugasan guru...
+                        </td>
+                      </tr>
+                    ) : penugasanList.length === 0 ? (
+                      <tr>
+                        <td
+                          colSpan={5}
+                          className="px-6 py-8 text-center text-slate-400"
+                        >
+                          Belum ada penugasan guru pengajar untuk rombel ini.
+                        </td>
+                      </tr>
+                    ) : (
+                      penugasanList.map((item) => {
+                        const id = String(item.id_penugasan);
+                        return (
+                          <tr
+                            key={id}
+                            className="transition hover:bg-white/[0.02]"
+                          >
+                            <td className="px-6 py-4 font-bold text-white">
+                              {String(item.nama_rombel)}
+                            </td>
+                            <td className="px-6 py-4 font-semibold text-sky-400">
+                              {String(item.nama_mapel)} (
+                              {String(item.beban_jam)} JP)
+                            </td>
+                            <td className="px-6 py-4 text-slate-100 font-medium">
+                              {String(item.nama_guru || "-")}
+                            </td>
+                            <td className="px-6 py-4 text-xs text-slate-400">
+                              {String(item.nip || "-")}{" "}
+                              {item.gelar ? `(${String(item.gelar)})` : ""}
+                            </td>
+                            <td className="px-6 py-4 text-right">
+                              {canManage ? (
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    void handleDeleteItem("penugasan", id)
+                                  }
+                                  className="rounded-lg bg-rose-500/10 p-1.5 text-rose-400 hover:bg-rose-500/20"
+                                >
+                                  <Icon name="trash" className="size-4" />
+                                </button>
+                              ) : null}
+                            </td>
+                          </tr>
+                        );
+                      })
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        ) : null}
+
+        {/* Modal Form */}
+        {modalType ? (
+          <Modal
+            isOpen={true}
+            onClose={() => setModalType(null)}
+            title={
+              modalType === "tahun_ajaran"
+                ? "Kelola Tahun Ajaran"
+                : modalType === "jurusan"
+                  ? "Kelola Program Keahlian / Jurusan"
+                  : modalType === "rombel"
+                    ? "Kelola Rombel / Kelas"
+                    : modalType === "mapel"
+                      ? "Kelola Mata Pelajaran"
+                      : "Kelola Penugasan Guru"
+            }
+            maxWidth="max-w-xl"
+          >
+            <form
+              onSubmit={(e) => void handleSaveForm(e)}
+              className="flex flex-col gap-4 py-2"
+            >
+              {modalType === "tahun_ajaran" ? (
+                <>
+                  <div>
+                    <label
+                      htmlFor="ta-nama"
+                      className="block text-xs font-semibold text-slate-300"
+                    >
+                      Nama Tahun Ajaran (cth: 2026/2027)
+                    </label>
+                    <input
+                      id="ta-nama"
+                      type="text"
+                      required
+                      value={formTA.nama_tahun}
+                      onChange={(e) =>
+                        setFormTA({ ...formTA, nama_tahun: e.target.value })
+                      }
+                      className="mt-1 w-full rounded-xl border border-white/10 bg-slate-900 px-3 py-2 text-sm text-slate-100 focus:border-sky-500 focus:outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label
+                      htmlFor="ta-semester"
+                      className="block text-xs font-semibold text-slate-300"
+                    >
+                      Semester
+                    </label>
+                    <select
+                      id="ta-semester"
+                      value={formTA.semester}
+                      onChange={(e) =>
+                        setFormTA({
+                          ...formTA,
+                          semester:
+                            e.target.value === "Genap" ? "Genap" : "Ganjil",
+                        })
+                      }
+                      className="mt-1 w-full rounded-xl border border-white/10 bg-slate-900 px-3 py-2 text-sm text-slate-100 focus:border-sky-500 focus:outline-none"
+                    >
+                      <option
+                        value="Ganjil"
+                        className="bg-slate-900 text-slate-100"
+                      >
+                        Ganjil
+                      </option>
+                      <option
+                        value="Genap"
+                        className="bg-slate-900 text-slate-100"
+                      >
+                        Genap
+                      </option>
+                    </select>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label
+                        htmlFor="ta-mulai"
+                        className="block text-xs font-semibold text-slate-300"
+                      >
+                        Tanggal Mulai
+                      </label>
+                      <input
+                        id="ta-mulai"
+                        type="date"
+                        required
+                        value={formTA.tanggal_mulai}
+                        onChange={(e) =>
+                          setFormTA({
+                            ...formTA,
+                            tanggal_mulai: e.target.value,
+                          })
+                        }
+                        className="mt-1 w-full rounded-xl border border-white/10 bg-slate-900 px-3 py-2 text-sm text-slate-100 focus:border-sky-500 focus:outline-none"
+                      />
+                    </div>
+                    <div>
+                      <label
+                        htmlFor="ta-selesai"
+                        className="block text-xs font-semibold text-slate-300"
+                      >
+                        Tanggal Selesai
+                      </label>
+                      <input
+                        id="ta-selesai"
+                        type="date"
+                        required
+                        value={formTA.tanggal_selesai}
+                        onChange={(e) =>
+                          setFormTA({
+                            ...formTA,
+                            tanggal_selesai: e.target.value,
+                          })
+                        }
+                        className="mt-1 w-full rounded-xl border border-white/10 bg-slate-900 px-3 py-2 text-sm text-slate-100 focus:border-sky-500 focus:outline-none"
+                      />
+                    </div>
+                  </div>
+                </>
+              ) : null}
+
+              {modalType === "jurusan" ? (
+                <>
+                  <div>
+                    <label
+                      htmlFor="jur-kode"
+                      className="block text-xs font-semibold text-slate-300"
+                    >
+                      Kode Jurusan (cth: RPL, TKJ, AKL)
+                    </label>
+                    <input
+                      id="jur-kode"
+                      type="text"
+                      required
+                      value={formJurusan.kode_jurusan}
+                      onChange={(e) =>
+                        setFormJurusan({
+                          ...formJurusan,
+                          kode_jurusan: e.target.value,
+                        })
+                      }
+                      className="mt-1 w-full rounded-xl border border-white/10 bg-slate-900 px-3 py-2 text-sm text-slate-100 focus:border-sky-500 focus:outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label
+                      htmlFor="jur-nama"
+                      className="block text-xs font-semibold text-slate-300"
+                    >
+                      Nama Lengkap Jurusan
+                    </label>
+                    <input
+                      id="jur-nama"
+                      type="text"
+                      required
+                      value={formJurusan.nama_jurusan}
+                      onChange={(e) =>
+                        setFormJurusan({
+                          ...formJurusan,
+                          nama_jurusan: e.target.value,
+                        })
+                      }
+                      className="mt-1 w-full rounded-xl border border-white/10 bg-slate-900 px-3 py-2 text-sm text-slate-100 focus:border-sky-500 focus:outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label
+                      htmlFor="jur-deskripsi"
+                      className="block text-xs font-semibold text-slate-300"
+                    >
+                      Deskripsi / Kompetensi
+                    </label>
+                    <textarea
+                      id="jur-deskripsi"
+                      rows={3}
+                      value={formJurusan.deskripsi || ""}
+                      onChange={(e) =>
+                        setFormJurusan({
+                          ...formJurusan,
+                          deskripsi: e.target.value,
+                        })
+                      }
+                      className="mt-1 w-full rounded-xl border border-white/10 bg-slate-900 px-3 py-2 text-sm text-slate-100 focus:border-sky-500 focus:outline-none"
+                    />
+                  </div>
+                </>
+              ) : null}
+
+              {modalType === "rombel" ? (
+                <>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label
+                        htmlFor="rom-ta"
+                        className="block text-xs font-semibold text-slate-300"
+                      >
+                        Tahun Ajaran
+                      </label>
+                      <select
+                        id="rom-ta"
+                        value={formRombel.id_tahun_ajaran}
+                        onChange={(e) =>
+                          setFormRombel({
+                            ...formRombel,
+                            id_tahun_ajaran: e.target.value,
+                          })
+                        }
+                        className="mt-1 w-full rounded-xl border border-white/10 bg-slate-900 px-3 py-2 text-sm text-slate-100 focus:border-sky-500 focus:outline-none"
+                      >
+                        {tahunAjaranList.map((ta) => (
+                          <option
+                            key={String(ta.id_tahun_ajaran)}
+                            value={String(ta.id_tahun_ajaran)}
+                            className="bg-slate-900 text-slate-100"
+                          >
+                            {String(ta.nama_tahun)} ({String(ta.semester)})
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label
+                        htmlFor="rom-tingkat"
+                        className="block text-xs font-semibold text-slate-300"
+                      >
+                        Tingkat
+                      </label>
+                      <select
+                        id="rom-tingkat"
+                        value={formRombel.tingkat}
+                        onChange={(e) =>
+                          setFormRombel({
+                            ...formRombel,
+                            tingkat: Number(e.target.value),
+                          })
+                        }
+                        className="mt-1 w-full rounded-xl border border-white/10 bg-slate-900 px-3 py-2 text-sm text-slate-100 focus:border-sky-500 focus:outline-none"
+                      >
+                        <option
+                          value={10}
+                          className="bg-slate-900 text-slate-100"
+                        >
+                          Kelas 10
+                        </option>
+                        <option
+                          value={11}
+                          className="bg-slate-900 text-slate-100"
+                        >
+                          Kelas 11
+                        </option>
+                        <option
+                          value={12}
+                          className="bg-slate-900 text-slate-100"
+                        >
+                          Kelas 12
+                        </option>
+                      </select>
+                    </div>
+                  </div>
+                  <div>
+                    <label
+                      htmlFor="rom-jur"
+                      className="block text-xs font-semibold text-slate-300"
+                    >
+                      Jurusan
+                    </label>
+                    <select
+                      id="rom-jur"
+                      value={formRombel.id_jurusan || ""}
+                      onChange={(e) =>
+                        setFormRombel({
+                          ...formRombel,
+                          id_jurusan: e.target.value,
+                        })
+                      }
+                      className="mt-1 w-full rounded-xl border border-white/10 bg-slate-900 px-3 py-2 text-sm text-slate-100 focus:border-sky-500 focus:outline-none"
+                    >
+                      <option value="" className="bg-slate-900 text-slate-100">
+                        Umum / Tidak Berjurusan
+                      </option>
+                      {jurusanList.map((j) => (
+                        <option
+                          key={String(j.id_jurusan)}
+                          value={String(j.id_jurusan)}
+                          className="bg-slate-900 text-slate-100"
+                        >
+                          {String(j.kode_jurusan)} - {String(j.nama_jurusan)}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label
+                      htmlFor="rom-nama"
+                      className="block text-xs font-semibold text-slate-300"
+                    >
+                      Nama Rombel (cth: X RPL 1)
+                    </label>
+                    <input
+                      id="rom-nama"
+                      type="text"
+                      required
+                      value={formRombel.nama_rombel}
+                      onChange={(e) =>
+                        setFormRombel({
+                          ...formRombel,
+                          nama_rombel: e.target.value,
+                        })
+                      }
+                      className="mt-1 w-full rounded-xl border border-white/10 bg-slate-900 px-3 py-2 text-sm text-slate-100 focus:border-sky-500 focus:outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label
+                      htmlFor="rom-wali"
+                      className="block text-xs font-semibold text-slate-300"
+                    >
+                      Wali Kelas
+                    </label>
+                    <select
+                      id="rom-wali"
+                      value={formRombel.id_wali_kelas || ""}
+                      onChange={(e) =>
+                        setFormRombel({
+                          ...formRombel,
+                          id_wali_kelas: e.target.value,
+                        })
+                      }
+                      className="mt-1 w-full rounded-xl border border-white/10 bg-slate-900 px-3 py-2 text-sm text-slate-100 focus:border-sky-500 focus:outline-none"
+                    >
+                      <option value="" className="bg-slate-900 text-slate-100">
+                        Belum Ditentukan
+                      </option>
+                      {guruList.map((g) => (
+                        <option
+                          key={String(g.id_guru)}
+                          value={String(g.id_guru)}
+                          className="bg-slate-900 text-slate-100"
+                        >
+                          {String(g.nama)} {g.nip ? `(${String(g.nip)})` : ""}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label
+                        htmlFor="rom-ruang"
+                        className="block text-xs font-semibold text-slate-300"
+                      >
+                        Ruang Kelas
+                      </label>
+                      <input
+                        id="rom-ruang"
+                        type="text"
+                        value={formRombel.ruang_kelas || ""}
+                        onChange={(e) =>
+                          setFormRombel({
+                            ...formRombel,
+                            ruang_kelas: e.target.value,
+                          })
+                        }
+                        className="mt-1 w-full rounded-xl border border-white/10 bg-slate-900 px-3 py-2 text-sm text-slate-100 focus:border-sky-500 focus:outline-none"
+                      />
+                    </div>
+                    <div>
+                      <label
+                        htmlFor="rom-kapasitas"
+                        className="block text-xs font-semibold text-slate-300"
+                      >
+                        Kapasitas Siswa
+                      </label>
+                      <input
+                        id="rom-kapasitas"
+                        type="number"
+                        min={1}
+                        max={60}
+                        value={formRombel.kapasitas}
+                        onChange={(e) =>
+                          setFormRombel({
+                            ...formRombel,
+                            kapasitas: Number(e.target.value),
+                          })
+                        }
+                        className="mt-1 w-full rounded-xl border border-white/10 bg-slate-900 px-3 py-2 text-sm text-slate-100 focus:border-sky-500 focus:outline-none"
+                      />
+                    </div>
+                  </div>
+                </>
+              ) : null}
+
+              {modalType === "mapel" ? (
+                <>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label
+                        htmlFor="map-kode"
+                        className="block text-xs font-semibold text-slate-300"
+                      >
+                        Kode Mapel (cth: MAT, IND, PBO)
+                      </label>
+                      <input
+                        id="map-kode"
+                        type="text"
+                        required
+                        value={formMapel.kode_mapel}
+                        onChange={(e) =>
+                          setFormMapel({
+                            ...formMapel,
+                            kode_mapel: e.target.value,
+                          })
+                        }
+                        className="mt-1 w-full rounded-xl border border-white/10 bg-slate-900 px-3 py-2 text-sm text-slate-100 focus:border-sky-500 focus:outline-none"
+                      />
+                    </div>
+                    <div>
+                      <label
+                        htmlFor="map-kelompok"
+                        className="block text-xs font-semibold text-slate-300"
+                      >
+                        Kelompok
+                      </label>
+                      <select
+                        id="map-kelompok"
+                        value={formMapel.kelompok}
+                        onChange={(e) => {
+                          const val = (
+                            e.target.value === "Peminatan" ||
+                            e.target.value === "Muatan Lokal" ||
+                            e.target.value === "Kejuruan"
+                              ? e.target.value
+                              : "Wajib"
+                          ) as
+                            | "Wajib"
+                            | "Peminatan"
+                            | "Muatan Lokal"
+                            | "Kejuruan";
+                          setFormMapel({ ...formMapel, kelompok: val });
+                        }}
+                        className="mt-1 w-full rounded-xl border border-white/10 bg-slate-900 px-3 py-2 text-sm text-slate-100 focus:border-sky-500 focus:outline-none"
+                      >
+                        <option
+                          value="Wajib"
+                          className="bg-slate-900 text-slate-100"
+                        >
+                          Wajib (Umum)
+                        </option>
+                        <option
+                          value="Peminatan"
+                          className="bg-slate-900 text-slate-100"
+                        >
+                          Peminatan Kejuruan
+                        </option>
+                        <option
+                          value="Muatan Lokal"
+                          className="bg-slate-900 text-slate-100"
+                        >
+                          Muatan Lokal
+                        </option>
+                        <option
+                          value="Kejuruan"
+                          className="bg-slate-900 text-slate-100"
+                        >
+                          Kejuruan
+                        </option>
+                      </select>
+                    </div>
+                  </div>
+                  <div>
+                    <label
+                      htmlFor="map-nama"
+                      className="block text-xs font-semibold text-slate-300"
+                    >
+                      Nama Mata Pelajaran
+                    </label>
+                    <input
+                      id="map-nama"
+                      type="text"
+                      required
+                      value={formMapel.nama_mapel}
+                      onChange={(e) =>
+                        setFormMapel({
+                          ...formMapel,
+                          nama_mapel: e.target.value,
+                        })
+                      }
+                      className="mt-1 w-full rounded-xl border border-white/10 bg-slate-900 px-3 py-2 text-sm text-slate-100 focus:border-sky-500 focus:outline-none"
+                    />
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label
+                        htmlFor="map-beban"
+                        className="block text-xs font-semibold text-slate-300"
+                      >
+                        Beban Jam (JP / Minggu)
+                      </label>
+                      <input
+                        id="map-beban"
+                        type="number"
+                        min={1}
+                        max={10}
+                        value={formMapel.beban_jam}
+                        onChange={(e) =>
+                          setFormMapel({
+                            ...formMapel,
+                            beban_jam: Number(e.target.value),
+                          })
+                        }
+                        className="mt-1 w-full rounded-xl border border-white/10 bg-slate-900 px-3 py-2 text-sm text-slate-100 focus:border-sky-500 focus:outline-none"
+                      />
+                    </div>
+                    <div>
+                      <label
+                        htmlFor="map-kkm"
+                        className="block text-xs font-semibold text-slate-300"
+                      >
+                        KKM (Ketuntasan Minimal)
+                      </label>
+                      <input
+                        id="map-kkm"
+                        type="number"
+                        min={50}
+                        max={100}
+                        value={formMapel.kkm}
+                        onChange={(e) =>
+                          setFormMapel({
+                            ...formMapel,
+                            kkm: Number(e.target.value),
+                          })
+                        }
+                        className="mt-1 w-full rounded-xl border border-white/10 bg-slate-900 px-3 py-2 text-sm text-slate-100 focus:border-sky-500 focus:outline-none"
+                      />
+                    </div>
+                  </div>
+                </>
+              ) : null}
+
+              {modalType === "penugasan" ? (
+                <>
+                  <div>
+                    <label
+                      htmlFor="pen-ta"
+                      className="block text-xs font-semibold text-slate-300"
+                    >
+                      Tahun Ajaran
+                    </label>
+                    <select
+                      id="pen-ta"
+                      value={formPenugasan.id_tahun_ajaran}
+                      onChange={(e) =>
+                        setFormPenugasan({
+                          ...formPenugasan,
+                          id_tahun_ajaran: e.target.value,
+                        })
+                      }
+                      className="mt-1 w-full rounded-xl border border-white/10 bg-slate-900 px-3 py-2 text-sm text-slate-100 focus:border-sky-500 focus:outline-none"
+                    >
+                      {tahunAjaranList.map((ta) => (
+                        <option
+                          key={String(ta.id_tahun_ajaran)}
+                          value={String(ta.id_tahun_ajaran)}
+                          className="bg-slate-900 text-slate-100"
+                        >
+                          {String(ta.nama_tahun)} ({String(ta.semester)})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label
+                      htmlFor="pen-rombel"
+                      className="block text-xs font-semibold text-slate-300"
+                    >
+                      Rombel / Kelas
+                    </label>
+                    <select
+                      id="pen-rombel"
+                      value={formPenugasan.id_rombel}
+                      onChange={(e) =>
+                        setFormPenugasan({
+                          ...formPenugasan,
+                          id_rombel: e.target.value,
+                        })
+                      }
+                      className="mt-1 w-full rounded-xl border border-white/10 bg-slate-900 px-3 py-2 text-sm text-slate-100 focus:border-sky-500 focus:outline-none"
+                    >
+                      {rombelList.map((rom) => (
+                        <option
+                          key={String(rom.id_rombel)}
+                          value={String(rom.id_rombel)}
+                          className="bg-slate-900 text-slate-100"
+                        >
+                          Kelas {String(rom.tingkat)} -{" "}
+                          {String(rom.nama_rombel)}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label
+                      htmlFor="pen-mapel"
+                      className="block text-xs font-semibold text-slate-300"
+                    >
+                      Mata Pelajaran
+                    </label>
+                    <select
+                      id="pen-mapel"
+                      value={formPenugasan.id_mapel}
+                      onChange={(e) =>
+                        setFormPenugasan({
+                          ...formPenugasan,
+                          id_mapel: e.target.value,
+                        })
+                      }
+                      className="mt-1 w-full rounded-xl border border-white/10 bg-slate-900 px-3 py-2 text-sm text-slate-100 focus:border-sky-500 focus:outline-none"
+                    >
+                      {mapelList.map((m) => (
+                        <option
+                          key={String(m.id_mapel)}
+                          value={String(m.id_mapel)}
+                          className="bg-slate-900 text-slate-100"
+                        >
+                          {String(m.kode_mapel)} - {String(m.nama_mapel)} (
+                          {String(m.beban_jam)} JP)
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label
+                      htmlFor="pen-guru"
+                      className="block text-xs font-semibold text-slate-300"
+                    >
+                      Guru Pengampu
+                    </label>
+                    <select
+                      id="pen-guru"
+                      value={formPenugasan.id_guru}
+                      onChange={(e) =>
+                        setFormPenugasan({
+                          ...formPenugasan,
+                          id_guru: e.target.value,
+                        })
+                      }
+                      className="mt-1 w-full rounded-xl border border-white/10 bg-slate-900 px-3 py-2 text-sm text-slate-100 focus:border-sky-500 focus:outline-none"
+                    >
+                      {guruList.map((g) => (
+                        <option
+                          key={String(g.id_guru)}
+                          value={String(g.id_guru)}
+                          className="bg-slate-900 text-slate-100"
+                        >
+                          {String(g.nama)} {g.nip ? `(${String(g.nip)})` : ""}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </>
+              ) : null}
+
+              <div className="mt-4 flex items-center justify-end gap-2 border-t border-white/10 pt-4">
+                <button
+                  type="button"
+                  onClick={() => setModalType(null)}
+                  className="rounded-xl border border-white/10 px-4 py-2 text-sm font-semibold text-slate-300 hover:bg-white/5"
+                >
+                  Batal
+                </button>
+                <button
+                  type="submit"
+                  disabled={saving}
+                  className="rounded-xl bg-sky-500 px-5 py-2 text-sm font-bold text-slate-950 shadow-lg shadow-sky-500/20 hover:bg-sky-400 disabled:opacity-50"
+                >
+                  {saving ? "Menyimpan..." : "Simpan"}
+                </button>
+              </div>
+            </form>
+          </Modal>
+        ) : null}
+      </div>
+    </AppShell>
+  );
+}

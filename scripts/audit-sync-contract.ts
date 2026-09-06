@@ -181,14 +181,25 @@ const desktopSync = read("web-desktop/src-tauri/src/desktop/sync.rs");
 const mobileSync = read("mobile/src-tauri/src/mobile/sync.rs");
 const desktopLib = read("web-desktop/src-tauri/src/lib.rs");
 const mobileLib = read("mobile/src-tauri/src/lib.rs");
-const desktopCommands = read("web-desktop/src-tauri/src/desktop/commands.rs");
-// `commands.rs` DITAMBAH modul khusus Mobile. Perintah yang tidak punya
-// padanan Desktop hidup di luar berkas yang disalin sync-rust-modules.ts, dan
-// audit yang hanya membaca commands.rs akan menuduhnya "terdaftar tetapi
-// fungsinya tidak ada".
+const desktopPayrollCommandsSource = read(
+	"web-desktop/src-tauri/src/desktop/payroll/commands.rs",
+);
+const desktopCommands = [
+	read("web-desktop/src-tauri/src/desktop/commands.rs"),
+	desktopPayrollCommandsSource,
+].join("\n");
+const desktopPayrollCommands = new Set(
+	definedCommands(desktopPayrollCommandsSource),
+);
+
+// `commands.rs` DITAMBAH modul khusus Mobile (share.rs dan payroll.rs).
+// Perintah yang tidak punya padanan Desktop hidup di luar berkas yang disalin
+// sync-rust-modules.ts, dan audit yang hanya membaca commands.rs akan menuduhnya
+// "terdaftar tetapi fungsinya tidak ada".
 const mobileCommands = [
 	read("mobile/src-tauri/src/mobile/commands.rs"),
-	read("mobile/src-tauri/src/mobile/device_storage.rs"),
+	read("mobile/src-tauri/src/mobile/share.rs"),
+	read("mobile/src-tauri/src/mobile/payroll.rs"),
 ].join("\n");
 const desktopBuild = read("web-desktop/src-tauri/build.rs");
 const mobileBuild = read("mobile/src-tauri/build.rs");
@@ -302,13 +313,13 @@ for (const [label, workspace, lib] of [
 	}
 	// Command berawalan `mobile_` hanya dipanggil di balik
 	// `if (isMobileRuntime()) { … }` pada gateway bersama, jadi wajar tidak
-	// terdaftar di biner Desktop/Web. Pakai awalan itu untuk SETIAP perintah
-	// yang hanya ada di Mobile — tanpa awalannya, audit ini akan menuduh
-	// gateway bersama memanggil command hantu.
+	// terdaftar di biner Desktop/Web. Begitu juga perintah administrasi payroll
+	// Desktop yang ada di gateway bersama tidak pernah dipanggil oleh UI Mobile.
 	const unknown = [...invoked].filter(
 		(name) =>
 			!registered.has(name) &&
-			!(workspace === "web-desktop" && name.startsWith("mobile_")),
+			!(workspace === "web-desktop" && name.startsWith("mobile_")) &&
+			!(workspace === "mobile" && desktopPayrollCommands.has(name)),
 	);
 	if (unknown.length > 0) {
 		fail(

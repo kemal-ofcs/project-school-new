@@ -15,4 +15,5 @@ pub mod turso;
 
 pub mod portability;
 pub mod payroll;
+pub mod academic;
 pub use config::DesktopState;

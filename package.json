@@ -12,5 +12,8 @@
     "verify:identity": "bun scripts/verify-identity.ts",
     "verify:template": "bun scripts/verify-template.ts"
   },
-  "devDependencies": {}
+  "devDependencies": {
+    "@types/bun": "^1.4.1",
+    "@types/node": "^26.4.1"
+  }
 }

@@ -5,6 +5,9 @@ export type AppArea =
   | "scanner"
   | "dashboard"
   | "history"
+  | "akademik"
+  | "siswa"
+  | "guru"
   | "karyawan"
   | "idcards"
   | "shift"
@@ -31,6 +34,9 @@ const AREA_PERMISSION: Record<
   scanner: "scanner.use",
   dashboard: "dashboard.view",
   history: "dashboard.view",
+  akademik: "academic.view",
+  siswa: "students.view",
+  guru: "teachers.view",
   karyawan: "employees.view",
   idcards: "employees.manage",
   shift: "shifts.view",

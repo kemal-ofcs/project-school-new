@@ -1,0 +1,68 @@
+"use client";
+
+import { requestWebApi } from "@/lib/client/api-client";
+import { isDesktopRuntime } from "@/lib/runtime/app-runtime";
+import { invokeDesktop } from "@/lib/runtime/desktop-commands";
+
+function kickDesktopSync() {
+  void invokeDesktop("desktop_sync_now").catch(() => undefined);
+}
+
+export interface SiswaInput {
+  id_siswa?: string;
+  nama_lengkap: string;
+  nis?: string | null;
+  nisn?: string | null;
+  jenis_kelamin?: "L" | "P";
+  id_rombel: string;
+  nama_wali?: string | null;
+  no_whatsapp_wali?: string | null;
+  alamat?: string | null;
+  angkatan?: number;
+  status?: string;
+}
+
+export async function getDaftarSiswa(id_rombel?: string) {
+  if (isDesktopRuntime()) {
+    return invokeDesktop<Record<string, unknown>[]>("desktop_get_students", {
+      id_rombel: id_rombel || null,
+    });
+  }
+  const response = await requestWebApi<{
+    students: Record<string, unknown>[];
+  }>("/api/students/query", "POST", {
+    id_rombel: id_rombel || undefined,
+  });
+  return response.students;
+}
+
+export async function simpanSiswa(draft: SiswaInput) {
+  if (isDesktopRuntime()) {
+    const result = await invokeDesktop<{ sukses: boolean; id_siswa: string }>(
+      "desktop_save_student",
+      { draft },
+    );
+    kickDesktopSync();
+    return result;
+  }
+  return requestWebApi<{ sukses: boolean; id_siswa: string }>(
+    "/api/students",
+    "POST",
+    { draft },
+  );
+}
+
+export async function hapusSiswa(id: string) {
+  if (isDesktopRuntime()) {
+    const result = await invokeDesktop<{ sukses: boolean }>(
+      "desktop_delete_student",
+      { id },
+    );
+    kickDesktopSync();
+    return result;
+  }
+  return requestWebApi<{ sukses: boolean }>("/api/students", "POST", {
+    action: "delete",
+    id,
+  });
+}

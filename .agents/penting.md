@@ -118,4 +118,19 @@ Dokumen ini memuat rangkuman prinsip, guard code, batasan terlarang, arsitektur 
 - **Offline-First Mutlak:** seluruh aset dan runtime WASM di-bundle di `public/3d/`; tidak boleh ada satupun request keluar saat aplikasi berjalan tanpa internet.
 - **Graceful Degradation:** tier kualitas `high | medium | low | off` ditentukan `detect-gpu` (default aman `low` bila deteksi gagal), disimpan device-local, dan turun otomatis saat frame rate di bawah target. Seluruh alur inti wajib tetap berfungsi penuh pada tier `off`.
 - **Hemat Baterai:** `frameloop="demand"` untuk scene statis, render loop berhenti saat aplikasi tidak terlihat, `prefers-reduced-motion` dihormati.
-- Kontrak lengkap: `.agents/skills/absensi-sppg-rules/references/07-immersive-3d-ui-ux.md`.
+- Kontrak lengkap: [07-immersive-3d-ui-ux.md](file:///e:/Freelance/Project%20Meksa/.agents/skills/absensi-sppg-rules/references/07-immersive-3d-ui-ux.md).
+
+---
+
+## 9. Indeks Dokumen Rujukan Lengkap (Klik Langsung)
+
+Berikut adalah tautan cepat ke seluruh berkas referensi teknis yang dapat dibuka langsung dengan 1 kali klik:
+
+1. [01-bootstrap-and-security.md](file:///e:/Freelance/Project%20Meksa/.agents/skills/absensi-sppg-rules/references/01-bootstrap-and-security.md) — Keamanan Vault Argon2id, AES-GCM, Zero-Secret Build, RBAC, dan Rate Limiting.
+2. [02-sync-canonical-and-outbox.md](file:///e:/Freelance/Project%20Meksa/.agents/skills/absensi-sppg-rules/references/02-sync-canonical-and-outbox.md) — 37 Rute Kanonik, Idempotensi, Atomic Receipt, dan Empty-Cloud Safety.
+3. [03-schema-4layer-consistency.md](file:///e:/Freelance/Project%20Meksa/.agents/skills/absensi-sppg-rules/references/03-schema-4layer-consistency.md) — 21 Snapshot Tables, Konsistensi DDL SQLite vs Rust vs Zod, dan Rekonsiliasi Shift.
+4. [04-hardware-and-android-lifecycle.md](file:///e:/Freelance/Project%20Meksa/.agents/skills/absensi-sppg-rules/references/04-hardware-and-android-lifecycle.md) — Siklus Hidup Kamera Android WebView, WebPki TLS, Scoped Storage SAF, dan GPS Caching.
+5. [05-business-logic-edge-cases.md](file:///e:/Freelance/Project%20Meksa/.agents/skills/absensi-sppg-rules/references/05-business-logic-edge-cases.md) — Shift Malam Lintas Hari, Auto-Alfa, Koreksi Admin, dan Geofencing.
+6. [06-payroll-and-system-hardening.md](file:///e:/Freelance/Project%20Meksa/.agents/skills/absensi-sppg-rules/references/06-payroll-and-system-hardening.md) — Payroll Engine, PPh 21 TER, BPJS, rust_decimal, dan Layered Guards.
+7. [07-immersive-3d-ui-ux.md](file:///e:/Freelance/Project%20Meksa/.agents/skills/absensi-sppg-rules/references/07-immersive-3d-ui-ux.md) — Stack 3D/Motion Resmi, Zero-CDN Assets, Prasyarat CSP, Tier Kualitas Adaptif, dan Checklist Visual.
+8. [sync-contract.md](file:///e:/Freelance/Project%20Meksa/.agents/skills/absensi-sppg-rules/references/sync-contract.md) — Kontrak Outbox dan Daftar Rute Sinkronisasi.

@@ -161,6 +161,16 @@ export const PERMISSION_CATALOG = [
     name: "Export Laporan & Slip Gaji",
     group: "Penggajian",
   },
+  { key: "academic.view", name: "Lihat Struktur Akademik", group: "Akademik" },
+  {
+    key: "academic.manage",
+    name: "Kelola Struktur Akademik",
+    group: "Akademik",
+  },
+  { key: "students.view", name: "Lihat Data Siswa", group: "Akademik" },
+  { key: "students.manage", name: "Kelola Data Siswa", group: "Akademik" },
+  { key: "teachers.view", name: "Lihat Data Guru & PTK", group: "Akademik" },
+  { key: "teachers.manage", name: "Kelola Data Guru & PTK", group: "Akademik" },
 ] as const;
 
 export type PermissionKey = (typeof PERMISSION_CATALOG)[number]["key"];
@@ -225,6 +235,9 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<
     "employees.view",
     "shifts.view",
     "sync.view",
+    "academic.view",
+    "students.view",
+    "teachers.view",
   ],
   scanner: ["home.view", "scanner.use", "sync.view"],
 };

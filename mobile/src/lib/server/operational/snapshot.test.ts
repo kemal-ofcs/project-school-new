@@ -42,6 +42,13 @@ describe("readOperationalSnapshot", () => {
           result(),
           result(),
           result(),
+          result(),
+          result(),
+          result(),
+          result(),
+          result(),
+          result(),
+          result(),
           result([{ revision: 12 }]),
         ];
       },
@@ -50,7 +57,7 @@ describe("readOperationalSnapshot", () => {
     const snapshot = await readOperationalSnapshot(client);
 
     expect(receivedMode).toBe("read");
-    expect(receivedStatementCount).toBe(22);
+    expect(receivedStatementCount).toBe(29);
     expect(snapshot.revision).toBe(12);
     expect(snapshot.employees).toEqual([
       { id_unik: "employee-1", nama: "Operator Uji" },
