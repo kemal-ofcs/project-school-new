@@ -21,6 +21,7 @@ const HOLIDAY_WHITELIST_MIGRATION_VERSION = 14;
 const PASSWORD_RECOVERY_MIGRATION_VERSION = 15;
 const ACADEMIC_FOUNDATION_MIGRATION_VERSION = 16;
 const ACADEMIC_UNIQUE_RELAXATION_MIGRATION_VERSION = 17;
+const CLASS_ATTENDANCE_MIGRATION_VERSION = 18;
 
 /**
  * Bangun ulang sebuah tabel untuk melepas UNIQUE yang terlanjur ikut terbuat.
@@ -1132,6 +1133,56 @@ export async function runDatabaseMigrations(client: Client) {
           VALUES (?, 'academic-unique-relaxation', ?);`,
     args: [ACADEMIC_UNIQUE_RELAXATION_MIGRATION_VERSION, now],
   });
+
+  // ── v18: Presensi Jam Mata Pelajaran & Rekonsiliasi Kehadiran Kelas (Fase 2) ──
+  await client.execute(`
+    CREATE TABLE IF NOT EXISTS presensi_mapel (
+      id_presensi_mapel TEXT PRIMARY KEY,
+      id_tahun_ajaran TEXT NOT NULL,
+      id_rombel TEXT NOT NULL,
+      id_mapel TEXT NOT NULL,
+      id_guru TEXT NOT NULL,
+      tanggal TEXT NOT NULL,
+      jam_ke TEXT NOT NULL,
+      materi_pokok TEXT,
+      catatan TEXT,
+      total_hadir INTEGER NOT NULL DEFAULT 0,
+      total_izin INTEGER NOT NULL DEFAULT 0,
+      total_sakit INTEGER NOT NULL DEFAULT 0,
+      total_alfa INTEGER NOT NULL DEFAULT 0,
+      total_dispensasi INTEGER NOT NULL DEFAULT 0,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+  `);
+
+  await client.execute(`
+    CREATE TABLE IF NOT EXISTS presensi_mapel_detail (
+      id_detail TEXT PRIMARY KEY,
+      id_presensi_mapel TEXT NOT NULL,
+      id_siswa TEXT NOT NULL,
+      status TEXT NOT NULL CHECK (status IN ('Hadir', 'Izin', 'Sakit', 'Alfa', 'Dispensasi')),
+      catatan TEXT,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+  `);
+
+  await client.execute({
+    sql: `INSERT OR IGNORE INTO schema_migration (version, name, applied_at)
+          VALUES (?, 'class-attendance-foundation', ?);`,
+    args: [CLASS_ATTENDANCE_MIGRATION_VERSION, now],
+  });
+
+  await client.execute(
+    "CREATE INDEX IF NOT EXISTS idx_presensi_mapel_lookup ON presensi_mapel(id_tahun_ajaran, id_rombel, id_mapel, tanggal);",
+  );
+  await client.execute(
+    "CREATE INDEX IF NOT EXISTS idx_presensi_mapel_detail_parent ON presensi_mapel_detail(id_presensi_mapel);",
+  );
+  await client.execute(
+    "CREATE INDEX IF NOT EXISTS idx_presensi_mapel_detail_siswa ON presensi_mapel_detail(id_siswa, created_at);",
+  );
 
   await client.execute(
     "CREATE INDEX IF NOT EXISTS idx_rombel_ta ON akademik_rombel(id_tahun_ajaran);",

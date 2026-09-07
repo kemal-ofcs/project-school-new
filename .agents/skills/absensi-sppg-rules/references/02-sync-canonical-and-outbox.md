@@ -4,30 +4,32 @@ Dokumen ini mendefinisikan kontrak resmi komunikasi sinkronisasi dua arah antara
 
 ---
 
-## 1. 57 Route Kanonik Outbox (The 57 Canonical Hyphen Routes)
+## 1. 62 Route Kanonik Outbox (The 62 Canonical Hyphen Routes)
 
-Hanya 57 pasangan `(domain, operation)` berikut yang diizinkan untuk diproduksi oleh outbox dan diproses oleh consumer backend/Turso:
+Hanya 62 pasangan `(domain, operation)` berikut yang diizinkan untuk diproduksi oleh outbox dan diproses oleh consumer backend/Turso:
 
 ```text
-1.  academic-assignment/create       20. backup/create                    39. payroll/bpjs-rule
-2.  academic-assignment/delete       21. company-profile/update           40. payroll/create-run
-3.  academic-class/create            22. correction/create                41. payroll/delete
-4.  academic-class/delete            23. correction/delete                42. payroll/overtime-rule
-5.  academic-class/update            24. employee/create                  43. payroll/payroll-component
-6.  academic-department/create       25. employee/status                  44. payroll/salary-config
-7.  academic-department/delete       26. employee/token                   45. payroll/tax-rule
-8.  academic-department/update       27. employee/update                  46. payroll/transition-status
-9.  academic-subject/create          28. holiday/create                   47. setting/update
-10. academic-subject/delete          29. holiday/delete                   48. setting/upsert
-11. academic-subject/update          30. holiday/update                   49. shift/create
-12. academic-year/create             31. holiday-whitelist/create         50. shift/delete
-13. academic-year/delete             32. holiday-whitelist/delete         51. shift/update
-14. academic-year/update             33. holiday-whitelist/update         52. student/create
-15. attendance/create                34. id-card/update                   53. student/delete
-16. attendance/delete                35. id-card-template/save            54. student/update
-17. attendance/scan                  36. log-scan/delete                  55. teacher/create
-18. attendance/update                37. offline-import/delete            56. teacher/delete
-19. backup/cancel                    38. offline-import/row               57. teacher/update
+ 1. academic-assignment/create      22. class-attendance/delete         43. offline-import/row
+ 2. academic-assignment/delete      23. class-attendance/update         44. payroll/bpjs-rule
+ 3. academic-class/create           24. class-attendance-detail/delete  45. payroll/create-run
+ 4. academic-class/delete           25. class-attendance-detail/save    46. payroll/delete
+ 5. academic-class/update           26. company-profile/update          47. payroll/overtime-rule
+ 6. academic-department/create      27. correction/create               48. payroll/payroll-component
+ 7. academic-department/delete      28. correction/delete               49. payroll/salary-config
+ 8. academic-department/update      29. employee/create                 50. payroll/tax-rule
+ 9. academic-subject/create         30. employee/status                 51. payroll/transition-status
+10. academic-subject/delete         31. employee/token                  52. setting/update
+11. academic-subject/update         32. employee/update                 53. setting/upsert
+12. academic-year/create            33. holiday/create                  54. shift/create
+13. academic-year/delete            34. holiday/delete                  55. shift/delete
+14. academic-year/update            35. holiday/update                  56. shift/update
+15. attendance/create               36. holiday-whitelist/create        57. student/create
+16. attendance/delete               37. holiday-whitelist/delete        58. student/delete
+17. attendance/scan                 38. holiday-whitelist/update        59. student/update
+18. attendance/update               39. id-card/update                  60. teacher/create
+19. backup/cancel                   40. id-card-template/save           61. teacher/delete
+20. backup/create                   41. log-scan/delete                 62. teacher/update
+21. class-attendance/create         42. offline-import/delete
 ```
 
 ### Aturan Penamaan & Boundary Compatibility:

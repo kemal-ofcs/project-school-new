@@ -724,6 +724,41 @@ pub fn initialize(path: &Path) -> Result<(), String> {
       VALUES (5, 'desktop-academic-foundation', unixepoch());
       INSERT OR IGNORE INTO desktop_schema_migration (version, name, applied_at)
       VALUES (6, 'desktop-academic-unique-relaxation', unixepoch());
+      CREATE TABLE IF NOT EXISTS presensi_mapel (
+        id_presensi_mapel TEXT PRIMARY KEY,
+        id_tahun_ajaran TEXT NOT NULL,
+        id_rombel TEXT NOT NULL,
+        id_mapel TEXT NOT NULL,
+        id_guru TEXT NOT NULL,
+        tanggal TEXT NOT NULL,
+        jam_ke TEXT NOT NULL,
+        materi_pokok TEXT,
+        catatan TEXT,
+        total_hadir INTEGER NOT NULL DEFAULT 0,
+        total_izin INTEGER NOT NULL DEFAULT 0,
+        total_sakit INTEGER NOT NULL DEFAULT 0,
+        total_alfa INTEGER NOT NULL DEFAULT 0,
+        total_dispensasi INTEGER NOT NULL DEFAULT 0,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      );
+      CREATE TABLE IF NOT EXISTS presensi_mapel_detail (
+        id_detail TEXT PRIMARY KEY,
+        id_presensi_mapel TEXT NOT NULL,
+        id_siswa TEXT NOT NULL,
+        status TEXT NOT NULL CHECK (status IN ('Hadir', 'Izin', 'Sakit', 'Alfa', 'Dispensasi')),
+        catatan TEXT,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS idx_local_presensi_mapel_lookup
+        ON presensi_mapel(id_tahun_ajaran, id_rombel, id_mapel, tanggal);
+      CREATE INDEX IF NOT EXISTS idx_local_presensi_mapel_detail_parent
+        ON presensi_mapel_detail(id_presensi_mapel);
+      CREATE INDEX IF NOT EXISTS idx_local_presensi_mapel_detail_siswa
+        ON presensi_mapel_detail(id_siswa, created_at);
+      INSERT OR IGNORE INTO desktop_schema_migration (version, name, applied_at)
+      VALUES (7, 'desktop-class-attendance-foundation', unixepoch());
       "#,
         )
         .map_err(|_| "Schema keamanan Desktop tidak dapat diinisialisasi.".to_owned())?;
@@ -1357,7 +1392,7 @@ mod tests {
                 |row| row.get(0),
             )
             .expect("migration count");
-        assert_eq!(migrations, 6);
+        assert_eq!(migrations, 7);
     }
 
     /// Pindah database cloud harus membuang seluruh cache database lama, tetapi

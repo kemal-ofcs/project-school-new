@@ -852,6 +852,16 @@ const SNAPSHOT_SOURCES: &[SnapshotSource] = &[
         table: "siswa_data",
         sql: "SELECT * FROM siswa_data ORDER BY nama_lengkap;",
     },
+    SnapshotSource {
+        payload_key: "presensiMapel",
+        table: "presensi_mapel",
+        sql: "SELECT * FROM presensi_mapel ORDER BY tanggal DESC, jam_ke ASC;",
+    },
+    SnapshotSource {
+        payload_key: "presensiMapelDetail",
+        table: "presensi_mapel_detail",
+        sql: "SELECT * FROM presensi_mapel_detail ORDER BY id_presensi_mapel, id_siswa;",
+    },
 ];
 
 pub struct TursoClient {
@@ -1927,7 +1937,10 @@ impl TursoClient {
                 ('students.view', 'Lihat Data Siswa', 'Akademik', 'Melihat daftar dan profil siswa.', 1, 410),
                 ('students.manage', 'Kelola Data Siswa', 'Akademik', 'Menambah, mengedit, dan menghapus data siswa.', 1, 411),
                 ('teachers.view', 'Lihat Data Guru & PTK', 'Akademik', 'Melihat data guru dan tenaga kependidikan.', 1, 420),
-                ('teachers.manage', 'Kelola Data Guru & PTK', 'Akademik', 'Mengelola data guru dan penugasan mapel.', 1, 421);"#,
+                ('teachers.manage', 'Kelola Data Guru & PTK', 'Akademik', 'Mengelola data guru dan penugasan mapel.', 1, 421),
+                ('class_attendance.view', 'Lihat Presensi Jam Mapel', 'Akademik', 'Melihat presensi per jam mata pelajaran dan deteksi bolos.', 1, 430),
+                ('class_attendance.manage', 'Kelola Presensi Jam Mapel', 'Akademik', 'Mencatat dan mengedit presensi jam mata pelajaran siswa.', 1, 431),
+                ('class_attendance.delete', 'Hapus Sesi Presensi Mapel', 'Akademik', 'Menghapus sesi presensi jam mata pelajaran beserta seluruh detail siswa.', 1, 432);"#,
                 vec![],
             ),
             // Seed Default Role Permissions untuk Role Superadmin (Role 1)
@@ -2191,7 +2204,42 @@ impl TursoClient {
             ),
             Statement::new("CREATE INDEX IF NOT EXISTS idx_rombel_ta ON akademik_rombel(id_tahun_ajaran);", vec![]),
             Statement::new("CREATE INDEX IF NOT EXISTS idx_siswa_rombel ON siswa_data(id_rombel, status);", vec![]),
-            Statement::new("CREATE INDEX IF NOT EXISTS idx_guru_mapel_lookup ON akademik_guru_mapel(id_rombel, id_mapel);", vec![]),
+            Statement::new(
+                r#"CREATE TABLE IF NOT EXISTS presensi_mapel (
+                    id_presensi_mapel TEXT PRIMARY KEY,
+                    id_tahun_ajaran TEXT NOT NULL,
+                    id_rombel TEXT NOT NULL,
+                    id_mapel TEXT NOT NULL,
+                    id_guru TEXT NOT NULL,
+                    tanggal TEXT NOT NULL,
+                    jam_ke TEXT NOT NULL,
+                    materi_pokok TEXT,
+                    catatan TEXT,
+                    total_hadir INTEGER NOT NULL DEFAULT 0,
+                    total_izin INTEGER NOT NULL DEFAULT 0,
+                    total_sakit INTEGER NOT NULL DEFAULT 0,
+                    total_alfa INTEGER NOT NULL DEFAULT 0,
+                    total_dispensasi INTEGER NOT NULL DEFAULT 0,
+                    created_at TEXT NOT NULL,
+                    updated_at TEXT NOT NULL
+                );"#,
+                vec![],
+            ),
+            Statement::new(
+                r#"CREATE TABLE IF NOT EXISTS presensi_mapel_detail (
+                    id_detail TEXT PRIMARY KEY,
+                    id_presensi_mapel TEXT NOT NULL,
+                    id_siswa TEXT NOT NULL,
+                    status TEXT NOT NULL CHECK (status IN ('Hadir', 'Izin', 'Sakit', 'Alfa', 'Dispensasi')),
+                    catatan TEXT,
+                    created_at TEXT NOT NULL,
+                    updated_at TEXT NOT NULL
+                );"#,
+                vec![],
+            ),
+            Statement::new("CREATE INDEX IF NOT EXISTS idx_presensi_mapel_lookup ON presensi_mapel(id_tahun_ajaran, id_rombel, id_mapel, tanggal);", vec![]),
+            Statement::new("CREATE INDEX IF NOT EXISTS idx_presensi_mapel_detail_parent ON presensi_mapel_detail(id_presensi_mapel);", vec![]),
+            Statement::new("CREATE INDEX IF NOT EXISTS idx_presensi_mapel_detail_siswa ON presensi_mapel_detail(id_siswa, created_at);", vec![]),
             // Seed Default Overtime Rules
             Statement::new(crate::desktop::payroll_seed::OVERTIME_TIER_RULES_SEED_SQL, vec![]),
             // Seed Default Tax Rules (Pasal 17 & TER Baseline)
@@ -2207,7 +2255,8 @@ impl TursoClient {
                 (14, 'holiday-whitelist-and-holiday-overtime', datetime('now')),
                 (15, 'superadmin-password-recovery-codes', datetime('now')),
                 (16, 'academic-foundation-v1', datetime('now')),
-                (17, 'academic-unique-relaxation', datetime('now'));"#,
+                (17, 'academic-unique-relaxation', datetime('now')),
+                (18, 'class-attendance-foundation', datetime('now'));"#,
                 vec![],
             ),
         ];
@@ -5017,6 +5066,21 @@ fn canonical_sync_route(domain: &str, operation: &str) -> Option<(&'static str, 
         ("student" | "siswa", "create") => ("student", "create"),
         ("student" | "siswa", "update") => ("student", "update"),
         ("student" | "siswa", "delete") => ("student", "delete"),
+        ("class-attendance" | "class_attendance" | "presensi-mapel" | "presensi_mapel", "create") => {
+            ("class-attendance", "create")
+        }
+        ("class-attendance" | "class_attendance" | "presensi-mapel" | "presensi_mapel", "update") => {
+            ("class-attendance", "update")
+        }
+        ("class-attendance" | "class_attendance" | "presensi-mapel" | "presensi_mapel", "delete") => {
+            ("class-attendance", "delete")
+        }
+        ("class-attendance-detail" | "class_attendance_detail" | "presensi-mapel-detail" | "presensi_mapel_detail", "save") => {
+            ("class-attendance-detail", "save")
+        }
+        ("class-attendance-detail" | "class_attendance_detail" | "presensi-mapel-detail" | "presensi_mapel_detail", "delete") => {
+            ("class-attendance-detail", "delete")
+        }
         _ => return None,
     };
     sync::is_canonical_sync_route(route.0, route.1).then_some(route)
@@ -5207,7 +5271,7 @@ async fn apply_event_to_turso(
                     .await?;
                 turso
                     .query_one(
-                        "INSERT INTO id_card (id_unik, nama, divisi, idcard_status, tanggal_generate) SELECT ?, ?, ?, 'Belum', date('now') WHERE NOT EXISTS (SELECT 1 FROM id_card WHERE id_unik = ?);",
+                        "INSERT INTO id_card (id_unik, nama, divisi, idcard_status, tanggal_generate) SELECT ?, ?, ?, 'Belum', date('now','+7 hours') WHERE NOT EXISTS (SELECT 1 FROM id_card WHERE id_unik = ?);",
                         vec![json!(id_unik), json!(nama), json!(divisi), json!(id_unik)],
                     )
                     .await?;
@@ -5312,7 +5376,7 @@ async fn apply_event_to_turso(
                     .await?;
                 turso
                     .query_one(
-                        "INSERT INTO id_card (id_unik, nama, divisi, idcard_status, tanggal_generate) SELECT ?, ?, ?, 'Belum', date('now') WHERE NOT EXISTS (SELECT 1 FROM id_card WHERE id_unik = ?);",
+                        "INSERT INTO id_card (id_unik, nama, divisi, idcard_status, tanggal_generate) SELECT ?, ?, ?, 'Belum', date('now','+7 hours') WHERE NOT EXISTS (SELECT 1 FROM id_card WHERE id_unik = ?);",
                         vec![json!(id_unik), json!(nama), json!(divisi), json!(id_unik)],
                     )
                     .await?;
@@ -7023,6 +7087,114 @@ async fn apply_event_to_turso(
                     "DELETE FROM siswa_data WHERE id_siswa = ?;",
                     vec![json!(id)],
                 ).await?;
+            }
+        }
+        ("class-attendance", "create" | "update") => {
+            let row = payload.get("class_attendance").or_else(|| payload.get("presensiMapel")).unwrap_or(payload);
+            let id = row.get("id_presensi_mapel").and_then(Value::as_str).filter(|v| !v.is_empty()).unwrap_or(entity_key);
+            if !id.is_empty() {
+                let id_ta = row.get("id_tahun_ajaran").and_then(Value::as_str).unwrap_or("");
+                let id_rombel = row.get("id_rombel").and_then(Value::as_str).unwrap_or("");
+                let id_mapel = row.get("id_mapel").and_then(Value::as_str).unwrap_or("");
+                let id_guru = row.get("id_guru").and_then(Value::as_str).unwrap_or("");
+                let tanggal = row.get("tanggal").and_then(Value::as_str).unwrap_or("");
+                let jam_ke = row.get("jam_ke").and_then(Value::as_str).unwrap_or("");
+                let materi = row.get("materi_pokok").and_then(Value::as_str);
+                let catatan = row.get("catatan").and_then(Value::as_str);
+                let total_hadir = row.get("total_hadir").and_then(Value::as_i64).unwrap_or(0);
+                let total_izin = row.get("total_izin").and_then(Value::as_i64).unwrap_or(0);
+                let total_sakit = row.get("total_sakit").and_then(Value::as_i64).unwrap_or(0);
+                let total_alfa = row.get("total_alfa").and_then(Value::as_i64).unwrap_or(0);
+                let total_dispensasi = row.get("total_dispensasi").and_then(Value::as_i64).unwrap_or(0);
+                let created_at = row.get("created_at").and_then(Value::as_str).unwrap_or("");
+                let updated_at = row.get("updated_at").and_then(Value::as_str).unwrap_or("");
+
+                turso.query_one(
+                    r#"INSERT INTO presensi_mapel (
+                        id_presensi_mapel, id_tahun_ajaran, id_rombel, id_mapel, id_guru,
+                        tanggal, jam_ke, materi_pokok, catatan, total_hadir, total_izin,
+                        total_sakit, total_alfa, total_dispensasi, created_at, updated_at
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    ON CONFLICT(id_presensi_mapel) DO UPDATE SET
+                        id_tahun_ajaran = excluded.id_tahun_ajaran,
+                        id_rombel = excluded.id_rombel,
+                        id_mapel = excluded.id_mapel,
+                        id_guru = excluded.id_guru,
+                        tanggal = excluded.tanggal,
+                        jam_ke = excluded.jam_ke,
+                        materi_pokok = excluded.materi_pokok,
+                        catatan = excluded.catatan,
+                        total_hadir = excluded.total_hadir,
+                        total_izin = excluded.total_izin,
+                        total_sakit = excluded.total_sakit,
+                        total_alfa = excluded.total_alfa,
+                        total_dispensasi = excluded.total_dispensasi,
+                        updated_at = excluded.updated_at;"#,
+                    vec![
+                        json!(id), json!(id_ta), json!(id_rombel), json!(id_mapel), json!(id_guru),
+                        json!(tanggal), json!(jam_ke), json!(materi), json!(catatan),
+                        json!(total_hadir), json!(total_izin), json!(total_sakit), json!(total_alfa),
+                        json!(total_dispensasi), json!(created_at), json!(updated_at)
+                    ],
+                ).await?;
+            }
+        }
+        ("class-attendance", "delete") => {
+            let id = payload.get("id_presensi_mapel").and_then(Value::as_str).filter(|v| !v.is_empty()).unwrap_or(entity_key);
+            if !id.is_empty() {
+                turso.query_one(
+                    "DELETE FROM presensi_mapel_detail WHERE id_presensi_mapel = ?;",
+                    vec![json!(id)],
+                ).await?;
+                turso.query_one(
+                    "DELETE FROM presensi_mapel WHERE id_presensi_mapel = ?;",
+                    vec![json!(id)],
+                ).await?;
+            }
+        }
+        ("class-attendance-detail", "save") => {
+            let row = payload.get("class_attendance_detail").or_else(|| payload.get("presensiMapelDetail")).unwrap_or(payload);
+            let id = row.get("id_detail").and_then(Value::as_str).filter(|v| !v.is_empty()).unwrap_or(entity_key);
+            if !id.is_empty() {
+                let id_presensi = row.get("id_presensi_mapel").and_then(Value::as_str).unwrap_or("");
+                let id_siswa = row.get("id_siswa").and_then(Value::as_str).unwrap_or("");
+                let status = row.get("status").and_then(Value::as_str).unwrap_or("Hadir");
+                let catatan = row.get("catatan").and_then(Value::as_str);
+                let created_at = row.get("created_at").and_then(Value::as_str).unwrap_or("");
+                let updated_at = row.get("updated_at").and_then(Value::as_str).unwrap_or("");
+
+                turso.query_one(
+                    r#"INSERT INTO presensi_mapel_detail (
+                        id_detail, id_presensi_mapel, id_siswa, status, catatan, created_at, updated_at
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?)
+                    ON CONFLICT(id_detail) DO UPDATE SET
+                        status = excluded.status,
+                        catatan = excluded.catatan,
+                        updated_at = excluded.updated_at;"#,
+                    vec![
+                        json!(id), json!(id_presensi), json!(id_siswa), json!(status),
+                        json!(catatan), json!(created_at), json!(updated_at)
+                    ],
+                ).await?;
+            }
+        }
+        ("class-attendance-detail", "delete") => {
+            // Siswa yang keluar dari roster sesi. Tanpa event ini barisnya
+            // tetap hidup di cloud, lalu tarikan berikutnya mengembalikannya ke
+            // setiap perangkat — dan rekonsiliasi terus melaporkannya Alfa di
+            // kelas yang sudah ia tinggalkan.
+            let id = payload
+                .get("id_detail")
+                .and_then(Value::as_str)
+                .filter(|v| !v.is_empty())
+                .unwrap_or(entity_key);
+            if !id.is_empty() {
+                turso
+                    .query_one(
+                        "DELETE FROM presensi_mapel_detail WHERE id_detail = ?;",
+                        vec![json!(id)],
+                    )
+                    .await?;
             }
         }
         _ => {

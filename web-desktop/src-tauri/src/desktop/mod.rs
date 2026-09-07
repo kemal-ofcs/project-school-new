@@ -16,4 +16,5 @@ pub mod turso;
 pub mod portability;
 pub mod payroll;
 pub mod academic;
+pub mod class_attendance;
 pub use config::DesktopState;

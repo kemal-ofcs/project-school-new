@@ -168,6 +168,12 @@ pub fn run() {
             mobile::commands::desktop_get_students,
             mobile::commands::desktop_save_student,
             mobile::commands::desktop_delete_student,
+            mobile::commands::desktop_get_class_attendance_sessions,
+            mobile::commands::desktop_get_class_attendance_detail,
+            mobile::commands::desktop_get_roster_for_attendance,
+            mobile::commands::desktop_save_class_attendance,
+            mobile::commands::desktop_delete_class_attendance,
+            mobile::commands::desktop_get_attendance_reconciliation,
         ])
         .run(tauri::generate_context!())
         .unwrap_or_else(|error| {

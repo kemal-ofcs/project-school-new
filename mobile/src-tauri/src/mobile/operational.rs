@@ -132,7 +132,7 @@ pub fn create_employee(state: &MobileState, draft: &Value) -> Result<Value, Comm
     let today = text(draft, "tanggal_daftar");
     let today = if today.is_empty() {
         connection
-            .query_row("SELECT date('now', 'localtime');", [], |row| row.get(0))
+            .query_row("SELECT date('now', '+7 hours');", [], |row| row.get(0))
             .map_err(|_| CommandError::internal())?
     } else {
         today.to_owned()
@@ -234,7 +234,7 @@ pub fn import_employees(state: &MobileState, drafts: &[Value]) -> Result<Value, 
     let client_id = sync::ensure_client_id(state)?;
     let mut connection = storage::database(&state.data_dir)?;
     let today: String = connection
-        .query_row("SELECT date('now', 'localtime');", [], |row| row.get(0))
+        .query_row("SELECT date('now', '+7 hours');", [], |row| row.get(0))
         .map_err(|_| CommandError::internal())?;
 
     let transaction = connection
@@ -1357,7 +1357,7 @@ pub fn update_id_card(state: &MobileState, draft: &Value) -> Result<Value, Comma
         .map_err(|_| CommandError::internal())?;
     let now: String = transaction
         .query_row(
-            "SELECT strftime('%Y-%m-%d %H:%M:%S','now','localtime');",
+            "SELECT strftime('%Y-%m-%d %H:%M:%S','now','+7 hours');",
             [],
             |row| row.get(0),
         )

@@ -10,6 +10,7 @@ const filesToSync = [
   "administration.rs",
   "scanner.rs",
   "academic.rs",
+  "class_attendance.rs",
   "commands.rs",
   // Tarif default payroll: satu sumber untuk SQLite lokal dan Turso cloud, di
   // kedua workspace. Perbedaan sekecil apa pun di sini membuat baris seed lokal

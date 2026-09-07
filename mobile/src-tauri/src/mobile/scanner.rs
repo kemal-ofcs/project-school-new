@@ -23,6 +23,7 @@ struct Employee {
     shift_id: i64,
     status: String,
     token: String,
+    personnel_type: Option<String>,
 }
 
 #[derive(Clone)]
@@ -488,6 +489,7 @@ fn failure(message: impl Into<String>, employee: Option<&Employee>) -> Value {
         "idKaryawan": employee.map(|item| item.id.as_str()).unwrap_or(""),
         "nama": employee.map(|item| item.name.as_str()).unwrap_or("-"),
         "divisi": employee.map(|item| item.division.as_str()).unwrap_or("-"),
+        "jenisPersonil": employee.and_then(|item| item.personnel_type.as_deref()),
         "pesan": message.into(),
     })
 }
@@ -508,6 +510,7 @@ fn failure_with_context(
         "idKaryawan": employee.id,
         "nama": employee.name,
         "divisi": employee.division,
+        "jenisPersonil": employee.personnel_type.as_deref(),
         "pesan": message.into(),
         "catatanSistem": system_note.into(),
         "keterangan": detail.into(),
@@ -998,6 +1001,7 @@ fn result_from_decision(
         "idKaryawan": employee.id,
         "nama": employee.name,
         "divisi": employee.division,
+        "jenisPersonil": employee.personnel_type.as_deref(),
         "pesan": message,
         "catatanSistem": decision.system_note,
         "keterangan": decision.detail,
@@ -1083,7 +1087,7 @@ fn submit_internal(
     let employee = transaction
         .query_row(
             r#"
-      SELECT id_unik, nama, divisi, id_shift, status_aktif, token_absensi
+      SELECT id_unik, nama, divisi, id_shift, status_aktif, token_absensi, jenis_personil
       FROM master_data WHERE id_unik = ? OR kode_karyawan = ? LIMIT 1;
       "#,
             params![parts[0], parts[0]],
@@ -1095,6 +1099,7 @@ fn submit_internal(
                     shift_id: row.get(3)?,
                     status: row.get::<_, Option<String>>(4)?.unwrap_or_default(),
                     token: row.get::<_, Option<String>>(5)?.unwrap_or_default(),
+                    personnel_type: row.get::<_, Option<String>>(6)?.filter(|s| !s.trim().is_empty()),
                 })
             },
         )

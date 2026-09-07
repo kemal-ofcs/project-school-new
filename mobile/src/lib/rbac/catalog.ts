@@ -171,6 +171,21 @@ export const PERMISSION_CATALOG = [
   { key: "students.manage", name: "Kelola Data Siswa", group: "Akademik" },
   { key: "teachers.view", name: "Lihat Data Guru & PTK", group: "Akademik" },
   { key: "teachers.manage", name: "Kelola Data Guru & PTK", group: "Akademik" },
+  {
+    key: "class_attendance.view",
+    name: "Lihat Presensi Jam Mapel",
+    group: "Akademik",
+  },
+  {
+    key: "class_attendance.manage",
+    name: "Kelola Presensi Jam Mapel",
+    group: "Akademik",
+  },
+  {
+    key: "class_attendance.delete",
+    name: "Hapus Sesi Presensi Mapel",
+    group: "Akademik",
+  },
 ] as const;
 
 export type PermissionKey = (typeof PERMISSION_CATALOG)[number]["key"];
@@ -207,6 +222,9 @@ export const SENSITIVE_MUTATION_PERMISSIONS = new Set<PermissionKey>([
   // yang sedang berdiri di depan layar. Peninjaunya WAJIB sadar memikul itu,
   // jadi tidak ikut paket bawaan Admin.
   "password_reset.approve",
+  // Menghapus sesi presensi memusnahkan seluruh rekam jejak kehadiran kelas jam
+  // tersebut beserta seluruh detail siswa.
+  "class_attendance.delete",
 ]);
 
 export const SYSTEM_ROLE_KEYS = [
@@ -238,6 +256,7 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<
     "academic.view",
     "students.view",
     "teachers.view",
+    "class_attendance.view",
   ],
   scanner: ["home.view", "scanner.use", "sync.view"],
 };

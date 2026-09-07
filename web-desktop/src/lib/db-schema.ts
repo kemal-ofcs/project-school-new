@@ -2,8 +2,8 @@ import type { Client } from "@libsql/client";
 import { BRANDING } from "@/lib/constants/branding";
 import { runDatabaseMigrations } from "./db-migrations";
 
-export const CURRENT_SCHEMA_VERSION = 17;
-export const REQUIRED_TABLE_COUNT = 42;
+export const CURRENT_SCHEMA_VERSION = 18;
+export const REQUIRED_TABLE_COUNT = 44;
 
 export async function isDatabaseSchemaReady(client: Client) {
   try {
@@ -26,7 +26,8 @@ export async function isDatabaseSchemaReady(client: Client) {
             'password_reset_request', 'app_mail_config', 'absensi_foto',
             'hari_libur_whitelist',
             'akademik_tahun_ajaran', 'akademik_jurusan', 'akademik_rombel',
-            'akademik_mapel', 'akademik_guru_mapel', 'guru_data', 'siswa_data'
+            'akademik_mapel', 'akademik_guru_mapel', 'guru_data', 'siswa_data',
+            'presensi_mapel', 'presensi_mapel_detail'
           )
         ) AS table_count;
     `);

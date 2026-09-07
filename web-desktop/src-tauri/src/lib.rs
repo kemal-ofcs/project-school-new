@@ -176,6 +176,12 @@ pub fn run() {
             desktop::commands::desktop_get_students,
             desktop::commands::desktop_save_student,
             desktop::commands::desktop_delete_student,
+            desktop::commands::desktop_get_class_attendance_sessions,
+            desktop::commands::desktop_get_class_attendance_detail,
+            desktop::commands::desktop_get_roster_for_attendance,
+            desktop::commands::desktop_save_class_attendance,
+            desktop::commands::desktop_delete_class_attendance,
+            desktop::commands::desktop_get_attendance_reconciliation,
         ])
         .run(tauri::generate_context!())
         .unwrap_or_else(|error| {

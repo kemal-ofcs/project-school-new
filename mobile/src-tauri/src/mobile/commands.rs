@@ -12,7 +12,7 @@ use super::{
         CommandError, MobileLoginResult, MobileRuntimeStatus, MobileSession, MobileSyncStatus,
         OperatorUser, SessionMode,
     },
-    academic, operational,
+    academic, class_attendance, operational,
     remote::{self, RemoteLoginError},
     scanner, secrets, storage, sync, turso,
 };
@@ -2481,6 +2481,63 @@ pub fn desktop_delete_student(
 ) -> Result<Value, CommandError> {
     require_permission(&state, "students.manage")?;
     academic::delete_student(&state, &id)
+}
+
+// ── Perintah Presensi Mapel Kelas & Rekonsiliasi Deteksi Bolos (Fase 2) ─────
+
+#[tauri::command]
+pub fn desktop_get_class_attendance_sessions(
+    state: State<'_, MobileState>,
+    params: Option<Value>,
+) -> Result<Value, CommandError> {
+    require_permission(&state, "class_attendance.view")?;
+    class_attendance::list_class_attendance_sessions(&state, &params.unwrap_or(Value::Null))
+}
+
+#[tauri::command]
+pub fn desktop_get_class_attendance_detail(
+    state: State<'_, MobileState>,
+    id_presensi_mapel: String,
+) -> Result<Value, CommandError> {
+    require_permission(&state, "class_attendance.view")?;
+    class_attendance::get_class_attendance_detail(&state, &id_presensi_mapel)
+}
+
+#[tauri::command]
+pub fn desktop_get_roster_for_attendance(
+    state: State<'_, MobileState>,
+    id_rombel: String,
+    tanggal: String,
+) -> Result<Value, CommandError> {
+    require_permission(&state, "class_attendance.view")?;
+    class_attendance::get_roster_for_attendance(&state, &id_rombel, &tanggal)
+}
+
+#[tauri::command]
+pub fn desktop_save_class_attendance(
+    state: State<'_, MobileState>,
+    draft: Value,
+) -> Result<Value, CommandError> {
+    require_permission(&state, "class_attendance.manage")?;
+    class_attendance::save_class_attendance(&state, &draft)
+}
+
+#[tauri::command]
+pub fn desktop_delete_class_attendance(
+    state: State<'_, MobileState>,
+    id_presensi_mapel: String,
+) -> Result<Value, CommandError> {
+    require_permission(&state, "class_attendance.delete")?;
+    class_attendance::delete_class_attendance(&state, &id_presensi_mapel)
+}
+
+#[tauri::command]
+pub fn desktop_get_attendance_reconciliation(
+    state: State<'_, MobileState>,
+    params: Option<Value>,
+) -> Result<Value, CommandError> {
+    require_permission(&state, "class_attendance.view")?;
+    class_attendance::get_attendance_reconciliation(&state, &params.unwrap_or(Value::Null))
 }
 
 #[cfg(test)]

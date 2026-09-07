@@ -147,6 +147,12 @@
     "allow-desktop-delete-teacher",
     "allow-desktop-get-students",
     "allow-desktop-save-student",
-    "allow-desktop-delete-student"
+    "allow-desktop-delete-student",
+    "allow-desktop-get-class-attendance-sessions",
+    "allow-desktop-get-class-attendance-detail",
+    "allow-desktop-get-roster-for-attendance",
+    "allow-desktop-save-class-attendance",
+    "allow-desktop-delete-class-attendance",
+    "allow-desktop-get-attendance-reconciliation"
   ]
 }

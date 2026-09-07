@@ -22,7 +22,11 @@ import {
   stopVideoStream,
 } from "@/lib/client/scan-photo";
 import { requestScreenWakeLock } from "@/lib/client/wakelock";
-import type { ScanResult, ScanTerminalInput } from "@/lib/contracts/scanner";
+import {
+  normalizePersonnelRole,
+  type ScanResult,
+  type ScanTerminalInput,
+} from "@/lib/contracts/scanner";
 import { getScanSecurity } from "@/lib/gateways/scan-security";
 import { submitTerminalScan } from "@/lib/gateways/scanner";
 import { requestSyncNow } from "@/lib/gateways/sync-status";
@@ -33,6 +37,7 @@ type ScanLogItem = {
   nama: string;
   idUnik: string;
   divisi: string;
+  jenisPersonil?: string;
   jenisScan: string;
   statusProses: string;
   pesan: string;
@@ -144,6 +149,10 @@ export function ScannerView() {
     setCameraActive(false);
     setTorchOn(false);
     setTorchSupported(false);
+    // Ucapan TTS ikut dihentikan: `speechSynthesis` adalah layanan tingkat
+    // browser, jadi sapaan yang sudah dimulai akan terus berbunyi meskipun
+    // layarnya ditinggalkan atau aplikasinya dilatarbelakangkan.
+    audioSynth.stopSpeaking();
   }, []);
 
   // Stop camera when user minimizes app or navigates away
@@ -163,6 +172,7 @@ export function ScannerView() {
   useEffect(() => {
     return () => {
       scannerControlsRef.current?.stop();
+      audioSynth.stopSpeaking();
       const stream = videoRef.current?.srcObject;
       if (stream instanceof MediaStream) {
         for (const track of stream.getTracks()) {
@@ -237,13 +247,48 @@ export function ScannerView() {
           triggerHaptic(isSuccess ? "success" : "error");
         }
 
-        // Audio & Speech Feedback
+        // Audio & Speech Feedback Multi-Role
         if (audioFeedback) {
           if (isSuccess) {
-            audioSynth.playSuccessBeep();
-            if (result.nama) {
+            // Dinormalkan: kolomnya menyimpan GURU/SISWA huruf besar.
+            const role = normalizePersonnelRole(result.jenisPersonil);
+            const namaPanggilan =
+              result.nama?.split(" ")[0] ||
+              result.nama ||
+              (role === "Siswa" ? "Siswa" : "Karyawan");
+
+            if (role === "Siswa") {
+              audioSynth.playChime();
+              if (result.jenisScan === "Masuk") {
+                audioSynth.speak(
+                  `Selamat pagi ${namaPanggilan}, selamat belajar!`,
+                );
+              } else if (result.jenisScan === "Pulang") {
+                audioSynth.speak(
+                  `Terima kasih ${namaPanggilan}, hati-hati di jalan!`,
+                );
+              } else {
+                audioSynth.speak(`Terima kasih ${namaPanggilan}.`);
+              }
+            } else if (role === "Guru") {
+              audioSynth.playChime();
+              if (result.jenisScan === "Masuk") {
+                audioSynth.speak(
+                  `Selamat datang Bapak atau Ibu ${namaPanggilan}, selamat mengajar!`,
+                );
+              } else if (result.jenisScan === "Pulang") {
+                audioSynth.speak(
+                  `Terima kasih Bapak atau Ibu ${namaPanggilan}, sampai jumpa.`,
+                );
+              } else {
+                audioSynth.speak(
+                  `Terima kasih Bapak atau Ibu ${namaPanggilan}.`,
+                );
+              }
+            } else {
+              audioSynth.playSuccessBeep();
               audioSynth.speak(
-                `${result.nama}. ${result.jenisScan || "Berhasil"}`,
+                `${namaPanggilan}. ${result.jenisScan || "Berhasil"}`,
               );
             }
           } else {
@@ -264,6 +309,7 @@ export function ScannerView() {
             nama: result.nama || "Tanpa Nama",
             idUnik: result.idKaryawan || "-",
             divisi: result.divisi || "-",
+            jenisPersonil: result.jenisPersonil,
             jenisScan: result.jenisScan || (isSuccess ? "Masuk" : "Ditolak"),
             statusProses: result.status || (isSuccess ? "Berhasil" : "Ditolak"),
             pesan: result.pesan || "",
@@ -879,6 +925,21 @@ export function ScannerView() {
                     <span className="text-sm font-bold text-white truncate">
                       {item.nama}
                     </span>
+                    {normalizePersonnelRole(item.jenisPersonil) === "Siswa" ? (
+                      <span className="rounded-md border border-sky-400/40 bg-sky-500/20 px-1.5 py-0.2 text-[9px] font-black uppercase text-sky-200">
+                        Siswa
+                      </span>
+                    ) : normalizePersonnelRole(item.jenisPersonil) ===
+                      "Guru" ? (
+                      <span className="rounded-md border border-emerald-400/40 bg-emerald-500/20 px-1.5 py-0.2 text-[9px] font-black uppercase text-emerald-200">
+                        Guru
+                      </span>
+                    ) : normalizePersonnelRole(item.jenisPersonil) ===
+                      "Pegawai" ? (
+                      <span className="rounded-md border border-amber-400/40 bg-amber-500/20 px-1.5 py-0.2 text-[9px] font-black uppercase text-amber-200">
+                        Pegawai
+                      </span>
+                    ) : null}
                     <StatusBadge status={item.statusProses} />
                   </div>
                   <div className="flex items-center gap-2 text-[11px] text-slate-400 mt-0.5">

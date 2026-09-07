@@ -60,6 +60,7 @@ export default function SettingsPage() {
   const canAkademik = canAccessArea(user, "akademik");
   const canGuru = canAccessArea(user, "guru");
   const canSiswa = canAccessArea(user, "siswa");
+  const canPresensiKelas = canAccessArea(user, "presensi_kelas");
   const canAudit = canAccessArea(user, "audit");
   const canManageGeofence = Boolean(
     user?.isSuperadmin || hasPermission(user, "branding.manage"),
@@ -692,6 +693,34 @@ export default function SettingsPage() {
                 href="/siswa"
                 onClick={() => triggerHaptic("light")}
                 className="rounded-xl bg-sky-500 px-3.5 py-1.5 text-xs font-black text-on-accent shadow-md active:scale-95 transition whitespace-nowrap"
+              >
+                Buka &rarr;
+              </Link>
+            </div>
+          </div>
+        ) : null}
+
+        {/* Presensi Jam Mapel */}
+        {canPresensiKelas ? (
+          <div className="rounded-3xl border border-teal-500/20 bg-gradient-to-br from-teal-950/30 via-slate-900/80 to-slate-900/90 p-4 backdrop-blur-md">
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2.5">
+                <div className="grid size-9 place-items-center rounded-xl bg-teal-500/20 text-teal-300">
+                  <Icon name="check" className="size-5" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-white">
+                    Presensi Jam Mapel
+                  </h3>
+                  <p className="text-[11px] text-slate-400">
+                    Jurnal kelas, rekonsiliasi &amp; deteksi bolos
+                  </p>
+                </div>
+              </div>
+              <Link
+                href="/presensi-kelas"
+                onClick={() => triggerHaptic("light")}
+                className="rounded-xl bg-teal-500 px-3.5 py-1.5 text-xs font-black text-on-accent shadow-md active:scale-95 transition whitespace-nowrap"
               >
                 Buka &rarr;
               </Link>

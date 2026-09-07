@@ -8,6 +8,7 @@ export type AppArea =
   | "akademik"
   | "siswa"
   | "guru"
+  | "presensi_kelas"
   | "karyawan"
   | "idcards"
   | "shift"
@@ -37,6 +38,7 @@ const AREA_PERMISSION: Record<
   akademik: "academic.view",
   siswa: "students.view",
   guru: "teachers.view",
+  presensi_kelas: "class_attendance.view",
   karyawan: "employees.view",
   idcards: "employees.manage",
   shift: "shifts.view",

@@ -348,6 +348,8 @@ const expectedDomains: [string, string][] = [
 	["academic-assignment", "akademik_guru_mapel"],
 	["teacher", "guru_data"],
 	["student", "siswa_data"],
+	["class-attendance", "presensi_mapel"],
+	["class-attendance-detail", "presensi_mapel_detail"],
 ];
 
 const missingDomains = expectedDomains.filter(

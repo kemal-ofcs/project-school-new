@@ -19,6 +19,41 @@ export const ATTENDANCE_SOURCE_VALUES = [
 
 export type AttendanceSource = (typeof ATTENDANCE_SOURCE_VALUES)[number];
 
+/** Peran personil sebagaimana ditampilkan terminal pemindai. */
+export const PERSONNEL_ROLES = ["Siswa", "Guru", "Pegawai"] as const;
+
+export type PersonnelRole = (typeof PERSONNEL_ROLES)[number];
+
+/**
+ * Normalisasi `master_data.jenis_personil` menjadi peran untuk tampilan.
+ *
+ * Kolom itu menyimpan DUA ejaan yang berbeda dan keduanya sah secara historis:
+ * `academic.rs` menulis `GURU`/`SISWA` (huruf besar) sesuai kontrak Fase 1,
+ * sedangkan jalur karyawan lama menulis `Pegawai` (kapital awal). Terminal
+ * pemindai sempat membandingkannya langsung dengan `"Siswa"`/`"Guru"`, sehingga
+ * TIDAK PERNAH cocok: setiap siswa dan guru jatuh ke cabang pegawai — tanpa
+ * lonceng, tanpa sapaan sekolah, dan tanpa lencana peran.
+ *
+ * Perbandingan dilakukan case-insensitive di satu tempat ini supaya kedua ejaan
+ * tetap dikenali tanpa perlu memigrasi data yang sudah tersimpan.
+ */
+export function normalizePersonnelRole(
+  raw: string | null | undefined,
+): PersonnelRole {
+  switch (
+    String(raw ?? "")
+      .trim()
+      .toUpperCase()
+  ) {
+    case "SISWA":
+      return "Siswa";
+    case "GURU":
+      return "Guru";
+    default:
+      return "Pegawai";
+  }
+}
+
 export interface ScanTerminalInput {
   qrContent: string;
   lat?: number;
@@ -44,6 +79,7 @@ export interface ScanResult {
   idKaryawan: string;
   nama: string;
   divisi: string;
+  jenisPersonil?: string;
   pesan: string;
   catatanSistem?: string;
   keterangan?: string;

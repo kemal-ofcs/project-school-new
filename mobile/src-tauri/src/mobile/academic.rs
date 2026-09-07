@@ -973,7 +973,7 @@ pub fn save_teacher(state: &MobileState, draft: &Value) -> Result<Value, Command
             id_unik, kode_karyawan, nama, divisi, jabatan_status, no_hp, lp,
             id_shift, status_aktif, tanggal_daftar, catatan, token_absensi, qr_code,
             status_qr, jenis_personil, status_backup
-        ) VALUES (?1, ?2, ?3, 'Tenaga Pengajar', 'Guru', ?4, ?5, ?6, ?7, date('now'), 'Data PTK Sekolah', ?8, ?9, 'Generated', 'GURU', 'NORMAL')
+        ) VALUES (?1, ?2, ?3, 'Tenaga Pengajar', 'Guru', ?4, ?5, ?6, ?7, date('now','+7 hours'), 'Data PTK Sekolah', ?8, ?9, 'Generated', 'GURU', 'NORMAL')
         ON CONFLICT(id_unik) DO UPDATE SET
             kode_karyawan = excluded.kode_karyawan,
             nama = excluded.nama,
@@ -1203,7 +1203,7 @@ pub fn save_student(state: &MobileState, draft: &Value) -> Result<Value, Command
             id_unik, kode_karyawan, nama, divisi, jabatan_status, lp,
             id_shift, status_aktif, tanggal_daftar, catatan, token_absensi, qr_code,
             status_qr, jenis_personil, status_backup
-        ) VALUES (?1, ?2, ?3, 'Peserta Didik', 'Siswa', ?4, 1, ?5, date('now'), 'Data Siswa Sekolah', ?6, ?7, 'Generated', 'SISWA', 'NORMAL')
+        ) VALUES (?1, ?2, ?3, 'Peserta Didik', 'Siswa', ?4, 1, ?5, date('now','+7 hours'), 'Data Siswa Sekolah', ?6, ?7, 'Generated', 'SISWA', 'NORMAL')
         ON CONFLICT(id_unik) DO UPDATE SET
             kode_karyawan = excluded.kode_karyawan,
             nama = excluded.nama,

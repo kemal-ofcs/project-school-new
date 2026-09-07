@@ -65,6 +65,14 @@ Aturan ini bersifat **GLOBAL** untuk seluruh workspace dan wajib ditaati oleh AI
 | **Mengulang normalisasi nomor WhatsApp / telepon secara ad-hoc di UI** | Format nomor tidak standar (+62 vs 08 vs 8) dan tautan WhatsApp rusak | Gunakan fungsi kanonik terpusat `normalizeOperatorPhone` dari `@/lib/operators/contact` |
 | **Menimpa filter user saat reload sinkronisasi latar belakang (`sppg:sync-completed`)** | Pilihan dropdown user hilang dan tabel menampilkan data di luar filter | Pertahankan state filter user saat reload data |
 | **Menyatakan fase selesai hanya dengan `bun run check:quick` tanpa kompilasi Rust** | Syntax error, warning, atau regression di Rust luput dari pengujian | Sebelum menyatakan fase selesai, WAJIB jalankan `bun run check` (mencakup `test:rust` / cargo test) |
+| **Memakai `date('now')` (UTC) atau `date('now','localtime')` untuk penentuan hari ini** | Pukul 00:00–07:00 WIB query menunjuk ke kemarin, rekonsiliasi salah tanggal | Gunakan kanonik WIB `date('now','+7 hours')` dan `datetime('now','+7 hours')` (`time_policy.rs`/`scanner.rs`) |
+| **Join langsung `absensi_harian` pada shift multi-sesi** | Siswa dan anomali berganda sebanyak jumlah sesi (`izinkan_multi_sesi = 1`) | Wajib lewat subquery agregasi `GATE_SUMMARY_SUBQUERY` (`MIN(NULLIF(TRIM(jam_masuk), ''))`, `GROUP BY id_karyawan, tanggal`) |
+| **Fallback status presensi tidak dikenal diam-diam ke "Hadir" (`_ => "Hadir"`)** | Bug klien menandai siswa tidak hadir sebagai hadir diam-diam | Tolak ketat dengan `VALIDATION_ERROR` / HTTP 400 (hanya izinkan 5 status kanonik) |
+| **Tidak membuang baris detail basi saat simpan ulang sesi presensi** | Detail siswa pindah rombel tetap tersimpan, total header dan detail pecah, siswa dilaporkan Alfa palsu | Prune baris detail yang tidak ada di payload kirim dan daftarkan event outbox `class-attendance-detail` `delete` |
+| **Memanggil `redirect("/forbidden")` di Mobile static export** | Mobile Next.js static export tidak memiliki rute `/forbidden`, user terdampar di halaman kosong | Gunakan `useEffect` client guard: `router.replace("/dashboard")` untuk non-hak akses, `/login` jika unauthenticated |
+| **Menghapus sesi presensi kelas tanpa izin sensitif** | Admin dapat menghapus bukti kehadiran satu jam pelajaran tanpa persetujuan Superadmin | Jadikan izin `class_attendance.delete` bagian dari `SENSITIVE_MUTATION_PERMISSIONS` |
+| **Pengurutan jam pelajaran leksikografis `ORDER BY jam_ke ASC`** | Jam ke-10 diurutkan sebelum jam ke-2 (`1, 10, 2, 3...`) | Urutkan numerik: `ORDER BY CAST(jam_ke AS INTEGER) ASC, jam_ke ASC` |
+| **Memanggil `getVoices()` langsung tanpa listener `voiceschanged`** | Suara TTS kosong pada panggilan pertama di WebView dan membacakan teks Indonesia dengan suara Inggris | Cache suara via event `voiceschanged` dan utamakan suara offline (`voice.localService === true`) |
 
 ---
 
@@ -266,6 +274,42 @@ Aturan ini bersifat **GLOBAL** untuk seluruh workspace dan wajib ditaati oleh AI
 ### 40. Protokol Verifikasi Penuh (`bun run check` vs `bun run check:quick`)
 - `bun run check:quick` menjalankan audit skema, audit kontrak, linter Biome, typecheck TypeScript, dan unit test JavaScript di kedua workspace.
 - Sebelum menyatakan suatu fase atau fitur selesai utuh, WAJIB jalankan `bun run check` (yang mencakup kompilasi Rust dan `cargo test`) untuk memastikan backend Rust bebas dari syntax error, panic, dan lint issue.
+
+### 41. Standar Tunggal Waktu Operasional & Tanggal Kanonik WIB (`date('now','+7 hours')`)
+- DILARANG menggunakan `date('now')` (UTC) atau `date('now','localtime')` untuk penentuan tanggal operasional, hari ini, filter presensi, rekonsiliasi, maupun snapshot.
+- Antara pukul 00:00–07:00 WIB, query UTC menunjuk ke hari kemarin sehingga rekonsiliasi absensi pagi membuka data yang salah.
+- Jam server/perangkat WAJIB menggunakan `date('now','+7 hours')` atau `datetime('now','+7 hours')` (mengikuti `current_jakarta_moment` di `scanner.rs`).
+
+### 42. Agregasi Wajib Scan Gerbang Multi-Sesi & Sanitasi Jam Masuk
+- Tabel `absensi_harian` mengizinkan multi-sesi per tanggal (`izinkan_multi_sesi = 1`). Melakukan join langsung ke `absensi_harian` menggandakan baris siswa dan anomali sebanyak jumlah sesi.
+- Setiap query yang membutuhkan status scan gerbang WAJIB melalui subquery agregasi tunggal (`GATE_SUMMARY_SUBQUERY` / `GROUP BY id_karyawan, tanggal`) dengan `MIN(NULLIF(TRIM(jam_masuk), ''))` dan sanitasi string kosong (`jam_masuk IS NOT NULL AND TRIM(jam_masuk) <> ''`).
+
+### 43. Penolakan Ketat Status Presensi Kelas (Anti-Silent Fallback ke Hadir)
+- Status kehadiran siswa pada presensi mapel terikat ketat pada 5 nilai kanonik: `Hadir`, `Izin`, `Sakit`, `Alfa`, `Dispensasi`.
+- DILARANG mengubah nilai status asing atau error menjadi "Hadir" secara diam-diam (`_ => "Hadir"`).
+- Nilai tak dikenal WAJIB ditolak dengan error validasi (`VALIDATION_ERROR` di Rust / HTTP 400 di API Route).
+
+### 44. Pembersihan Detail Basi Saat Simpan Ulang Sesi Presensi
+- Saat menyimpan ulang sesi presensi kelas (`save_class_attendance`), backend WAJIB menghapus baris `presensi_mapel_detail` untuk siswa yang sudah tidak ada di roster yang dikirim (misal siswa pindah rombel/keluar), dan mendaftarkan event outbox `delete` untuk detail yang dibuang.
+- Dilarang membiarkan detail usang tetap tersimpan karena akan membuat header `total_*` dan baris detail tidak sinkron serta menghasilkan anomali rekonsiliasi palsu.
+
+### 45. Navigasi Aman & Larangan `redirect("/forbidden")` di Mobile Static Export
+- Mobile menggunakan Tauri v2 dengan Next.js static export (`output: "export"`) yang tidak memiliki rute `/forbidden`.
+- DILARANG memanggil `redirect("/forbidden")` di mobile.
+- Proteksi area privat di mobile WAJIB menggunakan `useEffect` dengan `router.replace("/dashboard")` untuk pengguna tidak berhak dan `router.replace("/login")` untuk unauthenticated.
+
+### 46. Penghapusan Sesi Presensi Wajib Berizin Sensitif (`class_attendance.delete`)
+- Menghapus sesi presensi mapel memusnahkan seluruh rekam jejak kehadiran kelas jam tersebut beserta seluruh detail siswa.
+- Aksi penghapusan ini WAJIB menuntut permission tersendiri `class_attendance.delete` yang terdaftar dalam `SENSITIVE_MUTATION_PERMISSIONS`, sehingga tidak diberikan secara otomatis ke role bawaan Admin.
+
+### 47. Pengurutan Numerik Jam Pelajaran (`CAST(jam_ke AS INTEGER)`)
+- Kolom `jam_ke` bertipe TEXT sehingga pengurutan leksikografis biasa (`ORDER BY jam_ke ASC`) akan meletakkan jam ke-10 sebelum jam ke-2 (`1, 10, 2, 3...`).
+- Pengurutan sesi dan rekonsiliasi WAJIB menggunakan numerik: `ORDER BY CAST(jam_ke AS INTEGER) ASC, jam_ke ASC`.
+
+### 48. Kesiapan Suara TTS Asinkron & Seleksi Suara Offline (`localService`)
+- Pemanggilan `speechSynthesis.getVoices()` di WebView/Chromium bersifat asinkron dan kosong pada pemanggilan pertama.
+- Modul audio WAJIB mendengarkan event `voiceschanged` dan meng-cache daftar suara.
+- Untuk menjaga kepatuhan offline-first, seleksi suara bahasa Indonesia WAJIB memprioritaskan suara lokal (`voice.localService === true`) agar tidak bergantung pada koneksi internet.
 
 ---
 

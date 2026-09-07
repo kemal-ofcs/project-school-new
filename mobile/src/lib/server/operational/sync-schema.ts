@@ -26,6 +26,16 @@ const optionalAttendanceSource = z
 const optionalLongText = longText.nullable().optional();
 const optionalNumber = finiteNumber.nullable().optional();
 
+/**
+ * Bentuk kanonik `presensi_mapel.jam_ke` di batas sinkronisasi.
+ *
+ * Nilainya bisa berupa satu jam pelajaran (`3`) atau RENTANG blok dua jam
+ * (`1-2`) — karena itu kolomnya TEKS, bukan INTEGER. Regex ini menutup bentuk
+ * asing yang dulu lolos lewat `shortText.min(1)`; urutan awal<akhir ditegakkan
+ * `normalize_jam_ke` (Rust) dan `normalizeJamKe` (TS) sebelum event dibuat.
+ */
+const jamKeText = z.string().regex(/^(?:[1-9]|1[0-2])(?:-(?:[1-9]|1[0-2]))?$/);
+
 const employeeDraftFields = {
   jabatan_status: optionalShortText,
   no_hp: optionalShortText,
@@ -891,6 +901,89 @@ export const operationalSyncEventSchema = z.union([
     z
       .object({
         id_siswa: optionalShortText,
+      })
+      .strict(),
+  ),
+  eventSchema(
+    "class-attendance",
+    "create",
+    z
+      .object({
+        id_presensi_mapel: shortText.min(1),
+        id_tahun_ajaran: shortText.min(1),
+        id_rombel: shortText.min(1),
+        id_mapel: shortText.min(1),
+        id_guru: shortText.min(1),
+        tanggal: shortText.min(1),
+        jam_ke: jamKeText,
+        materi_pokok: optionalLongText,
+        catatan: optionalLongText,
+        total_hadir: optionalNumber,
+        total_izin: optionalNumber,
+        total_sakit: optionalNumber,
+        total_alfa: optionalNumber,
+        total_dispensasi: optionalNumber,
+        created_at: optionalShortText,
+        updated_at: optionalShortText,
+      })
+      .strict(),
+  ),
+  eventSchema(
+    "class-attendance",
+    "update",
+    z
+      .object({
+        id_presensi_mapel: optionalShortText,
+        id_tahun_ajaran: optionalShortText,
+        id_rombel: optionalShortText,
+        id_mapel: optionalShortText,
+        id_guru: optionalShortText,
+        tanggal: optionalShortText,
+        jam_ke: jamKeText.optional(),
+        materi_pokok: optionalLongText,
+        catatan: optionalLongText,
+        total_hadir: optionalNumber,
+        total_izin: optionalNumber,
+        total_sakit: optionalNumber,
+        total_alfa: optionalNumber,
+        total_dispensasi: optionalNumber,
+        created_at: optionalShortText,
+        updated_at: optionalShortText,
+      })
+      .strict(),
+  ),
+  eventSchema(
+    "class-attendance",
+    "delete",
+    z
+      .object({
+        id_presensi_mapel: optionalShortText,
+      })
+      .strict(),
+  ),
+  eventSchema(
+    "class-attendance-detail",
+    "delete",
+    z
+      .object({
+        id_detail: optionalShortText,
+        id_presensi_mapel: optionalShortText,
+        id_siswa: optionalShortText,
+      })
+      .strict(),
+  ),
+  eventSchema(
+    "class-attendance-detail",
+    "save",
+    z
+      .object({
+        id_detail: shortText.min(1),
+        id_presensi_mapel: shortText.min(1),
+        id_siswa: shortText.min(1),
+        status: z.enum(["Hadir", "Izin", "Sakit", "Alfa", "Dispensasi"]),
+        catatan: optionalLongText,
+        created_at: optionalShortText,
+        updated_at: optionalShortText,
       })
       .strict(),
   ),

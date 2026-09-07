@@ -58,6 +58,12 @@ const NAVIGATION: NavigationItem[] = [
     label: "Akademik",
   },
   {
+    area: "presensi_kelas",
+    href: "/presensi-kelas",
+    icon: "clock",
+    label: "Presensi KBM",
+  },
+  {
     area: "guru",
     href: "/guru",
     icon: "user",

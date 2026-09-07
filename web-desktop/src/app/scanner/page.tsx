@@ -18,7 +18,11 @@ import {
   stopVideoStream,
 } from "@/lib/client/scan-photo";
 import { useAuth } from "@/lib/context/AuthContext";
-import type { ScanResult, ScanTerminalInput } from "@/lib/contracts/scanner";
+import {
+  normalizePersonnelRole,
+  type ScanResult,
+  type ScanTerminalInput,
+} from "@/lib/contracts/scanner";
 import { getScanSecurity } from "@/lib/gateways/scan-security";
 import { submitTerminalScan } from "@/lib/gateways/scanner";
 import { requestSyncNow } from "@/lib/gateways/sync-status";
@@ -33,6 +37,7 @@ interface ScanLogItem {
   nama: string;
   idUnik: string;
   divisi: string;
+  jenisPersonil?: string;
   jenisScan: string;
   statusProses: string;
   pesan: string;
@@ -133,6 +138,10 @@ export default function ScannerPage() {
     }
     if (videoRef.current) videoRef.current.srcObject = null;
     setCameraActive(false);
+    // Ucapan TTS ikut dihentikan: `speechSynthesis` adalah layanan tingkat
+    // browser, jadi sapaan yang sudah dimulai akan terus berbunyi meskipun
+    // layarnya ditinggalkan atau aplikasinya dilatarbelakangkan.
+    audioSynth.stopSpeaking();
   }, []);
 
   const currentTime = clock
@@ -268,22 +277,57 @@ export default function ScannerPage() {
         }
         setTimeout(() => setScanFlashStatus(null), 700);
 
-        // Suara & Audio feedback + TTS Pengumuman
+        // Suara & Audio feedback + TTS Pengumuman Multi-Peran
         if (audioEnabled) {
           if (result.sukses) {
-            audioSynth.playSuccessBeep();
+            // Dinormalkan: kolomnya menyimpan GURU/SISWA huruf besar.
+            const role = normalizePersonnelRole(result.jenisPersonil);
             const namaPanggilan =
-              result.nama?.split(" ")[0] || result.nama || "Karyawan";
-            if (result.jenisScan === "Masuk") {
-              audioSynth.speak(
-                `Terima kasih, ${namaPanggilan}. Absen masuk tercatat.`,
-              );
-            } else if (result.jenisScan === "Pulang") {
-              audioSynth.speak(
-                `Terima kasih, ${namaPanggilan}. Absen pulang tercatat.`,
-              );
+              result.nama?.split(" ")[0] ||
+              result.nama ||
+              (role === "Siswa" ? "Siswa" : "Karyawan");
+
+            if (role === "Siswa") {
+              audioSynth.playChime();
+              if (result.jenisScan === "Masuk") {
+                audioSynth.speak(
+                  `Selamat pagi ${namaPanggilan}, selamat belajar!`,
+                );
+              } else if (result.jenisScan === "Pulang") {
+                audioSynth.speak(
+                  `Terima kasih ${namaPanggilan}, hati-hati di jalan!`,
+                );
+              } else {
+                audioSynth.speak(`Terima kasih ${namaPanggilan}.`);
+              }
+            } else if (role === "Guru") {
+              audioSynth.playChime();
+              if (result.jenisScan === "Masuk") {
+                audioSynth.speak(
+                  `Selamat datang Bapak atau Ibu ${namaPanggilan}, selamat mengajar!`,
+                );
+              } else if (result.jenisScan === "Pulang") {
+                audioSynth.speak(
+                  `Terima kasih Bapak atau Ibu ${namaPanggilan}, sampai jumpa.`,
+                );
+              } else {
+                audioSynth.speak(
+                  `Terima kasih Bapak atau Ibu ${namaPanggilan}.`,
+                );
+              }
             } else {
-              audioSynth.speak(`Terima kasih, ${namaPanggilan}.`);
+              audioSynth.playSuccessBeep();
+              if (result.jenisScan === "Masuk") {
+                audioSynth.speak(
+                  `Terima kasih, ${namaPanggilan}. Absen masuk tercatat.`,
+                );
+              } else if (result.jenisScan === "Pulang") {
+                audioSynth.speak(
+                  `Terima kasih, ${namaPanggilan}. Absen pulang tercatat.`,
+                );
+              } else {
+                audioSynth.speak(`Terima kasih, ${namaPanggilan}.`);
+              }
             }
           } else if (
             result.pesan.includes("Scan ganda") ||
@@ -310,9 +354,10 @@ export default function ScannerPage() {
           {
             id: `${now.getTime()}-${result.idKaryawan || cleanPayload}`,
             waktu: timeStr,
-            nama: result.nama || result.idKaryawan || "Karyawan",
+            nama: result.nama || result.idKaryawan || "Personil",
             idUnik: result.idKaryawan || "-",
             divisi: result.divisi || "-",
+            jenisPersonil: result.jenisPersonil,
             jenisScan: result.jenisScan || "Masuk",
             statusProses: result.status || "Selesai",
             pesan: result.pesan,
@@ -967,6 +1012,23 @@ export default function ScannerPage() {
                                       <span className="font-bold text-white">
                                         {lastResult.nama}
                                       </span>
+                                      {normalizePersonnelRole(
+                                        lastResult.jenisPersonil,
+                                      ) === "Siswa" ? (
+                                        <span className="ml-1.5 rounded-md border border-sky-400/40 bg-sky-500/20 px-1.5 py-0.5 text-[9px] font-black uppercase tracking-wider text-sky-200">
+                                          Siswa
+                                        </span>
+                                      ) : lastResult.jenisPersonil ===
+                                        "Guru" ? (
+                                        <span className="ml-1.5 rounded-md border border-emerald-400/40 bg-emerald-500/20 px-1.5 py-0.5 text-[9px] font-black uppercase tracking-wider text-emerald-200">
+                                          Guru
+                                        </span>
+                                      ) : lastResult.jenisPersonil ===
+                                        "Pegawai" ? (
+                                        <span className="ml-1.5 rounded-md border border-amber-400/40 bg-amber-500/20 px-1.5 py-0.5 text-[9px] font-black uppercase tracking-wider text-amber-200">
+                                          Pegawai
+                                        </span>
+                                      ) : null}
                                       {lastResult.divisi
                                         ? ` · ${lastResult.divisi}`
                                         : ""}
@@ -1105,8 +1167,26 @@ export default function ScannerPage() {
                         <span className="text-slate-400 block text-[10px]">
                           Nama:
                         </span>
-                        <span className="font-semibold text-white">
+                        <span className="font-semibold text-white flex items-center gap-1.5">
                           {lastResult.nama}
+                          {normalizePersonnelRole(lastResult.jenisPersonil) ===
+                          "Siswa" ? (
+                            <span className="rounded-md border border-sky-400/40 bg-sky-500/20 px-1.5 py-0.2 text-[9px] font-black uppercase text-sky-200">
+                              Siswa
+                            </span>
+                          ) : normalizePersonnelRole(
+                              lastResult.jenisPersonil,
+                            ) === "Guru" ? (
+                            <span className="rounded-md border border-emerald-400/40 bg-emerald-500/20 px-1.5 py-0.2 text-[9px] font-black uppercase text-emerald-200">
+                              Guru
+                            </span>
+                          ) : normalizePersonnelRole(
+                              lastResult.jenisPersonil,
+                            ) === "Pegawai" ? (
+                            <span className="rounded-md border border-amber-400/40 bg-amber-500/20 px-1.5 py-0.2 text-[9px] font-black uppercase text-amber-200">
+                              Pegawai
+                            </span>
+                          ) : null}
                         </span>
                       </div>
                       <div>
@@ -1163,6 +1243,22 @@ export default function ScannerPage() {
                   <div className="space-y-0.5">
                     <div className="font-bold text-white flex items-center gap-2">
                       <span>{item.nama}</span>
+                      {normalizePersonnelRole(item.jenisPersonil) ===
+                      "Siswa" ? (
+                        <span className="rounded-md border border-sky-400/40 bg-sky-500/20 px-1.5 py-0.2 text-[9px] font-black uppercase text-sky-200">
+                          Siswa
+                        </span>
+                      ) : normalizePersonnelRole(item.jenisPersonil) ===
+                        "Guru" ? (
+                        <span className="rounded-md border border-emerald-400/40 bg-emerald-500/20 px-1.5 py-0.2 text-[9px] font-black uppercase text-emerald-200">
+                          Guru
+                        </span>
+                      ) : normalizePersonnelRole(item.jenisPersonil) ===
+                        "Pegawai" ? (
+                        <span className="rounded-md border border-amber-400/40 bg-amber-500/20 px-1.5 py-0.2 text-[9px] font-black uppercase text-amber-200">
+                          Pegawai
+                        </span>
+                      ) : null}
                       <span className="text-[10px] px-1.5 py-0.2 bg-slate-800 rounded text-slate-400 font-normal">
                         {item.divisi}
                       </span>

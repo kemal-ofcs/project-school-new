@@ -524,7 +524,7 @@ export async function saveTeacher(draft: {
         id_unik, kode_karyawan, nama, divisi, jabatan_status, no_hp, lp,
         id_shift, status_aktif, tanggal_daftar, catatan, token_absensi, qr_code,
         status_qr, jenis_personil, status_backup
-      ) VALUES (?, ?, ?, 'Tenaga Pengajar', 'Guru', ?, ?, ?, ?, date('now'), 'Data PTK Sekolah', ?, ?, 'Generated', 'GURU', 'NORMAL')
+      ) VALUES (?, ?, ?, 'Tenaga Pengajar', 'Guru', ?, ?, ?, ?, date('now','+7 hours'), 'Data PTK Sekolah', ?, ?, 'Generated', 'GURU', 'NORMAL')
       ON CONFLICT(id_unik) DO UPDATE SET
         kode_karyawan = excluded.kode_karyawan,
         nama = excluded.nama,
@@ -674,7 +674,7 @@ export async function saveStudent(draft: {
         id_unik, kode_karyawan, nama, divisi, jabatan_status, lp,
         id_shift, status_aktif, tanggal_daftar, catatan, token_absensi, qr_code,
         status_qr, jenis_personil, status_backup
-      ) VALUES (?, ?, ?, 'Peserta Didik', 'Siswa', ?, 1, ?, date('now'), 'Data Siswa Sekolah', ?, ?, 'Generated', 'SISWA', 'NORMAL')
+      ) VALUES (?, ?, ?, 'Peserta Didik', 'Siswa', ?, 1, ?, date('now','+7 hours'), 'Data Siswa Sekolah', ?, ?, 'Generated', 'SISWA', 'NORMAL')
       ON CONFLICT(id_unik) DO UPDATE SET
         kode_karyawan = excluded.kode_karyawan,
         nama = excluded.nama,

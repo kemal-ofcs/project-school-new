@@ -19,7 +19,7 @@ use super::{
 /// `CURRENT_SCHEMA_VERSION` di `web-desktop/src/lib/db-schema.ts` setiap kali
 /// migrasi baru ditambahkan, karena keduanya membaca tabel `schema_migration`
 /// yang sama di Turso.
-pub const CLIENT_SCHEMA_VERSION: i64 = 17;
+pub const CLIENT_SCHEMA_VERSION: i64 = 18;
 
 /// Hanya `cloud > client` yang berbahaya; `cloud <= client` adalah kondisi normal.
 fn is_client_schema_outdated(cloud_version: i64) -> bool {
@@ -658,6 +658,49 @@ const SNAPSHOT_TABLES: &[SnapshotTable] = &[
         entity_column: "id_siswa",
         delete_missing: false,
     },
+    SnapshotTable {
+        payload_key: "presensiMapel",
+        domain: "class-attendance",
+        table: "presensi_mapel",
+        columns: &[
+            "id_presensi_mapel",
+            "id_tahun_ajaran",
+            "id_rombel",
+            "id_mapel",
+            "id_guru",
+            "tanggal",
+            "jam_ke",
+            "materi_pokok",
+            "catatan",
+            "total_hadir",
+            "total_izin",
+            "total_sakit",
+            "total_alfa",
+            "total_dispensasi",
+            "created_at",
+            "updated_at",
+        ],
+        conflict_column: "id_presensi_mapel",
+        entity_column: "id_presensi_mapel",
+        delete_missing: false,
+    },
+    SnapshotTable {
+        payload_key: "presensiMapelDetail",
+        domain: "class-attendance-detail",
+        table: "presensi_mapel_detail",
+        columns: &[
+            "id_detail",
+            "id_presensi_mapel",
+            "id_siswa",
+            "status",
+            "catatan",
+            "created_at",
+            "updated_at",
+        ],
+        conflict_column: "id_detail",
+        entity_column: "id_detail",
+        delete_missing: false,
+    },
 ];
 
 const CANONICAL_SYNC_ROUTES: &[(&str, &str)] = &[
@@ -681,6 +724,11 @@ const CANONICAL_SYNC_ROUTES: &[(&str, &str)] = &[
     ("attendance", "update"),
     ("backup", "cancel"),
     ("backup", "create"),
+    ("class-attendance", "create"),
+    ("class-attendance", "delete"),
+    ("class-attendance", "update"),
+    ("class-attendance-detail", "delete"),
+    ("class-attendance-detail", "save"),
     ("company-profile", "update"),
     ("correction", "create"),
     ("correction", "delete"),

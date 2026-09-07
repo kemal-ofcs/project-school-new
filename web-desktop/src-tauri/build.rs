@@ -160,6 +160,12 @@ const DESKTOP_COMMANDS: &[&str] = &[
     "desktop_get_students",
     "desktop_save_student",
     "desktop_delete_student",
+    "desktop_get_class_attendance_sessions",
+    "desktop_get_class_attendance_detail",
+    "desktop_get_roster_for_attendance",
+    "desktop_save_class_attendance",
+    "desktop_delete_class_attendance",
+    "desktop_get_attendance_reconciliation",
 ];
 
 fn local_build_values() -> HashMap<String, String> {
