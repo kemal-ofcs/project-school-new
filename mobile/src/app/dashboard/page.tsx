@@ -24,6 +24,7 @@ export default function DashboardPage() {
   const canViewMetrics = hasPermission(user, "dashboard.view");
   const canViewHistory = canAccessArea(user, "history");
   const canViewKaryawan = canAccessArea(user, "karyawan");
+  const canJurnalMengajar = canAccessArea(user, "jurnal_mengajar");
 
   const [metrics, setMetrics] = useState<DashboardMetrics | null>(null);
   const [recentScans, setRecentScans] = useState<Record<string, unknown>[]>([]);
@@ -141,6 +142,31 @@ export default function DashboardPage() {
                   {isLoading
                     ? "Memuat..."
                     : `${metrics?.totalKaryawan ?? 0} Karyawan Terdaftar`}
+                </p>
+              </div>
+            </div>
+            <Icon
+              name="chevron-right"
+              className="size-4 text-slate-500 group-hover:translate-x-1 transition-transform"
+            />
+          </Link>
+        ) : null}
+
+        {/* Quick Access: Jurnal Mengajar (hanya jika memiliki area jurnal_mengajar) */}
+        {canJurnalMengajar ? (
+          <Link
+            href="/jurnal-mengajar"
+            onClick={() => triggerHaptic("light")}
+            className="group flex items-center justify-between rounded-2xl border border-white/10 bg-slate-900/70 px-4 py-3.5 hover:bg-slate-900/90 active:scale-[0.98] transition-all"
+          >
+            <div className="flex items-center gap-3">
+              <div className="grid size-10 place-items-center rounded-2xl border border-white/10 bg-slate-800/60 text-sky-400">
+                <Icon name="document" className="size-5" />
+              </div>
+              <div>
+                <p className="text-sm font-bold text-white">Jurnal Mengajar</p>
+                <p className="text-[11px] text-slate-400 mt-0.5">
+                  Catatan KBM &amp; Paraf Digital Guru
                 </p>
               </div>
             </div>

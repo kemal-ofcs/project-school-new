@@ -170,6 +170,17 @@
     "allow-desktop-get-roster-for-attendance",
     "allow-desktop-save-class-attendance",
     "allow-desktop-delete-class-attendance",
-    "allow-desktop-get-attendance-reconciliation"
+    "allow-desktop-get-attendance-reconciliation",
+    "allow-desktop-get-teaching-journal",
+    "allow-desktop-list-teaching-journals",
+    "allow-desktop-save-teaching-journal",
+    "allow-desktop-delete-teaching-journal",
+    "allow-desktop-get-ledger-preview",
+    "allow-desktop-freeze-attendance-ledger",
+    "allow-desktop-get-frozen-ledger",
+    "allow-desktop-delete-frozen-ledger",
+    "allow-desktop-backfill-id-cards",
+    "allow-desktop-save-student-photo",
+    "allow-desktop-get-student-photo"
   ]
 }

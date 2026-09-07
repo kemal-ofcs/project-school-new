@@ -41,7 +41,7 @@ Aturan ini bersifat **GLOBAL** untuk seluruh workspace dan wajib ditaati oleh AI
 | **Pakai `rustls-platform-verifier` di Android** | Aplikasi Android crash seketika saat dibuka (JNI VM uninitialized) | Gunakan `webpki-roots` dan pasang provider `ring` di awal `lib.rs` |
 | **Set `isMinifyEnabled = true` di Android** | R8 memotong JNI reflection Tauri dan memicu UnsatisfiedLinkError | Wajib `isMinifyEnabled = false` di `build.gradle.kts` |
 | **Menghapus data lokal legacy saat cloud kosong** | Kehilangan seluruh data lokal historis customer | Cek `desktop_entity_revision` & pending outbox sebelum `delete_missing` |
-| **Domain outbox acak (`company_profile`, `scan_log`)** | Event retry terus-menerus atau false-synced tanpa mutasi | Wajib gunakan 57 Canonical Hyphen Routes (`company-profile`, `log-scan`, dll.) |
+| **Domain outbox acak (`company_profile`, `scan_log`)** | Event retry terus-menerus atau false-synced tanpa mutasi | Wajib gunakan 66 Canonical Hyphen Routes (`company-profile`, `log-scan`, dll.) |
 | **Mutasi kosong ditandai `applied`** | Sinkronisasi tampak sukses padahal data di server tidak berubah | Jika statement mutasi kosong (`is_empty()`), tandai `conflict`/`rejected` |
 | **Akses IPC mentah `invoke()` langsung dari UI React** | Logika duplikat, tidak portabel antara Desktop, Web, dan Mobile | Wajib lewat modul Gateway di `@/lib/gateways/*` via `isDesktopRuntime()` |
 | **Kalkulasi gaji/pajak di JS atau pakai float `f64`** | Floating-point error & rawan manipulasi via DevTools console | Wajib kalkulasi di Rust pakai `rust_decimal`, format visual via `Intl` |
@@ -52,7 +52,7 @@ Aturan ini bersifat **GLOBAL** untuk seluruh workspace dan wajib ditaati oleh AI
 | **Menaruh kelas base `bg-white` di JSX untuk tema terang** | Tema gelap rusak dan menjadi terlalu terang / silau | Tulis base JSX dalam dark mode (`bg-slate-900`), kelola tema terang via `html[data-theme="light"]` di `globals.css` |
 | **Tidak mengatur warna `<select option>` eksplisit** | Teks dropdown tema hilang/tidak terbaca di Windows WebView | Berikan styling warna eksplisit untuk `select option` pada dark dan light mode |
 | **Menaruh `focus()` di `useEffect` dengan dependensi callback atau tanpa guard activeElement** | Setiap pengetikan 1 karakter di input form memicu focus stealing | Ikat callback prop ke `useRef`, isolasi fokus hanya saat open transition, dan pasang guard `!dialogRef.current?.contains(document.activeElement)` |
-| **`SNAPSHOT_SOURCES` di `turso.rs` tidak sinkron dengan `SNAPSHOT_TABLES` di `sync.rs`** | Tabel snapshot baru tidak pernah ditarik dari cloud, trigger `sync_pulse` tidak terpasang, data antar-perangkat tidak pernah muncul selamanya | `SNAPSHOT_SOURCES` wajib mencakup SELURUH tabel snapshot (kini 28 tabel); verifikasi otomatis via audit skema & kontrak |
+| **`SNAPSHOT_SOURCES` di `turso.rs` tidak sinkron dengan `SNAPSHOT_TABLES` di `sync.rs`** | Tabel snapshot baru tidak pernah ditarik dari cloud, trigger `sync_pulse` tidak terpasang, data antar-perangkat tidak pernah muncul selamanya | `SNAPSHOT_SOURCES` wajib mencakup SELURUH tabel snapshot (kini 32 tabel); verifikasi otomatis via audit skema & kontrak |
 | **Tidak men-generate `token_absensi` & `qr_code` saat create guru/siswa** | Scanner mewajibkan format `id\|token` sehingga scan absensi gerbang ditolak dengan error "Format QR tidak valid" | Wajib generate token kriptografis acak dan simpan `qr_code = format!("{id}\|{token}")` ke `master_data` pada saat insert/update |
 | **Hapus data lokal set `master_data.status_aktif = 'Nonaktif'`, tapi cloud handler hanya `DELETE` child table** | Pull snapshot cloud berikutnya menimpa lokal kembali menjadi 'Aktif' (zombie resurrection) | Mutasi multi-tabel wajib atomik dan identik di SQLite lokal dan cloud handler; handler cloud dilarang hardcode status atau membuang field relasional |
 | **Melonggarkan atau memberi whitelist palsu pada skrip audit** | Bug runtime di mobile/desktop lolos deteksi audit (false sense of security) | Jika audit kontrak gagal, perbaiki kode pemanggil (`if (isMobileRuntime())` / pemisahan modul); DILARANG memodifikasi audit agar meloloskan bug |
@@ -119,15 +119,17 @@ Aturan ini bersifat **GLOBAL** untuk seluruh workspace dan wajib ditaati oleh AI
   2. DDL SQLite di `storage.rs` (Rust)
   3. Skema Server di `db-schema.ts` & `db-migrations.ts` (LibSQL)
   4. Validator Zod di `sync-schema.ts` (TypeScript)
-- **28 Tabel Snapshot Terdistribusi**:
+- **32 Tabel Snapshot Terdistribusi**:
   - 12 Tabel Operasional Inti: `master_data`, `id_card`, `tbl_shift`, `tbl_hari_libur`, `setting_gex_system`, `company_profile`, `id_card_template`, `backup_karyawan`, `koreksi_admin`, `import_offline`, `absensi_harian`, `log_scan`.
   - 1 Tabel Whitelist Hari Libur: `hari_libur_whitelist`.
   - 8 Tabel Payroll Engine: `salary_configs`, `overtime_tier_rules`, `payroll_components`, `tax_rules`, `bpjs_rules`, `payroll_runs`, `payroll_items`, `payroll_audit_logs`.
   - 7 Tabel Fondasi Akademik: `akademik_tahun_ajaran`, `akademik_jurusan`, `akademik_rombel`, `akademik_mapel`, `akademik_guru_mapel`, `guru_data`, `siswa_data`.
+  - 2 Tabel Presensi Mapel KBM: `presensi_mapel`, `presensi_mapel_detail`.
+  - 2 Tabel Jurnal & Leger Akademik: `jurnal_mengajar`, `leger_kehadiran`.
 - `master_operator` dikelola terpisah sebagai data autentikasi/RBAC cloud dan bukan bagian dari snapshot operasional perangkat.
 
-### 9. 57 Route Kanonik Outbox & Normalisasi Boundary
-- Hanya 57 route kanonik berformat hyphen-case yang diizinkan diproduksi oleh outbox (`sync.rs` dan `turso.rs`).
+### 9. 66 Route Kanonik Outbox & Normalisasi Boundary
+- Hanya 66 route kanonik berformat hyphen-case yang diizinkan diproduksi oleh outbox (`sync.rs` dan `turso.rs`).
 - Normalisasi alias lama hanya dilakukan pada boundary Turso, lalu disimpan ke changelog/receipt dalam bentuk kanonik.
 
 ### 10. Idempotensi Outbox, Monotonic Revisions & Atomic Transaksi

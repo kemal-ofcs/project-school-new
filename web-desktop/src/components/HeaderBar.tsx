@@ -64,6 +64,18 @@ const NAVIGATION: NavigationItem[] = [
     label: "Presensi KBM",
   },
   {
+    area: "jurnal_mengajar",
+    href: "/jurnal-mengajar",
+    icon: "document",
+    label: "Jurnal Mengajar",
+  },
+  {
+    area: "leger_kehadiran",
+    href: "/leger-kehadiran",
+    icon: "calendar",
+    label: "Leger Kehadiran",
+  },
+  {
     area: "guru",
     href: "/guru",
     icon: "user",

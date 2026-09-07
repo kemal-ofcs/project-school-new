@@ -51,6 +51,8 @@ describe("readOperationalSnapshot", () => {
           result(),
           result(),
           result(),
+          result([{ id_jurnal: "jrn-1", materi_disampaikan: "Materi Bab 1" }]),
+          result([{ id_leger: "lgr-1", persen_kehadiran: 95.5 }]),
           result([{ revision: 12 }]),
         ];
       },
@@ -59,7 +61,7 @@ describe("readOperationalSnapshot", () => {
     const snapshot = await readOperationalSnapshot(client);
 
     expect(receivedMode).toBe("read");
-    expect(receivedStatementCount).toBe(31);
+    expect(receivedStatementCount).toBe(33);
     expect(snapshot.revision).toBe(12);
     expect(snapshot.employees).toEqual([
       { id_unik: "employee-1", nama: "Operator Uji" },
@@ -78,6 +80,12 @@ describe("readOperationalSnapshot", () => {
     ]);
     expect(snapshot.salaryConfigs).toEqual([
       { id: "sc-1", id_karyawan: "employee-1", rate_per_hour: 25000 },
+    ]);
+    expect(snapshot.jurnalMengajar).toEqual([
+      { id_jurnal: "jrn-1", materi_disampaikan: "Materi Bab 1" },
+    ]);
+    expect(snapshot.legerKehadiran).toEqual([
+      { id_leger: "lgr-1", persen_kehadiran: 95.5 },
     ]);
     expect(snapshot.scanLogs).toEqual([]);
   });

@@ -71,3 +71,55 @@ export async function hapusSiswa(id: string) {
     id,
   });
 }
+
+export async function simpanFotoSiswa(
+  idSiswa: string,
+  fotoBase64: string,
+  fotoMime = "image/jpeg",
+) {
+  if (isDesktopRuntime()) {
+    return invokeDesktop<{ sukses: boolean; id_siswa: string }>(
+      "desktop_save_student_photo",
+      { idSiswa, fotoBase64, fotoMime },
+    );
+  }
+  return requestWebApi<{ sukses: boolean; id_siswa: string }>(
+    "/api/academic/students/photo/upload",
+    "POST",
+    { id_siswa: idSiswa, foto_base64: fotoBase64, foto_mime: fotoMime },
+  );
+}
+
+export async function getFotoSiswa(idSiswa: string) {
+  if (isDesktopRuntime()) {
+    return invokeDesktop<{
+      id_siswa: string;
+      foto_mime: string;
+      foto_base64: string;
+      updated_at: string;
+    } | null>("desktop_get_student_photo", { idSiswa });
+  }
+  return requestWebApi<{
+    id_siswa: string;
+    foto_mime: string;
+    foto_base64: string;
+    updated_at: string;
+  } | null>("/api/academic/students/photo/query", "POST", {
+    id_siswa: idSiswa,
+  });
+}
+
+export async function backfillKartuPelajar() {
+  if (isDesktopRuntime()) {
+    const res = await invokeDesktop<{
+      sukses: boolean;
+      total_inserted: number;
+    }>("desktop_backfill_id_cards");
+    kickDesktopSync();
+    return res;
+  }
+  return requestWebApi<{ sukses: boolean; total_inserted: number }>(
+    "/api/academic/id-cards/backfill",
+    "POST",
+  );
+}

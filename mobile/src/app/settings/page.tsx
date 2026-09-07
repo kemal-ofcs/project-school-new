@@ -61,6 +61,8 @@ export default function SettingsPage() {
   const canGuru = canAccessArea(user, "guru");
   const canSiswa = canAccessArea(user, "siswa");
   const canPresensiKelas = canAccessArea(user, "presensi_kelas");
+  const canJurnalMengajar = canAccessArea(user, "jurnal_mengajar");
+  const canLegerKehadiran = canAccessArea(user, "leger_kehadiran");
   const canAudit = canAccessArea(user, "audit");
   const canManageGeofence = Boolean(
     user?.isSuperadmin || hasPermission(user, "branding.manage"),
@@ -721,6 +723,62 @@ export default function SettingsPage() {
                 href="/presensi-kelas"
                 onClick={() => triggerHaptic("light")}
                 className="rounded-xl bg-teal-500 px-3.5 py-1.5 text-xs font-black text-on-accent shadow-md active:scale-95 transition whitespace-nowrap"
+              >
+                Buka &rarr;
+              </Link>
+            </div>
+          </div>
+        ) : null}
+
+        {/* Jurnal Mengajar */}
+        {canJurnalMengajar ? (
+          <div className="rounded-3xl border border-sky-500/20 bg-gradient-to-br from-sky-950/30 via-slate-900/80 to-slate-900/90 p-4 backdrop-blur-md">
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2.5">
+                <div className="grid size-9 place-items-center rounded-xl bg-sky-500/20 text-sky-300">
+                  <Icon name="document" className="size-5" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-white">
+                    Jurnal Mengajar
+                  </h3>
+                  <p className="text-[11px] text-slate-400">
+                    Catatan materi, kendala KBM &amp; paraf guru
+                  </p>
+                </div>
+              </div>
+              <Link
+                href="/jurnal-mengajar"
+                onClick={() => triggerHaptic("light")}
+                className="rounded-xl bg-sky-500 px-3.5 py-1.5 text-xs font-black text-on-accent shadow-md active:scale-95 transition whitespace-nowrap"
+              >
+                Buka &rarr;
+              </Link>
+            </div>
+          </div>
+        ) : null}
+
+        {/* Leger Kehadiran */}
+        {canLegerKehadiran ? (
+          <div className="rounded-3xl border border-indigo-500/20 bg-gradient-to-br from-indigo-950/30 via-slate-900/80 to-slate-900/90 p-4 backdrop-blur-md">
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2.5">
+                <div className="grid size-9 place-items-center rounded-xl bg-indigo-500/20 text-indigo-300">
+                  <Icon name="check" className="size-5" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-white">
+                    Leger Kehadiran
+                  </h3>
+                  <p className="text-[11px] text-slate-400">
+                    Rekapitulasi semester &amp; pembekuan rapor
+                  </p>
+                </div>
+              </div>
+              <Link
+                href="/leger-kehadiran"
+                onClick={() => triggerHaptic("light")}
+                className="rounded-xl bg-indigo-500 px-3.5 py-1.5 text-xs font-black text-on-accent shadow-md active:scale-95 transition whitespace-nowrap"
               >
                 Buka &rarr;
               </Link>

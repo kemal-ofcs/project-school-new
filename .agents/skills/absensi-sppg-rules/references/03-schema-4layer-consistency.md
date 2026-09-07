@@ -100,9 +100,9 @@ Setiap perubahan kolom atau tabel wajib diselaraskan pada **4 layer sekaligus**:
 
 ---
 
-## 2. Daftar 28 Tabel Snapshot Terdistribusi
+## 2. Daftar 32 Tabel Snapshot Terdistribusi
 
-Terdapat **30 tabel** yang termasuk dalam siklus snapshot klien (identik di `web-desktop` dan `mobile`):
+Terdapat **32 tabel** yang termasuk dalam siklus snapshot klien (identik di `web-desktop` dan `mobile`):
 
 | No | Nama Tabel SQLite | Domain Sync | Payload Key di Snapshot | Keterangan |
 | :--- | :--- | :--- | :--- | :--- |
@@ -136,6 +136,8 @@ Terdapat **30 tabel** yang termasuk dalam siklus snapshot klien (identik di `web
 | 28 | `siswa_data` | `student` | `siswaData` | Data profil siswa & wali |
 | 29 | `presensi_mapel` | `class-attendance` | `presensiMapel` | Header sesi presensi jam mata pelajaran (KBM) |
 | 30 | `presensi_mapel_detail` | `class-attendance-detail` | `presensiMapelDetail` | Status kehadiran tiap siswa pada satu sesi KBM |
+| 31 | `jurnal_mengajar` | `teaching-journal` | `jurnalMengajar` | Catatan jurnal materi KBM, kendala & paraf digital |
+| 32 | `leger_kehadiran` | `attendance-ledger` | `legerKehadiran` | Rekapitulasi nilai kehadiran beku untuk buku rapor |
 
 ### PERHATIAN KHUSUS: `master_operator` BUKAN Snapshot Operasional
 - Tabel `master_operator` (beserta hash password, role, permission, dan status bootstrap) dikelola secara terpisah sebagai **Boundary Autentikasi / RBAC Cloud**.

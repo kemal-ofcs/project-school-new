@@ -38,6 +38,8 @@ export async function readOperationalSnapshot(client: Client) {
     siswaData,
     presensiMapel,
     presensiMapelDetail,
+    jurnalMengajar,
+    legerKehadiran,
     revision,
   ] = await client.batch(
     [
@@ -95,6 +97,8 @@ export async function readOperationalSnapshot(client: Client) {
       "SELECT * FROM siswa_data ORDER BY nama_lengkap;",
       "SELECT * FROM presensi_mapel ORDER BY tanggal DESC, jam_ke ASC;",
       "SELECT * FROM presensi_mapel_detail ORDER BY id_presensi_mapel, id_siswa;",
+      "SELECT * FROM jurnal_mengajar ORDER BY updated_at DESC;",
+      "SELECT * FROM leger_kehadiran ORDER BY id_tahun_ajaran, semester, id_rombel, id_siswa;",
       "SELECT COALESCE(MAX(revision), 0) AS revision FROM sync_change_log;",
     ],
     "read",
@@ -133,5 +137,7 @@ export async function readOperationalSnapshot(client: Client) {
     siswaData: plainRows(siswaData.rows),
     presensiMapel: plainRows(presensiMapel.rows),
     presensiMapelDetail: plainRows(presensiMapelDetail.rows),
+    jurnalMengajar: plainRows(jurnalMengajar.rows),
+    legerKehadiran: plainRows(legerKehadiran.rows),
   };
 }

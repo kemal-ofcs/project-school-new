@@ -12,7 +12,7 @@ use super::{
         CommandError, DesktopLoginResult, DesktopRuntimeStatus, DesktopSession, DesktopSyncStatus,
         OperatorUser, SessionMode,
     },
-    academic, class_attendance, operational,
+    academic, class_attendance, operational, teaching_journal, attendance_ledger,
     remote::{self, RemoteLoginError},
     scanner, secrets, storage, sync, turso,
 };
@@ -2539,6 +2539,154 @@ pub fn desktop_get_attendance_reconciliation(
     require_permission(&state, "class_attendance.view")?;
     class_attendance::get_attendance_reconciliation(&state, &params.unwrap_or(Value::Null))
 }
+
+// ── Perintah Jurnal Mengajar, Kartu Pelajar & Leger Kehadiran (Fase 3) ──────
+
+#[tauri::command]
+pub fn desktop_get_teaching_journal(
+    state: State<'_, DesktopState>,
+    id_presensi_mapel: String,
+) -> Result<Value, CommandError> {
+    require_permission(&state, "teaching_journal.view")?;
+    teaching_journal::get_teaching_journal(&state, &id_presensi_mapel)
+}
+
+#[tauri::command]
+pub fn desktop_list_teaching_journals(
+    state: State<'_, DesktopState>,
+    id_rombel: Option<String>,
+    id_mapel: Option<String>,
+    id_guru: Option<String>,
+    tanggal_mulai: Option<String>,
+    tanggal_selesai: Option<String>,
+) -> Result<Value, CommandError> {
+    require_permission(&state, "teaching_journal.view")?;
+    teaching_journal::list_teaching_journals(
+        &state,
+        id_rombel.as_deref(),
+        id_mapel.as_deref(),
+        id_guru.as_deref(),
+        tanggal_mulai.as_deref(),
+        tanggal_selesai.as_deref(),
+    )
+}
+
+#[tauri::command]
+pub fn desktop_save_teaching_journal(
+    state: State<'_, DesktopState>,
+    draft: Value,
+) -> Result<Value, CommandError> {
+    let operator = require_permission(&state, "teaching_journal.manage")?;
+    teaching_journal::save_teaching_journal(&state, &operator.username, &draft)
+}
+
+#[tauri::command]
+pub fn desktop_delete_teaching_journal(
+    state: State<'_, DesktopState>,
+    id_jurnal: String,
+) -> Result<Value, CommandError> {
+    require_permission(&state, "teaching_journal.delete")?;
+    teaching_journal::delete_teaching_journal(&state, &id_jurnal)
+}
+
+#[tauri::command]
+pub fn desktop_get_ledger_preview(
+    state: State<'_, DesktopState>,
+    id_tahun_ajaran: String,
+    semester: String,
+    id_rombel: Option<String>,
+) -> Result<Value, CommandError> {
+    require_permission(&state, "attendance_ledger.view")?;
+    attendance_ledger::get_ledger_preview(&state, &id_tahun_ajaran, &semester, id_rombel.as_deref())
+}
+
+#[tauri::command]
+pub fn desktop_freeze_attendance_ledger(
+    state: State<'_, DesktopState>,
+    payload: Value,
+) -> Result<Value, CommandError> {
+    let operator = require_permission(&state, "attendance_ledger.manage")?;
+    attendance_ledger::freeze_attendance_ledger(&state, &operator.username, &payload)
+}
+
+#[tauri::command]
+pub fn desktop_get_frozen_ledger(
+    state: State<'_, DesktopState>,
+    id_tahun_ajaran: String,
+    semester: String,
+    id_rombel: Option<String>,
+) -> Result<Value, CommandError> {
+    require_permission(&state, "attendance_ledger.view")?;
+    attendance_ledger::get_frozen_ledger(&state, &id_tahun_ajaran, &semester, id_rombel.as_deref())
+}
+
+#[tauri::command]
+pub fn desktop_delete_frozen_ledger(
+    state: State<'_, DesktopState>,
+    id_tahun_ajaran: String,
+    semester: String,
+    id_rombel: String,
+) -> Result<Value, CommandError> {
+    require_permission(&state, "attendance_ledger.delete")?;
+    attendance_ledger::delete_frozen_ledger(&state, &id_tahun_ajaran, &semester, &id_rombel)
+}
+
+/// Menerbitkan baris `id_card` untuk SETIAP personil aktif yang belum punya —
+/// siswa, guru, dan karyawan sekaligus.
+///
+/// Karena itu gerbangnya `employees.manage`, bukan `students.manage`: cakupannya
+/// seluruh `master_data`, dan izin itu pula yang menjaga area `/id-cards` tempat
+/// tombolnya berada (`AREA_PERMISSION.idcards`). Memakai `students.manage`
+/// membuat pemegang izin siswa saja bisa menerbitkan kartu guru dan karyawan.
+#[tauri::command]
+pub fn desktop_backfill_id_cards(state: State<'_, DesktopState>) -> Result<Value, CommandError> {
+    require_permission(&state, "employees.manage")?;
+    academic::backfill_missing_id_cards(&state)
+}
+
+#[tauri::command]
+pub fn desktop_save_student_photo(
+    state: State<'_, DesktopState>,
+    id_siswa: String,
+    foto_base64: String,
+    foto_mime: Option<String>,
+) -> Result<Value, CommandError> {
+    require_permission(&state, "students.manage")?;
+    academic::save_student_photo(&state, &id_siswa, &foto_base64, foto_mime.as_deref())
+}
+
+/// Foto profil siswa: salinan lokal lebih dulu, cloud sebagai cadangan.
+///
+/// Urutannya disengaja. `siswa_foto` tidak ikut ditarik bersama snapshot, jadi
+/// perangkat yang tidak memotret siswa itu memang tidak memilikinya secara
+/// lokal — dan tanpa cadangan cloud, kartu pelajarnya tercetak tanpa foto.
+/// Sebaliknya, mendahulukan lokal membuat perangkat yang sudah punya salinannya
+/// tetap bisa mencetak kartu saat jaringan mati, sesuai janji offline-first.
+///
+/// Kegagalan menjangkau cloud diperlakukan sebagai "belum ada foto", bukan
+/// error: siswa tanpa foto adalah keadaan wajar, dan kartu tetap harus bisa
+/// dicetak tanpa fotonya.
+#[tauri::command]
+pub async fn desktop_get_student_photo(
+    state: State<'_, DesktopState>,
+    id_siswa: String,
+) -> Result<Value, CommandError> {
+    require_permission(&state, "students.view")?;
+
+    let local = academic::get_student_photo(&state, &id_siswa)?;
+    if !local.is_null() {
+        return Ok(local);
+    }
+
+    let Ok(client) = state.get_turso_client() else {
+        return Ok(Value::Null);
+    };
+    Ok(client
+        .get_student_photo(&id_siswa)
+        .await
+        .unwrap_or(Value::Null))
+}
+
 
 #[cfg(test)]
 mod tests_offline_login {

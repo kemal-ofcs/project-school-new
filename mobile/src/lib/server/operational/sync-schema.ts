@@ -27,6 +27,15 @@ const optionalLongText = longText.nullable().optional();
 const optionalNumber = finiteNumber.nullable().optional();
 
 /**
+ * Batas foto profil siswa dalam karakter base64 (±500 KB).
+ *
+ * WAJIB sama dengan `MAX_STUDENT_PHOTO_BASE64` di `academic.rs`. Foto yang
+ * lolos di perangkat tetapi ditolak di sini akan macet selamanya di outbox
+ * tanpa pernah bisa berhasil — pelajaran yang sama dengan `MAX_SCAN_PHOTO_BASE64`.
+ */
+export const MAX_STUDENT_PHOTO_SIZE = 512_000;
+
+/**
  * Bentuk kanonik `presensi_mapel.jam_ke` di batas sinkronisasi.
  *
  * Nilainya bisa berupa satu jam pelajaran (`3`) atau RENTANG blok dua jam
@@ -904,6 +913,25 @@ export const operationalSyncEventSchema = z.union([
       })
       .strict(),
   ),
+  /**
+   * Foto profil siswa yang didorong ke cloud.
+   *
+   * `siswa_foto` sengaja di luar `SNAPSHOT_TABLES` supaya foto tidak ikut
+   * ditarik di setiap siklus pull — tetapi ia tetap harus DIDORONG, persis
+   * seperti `absensi_foto` yang menumpang event `attendance/scan`.
+   */
+  eventSchema(
+    "student-photo",
+    "save",
+    z
+      .object({
+        id_siswa: shortText.min(1),
+        foto_mime: z.enum(["image/jpeg", "image/png", "image/webp"]).optional(),
+        foto_base64: z.string().min(1).max(MAX_STUDENT_PHOTO_SIZE),
+        updated_at: optionalShortText,
+      })
+      .strict(),
+  ),
   eventSchema(
     "class-attendance",
     "create",
@@ -987,7 +1015,81 @@ export const operationalSyncEventSchema = z.union([
       })
       .strict(),
   ),
+  eventSchema(
+    "teaching-journal",
+    "save",
+    z
+      .object({
+        id_jurnal: shortText.min(1),
+        id_presensi_mapel: shortText.min(1),
+        materi_disampaikan: optionalLongText,
+        kendala: optionalLongText,
+        tindak_lanjut: optionalLongText,
+        paraf_nama: optionalShortText,
+        paraf_operator: optionalShortText,
+        paraf_at: optionalShortText,
+        created_at: optionalShortText,
+        updated_at: optionalShortText,
+      })
+      .strict(),
+  ),
+  eventSchema(
+    "teaching-journal",
+    "delete",
+    z
+      .object({
+        id_jurnal: optionalShortText,
+        id_presensi_mapel: optionalShortText,
+      })
+      .strict(),
+  ),
+  eventSchema(
+    "attendance-ledger",
+    "freeze",
+    z
+      .object({
+        id_leger: shortText.min(1),
+        id_tahun_ajaran: shortText.min(1),
+        semester: z.enum(["Ganjil", "Genap"]),
+        id_siswa: shortText.min(1),
+        id_rombel: shortText.min(1),
+        total_hari_efektif: z.number().int().min(0),
+        hadir: z.number().int().min(0),
+        izin: z.number().int().min(0),
+        sakit: z.number().int().min(0),
+        alfa: z.number().int().min(0),
+        dispensasi: z.number().int().min(0),
+        persen_kehadiran: z.number().min(0).max(100),
+        dibekukan_at: optionalShortText,
+        dibekukan_oleh: optionalShortText,
+        created_at: optionalShortText,
+        updated_at: optionalShortText,
+      })
+      .strict(),
+  ),
+  eventSchema(
+    "attendance-ledger",
+    "delete",
+    z
+      .object({
+        id_leger: optionalShortText,
+        id_tahun_ajaran: optionalShortText,
+        semester: z.enum(["Ganjil", "Genap"]).optional(),
+        id_rombel: optionalShortText,
+      })
+      .strict(),
+  ),
 ]);
+
+export const studentPhotoUploadSchema = z
+  .object({
+    id_siswa: shortText.min(1),
+    foto_mime: z
+      .enum(["image/jpeg", "image/png", "image/webp"])
+      .default("image/jpeg"),
+    foto_base64: z.string().min(1).max(MAX_STUDENT_PHOTO_SIZE),
+  })
+  .strict();
 
 export type OperationalSyncEvent = {
   eventId: string;

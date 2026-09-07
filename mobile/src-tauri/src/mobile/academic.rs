@@ -92,6 +92,15 @@ fn ensure_scan_token(
     Ok((token, qr_code, is_new))
 }
 
+/// Batas foto profil siswa dalam karakter base64 (±500 KB).
+///
+/// Angkanya WAJIB sama dengan `MAX_STUDENT_PHOTO_SIZE` di `sync-schema.ts`.
+/// Alasannya sama dengan `MAX_SCAN_PHOTO_BASE64`: foto yang lolos di perangkat
+/// tetapi ditolak validator di batas sinkronisasi akan macet selamanya di outbox
+/// tanpa pernah bisa berhasil. Diberi nama supaya kedua sisi tidak bisa bergeser
+/// diam-diam.
+pub const MAX_STUDENT_PHOTO_BASE64: usize = 512_000;
+
 /// Tolak nilai yang seharusnya unik, di lapisan aplikasi — bukan lewat UNIQUE.
 ///
 /// Tabel akademik ikut sinkronisasi, dan UNIQUE di sana membuat push gagal
@@ -1008,6 +1017,22 @@ pub fn save_teacher(state: &MobileState, draft: &Value) -> Result<Value, Command
     )
     .map_err(|e| CommandError::new("DB_ERROR", format!("Gagal menyimpan profil guru: {e}")))?;
 
+    // 3. Pastikan baris id_card ada supaya guru muncul di modul kartu identitas
+    tx.execute(
+        r#"
+        INSERT INTO id_card (id_unik, nama, divisi, idcard_status, tanggal_generate)
+        SELECT ?1, ?2, 'Tenaga Pengajar', 'Belum', date('now','+7 hours')
+        WHERE NOT EXISTS (SELECT 1 FROM id_card WHERE id_unik = ?1);
+        "#,
+        params![id, nama],
+    )
+    .map_err(|e| CommandError::new("DB_ERROR", format!("Gagal memastikan baris id_card guru: {e}")))?;
+    tx.execute(
+        "UPDATE id_card SET nama = ?1, divisi = 'Tenaga Pengajar' WHERE id_unik = ?2;",
+        params![nama, id],
+    )
+    .map_err(|e| CommandError::new("DB_ERROR", format!("Gagal memperbarui nama di id_card guru: {e}")))?;
+
     let op = if is_new { "create" } else { "update" };
     let payload = json!({
         "id_guru": id,
@@ -1253,6 +1278,22 @@ pub fn save_student(state: &MobileState, draft: &Value) -> Result<Value, Command
     )
     .map_err(|e| CommandError::new("DB_ERROR", format!("Gagal menyimpan profil siswa: {e}")))?;
 
+    // 3. Pastikan baris id_card ada supaya siswa muncul di modul kartu identitas
+    tx.execute(
+        r#"
+        INSERT INTO id_card (id_unik, nama, divisi, idcard_status, tanggal_generate)
+        SELECT ?1, ?2, 'Peserta Didik', 'Belum', date('now','+7 hours')
+        WHERE NOT EXISTS (SELECT 1 FROM id_card WHERE id_unik = ?1);
+        "#,
+        params![id, nama],
+    )
+    .map_err(|e| CommandError::new("DB_ERROR", format!("Gagal memastikan baris id_card siswa: {e}")))?;
+    tx.execute(
+        "UPDATE id_card SET nama = ?1, divisi = 'Peserta Didik' WHERE id_unik = ?2;",
+        params![nama, id],
+    )
+    .map_err(|e| CommandError::new("DB_ERROR", format!("Gagal memperbarui nama di id_card siswa: {e}")))?;
+
     let op = if is_new { "create" } else { "update" };
     let payload = json!({
         "id_siswa": id,
@@ -1308,4 +1349,140 @@ pub fn delete_student(state: &MobileState, id: &str) -> Result<Value, CommandErr
     tx.commit().map_err(|_| CommandError::internal())?;
 
     Ok(json!({ "sukses": true }))
+}
+
+// ── 8. Backfill Kartu & Foto Siswa ─────────────────────────────────────────
+
+pub fn backfill_missing_id_cards(state: &MobileState) -> Result<Value, CommandError> {
+    let mut conn = storage::database(&state.data_dir)?;
+    let tx = conn.transaction().map_err(|_| CommandError::internal())?;
+    let inserted = tx.execute(
+        r#"
+        INSERT INTO id_card (id_unik, nama, divisi, idcard_status, tanggal_generate)
+        SELECT m.id_unik, m.nama, m.divisi, 'Belum', date('now','+7 hours')
+        FROM master_data m
+        WHERE m.status_aktif = 'Aktif'
+          AND NOT EXISTS (SELECT 1 FROM id_card c WHERE c.id_unik = m.id_unik);
+        "#,
+        [],
+    )
+    .map_err(|e| CommandError::new("DB_ERROR", format!("Gagal melakukan backfill id_card: {e}")))?;
+    tx.commit().map_err(|_| CommandError::internal())?;
+    Ok(json!({ "sukses": true, "total_inserted": inserted }))
+}
+
+pub fn save_student_photo(
+    state: &MobileState,
+    id_siswa: &str,
+    foto_base64: &str,
+    foto_mime: Option<&str>,
+) -> Result<Value, CommandError> {
+    let clean_id = id_siswa.trim();
+    if clean_id.is_empty() {
+        return Err(CommandError::new("VALIDATION_ERROR", "ID Siswa tidak boleh kosong."));
+    }
+    let clean_foto = foto_base64.trim();
+    if clean_foto.is_empty() {
+        return Err(CommandError::new("VALIDATION_ERROR", "Foto base64 tidak boleh kosong."));
+    }
+    if clean_foto.len() > MAX_STUDENT_PHOTO_BASE64 {
+        return Err(CommandError::new("VALIDATION_ERROR", "Ukuran foto siswa melebihi batas 500 KB."));
+    }
+    // Ketiga nilai ini WAJIB sama dengan enum `foto_mime` di `sync-schema.ts`.
+    // Menerima mime lain di sini berarti barisnya tersimpan mulus di perangkat
+    // lalu ditolak validator di batas sinkronisasi — event-nya macet permanen
+    // di outbox tanpa pernah bisa berhasil.
+    let mime = match foto_mime.unwrap_or("image/jpeg").trim() {
+        "" => "image/jpeg",
+        valid @ ("image/jpeg" | "image/png" | "image/webp") => valid,
+        other => {
+            return Err(CommandError::new(
+                "VALIDATION_ERROR",
+                format!(
+                    "Format foto '{other}' tidak didukung. Gunakan JPEG, PNG, atau WebP."
+                ),
+            ));
+        }
+    };
+
+    let mut conn = storage::database(&state.data_dir)?;
+    let tx = conn.transaction().map_err(|_| CommandError::internal())?;
+    let now = sqlite_now(&tx);
+
+    tx.execute(
+        r#"
+        INSERT INTO siswa_foto (id_siswa, foto_mime, foto_base64, updated_at)
+        VALUES (?1, ?2, ?3, ?4)
+        ON CONFLICT(id_siswa) DO UPDATE SET
+            foto_mime = excluded.foto_mime,
+            foto_base64 = excluded.foto_base64,
+            updated_at = excluded.updated_at;
+        "#,
+        params![clean_id, mime, clean_foto, now],
+    )
+    .map_err(|e| CommandError::new("DB_ERROR", format!("Gagal menyimpan foto siswa: {e}")))?;
+
+    // Salinan lokal saja TIDAK CUKUP. `siswa_foto` berada di luar
+    // `SNAPSHOT_TABLES` — itu benar, karena foto tidak boleh membengkakkan tiap
+    // siklus pull — tetapi "di luar snapshot" hanya berarti tidak ikut DITARIK.
+    // Tanpa event outbox ini, foto berhenti di perangkat yang memotretnya:
+    // cloud tidak pernah menerimanya, perangkat lain tidak pernah melihatnya,
+    // dan kartu pelajar yang dicetak di tempat lain kehilangan fotonya. Sama
+    // seperti `absensi_foto` yang menumpang event `attendance/scan`.
+    let client_id = sync::ensure_client_id(state)?;
+    sync::enqueue(
+        &tx,
+        &client_id,
+        "student-photo",
+        "save",
+        clean_id,
+        &json!({
+            "id_siswa": clean_id,
+            "foto_mime": mime,
+            "foto_base64": clean_foto,
+            "updated_at": now,
+        }),
+        None,
+    )?;
+
+    tx.commit().map_err(|_| CommandError::internal())?;
+    Ok(json!({ "sukses": true, "id_siswa": clean_id }))
+}
+
+pub fn get_student_photo(state: &MobileState, id_siswa: &str) -> Result<Value, CommandError> {
+    use rusqlite::OptionalExtension;
+    let conn = storage::database(&state.data_dir)?;
+    let mut stmt = conn
+        .prepare("SELECT id_siswa, foto_mime, foto_base64, updated_at FROM siswa_foto WHERE id_siswa = ?1 LIMIT 1;")
+        .map_err(|_| CommandError::internal())?;
+
+    let row = stmt
+        .query_row(params![id_siswa], |row| {
+            Ok(json!({
+                "id_siswa": row.get::<_, String>(0)?,
+                "foto_mime": row.get::<_, String>(1)?,
+                "foto_base64": row.get::<_, String>(2)?,
+                "updated_at": row.get::<_, String>(3)?,
+            }))
+        })
+        .optional()
+        .map_err(|_| CommandError::internal())?;
+
+    Ok(json!(row))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Batas foto siswa WAJIB sama dengan `MAX_STUDENT_PHOTO_SIZE` di
+    /// `sync-schema.ts`. Foto yang lolos di perangkat tetapi ditolak validator
+    /// di batas sinkronisasi akan macet selamanya di outbox.
+    #[test]
+    fn batas_foto_siswa_sepadan_dengan_validator_sync() {
+        assert_eq!(
+            MAX_STUDENT_PHOTO_BASE64, 512_000,
+            "ubah bersamaan dengan MAX_STUDENT_PHOTO_SIZE di sync-schema.ts"
+        );
+    }
 }

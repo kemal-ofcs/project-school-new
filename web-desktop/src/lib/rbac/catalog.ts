@@ -186,6 +186,36 @@ export const PERMISSION_CATALOG = [
     name: "Hapus Sesi Presensi Mapel",
     group: "Akademik",
   },
+  {
+    key: "teaching_journal.view",
+    name: "Lihat Jurnal Mengajar",
+    group: "Akademik",
+  },
+  {
+    key: "teaching_journal.manage",
+    name: "Kelola Jurnal Mengajar",
+    group: "Akademik",
+  },
+  {
+    key: "teaching_journal.delete",
+    name: "Hapus Jurnal Mengajar",
+    group: "Akademik",
+  },
+  {
+    key: "attendance_ledger.view",
+    name: "Lihat Leger Kehadiran",
+    group: "Akademik",
+  },
+  {
+    key: "attendance_ledger.manage",
+    name: "Kelola & Bekukan Leger Kehadiran",
+    group: "Akademik",
+  },
+  {
+    key: "attendance_ledger.delete",
+    name: "Batalkan Pembekuan Leger Kehadiran",
+    group: "Akademik",
+  },
 ] as const;
 
 export type PermissionKey = (typeof PERMISSION_CATALOG)[number]["key"];
@@ -225,6 +255,10 @@ export const SENSITIVE_MUTATION_PERMISSIONS = new Set<PermissionKey>([
   // Menghapus sesi presensi memusnahkan seluruh rekam jejak kehadiran kelas jam
   // tersebut beserta seluruh detail siswa.
   "class_attendance.delete",
+  // Menghapus jurnal menghilangkan catatan kendala kelas dan bukti penyampaian materi.
+  "teaching_journal.delete",
+  // Membatalkan pembekuan leger membuka kembali angka kehadiran yang sudah disahkan untuk rapor.
+  "attendance_ledger.delete",
 ]);
 
 export const SYSTEM_ROLE_KEYS = [
@@ -257,6 +291,8 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<
     "students.view",
     "teachers.view",
     "class_attendance.view",
+    "teaching_journal.view",
+    "attendance_ledger.view",
   ],
   scanner: ["home.view", "scanner.use", "sync.view"],
 };

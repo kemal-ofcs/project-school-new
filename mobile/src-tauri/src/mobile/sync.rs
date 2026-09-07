@@ -19,7 +19,7 @@ use super::{
 /// `CURRENT_SCHEMA_VERSION` di `web-desktop/src/lib/db-schema.ts` setiap kali
 /// migrasi baru ditambahkan, karena keduanya membaca tabel `schema_migration`
 /// yang sama di Turso.
-pub const CLIENT_SCHEMA_VERSION: i64 = 18;
+pub const CLIENT_SCHEMA_VERSION: i64 = 19;
 
 /// Hanya `cloud > client` yang berbahaya; `cloud <= client` adalah kondisi normal.
 fn is_client_schema_outdated(cloud_version: i64) -> bool {
@@ -701,6 +701,52 @@ const SNAPSHOT_TABLES: &[SnapshotTable] = &[
         entity_column: "id_detail",
         delete_missing: false,
     },
+    SnapshotTable {
+        payload_key: "jurnalMengajar",
+        domain: "teaching-journal",
+        table: "jurnal_mengajar",
+        columns: &[
+            "id_jurnal",
+            "id_presensi_mapel",
+            "materi_disampaikan",
+            "kendala",
+            "tindak_lanjut",
+            "paraf_nama",
+            "paraf_operator",
+            "paraf_at",
+            "created_at",
+            "updated_at",
+        ],
+        conflict_column: "id_jurnal",
+        entity_column: "id_jurnal",
+        delete_missing: false,
+    },
+    SnapshotTable {
+        payload_key: "legerKehadiran",
+        domain: "attendance-ledger",
+        table: "leger_kehadiran",
+        columns: &[
+            "id_leger",
+            "id_tahun_ajaran",
+            "semester",
+            "id_siswa",
+            "id_rombel",
+            "total_hari_efektif",
+            "hadir",
+            "izin",
+            "sakit",
+            "alfa",
+            "dispensasi",
+            "persen_kehadiran",
+            "dibekukan_at",
+            "dibekukan_oleh",
+            "created_at",
+            "updated_at",
+        ],
+        conflict_column: "id_leger",
+        entity_column: "id_leger",
+        delete_missing: false,
+    },
 ];
 
 const CANONICAL_SYNC_ROUTES: &[(&str, &str)] = &[
@@ -722,6 +768,8 @@ const CANONICAL_SYNC_ROUTES: &[(&str, &str)] = &[
     ("attendance", "delete"),
     ("attendance", "scan"),
     ("attendance", "update"),
+    ("attendance-ledger", "delete"),
+    ("attendance-ledger", "freeze"),
     ("backup", "cancel"),
     ("backup", "create"),
     ("class-attendance", "create"),
@@ -763,9 +811,12 @@ const CANONICAL_SYNC_ROUTES: &[(&str, &str)] = &[
     ("student", "create"),
     ("student", "delete"),
     ("student", "update"),
+    ("student-photo", "save"),
     ("teacher", "create"),
     ("teacher", "delete"),
     ("teacher", "update"),
+    ("teaching-journal", "delete"),
+    ("teaching-journal", "save"),
 ];
 
 pub(super) fn is_canonical_sync_route(domain: &str, operation: &str) -> bool {

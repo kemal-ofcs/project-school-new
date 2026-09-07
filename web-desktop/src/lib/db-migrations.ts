@@ -22,6 +22,7 @@ const PASSWORD_RECOVERY_MIGRATION_VERSION = 15;
 const ACADEMIC_FOUNDATION_MIGRATION_VERSION = 16;
 const ACADEMIC_UNIQUE_RELAXATION_MIGRATION_VERSION = 17;
 const CLASS_ATTENDANCE_MIGRATION_VERSION = 18;
+const TEACHING_JOURNAL_AND_LEDGER_MIGRATION_VERSION = 19;
 
 /**
  * Bangun ulang sebuah tabel untuk melepas UNIQUE yang terlanjur ikut terbuat.
@@ -1172,6 +1173,65 @@ export async function runDatabaseMigrations(client: Client) {
     sql: `INSERT OR IGNORE INTO schema_migration (version, name, applied_at)
           VALUES (?, 'class-attendance-foundation', ?);`,
     args: [CLASS_ATTENDANCE_MIGRATION_VERSION, now],
+  });
+
+  // ── v19: Jurnal Mengajar, Kartu Pelajar & Leger Kehadiran (Fase 3) ──
+  await client.execute(`
+    CREATE TABLE IF NOT EXISTS jurnal_mengajar (
+      id_jurnal TEXT PRIMARY KEY,
+      id_presensi_mapel TEXT NOT NULL,
+      materi_disampaikan TEXT,
+      kendala TEXT,
+      tindak_lanjut TEXT,
+      paraf_nama TEXT,
+      paraf_operator TEXT,
+      paraf_at TEXT,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+  `);
+
+  await client.execute(`
+    CREATE TABLE IF NOT EXISTS leger_kehadiran (
+      id_leger TEXT PRIMARY KEY,
+      id_tahun_ajaran TEXT NOT NULL,
+      semester TEXT NOT NULL CHECK (semester IN ('Ganjil', 'Genap')),
+      id_siswa TEXT NOT NULL,
+      id_rombel TEXT NOT NULL,
+      total_hari_efektif INTEGER NOT NULL DEFAULT 0,
+      hadir INTEGER NOT NULL DEFAULT 0,
+      izin INTEGER NOT NULL DEFAULT 0,
+      sakit INTEGER NOT NULL DEFAULT 0,
+      alfa INTEGER NOT NULL DEFAULT 0,
+      dispensasi INTEGER NOT NULL DEFAULT 0,
+      persen_kehadiran REAL NOT NULL DEFAULT 0,
+      dibekukan_at TEXT NOT NULL,
+      dibekukan_oleh TEXT NOT NULL,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+  `);
+
+  await client.execute(`
+    CREATE TABLE IF NOT EXISTS siswa_foto (
+      id_siswa TEXT PRIMARY KEY,
+      foto_mime TEXT NOT NULL DEFAULT 'image/jpeg',
+      foto_base64 TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+  `);
+
+  await client.execute(
+    "CREATE INDEX IF NOT EXISTS idx_jurnal_presensi ON jurnal_mengajar(id_presensi_mapel);",
+  );
+  await client.execute(
+    "CREATE INDEX IF NOT EXISTS idx_leger_scope ON leger_kehadiran(id_tahun_ajaran, semester, id_rombel, id_siswa);",
+  );
+
+  await client.execute({
+    sql: `INSERT OR IGNORE INTO schema_migration (version, name, applied_at)
+          VALUES (?, 'teaching-journal-and-attendance-ledger', ?);`,
+    args: [TEACHING_JOURNAL_AND_LEDGER_MIGRATION_VERSION, now],
   });
 
   await client.execute(

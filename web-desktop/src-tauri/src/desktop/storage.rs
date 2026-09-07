@@ -759,6 +759,48 @@ pub fn initialize(path: &Path) -> Result<(), String> {
         ON presensi_mapel_detail(id_siswa, created_at);
       INSERT OR IGNORE INTO desktop_schema_migration (version, name, applied_at)
       VALUES (7, 'desktop-class-attendance-foundation', unixepoch());
+      CREATE TABLE IF NOT EXISTS jurnal_mengajar (
+        id_jurnal TEXT PRIMARY KEY,
+        id_presensi_mapel TEXT NOT NULL,
+        materi_disampaikan TEXT,
+        kendala TEXT,
+        tindak_lanjut TEXT,
+        paraf_nama TEXT,
+        paraf_operator TEXT,
+        paraf_at TEXT,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS idx_local_jurnal_presensi
+        ON jurnal_mengajar(id_presensi_mapel);
+      CREATE TABLE IF NOT EXISTS leger_kehadiran (
+        id_leger TEXT PRIMARY KEY,
+        id_tahun_ajaran TEXT NOT NULL,
+        semester TEXT NOT NULL CHECK (semester IN ('Ganjil', 'Genap')),
+        id_siswa TEXT NOT NULL,
+        id_rombel TEXT NOT NULL,
+        total_hari_efektif INTEGER NOT NULL DEFAULT 0,
+        hadir INTEGER NOT NULL DEFAULT 0,
+        izin INTEGER NOT NULL DEFAULT 0,
+        sakit INTEGER NOT NULL DEFAULT 0,
+        alfa INTEGER NOT NULL DEFAULT 0,
+        dispensasi INTEGER NOT NULL DEFAULT 0,
+        persen_kehadiran REAL NOT NULL DEFAULT 0,
+        dibekukan_at TEXT NOT NULL,
+        dibekukan_oleh TEXT NOT NULL,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS idx_local_leger_scope
+        ON leger_kehadiran(id_tahun_ajaran, semester, id_rombel, id_siswa);
+      CREATE TABLE IF NOT EXISTS siswa_foto (
+        id_siswa TEXT PRIMARY KEY,
+        foto_mime TEXT NOT NULL DEFAULT 'image/jpeg',
+        foto_base64 TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      );
+      INSERT OR IGNORE INTO desktop_schema_migration (version, name, applied_at)
+      VALUES (8, 'desktop-teaching-journal-and-attendance-ledger', unixepoch());
       "#,
         )
         .map_err(|_| "Schema keamanan Desktop tidak dapat diinisialisasi.".to_owned())?;
@@ -1392,7 +1434,7 @@ mod tests {
                 |row| row.get(0),
             )
             .expect("migration count");
-        assert_eq!(migrations, 7);
+        assert_eq!(migrations, 8);
     }
 
     /// Pindah database cloud harus membuang seluruh cache database lama, tetapi

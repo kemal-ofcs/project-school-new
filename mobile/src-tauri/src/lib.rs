@@ -174,6 +174,17 @@ pub fn run() {
             mobile::commands::desktop_save_class_attendance,
             mobile::commands::desktop_delete_class_attendance,
             mobile::commands::desktop_get_attendance_reconciliation,
+            mobile::commands::desktop_get_teaching_journal,
+            mobile::commands::desktop_list_teaching_journals,
+            mobile::commands::desktop_save_teaching_journal,
+            mobile::commands::desktop_delete_teaching_journal,
+            mobile::commands::desktop_get_ledger_preview,
+            mobile::commands::desktop_freeze_attendance_ledger,
+            mobile::commands::desktop_get_frozen_ledger,
+            mobile::commands::desktop_delete_frozen_ledger,
+            mobile::commands::desktop_backfill_id_cards,
+            mobile::commands::desktop_save_student_photo,
+            mobile::commands::desktop_get_student_photo,
         ])
         .run(tauri::generate_context!())
         .unwrap_or_else(|error| {

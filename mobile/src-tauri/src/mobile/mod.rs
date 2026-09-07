@@ -17,5 +17,7 @@ pub mod portability;
 pub mod payroll;
 pub mod academic;
 pub mod class_attendance;
+pub mod teaching_journal;
+pub mod attendance_ledger;
 pub mod share;
 pub use config::MobileState;

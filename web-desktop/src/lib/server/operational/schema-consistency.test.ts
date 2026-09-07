@@ -40,7 +40,8 @@ describe("Schema Consistency & Zero-Drift Guard", () => {
         'hari_libur_whitelist',
         'akademik_tahun_ajaran', 'akademik_jurusan', 'akademik_rombel',
         'akademik_mapel', 'akademik_guru_mapel', 'guru_data', 'siswa_data',
-        'presensi_mapel', 'presensi_mapel_detail'
+        'presensi_mapel', 'presensi_mapel_detail',
+        'jurnal_mengajar', 'leger_kehadiran', 'siswa_foto'
       );
     `);
     const tableCount = Number(tablesRes.rows[0]?.count ?? 0);

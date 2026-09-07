@@ -182,6 +182,17 @@ pub fn run() {
             desktop::commands::desktop_save_class_attendance,
             desktop::commands::desktop_delete_class_attendance,
             desktop::commands::desktop_get_attendance_reconciliation,
+            desktop::commands::desktop_get_teaching_journal,
+            desktop::commands::desktop_list_teaching_journals,
+            desktop::commands::desktop_save_teaching_journal,
+            desktop::commands::desktop_delete_teaching_journal,
+            desktop::commands::desktop_get_ledger_preview,
+            desktop::commands::desktop_freeze_attendance_ledger,
+            desktop::commands::desktop_get_frozen_ledger,
+            desktop::commands::desktop_delete_frozen_ledger,
+            desktop::commands::desktop_backfill_id_cards,
+            desktop::commands::desktop_save_student_photo,
+            desktop::commands::desktop_get_student_photo,
         ])
         .run(tauri::generate_context!())
         .unwrap_or_else(|error| {

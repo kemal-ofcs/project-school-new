@@ -571,6 +571,18 @@ export async function saveTeacher(draft: {
           draft.status_kepegawaian || "Honorer",
         ],
       },
+      {
+        sql: `
+      INSERT INTO id_card (id_unik, nama, divisi, idcard_status, tanggal_generate)
+      SELECT ?, ?, 'Tenaga Pengajar', 'Belum', date('now','+7 hours')
+      WHERE NOT EXISTS (SELECT 1 FROM id_card WHERE id_unik = ?);
+    `,
+        args: [id, draft.nama, id],
+      },
+      {
+        sql: "UPDATE id_card SET nama = ?, divisi = 'Tenaga Pengajar' WHERE id_unik = ?;",
+        args: [draft.nama, id],
+      },
     ],
     "write",
   );
@@ -728,6 +740,18 @@ export async function saveStudent(draft: {
           status,
         ],
       },
+      {
+        sql: `
+      INSERT INTO id_card (id_unik, nama, divisi, idcard_status, tanggal_generate)
+      SELECT ?, ?, 'Peserta Didik', 'Belum', date('now','+7 hours')
+      WHERE NOT EXISTS (SELECT 1 FROM id_card WHERE id_unik = ?);
+    `,
+        args: [id, draft.nama_lengkap, id],
+      },
+      {
+        sql: "UPDATE id_card SET nama = ?, divisi = 'Peserta Didik' WHERE id_unik = ?;",
+        args: [draft.nama_lengkap, id],
+      },
     ],
     "write",
   );
@@ -754,4 +778,63 @@ export async function deleteStudent(id: string) {
     "write",
   );
   return { sukses: true };
+}
+
+export async function backfillMissingIdCards() {
+  await ensureDbInitialized();
+  const result = await db.execute({
+    sql: `
+      INSERT INTO id_card (id_unik, nama, divisi, idcard_status, tanggal_generate)
+      SELECT m.id_unik, m.nama, m.divisi, 'Belum', date('now','+7 hours')
+      FROM master_data m
+      WHERE m.status_aktif = 'Aktif'
+        AND NOT EXISTS (SELECT 1 FROM id_card c WHERE c.id_unik = m.id_unik);
+    `,
+  });
+  return { sukses: true, total_inserted: result.rowsAffected };
+}
+
+export async function saveStudentPhoto(data: {
+  id_siswa: string;
+  foto_base64: string;
+  foto_mime?: string;
+}) {
+  await ensureDbInitialized();
+  const idSiswa = data.id_siswa.trim();
+  const fotoBase64 = data.foto_base64.trim();
+  if (!idSiswa || !fotoBase64) {
+    throw new ApiRequestError("ID Siswa dan foto wajib diisi.", 400);
+  }
+  if (fotoBase64.length > 512_000) {
+    throw new ApiRequestError("Ukuran foto melebihi batas 500 KB.", 400);
+  }
+  const mime = (data.foto_mime || "image/jpeg").trim();
+  await db.execute({
+    sql: `
+      INSERT INTO siswa_foto (id_siswa, foto_mime, foto_base64, updated_at)
+      VALUES (?, ?, ?, datetime('now'))
+      ON CONFLICT(id_siswa) DO UPDATE SET
+        foto_mime = excluded.foto_mime,
+        foto_base64 = excluded.foto_base64,
+        updated_at = excluded.updated_at;
+    `,
+    args: [idSiswa, mime, fotoBase64],
+  });
+  return { sukses: true, id_siswa: idSiswa };
+}
+
+export async function getStudentPhoto(idSiswa: string) {
+  await ensureDbInitialized();
+  const result = await db.execute({
+    sql: "SELECT id_siswa, foto_mime, foto_base64, updated_at FROM siswa_foto WHERE id_siswa = ? LIMIT 1;",
+    args: [idSiswa],
+  });
+  if (result.rows.length === 0) return null;
+  const row = result.rows[0];
+  return {
+    id_siswa: String(row.id_siswa),
+    foto_mime: String(row.foto_mime),
+    foto_base64: String(row.foto_base64),
+    updated_at: String(row.updated_at),
+  };
 }

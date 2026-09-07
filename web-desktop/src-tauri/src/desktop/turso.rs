@@ -862,6 +862,16 @@ const SNAPSHOT_SOURCES: &[SnapshotSource] = &[
         table: "presensi_mapel_detail",
         sql: "SELECT * FROM presensi_mapel_detail ORDER BY id_presensi_mapel, id_siswa;",
     },
+    SnapshotSource {
+        payload_key: "jurnalMengajar",
+        table: "jurnal_mengajar",
+        sql: "SELECT * FROM jurnal_mengajar ORDER BY updated_at DESC;",
+    },
+    SnapshotSource {
+        payload_key: "legerKehadiran",
+        table: "leger_kehadiran",
+        sql: "SELECT * FROM leger_kehadiran ORDER BY id_tahun_ajaran, semester, id_rombel, id_siswa;",
+    },
 ];
 
 pub struct TursoClient {
@@ -1940,7 +1950,13 @@ impl TursoClient {
                 ('teachers.manage', 'Kelola Data Guru & PTK', 'Akademik', 'Mengelola data guru dan penugasan mapel.', 1, 421),
                 ('class_attendance.view', 'Lihat Presensi Jam Mapel', 'Akademik', 'Melihat presensi per jam mata pelajaran dan deteksi bolos.', 1, 430),
                 ('class_attendance.manage', 'Kelola Presensi Jam Mapel', 'Akademik', 'Mencatat dan mengedit presensi jam mata pelajaran siswa.', 1, 431),
-                ('class_attendance.delete', 'Hapus Sesi Presensi Mapel', 'Akademik', 'Menghapus sesi presensi jam mata pelajaran beserta seluruh detail siswa.', 1, 432);"#,
+                ('class_attendance.delete', 'Hapus Sesi Presensi Mapel', 'Akademik', 'Menghapus sesi presensi jam mata pelajaran beserta seluruh detail siswa.', 1, 432),
+                ('teaching_journal.view', 'Lihat Jurnal Mengajar', 'Akademik', 'Melihat catatan jurnal KBM dan materi yang disampaikan guru.', 1, 440),
+                ('teaching_journal.manage', 'Kelola Jurnal Mengajar', 'Akademik', 'Mengisi dan menyunting materi, kendala, tindak lanjut, dan paraf digital KBM.', 1, 441),
+                ('teaching_journal.delete', 'Hapus Jurnal Mengajar', 'Akademik', 'Menghapus catatan jurnal pembelajaran guru.', 1, 442),
+                ('attendance_ledger.view', 'Lihat Leger Kehadiran', 'Akademik', 'Melihat rekap dan pratinjau kalkulasi kehadiran rapor semesteran.', 1, 450),
+                ('attendance_ledger.manage', 'Kelola & Bekukan Leger Kehadiran', 'Akademik', 'Membekukan angka kehadiran resmi untuk rapor.', 1, 451),
+                ('attendance_ledger.delete', 'Batalkan Pembekuan Leger Kehadiran', 'Akademik', 'Membatalkan dan menghapus pembekuan leger kehadiran resmi.', 1, 452);"#,
                 vec![],
             ),
             // Seed Default Role Permissions untuk Role Superadmin (Role 1)
@@ -1979,6 +1995,16 @@ impl TursoClient {
             Statement::new(
                 r#"INSERT OR IGNORE INTO id_card_template (id, name, orientation, elements_json, is_active, created_at, updated_at) VALUES
                 ('default_template', 'Default ID Card Template', 'landscape', ?, 1, datetime('now'), datetime('now'));"#,
+                vec![json!(serde_json::to_string(&crate::desktop::operational::default_id_card_elements()).unwrap_or_else(|_| "[]".to_string()))],
+            ),
+            Statement::new(
+                r#"INSERT OR IGNORE INTO id_card_template (id, name, orientation, elements_json, is_active, created_at, updated_at) VALUES
+                ('template_siswa', 'Template Kartu Pelajar', 'landscape', ?, 1, datetime('now'), datetime('now'));"#,
+                vec![json!(serde_json::to_string(&crate::desktop::operational::default_id_card_elements()).unwrap_or_else(|_| "[]".to_string()))],
+            ),
+            Statement::new(
+                r#"INSERT OR IGNORE INTO id_card_template (id, name, orientation, elements_json, is_active, created_at, updated_at) VALUES
+                ('template_guru', 'Template Kartu Guru', 'landscape', ?, 1, datetime('now'), datetime('now'));"#,
                 vec![json!(serde_json::to_string(&crate::desktop::operational::default_id_card_elements()).unwrap_or_else(|_| "[]".to_string()))],
             ),
             // Payroll DDL
@@ -2240,6 +2266,53 @@ impl TursoClient {
             Statement::new("CREATE INDEX IF NOT EXISTS idx_presensi_mapel_lookup ON presensi_mapel(id_tahun_ajaran, id_rombel, id_mapel, tanggal);", vec![]),
             Statement::new("CREATE INDEX IF NOT EXISTS idx_presensi_mapel_detail_parent ON presensi_mapel_detail(id_presensi_mapel);", vec![]),
             Statement::new("CREATE INDEX IF NOT EXISTS idx_presensi_mapel_detail_siswa ON presensi_mapel_detail(id_siswa, created_at);", vec![]),
+            Statement::new(
+                r#"CREATE TABLE IF NOT EXISTS jurnal_mengajar (
+                    id_jurnal TEXT PRIMARY KEY,
+                    id_presensi_mapel TEXT NOT NULL,
+                    materi_disampaikan TEXT,
+                    kendala TEXT,
+                    tindak_lanjut TEXT,
+                    paraf_nama TEXT,
+                    paraf_operator TEXT,
+                    paraf_at TEXT,
+                    created_at TEXT NOT NULL,
+                    updated_at TEXT NOT NULL
+                );"#,
+                vec![],
+            ),
+            Statement::new(
+                r#"CREATE TABLE IF NOT EXISTS leger_kehadiran (
+                    id_leger TEXT PRIMARY KEY,
+                    id_tahun_ajaran TEXT NOT NULL,
+                    semester TEXT NOT NULL CHECK (semester IN ('Ganjil', 'Genap')),
+                    id_siswa TEXT NOT NULL,
+                    id_rombel TEXT NOT NULL,
+                    total_hari_efektif INTEGER NOT NULL DEFAULT 0,
+                    hadir INTEGER NOT NULL DEFAULT 0,
+                    izin INTEGER NOT NULL DEFAULT 0,
+                    sakit INTEGER NOT NULL DEFAULT 0,
+                    alfa INTEGER NOT NULL DEFAULT 0,
+                    dispensasi INTEGER NOT NULL DEFAULT 0,
+                    persen_kehadiran REAL NOT NULL DEFAULT 0,
+                    dibekukan_at TEXT NOT NULL,
+                    dibekukan_oleh TEXT NOT NULL,
+                    created_at TEXT NOT NULL,
+                    updated_at TEXT NOT NULL
+                );"#,
+                vec![],
+            ),
+            Statement::new(
+                r#"CREATE TABLE IF NOT EXISTS siswa_foto (
+                    id_siswa TEXT PRIMARY KEY,
+                    foto_mime TEXT NOT NULL DEFAULT 'image/jpeg',
+                    foto_base64 TEXT NOT NULL,
+                    updated_at TEXT NOT NULL
+                );"#,
+                vec![],
+            ),
+            Statement::new("CREATE INDEX IF NOT EXISTS idx_jurnal_presensi ON jurnal_mengajar(id_presensi_mapel);", vec![]),
+            Statement::new("CREATE INDEX IF NOT EXISTS idx_leger_scope ON leger_kehadiran(id_tahun_ajaran, semester, id_rombel, id_siswa);", vec![]),
             // Seed Default Overtime Rules
             Statement::new(crate::desktop::payroll_seed::OVERTIME_TIER_RULES_SEED_SQL, vec![]),
             // Seed Default Tax Rules (Pasal 17 & TER Baseline)
@@ -2256,7 +2329,8 @@ impl TursoClient {
                 (15, 'superadmin-password-recovery-codes', datetime('now')),
                 (16, 'academic-foundation-v1', datetime('now')),
                 (17, 'academic-unique-relaxation', datetime('now')),
-                (18, 'class-attendance-foundation', datetime('now'));"#,
+                (18, 'class-attendance-foundation', datetime('now')),
+                (19, 'teaching-journal-and-attendance-ledger', datetime('now'));"#,
                 vec![],
             ),
         ];
@@ -2469,6 +2543,11 @@ impl TursoClient {
         .await?;
         self.query_one(
             "INSERT OR IGNORE INTO schema_migration (version, name, applied_at) VALUES (-2011, 'superadmin-password-recovery-codes-v1', datetime('now'));",
+            vec![],
+        )
+        .await?;
+        self.query_one(
+            "INSERT OR IGNORE INTO schema_migration (version, name, applied_at) VALUES (-2012, 'teaching-journal-and-attendance-ledger-v1', datetime('now'));",
             vec![],
         )
         .await?;
@@ -2686,7 +2765,7 @@ impl TursoClient {
                 // Sentinel WAJIB dinaikkan setiap kali ensure_schema menambah
                 // tabel atau kolom — nilainya di sini dan pada INSERT di atas
                 // harus selalu sama.
-                "SELECT COUNT(*) AS total FROM schema_migration WHERE version = -2011;",
+                "SELECT COUNT(*) AS total FROM schema_migration WHERE version = -2012;",
                 vec![],
             )
             .await
@@ -5066,6 +5145,9 @@ fn canonical_sync_route(domain: &str, operation: &str) -> Option<(&'static str, 
         ("student" | "siswa", "create") => ("student", "create"),
         ("student" | "siswa", "update") => ("student", "update"),
         ("student" | "siswa", "delete") => ("student", "delete"),
+        ("student-photo" | "student_photo" | "siswa-foto" | "siswa_foto", "save") => {
+            ("student-photo", "save")
+        }
         ("class-attendance" | "class_attendance" | "presensi-mapel" | "presensi_mapel", "create") => {
             ("class-attendance", "create")
         }
@@ -5080,6 +5162,18 @@ fn canonical_sync_route(domain: &str, operation: &str) -> Option<(&'static str, 
         }
         ("class-attendance-detail" | "class_attendance_detail" | "presensi-mapel-detail" | "presensi_mapel_detail", "delete") => {
             ("class-attendance-detail", "delete")
+        }
+        ("teaching-journal" | "teaching_journal" | "jurnal-mengajar" | "jurnal_mengajar", "save" | "create" | "update") => {
+            ("teaching-journal", "save")
+        }
+        ("teaching-journal" | "teaching_journal" | "jurnal-mengajar" | "jurnal_mengajar", "delete") => {
+            ("teaching-journal", "delete")
+        }
+        ("attendance-ledger" | "attendance_ledger" | "leger-kehadiran" | "leger_kehadiran", "freeze" | "save" | "create") => {
+            ("attendance-ledger", "freeze")
+        }
+        ("attendance-ledger" | "attendance_ledger" | "leger-kehadiran" | "leger_kehadiran", "delete") => {
+            ("attendance-ledger", "delete")
         }
         _ => return None,
     };
@@ -7089,6 +7183,44 @@ async fn apply_event_to_turso(
                 ).await?;
             }
         }
+        // Foto profil siswa. `siswa_foto` sengaja DI LUAR `SNAPSHOT_TABLES` —
+        // satu foto ratusan kilobyte, dan menariknya lewat snapshot membuat tiap
+        // siklus pull membengkak di setiap perangkat. Tetapi "di luar snapshot"
+        // hanya berarti tidak ikut DITARIK; ia tetap wajib DIDORONG lewat event
+        // ini, persis seperti `absensi_foto` yang menumpang `attendance/scan`.
+        // Tanpa event ini foto hanya hidup di perangkat yang memotretnya, dan
+        // kartu pelajar yang dicetak dari perangkat lain kehilangan fotonya.
+        ("student-photo", "save") => {
+            let row = payload.get("student_photo").unwrap_or(payload);
+            let id = row
+                .get("id_siswa")
+                .and_then(Value::as_str)
+                .filter(|v| !v.is_empty())
+                .unwrap_or(entity_key);
+            let base64 = row.get("foto_base64").and_then(Value::as_str).unwrap_or("");
+            if !id.is_empty() && !base64.is_empty() {
+                let mime = row
+                    .get("foto_mime")
+                    .and_then(Value::as_str)
+                    .filter(|v| !v.is_empty())
+                    .unwrap_or("image/jpeg");
+                let updated_at = row
+                    .get("updated_at")
+                    .and_then(Value::as_str)
+                    .unwrap_or("");
+                turso
+                    .query_one(
+                        r#"INSERT INTO siswa_foto (id_siswa, foto_mime, foto_base64, updated_at)
+                        VALUES (?, ?, ?, ?)
+                        ON CONFLICT(id_siswa) DO UPDATE SET
+                            foto_mime = excluded.foto_mime,
+                            foto_base64 = excluded.foto_base64,
+                            updated_at = excluded.updated_at;"#,
+                        vec![json!(id), json!(mime), json!(base64), json!(updated_at)],
+                    )
+                    .await?;
+            }
+        }
         ("class-attendance", "create" | "update") => {
             let row = payload.get("class_attendance").or_else(|| payload.get("presensiMapel")).unwrap_or(payload);
             let id = row.get("id_presensi_mapel").and_then(Value::as_str).filter(|v| !v.is_empty()).unwrap_or(entity_key);
@@ -7195,6 +7327,120 @@ async fn apply_event_to_turso(
                         vec![json!(id)],
                     )
                     .await?;
+            }
+        }
+        ("teaching-journal", "save") => {
+            let row = payload.get("teaching_journal").or_else(|| payload.get("jurnalMengajar")).unwrap_or(payload);
+            let id = row.get("id_jurnal").and_then(Value::as_str).filter(|v| !v.is_empty()).unwrap_or(entity_key);
+            if !id.is_empty() {
+                let id_presensi = row.get("id_presensi_mapel").and_then(Value::as_str).unwrap_or("");
+                let materi = row.get("materi_disampaikan").and_then(Value::as_str);
+                let kendala = row.get("kendala").and_then(Value::as_str);
+                let tindak_lanjut = row.get("tindak_lanjut").and_then(Value::as_str);
+                let paraf_nama = row.get("paraf_nama").and_then(Value::as_str);
+                let paraf_operator = row.get("paraf_operator").and_then(Value::as_str);
+                let paraf_at = row.get("paraf_at").and_then(Value::as_str);
+                let created_at = row.get("created_at").and_then(Value::as_str).unwrap_or("");
+                let updated_at = row.get("updated_at").and_then(Value::as_str).unwrap_or("");
+
+                turso.query_one(
+                    r#"INSERT INTO jurnal_mengajar (
+                        id_jurnal, id_presensi_mapel, materi_disampaikan, kendala, tindak_lanjut,
+                        paraf_nama, paraf_operator, paraf_at, created_at, updated_at
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    ON CONFLICT(id_jurnal) DO UPDATE SET
+                        id_presensi_mapel = excluded.id_presensi_mapel,
+                        materi_disampaikan = excluded.materi_disampaikan,
+                        kendala = excluded.kendala,
+                        tindak_lanjut = excluded.tindak_lanjut,
+                        paraf_nama = excluded.paraf_nama,
+                        paraf_operator = excluded.paraf_operator,
+                        paraf_at = excluded.paraf_at,
+                        updated_at = excluded.updated_at;"#,
+                    vec![
+                        json!(id), json!(id_presensi), json!(materi), json!(kendala),
+                        json!(tindak_lanjut), json!(paraf_nama), json!(paraf_operator),
+                        json!(paraf_at), json!(created_at), json!(updated_at)
+                    ],
+                ).await?;
+            }
+        }
+        ("teaching-journal", "delete") => {
+            let id = payload.get("id_jurnal").and_then(Value::as_str).filter(|v| !v.is_empty()).unwrap_or(entity_key);
+            if !id.is_empty() {
+                turso.query_one(
+                    "DELETE FROM jurnal_mengajar WHERE id_jurnal = ?;",
+                    vec![json!(id)],
+                ).await?;
+            }
+        }
+        ("attendance-ledger", "freeze") => {
+            let row = payload.get("attendance_ledger").or_else(|| payload.get("legerKehadiran")).unwrap_or(payload);
+            let id = row.get("id_leger").and_then(Value::as_str).filter(|v| !v.is_empty()).unwrap_or(entity_key);
+            if !id.is_empty() {
+                let id_ta = row.get("id_tahun_ajaran").and_then(Value::as_str).unwrap_or("");
+                let semester = row.get("semester").and_then(Value::as_str).unwrap_or("Ganjil");
+                let id_siswa = row.get("id_siswa").and_then(Value::as_str).unwrap_or("");
+                let id_rombel = row.get("id_rombel").and_then(Value::as_str).unwrap_or("");
+                let total_hari_efektif = row.get("total_hari_efektif").and_then(Value::as_i64).unwrap_or(0);
+                let hadir = row.get("hadir").and_then(Value::as_i64).unwrap_or(0);
+                let izin = row.get("izin").and_then(Value::as_i64).unwrap_or(0);
+                let sakit = row.get("sakit").and_then(Value::as_i64).unwrap_or(0);
+                let alfa = row.get("alfa").and_then(Value::as_i64).unwrap_or(0);
+                let dispensasi = row.get("dispensasi").and_then(Value::as_i64).unwrap_or(0);
+                let persen_kehadiran = row.get("persen_kehadiran").and_then(Value::as_f64).unwrap_or(0.0);
+                let dibekukan_at = row.get("dibekukan_at").and_then(Value::as_str).unwrap_or("");
+                let dibekukan_oleh = row.get("dibekukan_oleh").and_then(Value::as_str).unwrap_or("");
+                let created_at = row.get("created_at").and_then(Value::as_str).unwrap_or("");
+                let updated_at = row.get("updated_at").and_then(Value::as_str).unwrap_or("");
+
+                turso.query_one(
+                    r#"INSERT INTO leger_kehadiran (
+                        id_leger, id_tahun_ajaran, semester, id_siswa, id_rombel,
+                        total_hari_efektif, hadir, izin, sakit, alfa, dispensasi,
+                        persen_kehadiran, dibekukan_at, dibekukan_oleh, created_at, updated_at
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    ON CONFLICT(id_leger) DO UPDATE SET
+                        id_tahun_ajaran = excluded.id_tahun_ajaran,
+                        semester = excluded.semester,
+                        id_siswa = excluded.id_siswa,
+                        id_rombel = excluded.id_rombel,
+                        total_hari_efektif = excluded.total_hari_efektif,
+                        hadir = excluded.hadir,
+                        izin = excluded.izin,
+                        sakit = excluded.sakit,
+                        alfa = excluded.alfa,
+                        dispensasi = excluded.dispensasi,
+                        persen_kehadiran = excluded.persen_kehadiran,
+                        dibekukan_at = excluded.dibekukan_at,
+                        dibekukan_oleh = excluded.dibekukan_oleh,
+                        updated_at = excluded.updated_at;"#,
+                    vec![
+                        json!(id), json!(id_ta), json!(semester), json!(id_siswa), json!(id_rombel),
+                        json!(total_hari_efektif), json!(hadir), json!(izin), json!(sakit),
+                        json!(alfa), json!(dispensasi), json!(persen_kehadiran),
+                        json!(dibekukan_at), json!(dibekukan_oleh), json!(created_at), json!(updated_at)
+                    ],
+                ).await?;
+            }
+        }
+        ("attendance-ledger", "delete") => {
+            let id = payload.get("id_leger").and_then(Value::as_str).filter(|v| !v.is_empty()).unwrap_or(entity_key);
+            if !id.is_empty() {
+                turso.query_one(
+                    "DELETE FROM leger_kehadiran WHERE id_leger = ?;",
+                    vec![json!(id)],
+                ).await?;
+            } else {
+                let id_ta = payload.get("id_tahun_ajaran").and_then(Value::as_str).unwrap_or("");
+                let sem = payload.get("semester").and_then(Value::as_str).unwrap_or("");
+                let id_rombel = payload.get("id_rombel").and_then(Value::as_str).unwrap_or("");
+                if !id_ta.is_empty() && !sem.is_empty() && !id_rombel.is_empty() {
+                    turso.query_one(
+                        "DELETE FROM leger_kehadiran WHERE id_tahun_ajaran = ? AND semester = ? AND id_rombel = ?;",
+                        vec![json!(id_ta), json!(sem), json!(id_rombel)],
+                    ).await?;
+                }
             }
         }
         _ => {
@@ -7613,6 +7859,53 @@ impl TursoClient {
                 "mime": if mime.is_empty() { "image/jpeg".to_string() } else { mime },
                 "base64": base64,
             }
+        }))
+    }
+
+    /// Foto profil siswa dari cloud, untuk perangkat yang tidak memotretnya.
+    ///
+    /// `siswa_foto` ada di luar `SNAPSHOT_TABLES`, jadi tidak pernah ikut ditarik
+    /// bersama snapshot — persis seperti `absensi_foto`. Perangkat yang tidak
+    /// menyimpan salinan lokalnya mengambil satu baris di sini saat dibutuhkan.
+    ///
+    /// Mengembalikan `null` bila belum ada foto, BUKAN error: kontrak gateway
+    /// (`getFotoSiswa`) bertipe nullable, dan siswa tanpa foto adalah keadaan
+    /// yang wajar, bukan kegagalan.
+    pub async fn get_student_photo(&self, id_siswa: &str) -> Result<Value, CommandError> {
+        self.ensure_schema_current().await?;
+        let id = id_siswa.trim();
+        if id.is_empty() || id.len() > 200 {
+            return Err(CommandError::new(
+                "VALIDATION_ERROR",
+                "ID siswa tidak valid.",
+            ));
+        }
+        let Some(row) = self
+            .query_one(
+                "SELECT id_siswa, COALESCE(foto_mime, 'image/jpeg') AS foto_mime, COALESCE(foto_base64, '') AS foto_base64, COALESCE(updated_at, '') AS updated_at FROM siswa_foto WHERE id_siswa = ? LIMIT 1;",
+                vec![json!(id)],
+            )
+            .await?
+            .to_objects()
+            .into_iter()
+            .next()
+        else {
+            return Ok(Value::Null);
+        };
+        let base64 = row
+            .get("foto_base64")
+            .and_then(Value::as_str)
+            .unwrap_or("")
+            .trim()
+            .to_string();
+        if base64.is_empty() {
+            return Ok(Value::Null);
+        }
+        Ok(json!({
+            "id_siswa": id,
+            "foto_mime": row.get("foto_mime").and_then(Value::as_str).unwrap_or("image/jpeg"),
+            "foto_base64": base64,
+            "updated_at": row.get("updated_at").and_then(Value::as_str).unwrap_or(""),
         }))
     }
 
