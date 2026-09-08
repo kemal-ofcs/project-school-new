@@ -3,6 +3,7 @@ import type { Client, Transaction } from "@libsql/client";
 import type { OperatorUser } from "@/lib/auth/operator-user";
 import { assertActorPermission } from "@/lib/auth/permission-assertion";
 import { BRANDING } from "@/lib/constants/branding";
+import { DEFAULT_ATTENDANCE_SOURCE } from "@/lib/contracts/scanner";
 import type { PermissionKey } from "@/lib/rbac/catalog";
 import { isTransientDatabaseError } from "@/lib/server/database-retry";
 import {
@@ -740,7 +741,19 @@ async function applyAttendance(
         text(data, "status_kehadiran"),
         text(data, "status_absen"),
         text(data, "keterangan"),
-        text(data, "sumber") || "Otomatis",
+        // `sumber` boleh absen di payload (Zod menandainya nullable+optional),
+        // sehingga cabang bawaan ini BENAR-BENAR bisa tercapai. Nilainya WAJIB
+        // salah satu dari lima yang diterima CHECK constraint
+        // `absensi_harian.sumber`; sebelumnya di sini tertulis `"Otomatis"`,
+        // yang bukan salah satunya — INSERT-nya ditolak cloud, event outbox-nya
+        // gagal permanen (`next_retry_at = NULL`), dan seluruh antrean
+        // sinkronisasi perangkat itu berhenti selamanya.
+        //
+        // `Generate Sistem` adalah pilihan yang jujur untuk baris tanpa sumber
+        // yang dinyatakan, sekaligus prioritas TERENDAH dalam hierarki
+        // rekonsiliasi — jadi ia tidak akan pernah menimpa catatan yang lebih
+        // tinggi.
+        text(data, "sumber") || DEFAULT_ATTENDANCE_SOURCE,
         text(data, "update_terakhir") || new Date().toISOString(),
         number(data, "menit_terlambat"),
         number(data, "menit_datang_awal"),

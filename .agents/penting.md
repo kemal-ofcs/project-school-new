@@ -52,6 +52,10 @@ Dokumen ini memuat rangkuman prinsip, guard code, batasan terlarang, arsitektur 
 - DILARANG membiarkan `SNAPSHOT_SOURCES` di `turso.rs` tertinggal dari `SNAPSHOT_TABLES` di `sync.rs`. Keduanya wajib memiliki daftar tabel yang sama persis agar trigger `sync_pulse` dan query pull snapshot terpasang sempurna.
 - DILARANG membuat entitas personil baru (`GURU`, `SISWA`, `PEGAWAI`) tanpa men-generate `token_absensi` kriptografis dan `qr_code = format!("{id}|{token}")`. Scanner menolak QR tanpa token dengan error "Format QR tidak valid".
 - DILARANG menuliskan tautan absolut sistem lokal (seperti `file:///e:/...` atau `C:\...`) ke dalam berkas dokumentasi markdown repositori. Gunakan tautan relatif Markdown.
+- DILARANG mengartikan tabel di luar `SNAPSHOT_TABLES` (seperti `siswa_foto`, `absensi_foto`) sebagai tabel yang tidak ikut sinkronisasi ("half-sync"). Mereka hanya tidak ditarik secara massal (pull), namun setiap mutasi lokal WAJIB didorong ke cloud lewat outbox push (`student-photo/save`, `attendance/scan`) dan diambil on-demand bila dibutuhkan perangkat lain.
+- DILARANG melewatkan validasi MIME type (`image/jpeg`, `image/png`, `image/webp`) dan batas ukuran di Rust backend sebelum menulis ke SQLite lokal dan outbox; nilai cacat yang lolos di lokal akan ditolak Zod / LibSQL cloud dan memicu penolakan outbox permanen (*permanent outbox jam*).
+- DILARANG memberikan permission parsial domain tunggal (`students.manage`) pada command yang menyentuh seluruh personil (`master_data` siswa, guru, dan karyawan — seperti `desktop_backfill_id_cards`); aksi lintas personil WAJIB dikawal permission yang mencakup seluruh domain (`employees.manage`) demi mencegah eskalasi hak akses (*privilege escalation*).
+- DILARANG menyisipkan doc comments `///` di antara atribut `#[tauri::command]` dan fungsi `pub fn ...`; komentar dokumentasi WAJIB diletakkan sebelum atribut `#[tauri::command]` agar tidak mematahkan regex ekstraksi command di skrip `audit:contract`.
 
 ---
 

@@ -134,6 +134,12 @@ diberikan secara sadar lewat Role & Akses. Daftar resminya ada di
 - Operator yang dinonaktifkan (`is_active = 0`) langsung ditolak pada request berikutnya.
 - Superadmin aktif terakhir di sistem dilindungi agar tidak dapat dihapus, dinonaktifkan, atau diturunkan role-nya secara tidak sengaja.
 
+### Scoping Hak Akses RBAC Sesuai Cakupan Nyata Data (Scope-Aware RBAC & Least Privilege):
+- **Celah Eskalasi Akses:** Menentukan permission `#[tauri::command]` hanya dari nama antarmuka adalah anti-pattern berbahaya.
+- Jika query backend mengeksekusi mutasi/penerbitan untuk seluruh personil aktif di `master_data` (mencakup siswa, guru, dan karyawan — seperti `desktop_backfill_id_cards`), DILARANG menggunakan permission parsial domain tunggal (`students.manage`).
+- Penggunaan `students.manage` pada operasi multi-entitas membuat operator kesiswaan bisa memodifikasi atau menerbitkan kartu identitas guru dan karyawan kantor.
+- Command yang beroperasi di atas seluruh personil WAJIB dilindungi oleh permission tingkat personil penuh (`employees.manage`).
+
 ---
 
 ## 5. Pemulihan Password Mandiri & Verifikasi Dua Langkah

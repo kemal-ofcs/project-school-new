@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { AppShell } from "@/components/AppShell";
 import { VirtualPayrollTable } from "@/components/payroll/VirtualPayrollTable";
 import { FeedbackBanner } from "@/components/ui/FeedbackBanner";
@@ -25,6 +25,12 @@ const IDR = new Intl.NumberFormat("id-ID", {
 });
 
 export default function PayrollDashboardPage() {
+  // Penjaga anti klik ganda (Aturan 5). `useState` tidak cukup: pembaruannya
+  // dijadwalkan, sehingga dua klik dalam satu tick React sama-sama membaca
+  // nilai lama dan keduanya lolos. Dideklarasikan di ATAS, sebelum setiap
+  // early return, supaya urutan hook tidak pernah berubah antar-render.
+  const isSubmittingRef = useRef(false);
+
   const isHydrated = useHydrated();
   const router = useRouter();
   const { user, isAuthenticated, isLoading: authLoading } = useAuth();
@@ -76,8 +82,10 @@ export default function PayrollDashboardPage() {
   }, [isHydrated, authLoading, isAuthenticated, loadData, router]);
 
   const handleCreateRun = async () => {
+    if (isSubmittingRef.current) return;
     setCreating(true);
     setFeedback(null);
+    isSubmittingRef.current = true;
     try {
       const idempotencyKey = `PR-RUN-${periodStart}-${periodEnd}-${Date.now()}`;
       const run = await createPayrollRun(
@@ -98,6 +106,7 @@ export default function PayrollDashboardPage() {
           err instanceof Error ? err.message : "Gagal membuat batch payroll.",
       });
     } finally {
+      isSubmittingRef.current = false;
       setCreating(false);
     }
   };

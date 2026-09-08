@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { AppShell } from "@/components/AppShell";
 import { FeedbackBanner } from "@/components/ui/FeedbackBanner";
 import { Icon } from "@/components/ui/Icon";
@@ -26,6 +26,12 @@ const IDR = new Intl.NumberFormat("id-ID", {
 });
 
 export default function TaxRulesPage() {
+  // Penjaga anti klik ganda (Aturan 5). `useState` tidak cukup: pembaruannya
+  // dijadwalkan, sehingga dua klik dalam satu tick React sama-sama membaca
+  // nilai lama dan keduanya lolos. Dideklarasikan di ATAS, sebelum setiap
+  // early return, supaya urutan hook tidak pernah berubah antar-render.
+  const isSubmittingRef = useRef(false);
+
   const isHydrated = useHydrated();
   const router = useRouter();
   const { user, isAuthenticated, isLoading: authLoading } = useAuth();
@@ -123,9 +129,11 @@ export default function TaxRulesPage() {
   };
 
   const handleDelete = async (id: string, label: string) => {
+    if (isSubmittingRef.current) return;
     if (!confirm(`Hapus lapisan tarif pajak "${label}"?`)) return;
     setSaving(true);
     setFeedback(null);
+    isSubmittingRef.current = true;
     try {
       await deleteTaxRule(id);
       setFeedback({
@@ -140,15 +148,18 @@ export default function TaxRulesPage() {
           err instanceof Error ? err.message : "Gagal menghapus lapisan pajak.",
       });
     } finally {
+      isSubmittingRef.current = false;
       setSaving(false);
     }
   };
 
   const handleSaveModal = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isSubmittingRef.current) return;
     if (!editingRule) return;
     setSaving(true);
     setFeedback(null);
+    isSubmittingRef.current = true;
     try {
       await saveTaxRule(editingRule);
       setModalOpen(false);
@@ -165,6 +176,7 @@ export default function TaxRulesPage() {
           err instanceof Error ? err.message : "Gagal menyimpan tarif pajak.",
       });
     } finally {
+      isSubmittingRef.current = false;
       setSaving(false);
     }
   };

@@ -507,7 +507,7 @@ mod tests {
                 (1, '2026-09-01', 'sis_01', 'Siti Rahma', 'Peserta Didik', '07:05:00', 'Hadir', 'Tepat Waktu', 'Scanner', '2026-09-01 07:05:00', 1, 'September', 2026, 'NORMAL-20260901-sis_01-1'),
                 (2, '2026-09-02', 'sis_01', 'Siti Rahma', 'Peserta Didik', '07:10:00', 'Hadir', 'Tepat Waktu', 'Scanner', '2026-09-02 07:10:00', 1, 'September', 2026, 'NORMAL-20260902-sis_01-1'),
                 (3, '2026-09-01', 'sis_02', 'Ahmad Fadil', 'Peserta Didik', '07:08:00', 'Hadir', 'Tepat Waktu', 'Scanner', '2026-09-01 07:08:00', 1, 'September', 2026, 'NORMAL-20260901-sis_02-1'),
-                (4, '2026-09-02', 'sis_02', 'Ahmad Fadil', 'Peserta Didik', NULL, 'Sakit', 'Sakit', 'Manual', '2026-09-02 07:00:00', 1, 'September', 2026, 'NORMAL-20260902-sis_02-1');
+                (4, '2026-09-02', 'sis_02', 'Ahmad Fadil', 'Peserta Didik', NULL, 'Sakit', 'Sakit', 'Import Manual', '2026-09-02 07:00:00', 1, 'September', 2026, 'NORMAL-20260902-sis_02-1');
             "#,
         )
         .expect("seed test data");

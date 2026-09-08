@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { AppShell } from "@/components/AppShell";
 import { FeedbackBanner } from "@/components/ui/FeedbackBanner";
 import { Icon } from "@/components/ui/Icon";
@@ -26,6 +26,12 @@ const IDR = new Intl.NumberFormat("id-ID", {
 });
 
 export default function BpjsRulesPage() {
+  // Penjaga anti klik ganda (Aturan 5). `useState` tidak cukup: pembaruannya
+  // dijadwalkan, sehingga dua klik dalam satu tick React sama-sama membaca
+  // nilai lama dan keduanya lolos. Dideklarasikan di ATAS, sebelum setiap
+  // early return, supaya urutan hook tidak pernah berubah antar-render.
+  const isSubmittingRef = useRef(false);
+
   const isHydrated = useHydrated();
   const router = useRouter();
   const { user, isAuthenticated, isLoading: authLoading } = useAuth();
@@ -111,9 +117,11 @@ export default function BpjsRulesPage() {
   };
 
   const handleDelete = async (id: string, name: string) => {
+    if (isSubmittingRef.current) return;
     if (!confirm(`Hapus aturan program BPJS "${name}"?`)) return;
     setSaving(true);
     setFeedback(null);
+    isSubmittingRef.current = true;
     try {
       await deleteBpjsRule(id);
       setFeedback({
@@ -128,15 +136,18 @@ export default function BpjsRulesPage() {
           err instanceof Error ? err.message : "Gagal menghapus aturan BPJS.",
       });
     } finally {
+      isSubmittingRef.current = false;
       setSaving(false);
     }
   };
 
   const handleSaveModal = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isSubmittingRef.current) return;
     if (!editingRule || !editingRule.component_code) return;
     setSaving(true);
     setFeedback(null);
+    isSubmittingRef.current = true;
     try {
       await saveBpjsRule(editingRule);
       setModalOpen(false);
@@ -153,6 +164,7 @@ export default function BpjsRulesPage() {
           err instanceof Error ? err.message : "Gagal menyimpan aturan BPJS.",
       });
     } finally {
+      isSubmittingRef.current = false;
       setSaving(false);
     }
   };

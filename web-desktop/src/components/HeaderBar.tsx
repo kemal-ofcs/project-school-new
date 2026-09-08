@@ -88,6 +88,24 @@ const NAVIGATION: NavigationItem[] = [
     label: "Siswa",
   },
   {
+    area: "dasbor_kehadiran",
+    href: "/dasbor-kehadiran",
+    icon: "dashboard",
+    label: "Dasbor Kehadiran",
+  },
+  {
+    area: "notifikasi_wa",
+    href: "/notifikasi-wa",
+    icon: "whatsapp",
+    label: "Notifikasi WA",
+  },
+  {
+    area: "bimbingan_konseling",
+    href: "/bimbingan-konseling",
+    icon: "users",
+    label: "Bimbingan Konseling",
+  },
+  {
     area: "audit",
     href: "/audit-absensi",
     icon: "alert",

@@ -193,6 +193,19 @@ pub fn run() {
             desktop::commands::desktop_backfill_id_cards,
             desktop::commands::desktop_save_student_photo,
             desktop::commands::desktop_get_student_photo,
+            desktop::commands::desktop_get_attendance_dashboard_metrics,
+            desktop::commands::desktop_queue_wa_notification,
+            desktop::commands::desktop_cancel_wa_notification,
+            desktop::commands::desktop_list_wa_notifications,
+            desktop::commands::desktop_get_wa_config,
+            desktop::commands::desktop_save_wa_config,
+            desktop::commands::desktop_list_counseling_cases,
+            desktop::commands::desktop_get_counseling_case,
+            desktop::commands::desktop_create_counseling_case,
+            desktop::commands::desktop_update_counseling_case,
+            desktop::commands::desktop_delete_counseling_case,
+            desktop::commands::desktop_add_counseling_session,
+            desktop::commands::desktop_delete_counseling_session,
         ])
         .run(tauri::generate_context!())
         .unwrap_or_else(|error| {

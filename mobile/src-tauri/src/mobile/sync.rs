@@ -19,7 +19,7 @@ use super::{
 /// `CURRENT_SCHEMA_VERSION` di `web-desktop/src/lib/db-schema.ts` setiap kali
 /// migrasi baru ditambahkan, karena keduanya membaca tabel `schema_migration`
 /// yang sama di Turso.
-pub const CLIENT_SCHEMA_VERSION: i64 = 19;
+pub const CLIENT_SCHEMA_VERSION: i64 = 20;
 
 /// Hanya `cloud > client` yang berbahaya; `cloud <= client` adalah kondisi normal.
 fn is_client_schema_outdated(cloud_version: i64) -> bool {
@@ -817,6 +817,8 @@ const CANONICAL_SYNC_ROUTES: &[(&str, &str)] = &[
     ("teacher", "update"),
     ("teaching-journal", "delete"),
     ("teaching-journal", "save"),
+    ("wa-notification", "cancel"),
+    ("wa-notification", "queue"),
 ];
 
 pub(super) fn is_canonical_sync_route(domain: &str, operation: &str) -> bool {
@@ -2617,6 +2619,14 @@ pub async fn synchronize(
     // di perangkatnya. Sisi web sudah memeriksa `rbac_revision` pada setiap
     // request; perangkat memeriksanya sekali per siklus sinkronisasi.
     enforce_rbac_revision(state).await;
+
+    // Pemangkasan antrean notifikasi yang sudah selesai. Dijalankan SETELAH
+    // push supaya baris yang baru saja diantre sempat terkirim lebih dulu, dan
+    // sengaja tidak mengembalikan error: gagal memangkas adalah urusan
+    // penyimpanan, bukan alasan menjatuhkan sinkronisasi yang sudah berhasil.
+    if let Ok(connection) = storage::database(&state.data_dir) {
+        let _ = super::wa_notification::purge_expired_notifications(&connection);
+    }
 
     match pulled {
         Ok(mut status) => {

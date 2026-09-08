@@ -216,6 +216,46 @@ export const PERMISSION_CATALOG = [
     name: "Batalkan Pembekuan Leger Kehadiran",
     group: "Akademik",
   },
+  {
+    key: "attendance_dashboard.view",
+    name: "Lihat Dasbor Audit Kehadiran",
+    group: "Akademik",
+  },
+  {
+    key: "notification.view",
+    name: "Lihat Antrean Notifikasi WhatsApp",
+    group: "Komunikasi",
+  },
+  {
+    key: "notification.manage",
+    name: "Kelola Pengaturan Notifikasi",
+    group: "Komunikasi",
+  },
+  {
+    key: "notification.send",
+    name: "Kirim Pesan WhatsApp ke Wali Murid",
+    group: "Komunikasi",
+  },
+  {
+    key: "notification.delete",
+    name: "Batalkan / Hapus Antrean Notifikasi",
+    group: "Komunikasi",
+  },
+  {
+    key: "counseling.view",
+    name: "Lihat Kasus Bimbingan Konseling (BK)",
+    group: "Kesiswaan",
+  },
+  {
+    key: "counseling.manage",
+    name: "Kelola Kasus & Sesi Konseling (BK)",
+    group: "Kesiswaan",
+  },
+  {
+    key: "counseling.delete",
+    name: "Hapus Kasus Bimbingan Konseling (BK)",
+    group: "Kesiswaan",
+  },
 ] as const;
 
 export type PermissionKey = (typeof PERMISSION_CATALOG)[number]["key"];
@@ -259,6 +299,12 @@ export const SENSITIVE_MUTATION_PERMISSIONS = new Set<PermissionKey>([
   "teaching_journal.delete",
   // Membatalkan pembekuan leger membuka kembali angka kehadiran yang sudah disahkan untuk rapor.
   "attendance_ledger.delete",
+  // Mengirim pesan langsung membebani kuota API/biaya dan mengirim komunikasi resmi ke wali.
+  "notification.send",
+  // Membatalkan/menghapus antrean notifikasi menghilangkan antrean pemberitahuan wali.
+  "notification.delete",
+  // Menghapus kasus BK memusnahkan rekam jejak konseling dan kedisiplinan siswa.
+  "counseling.delete",
 ]);
 
 export const SYSTEM_ROLE_KEYS = [
@@ -293,6 +339,9 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<
     "class_attendance.view",
     "teaching_journal.view",
     "attendance_ledger.view",
+    "attendance_dashboard.view",
+    "notification.view",
+    "counseling.view",
   ],
   scanner: ["home.view", "scanner.use", "sync.view"],
 };

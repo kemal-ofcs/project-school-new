@@ -1,7 +1,7 @@
 "use client";
 
 import { redirect } from "next/navigation";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { AppShell } from "@/components/AppShell";
 import { HolidayWhitelistPanel } from "@/components/HolidayWhitelistPanel";
 import { FeedbackBanner } from "@/components/ui/FeedbackBanner";
@@ -46,6 +46,12 @@ function formatDisplayDate(dateStr: string) {
 }
 
 export default function HolidaysPage() {
+  // Penjaga anti klik ganda (Aturan 5). `useState` tidak cukup: pembaruannya
+  // dijadwalkan, sehingga dua klik dalam satu tick React sama-sama membaca
+  // nilai lama dan keduanya lolos. Dideklarasikan di ATAS, sebelum setiap
+  // early return, supaya urutan hook tidak pernah berubah antar-render.
+  const isSubmittingRef = useRef(false);
+
   const isHydrated = useHydrated();
   const { user, isAuthenticated, isLoading: authLoading } = useAuth();
   const [holidays, setHolidays] = useState<HariLiburRecord[]>([]);
@@ -170,8 +176,10 @@ export default function HolidaysPage() {
   };
 
   const handleToggleStatus = async (item: HariLiburRecord) => {
+    if (isSubmittingRef.current) return;
     if (!canManage) return;
     const nextStatus = item.status_aktif === 1 ? 0 : 1;
+    isSubmittingRef.current = true;
     try {
       await updateHariLibur(item.id_libur, { status_aktif: nextStatus });
       setHolidays((prev) =>
@@ -191,11 +199,14 @@ export default function HolidaysPage() {
             ? err.message
             : "Gagal mengubah status hari libur.",
       });
+    } finally {
+      isSubmittingRef.current = false;
     }
   };
 
   const handleFormSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isSubmittingRef.current) return;
     if (!draft.tanggal || !draft.nama_libur) {
       setFeedback({
         tone: "error",
@@ -205,6 +216,7 @@ export default function HolidaysPage() {
     }
 
     setSaving(true);
+    isSubmittingRef.current = true;
     try {
       if (editingId) {
         await updateHariLibur(editingId, draft);
@@ -230,6 +242,7 @@ export default function HolidaysPage() {
             : "Gagal menyimpan data hari libur.",
       });
     } finally {
+      isSubmittingRef.current = false;
       setSaving(false);
     }
   };

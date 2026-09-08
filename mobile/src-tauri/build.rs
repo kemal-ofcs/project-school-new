@@ -108,6 +108,7 @@ const MOBILE_COMMANDS: &[&str] = &[
     "desktop_save_alfa_settings",
     "desktop_trigger_generate_alfa",
     "desktop_get_attendance_audit",
+    "desktop_get_attendance_dashboard_metrics",
     "desktop_get_server_url",
     "desktop_set_server_url",
     "desktop_get_turso_url",

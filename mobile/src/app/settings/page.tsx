@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { DatabaseBackupCard } from "@/components/DatabaseBackupCard";
 import { MailSettingsCard } from "@/components/MailSettingsCard";
 import { MobileAppShell } from "@/components/MobileAppShell";
@@ -51,6 +51,12 @@ import { validateGeofenceSettings } from "@/lib/validations/geofence";
 import { validateIpAllowlistEntries } from "@/lib/validations/ip-allowlist";
 
 export default function SettingsPage() {
+  // Penjaga anti klik ganda (Aturan 5). `useState` tidak cukup: pembaruannya
+  // dijadwalkan, sehingga dua klik dalam satu tick React sama-sama membaca
+  // nilai lama dan keduanya lolos. Dideklarasikan di ATAS, sebelum setiap
+  // early return, supaya urutan hook tidak pernah berubah antar-render.
+  const isSubmittingRef = useRef(false);
+
   const { user, isAuthenticated, isLoading: authLoading, logout } = useAuth();
   const router = useRouter();
   const isOnline = useOnlineStatus();
@@ -64,6 +70,7 @@ export default function SettingsPage() {
   const canJurnalMengajar = canAccessArea(user, "jurnal_mengajar");
   const canLegerKehadiran = canAccessArea(user, "leger_kehadiran");
   const canAudit = canAccessArea(user, "audit");
+  const canDasborKehadiran = canAccessArea(user, "dasbor_kehadiran");
   const canManageGeofence = Boolean(
     user?.isSuperadmin || hasPermission(user, "branding.manage"),
   );
@@ -244,6 +251,7 @@ export default function SettingsPage() {
   };
 
   const handleSaveGeofence = async () => {
+    if (isSubmittingRef.current) return;
     const errors = validateGeofenceSettings(geofence);
     const firstError = Object.values(errors)[0];
     if (firstError) {
@@ -254,6 +262,7 @@ export default function SettingsPage() {
     }
     setGeofenceBusy(true);
     triggerHaptic("light");
+    isSubmittingRef.current = true;
     try {
       const saved = await saveGeofenceSettings(geofence);
       setGeofence(saved);
@@ -269,11 +278,13 @@ export default function SettingsPage() {
       );
       setTimeout(() => setSaveMessage(""), 3000);
     } finally {
+      isSubmittingRef.current = false;
       setGeofenceBusy(false);
     }
   };
 
   const handleSaveScanSecurity = async () => {
+    if (isSubmittingRef.current) return;
     const entries = ipAllowlistDraft
       .split(/[\n,;]/)
       .map((item) => item.trim())
@@ -286,6 +297,7 @@ export default function SettingsPage() {
       return;
     }
     setIpAllowlistBusy(true);
+    isSubmittingRef.current = true;
     try {
       const saved = await saveScanSecurity({
         photoEnabled: scanPhotoEnabled,
@@ -313,14 +325,23 @@ export default function SettingsPage() {
       );
       triggerHaptic("error");
     } finally {
+      isSubmittingRef.current = false;
       setIpAllowlistBusy(false);
     }
   };
 
   const handleToggleGeofence = async () => {
+    if (isSubmittingRef.current) return;
     triggerHaptic("light");
+    // Nilai sebelumnya disimpan supaya sakelarnya bisa DIKEMBALIKAN saat
+    // penyimpanan gagal. Tanpa itu layar tetap menampilkan geofencing menyala
+    // sementara penyimpanannya menolak — operator mengira batas kantor sedang
+    // ditegakkan padahal tidak, dan satu-satunya petunjuk kegagalan hanyalah
+    // sebuah getaran yang mudah terlewat.
+    const sebelumnya = geofence;
     const updated = { ...geofence, enabled: !geofence.enabled };
     setGeofence(updated);
+    isSubmittingRef.current = true;
     try {
       await saveGeofenceSettings(updated);
       triggerHaptic("success");
@@ -330,14 +351,25 @@ export default function SettingsPage() {
           : "Geofencing GPS dinonaktifkan.",
       );
       setTimeout(() => setSaveMessage(""), 3000);
-    } catch {
+    } catch (error) {
+      setGeofence(sebelumnya);
       triggerHaptic("error");
+      setSaveMessage(
+        error instanceof Error
+          ? `Gagal menyimpan geofencing: ${error.message}`
+          : "Gagal menyimpan pengaturan geofencing.",
+      );
+      setTimeout(() => setSaveMessage(""), 4000);
+    } finally {
+      isSubmittingRef.current = false;
     }
   };
 
   const handleAutoAlfaToggle = async (enabled: boolean) => {
+    if (isSubmittingRef.current) return;
     setAutoAlfaBusy(true);
     triggerHaptic("light");
+    isSubmittingRef.current = true;
     try {
       await saveAutoAlfaSetting(enabled);
       setAutoAlfaEnabled(enabled);
@@ -355,6 +387,7 @@ export default function SettingsPage() {
       );
       setTimeout(() => setSaveMessage(""), 4000);
     } finally {
+      isSubmittingRef.current = false;
       setAutoAlfaBusy(false);
     }
   };
@@ -392,6 +425,7 @@ export default function SettingsPage() {
   const tursoProviderInfo = describeProvider(tursoProvider);
 
   const handleTursoSave = async () => {
+    if (isSubmittingRef.current) return;
     // Tahan input yang jelas salah di sini supaya alasannya tampil di dekat
     // field, bukan sebagai kegagalan IPC generik setelah penyimpanan.
     const needsEndpoint = providerNeedsEndpoint(tursoProvider);
@@ -414,6 +448,7 @@ export default function SettingsPage() {
     }
     setTursoBusy(true);
     triggerHaptic("light");
+    isSubmittingRef.current = true;
     try {
       await saveTursoConfig(
         needsEndpoint ? tursoUrl.trim() : "",
@@ -447,6 +482,7 @@ export default function SettingsPage() {
       );
       setTimeout(() => setSaveMessage(""), 4000);
     } finally {
+      isSubmittingRef.current = false;
       setTursoBusy(false);
     }
   };
@@ -809,6 +845,36 @@ export default function SettingsPage() {
                 className="rounded-xl bg-emerald-500 px-3.5 py-1.5 text-xs font-black text-slate-950 shadow-md hover:bg-emerald-400 active:scale-95 transition whitespace-nowrap"
               >
                 Buka &rarr;
+              </Link>
+            </div>
+          </div>
+        ) : null}
+
+        {/* Dasbor Audit Kehadiran (butuh izin attendance_dashboard.view).
+            Sepenuhnya offline: command Rust-nya membaca SQLite lokal, dan
+            seluruh tabel yang dibacanya ikut snapshot sinkronisasi. */}
+        {canDasborKehadiran ? (
+          <div className="rounded-3xl border border-indigo-500/20 bg-gradient-to-br from-indigo-950/30 via-slate-900/80 to-slate-900/90 p-4 backdrop-blur-md">
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2.5">
+                <div className="grid size-9 place-items-center rounded-xl bg-indigo-500/20 text-indigo-300">
+                  <Icon name="dashboard" className="size-5" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-white">
+                    Dasbor Kehadiran
+                  </h3>
+                  <p className="text-[11px] text-slate-400">
+                    Rekap siswa &amp; guru, per rombel, dan indikasi bolos
+                  </p>
+                </div>
+              </div>
+              <Link
+                href="/dasbor-kehadiran"
+                onClick={() => triggerHaptic("light")}
+                className="rounded-xl bg-indigo-500 px-3.5 py-1.5 text-xs font-black text-white shadow-md transition hover:bg-indigo-400 active:scale-95"
+              >
+                Lihat &rarr;
               </Link>
             </div>
           </div>

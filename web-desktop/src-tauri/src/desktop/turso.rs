@@ -1956,7 +1956,15 @@ impl TursoClient {
                 ('teaching_journal.delete', 'Hapus Jurnal Mengajar', 'Akademik', 'Menghapus catatan jurnal pembelajaran guru.', 1, 442),
                 ('attendance_ledger.view', 'Lihat Leger Kehadiran', 'Akademik', 'Melihat rekap dan pratinjau kalkulasi kehadiran rapor semesteran.', 1, 450),
                 ('attendance_ledger.manage', 'Kelola & Bekukan Leger Kehadiran', 'Akademik', 'Membekukan angka kehadiran resmi untuk rapor.', 1, 451),
-                ('attendance_ledger.delete', 'Batalkan Pembekuan Leger Kehadiran', 'Akademik', 'Membatalkan dan menghapus pembekuan leger kehadiran resmi.', 1, 452);"#,
+                ('attendance_ledger.delete', 'Batalkan Pembekuan Leger Kehadiran', 'Akademik', 'Membatalkan dan menghapus pembekuan leger kehadiran resmi.', 1, 452),
+                ('attendance_dashboard.view', 'Lihat Dasbor Audit Kehadiran', 'Akademik', 'Melihat analitik dan rekapitulasi audit kehadiran guru dan siswa.', 1, 460),
+                ('notification.view', 'Lihat Antrean Notifikasi WhatsApp', 'Komunikasi', 'Melihat daftar antrean pesan notifikasi WhatsApp wali murid.', 1, 500),
+                ('notification.manage', 'Kelola Pengaturan Notifikasi', 'Komunikasi', 'Mengatur provider dan konfigurasi WhatsApp gateway.', 1, 501),
+                ('notification.send', 'Kirim Pesan WhatsApp ke Wali Murid', 'Komunikasi', 'Memicu pengiriman pesan WhatsApp wali murid.', 1, 502),
+                ('notification.delete', 'Batalkan / Hapus Antrean Notifikasi', 'Komunikasi', 'Membatalkan dan menghapus antrean notifikasi WhatsApp.', 1, 503),
+                ('counseling.view', 'Lihat Kasus Bimbingan Konseling (BK)', 'Kesiswaan', 'Melihat daftar dan riwayat kasus bimbingan konseling siswa.', 1, 600),
+                ('counseling.manage', 'Kelola Kasus & Sesi Konseling (BK)', 'Kesiswaan', 'Mencatat kasus baru dan menambah sesi bimbingan konseling.', 1, 601),
+                ('counseling.delete', 'Hapus Kasus Bimbingan Konseling (BK)', 'Kesiswaan', 'Menghapus catatan kasus dan sesi bimbingan konseling siswa.', 1, 602);"#,
                 vec![],
             ),
             // Seed Default Role Permissions untuk Role Superadmin (Role 1)
@@ -2313,6 +2321,73 @@ impl TursoClient {
             ),
             Statement::new("CREATE INDEX IF NOT EXISTS idx_jurnal_presensi ON jurnal_mengajar(id_presensi_mapel);", vec![]),
             Statement::new("CREATE INDEX IF NOT EXISTS idx_leger_scope ON leger_kehadiran(id_tahun_ajaran, semester, id_rombel, id_siswa);", vec![]),
+            Statement::new(
+                r#"CREATE TABLE IF NOT EXISTS notifikasi_wa (
+                    id_notifikasi TEXT PRIMARY KEY,
+                    dedupe_key TEXT NOT NULL,
+                    jenis TEXT NOT NULL CHECK (jenis IN ('scan_masuk', 'scan_pulang', 'bolos', 'ambang_alfa')),
+                    id_siswa TEXT,
+                    tujuan_nomor TEXT NOT NULL,
+                    isi_pesan TEXT NOT NULL,
+                    status TEXT NOT NULL DEFAULT 'Menunggu' CHECK (status IN ('Menunggu', 'Terkirim', 'Gagal', 'Dibatalkan')),
+                    attempt_count INTEGER NOT NULL DEFAULT 0,
+                    last_error TEXT,
+                    sent_at TEXT,
+                    created_at TEXT NOT NULL,
+                    updated_at TEXT NOT NULL
+                );"#,
+                vec![],
+            ),
+            Statement::new(
+                r#"CREATE TABLE IF NOT EXISTS app_wa_config (
+                    id TEXT PRIMARY KEY,
+                    provider TEXT NOT NULL DEFAULT 'fonnte' CHECK (provider IN ('fonnte', 'wablas', 'custom')),
+                    api_key TEXT NOT NULL DEFAULT '',
+                    api_url TEXT,
+                    sender_number TEXT,
+                    is_active INTEGER NOT NULL DEFAULT 0,
+                    daily_limit INTEGER NOT NULL DEFAULT 1000,
+                    scan_masuk_enabled INTEGER NOT NULL DEFAULT 0,
+                    scan_pulang_enabled INTEGER NOT NULL DEFAULT 0,
+                    bolos_enabled INTEGER NOT NULL DEFAULT 1,
+                    ambang_alfa_enabled INTEGER NOT NULL DEFAULT 1,
+                    created_at TEXT NOT NULL,
+                    updated_at TEXT NOT NULL
+                );"#,
+                vec![],
+            ),
+            Statement::new(
+                r#"CREATE TABLE IF NOT EXISTS bk_kasus (
+                    id_kasus TEXT PRIMARY KEY,
+                    id_siswa TEXT NOT NULL,
+                    id_tahun_ajaran TEXT NOT NULL,
+                    kategori TEXT NOT NULL CHECK (kategori IN ('kedisiplinan', 'akademik', 'kehadiran', 'sosial')),
+                    ringkasan TEXT NOT NULL,
+                    kronologi TEXT,
+                    status TEXT NOT NULL DEFAULT 'Terbuka' CHECK (status IN ('Terbuka', 'Dalam Bimbingan', 'Selesai')),
+                    dibuat_oleh TEXT NOT NULL,
+                    created_at TEXT NOT NULL,
+                    updated_at TEXT NOT NULL
+                );"#,
+                vec![],
+            ),
+            Statement::new(
+                r#"CREATE TABLE IF NOT EXISTS bk_sesi (
+                    id_sesi TEXT PRIMARY KEY,
+                    id_kasus TEXT NOT NULL,
+                    tanggal TEXT NOT NULL,
+                    catatan_konseling TEXT NOT NULL,
+                    tindak_lanjut TEXT,
+                    konselor TEXT NOT NULL,
+                    created_at TEXT NOT NULL,
+                    updated_at TEXT NOT NULL
+                );"#,
+                vec![],
+            ),
+            Statement::new("CREATE INDEX IF NOT EXISTS idx_notifikasi_wa_status ON notifikasi_wa(status, created_at);", vec![]),
+            Statement::new("CREATE INDEX IF NOT EXISTS idx_notifikasi_wa_dedupe ON notifikasi_wa(dedupe_key);", vec![]),
+            Statement::new("CREATE INDEX IF NOT EXISTS idx_bk_kasus_siswa ON bk_kasus(id_siswa, id_tahun_ajaran);", vec![]),
+            Statement::new("CREATE INDEX IF NOT EXISTS idx_bk_sesi_kasus ON bk_sesi(id_kasus, tanggal);", vec![]),
             // Seed Default Overtime Rules
             Statement::new(crate::desktop::payroll_seed::OVERTIME_TIER_RULES_SEED_SQL, vec![]),
             // Seed Default Tax Rules (Pasal 17 & TER Baseline)
@@ -2330,7 +2405,8 @@ impl TursoClient {
                 (16, 'academic-foundation-v1', datetime('now')),
                 (17, 'academic-unique-relaxation', datetime('now')),
                 (18, 'class-attendance-foundation', datetime('now')),
-                (19, 'teaching-journal-and-attendance-ledger', datetime('now'));"#,
+                (19, 'teaching-journal-and-attendance-ledger', datetime('now')),
+                (20, 'phase-4-notification-and-counseling', datetime('now'));"#,
                 vec![],
             ),
         ];
@@ -2547,7 +2623,7 @@ impl TursoClient {
         )
         .await?;
         self.query_one(
-            "INSERT OR IGNORE INTO schema_migration (version, name, applied_at) VALUES (-2012, 'teaching-journal-and-attendance-ledger-v1', datetime('now'));",
+            "INSERT OR IGNORE INTO schema_migration (version, name, applied_at) VALUES (-2013, 'phase-4-notification-and-counseling-v1', datetime('now'));",
             vec![],
         )
         .await?;
@@ -2765,7 +2841,7 @@ impl TursoClient {
                 // Sentinel WAJIB dinaikkan setiap kali ensure_schema menambah
                 // tabel atau kolom — nilainya di sini dan pada INSERT di atas
                 // harus selalu sama.
-                "SELECT COUNT(*) AS total FROM schema_migration WHERE version = -2012;",
+                "SELECT COUNT(*) AS total FROM schema_migration WHERE version = -2013;",
                 vec![],
             )
             .await
@@ -4813,6 +4889,452 @@ impl TursoClient {
 
         Ok(json!({ "sukses": true }))
     }
+
+    pub async fn get_wa_config(&self) -> Result<Value, CommandError> {
+        self.ensure_schema_current().await?;
+        let res = self
+            .query_one(
+                "SELECT id, provider, api_key, api_url, sender_number, is_active, daily_limit, scan_masuk_enabled, scan_pulang_enabled, bolos_enabled, ambang_alfa_enabled, created_at, updated_at FROM app_wa_config WHERE id = 'default' LIMIT 1;",
+                vec![],
+            )
+            .await?;
+        if let Some(row) = res.to_objects().into_iter().next() {
+            let api_key = row.get("api_key").and_then(Value::as_str).unwrap_or("");
+            let has_api_key = !api_key.trim().is_empty();
+            let mut obj = json!(row);
+            obj["api_key"] = json!("");
+            obj["has_api_key"] = json!(has_api_key);
+            Ok(obj)
+        } else {
+            Ok(json!({
+                "id": "default",
+                "provider": "fonnte",
+                "api_key": "",
+                "has_api_key": false,
+                "api_url": null,
+                "sender_number": null,
+                "is_active": 0,
+                "daily_limit": 1000,
+                "scan_masuk_enabled": 0,
+                "scan_pulang_enabled": 0,
+                "bolos_enabled": 1,
+                "ambang_alfa_enabled": 1,
+                "created_at": "",
+                "updated_at": ""
+            }))
+        }
+    }
+
+    pub async fn save_wa_config(&self, draft: &Value) -> Result<Value, CommandError> {
+        self.ensure_schema_current().await?;
+        let provider = draft
+            .get("provider")
+            .and_then(Value::as_str)
+            .unwrap_or("fonnte")
+            .trim();
+        if !matches!(provider, "fonnte" | "wablas" | "custom") {
+            return Err(CommandError::new(
+                "VALIDATION_ERROR",
+                "Provider WhatsApp tidak valid. Pilih fonnte, wablas, atau custom.",
+            ));
+        }
+        let api_url = draft
+            .get("api_url")
+            .and_then(Value::as_str)
+            .map(str::trim)
+            .filter(|s| !s.is_empty());
+        let sender_number = draft
+            .get("sender_number")
+            .and_then(Value::as_str)
+            .map(str::trim)
+            .filter(|s| !s.is_empty());
+        let is_active = draft
+            .get("is_active")
+            .and_then(|v| {
+                v.as_i64()
+                    .or_else(|| v.as_bool().map(|b| if b { 1 } else { 0 }))
+            })
+            .unwrap_or(0);
+        let daily_limit = draft
+            .get("daily_limit")
+            .and_then(Value::as_i64)
+            .unwrap_or(1000)
+            .max(1);
+        let scan_masuk_enabled = draft
+            .get("scan_masuk_enabled")
+            .and_then(|v| {
+                v.as_i64()
+                    .or_else(|| v.as_bool().map(|b| if b { 1 } else { 0 }))
+            })
+            .unwrap_or(0);
+        let scan_pulang_enabled = draft
+            .get("scan_pulang_enabled")
+            .and_then(|v| {
+                v.as_i64()
+                    .or_else(|| v.as_bool().map(|b| if b { 1 } else { 0 }))
+            })
+            .unwrap_or(0);
+        let bolos_enabled = draft
+            .get("bolos_enabled")
+            .and_then(|v| {
+                v.as_i64()
+                    .or_else(|| v.as_bool().map(|b| if b { 1 } else { 0 }))
+            })
+            .unwrap_or(1);
+        let ambang_alfa_enabled = draft
+            .get("ambang_alfa_enabled")
+            .and_then(|v| {
+                v.as_i64()
+                    .or_else(|| v.as_bool().map(|b| if b { 1 } else { 0 }))
+            })
+            .unwrap_or(1);
+
+        let new_key = draft
+            .get("api_key")
+            .and_then(Value::as_str)
+            .map(str::trim)
+            .unwrap_or("");
+        let final_key = if !new_key.is_empty() {
+            new_key.to_string()
+        } else {
+            let existing = self
+                .query_one(
+                    "SELECT api_key FROM app_wa_config WHERE id = 'default' LIMIT 1;",
+                    vec![],
+                )
+                .await?;
+            existing
+                .to_objects()
+                .into_iter()
+                .next()
+                .and_then(|r| r.get("api_key").and_then(Value::as_str).map(str::to_string))
+                .unwrap_or_default()
+        };
+
+        // Sakelar per jenis dicerminkan ke `setting_gex_system` pada batch yang
+        // SAMA. `app_wa_config` cloud-only, sehingga scanner Desktop/Mobile —
+        // yang mengantre di dalam transaksi SQLite lokal, mungkin tanpa jaringan
+        // — tidak akan pernah bisa membacanya. Cerminan yang ikut sinkronisasi
+        // inilah yang sampai ke setiap terminal.
+        //
+        // Menyimpannya terpisah dari baris konfigurasi akan membuat salah satu
+        // sisi tersimpan sendirian ketika jaringan putus di tengah, dan sejak
+        // itu terminal mengantre sementara pengirimnya menolak — tanpa satu pun
+        // pesan kesalahan. Cerminan Web-nya di `saveWaConfig`.
+        let mut statements = vec![Statement::new(
+            r#"INSERT INTO app_wa_config (
+                id, provider, api_key, api_url, sender_number, is_active, daily_limit,
+                scan_masuk_enabled, scan_pulang_enabled, bolos_enabled, ambang_alfa_enabled,
+                created_at, updated_at
+            ) VALUES ('default', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))
+            ON CONFLICT(id) DO UPDATE SET
+                provider = excluded.provider,
+                api_key = excluded.api_key,
+                api_url = excluded.api_url,
+                sender_number = excluded.sender_number,
+                is_active = excluded.is_active,
+                daily_limit = excluded.daily_limit,
+                scan_masuk_enabled = excluded.scan_masuk_enabled,
+                scan_pulang_enabled = excluded.scan_pulang_enabled,
+                bolos_enabled = excluded.bolos_enabled,
+                ambang_alfa_enabled = excluded.ambang_alfa_enabled,
+                updated_at = datetime('now');"#,
+            vec![
+                json!(provider),
+                json!(final_key),
+                match api_url {
+                    Some(u) => json!(u),
+                    None => json!(null),
+                },
+                match sender_number {
+                    Some(s) => json!(s),
+                    None => json!(null),
+                },
+                json!(is_active),
+                json!(daily_limit),
+                json!(scan_masuk_enabled),
+                json!(scan_pulang_enabled),
+                json!(bolos_enabled),
+                json!(ambang_alfa_enabled),
+            ],
+        )];
+
+        for (key, aktif) in [
+            (
+                super::wa_notification::WA_NOTIFY_SCAN_MASUK_KEY,
+                scan_masuk_enabled,
+            ),
+            (
+                super::wa_notification::WA_NOTIFY_SCAN_PULANG_KEY,
+                scan_pulang_enabled,
+            ),
+            (super::wa_notification::WA_NOTIFY_BOLOS_KEY, bolos_enabled),
+            (
+                super::wa_notification::WA_NOTIFY_AMBANG_ALFA_KEY,
+                ambang_alfa_enabled,
+            ),
+        ] {
+            statements.push(Statement::new(
+                r#"INSERT INTO setting_gex_system (key, value) VALUES (?, ?)
+                ON CONFLICT(key) DO UPDATE SET value = excluded.value;"#,
+                vec![json!(key), json!(if aktif != 0 { "true" } else { "false" })],
+            ));
+        }
+
+        self.execute_atomic(statements).await?;
+
+        Ok(json!({ "sukses": true }))
+    }
+
+    pub async fn list_counseling_cases(
+        &self,
+        id_tahun_ajaran: Option<&str>,
+        status: Option<&str>,
+        kategori: Option<&str>,
+        id_siswa: Option<&str>,
+        search: Option<&str>,
+        limit: Option<i64>,
+    ) -> Result<Value, CommandError> {
+        self.ensure_schema_current().await?;
+        let mut sql = String::from(
+            r#"
+            SELECT k.id_kasus, k.id_siswa, k.id_tahun_ajaran, k.kategori,
+                   k.ringkasan, k.kronologi, k.status, k.dibuat_oleh,
+                   k.created_at, k.updated_at,
+                   COALESCE(s.nama_lengkap, m.nama, '') AS nama_siswa,
+                   COALESCE(s.nis, m.kode_karyawan, '') AS nis,
+                   COALESCE(r.nama_rombel, m.divisi, '') AS nama_rombel,
+                   COALESCE(s.nama_wali, '') AS nama_wali,
+                   COALESCE(s.no_whatsapp_wali, m.no_hp, '') AS no_whatsapp_wali,
+                   COALESCE(ta.nama_tahun, '') AS nama_tahun,
+                   (SELECT COUNT(*) FROM bk_sesi ses WHERE ses.id_kasus = k.id_kasus) AS total_sesi
+            FROM bk_kasus k
+            LEFT JOIN siswa_data s ON s.id_siswa = k.id_siswa
+            LEFT JOIN akademik_rombel r ON r.id_rombel = s.id_rombel
+            LEFT JOIN master_data m ON m.id_unik = k.id_siswa
+            LEFT JOIN akademik_tahun_ajaran ta ON ta.id_tahun_ajaran = k.id_tahun_ajaran
+            WHERE 1=1
+            "#,
+        );
+        let mut args: Vec<Value> = Vec::new();
+
+        if let Some(ta) = id_tahun_ajaran.filter(|t| !t.trim().is_empty()) {
+            sql.push_str(" AND k.id_tahun_ajaran = ?");
+            args.push(json!(ta.trim()));
+        }
+        if let Some(st) = status.filter(|s| !s.trim().is_empty() && *s != "Semua") {
+            sql.push_str(" AND k.status = ?");
+            args.push(json!(st.trim()));
+        }
+        if let Some(kat) = kategori.filter(|k| !k.trim().is_empty() && *k != "Semua") {
+            sql.push_str(" AND k.kategori = ?");
+            args.push(json!(kat.trim()));
+        }
+        if let Some(sid) = id_siswa.filter(|id| !id.trim().is_empty()) {
+            sql.push_str(" AND k.id_siswa = ?");
+            args.push(json!(sid.trim()));
+        }
+        if let Some(q) = search.filter(|s| !s.trim().is_empty()) {
+            sql.push_str(" AND (k.ringkasan LIKE ? OR s.nama_lengkap LIKE ? OR m.nama LIKE ? OR s.nis LIKE ?)");
+            let pattern = format!("%{}%", q.trim());
+            args.push(json!(pattern));
+            args.push(json!(pattern));
+            args.push(json!(pattern));
+            args.push(json!(pattern));
+        }
+
+        sql.push_str(" ORDER BY k.created_at DESC");
+        let max_rows = limit.unwrap_or(100).clamp(1, 500);
+        sql.push_str(&format!(" LIMIT {max_rows};"));
+
+        let res = self.query_one(&sql, args).await?;
+        Ok(json!({ "items": res.to_objects() }))
+    }
+
+    pub async fn get_counseling_case(&self, id_kasus: &str) -> Result<Value, CommandError> {
+        self.ensure_schema_current().await?;
+        let case_res = self
+            .query_one(
+                r#"
+                SELECT k.id_kasus, k.id_siswa, k.id_tahun_ajaran, k.kategori,
+                       k.ringkasan, k.kronologi, k.status, k.dibuat_oleh,
+                       k.created_at, k.updated_at,
+                       COALESCE(s.nama_lengkap, m.nama, '') AS nama_siswa,
+                       COALESCE(s.nis, m.kode_karyawan, '') AS nis,
+                       COALESCE(r.nama_rombel, m.divisi, '') AS nama_rombel,
+                       COALESCE(s.nama_wali, '') AS nama_wali,
+                       COALESCE(s.no_whatsapp_wali, m.no_hp, '') AS no_whatsapp_wali,
+                       COALESCE(ta.nama_tahun, '') AS nama_tahun
+                FROM bk_kasus k
+                LEFT JOIN siswa_data s ON s.id_siswa = k.id_siswa
+                LEFT JOIN akademik_rombel r ON r.id_rombel = s.id_rombel
+                LEFT JOIN master_data m ON m.id_unik = k.id_siswa
+                LEFT JOIN akademik_tahun_ajaran ta ON ta.id_tahun_ajaran = k.id_tahun_ajaran
+                WHERE k.id_kasus = ?
+                LIMIT 1;
+                "#,
+                vec![json!(id_kasus)],
+            )
+            .await?;
+
+        let case_obj = case_res
+            .to_objects()
+            .into_iter()
+            .next()
+            .ok_or_else(|| CommandError::new("NOT_FOUND", "Kasus BK tidak ditemukan."))?;
+
+        let sessions_res = self
+            .query_one(
+                "SELECT id_sesi, id_kasus, tanggal, catatan_konseling, tindak_lanjut, konselor, created_at, updated_at FROM bk_sesi WHERE id_kasus = ? ORDER BY tanggal ASC, created_at ASC;",
+                vec![json!(id_kasus)],
+            )
+            .await?;
+
+        let mut obj = json!(case_obj);
+        obj["sesi"] = json!(sessions_res.to_objects());
+        Ok(obj)
+    }
+
+    pub async fn create_counseling_case(&self, draft: &Value, actor: &str) -> Result<Value, CommandError> {
+        self.ensure_schema_current().await?;
+        let id_siswa = draft.get("id_siswa").and_then(Value::as_str).unwrap_or("").trim();
+        let id_tahun_ajaran = draft.get("id_tahun_ajaran").and_then(Value::as_str).unwrap_or("").trim();
+        let kategori = draft.get("kategori").and_then(Value::as_str).unwrap_or("kedisiplinan").trim();
+        let ringkasan = draft.get("ringkasan").and_then(Value::as_str).unwrap_or("").trim();
+        let kronologi = draft.get("kronologi").and_then(Value::as_str).map(str::trim);
+        let status = draft.get("status").and_then(Value::as_str).unwrap_or("Terbuka").trim();
+
+        if id_siswa.is_empty() || id_tahun_ajaran.is_empty() || ringkasan.is_empty() {
+            return Err(CommandError::new("VALIDATION_ERROR", "ID Siswa, Tahun Ajaran, dan Ringkasan kasus wajib diisi."));
+        }
+        if !matches!(kategori, "kedisiplinan" | "akademik" | "kehadiran" | "sosial") {
+            return Err(CommandError::new("VALIDATION_ERROR", "Kategori kasus tidak valid."));
+        }
+        if !matches!(status, "Terbuka" | "Dalam Bimbingan" | "Selesai") {
+            return Err(CommandError::new("VALIDATION_ERROR", "Status kasus tidak valid."));
+        }
+
+        let mut bytes = [0u8; 16];
+        rand_core::RngCore::fill_bytes(&mut rand_core::OsRng, &mut bytes);
+        let id_kasus = format!("bk_{}", hex::encode(bytes));
+
+        self.query_one(
+            r#"INSERT INTO bk_kasus (
+                id_kasus, id_siswa, id_tahun_ajaran, kategori, ringkasan,
+                kronologi, status, dibuat_oleh, created_at, updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'));"#,
+            vec![
+                json!(id_kasus),
+                json!(id_siswa),
+                json!(id_tahun_ajaran),
+                json!(kategori),
+                json!(ringkasan),
+                match kronologi { Some(k) if !k.is_empty() => json!(k), _ => json!(null) },
+                json!(status),
+                json!(actor),
+            ],
+        ).await?;
+
+        Ok(json!({ "sukses": true, "id_kasus": id_kasus }))
+    }
+
+    pub async fn update_counseling_case(&self, id_kasus: &str, draft: &Value) -> Result<Value, CommandError> {
+        self.ensure_schema_current().await?;
+        let mut updates = Vec::new();
+        let mut args = Vec::new();
+
+        if let Some(kategori) = draft.get("kategori").and_then(Value::as_str).map(str::trim) {
+            if !matches!(kategori, "kedisiplinan" | "akademik" | "kehadiran" | "sosial") {
+                return Err(CommandError::new("VALIDATION_ERROR", "Kategori kasus tidak valid."));
+            }
+            updates.push("kategori = ?");
+            args.push(json!(kategori));
+        }
+        if let Some(ringkasan) = draft.get("ringkasan").and_then(Value::as_str).map(str::trim) {
+            if ringkasan.is_empty() {
+                return Err(CommandError::new("VALIDATION_ERROR", "Ringkasan tidak boleh kosong."));
+            }
+            updates.push("ringkasan = ?");
+            args.push(json!(ringkasan));
+        }
+        if let Some(kronologi) = draft.get("kronologi").and_then(Value::as_str) {
+            updates.push("kronologi = ?");
+            args.push(json!(kronologi.trim()));
+        }
+        if let Some(status) = draft.get("status").and_then(Value::as_str).map(str::trim) {
+            if !matches!(status, "Terbuka" | "Dalam Bimbingan" | "Selesai") {
+                return Err(CommandError::new("VALIDATION_ERROR", "Status kasus tidak valid."));
+            }
+            updates.push("status = ?");
+            args.push(json!(status));
+        }
+
+        if updates.is_empty() {
+            return Ok(json!({ "sukses": true }));
+        }
+
+        updates.push("updated_at = datetime('now')");
+        args.push(json!(id_kasus));
+        let sql = format!("UPDATE bk_kasus SET {} WHERE id_kasus = ?;", updates.join(", "));
+        self.query_one(&sql, args).await?;
+
+        Ok(json!({ "sukses": true }))
+    }
+
+    pub async fn delete_counseling_case(&self, id_kasus: &str) -> Result<Value, CommandError> {
+        self.ensure_schema_current().await?;
+        self.execute_atomic(vec![
+            Statement::new("DELETE FROM bk_sesi WHERE id_kasus = ?;", vec![json!(id_kasus)]),
+            Statement::new("DELETE FROM bk_kasus WHERE id_kasus = ?;", vec![json!(id_kasus)]),
+        ]).await?;
+        Ok(json!({ "sukses": true }))
+    }
+
+    pub async fn add_counseling_session(&self, draft: &Value, counselor: &str) -> Result<Value, CommandError> {
+        self.ensure_schema_current().await?;
+        let id_kasus = draft.get("id_kasus").and_then(Value::as_str).unwrap_or("").trim();
+        let tanggal = draft.get("tanggal").and_then(Value::as_str).unwrap_or("").trim();
+        let catatan = draft.get("catatan_konseling").and_then(Value::as_str).unwrap_or("").trim();
+        let tindak_lanjut = draft.get("tindak_lanjut").and_then(Value::as_str).map(str::trim);
+
+        if id_kasus.is_empty() || tanggal.is_empty() || catatan.is_empty() {
+            return Err(CommandError::new("VALIDATION_ERROR", "ID Kasus, tanggal, dan catatan konseling wajib diisi."));
+        }
+
+        let mut bytes = [0u8; 16];
+        rand_core::RngCore::fill_bytes(&mut rand_core::OsRng, &mut bytes);
+        let id_sesi = format!("bks_{}", hex::encode(bytes));
+
+        let stmts = vec![
+            Statement::new(
+                r#"INSERT INTO bk_sesi (
+                    id_sesi, id_kasus, tanggal, catatan_konseling, tindak_lanjut,
+                    konselor, created_at, updated_at
+                ) VALUES (?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'));"#,
+                vec![
+                    json!(id_sesi),
+                    json!(id_kasus),
+                    json!(tanggal),
+                    json!(catatan),
+                    match tindak_lanjut { Some(t) if !t.is_empty() => json!(t), _ => json!(null) },
+                    json!(counselor),
+                ],
+            ),
+            Statement::new(
+                "UPDATE bk_kasus SET status = CASE WHEN status = 'Terbuka' THEN 'Dalam Bimbingan' ELSE status END, updated_at = datetime('now') WHERE id_kasus = ?;",
+                vec![json!(id_kasus)],
+            ),
+        ];
+
+        self.execute_atomic(stmts).await?;
+        Ok(json!({ "sukses": true, "id_sesi": id_sesi }))
+    }
+
+    pub async fn delete_counseling_session(&self, id_sesi: &str) -> Result<Value, CommandError> {
+        self.ensure_schema_current().await?;
+        self.query_one("DELETE FROM bk_sesi WHERE id_sesi = ?;", vec![json!(id_sesi)]).await?;
+        Ok(json!({ "sukses": true }))
+    }
 }
 
 fn extract_attendance_row_params(row: &Value, id_sesi: &str) -> Vec<Value> {
@@ -5174,6 +5696,12 @@ fn canonical_sync_route(domain: &str, operation: &str) -> Option<(&'static str, 
         }
         ("attendance-ledger" | "attendance_ledger" | "leger-kehadiran" | "leger_kehadiran", "delete") => {
             ("attendance-ledger", "delete")
+        }
+        ("wa-notification" | "wa_notification" | "notifikasi-wa" | "notifikasi_wa", "queue" | "create" | "save") => {
+            ("wa-notification", "queue")
+        }
+        ("wa-notification" | "wa_notification" | "notifikasi-wa" | "notifikasi_wa", "cancel" | "delete") => {
+            ("wa-notification", "cancel")
         }
         _ => return None,
     };
@@ -7441,6 +7969,50 @@ async fn apply_event_to_turso(
                         vec![json!(id_ta), json!(sem), json!(id_rombel)],
                     ).await?;
                 }
+            }
+        }
+        ("wa-notification", "queue") => {
+            let row = payload.get("wa_notification").or_else(|| payload.get("notifikasiWa")).unwrap_or(payload);
+            let id = row.get("id_notifikasi").and_then(Value::as_str).filter(|v| !v.is_empty()).unwrap_or(entity_key);
+            if !id.is_empty() {
+                let dedupe_key = row.get("dedupe_key").and_then(Value::as_str).unwrap_or("");
+                let jenis = row.get("jenis").and_then(Value::as_str).unwrap_or("scan_masuk");
+                let id_siswa = row.get("id_siswa").and_then(Value::as_str);
+                let tujuan_nomor = row.get("tujuan_nomor").and_then(Value::as_str).unwrap_or("");
+                let isi_pesan = row.get("isi_pesan").and_then(Value::as_str).unwrap_or("");
+                let status = row.get("status").and_then(Value::as_str).unwrap_or("Menunggu");
+                let created_at = row.get("created_at").and_then(Value::as_str).unwrap_or("");
+                let updated_at = row.get("updated_at").and_then(Value::as_str).unwrap_or(created_at);
+
+                turso.query_one(
+                    r#"INSERT INTO notifikasi_wa (
+                        id_notifikasi, dedupe_key, jenis, id_siswa, tujuan_nomor,
+                        isi_pesan, status, attempt_count, created_at, updated_at
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, 0, ?, ?)
+                    ON CONFLICT(id_notifikasi) DO UPDATE SET
+                        dedupe_key = excluded.dedupe_key,
+                        jenis = excluded.jenis,
+                        id_siswa = excluded.id_siswa,
+                        tujuan_nomor = excluded.tujuan_nomor,
+                        isi_pesan = excluded.isi_pesan,
+                        status = excluded.status,
+                        updated_at = excluded.updated_at;"#,
+                    vec![
+                        json!(id), json!(dedupe_key), json!(jenis),
+                        match id_siswa { Some(s) if !s.is_empty() => json!(s), _ => json!(null) },
+                        json!(tujuan_nomor), json!(isi_pesan), json!(status),
+                        json!(created_at), json!(updated_at)
+                    ],
+                ).await?;
+            }
+        }
+        ("wa-notification", "cancel") => {
+            let id = payload.get("id_notifikasi").and_then(Value::as_str).filter(|v| !v.is_empty()).unwrap_or(entity_key);
+            if !id.is_empty() {
+                turso.query_one(
+                    "UPDATE notifikasi_wa SET status = 'Dibatalkan', updated_at = datetime('now') WHERE id_notifikasi = ?;",
+                    vec![json!(id)],
+                ).await?;
             }
         }
         _ => {

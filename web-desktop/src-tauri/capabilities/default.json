@@ -181,6 +181,19 @@
     "allow-desktop-delete-frozen-ledger",
     "allow-desktop-backfill-id-cards",
     "allow-desktop-save-student-photo",
-    "allow-desktop-get-student-photo"
+    "allow-desktop-get-student-photo",
+    "allow-desktop-get-attendance-dashboard-metrics",
+    "allow-desktop-queue-wa-notification",
+    "allow-desktop-cancel-wa-notification",
+    "allow-desktop-list-wa-notifications",
+    "allow-desktop-get-wa-config",
+    "allow-desktop-save-wa-config",
+    "allow-desktop-list-counseling-cases",
+    "allow-desktop-get-counseling-case",
+    "allow-desktop-create-counseling-case",
+    "allow-desktop-update-counseling-case",
+    "allow-desktop-delete-counseling-case",
+    "allow-desktop-add-counseling-session",
+    "allow-desktop-delete-counseling-session"
   ]
 }

@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { MobileAppShell } from "@/components/MobileAppShell";
 import type { AttendancePhotoEntry } from "@/lib/attendance/photo-history";
 import { canAccessArea, hasPermission } from "@/lib/auth/access";
@@ -44,6 +44,12 @@ function formatTimestamp(value: string) {
  * benar-benar dibuka — penting di jaringan seluler.
  */
 export default function FotoAbsensiMobilePage() {
+  // Penjaga anti klik ganda (Aturan 5). `useState` tidak cukup: pembaruannya
+  // dijadwalkan, sehingga dua klik dalam satu tick React sama-sama membaca
+  // nilai lama dan keduanya lolos. Dideklarasikan di ATAS, sebelum setiap
+  // early return, supaya urutan hook tidak pernah berubah antar-render.
+  const isSubmittingRef = useRef(false);
+
   const router = useRouter();
   const { user, isAuthenticated, isLoading: authLoading } = useAuth();
 
@@ -117,8 +123,10 @@ export default function FotoAbsensiMobilePage() {
   };
 
   const runDelete = async () => {
+    if (isSubmittingRef.current) return;
     if (!confirmDelete) return;
     setBusy(true);
+    isSubmittingRef.current = true;
     try {
       await deleteAttendancePhotoEntry(confirmDelete.idFoto);
       setMessage({
@@ -134,6 +142,7 @@ export default function FotoAbsensiMobilePage() {
           error instanceof Error ? error.message : "Foto tidak dapat dihapus.",
       });
     } finally {
+      isSubmittingRef.current = false;
       setBusy(false);
     }
   };

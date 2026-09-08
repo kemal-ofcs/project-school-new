@@ -4,15 +4,15 @@ Dokumen ini mendefinisikan kontrak resmi komunikasi sinkronisasi dua arah antara
 
 ---
 
-## 1. 67 Route Kanonik Outbox (The 67 Canonical Hyphen Routes)
+## 1. 69 Route Kanonik Outbox (The 69 Canonical Hyphen Routes)
 
-Hanya 67 pasangan `(domain, operation)` berikut yang diizinkan untuk diproduksi oleh outbox dan diproses oleh consumer backend/Turso:
+Hanya 69 pasangan `(domain, operation)` berikut yang diizinkan untuk diproduksi oleh outbox dan diproses oleh consumer backend/Turso:
 
 ```text
- 1. academic-assignment/create      24. class-attendance/delete         47. payroll/create-run
- 2. academic-assignment/delete      25. class-attendance/update         48. payroll/delete
- 3. academic-class/create           26. class-attendance-detail/delete  49. payroll/overtime-rule
- 4. academic-class/delete           27. class-attendance-detail/save    50. payroll/payroll-component
+ 1. academic-assignment/create      24. class-attendance-detail/save    47. payroll/create-run
+ 2. academic-assignment/delete      25. class-attendance/create         48. payroll/delete
+ 3. academic-class/create           26. class-attendance/delete         49. payroll/overtime-rule
+ 4. academic-class/delete           27. class-attendance/update         50. payroll/payroll-component
  5. academic-class/update           28. company-profile/update          51. payroll/salary-config
  6. academic-department/create      29. correction/create               52. payroll/tax-rule
  7. academic-department/delete      30. correction/delete               53. payroll/transition-status
@@ -20,18 +20,18 @@ Hanya 67 pasangan `(domain, operation)` berikut yang diizinkan untuk diproduksi 
  9. academic-subject/create         32. employee/status                 55. setting/upsert
 10. academic-subject/delete         33. employee/token                  56. shift/create
 11. academic-subject/update         34. employee/update                 57. shift/delete
-12. academic-year/create            35. holiday/create                  58. shift/update
-13. academic-year/delete            36. holiday/delete                  59. student/create
-14. academic-year/update            37. holiday/update                  60. student/delete
-15. attendance/create               38. holiday-whitelist/create        61. student/update
-16. attendance/delete               39. holiday-whitelist/delete        62. student-photo/save
-17. attendance/scan                 40. holiday-whitelist/update        63. teacher/create
-18. attendance/update               41. id-card/update                  64. teacher/delete
-19. attendance-ledger/delete        42. id-card-template/save           65. teacher/update
-20. attendance-ledger/freeze        43. log-scan/delete                 66. teaching-journal/delete
+12. academic-year/create            35. holiday-whitelist/create        58. shift/update
+13. academic-year/delete            36. holiday-whitelist/delete        59. student-photo/save
+14. academic-year/update            37. holiday-whitelist/update        60. student/create
+15. attendance-ledger/delete        38. holiday/create                  61. student/delete
+16. attendance-ledger/freeze        39. holiday/delete                  62. student/update
+17. attendance/create               40. holiday/update                  63. teacher/create
+18. attendance/delete               41. id-card-template/save           64. teacher/delete
+19. attendance/scan                 42. id-card/update                  65. teacher/update
+20. attendance/update               43. log-scan/delete                 66. teaching-journal/delete
 21. backup/cancel                   44. offline-import/delete           67. teaching-journal/save
-22. backup/create                   45. offline-import/row
-23. class-attendance/create         46. payroll/bpjs-rule
+22. backup/create                   45. offline-import/row              68. wa-notification/cancel
+23. class-attendance-detail/delete  46. payroll/bpjs-rule               69. wa-notification/queue
 ```
 
 ### Aturan Penamaan & Boundary Compatibility:
@@ -250,3 +250,90 @@ sudah tahu jawabannya.
 1. **Atomisitas Mutasi:** Penonaktifan personil WAJIB memperbarui `master_data.status_aktif = 'Nonaktif'` dan tabel profil dalam satu transaksi atomik.
 2. **Paritas Handler Cloud:** Handler cloud DILARANG meng-hardcode `status_aktif = 'Aktif'` pada operasi upsert dan DILARANG menghilangkan kolom relasi penting (`id_shift`, `no_hp`, `lp`).
 3. **Audit Konsistensi:** Setiap mutasi relasional wajib memiliki tes integrasi yang memverifikasi bahwa penonaktifan di satu sisi tidak dibatalkan oleh snapshot pull di sisi lain.
+
+---
+
+## 9. Pembedaan Tegas Tabel di Luar SNAPSHOT_TABLES (Selective-Pull) vs Push Outbox (Anti-Half-Sync)
+
+### Masalah Asimetri Pemahaman ("Half-Sync"):
+- Tabel dengan aset biner atau base64 berukuran besar (seperti `siswa_foto` dan `absensi_foto`) sengaja ditempatkan di luar `SNAPSHOT_TABLES`.
+- Tujuannya murni untuk performa: pull snapshot rutin (`apply_table`) tidak boleh menarik ratusan foto berukuran puluhan megabyte ke setiap perangkat.
+- **Jebakan Fatal:** Menganggap "di luar `SNAPSHOT_TABLES`" sebagai "tabel lokal/cloud-only yang tidak ikut sinkronisasi sama sekali".
+- **Dampak Fatal:** Ketika foto siswa dipotret atau diunggah di sebuah perangkat Desktop/Mobile, foto tersebut hanya tersimpan di SQLite lokal. Karena tidak ada event outbox push, foto tersebut tidak pernah sampai ke Turso Cloud. Akibatnya, dashboard Web tidak dapat menampilkan foto siswa, dan perangkat lain yang mencetak Kartu Pelajar kehilangan foto tersebut.
+
+### Taksonomi 4 Kategori Tabel:
+1. **Fully-Synchronized Tables (32 Tabel Snapshot):**
+   - Terdaftar di `SNAPSHOT_TABLES` (sync.rs) DAN `SNAPSHOT_SOURCES` (turso.rs).
+   - Mengikuti siklus dua arah: ditarik via pull snapshot dan didorong via push outbox.
+2. **Selective-Pull / Heavy-Payload Tables (`siswa_foto`, `absensi_foto`, `notifikasi_wa`):**
+   - TIDAK terdaftar di `SNAPSHOT_TABLES` (mencegah pembengkakan pull rutin).
+   - TETAPI jika ditulis/dimutasi di perangkat lokal, WAJIB mendaftarkan event push outbox (`student-photo/save`, `attendance/scan`, `wa-notification/queue`) ke Turso Cloud dalam transaksi atomik yang sama.
+   - Perangkat lain atau Web mengambil data secara *on-demand* via query endpoint terpisah.
+   - `notifikasi_wa` masuk kategori ini bukan karena ukuran satu barisnya, melainkan karena volumenya: sekolah 800 siswa menghasilkan ±1.600 baris per hari, dan barisnya memuat nomor telepon serta isi pesan yang tidak perlu tersebar ke setiap terminal. Konsekuensi yang perlu diketahui: sebuah perangkat hanya melihat antrean yang IA buat sendiri.
+3. **Cloud-Only Tables (`password_reset_request`, `app_mail_config`, `master_operator`, `bk_kasus`, `bk_sesi`, `app_wa_config`):**
+   - Hanya ada dan dimutasi langsung di cloud via HTTP API Route atau command autentikasi. Tidak pernah ditulis ke SQLite lokal operasional.
+   - **Fiturnya karena itu menuntut jaringan di SEMUA build, termasuk Desktop.** `bk_kasus`/`bk_sesi` cloud-only bukan karena ukurannya melainkan kerahasiaannya — catatan kedisiplinan seorang anak tidak boleh tersimpan di SQLite terminal pemindai di lobi sekolah, alasan yang sama dengan `password_reset_request`. Jangan membangun halaman Mobile untuk kategori ini: yang lahir hanyalah layar yang gagal justru saat sinyal hilang. Gateway-nya dijaga `assertTersediaDiMobile()` (`src/lib/runtime/mobile-unsupported.ts`).
+4. **Device-Local Only Tables (`desktop_sync_outbox`, `desktop_sync_receipt`, `desktop_entity_revision`, `desktop_schema_migration`, `device_id`):**
+   - Infrastruktur lokal per-perangkat; tidak pernah didorong maupun ditarik.
+
+---
+
+## 10. Validasi Ketat Format & MIME Type di Rust Backend (Anti-Outbox Jam)
+
+### Mekanisme Terjadinya Outbox Jam:
+1. SQLite lokal bersifat *loose typing* (tipe dinamis). Nilai format string yang salah atau MIME type acak (misal `image/bmp`, `text/plain`, typo `image/jpgg`) dapat tersimpan mulus di tabel SQLite lokal.
+2. Saat mutasi lokal didaftarkan ke `desktop_sync_outbox` dan didorong ke cloud, LibSQL Cloud mengeksekusi handler push Turso yang divalidasi via Zod `.strict()` atau CHECK constraint cloud.
+3. Cloud menolak payload dengan status error (`VALIDATION_ERROR` / HTTP 400).
+4. Sesuai aturan idempotensi outbox, event yang ditolak cloud karena kegagalan constraint/validasi ditandai sebagai `failed` dengan `next_retry_at = NULL`.
+5. **Akibat Fatal:** Antrean outbox macet permanen (*permanent outbox jam*). Perangkat tidak akan pernah bisa melakukan push perubahan berikutnya sampai database di-reset.
+
+### Aturan Validasi Mutlak di Rust:
+- Rust backend (`tauri::command` dan modul domain) adalah pintu gerbang pertama pertahanan.
+- Backend Rust WAJIB memvalidasi format data, panjang karakter, batas ukuran file base64, dan whitelist enum/MIME type (`image/jpeg`, `image/png`, `image/webp`) SESUAI PERSIS dengan Zod validator di `sync-schema.ts` SEBELUM data ditulis ke SQLite lokal dan outbox.
+- Jika data cacat ditolak di Rust, UI akan langsung menampilkan error kepada pengguna dan transaksi dibatalkan sebelum sempat mengotori antrean outbox.
+
+---
+
+## 11. Scoping Hak Akses RBAC Sesuai Cakupan Nyata Data (Scope-Aware RBAC & Least Privilege)
+
+### Celah Eskalasi Hak Akses (*Privilege Escalation*):
+- Menentukan permission command hanya berdasarkan "nama halaman UI" atau "nama form" adalah anti-pattern berbahaya.
+- Contoh nyata: Command `desktop_backfill_id_cards` berada di menu kartu, tetapi query SQL-nya menerbitkan kartu untuk **seluruh personil aktif di `master_data`** (guru, siswa, dan karyawan/staf sekaligus).
+- Jika command tersebut dijaga oleh `students.manage`:
+  - Staf kesiswaan (yang hanya berwenang mengurus siswa) secara diam-diam mendapatkan hak menerbitkan dan memodifikasi kartu identitas guru dan karyawan kantor.
+  - Sebaliknya, staf administrasi umum tidak dapat menjalankan tombol backfill karena tidak memiliki izin kelola siswa.
+
+### Aturan Scoping RBAC:
+1. **Analisis Query Terluas:** Evaluasi himpunan data (`WHERE` clause) pada query SQL yang dieksekusi oleh command.
+2. **Scope Multi-Entitas:** Jika query menyentuh seluruh personil (`master_data`), command WAJIB dikawal oleh permission personil tingkat sistem (`employees.manage`), bukan permission entitas anak (`students.manage` atau `teachers.manage`).
+3. **Prinsip Least Privilege:** Pisahkan aksi parsial ke command terpisah jika memang ditujukan hanya untuk satu kelompok peran.
+
+---
+
+## 12. Urutan Kanonik Doc Comments dan Atribut `#[tauri::command]` (Anti-Regex Audit Failure)
+
+### Analisis Parser Skrip Audit:
+Skrip `scripts/audit-sync-contract.ts` memeriksa pendaftaran seluruh command Tauri menggunakan pencocokan pola regex AST:
+```typescript
+source.matchAll(/#\[tauri::command\][\s\S]{0,200}?\bfn\s+([a-z_][a-z0-9_]*)/g)
+```
+Regex ini membatasi jarak antara atribut `#[tauri::command]` dan kata kunci `fn` maksimal 200 karakter.
+
+### Format Penulisan yang Benar (WAJIB):
+```rust
+/// Penjelasan dokumentasi fungsi secara lengkap, boleh panjang berparagraf-paragraf.
+/// Berisi konteks bisnis, izin yang dibutuhkan, dan catatan arsitektur.
+#[tauri::command]
+pub fn desktop_nama_perintah(state: State<'_, DesktopState>) -> Result<Value, CommandError> {
+    // ...
+}
+```
+
+### Format yang DILARANG:
+```rust
+#[tauri::command]
+/// Komentar dokumentasi yang sangat panjang ditaruh di sini (>200 karakter) ...
+/// Ini akan mematahkan regex audit-sync-contract!
+pub fn desktop_nama_perintah(...)
+```
+Meletakkan doc comment di antara `#[tauri::command]` dan `pub fn` akan membuat regex gagal menemukan command tersebut. Audit kontrak akan melaporkan bahwa command yang didaftarkan di `build.rs` atau `lib.rs` "tidak didefinisikan di modul", menggagalkan seluruh gerbang kualitas.

@@ -19,6 +19,20 @@ export const ATTENDANCE_SOURCE_VALUES = [
 
 export type AttendanceSource = (typeof ATTENDANCE_SOURCE_VALUES)[number];
 
+/**
+ * Nilai bawaan ketika sebuah baris absensi tiba tanpa `sumber` yang dinyatakan.
+ *
+ * Dua alasan memilih `Generate Sistem`: ia jujur (memang tidak ada yang
+ * menyatakan sumbernya), dan ia PRIORITAS TERENDAH dalam hierarki rekonsiliasi
+ * — sehingga baris tanpa sumber tidak akan pernah menimpa `Koreksi Admin` atau
+ * catatan scanner yang sah.
+ *
+ * Bawaannya WAJIB salah satu anggota `ATTENDANCE_SOURCE_VALUES`. Nilai di luar
+ * daftar itu ditolak CHECK constraint cloud, dan penolakan pada push outbox
+ * membekukan seluruh antrean sinkronisasi perangkat secara permanen.
+ */
+export const DEFAULT_ATTENDANCE_SOURCE: AttendanceSource = "Generate Sistem";
+
 /** Peran personil sebagaimana ditampilkan terminal pemindai. */
 export const PERSONNEL_ROLES = ["Siswa", "Guru", "Pegawai"] as const;
 

@@ -115,6 +115,7 @@
     "allow-desktop-save-alfa-settings",
     "allow-desktop-trigger-generate-alfa",
     "allow-desktop-get-attendance-audit",
+    "allow-desktop-get-attendance-dashboard-metrics",
     "allow-desktop-get-server-url",
     "allow-desktop-set-server-url",
     "allow-desktop-get-turso-url",

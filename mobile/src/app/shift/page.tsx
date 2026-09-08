@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import type React from "react";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { MobileAppShell } from "@/components/MobileAppShell";
 import { Icon } from "@/components/ui/Icon";
 import { Modal } from "@/components/ui/Modal";
@@ -66,6 +66,12 @@ function formatMinutesToHours(min: unknown): string {
 }
 
 export default function MobileShiftPage() {
+  // Penjaga anti klik ganda (Aturan 5). `useState` tidak cukup: pembaruannya
+  // dijadwalkan, sehingga dua klik dalam satu tick React sama-sama membaca
+  // nilai lama dan keduanya lolos. Dideklarasikan di ATAS, sebelum setiap
+  // early return, supaya urutan hook tidak pernah berubah antar-render.
+  const isSubmittingRef = useRef(false);
+
   const router = useRouter();
   const { user, isAuthenticated, isLoading: authLoading } = useAuth();
   const canView = canAccessArea(user, "shift");
@@ -327,6 +333,7 @@ export default function MobileShiftPage() {
 
   const handleFormSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isSubmittingRef.current) return;
     const validationErrors = validateShiftDraft(formData);
     if (Object.keys(validationErrors).length > 0) {
       triggerHaptic("error");
@@ -337,6 +344,7 @@ export default function MobileShiftPage() {
 
     setSaving(true);
     triggerHaptic("light");
+    isSubmittingRef.current = true;
     try {
       if (isEditing && editId) {
         await updateShift(editId, formData);
@@ -356,6 +364,7 @@ export default function MobileShiftPage() {
       const msg = err instanceof Error ? err.message : "Gagal menyimpan shift.";
       setErrorMsg(msg);
     } finally {
+      isSubmittingRef.current = false;
       setSaving(false);
     }
   };

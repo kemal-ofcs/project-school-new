@@ -203,6 +203,43 @@ untuk database baru, dan `ALTER TABLE` (`ensure_column` di Rust,
     (format kanonik `+62...`). DILARANG membuat regex atau pembersih manual ad-hoc di komponen UI.
 41. Verifikasi fase selesai WAJIB menjalankan `bun run check` penuh (mencakup `cargo test` kedua workspace).
     `bun run check:quick` tidak mengompilasi Rust dan tidak memvalidasi perintah Tauri baru.
+42. Pembedaan tegas "di luar SNAPSHOT_TABLES" (Selective / Heavy Payload) vs "Tabel Cloud-Only" vs "Tidak Ikut Sinkronisasi":
+    Tabel dengan payload biner/media/foto (seperti `siswa_foto`, `absensi_foto`) sengaja ditempatkan di luar `SNAPSHOT_TABLES`
+    semata-mata agar siklus pull snapshot rutin (`apply_table`) tidak membengkak dan memperlambat startup perangkat.
+    "Di luar snapshot" HANYA berarti tidak ikut ditarik secara massal (pull). Setiap mutasi lokal (insert/update) pada tabel
+    tersebut WAJIB didaftarkan ke `desktop_sync_outbox` dalam transaksi atomik yang sama dan memiliki rute kanonik push
+    (`student-photo/save`, `attendance/scan`) ke database cloud, lalu dibaca on-demand jika lokal belum memilikinya.
+    Sebaliknya, tabel "Cloud-Only" (`password_reset_request`, `app_mail_config`, `master_operator`) tidak pernah ditulis
+    via SQLite lokal melainkan langsung ke cloud via route API. Dan tabel "Device-Local Only" (`desktop_sync_outbox`,
+    `desktop_sync_receipt`, `desktop_entity_revision`, `desktop_schema_migration`, `device_id`) tidak pernah didorong
+    maupun ditarik. DILARANG menerapkan aturan setengah jalan yang memutus aliran push dari lokal ke cloud ("half-sync").
+43. Validasi ketat format, enum, dan MIME type di Rust backend sebelum menulis ke SQLite & outbox (Anti-Outbox Jam):
+    SQLite lokal bersifat *loose typing*, sehingga string cacat atau MIME type sembarang (misal `image/bmp`, `text/plain`,
+    typo string) dapat tersimpan mulus di perangkat lokal. Namun saat baris tersebut didorong ke LibSQL cloud, validator
+    Zod `.strict()` atau CHECK constraint cloud Turso akan menolaknya. Penolakan push outbox di cloud langsung menandai
+    event sebagai `failed` permanen dengan `next_retry_at = NULL`. Seluruh antrean outbox sinkronisasi perangkat macet
+    selamanya! Backend Rust (`tauri::command` dan fungsi domain) WAJIB memvalidasi format, panjang karakter, batas ukuran
+    (base64 foto siswa maks 500 KB, foto absensi maks 2 MB), dan whitelist enum/MIME type secara presisi (contoh:
+    `image/jpeg`, `image/png`, `image/webp`) SESUAI PERSIS dengan enum Zod di `sync-schema.ts` SEBELUM menulis ke SQLite
+    lokal dan outbox.
+44. Scoping hak akses RBAC presisi berdasarkan cakupan nyata data (Scope-Aware RBAC & Least Privilege):
+    Jangan menentukan permission guard pada `#[tauri::command]` hanya berdasarkan nama form atau lokasi tombol di UI.
+    Analisis cakupan query SQL dan mutasi data yang dieksekusi: jika suatu command menyentuh seluruh personil aktif di
+    `master_data` (mencakup siswa, guru, dan karyawan/pegawai — contoh: `desktop_backfill_id_cards`), DILARANG menggunakan
+    permission parsial domain tunggal (`students.manage`). Menggunakan `students.manage` pada operasi multi-entitas
+    menciptakan celah eskalasi hak akses (*privilege escalation*), di mana pemegang izin kelola siswa dapat memicu
+    penerbitan atau manipulasi data kartu guru dan staf kantor. Gunakan permission yang mencakup domain seluruh personil
+    (`employees.manage`) atau izin infrastruktur yang berwenang.
+45. Urutan kanonik dokumen Rust dan penempatan atribut `#[tauri::command]` (Anti-Regex Audit Failure):
+    Skrip audit integritas (`audit-sync-contract.ts`) mengekstrak command menggunakan regex parser terikat
+    (`/#\[tauri::command\][\s\S]{0,200}?\bfn\s+([a-z_][a-z0-9_]*)/g`).
+    Urutan penulisan di Rust WAJIB mengikuti urutan standar:
+    1. Doc comments (`/// ...`)
+    2. Atribut `#[tauri::command]`
+    3. Deklarasi fungsi `pub fn desktop_...`
+    DILARANG meletakkan komentar dokumentasi `///` di antara `#[tauri::command]` dan nama fungsi `pub fn ...`.
+    Komentar panjang (>200 karakter) di sela atribut mematahkan regex audit dan membuat command dilaporkan tidak
+    terdefinisi (*missing defined command*), menggagalkan seluruh gerbang kualitas.
 
 ## Pemulihan password & verifikasi dua langkah
 

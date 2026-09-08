@@ -2,7 +2,7 @@
 
 import { redirect } from "next/navigation";
 import type { ChangeEvent, FormEvent } from "react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { AppShell } from "@/components/AppShell";
 import { DatabaseBackupCard } from "@/components/DatabaseBackupCard";
 import { MailSettingsCard } from "@/components/MailSettingsCard";
@@ -127,6 +127,12 @@ interface FeedbackMessage {
 }
 
 export default function SettingsPage() {
+  // Penjaga anti klik ganda (Aturan 5). `useState` tidak cukup: pembaruannya
+  // dijadwalkan, sehingga dua klik dalam satu tick React sama-sama membaca
+  // nilai lama dan keduanya lolos. Dideklarasikan di ATAS, sebelum setiap
+  // early return, supaya urutan hook tidak pernah berubah antar-render.
+  const isSubmittingRef = useRef(false);
+
   const isHydrated = useHydrated();
   const isOnline = useOnlineStatus();
   const logoUrl = useAppLogo();
@@ -356,7 +362,9 @@ export default function SettingsPage() {
   }, [isHydrated, isAuthenticated]);
 
   const handleAutoAlfaToggle = async (enabled: boolean) => {
+    if (isSubmittingRef.current) return;
     setAutoAlfaBusy(true);
+    isSubmittingRef.current = true;
     try {
       await saveAutoAlfaSetting(enabled);
       setAutoAlfaEnabled(enabled);
@@ -373,6 +381,7 @@ export default function SettingsPage() {
             : "Gagal menyimpan pengaturan Auto Alfa.",
       });
     } finally {
+      isSubmittingRef.current = false;
       setAutoAlfaBusy(false);
     }
   };
@@ -561,6 +570,7 @@ export default function SettingsPage() {
 
   const handleTursoSave = async (e: FormEvent) => {
     e.preventDefault();
+    if (isSubmittingRef.current) return;
     // Tahan input yang jelas salah di sini supaya pengguna melihat alasannya di
     // sebelah field, bukan sebagai kegagalan IPC generik setelah penyimpanan.
     // Mode Database Lokal tidak punya alamat maupun token, dan validator
@@ -590,6 +600,7 @@ export default function SettingsPage() {
       return;
     }
     setTursoBusy(true);
+    isSubmittingRef.current = true;
     try {
       await saveTursoConfig(
         needsEndpoint ? tursoUrl.trim() : "",
@@ -622,6 +633,7 @@ export default function SettingsPage() {
             : "Gagal menyimpan konfigurasi database cloud Turso.",
       });
     } finally {
+      isSubmittingRef.current = false;
       setTursoBusy(false);
     }
   };
@@ -697,6 +709,7 @@ export default function SettingsPage() {
   };
 
   const handleLogoUpload = async (event: ChangeEvent<HTMLInputElement>) => {
+    if (isSubmittingRef.current) return;
     const file = event.target.files?.[0];
     if (!file) return;
 
@@ -722,6 +735,7 @@ export default function SettingsPage() {
     // tersebar ke cloud, Desktop lain, dan Mobile. Sebelumnya logo hanya
     // ditulis ke localStorage perangkat ini sehingga tidak pernah tersinkron.
     setLogoBusy(true);
+    isSubmittingRef.current = true;
     try {
       const optimized = await optimizeImageFile(file, {
         maxWidth: 600,
@@ -749,13 +763,16 @@ export default function SettingsPage() {
             : "Logo tidak dapat disimpan. Silakan coba file lain.",
       });
     } finally {
+      isSubmittingRef.current = false;
       setLogoBusy(false);
       event.target.value = "";
     }
   };
 
   const handleResetLogo = async () => {
+    if (isSubmittingRef.current) return;
     setLogoBusy(true);
+    isSubmittingRef.current = true;
     try {
       const updated = await updateCompanyProfile({
         ...companyProfile,
@@ -777,6 +794,7 @@ export default function SettingsPage() {
             : "Gagal mengembalikan logo ke default.",
       });
     } finally {
+      isSubmittingRef.current = false;
       setLogoBusy(false);
     }
   };
@@ -932,6 +950,7 @@ export default function SettingsPage() {
   const handleScanSecuritySubmit = async (
     event: FormEvent<HTMLFormElement>,
   ) => {
+    if (isSubmittingRef.current) return;
     event.preventDefault();
     const entries = ipAllowlistDraft
       .split(/[\n,;]/)
@@ -945,6 +964,7 @@ export default function SettingsPage() {
       return;
     }
     setIpAllowlistBusy(true);
+    isSubmittingRef.current = true;
     try {
       const saved = await saveScanSecurity({
         photoEnabled: scanPhotoEnabled,
@@ -974,11 +994,13 @@ export default function SettingsPage() {
             : "Pengaturan keamanan absensi gagal disimpan.",
       });
     } finally {
+      isSubmittingRef.current = false;
       setIpAllowlistBusy(false);
     }
   };
 
   const handleGeofenceSubmit = async (event: FormEvent<HTMLFormElement>) => {
+    if (isSubmittingRef.current) return;
     event.preventDefault();
     const validationMessage = Object.values(
       validateGeofenceSettings(geofence),
@@ -988,6 +1010,7 @@ export default function SettingsPage() {
       return;
     }
     setGeofenceBusy(true);
+    isSubmittingRef.current = true;
     try {
       setGeofence(await saveGeofenceSettings(geofence));
       setFeedback({
@@ -1005,6 +1028,7 @@ export default function SettingsPage() {
             : "Pengaturan geofencing gagal disimpan.",
       });
     } finally {
+      isSubmittingRef.current = false;
       setGeofenceBusy(false);
     }
   };
@@ -1012,6 +1036,7 @@ export default function SettingsPage() {
   const handleScannerSafetySubmit = async (
     event: FormEvent<HTMLFormElement>,
   ) => {
+    if (isSubmittingRef.current) return;
     event.preventDefault();
     const validationMessage = Object.values(
       validateScannerSafetySettings(scannerSafety),
@@ -1021,6 +1046,7 @@ export default function SettingsPage() {
       return;
     }
     setScannerSafetyBusy(true);
+    isSubmittingRef.current = true;
     try {
       setScannerSafety(await saveScannerSafetySettings(scannerSafety));
       setFeedback({
@@ -1037,6 +1063,7 @@ export default function SettingsPage() {
             : "Pengaturan keamanan scanner gagal disimpan.",
       });
     } finally {
+      isSubmittingRef.current = false;
       setScannerSafetyBusy(false);
     }
   };

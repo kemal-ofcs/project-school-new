@@ -23,6 +23,7 @@ const ACADEMIC_FOUNDATION_MIGRATION_VERSION = 16;
 const ACADEMIC_UNIQUE_RELAXATION_MIGRATION_VERSION = 17;
 const CLASS_ATTENDANCE_MIGRATION_VERSION = 18;
 const TEACHING_JOURNAL_AND_LEDGER_MIGRATION_VERSION = 19;
+const PHASE_4_MIGRATION_VERSION = 20;
 
 /**
  * Bangun ulang sebuah tabel untuk melepas UNIQUE yang terlanjur ikut terbuat.
@@ -1232,6 +1233,91 @@ export async function runDatabaseMigrations(client: Client) {
     sql: `INSERT OR IGNORE INTO schema_migration (version, name, applied_at)
           VALUES (?, 'teaching-journal-and-attendance-ledger', ?);`,
     args: [TEACHING_JOURNAL_AND_LEDGER_MIGRATION_VERSION, now],
+  });
+
+  // ──────────────────────────────────────────────────────────────────────────
+  // Versi 20: Fase 4 — Notifikasi WhatsApp & Bimbingan Konseling (BK)
+  // ──────────────────────────────────────────────────────────────────────────
+  await client.execute(`
+    CREATE TABLE IF NOT EXISTS notifikasi_wa (
+      id_notifikasi TEXT PRIMARY KEY,
+      dedupe_key TEXT NOT NULL,
+      jenis TEXT NOT NULL CHECK (jenis IN ('scan_masuk', 'scan_pulang', 'bolos', 'ambang_alfa')),
+      id_siswa TEXT,
+      tujuan_nomor TEXT NOT NULL,
+      isi_pesan TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'Menunggu' CHECK (status IN ('Menunggu', 'Terkirim', 'Gagal', 'Dibatalkan')),
+      attempt_count INTEGER NOT NULL DEFAULT 0,
+      last_error TEXT,
+      sent_at TEXT,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+  `);
+
+  await client.execute(`
+    CREATE TABLE IF NOT EXISTS app_wa_config (
+      id TEXT PRIMARY KEY,
+      provider TEXT NOT NULL DEFAULT 'fonnte' CHECK (provider IN ('fonnte', 'wablas', 'custom')),
+      api_key TEXT NOT NULL DEFAULT '',
+      api_url TEXT,
+      sender_number TEXT,
+      is_active INTEGER NOT NULL DEFAULT 0,
+      daily_limit INTEGER NOT NULL DEFAULT 1000,
+      scan_masuk_enabled INTEGER NOT NULL DEFAULT 0,
+      scan_pulang_enabled INTEGER NOT NULL DEFAULT 0,
+      bolos_enabled INTEGER NOT NULL DEFAULT 1,
+      ambang_alfa_enabled INTEGER NOT NULL DEFAULT 1,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+  `);
+
+  await client.execute(`
+    CREATE TABLE IF NOT EXISTS bk_kasus (
+      id_kasus TEXT PRIMARY KEY,
+      id_siswa TEXT NOT NULL,
+      id_tahun_ajaran TEXT NOT NULL,
+      kategori TEXT NOT NULL CHECK (kategori IN ('kedisiplinan', 'akademik', 'kehadiran', 'sosial')),
+      ringkasan TEXT NOT NULL,
+      kronologi TEXT,
+      status TEXT NOT NULL DEFAULT 'Terbuka' CHECK (status IN ('Terbuka', 'Dalam Bimbingan', 'Selesai')),
+      dibuat_oleh TEXT NOT NULL,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+  `);
+
+  await client.execute(`
+    CREATE TABLE IF NOT EXISTS bk_sesi (
+      id_sesi TEXT PRIMARY KEY,
+      id_kasus TEXT NOT NULL,
+      tanggal TEXT NOT NULL,
+      catatan_konseling TEXT NOT NULL,
+      tindak_lanjut TEXT,
+      konselor TEXT NOT NULL,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+  `);
+
+  await client.execute(
+    "CREATE INDEX IF NOT EXISTS idx_notifikasi_wa_status ON notifikasi_wa(status, created_at);",
+  );
+  await client.execute(
+    "CREATE INDEX IF NOT EXISTS idx_notifikasi_wa_dedupe ON notifikasi_wa(dedupe_key);",
+  );
+  await client.execute(
+    "CREATE INDEX IF NOT EXISTS idx_bk_kasus_siswa ON bk_kasus(id_siswa, id_tahun_ajaran);",
+  );
+  await client.execute(
+    "CREATE INDEX IF NOT EXISTS idx_bk_sesi_kasus ON bk_sesi(id_kasus, tanggal);",
+  );
+
+  await client.execute({
+    sql: `INSERT OR IGNORE INTO schema_migration (version, name, applied_at)
+          VALUES (?, 'phase-4-notification-and-counseling', ?);`,
+    args: [PHASE_4_MIGRATION_VERSION, now],
   });
 
   await client.execute(

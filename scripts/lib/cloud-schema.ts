@@ -186,11 +186,33 @@ export function collectLocalDdl(storageSource: string): string[] {
 	return statements;
 }
 
-/** Bangun struktur skema dengan benar-benar menjalankan DDL-nya. */
-export function buildSchemaFromDdl(
+/**
+ * Jalankan DDL-nya ke database sementara dan kembalikan database yang MASIH
+ * terbuka.
+ *
+ * `buildSchemaFromDdl` hanya butuh bentuk akhir skemanya lalu menutup database
+ * itu. `audit:sql` butuh yang sebaliknya: database hidup untuk mem-`prepare`
+ * setiap query aplikasi terhadapnya. Keduanya wajib memakai jalur DDL yang
+ * sama persis — parser DDL kedua akan menjadi sumber drift baru.
+ */
+export function openDatabaseFromDdl(
 	statements: string[],
 	label: string,
-): TableSchema {
+	/**
+	 * Izinkan sebuah tabel didefinisikan ulang oleh set DDL berikutnya.
+	 *
+	 * HANYA untuk pemanggil yang sengaja MENGGABUNGKAN beberapa lapisan DDL
+	 * sekaligus (`audit:sql` menumpuk lokal + cloud + perbaikan supaya tabel
+	 * cloud-only ikut terbentuk). Beberapa tabel milik Web ditulis dengan
+	 * `CREATE TABLE` polos, sehingga tumpang tindihnya pasti terjadi dan bukan
+	 * pertanda drift.
+	 *
+	 * `audit:schema` memeriksa tiap lapisan SENDIRI-SENDIRI dan wajib tetap
+	 * menolak tabel ganda — jangan pernah menyalakan opsi ini di sana, karena
+	 * justru bentrokan itulah drift yang dicarinya.
+	 */
+	izinkanTabelGanda = false,
+): Database {
 	const db = new Database(":memory:");
 	const failures: string[] = [];
 
@@ -203,6 +225,7 @@ export function buildSchemaFromDdl(
 			// SQLite. Itu bukan kesalahan: di produksi `ensure_column` memeriksa
 			// keberadaan kolom lebih dulu dan melewatinya.
 			if (/duplicate column name/i.test(message)) continue;
+			if (izinkanTabelGanda && /already exists/i.test(message)) continue;
 			const preview = statement.slice(0, 110).replace(/\s+/g, " ");
 			failures.push(`${message}\n        SQL: ${preview}…`);
 		}
@@ -215,6 +238,15 @@ export function buildSchemaFromDdl(
 		);
 	}
 
+	return db;
+}
+
+/** Bangun struktur skema dengan benar-benar menjalankan DDL-nya. */
+export function buildSchemaFromDdl(
+	statements: string[],
+	label: string,
+): TableSchema {
+	const db = openDatabaseFromDdl(statements, label);
 	const schema = readSchema(db);
 	db.close();
 	return schema;

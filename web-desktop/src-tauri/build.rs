@@ -177,6 +177,19 @@ const DESKTOP_COMMANDS: &[&str] = &[
     "desktop_backfill_id_cards",
     "desktop_save_student_photo",
     "desktop_get_student_photo",
+    "desktop_get_attendance_dashboard_metrics",
+    "desktop_queue_wa_notification",
+    "desktop_cancel_wa_notification",
+    "desktop_list_wa_notifications",
+    "desktop_get_wa_config",
+    "desktop_save_wa_config",
+    "desktop_list_counseling_cases",
+    "desktop_get_counseling_case",
+    "desktop_create_counseling_case",
+    "desktop_update_counseling_case",
+    "desktop_delete_counseling_case",
+    "desktop_add_counseling_session",
+    "desktop_delete_counseling_session",
 ];
 
 fn local_build_values() -> HashMap<String, String> {

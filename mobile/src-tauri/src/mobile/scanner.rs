@@ -2124,6 +2124,85 @@ fn submit_internal(
         previous_update.as_deref(),
         photo_row.as_ref(),
     )?;
+
+    // Otomatis antrekan notifikasi WhatsApp ke wali bila personil adalah siswa
+    // dan nomor wali tersedia di siswa_data (atau master_data).
+    // Mengantre secara lokal 0ms, tanpa pernah memblokir antrean gerbang (Rule 58).
+    //
+    // Sakelar induknya dibaca DI SINI, sebelum mengantre — bukan nanti saat
+    // mengirim. Menyaring di titik kirim membuat barisnya tetap lahir dan tetap
+    // menumpuk di SQLite setiap perangkat dan di cloud; yang dihemat hanyalah
+    // pesannya, bukan penyimpanannya.
+    let jenis_notifikasi = if is_check_in {
+        "scan_masuk"
+    } else {
+        "scan_pulang"
+    };
+    if decision.allowed
+        && super::wa_notification::wa_notify_enabled(&settings, jenis_notifikasi)
+    {
+        let parent_info: Option<(String, String, String)> = transaction
+            .query_row(
+                r#"
+                SELECT COALESCE(s.no_whatsapp_wali, m.no_hp, ''),
+                       COALESCE(s.nama_lengkap, m.nama),
+                       COALESCE(r.nama_rombel, m.divisi)
+                FROM master_data m
+                LEFT JOIN siswa_data s ON s.id_siswa = m.id_unik
+                LEFT JOIN akademik_rombel r ON r.id_rombel = s.id_rombel
+                -- `jenis_personil` tersimpan dengan ejaan yang BERBEDA-BEDA:
+                -- alur akademik menulis 'SISWA' huruf besar (`academic.rs`),
+                -- impor Excel dan sync-push menulis 'Pegawai' kapital awal.
+                -- Perbandingan mentah `= 'Siswa'` karena itu tidak pernah cocok
+                -- untuk siswa yang dibuat alur akademik — justru siswa yang
+                -- notifikasi ini dituju. Klausanya selama ini mati dan hanya
+                -- tertolong `OR s.id_siswa IS NOT NULL`. Bentuk LOWER(TRIM(...))
+                -- ini sama dengan yang dipakai `attendance_dashboard.rs`.
+                WHERE m.id_unik = ?1
+                  AND (LOWER(TRIM(COALESCE(m.jenis_personil, ''))) = 'siswa'
+                       OR s.id_siswa IS NOT NULL)
+                LIMIT 1;
+                "#,
+                params![employee.id],
+                |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
+            )
+            .optional()
+            .unwrap_or(None);
+
+        if let Some((phone, student_name, class_name)) = parent_info {
+            let canon_phone = super::wa_notification::normalize_phone_canonical(&phone);
+            if super::wa_notification::is_valid_phone(&canon_phone) {
+                let jenis = jenis_notifikasi;
+                let dedupe_key = format!("scan:{session_id}:{jenis}");
+                let pesan = if is_check_in {
+                    format!(
+                        "Yth. Wali Murid dari {student_name} ({class_name}). Kami informasikan bahwa ananda telah hadir dan melakukan scan masuk di sekolah pada pukul {} WIB ({}). Status: {}.",
+                        moment.time, decision.work_date, status
+                    )
+                } else {
+                    format!(
+                        "Yth. Wali Murid dari {student_name} ({class_name}). Kami informasikan bahwa ananda telah selesai KBM dan melakukan scan pulang pada pukul {} WIB ({}).",
+                        moment.time, decision.work_date
+                    )
+                };
+
+                let draft_notif = json!({
+                    "dedupe_key": dedupe_key,
+                    "jenis": jenis,
+                    "id_siswa": employee.id,
+                    "tujuan_nomor": canon_phone,
+                    "isi_pesan": pesan,
+                });
+
+                let _ = super::wa_notification::queue_wa_notification_tx(
+                    &transaction,
+                    &client_id,
+                    &draft_notif,
+                );
+            }
+        }
+    }
+
     transaction.commit().map_err(|_| CommandError::internal())?;
     Ok(result_from_decision(
         &decision,
@@ -2553,6 +2632,182 @@ mod tests {
                 [key],
             )
             .expect("sakelar induk");
+    }
+
+    /// Tambahkan seorang siswa lengkap dengan nomor WhatsApp walinya.
+    ///
+    /// Tanpa nomor wali, jalur notifikasi tidak pernah tersentuh sama sekali,
+    /// sehingga tes sakelarnya akan lulus karena alasan yang salah.
+    fn seed_siswa_dengan_wali(state: &MobileState) {
+        let connection = storage::database(&state.data_dir).expect("database lokal");
+        connection
+            .execute_batch(
+                r#"
+        INSERT INTO akademik_tahun_ajaran (
+          id_tahun_ajaran, nama_tahun, semester, tanggal_mulai, tanggal_selesai,
+          is_aktif, created_at, updated_at
+        ) VALUES ('ta_2026', '2026/2027', 'Ganjil', '2026-07-01', '2026-12-31', 1,
+                  '2026-07-01', '2026-07-01');
+
+        INSERT INTO akademik_rombel (
+          id_rombel, id_tahun_ajaran, tingkat, nama_rombel, kapasitas, is_aktif
+        ) VALUES ('rombel_10a', 'ta_2026', 10, 'X-A', 36, 1);
+
+        INSERT INTO master_data (
+          id_unik, kode_karyawan, nama, divisi, id_shift, status_aktif,
+          jenis_personil, token_absensi, qr_code
+        ) VALUES ('S001', 'S001', 'Siti Rahma', 'X-A', 1, 'Aktif',
+                  'Siswa', 'TOKEN-SISWA', 'S001|TOKEN-SISWA');
+
+        INSERT INTO siswa_data (
+          id_siswa, nis, nisn, nama_lengkap, jenis_kelamin, id_rombel,
+          nama_wali, no_whatsapp_wali, angkatan, status, created_at, updated_at
+        ) VALUES ('S001', '1001', '00123', 'Siti Rahma', 'P', 'rombel_10a',
+                  'Ibu Rahma', '081234567890', 2026, 'Aktif',
+                  '2026-07-01', '2026-07-01');
+        "#,
+            )
+            .expect("seed siswa");
+    }
+
+    fn jumlah_antrean_notifikasi(state: &MobileState) -> i64 {
+        let connection = storage::database(&state.data_dir).expect("database lokal");
+        connection
+            .query_row("SELECT COUNT(*) FROM notifikasi_wa;", [], |row| row.get(0))
+            .expect("hitung antrean")
+    }
+
+    /// Sakelar mati berarti barisnya TIDAK PERNAH LAHIR.
+    ///
+    /// Ini inti perbaikannya. Menyaring di titik kirim tidak cukup: barisnya
+    /// tetap tertulis di SQLite setiap perangkat dan ikut terdorong ke cloud,
+    /// sehingga sekolah 800 siswa tetap menimbun ±1.600 baris per hari meskipun
+    /// tidak satu pun pesan dikirim.
+    #[test]
+    fn sakelar_mati_tidak_mengantrekan_notifikasi_sama_sekali() {
+        use super::{submit_at_with_policy, ScanSecurityPolicy};
+        let (_directory, state) = fixture();
+        seed_siswa_dengan_wali(&state);
+
+        let hasil = submit_at_with_policy(
+            &state,
+            &json!({ "qrContent": "S001|TOKEN-SISWA" }),
+            "OP001",
+            ScanSecurityPolicy::default(),
+            moment("2026-09-02", "07:00:00"),
+        )
+        .expect("scan diproses");
+
+        // Absensinya tetap berjalan normal; yang ditahan hanya notifikasinya.
+        assert_eq!(
+            hasil.get("sukses").and_then(|value| value.as_bool()),
+            Some(true),
+            "sakelar notifikasi tidak boleh mempengaruhi absensinya",
+        );
+        assert_eq!(
+            jumlah_antrean_notifikasi(&state),
+            0,
+            "bawaan mati wajib berarti tidak ada baris antrean sama sekali",
+        );
+    }
+
+    /// Sakelar hidup mengantrekan, dan hanya jenis yang dinyalakan.
+    #[test]
+    fn sakelar_hidup_mengantrekan_hanya_jenis_yang_dinyalakan() {
+        use super::super::wa_notification::{
+            WA_NOTIFY_SCAN_MASUK_KEY, WA_NOTIFY_SCAN_PULANG_KEY,
+        };
+        use super::{submit_at_with_policy, ScanSecurityPolicy};
+        let (_directory, state) = fixture();
+        seed_siswa_dengan_wali(&state);
+        aktifkan(&state, WA_NOTIFY_SCAN_MASUK_KEY);
+
+        submit_at_with_policy(
+            &state,
+            &json!({ "qrContent": "S001|TOKEN-SISWA" }),
+            "OP001",
+            ScanSecurityPolicy::default(),
+            moment("2026-09-02", "07:00:00"),
+        )
+        .expect("scan masuk diproses");
+
+        let connection = storage::database(&state.data_dir).expect("database lokal");
+        let jenis: Vec<String> = connection
+            .prepare("SELECT jenis FROM notifikasi_wa ORDER BY created_at;")
+            .expect("prepare")
+            .query_map([], |row| row.get(0))
+            .expect("query")
+            .filter_map(Result::ok)
+            .collect();
+        assert_eq!(
+            jenis,
+            vec!["scan_masuk".to_string()],
+            "hanya jenis yang dinyalakan yang boleh mengantre",
+        );
+
+        // Pastikan kunci scan_pulang memang belum tersentuh; menyalakannya
+        // adalah keputusan terpisah dan tidak ikut terbawa oleh yang pertama.
+        let pulang_aktif: i64 = connection
+            .query_row(
+                "SELECT COUNT(*) FROM setting_gex_system WHERE key = ?1;",
+                [WA_NOTIFY_SCAN_PULANG_KEY],
+                |row| row.get(0),
+            )
+            .expect("hitung kunci");
+        assert_eq!(pulang_aktif, 0);
+    }
+
+    /// Siswa yang dibuat alur akademik memakai ejaan `'SISWA'` huruf besar
+    /// (lihat `academic.rs`), dan belum tentu punya baris `siswa_data`.
+    ///
+    /// Perbandingan mentah `m.jenis_personil = 'Siswa'` tidak pernah cocok
+    /// dengan baris seperti ini, dan tanpa `siswa_data` tidak ada `OR
+    /// s.id_siswa IS NOT NULL` yang menolongnya — jadi walinya TIDAK PERNAH
+    /// diberi tahu, diam-diam. Tes ini gagal sebelum perbandingan itu diubah
+    /// menjadi LOWER(TRIM(...)).
+    #[test]
+    fn ejaan_jenis_personil_huruf_besar_tetap_dikenali_sebagai_siswa() {
+        use super::super::wa_notification::WA_NOTIFY_SCAN_MASUK_KEY;
+        use super::{submit_at_with_policy, ScanSecurityPolicy};
+        let (_directory, state) = fixture();
+        aktifkan(&state, WA_NOTIFY_SCAN_MASUK_KEY);
+
+        let connection = storage::database(&state.data_dir).expect("database lokal");
+        connection
+            .execute_batch(
+                r#"
+        INSERT INTO master_data (
+          id_unik, kode_karyawan, nama, divisi, id_shift, status_aktif,
+          jenis_personil, no_hp, token_absensi, qr_code
+        ) VALUES ('S900', 'S900', 'Dewi Anggraini', 'X-B', 1, 'Aktif',
+                  'SISWA', '081298765432', 'TOKEN-S900', 'S900|TOKEN-S900');
+        "#,
+            )
+            .expect("seed siswa huruf besar");
+
+        submit_at_with_policy(
+            &state,
+            &json!({ "qrContent": "S900|TOKEN-S900" }),
+            "OP001",
+            ScanSecurityPolicy::default(),
+            moment("2026-09-02", "07:00:00"),
+        )
+        .expect("scan diproses");
+
+        let (jumlah, tujuan): (i64, String) = connection
+            .query_row(
+                "SELECT COUNT(*), COALESCE(MAX(tujuan_nomor), '') FROM notifikasi_wa;",
+                [],
+                |row| Ok((row.get(0)?, row.get(1)?)),
+            )
+            .expect("baca antrean");
+        assert_eq!(
+            jumlah, 1,
+            "siswa dengan jenis_personil 'SISWA' wajib ikut memicu notifikasi",
+        );
+        // Nomornya jatuh ke `master_data.no_hp` karena baris `siswa_data`
+        // memang belum ada, dan nomor itu tetap dinormalkan ke bentuk kanonik.
+        assert_eq!(tujuan, "+6281298765432");
     }
 
     /// Sakelar induk mati: role yang mewajibkan foto pun tidak diminta foto.

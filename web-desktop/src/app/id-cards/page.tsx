@@ -205,6 +205,12 @@ const DEFAULT_ID_CARD_ELEMENTS: IdCardElement[] = [
 type ActiveTab = "cards" | "builder" | "layout";
 
 export default function IdCardsPage() {
+  // Penjaga anti klik ganda (Aturan 5). `useState` tidak cukup: pembaruannya
+  // dijadwalkan, sehingga dua klik dalam satu tick React sama-sama membaca
+  // nilai lama dan keduanya lolos. Dideklarasikan di ATAS, sebelum setiap
+  // early return, supaya urutan hook tidak pernah berubah antar-render.
+  const isSubmittingRef = useRef(false);
+
   const hydrated = useHydrated();
   const { user, isAuthenticated, isLoading: authLoading } = useAuth();
 
@@ -468,8 +474,10 @@ export default function IdCardsPage() {
   };
 
   const handleBackfill = async () => {
+    if (isSubmittingRef.current) return;
     setLoading(true);
     setError(null);
+    isSubmittingRef.current = true;
     try {
       const res = await backfillKartuPelajar();
       setMessage(
@@ -483,6 +491,7 @@ export default function IdCardsPage() {
           : "Gagal menyinkronkan kartu personil.",
       );
     } finally {
+      isSubmittingRef.current = false;
       setLoading(false);
     }
   };
@@ -604,10 +613,12 @@ export default function IdCardsPage() {
     side: CardSide = "front",
     overrideFilename?: string,
   ) => {
+    if (isSubmittingRef.current) return;
     if (!template) return;
     const id = String(row.id_unik);
     const nama = String(row.nama || id);
     setWorkingId(id);
+    isSubmittingRef.current = true;
     try {
       const pngUrl = await renderIdCardSideToCanvas({
         template,
@@ -644,6 +655,7 @@ export default function IdCardsPage() {
         cause instanceof Error ? cause.message : "ID card gagal diunduh.",
       );
     } finally {
+      isSubmittingRef.current = false;
       setWorkingId(null);
     }
   };
@@ -678,8 +690,10 @@ export default function IdCardsPage() {
 
   // Execute Print using in-DOM high-res print engine
   const handleExecutePrint = async () => {
+    if (isSubmittingRef.current) return;
     if (!template || printTargetRows.length === 0) return;
     setPrintBusy(true);
+    isSubmittingRef.current = true;
     try {
       setMessage(
         `Sedang menyiapkan pencetakan untuk ${printTargetRows.length} ID card...`,
@@ -751,14 +765,17 @@ export default function IdCardsPage() {
           : "Gagal memproses pencetakan ID card.",
       );
     } finally {
+      isSubmittingRef.current = false;
       setPrintBusy(false);
     }
   };
 
   // Builder actions
   const handleSaveTemplate = async () => {
+    if (isSubmittingRef.current) return;
     if (!template) return;
     setBuilderBusy(true);
+    isSubmittingRef.current = true;
     try {
       const saved = await saveIdCardTemplate(template);
       setTemplate(saved);
@@ -772,6 +789,7 @@ export default function IdCardsPage() {
           : "Gagal menyimpan template ID card.",
       );
     } finally {
+      isSubmittingRef.current = false;
       setBuilderBusy(false);
     }
   };

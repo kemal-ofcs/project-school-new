@@ -2,7 +2,7 @@
 
 import { redirect } from "next/navigation";
 import type React from "react";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { AppShell } from "@/components/AppShell";
 import { FeedbackBanner } from "@/components/ui/FeedbackBanner";
 import { Icon } from "@/components/ui/Icon";
@@ -60,6 +60,12 @@ function hitungJamKerjaNormalOtomatis(
 }
 
 export default function ShiftPage() {
+  // Penjaga anti klik ganda (Aturan 5). `useState` tidak cukup: pembaruannya
+  // dijadwalkan, sehingga dua klik dalam satu tick React sama-sama membaca
+  // nilai lama dan keduanya lolos. Dideklarasikan di ATAS, sebelum setiap
+  // early return, supaya urutan hook tidak pernah berubah antar-render.
+  const isSubmittingRef = useRef(false);
+
   const isHydrated = useHydrated();
   const { user, isAuthenticated, isLoading: authLoading } = useAuth();
   const canManage = hasPermission(user, "shifts.manage");
@@ -303,6 +309,7 @@ export default function ShiftPage() {
 
   const handleFormSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isSubmittingRef.current) return;
     const validationErrors = validateShiftDraft(formData);
     if (Object.keys(validationErrors).length > 0) {
       setFormErrors(validationErrors);
@@ -310,6 +317,7 @@ export default function ShiftPage() {
       return;
     }
 
+    isSubmittingRef.current = true;
     try {
       if (isEditing && editId) {
         await updateShift(editId, formData);
@@ -324,6 +332,8 @@ export default function ShiftPage() {
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Gagal menyimpan shift.";
       setErrorMsg(msg);
+    } finally {
+      isSubmittingRef.current = false;
     }
   };
 

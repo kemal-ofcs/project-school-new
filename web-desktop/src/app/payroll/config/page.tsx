@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { AppShell } from "@/components/AppShell";
 import { FeedbackBanner } from "@/components/ui/FeedbackBanner";
 import { Icon } from "@/components/ui/Icon";
@@ -31,6 +31,12 @@ const IDR = new Intl.NumberFormat("id-ID", {
 });
 
 export default function PayrollConfigPage() {
+  // Penjaga anti klik ganda (Aturan 5). `useState` tidak cukup: pembaruannya
+  // dijadwalkan, sehingga dua klik dalam satu tick React sama-sama membaca
+  // nilai lama dan keduanya lolos. Dideklarasikan di ATAS, sebelum setiap
+  // early return, supaya urutan hook tidak pernah berubah antar-render.
+  const isSubmittingRef = useRef(false);
+
   const isHydrated = useHydrated();
   const router = useRouter();
   const { user, isAuthenticated, isLoading: authLoading } = useAuth();
@@ -151,6 +157,8 @@ export default function PayrollConfigPage() {
 
   const handleSaveSalary = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isSubmittingRef.current) return;
+    isSubmittingRef.current = true;
     try {
       await saveSalaryConfig(draftSalary);
       setModalSalaryOpen(false);
@@ -165,11 +173,15 @@ export default function PayrollConfigPage() {
         message:
           err instanceof Error ? err.message : "Gagal menyimpan rate gaji.",
       });
+    } finally {
+      isSubmittingRef.current = false;
     }
   };
 
   const handleDeleteSalary = async (id: string, name: string) => {
+    if (isSubmittingRef.current) return;
     if (!confirm(`Hapus rate gaji untuk "${name}"?`)) return;
+    isSubmittingRef.current = true;
     try {
       await deleteSalaryConfig(id);
       setFeedback({
@@ -183,11 +195,15 @@ export default function PayrollConfigPage() {
         message:
           err instanceof Error ? err.message : "Gagal menghapus rate gaji.",
       });
+    } finally {
+      isSubmittingRef.current = false;
     }
   };
 
   const handleSaveComponent = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isSubmittingRef.current) return;
+    isSubmittingRef.current = true;
     try {
       await savePayrollComponent(draftComp);
       setModalCompOpen(false);
@@ -202,11 +218,15 @@ export default function PayrollConfigPage() {
         message:
           err instanceof Error ? err.message : "Gagal menyimpan komponen.",
       });
+    } finally {
+      isSubmittingRef.current = false;
     }
   };
 
   const handleDeleteComponent = async (id: string) => {
+    if (isSubmittingRef.current) return;
     if (!confirm("Apakah Anda yakin ingin menghapus komponen ini?")) return;
+    isSubmittingRef.current = true;
     try {
       await deletePayrollComponent(id);
       setFeedback({ type: "success", message: "Komponen berhasil dihapus." });
@@ -217,6 +237,8 @@ export default function PayrollConfigPage() {
         message:
           err instanceof Error ? err.message : "Gagal menghapus komponen.",
       });
+    } finally {
+      isSubmittingRef.current = false;
     }
   };
 

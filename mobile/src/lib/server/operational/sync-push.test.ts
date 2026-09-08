@@ -281,6 +281,38 @@ describe("operational sync idempotency", () => {
     expect(Number(rows.rows[0]?.total)).toBe(1);
   });
 
+  /**
+   * `sumber` bersifat nullable+optional di validator Zod, jadi payload tanpa
+   * kolom itu SAH dan cabang bawaannya benar-benar tercapai.
+   *
+   * Bawaan yang dipakai wajib salah satu dari lima nilai yang diterima CHECK
+   * constraint `absensi_harian.sumber`. Sebelum perbaikan, bawaannya
+   * `"Otomatis"` — bukan salah satunya — sehingga INSERT-nya ditolak cloud,
+   * event outbox-nya gagal permanen (`next_retry_at = NULL`), dan seluruh
+   * antrean sinkronisasi perangkat itu berhenti selamanya. Tes ini gagal
+   * sebelum bawaannya dibetulkan.
+   */
+  test("absensi tanpa sumber memakai bawaan yang diterima CHECK constraint", async () => {
+    const client = await fixture();
+    const { sumber: _dibuang, ...tanpaSumber } = successfulScanEvent().payload
+      .attendance as Record<string, unknown>;
+    const input = event({
+      eventId: `evt-${"c".repeat(64)}`,
+      domain: "attendance",
+      operation: "create",
+      entityKey: "tanpa-sumber:NORMAL-20260810-K001-1",
+      payload: { attendance: tanpaSumber },
+    });
+
+    const hasil = await processOperationalSyncEvent(client, actor, input);
+    expect(hasil.status).toBe("applied");
+
+    const rows = await client.execute(
+      "SELECT sumber FROM absensi_harian WHERE id_sesi = 'NORMAL-20260810-K001-1';",
+    );
+    expect(String(rows.rows[0]?.sumber)).toBe("Generate Sistem");
+  });
+
   test("receipt konflik duplicate lama dibuka ulang dan karyawan server dipertahankan", async () => {
     const client = await fixture();
     await client.execute({

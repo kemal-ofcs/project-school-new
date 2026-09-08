@@ -2,7 +2,7 @@
 
 import { redirect } from "next/navigation";
 import type { FormEvent, ReactNode } from "react";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { AppShell } from "@/components/AppShell";
 import { FeedbackBanner } from "@/components/ui/FeedbackBanner";
 import { Icon } from "@/components/ui/Icon";
@@ -77,6 +77,12 @@ function errorMessage(error: unknown) {
 }
 
 export default function MasterOperatorPage() {
+  // Penjaga anti klik ganda (Aturan 5). `useState` tidak cukup: pembaruannya
+  // dijadwalkan, sehingga dua klik dalam satu tick React sama-sama membaca
+  // nilai lama dan keduanya lolos. Dideklarasikan di ATAS, sebelum setiap
+  // early return, supaya urutan hook tidak pernah berubah antar-render.
+  const isSubmittingRef = useRef(false);
+
   const isHydrated = useHydrated();
   const { user, isAuthenticated, isLoading: authLoading } = useAuth();
   const [activeTab, setActiveTab] = useState<ActiveTab>("operators");
@@ -186,10 +192,12 @@ export default function MasterOperatorPage() {
   };
 
   const submitOperator = async (event: FormEvent) => {
+    if (isSubmittingRef.current) return;
     event.preventDefault();
     if (!user) return;
     setSaving(true);
     setFeedback(null);
+    isSubmittingRef.current = true;
     try {
       if (editingOperator) {
         await updateMasterOperator(user.id, editingOperator.id, operatorDraft);
@@ -207,6 +215,7 @@ export default function MasterOperatorPage() {
     } catch (error) {
       setFeedback({ tone: "error", message: errorMessage(error) });
     } finally {
+      isSubmittingRef.current = false;
       setSaving(false);
     }
   };
@@ -258,10 +267,12 @@ export default function MasterOperatorPage() {
   };
 
   const submitRole = async (event: FormEvent) => {
+    if (isSubmittingRef.current) return;
     event.preventDefault();
     if (!user) return;
     setSaving(true);
     setFeedback(null);
+    isSubmittingRef.current = true;
     try {
       if (editingRole) {
         await updateRole(user.id, editingRole.id, roleDraft, {
@@ -287,14 +298,17 @@ export default function MasterOperatorPage() {
     } catch (error) {
       setFeedback({ tone: "error", message: errorMessage(error) });
     } finally {
+      isSubmittingRef.current = false;
       setSaving(false);
     }
   };
 
   const confirmDelete = async () => {
+    if (isSubmittingRef.current) return;
     if (!user || !deleteTarget) return;
     setSaving(true);
     setFeedback(null);
+    isSubmittingRef.current = true;
     try {
       if (deleteTarget.type === "operator") {
         await deleteMasterOperator(user.id, deleteTarget.item.id);
@@ -308,6 +322,7 @@ export default function MasterOperatorPage() {
       setDeleteTarget(null);
       setFeedback({ tone: "error", message: errorMessage(error) });
     } finally {
+      isSubmittingRef.current = false;
       setSaving(false);
     }
   };

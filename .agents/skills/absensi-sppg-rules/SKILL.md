@@ -80,12 +80,15 @@ Dokumen ini adalah **standar tertinggi (Golden Standard)** pengembangan pada pro
 | **Zod schema memakai `.passthrough()` dan melonggarkan tipe** | Nilai cacat lolos validasi lalu gagal permanen di CHECK constraint cloud | Gunakan `.strict()`, validasi enum persis CHECK constraint, dan validasi nested object secara ketat |
 | **Memanggil Tauri IPC dengan snake_case (`{ id_rombel }`)** | Tauri v2 memetakan ke camelCase sehingga nilai menjadi `None` secara diam-diam tanpa error | Panggil dengan camelCase dari frontend JS/TS (`{ idRombel }`) |
 | **String slice mentah `&id[4..10]` di Rust** | Panic saat string kurang dari 10 byte atau indeks memotong boundary karakter UTF-8 | Gunakan iterator aman: `id.chars().skip(4).take(6).collect::<String>()` |
-| **Menulis ulang regex normalisasi WhatsApp di halaman UI** | Format nomor tidak standar dan tautan wa.me rusak | Gunakan modul kanonik terpusat `src/lib/operators/contact.ts` |
-| **Menyatakan fase selesai hanya dengan `check:quick`** | Bug kompilasi Rust dan 20+ command baru tidak terdeteksi | Jalankan `bun run check` (mencakup `cargo test` kedua workspace) sebelum checkpoint selesai |
+| **Memanggil `getVoices()` langsung tanpa listener `voiceschanged`** | Suara TTS kosong pada panggilan pertama di WebView dan membacakan teks Indonesia dengan suara Inggris | Cache suara via event `voiceschanged` dan utamakan suara offline (`voice.localService === true`) |
+| **Menganggap "di luar SNAPSHOT_TABLES" sebagai "tidak ikut sinkronisasi" (Half-Sync)** | Mutasi foto/media berhenti di perangkat lokal pemotret, cloud tidak menerima data, perangkat lain kehilangan foto | Tabel di luar snapshot (seperti `siswa_foto`, `absensi_foto`) HANYA tidak ikut ditarik (pull massal); saat ditulis di lokal WAJIB push via outbox (`student-photo/save`, `attendance/scan`) dan di-fetch on-demand |
+| **Tidak memvalidasi MIME type dan format string di backend Rust** | Nilai cacat lolos di SQLite lokal (loose typing), lalu ditolak CHECK constraint / Zod di LibSQL cloud, memicu failed outbox permanen (*permanent outbox jam*) | Rust backend WAJIB memvalidasi whitelist enum/MIME (`image/jpeg`, `image/png`, `image/webp`), batas ukuran (base64 maks 500 KB / 2 MB) SESUAI PERSIS dengan Zod validator sebelum menulis ke DB lokal dan outbox |
+| **Scoping permission parsial domain tunggal pada command yang menyentuh seluruh personil (`master_data`)** | Eskalasi hak akses (*privilege escalation*): pengelola siswa bisa menerbitkan/memanipulasi kartu guru dan staf karyawan kantor | Command multi-entitas lintas personil (seperti `desktop_backfill_id_cards`) WAJIB dijaga oleh `employees.manage`, bukan `students.manage` |
+| **Meletakkan doc comment `///` di antara `#[tauri::command]` dan `pub fn`** | Regex parser `audit-sync-contract.ts` gagal mencocokkan nama command jika komentar >200 char, audit gagal dengan error command hilang | Doc comment `///` WAJIB selalu sebelum `#[tauri::command]`, lalu diikuti `pub fn desktop_...` |
 
 ---
 
-## 4. 29 Prinsip Emas Arsitektur (The 29 Golden Rules)
+## 4. 44 Prinsip Emas Arsitektur (The 44 Golden Rules)
 
 ### 4.1 Arsitektur 2-Tier LibSQL & Dekompresi Reqwest (Gzip/Brotli)
 - Desktop dan Mobile berkomunikasi langsung ke Database LibSQL via `/v2/pipeline`.
@@ -341,14 +344,40 @@ Dokumen ini adalah **standar tertinggi (Golden Standard)** pengembangan pada pro
 - DILARANG memotong string di Rust menggunakan byte-slicing mentah `&id[start..end]` yang dapat memicu runtime panic jika panjang string kurang dari indeks atau indeks memotong boundary karakter UTF-8. Gunakan iterator karakter aman: `id.chars().skip(offset).take(count).collect::<String>()`.
 - Normalisasi nomor WhatsApp/HP WAJIB menggunakan fungsi terpusat dari `src/lib/operators/contact.ts` (format kanonik `+62...`), bukan regex manual ad-hoc di komponen UI.
 
+### 4.41 Pembedaan Tegas Antara Selective-Pull vs Push Outbox vs Cloud-Only (Anti-Half-Sync)
+- Tabel dengan payload biner/media/foto (seperti `siswa_foto`, `absensi_foto`) sengaja ditempatkan di luar `SNAPSHOT_TABLES` semata-mata agar siklus pull snapshot rutin (`apply_table`) tidak membengkak dan memperlambat startup perangkat.
+- "Di luar snapshot" HANYA berarti tidak ikut ditarik secara massal (pull). Setiap mutasi lokal (insert/update) pada tabel tersebut WAJIB didaftarkan ke `desktop_sync_outbox` dalam transaksi atomik yang sama dan memiliki rute kanonik push (`student-photo/save`, `attendance/scan`) ke database cloud, lalu dibaca on-demand jika lokal belum memilikinya.
+- Sebaliknya, tabel "Cloud-Only" (`password_reset_request`, `app_mail_config`, `master_operator`) tidak pernah ditulis via SQLite operasional lokal melainkan langsung ke cloud via route API. Dan tabel "Device-Local Only" (`desktop_sync_outbox`, `desktop_sync_receipt`, `desktop_entity_revision`, `desktop_schema_migration`, `device_id`) tidak pernah didorong maupun ditarik.
+- DILARANG menerapkan aturan setengah jalan yang memutus aliran push dari lokal ke cloud ("half-sync").
+
+### 4.42 Validasi Ketat Format, Enum & MIME di Rust Backend Sebelum SQLite & Outbox (Anti-Outbox Jam)
+- SQLite lokal bersifat *loose typing*, sehingga string cacat atau MIME type sembarang (misal `image/bmp`, `text/plain`, typo string) dapat tersimpan mulus di perangkat lokal.
+- Namun saat baris tersebut didorong ke LibSQL cloud, validator Zod `.strict()` atau CHECK constraint cloud Turso akan menolaknya.
+- Penolakan push outbox di cloud langsung menandai event sebagai `failed` permanen dengan `next_retry_at = NULL`. Seluruh antrean outbox sinkronisasi perangkat macet selamanya!
+- Backend Rust (`tauri::command` dan fungsi domain) WAJIB memvalidasi format, panjang karakter, batas ukuran (base64 foto siswa maks 500 KB, foto absensi maks 2 MB), dan whitelist enum/MIME type secara presisi (contoh: `image/jpeg`, `image/png`, `image/webp`) SESUAI PERSIS dengan enum Zod di `sync-schema.ts` SEBELUM menulis ke SQLite lokal dan outbox.
+
+### 4.43 Scoping Hak Akses RBAC Sesuai Cakupan Nyata Data (Scope-Aware RBAC & Least Privilege)
+- Jangan menentukan permission guard pada `#[tauri::command]` hanya berdasarkan nama form atau lokasi tombol di UI.
+- Analisis cakupan query SQL dan mutasi data yang dieksekusi: jika suatu command menyentuh seluruh personil aktif di `master_data` (mencakup siswa, guru, dan karyawan/pegawai — contoh: `desktop_backfill_id_cards`), DILARANG menggunakan permission parsial domain tunggal (`students.manage`).
+- Menggunakan `students.manage` pada operasi multi-entitas menciptakan celah eskalasi hak akses (*privilege escalation*), di mana pemegang izin kelola siswa dapat memicu penerbitan atau manipulasi data kartu guru dan staf kantor.
+- Gunakan permission yang mencakup domain seluruh personil (`employees.manage`) atau izin infrastruktur yang berwenang.
+
+### 4.44 Urutan Kanonik Dokumen Rust dan Penempatan Atribut `#[tauri::command]` (Anti-Regex Failure)
+- Skrip audit integritas (`audit-sync-contract.ts`) mengekstrak command menggunakan regex parser terikat (`/#\[tauri::command\][\s\S]{0,200}?\bfn\s+([a-z_][a-z0-9_]*)/g`).
+- Urutan penulisan di Rust WAJIB mengikuti urutan standar:
+  1. Doc comments (`/// ...`)
+  2. Atribut `#[tauri::command]`
+  3. Deklarasi fungsi `pub fn desktop_...`
+- DILARANG meletakkan komentar dokumentasi `///` di antara `#[tauri::command]` dan nama fungsi `pub fn ...`. Komentar panjang (>200 karakter) di sela atribut mematahkan regex audit dan membuat command dilaporkan tidak terdefinisi (*missing defined command*), menggagalkan seluruh gerbang kualitas.
+
 ---
 
 ## 5. Modul Referensi Mendalam (`references/`)
 
 Untuk detail implementasi teknis setiap area, rujuk file referensi berikut:
 1. [references/01-bootstrap-and-security.md](references/01-bootstrap-and-security.md) — Vault Argon2id, AES-GCM, Zero-Secret Build, RBAC, & Rate Limiting.
-2. [references/02-sync-canonical-and-outbox.md](references/02-sync-canonical-and-outbox.md) — 57 Route Kanonik, Idempotensi, Atomic Receipt, & Empty-Cloud Safety.
-3. [references/03-schema-4layer-consistency.md](references/03-schema-4layer-consistency.md) — 28 Snapshot Tables, DDL vs Zod vs Rust, & Shift Rekonsiliasi.
+2. [references/02-sync-canonical-and-outbox.md](references/02-sync-canonical-and-outbox.md) — 67 Route Kanonik, Idempotensi, Atomic Receipt, & Empty-Cloud Safety.
+3. [references/03-schema-4layer-consistency.md](references/03-schema-4layer-consistency.md) — 32 Snapshot Tables, DDL vs Zod vs Rust, & Shift Rekonsiliasi.
 4. [references/04-hardware-and-android-lifecycle.md](references/04-hardware-and-android-lifecycle.md) — Lifecycle Kamera Android WebView, WebPki TLS, ProGuard R8, & GPS Cache.
 5. [references/05-business-logic-edge-cases.md](references/05-business-logic-edge-cases.md) — Shift Malam Lintas Hari, Auto-Alfa, Koreksi Admin, & Geofence.
 6. [references/06-payroll-and-system-hardening.md](references/06-payroll-and-system-hardening.md) — Payroll Engine, PPh 21 TER, BPJS, rust_decimal, Layered Guards, & Platform Hardening.

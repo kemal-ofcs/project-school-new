@@ -133,6 +133,18 @@ pub fn run() {
             mobile::commands::desktop_save_alfa_settings,
             mobile::commands::desktop_trigger_generate_alfa,
             mobile::commands::desktop_get_attendance_audit,
+            // Dasbor Audit Kehadiran ikut ke Mobile karena ia BENAR-BENAR
+            // offline: `get_attendance_dashboard_metrics` membaca SQLite lokal,
+            // dan keenam tabel yang dibacanya (`absensi_harian`, `master_data`,
+            // `siswa_data`, `akademik_rombel`, `presensi_mapel`,
+            // `presensi_mapel_detail`) ada di `SNAPSHOT_TABLES` sehingga
+            // datanya sudah tersedia di perangkat. Ini juga fitur Fase 4 yang
+            // paling berguna di genggaman: kepala sekolah bisa melihat rekap
+            // pagi itu tanpa membuka laptop.
+            //
+            // Bimbingan Konseling dan tinjauan antrean WhatsApp SENGAJA tidak
+            // ikut — lihat catatan di gateway masing-masing.
+            mobile::commands::desktop_get_attendance_dashboard_metrics,
             mobile::commands::desktop_get_server_url,
             mobile::commands::desktop_set_server_url,
             mobile::commands::desktop_get_turso_url,

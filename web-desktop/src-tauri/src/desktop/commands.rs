@@ -12,7 +12,8 @@ use super::{
         CommandError, DesktopLoginResult, DesktopRuntimeStatus, DesktopSession, DesktopSyncStatus,
         OperatorUser, SessionMode,
     },
-    academic, class_attendance, operational, teaching_journal, attendance_ledger,
+    academic, attendance_dashboard, attendance_ledger, class_attendance, operational, teaching_journal,
+    wa_notification,
     remote::{self, RemoteLoginError},
     scanner, secrets, storage, sync, turso,
 };
@@ -2687,6 +2688,177 @@ pub async fn desktop_get_student_photo(
         .unwrap_or(Value::Null))
 }
 
+/// Mengambil metrik analitik kehadiran komprehensif untuk Dasbor Audit Kehadiran.
+#[tauri::command]
+pub fn desktop_get_attendance_dashboard_metrics(
+    state: State<'_, DesktopState>,
+    tanggal: Option<String>,
+) -> Result<Value, CommandError> {
+    require_permission(&state, "attendance_dashboard.view")?;
+    attendance_dashboard::get_attendance_dashboard_metrics(&state, tanggal.as_deref())
+}
+
+/// Mengantrekan notifikasi WhatsApp ke antrean lokal dan outbox.
+#[tauri::command]
+pub fn desktop_queue_wa_notification(
+    state: State<'_, DesktopState>,
+    draft: Value,
+) -> Result<Value, CommandError> {
+    require_permission(&state, "notification.manage")?;
+    wa_notification::queue_wa_notification(&state, &draft)
+}
+
+/// Membatalkan antrean pesan WhatsApp yang masih berstatus Menunggu.
+#[tauri::command]
+pub fn desktop_cancel_wa_notification(
+    state: State<'_, DesktopState>,
+    id_notifikasi: String,
+    alasan: Option<String>,
+) -> Result<Value, CommandError> {
+    require_permission(&state, "notification.delete")?;
+    wa_notification::cancel_wa_notification(&state, &id_notifikasi, alasan.as_deref())
+}
+
+/// Menampilkan daftar antrean notifikasi WhatsApp lokal dengan filter.
+#[tauri::command]
+pub fn desktop_list_wa_notifications(
+    state: State<'_, DesktopState>,
+    status: Option<String>,
+    jenis: Option<String>,
+    id_siswa: Option<String>,
+    tanggal: Option<String>,
+    limit: Option<i64>,
+) -> Result<Value, CommandError> {
+    require_permission(&state, "notification.view")?;
+    wa_notification::list_wa_notifications(
+        &state,
+        status.as_deref(),
+        jenis.as_deref(),
+        id_siswa.as_deref(),
+        tanggal.as_deref(),
+        limit,
+    )
+}
+
+/// Membaca konfigurasi gateway WhatsApp (Cloud-Only via Turso).
+#[tauri::command]
+pub async fn desktop_get_wa_config(
+    state: State<'_, DesktopState>,
+) -> Result<Value, CommandError> {
+    require_permission(&state, "notification.view")?;
+    state.get_turso_client()?.get_wa_config().await
+}
+
+/// Menyimpan konfigurasi gateway WhatsApp (Cloud-Only via Turso).
+#[tauri::command]
+pub async fn desktop_save_wa_config(
+    state: State<'_, DesktopState>,
+    draft: Value,
+) -> Result<Value, CommandError> {
+    require_permission(&state, "notification.manage")?;
+    state.get_turso_client()?.save_wa_config(&draft).await
+}
+
+/// Menampilkan daftar kasus Bimbingan Konseling (BK, Cloud-Only).
+#[tauri::command]
+pub async fn desktop_list_counseling_cases(
+    state: State<'_, DesktopState>,
+    id_tahun_ajaran: Option<String>,
+    status: Option<String>,
+    kategori: Option<String>,
+    id_siswa: Option<String>,
+    search: Option<String>,
+    limit: Option<i64>,
+) -> Result<Value, CommandError> {
+    require_permission(&state, "counseling.view")?;
+    state
+        .get_turso_client()?
+        .list_counseling_cases(
+            id_tahun_ajaran.as_deref(),
+            status.as_deref(),
+            kategori.as_deref(),
+            id_siswa.as_deref(),
+            search.as_deref(),
+            limit,
+        )
+        .await
+}
+
+/// Mengambil detail kasus BK beserta seluruh riwayat sesi konseling (Cloud-Only).
+#[tauri::command]
+pub async fn desktop_get_counseling_case(
+    state: State<'_, DesktopState>,
+    id_kasus: String,
+) -> Result<Value, CommandError> {
+    require_permission(&state, "counseling.view")?;
+    state.get_turso_client()?.get_counseling_case(&id_kasus).await
+}
+
+/// Membuat kasus BK baru untuk siswa (Cloud-Only).
+#[tauri::command]
+pub async fn desktop_create_counseling_case(
+    state: State<'_, DesktopState>,
+    draft: Value,
+) -> Result<Value, CommandError> {
+    let operator = require_permission(&state, "counseling.manage")?;
+    state
+        .get_turso_client()?
+        .create_counseling_case(&draft, &operator.username)
+        .await
+}
+
+/// Memperbarui informasi kasus BK (Cloud-Only).
+#[tauri::command]
+pub async fn desktop_update_counseling_case(
+    state: State<'_, DesktopState>,
+    id_kasus: String,
+    draft: Value,
+) -> Result<Value, CommandError> {
+    require_permission(&state, "counseling.manage")?;
+    state
+        .get_turso_client()?
+        .update_counseling_case(&id_kasus, &draft)
+        .await
+}
+
+/// Menghapus kasus BK beserta seluruh sesi terkait (Cloud-Only, Izin Sensitif).
+#[tauri::command]
+pub async fn desktop_delete_counseling_case(
+    state: State<'_, DesktopState>,
+    id_kasus: String,
+) -> Result<Value, CommandError> {
+    require_permission(&state, "counseling.delete")?;
+    state
+        .get_turso_client()?
+        .delete_counseling_case(&id_kasus)
+        .await
+}
+
+/// Menambahkan catatan sesi konseling baru pada kasus BK (Cloud-Only).
+#[tauri::command]
+pub async fn desktop_add_counseling_session(
+    state: State<'_, DesktopState>,
+    draft: Value,
+) -> Result<Value, CommandError> {
+    let operator = require_permission(&state, "counseling.manage")?;
+    state
+        .get_turso_client()?
+        .add_counseling_session(&draft, &operator.username)
+        .await
+}
+
+/// Menghapus satu sesi konseling pada kasus BK (Cloud-Only, Izin Sensitif).
+#[tauri::command]
+pub async fn desktop_delete_counseling_session(
+    state: State<'_, DesktopState>,
+    id_sesi: String,
+) -> Result<Value, CommandError> {
+    require_permission(&state, "counseling.delete")?;
+    state
+        .get_turso_client()?
+        .delete_counseling_session(&id_sesi)
+        .await
+}
 
 #[cfg(test)]
 mod tests_offline_login {

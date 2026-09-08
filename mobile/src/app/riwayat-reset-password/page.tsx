@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { MobileAppShell } from "@/components/MobileAppShell";
 import { Icon } from "@/components/ui/Icon";
 import { canAccessArea, hasPermission } from "@/lib/auth/access";
@@ -59,6 +59,12 @@ function formatScore(score: number | null) {
 }
 
 export default function RiwayatResetPasswordMobilePage() {
+  // Penjaga anti klik ganda (Aturan 5). `useState` tidak cukup: pembaruannya
+  // dijadwalkan, sehingga dua klik dalam satu tick React sama-sama membaca
+  // nilai lama dan keduanya lolos. Dideklarasikan di ATAS, sebelum setiap
+  // early return, supaya urutan hook tidak pernah berubah antar-render.
+  const isSubmittingRef = useRef(false);
+
   const router = useRouter();
   const { user, isAuthenticated, isLoading: authLoading } = useAuth();
 
@@ -127,8 +133,10 @@ export default function RiwayatResetPasswordMobilePage() {
   };
 
   const runDelete = async () => {
+    if (isSubmittingRef.current) return;
     if (!confirmDelete) return;
     setBusy(true);
+    isSubmittingRef.current = true;
     try {
       await deletePasswordResetHistory(confirmDelete.id);
       setMessage({
@@ -146,6 +154,7 @@ export default function RiwayatResetPasswordMobilePage() {
             : "Riwayat tidak dapat dihapus.",
       });
     } finally {
+      isSubmittingRef.current = false;
       setBusy(false);
     }
   };
@@ -157,8 +166,10 @@ export default function RiwayatResetPasswordMobilePage() {
    * memegang hash-nya — sehingga layar ini satu-satunya kesempatan membacanya.
    */
   const approve = async (entry: ResetHistoryEntry) => {
+    if (isSubmittingRef.current) return;
     setBusy(true);
     triggerHaptic("light");
+    isSubmittingRef.current = true;
     try {
       setApproval(await approvePasswordReset(entry.id));
       await load();
@@ -171,6 +182,7 @@ export default function RiwayatResetPasswordMobilePage() {
             : "Permintaan tidak dapat disetujui.",
       });
     } finally {
+      isSubmittingRef.current = false;
       setBusy(false);
     }
   };

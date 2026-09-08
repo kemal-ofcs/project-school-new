@@ -133,6 +133,107 @@ fn rebuild_without_unique(
     Ok(())
 }
 
+/// Nilai `absensi_harian.sumber` yang diterima database.
+///
+/// Sama persis dengan CHECK constraint cloud dan `ATTENDANCE_SOURCE_VALUES` di
+/// `src/lib/contracts/scanner.ts`.
+const ATTENDANCE_SOURCE_VALUES: &[&str] = &[
+    "Scanner",
+    "Koreksi Admin",
+    "Import Offline",
+    "Import Manual",
+    "Generate Sistem",
+];
+
+/// Pasang CHECK constraint `sumber` pada `absensi_harian` yang sudah terlanjur
+/// lahir tanpa constraint itu.
+///
+/// `CREATE TABLE IF NOT EXISTS` tidak pernah memperbaiki tabel yang sudah ada,
+/// sehingga tanpa migrasi ini hanya pemasangan BARU yang terlindungi —
+/// sementara justru pemasangan lama yang sudah menampung bertahun-tahun data.
+///
+/// Baris dengan nilai di luar daftar dinormalkan lebih dulu menjadi
+/// `Generate Sistem`. Dua alasan: tanpa itu penyalinan ke tabel staging akan
+/// ditolak dan seluruh migrasi membatalkan diri diam-diam (constraint-nya tidak
+/// pernah terpasang, dan tidak ada yang tahu); dan baris seperti itu memang
+/// SUDAH tidak bisa didorong ke cloud, jadi menormalkannya justru
+/// membebaskannya. `Generate Sistem` dipilih karena prioritas TERENDAH — ia
+/// tidak akan menimpa catatan yang lebih tinggi saat rekonsiliasi.
+fn ensure_attendance_source_check(connection: &Connection) -> Result<(), String> {
+    let existing: Option<String> = connection
+        .query_row(
+            "SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'absensi_harian';",
+            [],
+            |row| row.get(0),
+        )
+        .optional()
+        .map_err(|_| "Skema absensi_harian tidak dapat diperiksa.".to_string())?;
+    let Some(existing) = existing else {
+        return Ok(());
+    };
+    if existing.contains("CHECK (sumber IN (") {
+        return Ok(());
+    }
+
+    let daftar = ATTENDANCE_SOURCE_VALUES
+        .iter()
+        .map(|nilai| format!("'{nilai}'"))
+        .collect::<Vec<_>>()
+        .join(", ");
+
+    const KOLOM: &str = "id_absensi, tanggal, id_karyawan, nama, kelas_divisi, \
+        jam_masuk, jam_pulang, status_kehadiran, status_absen, keterangan, sumber, \
+        update_terakhir, menit_terlambat, menit_datang_awal, jam_kerja, lembur, \
+        jam_kerja_kurang, id_shift, bulan, tahun, id_sesi, mode_tugas, id_backup, \
+        id_karyawan_asal, tanggal_tugas";
+
+    let script = format!(
+        "BEGIN;
+        UPDATE absensi_harian SET sumber = 'Generate Sistem'
+          WHERE sumber IS NULL OR sumber NOT IN ({daftar});
+        DROP TABLE IF EXISTS absensi_harian__rebuild;
+        CREATE TABLE absensi_harian__rebuild (
+          id_absensi INTEGER PRIMARY KEY AUTOINCREMENT,
+          tanggal TEXT NOT NULL,
+          id_karyawan TEXT NOT NULL,
+          nama TEXT NOT NULL,
+          kelas_divisi TEXT NOT NULL,
+          jam_masuk TEXT,
+          jam_pulang TEXT,
+          status_kehadiran TEXT NOT NULL,
+          status_absen TEXT NOT NULL,
+          keterangan TEXT,
+          sumber TEXT NOT NULL CHECK (sumber IN ({daftar})),
+          update_terakhir TEXT NOT NULL,
+          menit_terlambat INTEGER DEFAULT 0,
+          menit_datang_awal INTEGER DEFAULT 0,
+          jam_kerja INTEGER DEFAULT 0,
+          lembur INTEGER DEFAULT 0,
+          jam_kerja_kurang INTEGER DEFAULT 0,
+          id_shift INTEGER NOT NULL,
+          bulan TEXT NOT NULL,
+          tahun INTEGER NOT NULL,
+          id_sesi TEXT UNIQUE NOT NULL,
+          mode_tugas TEXT DEFAULT 'NORMAL',
+          id_backup TEXT,
+          id_karyawan_asal TEXT,
+          tanggal_tugas TEXT
+        );
+        INSERT INTO absensi_harian__rebuild ({KOLOM}) SELECT {KOLOM} FROM absensi_harian;
+        DROP TABLE absensi_harian;
+        ALTER TABLE absensi_harian__rebuild RENAME TO absensi_harian;
+        CREATE INDEX IF NOT EXISTS idx_local_attendance_employee_date
+          ON absensi_harian(id_karyawan, tanggal);
+        CREATE INDEX IF NOT EXISTS idx_local_absensi_tanggal
+          ON absensi_harian(tanggal);
+        COMMIT;"
+    );
+
+    connection.execute_batch(&script).map_err(|error| {
+        format!("Tabel absensi_harian tidak dapat dibangun ulang dengan CHECK sumber: {error}")
+    })
+}
+
 /// Menanam tarif default payroll dan membersihkan sisa seed versi lama.
 ///
 /// Seed lokal dan seed cloud dulu ditulis terpisah dengan id, kode komponen,
@@ -304,7 +405,15 @@ pub fn initialize(path: &Path) -> Result<(), String> {
         status_kehadiran TEXT NOT NULL,
         status_absen TEXT NOT NULL,
         keterangan TEXT,
-        sumber TEXT NOT NULL,
+        -- Daftar yang sama persis dengan CHECK constraint cloud
+        -- (`db-schema.ts` dan `turso.rs`) serta `ATTENDANCE_SOURCE_VALUES`.
+        -- Tanpa CHECK di sini, nilai keliru diterima mulus di perangkat lalu
+        -- DITOLAK saat push, dan penolakan itu membekukan seluruh antrean
+        -- outbox secara permanen (`next_retry_at = NULL`). Lebih baik gagal
+        -- di titik tulis, tempat pemanggilnya masih bisa diberi tahu.
+        sumber TEXT NOT NULL CHECK (sumber IN (
+          'Scanner', 'Koreksi Admin', 'Import Offline', 'Import Manual', 'Generate Sistem'
+        )),
         update_terakhir TEXT NOT NULL,
         menit_terlambat INTEGER DEFAULT 0,
         menit_datang_awal INTEGER DEFAULT 0,
@@ -801,11 +910,31 @@ pub fn initialize(path: &Path) -> Result<(), String> {
       );
       INSERT OR IGNORE INTO desktop_schema_migration (version, name, applied_at)
       VALUES (8, 'desktop-teaching-journal-and-attendance-ledger', unixepoch());
+      CREATE TABLE IF NOT EXISTS notifikasi_wa (
+        id_notifikasi TEXT PRIMARY KEY,
+        dedupe_key TEXT NOT NULL,
+        jenis TEXT NOT NULL CHECK (jenis IN ('scan_masuk', 'scan_pulang', 'bolos', 'ambang_alfa')),
+        id_siswa TEXT,
+        tujuan_nomor TEXT NOT NULL,
+        isi_pesan TEXT NOT NULL,
+        status TEXT NOT NULL DEFAULT 'Menunggu' CHECK (status IN ('Menunggu', 'Terkirim', 'Gagal', 'Dibatalkan')),
+        attempt_count INTEGER NOT NULL DEFAULT 0,
+        last_error TEXT,
+        sent_at TEXT,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS idx_local_notifikasi_wa_status ON notifikasi_wa(status, created_at);
+      CREATE INDEX IF NOT EXISTS idx_local_notifikasi_wa_dedupe ON notifikasi_wa(dedupe_key);
+      INSERT OR IGNORE INTO desktop_schema_migration (version, name, applied_at)
+      VALUES (9, 'desktop-whatsapp-notification-queue', unixepoch());
       "#,
         )
         .map_err(|_| "Schema keamanan Desktop tidak dapat diinisialisasi.".to_owned())?;
 
     seed_payroll_rate_tables(&connection)?;
+
+    ensure_attendance_source_check(&connection)?;
 
     // v17: melepas UNIQUE dari tabel akademik yang ikut sinkronisasi. Cerminan
     // `TursoClient::rebuild_without_unique` — lihat alasan lengkapnya di sana.
@@ -1434,7 +1563,7 @@ mod tests {
                 |row| row.get(0),
             )
             .expect("migration count");
-        assert_eq!(migrations, 8);
+        assert_eq!(migrations, 9);
     }
 
     /// Pindah database cloud harus membuang seluruh cache database lama, tetapi
@@ -1623,5 +1752,128 @@ mod tests {
             )
             .expect("legacy count");
         assert_eq!(leftover, 0, "baris seed lama harus dibersihkan");
+    }
+
+    /// Database yang sudah terlanjur punya `absensi_harian` TANPA CHECK harus
+    /// disembuhkan, bukan sekadar dibiarkan.
+    ///
+    /// `CREATE TABLE IF NOT EXISTS` tidak pernah memperbaiki tabel yang sudah
+    /// lahir, jadi tanpa migrasi ini hanya pemasangan baru yang terlindungi —
+    /// padahal justru pemasangan lama yang sudah menampung bertahun-tahun data.
+    #[test]
+    fn migrasi_memasang_check_sumber_pada_tabel_lama() {
+        let directory = tempdir().expect("temporary directory");
+
+        // Bangun tabel versi lama: persis tanpa CHECK pada `sumber`.
+        {
+            let connection = database(directory.path()).expect("database lokal");
+            connection
+                .execute_batch(
+                    r#"
+                CREATE TABLE absensi_harian (
+                  id_absensi INTEGER PRIMARY KEY AUTOINCREMENT,
+                  tanggal TEXT NOT NULL,
+                  id_karyawan TEXT NOT NULL,
+                  nama TEXT NOT NULL,
+                  kelas_divisi TEXT NOT NULL,
+                  jam_masuk TEXT,
+                  jam_pulang TEXT,
+                  status_kehadiran TEXT NOT NULL,
+                  status_absen TEXT NOT NULL,
+                  keterangan TEXT,
+                  sumber TEXT NOT NULL,
+                  update_terakhir TEXT NOT NULL,
+                  menit_terlambat INTEGER DEFAULT 0,
+                  menit_datang_awal INTEGER DEFAULT 0,
+                  jam_kerja INTEGER DEFAULT 0,
+                  lembur INTEGER DEFAULT 0,
+                  jam_kerja_kurang INTEGER DEFAULT 0,
+                  id_shift INTEGER NOT NULL,
+                  bulan TEXT NOT NULL,
+                  tahun INTEGER NOT NULL,
+                  id_sesi TEXT UNIQUE NOT NULL,
+                  mode_tugas TEXT DEFAULT 'NORMAL',
+                  id_backup TEXT,
+                  id_karyawan_asal TEXT,
+                  tanggal_tugas TEXT
+                );
+                INSERT INTO absensi_harian (
+                  tanggal, id_karyawan, nama, kelas_divisi, status_kehadiran,
+                  status_absen, sumber, update_terakhir, id_shift, bulan, tahun, id_sesi
+                ) VALUES
+                  ('2026-09-07', 'K001', 'Sah', 'Dapur', 'Hadir', 'Masuk',
+                   'Scanner', '2026-09-07 07:00:00', 1, '09', 2026, 'sesi_sah'),
+                  ('2026-09-07', 'K002', 'Cacat', 'Dapur', 'Hadir', 'Masuk',
+                   'Scanner Terminal', '2026-09-07 07:00:00', 1, '09', 2026, 'sesi_cacat');
+                "#,
+                )
+                .expect("skema versi lama");
+        }
+
+        initialize(directory.path()).expect("migrasi berjalan");
+
+        let connection = database(directory.path()).expect("database lokal");
+
+        // 1. Constraint-nya benar-benar terpasang sekarang.
+        let sql: String = connection
+            .query_row(
+                "SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'absensi_harian';",
+                [],
+                |row| row.get(0),
+            )
+            .expect("baca skema");
+        assert!(
+            sql.contains("CHECK (sumber IN ("),
+            "CHECK sumber wajib terpasang setelah migrasi",
+        );
+
+        // 2. Baris yang sah dipertahankan apa adanya; yang cacat dinormalkan.
+        //    Baris cacat itu SUDAH tidak bisa didorong ke cloud, jadi
+        //    menormalkannya membebaskannya, bukan merusaknya.
+        let mut statement = connection
+            .prepare("SELECT id_sesi, sumber FROM absensi_harian ORDER BY id_sesi;")
+            .expect("prepare");
+        let baris: Vec<(String, String)> = statement
+            .query_map([], |row| Ok((row.get(0)?, row.get(1)?)))
+            .expect("query")
+            .filter_map(Result::ok)
+            .collect();
+        assert_eq!(
+            baris,
+            vec![
+                ("sesi_cacat".to_string(), "Generate Sistem".to_string()),
+                ("sesi_sah".to_string(), "Scanner".to_string()),
+            ],
+        );
+
+        // 3. Indeksnya ikut dibangun ulang — tanpa itu setiap query kehadiran
+        //    berubah menjadi pemindaian tabel penuh.
+        let indeks: i64 = connection
+            .query_row(
+                "SELECT COUNT(*) FROM sqlite_master WHERE type = 'index'
+                   AND tbl_name = 'absensi_harian'
+                   AND name IN ('idx_local_attendance_employee_date', 'idx_local_absensi_tanggal');",
+                [],
+                |row| row.get(0),
+            )
+            .expect("hitung indeks");
+        assert_eq!(indeks, 2, "kedua indeks wajib ada kembali");
+
+        // 4. Nilai asing kini ditolak di titik tulis, bukan saat push.
+        let ditolak = connection.execute(
+            "INSERT INTO absensi_harian (
+               tanggal, id_karyawan, nama, kelas_divisi, status_kehadiran,
+               status_absen, sumber, update_terakhir, id_shift, bulan, tahun, id_sesi
+             ) VALUES ('2026-09-08', 'K003', 'Baru', 'Dapur', 'Hadir', 'Masuk',
+                       'Scanner Terminal', '2026-09-08 07:00:00', 1, '09', 2026, 'sesi_baru');",
+            [],
+        );
+        assert!(
+            ditolak.is_err(),
+            "sumber di luar daftar wajib ditolak database lokal",
+        );
+
+        // 5. Idempoten: menjalankan ulang tidak membangun ulang apa pun.
+        initialize(directory.path()).expect("migrasi kedua");
     }
 }

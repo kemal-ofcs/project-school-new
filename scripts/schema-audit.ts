@@ -352,6 +352,7 @@ const expectedDomains: [string, string][] = [
 	["class-attendance-detail", "presensi_mapel_detail"],
 	["teaching-journal", "jurnal_mengajar"],
 	["attendance-ledger", "leger_kehadiran"],
+	["wa-notification", "notifikasi_wa"],
 ];
 
 const missingDomains = expectedDomains.filter(

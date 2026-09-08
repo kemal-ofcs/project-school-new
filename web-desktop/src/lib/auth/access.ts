@@ -22,7 +22,10 @@ export type AppArea =
   | "operators"
   | "password_reset"
   | "attendance_photo"
-  | "diagnostics";
+  | "diagnostics"
+  | "dasbor_kehadiran"
+  | "notifikasi_wa"
+  | "bimbingan_konseling";
 
 export interface AccessSubject {
   isSuperadmin: boolean;
@@ -43,6 +46,9 @@ const AREA_PERMISSION: Record<
   presensi_kelas: "class_attendance.view",
   jurnal_mengajar: "teaching_journal.view",
   leger_kehadiran: "attendance_ledger.view",
+  dasbor_kehadiran: "attendance_dashboard.view",
+  notifikasi_wa: "notification.view",
+  bimbingan_konseling: "counseling.view",
   karyawan: "employees.view",
   idcards: "employees.manage",
   shift: "shifts.view",

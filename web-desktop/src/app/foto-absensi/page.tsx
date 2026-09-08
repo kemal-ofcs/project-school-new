@@ -1,7 +1,7 @@
 "use client";
 
 import { redirect } from "next/navigation";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { AppShell } from "@/components/AppShell";
 import { FeedbackBanner } from "@/components/ui/FeedbackBanner";
 import { Icon } from "@/components/ui/Icon";
@@ -56,6 +56,12 @@ function formatSize(bytes: number) {
  * satu hanya ketika benar-benar dibuka.
  */
 export default function FotoAbsensiPage() {
+  // Penjaga anti klik ganda (Aturan 5). `useState` tidak cukup: pembaruannya
+  // dijadwalkan, sehingga dua klik dalam satu tick React sama-sama membaca
+  // nilai lama dan keduanya lolos. Dideklarasikan di ATAS, sebelum setiap
+  // early return, supaya urutan hook tidak pernah berubah antar-render.
+  const isSubmittingRef = useRef(false);
+
   const isHydrated = useHydrated();
   const { user, isAuthenticated, isLoading: authLoading } = useAuth();
 
@@ -125,8 +131,10 @@ export default function FotoAbsensiPage() {
   };
 
   const confirmDelete = async () => {
+    if (isSubmittingRef.current) return;
     if (!deleteTarget) return;
     setBusy(true);
+    isSubmittingRef.current = true;
     try {
       await deleteAttendancePhotoEntry(deleteTarget.idFoto);
       setDeleteTarget(null);
@@ -142,12 +150,15 @@ export default function FotoAbsensiPage() {
           error instanceof Error ? error.message : "Foto tidak dapat dihapus.",
       });
     } finally {
+      isSubmittingRef.current = false;
       setBusy(false);
     }
   };
 
   const confirmPurge = async () => {
+    if (isSubmittingRef.current) return;
     setBusy(true);
+    isSubmittingRef.current = true;
     try {
       const result = await purgeAttendancePhotoEntries(PURGE_DAYS);
       setPurgeOpen(false);
@@ -166,6 +177,7 @@ export default function FotoAbsensiPage() {
           error instanceof Error ? error.message : "Pembersihan foto gagal.",
       });
     } finally {
+      isSubmittingRef.current = false;
       setBusy(false);
     }
   };

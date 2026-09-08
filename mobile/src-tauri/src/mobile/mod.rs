@@ -19,5 +19,7 @@ pub mod academic;
 pub mod class_attendance;
 pub mod teaching_journal;
 pub mod attendance_ledger;
+pub mod attendance_dashboard;
+pub mod wa_notification;
 pub mod share;
 pub use config::MobileState;

@@ -73,10 +73,14 @@ Aturan ini bersifat **GLOBAL** untuk seluruh workspace dan wajib ditaati oleh AI
 | **Menghapus sesi presensi kelas tanpa izin sensitif** | Admin dapat menghapus bukti kehadiran satu jam pelajaran tanpa persetujuan Superadmin | Jadikan izin `class_attendance.delete` bagian dari `SENSITIVE_MUTATION_PERMISSIONS` |
 | **Pengurutan jam pelajaran leksikografis `ORDER BY jam_ke ASC`** | Jam ke-10 diurutkan sebelum jam ke-2 (`1, 10, 2, 3...`) | Urutkan numerik: `ORDER BY CAST(jam_ke AS INTEGER) ASC, jam_ke ASC` |
 | **Memanggil `getVoices()` langsung tanpa listener `voiceschanged`** | Suara TTS kosong pada panggilan pertama di WebView dan membacakan teks Indonesia dengan suara Inggris | Cache suara via event `voiceschanged` dan utamakan suara offline (`voice.localService === true`) |
+| **Menganggap "di luar SNAPSHOT_TABLES" sebagai "tidak ikut sinkronisasi" (Half-Sync)** | Mutasi foto/media berhenti di perangkat lokal pemotret, cloud tidak menerima data, perangkat lain kehilangan foto | Tabel di luar snapshot (seperti `siswa_foto`, `absensi_foto`) HANYA tidak ikut ditarik (pull massal); saat ditulis di lokal WAJIB push via outbox (`student-photo/save`, `attendance/scan`) dan di-fetch on-demand |
+| **Tidak memvalidasi MIME type dan format string di backend Rust** | Nilai cacat lolos di SQLite lokal (loose typing), lalu ditolak CHECK constraint / Zod di LibSQL cloud, memicu failed outbox permanen (*permanent outbox jam*) | Rust backend WAJIB memvalidasi whitelist enum/MIME (`image/jpeg`, `image/png`, `image/webp`), batas ukuran (base64 maks 500 KB / 2 MB) SESUAI PERSIS dengan Zod validator sebelum menulis ke DB lokal dan outbox |
+| **Scoping permission parsial domain tunggal pada command yang menyentuh seluruh personil (`master_data`)** | Eskalasi hak akses (*privilege escalation*): pengelola siswa bisa menerbitkan/memanipulasi kartu guru dan staf karyawan kantor | Command multi-entitas lintas personil (seperti `desktop_backfill_id_cards`) WAJIB dijaga oleh `employees.manage`, bukan `students.manage` |
+| **Meletakkan doc comment `///` di antara `#[tauri::command]` dan `pub fn`** | Regex parser `audit-sync-contract.ts` gagal mencocokkan nama command jika komentar >200 char, audit gagal dengan error command hilang | Doc comment `///` WAJIB selalu sebelum `#[tauri::command]`, lalu diikuti `pub fn desktop_...` |
 
 ---
 
-## 3. 40 Aturan Emas Arsitektur & Rekayasa (The 40 Golden Rules)
+## 3. 52 Aturan Emas Arsitektur & Rekayasa (The 52 Golden Rules)
 
 ### 1. Arsitektur 2-Tier Turso & Dekompresi Payload (Reqwest Gzip/Brotli)
 - Desktop dan Mobile berkomunikasi langsung ke Database Cloud LibSQL/Turso via `/v2/pipeline`.
@@ -312,6 +316,32 @@ Aturan ini bersifat **GLOBAL** untuk seluruh workspace dan wajib ditaati oleh AI
 - Pemanggilan `speechSynthesis.getVoices()` di WebView/Chromium bersifat asinkron dan kosong pada pemanggilan pertama.
 - Modul audio WAJIB mendengarkan event `voiceschanged` dan meng-cache daftar suara.
 - Untuk menjaga kepatuhan offline-first, seleksi suara bahasa Indonesia WAJIB memprioritaskan suara lokal (`voice.localService === true`) agar tidak bergantung pada koneksi internet.
+
+### 49. Pembedaan Tegas Selective-Pull vs Push Outbox vs Cloud-Only (Anti-Half-Sync)
+- Tabel dengan payload biner/media/foto (seperti `siswa_foto`, `absensi_foto`) sengaja ditempatkan di luar `SNAPSHOT_TABLES` semata-mata agar siklus pull snapshot rutin (`apply_table`) tidak membengkak dan memperlambat startup perangkat.
+- "Di luar snapshot" HANYA berarti tidak ikut ditarik secara massal (pull). Setiap mutasi lokal (insert/update) pada tabel tersebut WAJIB didaftarkan ke `desktop_sync_outbox` dalam transaksi atomik yang sama dan memiliki rute kanonik push (`student-photo/save`, `attendance/scan`) ke database cloud, lalu dibaca on-demand jika lokal belum memilikinya.
+- Sebaliknya, tabel "Cloud-Only" (`password_reset_request`, `app_mail_config`, `master_operator`) tidak pernah ditulis via SQLite operasional lokal melainkan langsung ke cloud via route API. Dan tabel "Device-Local Only" (`desktop_sync_outbox`, `desktop_sync_receipt`, `desktop_entity_revision`, `desktop_schema_migration`, `device_id`) tidak pernah didorong maupun ditarik.
+- DILARANG menerapkan aturan setengah jalan yang memutus aliran push dari lokal ke cloud ("half-sync").
+
+### 50. Validasi Ketat Format, Enum & MIME di Rust Backend Sebelum SQLite & Outbox (Anti-Outbox Jam)
+- SQLite lokal bersifat *loose typing*, sehingga string cacat atau MIME type sembarang (misal `image/bmp`, `text/plain`, typo string) dapat tersimpan mulus di perangkat lokal.
+- Namun saat baris tersebut didorong ke LibSQL cloud, validator Zod `.strict()` atau CHECK constraint cloud Turso akan menolaknya.
+- Penolakan push outbox di cloud langsung menandai event sebagai `failed` permanen dengan `next_retry_at = NULL`. Seluruh antrean outbox sinkronisasi perangkat macet selamanya!
+- Backend Rust (`tauri::command` dan fungsi domain) WAJIB memvalidasi format, panjang karakter, batas ukuran (base64 foto siswa maks 500 KB, foto absensi maks 2 MB), dan whitelist enum/MIME type secara presisi (contoh: `image/jpeg`, `image/png`, `image/webp`) SESUAI PERSIS dengan enum Zod di `sync-schema.ts` SEBELUM menulis ke SQLite lokal dan outbox.
+
+### 51. Scoping Hak Akses RBAC Sesuai Cakupan Nyata Data & Anti-Eskalasi Akses (Scope-Aware RBAC)
+- Jangan menentukan permission guard pada `#[tauri::command]` hanya berdasarkan nama form atau lokasi tombol di UI.
+- Analisis cakupan query SQL dan mutasi data yang dieksekusi: jika suatu command menyentuh seluruh personil aktif di `master_data` (mencakup siswa, guru, dan karyawan/pegawai — contoh: `desktop_backfill_id_cards`), DILARANG menggunakan permission parsial domain tunggal (`students.manage`).
+- Menggunakan `students.manage` pada operasi multi-entitas menciptakan celah eskalasi hak akses (*privilege escalation*), di mana pemegang izin kelola siswa dapat memicu penerbitan atau manipulasi data kartu guru dan staf kantor.
+- Gunakan permission yang mencakup domain seluruh personil (`employees.manage`) atau izin infrastruktur yang berwenang.
+
+### 52. Urutan Kanonik Dokumen Rust dan Penempatan Atribut `#[tauri::command]` (Anti-Regex Failure)
+- Skrip audit integritas (`audit-sync-contract.ts`) mengekstrak command menggunakan regex parser terikat (`/#\[tauri::command\][\s\S]{0,200}?\bfn\s+([a-z_][a-z0-9_]*)/g`).
+- Urutan penulisan di Rust WAJIB mengikuti urutan standar:
+  1. Doc comments (`/// ...`)
+  2. Atribut `#[tauri::command]`
+  3. Deklarasi fungsi `pub fn desktop_...`
+- DILARANG meletakkan komentar dokumentasi `///` di antara `#[tauri::command]` dan nama fungsi `pub fn ...`. Komentar panjang (>200 karakter) di sela atribut mematahkan regex audit dan membuat command dilaporkan tidak terdefinisi (*missing defined command*), menggagalkan seluruh gerbang kualitas.
 
 ---
 

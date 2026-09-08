@@ -22,7 +22,7 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 5. **Ironclad Backend & Sync Security**:
    - All multi-table mutations must execute inside a single atomic transaction (`connection.transaction()` / `db.batch()`).
    - Every local mutation on Desktop/Mobile must enqueue an outbox event in `desktop_sync_outbox`.
-   - Attendance priority hierarchy: `Koreksi Admin` > `Import Offline / Manual` > `Scanner Terminal` > `Generate Sistem`.
+   - Attendance priority hierarchy: `Koreksi Admin` > `Import Offline` / `Import Manual` > `Scanner` > `Generate Sistem`. Kelimanya adalah nilai LITERAL kolom `absensi_harian.sumber`, dan CHECK constraint cloud hanya menerima kelima itu — menulis `'Scanner Terminal'` diterima SQLite lokal (yang tidak punya CHECK) lalu ditolak permanen saat push, sehingga outbox macet selamanya.
    - Always protect forms against race conditions using `isSubmittingRef = useRef(false)`.
    - **Form & Modal Focus Safety**: In dialogs (`Modal`), callback props (`onClose`, `onSubmit`, `onChange`) MUST be stabilized via `useRef` (`onCloseRef.current = onClose`) so inline handler re-renders do NOT re-trigger effects. Never call `.focus()` inside effects that depend on callback props or without `!dialogRef.current?.contains(document.activeElement)` guard (prevents 1-keystroke focus-stealing bug).
 6. **Unified Stack & Android APK Readiness**:

@@ -195,3 +195,34 @@ Jika sebuah tabel terdaftar di `SNAPSHOT_TABLES` (sync.rs) tetapi absen dari `SN
 
 - **camelCase IPC Mapping:** Tauri v2 memetakan argumen Rust `snake_case` (misal: `id_rombel: Option<String>`) menjadi `camelCase` di JavaScript (`{ idRombel }`). Jangan pernah mengirim kunci `snake_case` dari JavaScript karena nilainya akan menjadi `None` secara diam-diam.
 - **Safe Character Slicing di Rust:** DILARANG menggunakan byte-slice mentah `&id[start..end]`. Gunakan iterator karakter yang aman terhadap batas UTF-8: `id.chars().skip(offset).take(count).collect::<String>()`.
+
+---
+
+## 8. Tabel Selektif di Luar Snapshot (`siswa_foto`, `absensi_foto`) Tetap Wajib Ikut Sinkronisasi Push Outbox
+
+- **Alasan di Luar Snapshot:** Tabel yang memuat aset biner atau base64 foto (`siswa_foto`, `absensi_foto`) sengaja TIDAK dimasukkan ke dalam `SNAPSHOT_TABLES` (32 tabel) agar tidak membebani ukuran download snapshot pull rutin (`apply_table`).
+- **Kewajiban Sinkronisasi Push:** "Di luar snapshot" HANYA berarti tidak ikut ditarik massal saat startup perangkat. Tabel ini BUKAN tabel lokal murni yang terputus dari cloud.
+- Setiap kali data foto disimpan atau diperbarui di SQLite lokal (misal saat operator memotret siswa), transaksi lokal WAJIB mendaftarkan event push ke `desktop_sync_outbox` (`student-photo/save`, `attendance/scan`).
+- Perangkat lain atau dashboard Web mengakses foto tersebut secara *on-demand* via query endpoint terpisah jika salinan lokal belum ada.
+- **`notifikasi_wa` mengikuti pola yang sama:** ditulis di SQLite lokal oleh scanner, didorong lewat rute kanonik `wa-notification/queue`, tetapi tidak ikut ditarik snapshot — satu perangkat tidak perlu mengunduh antrean perangkat lain, dan barisnya memuat nomor telepon serta isi pesan.
+
+### Dua kategori yang berbeda dan tidak boleh dikacaukan
+
+Ada tabel "di luar snapshot" yang tetap DIDORONG dari lokal, dan ada tabel **cloud-only** yang tidak pernah punya baris lokal sama sekali. Keduanya sama-sama absen dari `SNAPSHOT_TABLES`, tetapi konsekuensinya berlawanan.
+
+| Tabel | Kategori | Konsekuensi |
+| :--- | :--- | :--- |
+| `siswa_foto`, `absensi_foto`, `notifikasi_wa` | Di luar snapshot, WAJIB push | Ditulis offline, tersinkron ke cloud lewat outbox |
+| `bk_kasus`, `bk_sesi`, `app_wa_config`, `password_reset_request`, `app_mail_config` | Cloud-only | TIDAK punya baris lokal; fiturnya menuntut jaringan di SEMUA build, termasuk Desktop |
+
+`bk_kasus`/`bk_sesi` cloud-only bukan karena ukurannya melainkan karena kerahasiaannya: catatan kedisiplinan seorang anak tidak boleh tersimpan di SQLite terminal pemindai di lobi sekolah — alasan yang sama dengan `password_reset_request`. Karena itu Bimbingan Konseling **menukar akses offline dengan kerahasiaan**, dan itu pertukaran yang disengaja. Konsekuensi praktisnya: jangan membangun halaman Mobile untuk fitur cloud-only — yang lahir hanyalah layar yang gagal justru ketika sinyal hilang. Gateway-nya dijaga `assertTersediaDiMobile()`.
+
+---
+
+## 9. Validasi Ketat Format, Enum & MIME di Rust Backend Sebelum SQLite & Outbox (Anti-Outbox Jam)
+
+- SQLite lokal menerapkan *dynamic loose typing*, sehingga nilai string format sembarang (misal MIME type `image/bmp`, `text/plain`, atau salah ketik) akan tersimpan mulus di database lokal tanpa melempar error.
+- Ketika row tersebut di-push oleh outbox ke Turso Cloud, LibSQL cloud atau validator Zod `.strict()` akan menolaknya karena tidak sesuai whitelist enum (`image/jpeg`, `image/png`, `image/webp`).
+- Penolakan cloud pada push outbox langsung menandai status event menjadi `failed` dengan `next_retry_at = NULL`. Seluruh antrean sinkronisasi perangkat macet selamanya!
+- **Kewajiban Defensif Rust:** Backend Rust (`tauri::command` dan modul domain) WAJIB memvalidasi format, panjang karakter, batas ukuran (base64 foto siswa maks 500 KB, foto absensi maks 2 MB), dan whitelist enum/MIME type secara presisi SESUAI PERSIS dengan Zod validator di `sync-schema.ts` SEBELUM menulis ke SQLite lokal dan outbox.
+

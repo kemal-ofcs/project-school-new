@@ -286,7 +286,9 @@ export default function KaryawanPage() {
   };
 
   const handleImport = async (file: File) => {
+    if (isSubmittingRef.current) return;
     setBulkWorking(true);
+    isSubmittingRef.current = true;
     try {
       const drafts = await readEmployeeWorkbook(file);
       const result = await importKaryawanMassal(drafts);
@@ -299,6 +301,7 @@ export default function KaryawanPage() {
         cause instanceof Error ? cause.message : "Import Excel gagal.",
       );
     } finally {
+      isSubmittingRef.current = false;
       setBulkWorking(false);
       if (importInputRef.current) importInputRef.current.value = "";
     }

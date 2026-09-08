@@ -1079,6 +1079,35 @@ export const operationalSyncEventSchema = z.union([
       })
       .strict(),
   ),
+  eventSchema(
+    "wa-notification",
+    "queue",
+    z
+      .object({
+        id_notifikasi: shortText.min(1),
+        dedupe_key: shortText.min(1),
+        jenis: z.enum(["scan_masuk", "scan_pulang", "bolos", "ambang_alfa"]),
+        id_siswa: optionalShortText,
+        tujuan_nomor: shortText.min(1),
+        isi_pesan: z.string().min(1).max(5000),
+        status: z
+          .enum(["Menunggu", "Terkirim", "Gagal", "Dibatalkan"])
+          .optional(),
+        created_at: optionalShortText,
+        updated_at: optionalShortText,
+      })
+      .strict(),
+  ),
+  eventSchema(
+    "wa-notification",
+    "cancel",
+    z
+      .object({
+        id_notifikasi: shortText.min(1),
+        alasan: optionalShortText,
+      })
+      .strict(),
+  ),
 ]);
 
 export const studentPhotoUploadSchema = z

@@ -1,7 +1,7 @@
 "use client";
 
 import { redirect } from "next/navigation";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { AppShell } from "@/components/AppShell";
 import { FeedbackBanner } from "@/components/ui/FeedbackBanner";
 import { Icon } from "@/components/ui/Icon";
@@ -41,6 +41,12 @@ const PURGE_DAYS = 90;
  * melihat dan `password_reset.delete` untuk menghapus.
  */
 export default function RiwayatResetPasswordPage() {
+  // Penjaga anti klik ganda (Aturan 5). `useState` tidak cukup: pembaruannya
+  // dijadwalkan, sehingga dua klik dalam satu tick React sama-sama membaca
+  // nilai lama dan keduanya lolos. Dideklarasikan di ATAS, sebelum setiap
+  // early return, supaya urutan hook tidak pernah berubah antar-render.
+  const isSubmittingRef = useRef(false);
+
   const isHydrated = useHydrated();
   const { user, isAuthenticated, isLoading: authLoading } = useAuth();
 
@@ -75,7 +81,9 @@ export default function RiwayatResetPasswordPage() {
    * sendiri, bukan notifikasi yang hilang otomatis.
    */
   const approve = async (entry: ResetHistoryEntry) => {
+    if (isSubmittingRef.current) return;
     setBusy(true);
+    isSubmittingRef.current = true;
     try {
       setApproval(await approvePasswordReset(entry.id));
       await load();
@@ -88,6 +96,7 @@ export default function RiwayatResetPasswordPage() {
             : "Permintaan tidak dapat disetujui.",
       });
     } finally {
+      isSubmittingRef.current = false;
       setBusy(false);
     }
   };
@@ -135,8 +144,10 @@ export default function RiwayatResetPasswordPage() {
   };
 
   const confirmDelete = async () => {
+    if (isSubmittingRef.current) return;
     if (!deleteTarget) return;
     setBusy(true);
+    isSubmittingRef.current = true;
     try {
       await deletePasswordResetHistory(deleteTarget.id);
       setDeleteTarget(null);
@@ -154,12 +165,15 @@ export default function RiwayatResetPasswordPage() {
             : "Riwayat tidak dapat dihapus.",
       });
     } finally {
+      isSubmittingRef.current = false;
       setBusy(false);
     }
   };
 
   const confirmPurge = async () => {
+    if (isSubmittingRef.current) return;
     setBusy(true);
+    isSubmittingRef.current = true;
     try {
       const result = await purgePasswordResetHistory(PURGE_DAYS);
       setPurgeOpen(false);
@@ -178,6 +192,7 @@ export default function RiwayatResetPasswordPage() {
           error instanceof Error ? error.message : "Pembersihan riwayat gagal.",
       });
     } finally {
+      isSubmittingRef.current = false;
       setBusy(false);
     }
   };
