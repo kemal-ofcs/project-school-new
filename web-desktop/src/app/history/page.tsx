@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AppShell } from "@/components/AppShell";
 import { FeedbackBanner } from "@/components/ui/FeedbackBanner";
 import { Icon } from "@/components/ui/Icon";
+import { Modal } from "@/components/ui/Modal";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { canAccessArea, hasPermission } from "@/lib/auth/access";
 import { exportToCsv, exportToExcel } from "@/lib/client/excel-export";
@@ -19,7 +20,16 @@ import { syncNow } from "@/lib/gateways/sync-status";
 import { useDebounce } from "@/lib/hooks/useDebounce";
 import { useHydrated } from "@/lib/hooks/useHydrated";
 
-const SCAN_PAGE_SIZE = 500;
+// Satu halaman untuk KEDUA tab. Angka ini soal berapa baris yang dibawa satu
+// balasan, bukan selera tampilan: rekap harian bertambah satu baris per
+// personil per hari, jadi rentang sebulan pada 800 personil tanpa batas berarti
+// ±24.000 baris dalam sekali muat.
+const BARIS_PER_HALAMAN = 500;
+
+// Pagar pengaman pengambilan ekspor. Ekspor menyusuri halaman sampai habis;
+// batas ini memastikan sebuah bug di sisi lain tidak berubah menjadi lingkaran
+// tak berujung yang membekukan antarmuka.
+const MAKS_HALAMAN_EKSPOR = 200;
 
 function today() {
   return new Date().toLocaleDateString("en-CA");
@@ -206,13 +216,15 @@ export default function HistoryPage() {
             ? await getRiwayatScan({
                 tanggal_mulai: tanggalMulai,
                 tanggal_selesai: tanggalSelesai,
-                limit: SCAN_PAGE_SIZE,
-                offset: page * SCAN_PAGE_SIZE,
+                limit: BARIS_PER_HALAMAN,
+                offset: page * BARIS_PER_HALAMAN,
               })
             : await getRekapHarian({
                 tanggal_mulai: tanggalMulai,
                 tanggal_selesai: tanggalSelesai,
                 divisi: selectedDivisi !== "all" ? selectedDivisi : undefined,
+                limit: BARIS_PER_HALAMAN,
+                offset: page * BARIS_PER_HALAMAN,
               });
         setRows(data);
         setError(null);
@@ -262,123 +274,138 @@ export default function HistoryPage() {
     return Array.from(set).sort();
   }, [rows]);
 
-  // Client-side filtering & sorting
-  const filteredRows = useMemo(() => {
-    const term = debouncedSearch.trim().toLowerCase();
-    const matchesSearch = (r: Record<string, unknown>) => {
-      if (!term) return true;
-      const combined = [
-        r.nama,
-        r.id_karyawan,
-        r.divisi,
-        r.kelas_divisi,
-        r.keterangan,
-        r.catatan_sistem,
-        r.sumber,
-        r.sumber_data,
-        r.id_sesi,
-        r.id_referensi,
-        r.kode_operator,
-        r.jenis_scan,
-        r.status_proses,
-        r.status_kehadiran,
-        r.status_absen,
-      ]
-        .filter(Boolean)
-        .join(" ")
-        .toLowerCase();
-      return combined.includes(term);
-    };
+  // Client-side filtering & sorting.
+  //
+  // Dipisahkan dari useMemo supaya ekspor bisa memakainya kembali. Setelah
+  // batas paginasi dipasang, `rows` hanya berisi satu halaman — ekspor yang
+  // menyaring dari sana akan diam-diam memotong hasilnya, dan kegagalan itu
+  // baru ketahuan ketika ada yang membandingkan berkasnya dengan kenyataan.
+  const saringDanUrutkan = useCallback(
+    (sumber: Record<string, unknown>[]) => {
+      const term = debouncedSearch.trim().toLowerCase();
+      const matchesSearch = (r: Record<string, unknown>) => {
+        if (!term) return true;
+        const combined = [
+          r.nama,
+          r.id_karyawan,
+          r.divisi,
+          r.kelas_divisi,
+          r.keterangan,
+          r.catatan_sistem,
+          r.sumber,
+          r.sumber_data,
+          r.id_sesi,
+          r.id_referensi,
+          r.kode_operator,
+          r.jenis_scan,
+          r.status_proses,
+          r.status_kehadiran,
+          r.status_absen,
+        ]
+          .filter(Boolean)
+          .join(" ")
+          .toLowerCase();
+        return combined.includes(term);
+      };
 
-    let result = rows.filter((r) => {
-      if (!matchesSearch(r)) return false;
+      let result = sumber.filter((r) => {
+        if (!matchesSearch(r)) return false;
 
-      if (tab === "scan") {
+        if (tab === "scan") {
+          const matchDiv =
+            selectedDivisi === "all" ||
+            String(r.divisi || "") === selectedDivisi;
+          const matchStatus =
+            selectedStatus === "all" ||
+            String(r.status_proses || "") === selectedStatus ||
+            String(r.jenis_scan || "") === selectedStatus ||
+            String(r.keterangan || "") === selectedStatus ||
+            (selectedStatus === "Perlu Verifikasi" &&
+              (String(r.status_proses || "") === "Perlu Verifikasi" ||
+                String(r.keterangan || "").includes("Perlu Verifikasi") ||
+                String(r.catatan_sistem || "").includes("Perlu Verifikasi")));
+          return matchDiv && matchStatus;
+        }
+
+        // Daily attendance tab
         const matchDiv =
-          selectedDivisi === "all" || String(r.divisi || "") === selectedDivisi;
+          selectedDivisi === "all" ||
+          String(r.kelas_divisi || r.divisi || "") === selectedDivisi;
         const matchStatus =
           selectedStatus === "all" ||
-          String(r.status_proses || "") === selectedStatus ||
-          String(r.jenis_scan || "") === selectedStatus ||
-          String(r.keterangan || "") === selectedStatus ||
+          String(r.status_kehadiran || "") === selectedStatus ||
+          String(r.status_absen || "") === selectedStatus ||
           (selectedStatus === "Perlu Verifikasi" &&
-            (String(r.status_proses || "") === "Perlu Verifikasi" ||
-              String(r.keterangan || "").includes("Perlu Verifikasi") ||
-              String(r.catatan_sistem || "").includes("Perlu Verifikasi")));
+            (String(r.status_absen || "") === "Perlu Verifikasi" ||
+              String(r.status_kehadiran || "") === "Perlu Verifikasi")) ||
+          (selectedStatus === "Terlambat" &&
+            Number(r.menit_terlambat || 0) > 0) ||
+          (selectedStatus === "JamKurang" &&
+            Number(r.jam_kerja_kurang || 0) > 0);
         return matchDiv && matchStatus;
-      }
+      });
 
-      // Daily attendance tab
-      const matchDiv =
-        selectedDivisi === "all" ||
-        String(r.kelas_divisi || r.divisi || "") === selectedDivisi;
-      const matchStatus =
-        selectedStatus === "all" ||
-        String(r.status_kehadiran || "") === selectedStatus ||
-        String(r.status_absen || "") === selectedStatus ||
-        (selectedStatus === "Perlu Verifikasi" &&
-          (String(r.status_absen || "") === "Perlu Verifikasi" ||
-            String(r.status_kehadiran || "") === "Perlu Verifikasi")) ||
-        (selectedStatus === "Terlambat" &&
-          Number(r.menit_terlambat || 0) > 0) ||
-        (selectedStatus === "JamKurang" && Number(r.jam_kerja_kurang || 0) > 0);
-      return matchDiv && matchStatus;
-    });
-
-    // Sorting
-    result = result.slice().sort((a, b) => {
-      if (sortOption === "name_asc") {
-        return String(a.nama || "").localeCompare(String(b.nama || ""));
-      }
-      if (sortOption === "name_desc") {
-        return String(b.nama || "").localeCompare(String(a.nama || ""));
-      }
-      if (sortOption === "division_asc") {
-        return String(a.divisi || a.kelas_divisi || "").localeCompare(
-          String(b.divisi || b.kelas_divisi || ""),
-        );
-      }
-
-      if (tab === "scan") {
-        const timeA = String(a.timestamp_scan || a.tanggal_kerja || "");
-        const timeB = String(b.timestamp_scan || b.tanggal_kerja || "");
-        const idA = Number(a.id_log || 0);
-        const idB = Number(b.id_log || 0);
-        if (sortOption === "time_asc") {
-          const cmp = timeA.localeCompare(timeB);
-          return cmp !== 0 ? cmp : idA - idB;
+      // Sorting
+      result = result.slice().sort((a, b) => {
+        if (sortOption === "name_asc") {
+          return String(a.nama || "").localeCompare(String(b.nama || ""));
         }
-        // default time_desc
-        const cmp = timeB.localeCompare(timeA);
-        return cmp !== 0 ? cmp : idB - idA;
-      }
+        if (sortOption === "name_desc") {
+          return String(b.nama || "").localeCompare(String(a.nama || ""));
+        }
+        if (sortOption === "division_asc") {
+          return String(a.divisi || a.kelas_divisi || "").localeCompare(
+            String(b.divisi || b.kelas_divisi || ""),
+          );
+        }
 
-      // Tab daily
-      const dateA = String(a.tanggal || "");
-      const dateB = String(b.tanggal || "");
-      const updatedA = String(a.update_terakhir || dateA);
-      const updatedB = String(b.update_terakhir || dateB);
-      const idA = Number(a.id_absensi || 0);
-      const idB = Number(b.id_absensi || 0);
+        if (tab === "scan") {
+          const timeA = String(a.timestamp_scan || a.tanggal_kerja || "");
+          const timeB = String(b.timestamp_scan || b.tanggal_kerja || "");
+          const idA = Number(a.id_log || 0);
+          const idB = Number(b.id_log || 0);
+          if (sortOption === "time_asc") {
+            const cmp = timeA.localeCompare(timeB);
+            return cmp !== 0 ? cmp : idA - idB;
+          }
+          // default time_desc
+          const cmp = timeB.localeCompare(timeA);
+          return cmp !== 0 ? cmp : idB - idA;
+        }
 
-      if (sortOption === "time_asc") {
-        const dateCmp = dateA.localeCompare(dateB);
-        if (dateCmp !== 0) return dateCmp;
-        const timeCmp = String(a.jam_masuk || "").localeCompare(
-          String(b.jam_masuk || ""),
-        );
-        return timeCmp !== 0 ? timeCmp : idA - idB;
-      }
+        // Tab daily
+        const dateA = String(a.tanggal || "");
+        const dateB = String(b.tanggal || "");
+        const updatedA = String(a.update_terakhir || dateA);
+        const updatedB = String(b.update_terakhir || dateB);
+        const idA = Number(a.id_absensi || 0);
+        const idB = Number(b.id_absensi || 0);
 
-      // default time_desc (Latest updated / created comes first)
-      const updatedCmp = updatedB.localeCompare(updatedA);
-      if (updatedCmp !== 0) return updatedCmp;
-      const dateCmp = dateB.localeCompare(dateA);
-      return dateCmp !== 0 ? dateCmp : idB - idA;
-    });
+        if (sortOption === "time_asc") {
+          const dateCmp = dateA.localeCompare(dateB);
+          if (dateCmp !== 0) return dateCmp;
+          const timeCmp = String(a.jam_masuk || "").localeCompare(
+            String(b.jam_masuk || ""),
+          );
+          return timeCmp !== 0 ? timeCmp : idA - idB;
+        }
 
-    return result;
-  }, [rows, tab, selectedDivisi, selectedStatus, debouncedSearch, sortOption]);
+        // default time_desc (Latest updated / created comes first)
+        const updatedCmp = updatedB.localeCompare(updatedA);
+        if (updatedCmp !== 0) return updatedCmp;
+        const dateCmp = dateB.localeCompare(dateA);
+        return dateCmp !== 0 ? dateCmp : idB - idA;
+      });
+
+      return result;
+    },
+    [tab, selectedDivisi, selectedStatus, debouncedSearch, sortOption],
+  );
+
+  const filteredRows = useMemo(
+    () => saringDanUrutkan(rows),
+    [rows, saringDanUrutkan],
+  );
 
   // Metric summaries
   const metrics = useMemo(() => {
@@ -410,119 +437,157 @@ export default function HistoryPage() {
     return { total, hadir, lengkap, terlambat, jamKurang, alfa, izinSakit };
   }, [rows, tab]);
 
-  const getExportData = useCallback(() => {
-    if (tab === "scan") {
+  // Ekspor menyusuri seluruh halaman, bukan halaman yang sedang tampak.
+  //
+  // Sebelum ada batas, satu panggilan mengembalikan semuanya dan ekspor
+  // kebetulan utuh. Sekarang tidak lagi, dan tab scan bahkan SUDAH terpotong
+  // di 500 baris sejak sebelum perubahan ini — batas fetch-nya ada, kontrol
+  // halamannya tidak pernah ada, dan tidak ada yang memberi tahu penggunanya.
+  const ambilSemuaBaris = useCallback(async () => {
+    const semua: Record<string, unknown>[] = [];
+    for (let halaman = 0; halaman < MAKS_HALAMAN_EKSPOR; halaman++) {
+      const bagian =
+        tab === "scan"
+          ? await getRiwayatScan({
+              tanggal_mulai: tanggalMulai,
+              tanggal_selesai: tanggalSelesai,
+              limit: BARIS_PER_HALAMAN,
+              offset: halaman * BARIS_PER_HALAMAN,
+            })
+          : await getRekapHarian({
+              tanggal_mulai: tanggalMulai,
+              tanggal_selesai: tanggalSelesai,
+              divisi: selectedDivisi !== "all" ? selectedDivisi : undefined,
+              limit: BARIS_PER_HALAMAN,
+              offset: halaman * BARIS_PER_HALAMAN,
+            });
+      semua.push(...bagian);
+      // Halaman yang tidak penuh berarti sudah habis.
+      if (bagian.length < BARIS_PER_HALAMAN) break;
+    }
+    return semua;
+  }, [tab, tanggalMulai, tanggalSelesai, selectedDivisi]);
+
+  const getExportData = useCallback(
+    (barisEkspor: Record<string, unknown>[]) => {
+      if (tab === "scan") {
+        const headers = [
+          "Timestamp_Scan",
+          "Tanggal",
+          "Jam",
+          "ID_Unik",
+          "Nama",
+          "Divisi",
+          "Jenis_Scan",
+          "Status_Proses",
+          "Sumber_Data",
+          "Catatan_Sistem",
+          "Keterangan",
+          "Waktu_Telat",
+          "Menit_Datang_Awal",
+          "ID_Referensi",
+          "Kode_Operator",
+        ];
+        const dataRows = barisEkspor.map((r) => [
+          formatDisplayDateTime(r.timestamp_scan),
+          formatDisplayDate(r.tanggal_kerja),
+          formatTimeOnly(r.jam_scan),
+          String(r.id_karyawan || ""),
+          String(r.nama || ""),
+          String(r.divisi || ""),
+          String(r.jenis_scan || ""),
+          String(r.status_proses || ""),
+          String(r.sumber_data || "") === "Import Offline"
+            ? "Import Manual"
+            : String(r.sumber_data || ""),
+          String(r.catatan_sistem || ""),
+          String(r.keterangan || ""),
+          String(r.menit_terlambat || 0),
+          String(r.menit_datang_awal || 0),
+          String(r.id_referensi || ""),
+          String(r.kode_operator || ""),
+        ]);
+        return {
+          filename: `Riwayat_Log_Scan_${tanggalMulai}_sd_${tanggalSelesai}`,
+          sheetName: "Log Scan",
+          headers,
+          rows: dataRows,
+        };
+      }
+
       const headers = [
-        "Timestamp_Scan",
         "Tanggal",
-        "Jam",
         "ID_Unik",
         "Nama",
         "Divisi",
-        "Jenis_Scan",
-        "Status_Proses",
+        "Jam_Masuk",
+        "Jam_Pulang",
+        "Status_Kehadiran",
+        "Status_Absen",
+        "Keterangan_Admin",
         "Sumber_Data",
-        "Catatan_Sistem",
-        "Keterangan",
-        "Waktu_Telat",
+        "Update_Terakhir",
+        "Menit_Terlambat",
         "Menit_Datang_Awal",
-        "ID_Referensi",
-        "Kode_Operator",
+        "Jam_Kerja",
+        "Lembur",
+        "Shift",
+        "Bulan",
+        "Tahun",
+        "Jam_Kerja_Kurang",
+        "ID_sesi",
+        "Mode_Tugas",
+        "ID_Backup",
+        "ID_Karyawan_Asal",
+        "Tanggal_Tugas",
       ];
-      const dataRows = filteredRows.map((r) => [
-        formatDisplayDateTime(r.timestamp_scan),
-        formatDisplayDate(r.tanggal_kerja),
-        formatTimeOnly(r.jam_scan),
+      const dataRows = barisEkspor.map((r) => [
+        formatDisplayDate(r.tanggal),
         String(r.id_karyawan || ""),
         String(r.nama || ""),
-        String(r.divisi || ""),
-        String(r.jenis_scan || ""),
-        String(r.status_proses || ""),
-        String(r.sumber_data || "") === "Import Offline"
-          ? "Import Manual"
-          : String(r.sumber_data || ""),
-        String(r.catatan_sistem || ""),
+        String(r.kelas_divisi || r.divisi || ""),
+        formatTimeOnly(r.jam_masuk),
+        formatTimeOnly(r.jam_pulang),
+        String(r.status_kehadiran || ""),
+        String(r.status_absen || ""),
         String(r.keterangan || ""),
-        String(r.menit_terlambat || 0),
-        String(r.menit_datang_awal || 0),
-        String(r.id_referensi || ""),
-        String(r.kode_operator || ""),
+        String(r.sumber || "") === "Import Offline"
+          ? "Import Manual"
+          : String(r.sumber || ""),
+        formatDisplayDateTime(r.update_terakhir),
+        Number(r.menit_terlambat || 0),
+        Number(r.menit_datang_awal || 0),
+        Number(r.jam_kerja || 0),
+        Number(r.lembur || 0),
+        String(r.nama_shift || r.kode_shift || r.id_shift || ""),
+        String(r.bulan || ""),
+        Number(r.tahun || 0),
+        Number(r.jam_kerja_kurang || 0),
+        String(r.id_sesi || ""),
+        String(r.mode_tugas || "NORMAL"),
+        String(r.id_backup || ""),
+        String(r.id_karyawan_asal || ""),
+        formatDisplayDate(r.tanggal_tugas),
       ]);
       return {
-        filename: `Riwayat_Log_Scan_${tanggalMulai}_sd_${tanggalSelesai}`,
-        sheetName: "Log Scan",
+        filename: `Riwayat_Absensi_Harian_${tanggalMulai}_sd_${tanggalSelesai}`,
+        sheetName: "Absensi Harian",
         headers,
         rows: dataRows,
       };
-    }
-
-    const headers = [
-      "Tanggal",
-      "ID_Unik",
-      "Nama",
-      "Divisi",
-      "Jam_Masuk",
-      "Jam_Pulang",
-      "Status_Kehadiran",
-      "Status_Absen",
-      "Keterangan_Admin",
-      "Sumber_Data",
-      "Update_Terakhir",
-      "Menit_Terlambat",
-      "Menit_Datang_Awal",
-      "Jam_Kerja",
-      "Lembur",
-      "Shift",
-      "Bulan",
-      "Tahun",
-      "Jam_Kerja_Kurang",
-      "ID_sesi",
-      "Mode_Tugas",
-      "ID_Backup",
-      "ID_Karyawan_Asal",
-      "Tanggal_Tugas",
-    ];
-    const dataRows = filteredRows.map((r) => [
-      formatDisplayDate(r.tanggal),
-      String(r.id_karyawan || ""),
-      String(r.nama || ""),
-      String(r.kelas_divisi || r.divisi || ""),
-      formatTimeOnly(r.jam_masuk),
-      formatTimeOnly(r.jam_pulang),
-      String(r.status_kehadiran || ""),
-      String(r.status_absen || ""),
-      String(r.keterangan || ""),
-      String(r.sumber || "") === "Import Offline"
-        ? "Import Manual"
-        : String(r.sumber || ""),
-      formatDisplayDateTime(r.update_terakhir),
-      Number(r.menit_terlambat || 0),
-      Number(r.menit_datang_awal || 0),
-      Number(r.jam_kerja || 0),
-      Number(r.lembur || 0),
-      String(r.nama_shift || r.kode_shift || r.id_shift || ""),
-      String(r.bulan || ""),
-      Number(r.tahun || 0),
-      Number(r.jam_kerja_kurang || 0),
-      String(r.id_sesi || ""),
-      String(r.mode_tugas || "NORMAL"),
-      String(r.id_backup || ""),
-      String(r.id_karyawan_asal || ""),
-      formatDisplayDate(r.tanggal_tugas),
-    ]);
-    return {
-      filename: `Riwayat_Absensi_Harian_${tanggalMulai}_sd_${tanggalSelesai}`,
-      sheetName: "Absensi Harian",
-      headers,
-      rows: dataRows,
-    };
-  }, [filteredRows, tab, tanggalMulai, tanggalSelesai]);
+    },
+    [tab, tanggalMulai, tanggalSelesai],
+  );
 
   const handleExportCSV = async () => {
     if (filteredRows.length === 0) return;
     setExporting(true);
     try {
-      const { filename, headers, rows: exportRows } = getExportData();
+      const {
+        filename,
+        headers,
+        rows: exportRows,
+      } = getExportData(saringDanUrutkan(await ambilSemuaBaris()));
       const res = await exportToCsv(filename, headers, exportRows);
       if (res.cancelled) return;
       if (res.path) {
@@ -548,7 +613,7 @@ export default function HistoryPage() {
         sheetName,
         headers,
         rows: exportRows,
-      } = getExportData();
+      } = getExportData(saringDanUrutkan(await ambilSemuaBaris()));
       const res = await exportToExcel(filename, sheetName, headers, exportRows);
       if (res.cancelled) return;
       if (res.path) {
@@ -794,6 +859,7 @@ export default function HistoryPage() {
               Tanggal Mulai
             </span>
             <input
+              aria-label="Tanggal mulai"
               type="date"
               value={tanggalMulai}
               onChange={(e) => {
@@ -810,6 +876,7 @@ export default function HistoryPage() {
               Tanggal Selesai
             </span>
             <input
+              aria-label="Tanggal selesai"
               type="date"
               value={tanggalSelesai}
               onChange={(e) => {
@@ -827,6 +894,7 @@ export default function HistoryPage() {
             </span>
             <div className="relative flex items-center">
               <input
+                aria-label="Cari riwayat absensi"
                 type="text"
                 placeholder="ID, Nama, Divisi, Ket..."
                 value={search}
@@ -851,6 +919,7 @@ export default function HistoryPage() {
               Divisi
             </span>
             <select
+              aria-label="Filter divisi"
               value={selectedDivisi}
               onChange={(e) => {
                 setSelectedDivisi(e.target.value);
@@ -873,6 +942,7 @@ export default function HistoryPage() {
               Status
             </span>
             <select
+              aria-label="Filter status"
               value={selectedStatus}
               onChange={(e) => setSelectedStatus(e.target.value)}
               className="min-h-10 w-full rounded-xl border border-slate-800 bg-slate-950 px-3 text-slate-300 outline-none focus:border-sky-500"
@@ -917,6 +987,7 @@ export default function HistoryPage() {
               </span>
               <div className="flex flex-wrap items-center gap-2">
                 <select
+                  aria-label="Urutan data"
                   value={sortOption}
                   onChange={(e) =>
                     setSortOption(
@@ -1328,123 +1399,48 @@ export default function HistoryPage() {
             </table>
           )}
         </div>
+
+        {/* Navigasi halaman. Batas pengambilan sudah ada sejak lama pada tab
+            scan, tetapi kontrolnya tidak pernah ada — sehingga baris ke-501 dan
+            seterusnya tidak bisa dilihat siapa pun. */}
+        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-800 px-4 py-3 text-xs text-slate-400">
+          <span className="font-mono">
+            Halaman {page + 1} · menampilkan {filteredRows.length} baris
+            {rows.length === BARIS_PER_HALAMAN
+              ? " · masih ada baris berikutnya"
+              : ""}
+          </span>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setPage((n) => Math.max(0, n - 1))}
+              disabled={page === 0 || loading}
+              className="rounded-lg border border-slate-700 px-3 py-1.5 font-semibold text-slate-200 transition hover:border-sky-500 hover:text-white disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              Sebelumnya
+            </button>
+            <button
+              type="button"
+              onClick={() => setPage((n) => n + 1)}
+              disabled={rows.length < BARIS_PER_HALAMAN || loading}
+              className="rounded-lg border border-slate-700 px-3 py-1.5 font-semibold text-slate-200 transition hover:border-sky-500 hover:text-white disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              Berikutnya
+            </button>
+          </div>
+        </div>
       </div>
 
       {/* Modal Edit Absensi Harian */}
       {editData ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-fadeIn">
-          <div className="w-full max-w-lg rounded-3xl border border-slate-700 bg-slate-900 p-6 shadow-2xl space-y-4">
-            <div className="border-b border-slate-800 pb-3 flex items-center justify-between">
-              <div>
-                <h3 className="text-base font-bold text-white flex items-center gap-2">
-                  <span>✏️</span>
-                  <span>Edit Data Absensi</span>
-                </h3>
-                <p className="text-xs text-slate-400 mt-0.5">
-                  {editData.nama} ({editData.id_karyawan}) ·{" "}
-                  {formatDisplayDate(editData.tanggal)}
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={() => setEditData(null)}
-                className="text-slate-400 hover:text-white text-lg leading-none"
-              >
-                ✕
-              </button>
-            </div>
-
-            <div className="grid grid-cols-2 gap-3 text-xs font-mono">
-              <div>
-                <span className="text-slate-400 block mb-1 font-semibold">
-                  Jam Masuk (HH:mm)
-                </span>
-                <input
-                  aria-label="Jam Masuk"
-                  type="time"
-                  className="min-h-10 w-full rounded-xl border border-slate-700 bg-slate-950 px-3 text-white outline-none focus:border-sky-400"
-                  value={editData.jam_masuk}
-                  onChange={(e) =>
-                    setEditData({ ...editData, jam_masuk: e.target.value })
-                  }
-                />
-              </div>
-
-              <div>
-                <span className="text-slate-400 block mb-1 font-semibold">
-                  Jam Pulang (HH:mm)
-                </span>
-                <input
-                  aria-label="Jam Pulang"
-                  type="time"
-                  className="min-h-10 w-full rounded-xl border border-slate-700 bg-slate-950 px-3 text-white outline-none focus:border-sky-400"
-                  value={editData.jam_pulang}
-                  onChange={(e) =>
-                    setEditData({ ...editData, jam_pulang: e.target.value })
-                  }
-                />
-              </div>
-
-              <div>
-                <span className="text-slate-400 block mb-1 font-semibold">
-                  Status Kehadiran
-                </span>
-                <select
-                  aria-label="Status Kehadiran"
-                  className="min-h-10 w-full rounded-xl border border-slate-700 bg-slate-950 px-3 text-white outline-none focus:border-sky-400"
-                  value={editData.status_kehadiran}
-                  onChange={(e) =>
-                    setEditData({
-                      ...editData,
-                      status_kehadiran: e.target.value,
-                    })
-                  }
-                >
-                  <option value="Hadir">Hadir</option>
-                  <option value="Sakit">Sakit</option>
-                  <option value="Izin">Izin</option>
-                  <option value="Dispen">Dispen</option>
-                  <option value="Alfa">Alfa</option>
-                </select>
-              </div>
-
-              <div>
-                <span className="text-slate-400 block mb-1 font-semibold">
-                  Status Absen
-                </span>
-                <select
-                  aria-label="Status Absen"
-                  className="min-h-10 w-full rounded-xl border border-slate-700 bg-slate-950 px-3 text-white outline-none focus:border-sky-400"
-                  value={editData.status_absen}
-                  onChange={(e) =>
-                    setEditData({ ...editData, status_absen: e.target.value })
-                  }
-                >
-                  <option value="Lengkap">Lengkap</option>
-                  <option value="Belum Pulang">Belum Pulang</option>
-                  <option value="Tidak Hadir">Tidak Hadir</option>
-                  <option value="Perlu Verifikasi">Perlu Verifikasi</option>
-                </select>
-              </div>
-
-              <div className="col-span-2">
-                <span className="text-slate-400 block mb-1 font-semibold">
-                  Keterangan
-                </span>
-                <input
-                  aria-label="Keterangan"
-                  type="text"
-                  placeholder="Keterangan koreksi / edit..."
-                  className="min-h-10 w-full rounded-xl border border-slate-700 bg-slate-950 px-3 text-white outline-none focus:border-sky-400"
-                  value={editData.keterangan}
-                  onChange={(e) =>
-                    setEditData({ ...editData, keterangan: e.target.value })
-                  }
-                />
-              </div>
-            </div>
-
-            <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-800">
+        <Modal
+          isOpen
+          onClose={() => setEditData(null)}
+          title="Edit Data Absensi"
+          subtitle={`${editData.nama} (${editData.id_karyawan}) · ${formatDisplayDate(editData.tanggal)}`}
+          maxWidth="max-w-lg"
+          footer={
+            <div className="flex items-center justify-end gap-2">
               <button
                 type="button"
                 disabled={actionBusy}
@@ -1472,36 +1468,110 @@ export default function HistoryPage() {
                 )}
               </button>
             </div>
+          }
+        >
+          <div className="grid grid-cols-2 gap-3 text-xs font-mono">
+            <div>
+              <span className="text-slate-400 block mb-1 font-semibold">
+                Jam Masuk (HH:mm)
+              </span>
+              <input
+                aria-label="Jam Masuk"
+                type="time"
+                className="min-h-10 w-full rounded-xl border border-slate-700 bg-slate-950 px-3 text-white outline-none focus:border-sky-400"
+                value={editData.jam_masuk}
+                onChange={(e) =>
+                  setEditData({ ...editData, jam_masuk: e.target.value })
+                }
+              />
+            </div>
+
+            <div>
+              <span className="text-slate-400 block mb-1 font-semibold">
+                Jam Pulang (HH:mm)
+              </span>
+              <input
+                aria-label="Jam Pulang"
+                type="time"
+                className="min-h-10 w-full rounded-xl border border-slate-700 bg-slate-950 px-3 text-white outline-none focus:border-sky-400"
+                value={editData.jam_pulang}
+                onChange={(e) =>
+                  setEditData({ ...editData, jam_pulang: e.target.value })
+                }
+              />
+            </div>
+
+            <div>
+              <span className="text-slate-400 block mb-1 font-semibold">
+                Status Kehadiran
+              </span>
+              <select
+                aria-label="Status Kehadiran"
+                className="min-h-10 w-full rounded-xl border border-slate-700 bg-slate-950 px-3 text-white outline-none focus:border-sky-400"
+                value={editData.status_kehadiran}
+                onChange={(e) =>
+                  setEditData({
+                    ...editData,
+                    status_kehadiran: e.target.value,
+                  })
+                }
+              >
+                <option value="Hadir">Hadir</option>
+                <option value="Sakit">Sakit</option>
+                <option value="Izin">Izin</option>
+                <option value="Dispen">Dispen</option>
+                <option value="Alfa">Alfa</option>
+              </select>
+            </div>
+
+            <div>
+              <span className="text-slate-400 block mb-1 font-semibold">
+                Status Absen
+              </span>
+              <select
+                aria-label="Status Absen"
+                className="min-h-10 w-full rounded-xl border border-slate-700 bg-slate-950 px-3 text-white outline-none focus:border-sky-400"
+                value={editData.status_absen}
+                onChange={(e) =>
+                  setEditData({ ...editData, status_absen: e.target.value })
+                }
+              >
+                <option value="Lengkap">Lengkap</option>
+                <option value="Belum Pulang">Belum Pulang</option>
+                <option value="Tidak Hadir">Tidak Hadir</option>
+                <option value="Perlu Verifikasi">Perlu Verifikasi</option>
+              </select>
+            </div>
+
+            <div className="col-span-2">
+              <span className="text-slate-400 block mb-1 font-semibold">
+                Keterangan
+              </span>
+              <input
+                aria-label="Keterangan"
+                type="text"
+                placeholder="Keterangan koreksi / edit..."
+                className="min-h-10 w-full rounded-xl border border-slate-700 bg-slate-950 px-3 text-white outline-none focus:border-sky-400"
+                value={editData.keterangan}
+                onChange={(e) =>
+                  setEditData({ ...editData, keterangan: e.target.value })
+                }
+              />
+            </div>
           </div>
-        </div>
+        </Modal>
       ) : null}
 
       {/* Modal Konfirmasi Hapus */}
       {deleteData ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-fadeIn">
-          <div className="w-full max-w-md rounded-3xl border border-rose-800/60 bg-slate-900 p-6 shadow-2xl space-y-4">
-            <div className="border-b border-slate-800 pb-3 flex items-center gap-3 text-rose-400">
-              <div className="w-10 h-10 rounded-2xl bg-rose-950/80 border border-rose-800 flex items-center justify-center text-xl shrink-0">
-                ⚠️
-              </div>
-              <div>
-                <h3 className="text-base font-bold text-white">
-                  Konfirmasi Hapus Data
-                </h3>
-                <p className="text-xs text-rose-300 mt-0.5 font-mono">
-                  {deleteData.title}
-                </p>
-              </div>
-            </div>
-
-            <div className="bg-slate-950/60 p-3.5 rounded-2xl border border-slate-800 text-xs font-mono text-slate-300 space-y-1">
-              <p>{deleteData.subtitle}</p>
-              <p className="text-amber-400 text-[11px] pt-1">
-                Tindakan ini permanen dan akan mencatat jejak audit operator.
-              </p>
-            </div>
-
-            <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-800">
+        <Modal
+          isOpen
+          onClose={() => setDeleteData(null)}
+          title="Konfirmasi Hapus Data"
+          subtitle={deleteData.title}
+          maxWidth="max-w-md"
+          footer={
+            <div className="flex items-center justify-end gap-2">
               <button
                 type="button"
                 disabled={actionBusy}
@@ -1529,8 +1599,15 @@ export default function HistoryPage() {
                 )}
               </button>
             </div>
+          }
+        >
+          <div className="bg-slate-950/60 p-3.5 rounded-2xl border border-slate-800 text-xs font-mono text-slate-300 space-y-1">
+            <p>{deleteData.subtitle}</p>
+            <p className="text-amber-400 text-[11px] pt-1">
+              Tindakan ini permanen dan akan mencatat jejak audit operator.
+            </p>
           </div>
-        </div>
+        </Modal>
       ) : null}
     </AppShell>
   );

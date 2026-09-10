@@ -1309,9 +1309,8 @@ pub fn reset_cloud_linked_data(
 
     // Tarif default payroll bukan data cloud, melainkan seed bawaan aplikasi.
     // Tabelnya baru saja dikosongkan, jadi tanam ulang di transaksi yang sama.
-    seed_payroll_rate_tables(&transaction).map_err(|message| {
-        CommandError::new("LOCAL_RESET_FAILED", message)
-    })?;
+    seed_payroll_rate_tables(&transaction)
+        .map_err(|message| CommandError::new("LOCAL_RESET_FAILED", message))?;
 
     transaction.commit().map_err(|_| CommandError::internal())?;
 
@@ -1603,11 +1602,18 @@ mod tests {
         std::fs::write(credentials.join("operator-lama.stronghold"), b"x").expect("write snapshot");
         std::fs::write(credentials.join("turso_config.vault"), b"y").expect("write vault");
 
-        reset_cloud_linked_data(directory.path(), &["turso_database_url", "turso_auth_token"])
-            .expect("reset local workspace");
+        reset_cloud_linked_data(
+            directory.path(),
+            &["turso_database_url", "turso_auth_token"],
+        )
+        .expect("reset local workspace");
 
         let connection = database(directory.path()).expect("database connection");
-        for table in ["master_data", "desktop_sync_outbox", "desktop_entity_revision"] {
+        for table in [
+            "master_data",
+            "desktop_sync_outbox",
+            "desktop_entity_revision",
+        ] {
             let total: i64 = connection
                 .query_row(&format!("SELECT COUNT(*) FROM {table};"), [], |row| {
                     row.get(0)
@@ -1724,7 +1730,10 @@ mod tests {
                     |row| row.get(0),
                 )
                 .expect("tax category count");
-            assert!(total > 0, "kategori tarif {category} tidak ter-seed di lokal");
+            assert!(
+                total > 0,
+                "kategori tarif {category} tidak ter-seed di lokal"
+            );
         }
     }
 

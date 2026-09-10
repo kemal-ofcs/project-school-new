@@ -5,6 +5,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { AppShell } from "@/components/AppShell";
 import { FeedbackBanner } from "@/components/ui/FeedbackBanner";
 import { Icon } from "@/components/ui/Icon";
+import { Modal } from "@/components/ui/Modal";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { canAccessArea, hasPermission } from "@/lib/auth/access";
 import { useAuth } from "@/lib/context/AuthContext";
@@ -21,6 +22,7 @@ import {
   type WaNotificationJenis,
   type WaNotificationStatus,
 } from "@/lib/gateways/wa-notification";
+import { useConfirmDialog } from "@/lib/hooks/useConfirmDialog";
 
 export default function NotifikasiWaPage() {
   const { user, isAuthenticated, isLoading: authLoading } = useAuth();
@@ -59,6 +61,7 @@ export default function NotifikasiWaPage() {
   // Wajib berada di ATAS, sebelum setiap early return: hook yang dilewati pada
   // sebagian render mengubah urutan hook dan menjatuhkan seluruh halaman.
   const isSubmittingRef = useRef(false);
+  const { konfirmasi, dialogKonfirmasi } = useConfirmDialog();
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -151,9 +154,14 @@ export default function NotifikasiWaPage() {
 
   const handleCancelNotification = async (item: WaNotificationItem) => {
     if (isSubmittingRef.current || !canDelete) return;
-    const confirmed = window.confirm(
-      `Batalkan antrean notifikasi untuk ${item.nama_siswa || item.tujuan_nomor}?`,
-    );
+    const confirmed = await konfirmasi({
+      title: "Batalkan notifikasi ini?",
+      description: `Pesan untuk ${item.nama_siswa || item.tujuan_nomor} tidak akan pernah dikirim.`,
+      preserved:
+        "Barisnya tetap tercatat berstatus Dibatalkan sebagai jejak audit, bukan dihapus.",
+      confirmLabel: "Ya, batalkan",
+      tone: "warning",
+    });
     if (!confirmed) return;
 
     isSubmittingRef.current = true;
@@ -604,75 +612,13 @@ export default function NotifikasiWaPage() {
 
         {/* Modal Detail Pesan */}
         {selectedItem && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm">
-            <div className="w-full max-w-lg rounded-xl border border-slate-800 bg-slate-900 p-6 shadow-2xl">
-              <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-                <h3 className="text-base font-semibold text-slate-100">
-                  Detail Notifikasi WhatsApp
-                </h3>
-                <button
-                  type="button"
-                  onClick={() => setSelectedItem(null)}
-                  className="rounded-lg p-1 text-slate-400 hover:bg-slate-800 hover:text-slate-200"
-                >
-                  <Icon name="x" className="h-5 w-5" />
-                </button>
-              </div>
-
-              <div className="mt-4 space-y-3 text-xs">
-                <div>
-                  <span className="text-slate-400">ID Notifikasi:</span>{" "}
-                  <span className="font-mono text-slate-200">
-                    {selectedItem.id_notifikasi}
-                  </span>
-                </div>
-                <div>
-                  <span className="text-slate-400">Dedupe Key:</span>{" "}
-                  <span className="font-mono text-slate-200">
-                    {selectedItem.dedupe_key}
-                  </span>
-                </div>
-                <div>
-                  <span className="text-slate-400">Penerima:</span>{" "}
-                  <span className="font-medium text-slate-200">
-                    {selectedItem.nama_siswa} ({selectedItem.nama_rombel})
-                  </span>
-                </div>
-                <div>
-                  <span className="text-slate-400">Nomor Tujuan:</span>{" "}
-                  <span className="font-mono text-slate-200">
-                    {selectedItem.tujuan_nomor}
-                  </span>
-                </div>
-                <div>
-                  <span className="text-slate-400">Waktu Antre:</span>{" "}
-                  <span className="font-mono text-slate-200">
-                    {selectedItem.created_at}
-                  </span>
-                </div>
-                <div>
-                  <span className="text-slate-400">Status:</span>{" "}
-                  {getStatusBadge(selectedItem.status)}
-                </div>
-
-                {selectedItem.last_error && (
-                  <div className="rounded-lg bg-rose-500/10 p-2.5 text-rose-400 ring-1 ring-rose-500/20">
-                    <p className="font-medium">Pesan Error Terakhir:</p>
-                    <p className="mt-1 font-mono text-[11px]">
-                      {selectedItem.last_error}
-                    </p>
-                  </div>
-                )}
-
-                <div>
-                  <p className="mb-1 text-slate-400">Isi Pesan Dibekukan:</p>
-                  <div className="whitespace-pre-wrap rounded-lg border border-slate-800 bg-slate-950 p-3.5 font-sans leading-relaxed text-slate-200">
-                    {selectedItem.isi_pesan}
-                  </div>
-                </div>
-              </div>
-
-              <div className="mt-6 flex justify-end gap-3 border-t border-slate-800 pt-4">
+          <Modal
+            isOpen
+            onClose={() => setSelectedItem(null)}
+            title="Detail Notifikasi WhatsApp"
+            maxWidth="max-w-lg"
+            footer={
+              <div className="flex flex-wrap justify-end gap-3">
                 <a
                   href={`https://wa.me/${selectedItem.tujuan_nomor.replace(
                     /[^\d]/g,
@@ -693,284 +639,324 @@ export default function NotifikasiWaPage() {
                   Tutup
                 </button>
               </div>
+            }
+          >
+            <div className="space-y-3 text-xs">
+              <div>
+                <span className="text-slate-400">ID Notifikasi:</span>{" "}
+                <span className="font-mono text-slate-200">
+                  {selectedItem.id_notifikasi}
+                </span>
+              </div>
+              <div>
+                <span className="text-slate-400">Dedupe Key:</span>{" "}
+                <span className="font-mono text-slate-200">
+                  {selectedItem.dedupe_key}
+                </span>
+              </div>
+              <div>
+                <span className="text-slate-400">Penerima:</span>{" "}
+                <span className="font-medium text-slate-200">
+                  {selectedItem.nama_siswa} ({selectedItem.nama_rombel})
+                </span>
+              </div>
+              <div>
+                <span className="text-slate-400">Nomor Tujuan:</span>{" "}
+                <span className="font-mono text-slate-200">
+                  {selectedItem.tujuan_nomor}
+                </span>
+              </div>
+              <div>
+                <span className="text-slate-400">Waktu Antre:</span>{" "}
+                <span className="font-mono text-slate-200">
+                  {selectedItem.created_at}
+                </span>
+              </div>
+              <div>
+                <span className="text-slate-400">Status:</span>{" "}
+                {getStatusBadge(selectedItem.status)}
+              </div>
+
+              {selectedItem.last_error && (
+                <div className="rounded-lg bg-rose-500/10 p-2.5 text-rose-400 ring-1 ring-rose-500/20">
+                  <p className="font-medium">Pesan Error Terakhir:</p>
+                  <p className="mt-1 font-mono text-[11px]">
+                    {selectedItem.last_error}
+                  </p>
+                </div>
+              )}
+
+              <div>
+                <p className="mb-1 text-slate-400">Isi Pesan Dibekukan:</p>
+                <div className="whitespace-pre-wrap rounded-lg border border-slate-800 bg-slate-950 p-3.5 font-sans leading-relaxed text-slate-200">
+                  {selectedItem.isi_pesan}
+                </div>
+              </div>
             </div>
-          </div>
+          </Modal>
         )}
 
         {/* Modal Konfigurasi Gateway */}
         {configModalOpen && configDraft && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm">
-            <div className="w-full max-w-xl rounded-xl border border-slate-800 bg-slate-900 p-6 shadow-2xl">
-              <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-                <div>
-                  <h3 className="text-base font-semibold text-slate-100">
-                    Konfigurasi WhatsApp Gateway
-                  </h3>
-                  <p className="text-xs text-slate-400">
-                    Pengaturan provider pesan otomatis ke wali (Cloud-Only)
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setConfigModalOpen(false)}
-                  className="rounded-lg p-1 text-slate-400 hover:bg-slate-800 hover:text-slate-200"
-                >
-                  <Icon name="x" className="h-5 w-5" />
-                </button>
-              </div>
-
-              <form onSubmit={handleSaveConfig} className="mt-4 space-y-4">
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                  <div>
-                    <label
-                      htmlFor="cfg-provider"
-                      className="mb-1.5 block text-xs font-medium text-slate-300"
-                    >
-                      Provider WhatsApp
-                    </label>
-                    <select
-                      id="cfg-provider"
-                      value={configDraft.provider}
-                      onChange={(e) =>
-                        setConfigDraft({
-                          ...configDraft,
-                          provider: e.target.value as WaConfigProvider,
-                        })
-                      }
-                      className="w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-xs text-slate-200 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
-                    >
-                      <option value="fonnte">Fonnte (Indonesia)</option>
-                      <option value="wablas">Wablas (Indonesia)</option>
-                      <option value="custom">Custom HTTP API</option>
-                    </select>
-                  </div>
-
-                  <div>
-                    <label
-                      htmlFor="cfg-daily-limit"
-                      className="mb-1.5 block text-xs font-medium text-slate-300"
-                    >
-                      Batas Harian (Pesan/Hari)
-                    </label>
-                    <input
-                      id="cfg-daily-limit"
-                      type="number"
-                      min={1}
-                      max={50000}
-                      value={configDraft.dailyLimit}
-                      onChange={(e) =>
-                        setConfigDraft({
-                          ...configDraft,
-                          dailyLimit: parseInt(e.target.value, 10) || 1000,
-                        })
-                      }
-                      className="w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-xs text-slate-200 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
-                    />
-                  </div>
-                </div>
-
+          <Modal
+            isOpen
+            onClose={() => setConfigModalOpen(false)}
+            title="Konfigurasi WhatsApp Gateway"
+            subtitle="Pengaturan provider pesan otomatis ke wali (Cloud-Only)"
+            maxWidth="max-w-xl"
+          >
+            <form onSubmit={handleSaveConfig} className="space-y-4">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div>
                   <label
-                    htmlFor="cfg-api-key"
+                    htmlFor="cfg-provider"
                     className="mb-1.5 block text-xs font-medium text-slate-300"
                   >
-                    API Key / Token Gateway
+                    Provider WhatsApp
                   </label>
-                  <div className="relative">
-                    <input
-                      id="cfg-api-key"
-                      type={showApiKey ? "text" : "password"}
-                      placeholder={
-                        config?.hasApiKey
-                          ? "(Tersimpan di vault. Biarkan kosong jika tidak diubah)"
-                          : "Masukkan API Key dari dashboard provider..."
-                      }
-                      value={configDraft.apiKey}
-                      onChange={(e) =>
-                        setConfigDraft({
-                          ...configDraft,
-                          apiKey: e.target.value,
-                        })
-                      }
-                      className="w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 pr-10 text-xs font-mono text-slate-200 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowApiKey(!showApiKey)}
-                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-200"
-                    >
-                      <Icon
-                        name={showApiKey ? "eye-off" : "eye"}
-                        className="h-4 w-4"
-                      />
-                    </button>
-                  </div>
-                </div>
-
-                {configDraft.provider === "custom" && (
-                  <div>
-                    <label
-                      htmlFor="cfg-api-url"
-                      className="mb-1.5 block text-xs font-medium text-slate-300"
-                    >
-                      Endpoint URL Custom API
-                    </label>
-                    <input
-                      id="cfg-api-url"
-                      type="url"
-                      placeholder="https://api.gateway-anda.com/send"
-                      value={configDraft.apiUrl ?? ""}
-                      onChange={(e) =>
-                        setConfigDraft({
-                          ...configDraft,
-                          apiUrl: e.target.value,
-                        })
-                      }
-                      className="w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-xs font-mono text-slate-200 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
-                    />
-                  </div>
-                )}
-
-                <div>
-                  <label
-                    htmlFor="cfg-sender-number"
-                    className="mb-1.5 block text-xs font-medium text-slate-300"
-                  >
-                    Nomor Pengirim / Device ID (Opsional)
-                  </label>
-                  <input
-                    id="cfg-sender-number"
-                    type="text"
-                    placeholder="Contoh: 081234567890 atau device_01"
-                    value={configDraft.senderNumber ?? ""}
+                  <select
+                    id="cfg-provider"
+                    value={configDraft.provider}
                     onChange={(e) =>
                       setConfigDraft({
                         ...configDraft,
-                        senderNumber: e.target.value,
+                        provider: e.target.value as WaConfigProvider,
+                      })
+                    }
+                    className="w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-xs text-slate-200 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                  >
+                    <option value="fonnte">Fonnte (Indonesia)</option>
+                    <option value="wablas">Wablas (Indonesia)</option>
+                    <option value="custom">Custom HTTP API</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label
+                    htmlFor="cfg-daily-limit"
+                    className="mb-1.5 block text-xs font-medium text-slate-300"
+                  >
+                    Batas Harian (Pesan/Hari)
+                  </label>
+                  <input
+                    id="cfg-daily-limit"
+                    type="number"
+                    min={1}
+                    max={50000}
+                    value={configDraft.dailyLimit}
+                    onChange={(e) =>
+                      setConfigDraft({
+                        ...configDraft,
+                        dailyLimit: parseInt(e.target.value, 10) || 1000,
                       })
                     }
                     className="w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-xs text-slate-200 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
                   />
                 </div>
+              </div>
 
-                <div className="rounded-lg border border-slate-800 bg-slate-950/60 p-3.5">
-                  <p className="mb-2 text-xs font-semibold text-slate-300">
-                    Pemicu Notifikasi Otomatis
-                  </p>
-                  <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2 text-xs">
-                    <label className="flex items-center gap-2 text-slate-300 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={configDraft.scanMasukEnabled}
-                        onChange={(e) =>
-                          setConfigDraft({
-                            ...configDraft,
-                            scanMasukEnabled: e.target.checked,
-                          })
-                        }
-                        className="rounded border-slate-700 text-indigo-600 focus:ring-indigo-500"
-                      />
-                      Scan Masuk Gerbang
-                    </label>
-
-                    <label className="flex items-center gap-2 text-slate-300 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={configDraft.scanPulangEnabled}
-                        onChange={(e) =>
-                          setConfigDraft({
-                            ...configDraft,
-                            scanPulangEnabled: e.target.checked,
-                          })
-                        }
-                        className="rounded border-slate-700 text-indigo-600 focus:ring-indigo-500"
-                      />
-                      Scan Pulang Gerbang
-                    </label>
-
-                    <label className="flex items-center gap-2 text-slate-300 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={configDraft.bolosEnabled}
-                        onChange={(e) =>
-                          setConfigDraft({
-                            ...configDraft,
-                            bolosEnabled: e.target.checked,
-                          })
-                        }
-                        className="rounded border-slate-700 text-indigo-600 focus:ring-indigo-500"
-                      />
-                      Deteksi Bolos Kelas
-                    </label>
-
-                    <label className="flex items-center gap-2 text-slate-300 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={configDraft.ambangAlfaEnabled}
-                        onChange={(e) =>
-                          setConfigDraft({
-                            ...configDraft,
-                            ambangAlfaEnabled: e.target.checked,
-                          })
-                        }
-                        className="rounded border-slate-700 text-indigo-600 focus:ring-indigo-500"
-                      />
-                      Peringatan Ambang Alfa
-                    </label>
-                  </div>
-                  <p className="mt-2.5 text-[11px] leading-relaxed text-slate-400">
-                    Pemicu yang dimatikan tidak akan membuat baris antrean sama
-                    sekali — bukan sekadar tidak dikirim. Sekolah 800 siswa
-                    menghasilkan sekitar 1.600 baris per hari bila Scan Masuk
-                    dan Scan Pulang dibiarkan menyala. Keempatnya bawaannya
-                    mati, dan perubahan di sini ikut tersinkronisasi ke seluruh
-                    terminal pemindai.
-                  </p>
+              <div>
+                <label
+                  htmlFor="cfg-api-key"
+                  className="mb-1.5 block text-xs font-medium text-slate-300"
+                >
+                  API Key / Token Gateway
+                </label>
+                <div className="relative">
+                  <input
+                    id="cfg-api-key"
+                    type={showApiKey ? "text" : "password"}
+                    placeholder={
+                      config?.hasApiKey
+                        ? "(Tersimpan di vault. Biarkan kosong jika tidak diubah)"
+                        : "Masukkan API Key dari dashboard provider..."
+                    }
+                    value={configDraft.apiKey}
+                    onChange={(e) =>
+                      setConfigDraft({
+                        ...configDraft,
+                        apiKey: e.target.value,
+                      })
+                    }
+                    className="w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 pr-10 text-xs font-mono text-slate-200 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowApiKey(!showApiKey)}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-200"
+                  >
+                    <Icon
+                      name={showApiKey ? "eye-off" : "eye"}
+                      className="h-4 w-4"
+                    />
+                  </button>
                 </div>
+              </div>
 
-                <div className="rounded-lg border border-amber-500/20 bg-amber-500/10 p-3.5">
-                  <label className="flex items-center gap-2.5 text-xs font-semibold text-amber-300 cursor-pointer">
+              {configDraft.provider === "custom" && (
+                <div>
+                  <label
+                    htmlFor="cfg-api-url"
+                    className="mb-1.5 block text-xs font-medium text-slate-300"
+                  >
+                    Endpoint URL Custom API
+                  </label>
+                  <input
+                    id="cfg-api-url"
+                    type="url"
+                    placeholder="https://api.gateway-anda.com/send"
+                    value={configDraft.apiUrl ?? ""}
+                    onChange={(e) =>
+                      setConfigDraft({
+                        ...configDraft,
+                        apiUrl: e.target.value,
+                      })
+                    }
+                    className="w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-xs font-mono text-slate-200 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                  />
+                </div>
+              )}
+
+              <div>
+                <label
+                  htmlFor="cfg-sender-number"
+                  className="mb-1.5 block text-xs font-medium text-slate-300"
+                >
+                  Nomor Pengirim / Device ID (Opsional)
+                </label>
+                <input
+                  id="cfg-sender-number"
+                  type="text"
+                  placeholder="Contoh: 081234567890 atau device_01"
+                  value={configDraft.senderNumber ?? ""}
+                  onChange={(e) =>
+                    setConfigDraft({
+                      ...configDraft,
+                      senderNumber: e.target.value,
+                    })
+                  }
+                  className="w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-xs text-slate-200 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                />
+              </div>
+
+              <div className="rounded-lg border border-slate-800 bg-slate-950/60 p-3.5">
+                <p className="mb-2 text-xs font-semibold text-slate-300">
+                  Pemicu Notifikasi Otomatis
+                </p>
+                <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2 text-xs">
+                  <label className="flex items-center gap-2 text-slate-300 cursor-pointer">
                     <input
                       type="checkbox"
-                      checked={configDraft.isActive}
+                      checked={configDraft.scanMasukEnabled}
                       onChange={(e) =>
                         setConfigDraft({
                           ...configDraft,
-                          isActive: e.target.checked,
+                          scanMasukEnabled: e.target.checked,
                         })
                       }
-                      className="h-4 w-4 rounded border-slate-700 text-amber-500 focus:ring-amber-400"
+                      className="rounded border-slate-700 text-indigo-600 focus:ring-indigo-500"
                     />
-                    Aktifkan Pengiriman Otomatis WhatsApp Gateway
+                    Scan Masuk Gerbang
                   </label>
-                  <p className="mt-1 text-[11px] text-amber-400/80">
-                    Bila nonaktif, antrean tetap dicatat dan Anda dapat mengirim
-                    pesan satu per satu secara gratis menggunakan tautan
-                    WhatsApp Web (wa.me).
-                  </p>
-                </div>
 
-                <div className="mt-6 flex justify-end gap-3 border-t border-slate-800 pt-4">
-                  <button
-                    type="button"
-                    onClick={() => setConfigModalOpen(false)}
-                    className="rounded-lg border border-slate-700 bg-slate-800 px-4 py-2 text-xs font-medium text-slate-300 transition hover:bg-slate-700"
-                  >
-                    Batal
-                  </button>
-                  <button
-                    type="submit"
-                    disabled={savingConfig}
-                    className="rounded-lg bg-indigo-600 px-4 py-2 text-xs font-semibold text-white shadow transition hover:bg-indigo-500 disabled:opacity-50"
-                  >
-                    {savingConfig ? "Menyimpan..." : "Simpan Konfigurasi"}
-                  </button>
+                  <label className="flex items-center gap-2 text-slate-300 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={configDraft.scanPulangEnabled}
+                      onChange={(e) =>
+                        setConfigDraft({
+                          ...configDraft,
+                          scanPulangEnabled: e.target.checked,
+                        })
+                      }
+                      className="rounded border-slate-700 text-indigo-600 focus:ring-indigo-500"
+                    />
+                    Scan Pulang Gerbang
+                  </label>
+
+                  <label className="flex items-center gap-2 text-slate-300 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={configDraft.bolosEnabled}
+                      onChange={(e) =>
+                        setConfigDraft({
+                          ...configDraft,
+                          bolosEnabled: e.target.checked,
+                        })
+                      }
+                      className="rounded border-slate-700 text-indigo-600 focus:ring-indigo-500"
+                    />
+                    Deteksi Bolos Kelas
+                  </label>
+
+                  <label className="flex items-center gap-2 text-slate-300 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={configDraft.ambangAlfaEnabled}
+                      onChange={(e) =>
+                        setConfigDraft({
+                          ...configDraft,
+                          ambangAlfaEnabled: e.target.checked,
+                        })
+                      }
+                      className="rounded border-slate-700 text-indigo-600 focus:ring-indigo-500"
+                    />
+                    Peringatan Ambang Alfa
+                  </label>
                 </div>
-              </form>
-            </div>
-          </div>
+                <p className="mt-2.5 text-[11px] leading-relaxed text-slate-400">
+                  Pemicu yang dimatikan tidak akan membuat baris antrean sama
+                  sekali — bukan sekadar tidak dikirim. Sekolah 800 siswa
+                  menghasilkan sekitar 1.600 baris per hari bila Scan Masuk dan
+                  Scan Pulang dibiarkan menyala. Keempatnya bawaannya mati, dan
+                  perubahan di sini ikut tersinkronisasi ke seluruh terminal
+                  pemindai.
+                </p>
+              </div>
+
+              <div className="rounded-lg border border-amber-500/20 bg-amber-500/10 p-3.5">
+                <label className="flex items-center gap-2.5 text-xs font-semibold text-amber-300 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={configDraft.isActive}
+                    onChange={(e) =>
+                      setConfigDraft({
+                        ...configDraft,
+                        isActive: e.target.checked,
+                      })
+                    }
+                    className="h-4 w-4 rounded border-slate-700 text-amber-500 focus:ring-amber-400"
+                  />
+                  Aktifkan Pengiriman Otomatis WhatsApp Gateway
+                </label>
+                <p className="mt-1 text-[11px] text-amber-400/80">
+                  Bila nonaktif, antrean tetap dicatat dan Anda dapat mengirim
+                  pesan satu per satu secara gratis menggunakan tautan WhatsApp
+                  Web (wa.me).
+                </p>
+              </div>
+
+              <div className="mt-6 flex justify-end gap-3 border-t border-slate-800 pt-4">
+                <button
+                  type="button"
+                  onClick={() => setConfigModalOpen(false)}
+                  className="rounded-lg border border-slate-700 bg-slate-800 px-4 py-2 text-xs font-medium text-slate-300 transition hover:bg-slate-700"
+                >
+                  Batal
+                </button>
+                <button
+                  type="submit"
+                  disabled={savingConfig}
+                  className="rounded-lg bg-indigo-600 px-4 py-2 text-xs font-semibold text-white shadow transition hover:bg-indigo-500 disabled:opacity-50"
+                >
+                  {savingConfig ? "Menyimpan..." : "Simpan Konfigurasi"}
+                </button>
+              </div>
+            </form>
+          </Modal>
         )}
       </div>
+      {dialogKonfirmasi}
     </AppShell>
   );
 }

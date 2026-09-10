@@ -23,6 +23,7 @@ export type AppArea =
   | "password_reset"
   | "attendance_photo"
   | "diagnostics"
+  | "sync"
   | "dasbor_kehadiran"
   | "notifikasi_wa"
   | "bimbingan_konseling";
@@ -60,6 +61,10 @@ const AREA_PERMISSION: Record<
   password_reset: "password_reset.view",
   attendance_photo: "attendance_photo.view",
   diagnostics: "diagnostics.view",
+  // Halaman status sinkronisasi menampilkan konflik, yang memuat payload lintas
+  // domain. `sync.view` sudah ada di paket bawaan peran operator DAN scanner,
+  // jadi memasang penjaganya tidak mencabut akses siapa pun.
+  sync: "sync.view",
 };
 
 export function hasPermission(

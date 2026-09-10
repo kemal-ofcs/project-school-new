@@ -1160,10 +1160,7 @@ pub fn save_scan_security(state: &DesktopState, payload: &Value) -> Result<Value
         .transaction()
         .map_err(|_| CommandError::internal())?;
     for (key, value) in [
-        (
-            scanner::SCAN_PHOTO_ENABLED_KEY,
-            flag("photoEnabled"),
-        ),
+        (scanner::SCAN_PHOTO_ENABLED_KEY, flag("photoEnabled")),
         (
             scanner::SCAN_IP_RESTRICTION_ENABLED_KEY,
             flag("ipRestrictionEnabled"),
@@ -2581,11 +2578,10 @@ pub fn get_attendance_audit(
     // salah untuk shift malam: jendela pulangnya baru tutup pukul 09:00 H+1,
     // sehingga sesi yang masih berjalan dilaporkan "Belum Scan Pulang" saat
     // diaudit pagi harinya.
-    let menit_berjalan =
-        match super::time_policy::days_between(&tanggal_target, &hari_ini) {
-            Ok(selisih) => selisih * 1440 + parse_time_to_minutes(&jam_sekarang),
-            Err(_) => i64::MAX / 4,
-        };
+    let menit_berjalan = match super::time_policy::days_between(&tanggal_target, &hari_ini) {
+        Ok(selisih) => selisih * 1440 + parse_time_to_minutes(&jam_sekarang),
+        Err(_) => i64::MAX / 4,
+    };
 
     let hari_libur: Option<String> = connection
         .query_row(
@@ -2610,7 +2606,8 @@ pub fn get_attendance_audit(
             "#,
         )
         .map_err(|_| CommandError::internal())?;
-    let mut shifts: HashMap<i64, (String, String, String, i64, i64, i64, i64, i64)> = HashMap::new();
+    let mut shifts: HashMap<i64, (String, String, String, i64, i64, i64, i64, i64)> =
+        HashMap::new();
     let shift_rows = shift_statement
         .query_map([], |row| {
             Ok((
@@ -2828,10 +2825,10 @@ pub fn get_attendance_audit(
 
         let mut bermasalah = false;
         let catat = |kategori: &'static str,
-                         keparahan: &'static str,
-                         detail: String,
-                         record: Option<&(String, String, String, String, i64, i64)>,
-                         temuan: &mut Vec<TemuanAudit>| {
+                     keparahan: &'static str,
+                     detail: String,
+                     record: Option<&(String, String, String, String, i64, i64)>,
+                     temuan: &mut Vec<TemuanAudit>| {
             temuan.push(TemuanAudit {
                 id_karyawan: id_unik.clone(),
                 nama: nama.clone(),
@@ -2982,7 +2979,9 @@ pub fn get_attendance_audit(
                 catat(
                     "Scan Ditolak",
                     "sedang",
-                    format!("Ada {ditolak} scan ditolak (geofence, multi-scan, atau di luar jendela)."),
+                    format!(
+                        "Ada {ditolak} scan ditolak (geofence, multi-scan, atau di luar jendela)."
+                    ),
                     record,
                     &mut temuan,
                 );
@@ -3815,7 +3814,10 @@ pub fn force_enqueue_settings(state: &DesktopState) -> Result<Value, CommandErro
     drop(cp_stmt);
 
     for profile in profiles {
-        let cp_id = profile.get("id").and_then(Value::as_str).unwrap_or("default_company");
+        let cp_id = profile
+            .get("id")
+            .and_then(Value::as_str)
+            .unwrap_or("default_company");
         let _ = sync::enqueue(
             &transaction,
             &client_id,
@@ -3854,7 +3856,10 @@ pub fn force_enqueue_settings(state: &DesktopState) -> Result<Value, CommandErro
     drop(tpl_stmt);
 
     for template in templates {
-        let tpl_id = template.get("id").and_then(Value::as_str).unwrap_or("default_template");
+        let tpl_id = template
+            .get("id")
+            .and_then(Value::as_str)
+            .unwrap_or("default_template");
         let _ = sync::enqueue(
             &transaction,
             &client_id,

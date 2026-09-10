@@ -1,3 +1,8 @@
+// BERKAS INI HASIL SALIN OTOMATIS dari web-desktop oleh
+// `mobile/scripts/sync-rust-modules.ts`. JANGAN disunting dengan tangan —
+// perubahannya akan tertimpa diam-diam pada sinkronisasi berikutnya.
+// Sunting sumbernya: `web-desktop/src-tauri/src/desktop/time_policy.rs`.
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum ShiftKind {
     Regular,
@@ -808,7 +813,10 @@ mod tests {
         shift.night_buffer_minutes = 120;
 
         // 06:00 hari berikutnya (360 + 1440) + 60 + 120 + offset 30.
-        assert_eq!(alfa_generation_minute(&shift, 30), Some(1800 + 60 + 120 + 30));
+        assert_eq!(
+            alfa_generation_minute(&shift, 30),
+            Some(1800 + 60 + 120 + 30)
+        );
     }
 
     #[test]

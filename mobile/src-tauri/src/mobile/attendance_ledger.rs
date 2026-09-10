@@ -1,3 +1,8 @@
+// BERKAS INI HASIL SALIN OTOMATIS dari web-desktop oleh
+// `mobile/scripts/sync-rust-modules.ts`. JANGAN disunting dengan tangan —
+// perubahannya akan tertimpa diam-diam pada sinkronisasi berikutnya.
+// Sunting sumbernya: `web-desktop/src-tauri/src/desktop/attendance_ledger.rs`.
+
 use rusqlite::{params, OptionalExtension};
 use serde_json::{json, Value};
 
@@ -545,8 +550,9 @@ mod tests {
             .expect("delete frozen ledger");
         assert_eq!(del_res["sukses"], true);
 
-        let frozen_after = get_frozen_ledger(&state, "ta_2026_ganjil", "Ganjil", Some("rombel_10a"))
-            .expect("get frozen ledger after delete");
+        let frozen_after =
+            get_frozen_ledger(&state, "ta_2026_ganjil", "Ganjil", Some("rombel_10a"))
+                .expect("get frozen ledger after delete");
         assert_eq!(frozen_after.as_array().expect("empty array").len(), 0);
     }
 }

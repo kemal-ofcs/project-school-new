@@ -39,6 +39,8 @@ export async function POST(request: NextRequest) {
               ? body.tanggal_selesai
               : undefined,
           divisi: typeof body.divisi === "string" ? body.divisi : undefined,
+          limit: Number(body.limit) || undefined,
+          offset: Number(body.offset) || undefined,
         }),
       });
     if (body.kind === "scan-history")

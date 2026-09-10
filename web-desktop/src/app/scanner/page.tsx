@@ -5,6 +5,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { AppShell } from "@/components/AppShell";
+import { Modal } from "@/components/ui/Modal";
 import { canAccessArea, hasPermission } from "@/lib/auth/access";
 import {
   getCachedCoordinates,
@@ -677,16 +678,16 @@ export default function ScannerPage() {
       {/* Penahanan scan untuk foto wajah + latar. Panel ini menutupi layar
           supaya jelas bahwa absensi BELUM terkirim sampai fotonya diambil. */}
       {pendingScan ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/95 p-4">
-          <div className="w-full max-w-md space-y-4 rounded-3xl border border-white/10 bg-slate-900 p-5">
+        <Modal
+          isOpen
+          onClose={closePhotoHold}
+          title="Ambil foto wajah & latar"
+          subtitle="QR terbaca — absensi ditahan"
+          maxWidth="max-w-md"
+        >
+          <div className="space-y-4">
             <div>
-              <p className="text-[11px] font-bold uppercase tracking-wider text-amber-300">
-                QR terbaca — absensi ditahan
-              </p>
-              <h2 className="mt-1 text-lg font-black text-white">
-                Ambil foto wajah &amp; latar
-              </h2>
-              <p className="mt-1 text-xs leading-5 text-slate-400">
+              <p className="text-xs leading-5 text-slate-400">
                 Hadapkan wajah ke kamera bersama latar tempat Anda berdiri. Foto
                 diambil otomatis setelah wajah terdeteksi dan Anda tahan diam
                 sejenak, dan absensi baru dikirim setelah fotonya tersimpan.
@@ -768,7 +769,7 @@ export default function ScannerPage() {
               </button>
             </div>
           </div>
-        </div>
+        </Modal>
       ) : null}
 
       {/* Header Bar Terminal */}
@@ -870,6 +871,7 @@ export default function ScannerPage() {
                   {/* Camera Device Selector if multiple cameras exist */}
                   {cameraDevices.length > 1 ? (
                     <select
+                      aria-label="Kamera pemindai"
                       value={selectedDeviceId}
                       onChange={(e) => {
                         setSelectedDeviceId(e.target.value);

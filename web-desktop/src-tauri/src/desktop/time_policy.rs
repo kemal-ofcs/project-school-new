@@ -808,7 +808,10 @@ mod tests {
         shift.night_buffer_minutes = 120;
 
         // 06:00 hari berikutnya (360 + 1440) + 60 + 120 + offset 30.
-        assert_eq!(alfa_generation_minute(&shift, 30), Some(1800 + 60 + 120 + 30));
+        assert_eq!(
+            alfa_generation_minute(&shift, 30),
+            Some(1800 + 60 + 120 + 30)
+        );
     }
 
     #[test]

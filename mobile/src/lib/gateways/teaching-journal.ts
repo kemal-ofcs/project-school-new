@@ -33,6 +33,7 @@ export interface TeachingJournalFilter {
   id_guru?: string;
   tanggal_mulai?: string;
   tanggal_selesai?: string;
+  limit?: number;
 }
 
 export interface SaveTeachingJournalDraft {
@@ -72,6 +73,7 @@ export async function listTeachingJournals(
       idGuru: filter?.id_guru || null,
       tanggalMulai: filter?.tanggal_mulai || null,
       tanggalSelesai: filter?.tanggal_selesai || null,
+      limit: filter?.limit ?? null,
     });
   }
   return requestWebApi<TeachingJournal[]>(

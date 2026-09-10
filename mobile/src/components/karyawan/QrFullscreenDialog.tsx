@@ -1,9 +1,10 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Icon } from "@/components/ui/Icon";
 import { downloadDataUrl } from "@/lib/client/download";
 import { triggerHaptic } from "@/lib/client/haptics";
 import { shareDataUrl } from "@/lib/client/share";
 import { BRANDING } from "@/lib/constants/branding";
+import { useDialogFocus } from "@/lib/hooks/useDialogFocus";
 
 interface QrFullscreenDialogProps {
   /** Data URL base64 dari QR Code yang akan ditampilkan. */
@@ -27,6 +28,7 @@ export function QrFullscreenDialog({
   isOpen,
   onClose,
 }: QrFullscreenDialogProps) {
+  const dialogRef = useRef<HTMLDivElement | null>(null);
   const [saveStatus, setSaveStatus] = useState<string | null>(null);
   const [sharing, setSharing] = useState(false);
 
@@ -40,15 +42,15 @@ export function QrFullscreenDialog({
     return () => window.removeEventListener("keydown", handleKey);
   }, [isOpen, onClose]);
 
-  // Cegah body scroll saat dialog terbuka
-  useEffect(() => {
-    if (!isOpen) return;
-    const prev = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    return () => {
-      document.body.style.overflow = prev;
-    };
-  }, [isOpen]);
+  // Dialog ini sengaja TIDAK memakai <Modal>: ia layar penuh dan
+  // `theme-invariant` dengan latar putih supaya QR-nya terpindai andal, yang
+  // justru hilang bila dibungkus panel gelap standar. Semantik dan Escape-nya
+  // sudah ada; yang kurang hanya pengelolaan fokus dan kunci gulir, dan hook
+  // yang sama dengan <Modal> memenuhi keduanya sekaligus.
+  //
+  // WAJIB dipanggil SEBELUM early return di bawah: hook yang dilewati pada
+  // sebagian render mengubah urutan hook dan menjatuhkan komponennya.
+  useDialogFocus(dialogRef, isOpen);
 
   if (!isOpen) return null;
 
@@ -95,6 +97,8 @@ export function QrFullscreenDialog({
 
   return (
     <div
+      ref={dialogRef}
+      tabIndex={-1}
       role="dialog"
       aria-modal="true"
       aria-label={`QR Code absensi: ${employeeName}`}

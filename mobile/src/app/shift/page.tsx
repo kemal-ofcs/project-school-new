@@ -118,8 +118,17 @@ export default function MobileShiftPage() {
   useEffect(() => {
     if (!authLoading && !isAuthenticated) {
       router.replace("/login");
+      return;
     }
-  }, [authLoading, isAuthenticated, router]);
+    // Ditolak izin area: dipulangkan, bukan dibiarkan menatap layar kosong.
+    // Sebelumnya `canView` hanya menahan pemuatan data, sehingga operator
+    // tanpa hak melihat halaman kosong tanpa satu pun penjelasan.
+    //
+    // Mobile memakai static export dan tidak punya rute `/forbidden`.
+    if (!authLoading && isAuthenticated && !canView) {
+      router.replace("/dashboard");
+    }
+  }, [authLoading, isAuthenticated, canView, router]);
 
   const loadShifts = useCallback(async (silent = false) => {
     if (!silent) setLoading(true);
@@ -506,6 +515,7 @@ export default function MobileShiftPage() {
             <path d="m21 21-4.3-4.3" />
           </svg>
           <input
+            aria-label="Cari shift"
             type="text"
             value={search}
             onChange={(e) => setSearch(e.target.value)}

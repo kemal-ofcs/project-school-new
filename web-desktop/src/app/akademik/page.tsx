@@ -1,5 +1,6 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import { redirect } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { AppShell } from "@/components/AppShell";
@@ -33,10 +34,59 @@ import {
   type TahunAjaranInput,
 } from "@/lib/gateways/academic";
 import { getDaftarGuru } from "@/lib/gateways/teacher";
+import { useConfirmDialog } from "@/lib/hooks/useConfirmDialog";
 
 type TabKey = "tahun_ajaran" | "jurusan" | "rombel" | "mapel" | "penugasan";
 
+/**
+ * Kelima panel tab dimuat terpisah.
+ *
+ * Hanya satu yang dirender pada satu waktu, sehingga menaruh semuanya di bundel
+ * halaman berarti empat panel yang tidak dilihat ikut diunduh. `ssr: false`
+ * wajib: Desktop dan Mobile memakai `output: "export"`.
+ */
+const TahunAjaranPanel = dynamic(
+  () =>
+    import("@/components/akademik/TahunAjaranPanel").then((mod) => ({
+      default: mod.TahunAjaranPanel,
+    })),
+  { ssr: false },
+);
+
+const JurusanPanel = dynamic(
+  () =>
+    import("@/components/akademik/JurusanPanel").then((mod) => ({
+      default: mod.JurusanPanel,
+    })),
+  { ssr: false },
+);
+
+const RombelPanel = dynamic(
+  () =>
+    import("@/components/akademik/RombelPanel").then((mod) => ({
+      default: mod.RombelPanel,
+    })),
+  { ssr: false },
+);
+
+const MapelPanel = dynamic(
+  () =>
+    import("@/components/akademik/MapelPanel").then((mod) => ({
+      default: mod.MapelPanel,
+    })),
+  { ssr: false },
+);
+
+const PenugasanPanel = dynamic(
+  () =>
+    import("@/components/akademik/PenugasanPanel").then((mod) => ({
+      default: mod.PenugasanPanel,
+    })),
+  { ssr: false },
+);
+
 export default function AkademikPage() {
+  const { konfirmasi, dialogKonfirmasi } = useConfirmDialog();
   const { user, isAuthenticated, isLoading: authLoading } = useAuth();
   const canManage = hasPermission(user, "academic.manage");
 
@@ -202,8 +252,17 @@ export default function AkademikPage() {
     try {
       const res = await getDaftarRombel(taId || undefined);
       setRombelList(res);
-    } catch {
-      // ignore
+    } catch (err) {
+      // Diam di sini berarti daftar LAMA tetap tampil untuk tahun ajaran yang
+      // BARU dipilih — pengguna mengira sedang melihat rombel tahun itu.
+      setRombelList([]);
+      setFeedback({
+        tone: "error",
+        message:
+          err instanceof Error
+            ? err.message
+            : "Daftar rombel untuk tahun ajaran ini gagal dimuat.",
+      });
     }
   };
 
@@ -213,8 +272,17 @@ export default function AkademikPage() {
     try {
       const res = await getDaftarPenugasanGuru(rombelId || undefined);
       setPenugasanList(res);
-    } catch {
-      // ignore
+    } catch (err) {
+      // Alasan yang sama dengan filter rombel di atas: daftar basi yang
+      // dibiarkan tampil lebih menyesatkan daripada daftar kosong.
+      setPenugasanList([]);
+      setFeedback({
+        tone: "error",
+        message:
+          err instanceof Error
+            ? err.message
+            : "Daftar penugasan guru gagal dimuat.",
+      });
     }
   };
 
@@ -241,7 +309,14 @@ export default function AkademikPage() {
 
   const handleDeleteItem = async (type: TabKey, id: string) => {
     if (!canManage) return;
-    const ok = window.confirm("Apakah Anda yakin ingin menghapus data ini?");
+    const ok = await konfirmasi({
+      title: "Hapus data akademik ini?",
+      description:
+        "Baris ini dihapus permanen dan penghapusannya ikut tersinkronisasi ke seluruh perangkat.",
+      preserved:
+        "Data absensi dan presensi yang sudah tercatat tidak ikut terhapus.",
+      confirmLabel: "Ya, hapus",
+    });
     if (!ok) return;
 
     try {
@@ -479,597 +554,67 @@ export default function AkademikPage() {
 
         {/* Tab 1: Tahun Ajaran */}
         {activeTab === "tahun_ajaran" ? (
-          <div className="overflow-hidden rounded-2xl border border-white/10 bg-slate-900/60 shadow-xl backdrop-blur-xl">
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-sm text-slate-200">
-                <thead className="border-b border-white/10 bg-white/[0.03] text-xs uppercase tracking-wider text-slate-400">
-                  <tr>
-                    <th className="px-6 py-4">Tahun Ajaran</th>
-                    <th className="px-6 py-4">Semester</th>
-                    <th className="px-6 py-4">Periode</th>
-                    <th className="px-6 py-4">Status</th>
-                    <th className="px-6 py-4 text-right">Aksi</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-white/5">
-                  {loading ? (
-                    <tr>
-                      <td
-                        colSpan={5}
-                        className="px-6 py-8 text-center text-slate-400"
-                      >
-                        Memuat data tahun ajaran...
-                      </td>
-                    </tr>
-                  ) : tahunAjaranList.length === 0 ? (
-                    <tr>
-                      <td
-                        colSpan={5}
-                        className="px-6 py-8 text-center text-slate-400"
-                      >
-                        Belum ada data tahun ajaran. Silakan tambahkan data
-                        baru.
-                      </td>
-                    </tr>
-                  ) : (
-                    tahunAjaranList.map((item) => {
-                      const id = String(item.id_tahun_ajaran);
-                      const isAktif = Number(item.is_aktif) === 1;
-                      return (
-                        <tr
-                          key={id}
-                          className="transition hover:bg-white/[0.02]"
-                        >
-                          <td className="px-6 py-4 font-bold text-white">
-                            {String(item.nama_tahun)}
-                          </td>
-                          <td className="px-6 py-4">{String(item.semester)}</td>
-                          <td className="px-6 py-4 text-xs text-slate-400">
-                            {String(item.tanggal_mulai)} s/d{" "}
-                            {String(item.tanggal_selesai)}
-                          </td>
-                          <td className="px-6 py-4">
-                            {isAktif ? (
-                              <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-400/10 px-3 py-1 text-xs font-semibold text-emerald-400 border border-emerald-400/20">
-                                <span className="size-1.5 rounded-full bg-emerald-400" />
-                                Aktif Berjalan
-                              </span>
-                            ) : (
-                              <span className="inline-flex items-center gap-1.5 rounded-full bg-slate-800 px-3 py-1 text-xs font-semibold text-slate-400 border border-white/5">
-                                Nonaktif
-                              </span>
-                            )}
-                          </td>
-                          <td className="px-6 py-4 text-right">
-                            <div className="flex items-center justify-end gap-2">
-                              {!isAktif && canManage ? (
-                                <button
-                                  type="button"
-                                  onClick={() => void handleSetActiveTA(id)}
-                                  className="rounded-lg bg-sky-500/10 px-2.5 py-1 text-xs font-bold text-sky-400 border border-sky-500/20 hover:bg-sky-500/20"
-                                >
-                                  Jadikan Aktif
-                                </button>
-                              ) : null}
-                              {canManage ? (
-                                <>
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      setFormTA({
-                                        id_tahun_ajaran: id,
-                                        nama_tahun: String(item.nama_tahun),
-                                        semester:
-                                          String(item.semester) === "Genap"
-                                            ? "Genap"
-                                            : "Ganjil",
-                                        tanggal_mulai: String(
-                                          item.tanggal_mulai,
-                                        ),
-                                        tanggal_selesai: String(
-                                          item.tanggal_selesai,
-                                        ),
-                                        is_aktif: Number(item.is_aktif),
-                                      });
-                                      setModalType("tahun_ajaran");
-                                    }}
-                                    className="rounded-lg bg-white/5 p-1.5 text-slate-300 hover:bg-white/10 hover:text-white"
-                                    title="Edit"
-                                  >
-                                    <Icon name="tools" className="size-4" />
-                                  </button>
-                                  <button
-                                    type="button"
-                                    onClick={() =>
-                                      void handleDeleteItem("tahun_ajaran", id)
-                                    }
-                                    className="rounded-lg bg-rose-500/10 p-1.5 text-rose-400 hover:bg-rose-500/20"
-                                    title="Hapus"
-                                  >
-                                    <Icon name="trash" className="size-4" />
-                                  </button>
-                                </>
-                              ) : null}
-                            </div>
-                          </td>
-                        </tr>
-                      );
-                    })
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </div>
+          <TahunAjaranPanel
+            tahunAjaranList={tahunAjaranList}
+            loading={loading}
+            canManage={canManage}
+            setFormTA={setFormTA}
+            setModalType={setModalType}
+            handleSetActiveTA={handleSetActiveTA}
+            handleDeleteItem={handleDeleteItem}
+          />
         ) : null}
 
         {/* Tab 2: Jurusan */}
         {activeTab === "jurusan" ? (
-          <div className="overflow-hidden rounded-2xl border border-white/10 bg-slate-900/60 shadow-xl backdrop-blur-xl">
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-sm text-slate-200">
-                <thead className="border-b border-white/10 bg-white/[0.03] text-xs uppercase tracking-wider text-slate-400">
-                  <tr>
-                    <th className="px-6 py-4">Kode</th>
-                    <th className="px-6 py-4">Nama Jurusan</th>
-                    <th className="px-6 py-4">Deskripsi</th>
-                    <th className="px-6 py-4">Status</th>
-                    <th className="px-6 py-4 text-right">Aksi</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-white/5">
-                  {loading ? (
-                    <tr>
-                      <td
-                        colSpan={5}
-                        className="px-6 py-8 text-center text-slate-400"
-                      >
-                        Memuat data jurusan...
-                      </td>
-                    </tr>
-                  ) : jurusanList.length === 0 ? (
-                    <tr>
-                      <td
-                        colSpan={5}
-                        className="px-6 py-8 text-center text-slate-400"
-                      >
-                        Belum ada data program keahlian/jurusan.
-                      </td>
-                    </tr>
-                  ) : (
-                    jurusanList.map((item) => {
-                      const id = String(item.id_jurusan);
-                      return (
-                        <tr
-                          key={id}
-                          className="transition hover:bg-white/[0.02]"
-                        >
-                          <td className="px-6 py-4 font-mono font-bold text-sky-400">
-                            {String(item.kode_jurusan)}
-                          </td>
-                          <td className="px-6 py-4 font-bold text-white">
-                            {String(item.nama_jurusan)}
-                          </td>
-                          <td className="px-6 py-4 text-xs text-slate-400 max-w-xs truncate">
-                            {String(item.deskripsi || "-")}
-                          </td>
-                          <td className="px-6 py-4">
-                            {Number(item.is_aktif) === 1 ? (
-                              <span className="rounded-full bg-emerald-400/10 px-2.5 py-0.5 text-xs font-semibold text-emerald-400">
-                                Aktif
-                              </span>
-                            ) : (
-                              <span className="rounded-full bg-slate-800 px-2.5 py-0.5 text-xs font-semibold text-slate-400">
-                                Nonaktif
-                              </span>
-                            )}
-                          </td>
-                          <td className="px-6 py-4 text-right">
-                            {canManage ? (
-                              <div className="flex items-center justify-end gap-2">
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    setFormJurusan({
-                                      id_jurusan: id,
-                                      kode_jurusan: String(item.kode_jurusan),
-                                      nama_jurusan: String(item.nama_jurusan),
-                                      deskripsi: item.deskripsi
-                                        ? String(item.deskripsi)
-                                        : "",
-                                      is_aktif: Number(item.is_aktif),
-                                    });
-                                    setModalType("jurusan");
-                                  }}
-                                  className="rounded-lg bg-white/5 p-1.5 text-slate-300 hover:bg-white/10 hover:text-white"
-                                >
-                                  <Icon name="tools" className="size-4" />
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() =>
-                                    void handleDeleteItem("jurusan", id)
-                                  }
-                                  className="rounded-lg bg-rose-500/10 p-1.5 text-rose-400 hover:bg-rose-500/20"
-                                >
-                                  <Icon name="trash" className="size-4" />
-                                </button>
-                              </div>
-                            ) : null}
-                          </td>
-                        </tr>
-                      );
-                    })
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </div>
+          <JurusanPanel
+            jurusanList={jurusanList}
+            loading={loading}
+            canManage={canManage}
+            setFormJurusan={setFormJurusan}
+            setModalType={setModalType}
+            handleDeleteItem={handleDeleteItem}
+          />
         ) : null}
 
         {/* Tab 3: Rombel */}
         {activeTab === "rombel" ? (
-          <div className="flex flex-col gap-4">
-            <div className="flex items-center gap-3">
-              <label
-                htmlFor="ta-filter-rombel"
-                className="text-xs font-semibold text-slate-400"
-              >
-                Filter Tahun Ajaran:
-              </label>
-              <select
-                id="ta-filter-rombel"
-                value={selectedTaForRombel}
-                onChange={(e) => void handleTaFilterChange(e.target.value)}
-                className="rounded-xl border border-white/10 bg-slate-900 px-3 py-2 text-sm text-slate-100 shadow-inner focus:border-sky-500 focus:outline-none"
-              >
-                {tahunAjaranList.map((ta) => (
-                  <option
-                    key={String(ta.id_tahun_ajaran)}
-                    value={String(ta.id_tahun_ajaran)}
-                    className="bg-slate-900 text-slate-100"
-                  >
-                    {String(ta.nama_tahun)} ({String(ta.semester)})
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div className="overflow-hidden rounded-2xl border border-white/10 bg-slate-900/60 shadow-xl backdrop-blur-xl">
-              <div className="overflow-x-auto">
-                <table className="w-full text-left text-sm text-slate-200">
-                  <thead className="border-b border-white/10 bg-white/[0.03] text-xs uppercase tracking-wider text-slate-400">
-                    <tr>
-                      <th className="px-6 py-4">Tingkat</th>
-                      <th className="px-6 py-4">Nama Rombel</th>
-                      <th className="px-6 py-4">Jurusan</th>
-                      <th className="px-6 py-4">Wali Kelas</th>
-                      <th className="px-6 py-4">Ruang & Siswa</th>
-                      <th className="px-6 py-4 text-right">Aksi</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-white/5">
-                    {loading ? (
-                      <tr>
-                        <td
-                          colSpan={6}
-                          className="px-6 py-8 text-center text-slate-400"
-                        >
-                          Memuat data rombel...
-                        </td>
-                      </tr>
-                    ) : rombelList.length === 0 ? (
-                      <tr>
-                        <td
-                          colSpan={6}
-                          className="px-6 py-8 text-center text-slate-400"
-                        >
-                          Belum ada rombel pada tahun ajaran ini.
-                        </td>
-                      </tr>
-                    ) : (
-                      rombelList.map((item) => {
-                        const id = String(item.id_rombel);
-                        return (
-                          <tr
-                            key={id}
-                            className="transition hover:bg-white/[0.02]"
-                          >
-                            <td className="px-6 py-4 font-mono font-bold text-sky-400">
-                              Kelas {String(item.tingkat)}
-                            </td>
-                            <td className="px-6 py-4 font-bold text-white">
-                              {String(item.nama_rombel)}
-                            </td>
-                            <td className="px-6 py-4 text-xs text-slate-300">
-                              {String(
-                                item.nama_jurusan || item.kode_jurusan || "-",
-                              )}
-                            </td>
-                            <td className="px-6 py-4 text-sm text-slate-300">
-                              {String(
-                                item.nama_wali_kelas || "Belum ditentukan",
-                              )}
-                            </td>
-                            <td className="px-6 py-4 text-xs text-slate-400">
-                              {String(item.ruang_kelas || "-")} |{" "}
-                              {String(item.jumlah_siswa || 0)} /{" "}
-                              {String(item.kapasitas || 36)} Siswa
-                            </td>
-                            <td className="px-6 py-4 text-right">
-                              {canManage ? (
-                                <div className="flex items-center justify-end gap-2">
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      setFormRombel({
-                                        id_rombel: id,
-                                        id_tahun_ajaran: String(
-                                          item.id_tahun_ajaran,
-                                        ),
-                                        tingkat: Number(item.tingkat),
-                                        id_jurusan: item.id_jurusan
-                                          ? String(item.id_jurusan)
-                                          : "",
-                                        nama_rombel: String(item.nama_rombel),
-                                        id_wali_kelas: item.id_wali_kelas
-                                          ? String(item.id_wali_kelas)
-                                          : "",
-                                        kapasitas: Number(item.kapasitas),
-                                        ruang_kelas: item.ruang_kelas
-                                          ? String(item.ruang_kelas)
-                                          : "",
-                                        is_aktif: Number(item.is_aktif),
-                                      });
-                                      setModalType("rombel");
-                                    }}
-                                    className="rounded-lg bg-white/5 p-1.5 text-slate-300 hover:bg-white/10 hover:text-white"
-                                  >
-                                    <Icon name="tools" className="size-4" />
-                                  </button>
-                                  <button
-                                    type="button"
-                                    onClick={() =>
-                                      void handleDeleteItem("rombel", id)
-                                    }
-                                    className="rounded-lg bg-rose-500/10 p-1.5 text-rose-400 hover:bg-rose-500/20"
-                                  >
-                                    <Icon name="trash" className="size-4" />
-                                  </button>
-                                </div>
-                              ) : null}
-                            </td>
-                          </tr>
-                        );
-                      })
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          </div>
+          <RombelPanel
+            rombelList={rombelList}
+            tahunAjaranList={tahunAjaranList}
+            selectedTaForRombel={selectedTaForRombel}
+            loading={loading}
+            canManage={canManage}
+            setFormRombel={setFormRombel}
+            setModalType={setModalType}
+            handleTaFilterChange={handleTaFilterChange}
+            handleDeleteItem={handleDeleteItem}
+          />
         ) : null}
 
         {/* Tab 4: Mapel */}
         {activeTab === "mapel" ? (
-          <div className="overflow-hidden rounded-2xl border border-white/10 bg-slate-900/60 shadow-xl backdrop-blur-xl">
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-sm text-slate-200">
-                <thead className="border-b border-white/10 bg-white/[0.03] text-xs uppercase tracking-wider text-slate-400">
-                  <tr>
-                    <th className="px-6 py-4">Kode</th>
-                    <th className="px-6 py-4">Mata Pelajaran</th>
-                    <th className="px-6 py-4">Kelompok</th>
-                    <th className="px-6 py-4">Beban Jam</th>
-                    <th className="px-6 py-4">KKM</th>
-                    <th className="px-6 py-4 text-right">Aksi</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-white/5">
-                  {loading ? (
-                    <tr>
-                      <td
-                        colSpan={6}
-                        className="px-6 py-8 text-center text-slate-400"
-                      >
-                        Memuat data mata pelajaran...
-                      </td>
-                    </tr>
-                  ) : mapelList.length === 0 ? (
-                    <tr>
-                      <td
-                        colSpan={6}
-                        className="px-6 py-8 text-center text-slate-400"
-                      >
-                        Belum ada kurikulum mata pelajaran.
-                      </td>
-                    </tr>
-                  ) : (
-                    mapelList.map((item) => {
-                      const id = String(item.id_mapel);
-                      return (
-                        <tr
-                          key={id}
-                          className="transition hover:bg-white/[0.02]"
-                        >
-                          <td className="px-6 py-4 font-mono font-bold text-sky-400">
-                            {String(item.kode_mapel)}
-                          </td>
-                          <td className="px-6 py-4 font-bold text-white">
-                            {String(item.nama_mapel)}
-                          </td>
-                          <td className="px-6 py-4">
-                            <span className="rounded-full bg-slate-800 px-2.5 py-0.5 text-xs font-semibold text-slate-300">
-                              {String(item.kelompok)}
-                            </span>
-                          </td>
-                          <td className="px-6 py-4 text-sm text-slate-300">
-                            {String(item.beban_jam)} JP/Minggu
-                          </td>
-                          <td className="px-6 py-4 font-semibold text-amber-400">
-                            {String(item.kkm)}
-                          </td>
-                          <td className="px-6 py-4 text-right">
-                            {canManage ? (
-                              <div className="flex items-center justify-end gap-2">
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    const rawKelompok = String(item.kelompok);
-                                    const kelompokVal = (
-                                      rawKelompok === "Peminatan" ||
-                                      rawKelompok === "Muatan Lokal" ||
-                                      rawKelompok === "Kejuruan"
-                                        ? rawKelompok
-                                        : "Wajib"
-                                    ) as
-                                      | "Wajib"
-                                      | "Peminatan"
-                                      | "Muatan Lokal"
-                                      | "Kejuruan";
-
-                                    setFormMapel({
-                                      id_mapel: id,
-                                      kode_mapel: String(item.kode_mapel),
-                                      nama_mapel: String(item.nama_mapel),
-                                      tingkat: item.tingkat
-                                        ? Number(item.tingkat)
-                                        : undefined,
-                                      kelompok: kelompokVal,
-                                      beban_jam: Number(item.beban_jam),
-                                      kkm: Number(item.kkm),
-                                      is_aktif: Number(item.is_aktif),
-                                    });
-                                    setModalType("mapel");
-                                  }}
-                                  className="rounded-lg bg-white/5 p-1.5 text-slate-300 hover:bg-white/10 hover:text-white"
-                                >
-                                  <Icon name="tools" className="size-4" />
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() =>
-                                    void handleDeleteItem("mapel", id)
-                                  }
-                                  className="rounded-lg bg-rose-500/10 p-1.5 text-rose-400 hover:bg-rose-500/20"
-                                >
-                                  <Icon name="trash" className="size-4" />
-                                </button>
-                              </div>
-                            ) : null}
-                          </td>
-                        </tr>
-                      );
-                    })
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </div>
+          <MapelPanel
+            mapelList={mapelList}
+            loading={loading}
+            canManage={canManage}
+            setFormMapel={setFormMapel}
+            setModalType={setModalType}
+            handleDeleteItem={handleDeleteItem}
+          />
         ) : null}
 
         {/* Tab 5: Penugasan Guru */}
         {activeTab === "penugasan" ? (
-          <div className="flex flex-col gap-4">
-            <div className="flex items-center gap-3">
-              <label
-                htmlFor="rombel-filter-penugasan"
-                className="text-xs font-semibold text-slate-400"
-              >
-                Filter Rombel:
-              </label>
-              <select
-                id="rombel-filter-penugasan"
-                value={selectedRombelForPenugasan}
-                onChange={(e) => void handleRombelFilterChange(e.target.value)}
-                className="rounded-xl border border-white/10 bg-slate-900 px-3 py-2 text-sm text-slate-100 shadow-inner focus:border-sky-500 focus:outline-none"
-              >
-                {rombelList.map((rom) => (
-                  <option
-                    key={String(rom.id_rombel)}
-                    value={String(rom.id_rombel)}
-                    className="bg-slate-900 text-slate-100"
-                  >
-                    Kelas {String(rom.tingkat)} - {String(rom.nama_rombel)}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div className="overflow-hidden rounded-2xl border border-white/10 bg-slate-900/60 shadow-xl backdrop-blur-xl">
-              <div className="overflow-x-auto">
-                <table className="w-full text-left text-sm text-slate-200">
-                  <thead className="border-b border-white/10 bg-white/[0.03] text-xs uppercase tracking-wider text-slate-400">
-                    <tr>
-                      <th className="px-6 py-4">Rombel</th>
-                      <th className="px-6 py-4">Mata Pelajaran</th>
-                      <th className="px-6 py-4">Guru Pengampu</th>
-                      <th className="px-6 py-4">NIP / Gelar</th>
-                      <th className="px-6 py-4 text-right">Aksi</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-white/5">
-                    {loading ? (
-                      <tr>
-                        <td
-                          colSpan={5}
-                          className="px-6 py-8 text-center text-slate-400"
-                        >
-                          Memuat data penugasan guru...
-                        </td>
-                      </tr>
-                    ) : penugasanList.length === 0 ? (
-                      <tr>
-                        <td
-                          colSpan={5}
-                          className="px-6 py-8 text-center text-slate-400"
-                        >
-                          Belum ada penugasan guru pengajar untuk rombel ini.
-                        </td>
-                      </tr>
-                    ) : (
-                      penugasanList.map((item) => {
-                        const id = String(item.id_penugasan);
-                        return (
-                          <tr
-                            key={id}
-                            className="transition hover:bg-white/[0.02]"
-                          >
-                            <td className="px-6 py-4 font-bold text-white">
-                              {String(item.nama_rombel)}
-                            </td>
-                            <td className="px-6 py-4 font-semibold text-sky-400">
-                              {String(item.nama_mapel)} (
-                              {String(item.beban_jam)} JP)
-                            </td>
-                            <td className="px-6 py-4 text-slate-100 font-medium">
-                              {String(item.nama_guru || "-")}
-                            </td>
-                            <td className="px-6 py-4 text-xs text-slate-400">
-                              {String(item.nip || "-")}{" "}
-                              {item.gelar ? `(${String(item.gelar)})` : ""}
-                            </td>
-                            <td className="px-6 py-4 text-right">
-                              {canManage ? (
-                                <button
-                                  type="button"
-                                  onClick={() =>
-                                    void handleDeleteItem("penugasan", id)
-                                  }
-                                  className="rounded-lg bg-rose-500/10 p-1.5 text-rose-400 hover:bg-rose-500/20"
-                                >
-                                  <Icon name="trash" className="size-4" />
-                                </button>
-                              ) : null}
-                            </td>
-                          </tr>
-                        );
-                      })
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          </div>
+          <PenugasanPanel
+            penugasanList={penugasanList}
+            rombelList={rombelList}
+            selectedRombelForPenugasan={selectedRombelForPenugasan}
+            loading={loading}
+            canManage={canManage}
+            handleRombelFilterChange={handleRombelFilterChange}
+            handleDeleteItem={handleDeleteItem}
+          />
         ) : null}
 
         {/* Modal Form */}
@@ -1754,6 +1299,7 @@ export default function AkademikPage() {
           </Modal>
         ) : null}
       </div>
+      {dialogKonfirmasi}
     </AppShell>
   );
 }

@@ -17,6 +17,7 @@ import {
   type SiswaInput,
   simpanSiswa,
 } from "@/lib/gateways/student";
+import { useConfirmDialog } from "@/lib/hooks/useConfirmDialog";
 import { useDebounce } from "@/lib/hooks/useDebounce";
 import { useHydrated } from "@/lib/hooks/useHydrated";
 import { normalizeOperatorPhone } from "@/lib/operators/contact";
@@ -77,6 +78,7 @@ export default function SiswaMobilePage() {
   const [form, setForm] = useState<SiswaInput>(emptyForm());
 
   const isSubmittingRef = useRef(false);
+  const { konfirmasi, dialogKonfirmasi } = useConfirmDialog();
 
   useEffect(() => {
     if (!authLoading && !isAuthenticated) router.replace("/login");
@@ -193,7 +195,15 @@ export default function SiswaMobilePage() {
   const handleDelete = useCallback(
     async (id: string) => {
       if (!canManage || isSubmittingRef.current) return;
-      if (!window.confirm("Hapus profil siswa ini?")) return;
+      const setuju = await konfirmasi({
+        title: "Hapus profil siswa ini?",
+        description:
+          "Profil siswa dinonaktifkan dan hilang dari daftar rombel. Penghapusannya ikut tersinkronisasi ke seluruh perangkat.",
+        preserved:
+          "Riwayat absensi gerbang, presensi kelas, dan leger kehadirannya tetap tersimpan.",
+        confirmLabel: "Ya, hapus",
+      });
+      if (!setuju) return;
       isSubmittingRef.current = true;
       try {
         await hapusSiswa(id);
@@ -210,7 +220,7 @@ export default function SiswaMobilePage() {
         isSubmittingRef.current = false;
       }
     },
-    [canManage, loadData],
+    [canManage, konfirmasi, loadData],
   );
 
   if (authLoading || !isHydrated) {
@@ -282,6 +292,7 @@ export default function SiswaMobilePage() {
           className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400"
         />
         <input
+          aria-label="Cari siswa"
           type="search"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
@@ -593,6 +604,7 @@ export default function SiswaMobilePage() {
           </form>
         </Modal>
       ) : null}
+      {dialogKonfirmasi}
     </MobileAppShell>
   );
 }

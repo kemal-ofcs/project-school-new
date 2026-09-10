@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { AppShell } from "@/components/AppShell";
 import { FeedbackBanner } from "@/components/ui/FeedbackBanner";
+import { Modal } from "@/components/ui/Modal";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { canAccessArea, hasPermission } from "@/lib/auth/access";
 import { useAuth } from "@/lib/context/AuthContext";
@@ -497,26 +498,13 @@ export default function OperationalPage() {
 
       {/* Confirmation Overwrite Modal */}
       {confirmOverwrite ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-sm p-4 animate-in fade-in duration-150">
-          <div className="w-full max-w-md rounded-2xl border border-amber-500/40 bg-slate-900 p-6 shadow-2xl space-y-4">
-            <div className="flex items-center gap-3 text-amber-400">
-              <span className="text-2xl">⚠️</span>
-              <h3 className="text-base font-bold text-white">
-                Konfirmasi Timpa Koreksi
-              </h3>
-            </div>
-            <p className="text-sm text-slate-300">
-              Karyawan{" "}
-              <strong className="text-white">{confirmOverwrite.nama}</strong>{" "}
-              sudah memiliki riwayat koreksi/absensi pada tanggal{" "}
-              <strong className="text-white">{confirmOverwrite.tanggal}</strong>
-              .
-            </p>
-            <p className="text-xs text-amber-300/90 bg-amber-950/40 border border-amber-800/40 p-2.5 rounded-xl">
-              Menyimpan koreksi baru akan memperbarui dan menyelaraskan data
-              absensi pada tanggal tersebut.
-            </p>
-            <div className="flex justify-end gap-3 pt-2">
+        <Modal
+          isOpen
+          onClose={() => setConfirmOverwrite(null)}
+          title="Konfirmasi Timpa Koreksi"
+          maxWidth="max-w-md"
+          footer={
+            <div className="flex justify-end gap-3">
               <button
                 type="button"
                 onClick={() => setConfirmOverwrite(null)}
@@ -536,8 +524,22 @@ export default function OperationalPage() {
                 Ya, Perbarui Koreksi
               </button>
             </div>
+          }
+        >
+          <div className="space-y-4">
+            <p className="text-sm text-slate-300">
+              Karyawan{" "}
+              <strong className="text-white">{confirmOverwrite.nama}</strong>{" "}
+              sudah memiliki riwayat koreksi/absensi pada tanggal{" "}
+              <strong className="text-white">{confirmOverwrite.tanggal}</strong>
+              .
+            </p>
+            <p className="text-xs text-amber-300/90 bg-amber-950/40 border border-amber-800/40 p-2.5 rounded-xl">
+              Menyimpan koreksi baru akan memperbarui dan menyelaraskan data
+              absensi pada tanggal tersebut.
+            </p>
           </div>
-        </div>
+        </Modal>
       ) : null}
 
       {/* Tab Switcher */}
@@ -1461,36 +1463,14 @@ export default function OperationalPage() {
 
       {/* Modal Konfirmasi Hapus Riwayat */}
       {deleteConfirm ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-fadeIn">
-          <div className="w-full max-w-md rounded-3xl border border-rose-800/60 bg-slate-900 p-6 shadow-2xl space-y-4">
-            <div className="border-b border-slate-800 pb-3 flex items-center gap-3 text-rose-400">
-              <div className="w-10 h-10 rounded-2xl bg-rose-950/80 border border-rose-800 flex items-center justify-center text-xl shrink-0">
-                ⚠️
-              </div>
-              <div>
-                <h3 className="text-base font-bold text-white">
-                  Konfirmasi Hapus{" "}
-                  {deleteConfirm.type === "import"
-                    ? "Import Manual"
-                    : "Koreksi"}
-                </h3>
-                <p className="text-xs text-rose-300 mt-0.5 font-mono">
-                  {deleteConfirm.title}
-                </p>
-              </div>
-            </div>
-
-            <div className="bg-slate-950/60 p-3.5 rounded-2xl border border-slate-800 text-xs font-mono text-slate-300 space-y-1">
-              <p>{deleteConfirm.subtitle}</p>
-              <p className="text-amber-400 text-[11px] pt-1">
-                Menghapus{" "}
-                {deleteConfirm.type === "import" ? "rekaman import" : "koreksi"}{" "}
-                akan membatalkan efeknya pada absensi harian dan mencatat jejak
-                audit operator.
-              </p>
-            </div>
-
-            <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-800">
+        <Modal
+          isOpen
+          onClose={() => setDeleteConfirm(null)}
+          title={`Konfirmasi Hapus ${deleteConfirm.type === "import" ? "Import Manual" : "Koreksi"}`}
+          subtitle={deleteConfirm.title}
+          maxWidth="max-w-md"
+          footer={
+            <div className="flex items-center justify-end gap-2">
               <button
                 type="button"
                 disabled={busy}
@@ -1521,8 +1501,20 @@ export default function OperationalPage() {
                 )}
               </button>
             </div>
+          }
+        >
+          <div className="space-y-4">
+            <div className="bg-slate-950/60 p-3.5 rounded-2xl border border-slate-800 text-xs font-mono text-slate-300 space-y-1">
+              <p>{deleteConfirm.subtitle}</p>
+              <p className="text-amber-400 text-[11px] pt-1">
+                Menghapus{" "}
+                {deleteConfirm.type === "import" ? "rekaman import" : "koreksi"}{" "}
+                akan membatalkan efeknya pada absensi harian dan mencatat jejak
+                audit operator.
+              </p>
+            </div>
           </div>
-        </div>
+        </Modal>
       ) : null}
     </AppShell>
   );

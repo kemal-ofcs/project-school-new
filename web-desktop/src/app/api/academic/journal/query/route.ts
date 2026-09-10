@@ -6,6 +6,7 @@ import {
   readJsonBody,
   toApiErrorResponse,
 } from "@/lib/server/http/api-response";
+import { assertSameOriginMutation } from "@/lib/server/http/request-security";
 import {
   getTeachingJournal,
   listTeachingJournals,
@@ -15,6 +16,7 @@ export const runtime = "nodejs";
 
 export async function POST(request: NextRequest) {
   try {
+    assertSameOriginMutation(request);
     await requireWebPermission(request, "teaching_journal.view");
     await ensureServerDatabaseInitialized();
     const body = await readJsonBody<{
@@ -24,6 +26,7 @@ export async function POST(request: NextRequest) {
       id_guru?: string;
       tanggal_mulai?: string;
       tanggal_selesai?: string;
+      limit?: number;
     }>(request);
 
     if (body?.id_presensi_mapel) {
@@ -37,6 +40,7 @@ export async function POST(request: NextRequest) {
       idGuru: body?.id_guru,
       tanggalMulai: body?.tanggal_mulai,
       tanggalSelesai: body?.tanggal_selesai,
+      limit: Number(body?.limit) || undefined,
     });
     return noStoreJson(journals);
   } catch (error) {

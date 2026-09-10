@@ -5,6 +5,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { AppShell } from "@/components/AppShell";
 import { FeedbackBanner } from "@/components/ui/FeedbackBanner";
 import { Icon } from "@/components/ui/Icon";
+import { Modal } from "@/components/ui/Modal";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { canAccessArea, hasPermission } from "@/lib/auth/access";
 import { useAuth } from "@/lib/context/AuthContext";
@@ -28,6 +29,7 @@ import {
 } from "@/lib/gateways/counseling";
 import { getDaftarSiswa } from "@/lib/gateways/student";
 import { syncNow } from "@/lib/gateways/sync-status";
+import { useConfirmDialog } from "@/lib/hooks/useConfirmDialog";
 
 export default function BimbinganKonselingPage() {
   const { user, isAuthenticated, isLoading: authLoading } = useAuth();
@@ -113,6 +115,7 @@ export default function BimbinganKonselingPage() {
   // Wajib berada di ATAS, sebelum setiap early return: hook yang dilewati pada
   // sebagian render mengubah urutan hook dan menjatuhkan seluruh halaman.
   const isSubmittingRef = useRef(false);
+  const { konfirmasi, dialogKonfirmasi } = useConfirmDialog();
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -326,9 +329,13 @@ export default function BimbinganKonselingPage() {
 
   const handleDeleteCase = async (idKasus: string, studentName: string) => {
     if (isSubmittingRef.current || !canDelete) return;
-    const confirmed = window.confirm(
-      `PERINGATAN: Hapus seluruh rekam jejak kasus BK siswa ${studentName}? Tindakan ini tidak dapat dibatalkan.`,
-    );
+    const confirmed = await konfirmasi({
+      title: `Hapus rekam jejak BK ${studentName}?`,
+      description:
+        "Seluruh catatan kasus beserta semua sesi konselingnya dihapus permanen dan tidak dapat dipulihkan.",
+      preserved: "Data absensi dan presensi kelas siswa tidak ikut terhapus.",
+      confirmLabel: "Ya, hapus rekam jejak",
+    });
     if (!confirmed) return;
 
     isSubmittingRef.current = true;
@@ -401,7 +408,13 @@ export default function BimbinganKonselingPage() {
 
   const handleDeleteSession = async (idSesi: string) => {
     if (isSubmittingRef.current || !canDelete || !activeCase) return;
-    const confirmed = window.confirm("Hapus catatan sesi konseling ini?");
+    const confirmed = await konfirmasi({
+      title: "Hapus catatan sesi konseling ini?",
+      description:
+        "Catatan sesi beserta tindak lanjutnya dihapus permanen dari rekam jejak kasus.",
+      preserved: "Kasus induknya dan sesi lainnya tetap tersimpan.",
+      confirmLabel: "Ya, hapus sesi",
+    });
     if (!confirmed) return;
 
     isSubmittingRef.current = true;
@@ -793,371 +806,166 @@ export default function BimbinganKonselingPage() {
 
         {/* Modal Catat Kasus Baru */}
         {createModalOpen && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm">
-            <div className="w-full max-w-lg rounded-xl border border-slate-800 bg-slate-900 p-6 shadow-2xl">
-              <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-                <h3 className="text-base font-semibold text-slate-100">
-                  Catat Kasus Bimbingan Konseling
-                </h3>
-                <button
-                  type="button"
-                  onClick={() => setCreateModalOpen(false)}
-                  className="rounded-lg p-1 text-slate-400 hover:bg-slate-800 hover:text-slate-200"
+          <Modal
+            isOpen
+            onClose={() => setCreateModalOpen(false)}
+            title="Catat Kasus Bimbingan Konseling"
+            maxWidth="max-w-lg"
+          >
+            <form onSubmit={handleCreateCase} className="space-y-4">
+              <div>
+                <label
+                  htmlFor="create-id-siswa"
+                  className="mb-1.5 block text-xs font-medium text-slate-300"
                 >
-                  <Icon name="x" className="h-5 w-5" />
-                </button>
+                  Pilih Siswa
+                </label>
+                <select
+                  id="create-id-siswa"
+                  value={newCaseDraft.id_siswa}
+                  onChange={(e) =>
+                    setNewCaseDraft({
+                      ...newCaseDraft,
+                      id_siswa: e.target.value,
+                    })
+                  }
+                  className="w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-xs text-slate-200 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                  required
+                >
+                  <option value="">-- Pilih Siswa --</option>
+                  {students.map((s) => (
+                    <option key={String(s.id_siswa)} value={String(s.id_siswa)}>
+                      {String(s.nama_lengkap)} ({String(s.nama_rombel || "-")})
+                      - NIS: {String(s.nis || "-")}
+                    </option>
+                  ))}
+                </select>
               </div>
 
-              <form onSubmit={handleCreateCase} className="mt-4 space-y-4">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div>
                   <label
-                    htmlFor="create-id-siswa"
+                    htmlFor="create-kategori"
                     className="mb-1.5 block text-xs font-medium text-slate-300"
                   >
-                    Pilih Siswa
+                    Kategori Kasus
                   </label>
                   <select
-                    id="create-id-siswa"
-                    value={newCaseDraft.id_siswa}
+                    id="create-kategori"
+                    value={newCaseDraft.kategori}
                     onChange={(e) =>
                       setNewCaseDraft({
                         ...newCaseDraft,
-                        id_siswa: e.target.value,
+                        kategori: e.target.value as CounselingCategory,
                       })
                     }
                     className="w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-xs text-slate-200 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
-                    required
                   >
-                    <option value="">-- Pilih Siswa --</option>
-                    {students.map((s) => (
-                      <option
-                        key={String(s.id_siswa)}
-                        value={String(s.id_siswa)}
-                      >
-                        {String(s.nama_lengkap)} ({String(s.nama_rombel || "-")}
-                        ) - NIS: {String(s.nis || "-")}
-                      </option>
-                    ))}
+                    <option value="kedisiplinan">Kedisiplinan</option>
+                    <option value="akademik">Akademik</option>
+                    <option value="kehadiran">Kehadiran / Bolos</option>
+                    <option value="sosial">Sosial / Perilaku</option>
                   </select>
                 </div>
 
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                  <div>
-                    <label
-                      htmlFor="create-kategori"
-                      className="mb-1.5 block text-xs font-medium text-slate-300"
-                    >
-                      Kategori Kasus
-                    </label>
-                    <select
-                      id="create-kategori"
-                      value={newCaseDraft.kategori}
-                      onChange={(e) =>
-                        setNewCaseDraft({
-                          ...newCaseDraft,
-                          kategori: e.target.value as CounselingCategory,
-                        })
-                      }
-                      className="w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-xs text-slate-200 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
-                    >
-                      <option value="kedisiplinan">Kedisiplinan</option>
-                      <option value="akademik">Akademik</option>
-                      <option value="kehadiran">Kehadiran / Bolos</option>
-                      <option value="sosial">Sosial / Perilaku</option>
-                    </select>
-                  </div>
-
-                  <div>
-                    <label
-                      htmlFor="create-status"
-                      className="mb-1.5 block text-xs font-medium text-slate-300"
-                    >
-                      Status Awal
-                    </label>
-                    <select
-                      id="create-status"
-                      value={newCaseDraft.status}
-                      onChange={(e) =>
-                        setNewCaseDraft({
-                          ...newCaseDraft,
-                          status: e.target.value as CounselingStatus,
-                        })
-                      }
-                      className="w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-xs text-slate-200 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
-                    >
-                      <option value="Terbuka">Terbuka</option>
-                      <option value="Dalam Bimbingan">Dalam Bimbingan</option>
-                    </select>
-                  </div>
-                </div>
-
                 <div>
                   <label
-                    htmlFor="create-ringkasan"
+                    htmlFor="create-status"
                     className="mb-1.5 block text-xs font-medium text-slate-300"
                   >
-                    Ringkasan Kasus (Judul Masalah)
+                    Status Awal
                   </label>
-                  <input
-                    id="create-ringkasan"
-                    type="text"
-                    placeholder="Contoh: Sering tidak masuk tanpa keterangan pada jam ke-3 dan 4..."
-                    value={newCaseDraft.ringkasan}
+                  <select
+                    id="create-status"
+                    value={newCaseDraft.status}
                     onChange={(e) =>
                       setNewCaseDraft({
                         ...newCaseDraft,
-                        ringkasan: e.target.value,
+                        status: e.target.value as CounselingStatus,
                       })
                     }
                     className="w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-xs text-slate-200 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
-                    required
-                  />
+                  >
+                    <option value="Terbuka">Terbuka</option>
+                    <option value="Dalam Bimbingan">Dalam Bimbingan</option>
+                  </select>
                 </div>
+              </div>
 
-                <div>
-                  <label
-                    htmlFor="create-kronologi"
-                    className="mb-1.5 block text-xs font-medium text-slate-300"
-                  >
-                    Kronologi Kejadian / Keterangan Lengkap
-                  </label>
-                  <textarea
-                    id="create-kronologi"
-                    rows={4}
-                    placeholder="Tuliskan kronologi, saksi, waktu kejadian, dan data pendukung..."
-                    value={newCaseDraft.kronologi}
-                    onChange={(e) =>
-                      setNewCaseDraft({
-                        ...newCaseDraft,
-                        kronologi: e.target.value,
-                      })
-                    }
-                    className="w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-xs text-slate-200 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
-                  />
-                </div>
+              <div>
+                <label
+                  htmlFor="create-ringkasan"
+                  className="mb-1.5 block text-xs font-medium text-slate-300"
+                >
+                  Ringkasan Kasus (Judul Masalah)
+                </label>
+                <input
+                  id="create-ringkasan"
+                  type="text"
+                  placeholder="Contoh: Sering tidak masuk tanpa keterangan pada jam ke-3 dan 4..."
+                  value={newCaseDraft.ringkasan}
+                  onChange={(e) =>
+                    setNewCaseDraft({
+                      ...newCaseDraft,
+                      ringkasan: e.target.value,
+                    })
+                  }
+                  className="w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-xs text-slate-200 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                  required
+                />
+              </div>
 
-                <div className="mt-6 flex justify-end gap-3 border-t border-slate-800 pt-4">
-                  <button
-                    type="button"
-                    onClick={() => setCreateModalOpen(false)}
-                    className="rounded-lg border border-slate-700 bg-slate-800 px-4 py-2 text-xs font-medium text-slate-300 transition hover:bg-slate-700"
-                  >
-                    Batal
-                  </button>
-                  <button
-                    type="submit"
-                    className="rounded-lg bg-indigo-600 px-4 py-2 text-xs font-semibold text-white shadow transition hover:bg-indigo-500"
-                  >
-                    Simpan Kasus
-                  </button>
-                </div>
-              </form>
-            </div>
-          </div>
+              <div>
+                <label
+                  htmlFor="create-kronologi"
+                  className="mb-1.5 block text-xs font-medium text-slate-300"
+                >
+                  Kronologi Kejadian / Keterangan Lengkap
+                </label>
+                <textarea
+                  id="create-kronologi"
+                  rows={4}
+                  placeholder="Tuliskan kronologi, saksi, waktu kejadian, dan data pendukung..."
+                  value={newCaseDraft.kronologi}
+                  onChange={(e) =>
+                    setNewCaseDraft({
+                      ...newCaseDraft,
+                      kronologi: e.target.value,
+                    })
+                  }
+                  className="w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-xs text-slate-200 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                />
+              </div>
+
+              <div className="mt-6 flex justify-end gap-3 border-t border-slate-800 pt-4">
+                <button
+                  type="button"
+                  onClick={() => setCreateModalOpen(false)}
+                  className="rounded-lg border border-slate-700 bg-slate-800 px-4 py-2 text-xs font-medium text-slate-300 transition hover:bg-slate-700"
+                >
+                  Batal
+                </button>
+                <button
+                  type="submit"
+                  className="rounded-lg bg-indigo-600 px-4 py-2 text-xs font-semibold text-white shadow transition hover:bg-indigo-500"
+                >
+                  Simpan Kasus
+                </button>
+              </div>
+            </form>
+          </Modal>
         )}
 
         {/* Modal Detail Kasus & Timeline Sesi */}
         {detailModalOpen && activeCase && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm">
-            <div className="flex max-h-[90vh] w-full max-w-3xl flex-col rounded-xl border border-slate-800 bg-slate-900 shadow-2xl">
-              <div className="flex items-center justify-between border-b border-slate-800 p-5">
-                <div>
-                  <div className="flex items-center gap-2.5">
-                    <h3 className="text-base font-semibold text-slate-100">
-                      {activeCase.ringkasan}
-                    </h3>
-                    {getStatusBadge(activeCase.status)}
-                    {getKategoriBadge(activeCase.kategori)}
-                  </div>
-                  <p className="mt-1 text-xs text-slate-400">
-                    Siswa:{" "}
-                    <span className="text-slate-200 font-medium">
-                      {activeCase.nama_siswa}
-                    </span>{" "}
-                    ({activeCase.nama_rombel}) | NIS: {activeCase.nis || "-"}
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setDetailModalOpen(false)}
-                  className="rounded-lg p-1 text-slate-400 hover:bg-slate-800 hover:text-slate-200"
-                >
-                  <Icon name="x" className="h-5 w-5" />
-                </button>
-              </div>
-
-              <div className="flex-1 overflow-y-auto p-6 space-y-6">
-                {/* Informasi Siswa & Wali */}
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 rounded-xl border border-slate-800 bg-slate-950/60 p-4 text-xs">
-                  <div>
-                    <span className="text-slate-400">Nama Wali Murid:</span>{" "}
-                    <span className="font-semibold text-slate-200">
-                      {activeCase.nama_wali || "Belum dicatat"}
-                    </span>
-                  </div>
-                  <div>
-                    <span className="text-slate-400">Nomor WhatsApp Wali:</span>{" "}
-                    <span className="font-mono font-medium text-slate-200">
-                      {activeCase.no_whatsapp_wali || "-"}
-                    </span>
-                  </div>
-                  <div>
-                    <span className="text-slate-400">Dicatat Oleh:</span>{" "}
-                    <span className="text-slate-300">
-                      {activeCase.dibuat_oleh} ({activeCase.created_at})
-                    </span>
-                  </div>
-                  <div>
-                    <span className="text-slate-400">Tahun Ajaran:</span>{" "}
-                    <span className="text-slate-300">
-                      {activeCase.nama_tahun}
-                    </span>
-                  </div>
-                </div>
-
-                {/* Kronologi */}
-                <div>
-                  <h4 className="text-xs font-semibold text-slate-300 mb-1.5">
-                    Kronologi / Catatan Kejadian
-                  </h4>
-                  <div className="whitespace-pre-wrap rounded-lg border border-slate-800 bg-slate-950 p-4 text-xs leading-relaxed text-slate-300">
-                    {activeCase.kronologi ||
-                      "Tidak ada catatan kronologi terperinci."}
-                  </div>
-                </div>
-
-                {/* Ubah Status Cepat */}
-                {canManage && (
-                  <div className="flex items-center gap-3 rounded-lg border border-slate-800 bg-slate-800/40 p-3 text-xs">
-                    <span className="text-slate-400 font-medium">
-                      Ubah Status Kasus:
-                    </span>
-                    <div className="flex items-center gap-2">
-                      <button
-                        type="button"
-                        onClick={() =>
-                          handleUpdateStatus(activeCase.id_kasus, "Terbuka")
-                        }
-                        className={`rounded-md px-2.5 py-1 font-medium transition ${
-                          activeCase.status === "Terbuka"
-                            ? "bg-rose-500/20 text-rose-300 ring-1 ring-rose-500/30"
-                            : "text-slate-400 hover:bg-slate-800"
-                        }`}
-                      >
-                        Terbuka
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() =>
-                          handleUpdateStatus(
-                            activeCase.id_kasus,
-                            "Dalam Bimbingan",
-                          )
-                        }
-                        className={`rounded-md px-2.5 py-1 font-medium transition ${
-                          activeCase.status === "Dalam Bimbingan"
-                            ? "bg-amber-500/20 text-amber-300 ring-1 ring-amber-500/30"
-                            : "text-slate-400 hover:bg-slate-800"
-                        }`}
-                      >
-                        Dalam Bimbingan
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() =>
-                          handleUpdateStatus(activeCase.id_kasus, "Selesai")
-                        }
-                        className={`rounded-md px-2.5 py-1 font-medium transition ${
-                          activeCase.status === "Selesai"
-                            ? "bg-emerald-500/20 text-emerald-300 ring-1 ring-emerald-500/30"
-                            : "text-slate-400 hover:bg-slate-800"
-                        }`}
-                      >
-                        Selesai
-                      </button>
-                    </div>
-                  </div>
-                )}
-
-                {/* Timeline Sesi Konseling */}
-                <div>
-                  <div className="flex items-center justify-between mb-3">
-                    <h4 className="text-xs font-semibold text-slate-200">
-                      Riwayat Sesi Konseling ({activeCase.sesi?.length || 0}{" "}
-                      Sesi)
-                    </h4>
-                    {canManage && (
-                      <button
-                        type="button"
-                        onClick={() => setSessionModalOpen(true)}
-                        className="inline-flex items-center gap-1.5 rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-medium text-white shadow transition hover:bg-indigo-500"
-                      >
-                        <Icon name="plus" className="h-3.5 w-3.5" />
-                        Tambah Sesi Konseling
-                      </button>
-                    )}
-                  </div>
-
-                  {activeCase.sesi?.length === 0 ? (
-                    <div className="rounded-lg border border-dashed border-slate-800 p-6 text-center text-xs text-slate-500">
-                      Belum ada sesi konseling yang dicatat untuk kasus ini.
-                      Klik "Tambah Sesi Konseling" untuk memulai bimbingan.
-                    </div>
-                  ) : (
-                    <div className="relative border-l-2 border-slate-800 pl-4 space-y-4 ml-2">
-                      {activeCase.sesi.map((ses, idx) => (
-                        <div
-                          key={ses.id_sesi}
-                          className="relative rounded-lg border border-slate-800 bg-slate-950 p-4 text-xs"
-                        >
-                          <span className="absolute -left-[23px] top-4.5 h-3 w-3 rounded-full border-2 border-slate-900 bg-indigo-500" />
-                          <div className="flex items-center justify-between border-b border-slate-800 pb-2 mb-2">
-                            <div>
-                              <span className="font-semibold text-slate-200">
-                                Sesi #{idx + 1} ({ses.tanggal})
-                              </span>
-                              <span className="text-slate-500 ml-2 font-mono">
-                                Konselor: {ses.konselor}
-                              </span>
-                            </div>
-                            {canDelete && (
-                              <button
-                                type="button"
-                                onClick={() => handleDeleteSession(ses.id_sesi)}
-                                className="text-slate-500 hover:text-rose-400"
-                                title="Hapus sesi"
-                              >
-                                <Icon name="trash" className="h-3.5 w-3.5" />
-                              </button>
-                            )}
-                          </div>
-
-                          <div className="space-y-2">
-                            <div>
-                              <p className="text-slate-400 font-medium">
-                                Catatan Konseling:
-                              </p>
-                              <p className="text-slate-200 whitespace-pre-wrap mt-0.5">
-                                {ses.catatan_konseling}
-                              </p>
-                            </div>
-                            {ses.tindak_lanjut && (
-                              <div className="rounded bg-indigo-500/10 p-2.5 text-indigo-300 ring-1 ring-indigo-500/20">
-                                <span className="font-semibold">
-                                  Tindak Lanjut:
-                                </span>{" "}
-                                {ses.tindak_lanjut}
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              <div className="flex justify-between border-t border-slate-800 p-4">
+          <Modal
+            isOpen
+            onClose={() => setDetailModalOpen(false)}
+            title={activeCase.ringkasan}
+            subtitle={`Siswa: ${activeCase.nama_siswa} (${activeCase.nama_rombel}) | NIS: ${activeCase.nis || "-"}`}
+            maxWidth="max-w-3xl"
+            footer={
+              <div className="flex w-full justify-between">
                 <button
                   type="button"
                   onClick={() => handleOpenLetter(activeCase)}
@@ -1174,373 +982,288 @@ export default function BimbinganKonselingPage() {
                   Tutup
                 </button>
               </div>
+            }
+          >
+            <div className="flex items-center gap-2.5">
+              {getStatusBadge(activeCase.status)}
+              {getKategoriBadge(activeCase.kategori)}
             </div>
-          </div>
+            <div className="space-y-6">
+              {/* Informasi Siswa & Wali */}
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 rounded-xl border border-slate-800 bg-slate-950/60 p-4 text-xs">
+                <div>
+                  <span className="text-slate-400">Nama Wali Murid:</span>{" "}
+                  <span className="font-semibold text-slate-200">
+                    {activeCase.nama_wali || "Belum dicatat"}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-slate-400">Nomor WhatsApp Wali:</span>{" "}
+                  <span className="font-mono font-medium text-slate-200">
+                    {activeCase.no_whatsapp_wali || "-"}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-slate-400">Dicatat Oleh:</span>{" "}
+                  <span className="text-slate-300">
+                    {activeCase.dibuat_oleh} ({activeCase.created_at})
+                  </span>
+                </div>
+                <div>
+                  <span className="text-slate-400">Tahun Ajaran:</span>{" "}
+                  <span className="text-slate-300">
+                    {activeCase.nama_tahun}
+                  </span>
+                </div>
+              </div>
+
+              {/* Kronologi */}
+              <div>
+                <h4 className="text-xs font-semibold text-slate-300 mb-1.5">
+                  Kronologi / Catatan Kejadian
+                </h4>
+                <div className="whitespace-pre-wrap rounded-lg border border-slate-800 bg-slate-950 p-4 text-xs leading-relaxed text-slate-300">
+                  {activeCase.kronologi ||
+                    "Tidak ada catatan kronologi terperinci."}
+                </div>
+              </div>
+
+              {/* Ubah Status Cepat */}
+              {canManage && (
+                <div className="flex items-center gap-3 rounded-lg border border-slate-800 bg-slate-800/40 p-3 text-xs">
+                  <span className="text-slate-400 font-medium">
+                    Ubah Status Kasus:
+                  </span>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() =>
+                        handleUpdateStatus(activeCase.id_kasus, "Terbuka")
+                      }
+                      className={`rounded-md px-2.5 py-1 font-medium transition ${
+                        activeCase.status === "Terbuka"
+                          ? "bg-rose-500/20 text-rose-300 ring-1 ring-rose-500/30"
+                          : "text-slate-400 hover:bg-slate-800"
+                      }`}
+                    >
+                      Terbuka
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        handleUpdateStatus(
+                          activeCase.id_kasus,
+                          "Dalam Bimbingan",
+                        )
+                      }
+                      className={`rounded-md px-2.5 py-1 font-medium transition ${
+                        activeCase.status === "Dalam Bimbingan"
+                          ? "bg-amber-500/20 text-amber-300 ring-1 ring-amber-500/30"
+                          : "text-slate-400 hover:bg-slate-800"
+                      }`}
+                    >
+                      Dalam Bimbingan
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        handleUpdateStatus(activeCase.id_kasus, "Selesai")
+                      }
+                      className={`rounded-md px-2.5 py-1 font-medium transition ${
+                        activeCase.status === "Selesai"
+                          ? "bg-emerald-500/20 text-emerald-300 ring-1 ring-emerald-500/30"
+                          : "text-slate-400 hover:bg-slate-800"
+                      }`}
+                    >
+                      Selesai
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Timeline Sesi Konseling */}
+              <div>
+                <div className="flex items-center justify-between mb-3">
+                  <h4 className="text-xs font-semibold text-slate-200">
+                    Riwayat Sesi Konseling ({activeCase.sesi?.length || 0} Sesi)
+                  </h4>
+                  {canManage && (
+                    <button
+                      type="button"
+                      onClick={() => setSessionModalOpen(true)}
+                      className="inline-flex items-center gap-1.5 rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-medium text-white shadow transition hover:bg-indigo-500"
+                    >
+                      <Icon name="plus" className="h-3.5 w-3.5" />
+                      Tambah Sesi Konseling
+                    </button>
+                  )}
+                </div>
+
+                {activeCase.sesi?.length === 0 ? (
+                  <div className="rounded-lg border border-dashed border-slate-800 p-6 text-center text-xs text-slate-500">
+                    Belum ada sesi konseling yang dicatat untuk kasus ini. Klik
+                    "Tambah Sesi Konseling" untuk memulai bimbingan.
+                  </div>
+                ) : (
+                  <div className="relative border-l-2 border-slate-800 pl-4 space-y-4 ml-2">
+                    {activeCase.sesi.map((ses, idx) => (
+                      <div
+                        key={ses.id_sesi}
+                        className="relative rounded-lg border border-slate-800 bg-slate-950 p-4 text-xs"
+                      >
+                        <span className="absolute -left-[23px] top-4.5 h-3 w-3 rounded-full border-2 border-slate-900 bg-indigo-500" />
+                        <div className="flex items-center justify-between border-b border-slate-800 pb-2 mb-2">
+                          <div>
+                            <span className="font-semibold text-slate-200">
+                              Sesi #{idx + 1} ({ses.tanggal})
+                            </span>
+                            <span className="text-slate-500 ml-2 font-mono">
+                              Konselor: {ses.konselor}
+                            </span>
+                          </div>
+                          {canDelete && (
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteSession(ses.id_sesi)}
+                              className="text-slate-500 hover:text-rose-400"
+                              title="Hapus sesi"
+                            >
+                              <Icon name="trash" className="h-3.5 w-3.5" />
+                            </button>
+                          )}
+                        </div>
+
+                        <div className="space-y-2">
+                          <div>
+                            <p className="text-slate-400 font-medium">
+                              Catatan Konseling:
+                            </p>
+                            <p className="text-slate-200 whitespace-pre-wrap mt-0.5">
+                              {ses.catatan_konseling}
+                            </p>
+                          </div>
+                          {ses.tindak_lanjut && (
+                            <div className="rounded bg-indigo-500/10 p-2.5 text-indigo-300 ring-1 ring-indigo-500/20">
+                              <span className="font-semibold">
+                                Tindak Lanjut:
+                              </span>{" "}
+                              {ses.tindak_lanjut}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          </Modal>
         )}
 
         {/* Modal Tambah Sesi Konseling */}
         {sessionModalOpen && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm">
-            <div className="w-full max-w-md rounded-xl border border-slate-800 bg-slate-900 p-6 shadow-2xl">
-              <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-                <h3 className="text-base font-semibold text-slate-100">
-                  Tambah Sesi Konseling
-                </h3>
+          <Modal
+            isOpen
+            onClose={() => setSessionModalOpen(false)}
+            title="Tambah Sesi Konseling"
+            maxWidth="max-w-md"
+          >
+            <form onSubmit={handleAddSession} className="space-y-4 text-xs">
+              <div>
+                <label
+                  htmlFor="session-tanggal"
+                  className="mb-1.5 block font-medium text-slate-300"
+                >
+                  Tanggal Pertemuan Sesi
+                </label>
+                <input
+                  id="session-tanggal"
+                  type="date"
+                  value={newSessionDraft.tanggal}
+                  onChange={(e) =>
+                    setNewSessionDraft({
+                      ...newSessionDraft,
+                      tanggal: e.target.value,
+                    })
+                  }
+                  className="w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-slate-200 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                  required
+                />
+              </div>
+
+              <div>
+                <label
+                  htmlFor="session-catatan"
+                  className="mb-1.5 block font-medium text-slate-300"
+                >
+                  Catatan Pembahasan / Hasil Konseling
+                </label>
+                <textarea
+                  id="session-catatan"
+                  rows={4}
+                  placeholder="Tuliskan hasil diskusi dengan siswa, pengakuan, dan komitmen..."
+                  value={newSessionDraft.catatan_konseling}
+                  onChange={(e) =>
+                    setNewSessionDraft({
+                      ...newSessionDraft,
+                      catatan_konseling: e.target.value,
+                    })
+                  }
+                  className="w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-slate-200 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                  required
+                />
+              </div>
+
+              <div>
+                <label
+                  htmlFor="session-tindak-lanjut"
+                  className="mb-1.5 block font-medium text-slate-300"
+                >
+                  Rencana Tindak Lanjut (Opsional)
+                </label>
+                <input
+                  id="session-tindak-lanjut"
+                  type="text"
+                  placeholder="Contoh: Pemanggilan orang tua, pemantauan presensi harian..."
+                  value={newSessionDraft.tindak_lanjut}
+                  onChange={(e) =>
+                    setNewSessionDraft({
+                      ...newSessionDraft,
+                      tindak_lanjut: e.target.value,
+                    })
+                  }
+                  className="w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-slate-200 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                />
+              </div>
+
+              <div className="mt-6 flex justify-end gap-3 border-t border-slate-800 pt-4">
                 <button
                   type="button"
                   onClick={() => setSessionModalOpen(false)}
-                  className="rounded-lg p-1 text-slate-400 hover:bg-slate-800 hover:text-slate-200"
+                  className="rounded-lg border border-slate-700 bg-slate-800 px-4 py-2 font-medium text-slate-300 transition hover:bg-slate-700"
                 >
-                  <Icon name="x" className="h-5 w-5" />
+                  Batal
+                </button>
+                <button
+                  type="submit"
+                  className="rounded-lg bg-indigo-600 px-4 py-2 font-semibold text-white shadow transition hover:bg-indigo-500"
+                >
+                  Simpan Sesi
                 </button>
               </div>
-
-              <form
-                onSubmit={handleAddSession}
-                className="mt-4 space-y-4 text-xs"
-              >
-                <div>
-                  <label
-                    htmlFor="session-tanggal"
-                    className="mb-1.5 block font-medium text-slate-300"
-                  >
-                    Tanggal Pertemuan Sesi
-                  </label>
-                  <input
-                    id="session-tanggal"
-                    type="date"
-                    value={newSessionDraft.tanggal}
-                    onChange={(e) =>
-                      setNewSessionDraft({
-                        ...newSessionDraft,
-                        tanggal: e.target.value,
-                      })
-                    }
-                    className="w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-slate-200 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
-                    required
-                  />
-                </div>
-
-                <div>
-                  <label
-                    htmlFor="session-catatan"
-                    className="mb-1.5 block font-medium text-slate-300"
-                  >
-                    Catatan Pembahasan / Hasil Konseling
-                  </label>
-                  <textarea
-                    id="session-catatan"
-                    rows={4}
-                    placeholder="Tuliskan hasil diskusi dengan siswa, pengakuan, dan komitmen..."
-                    value={newSessionDraft.catatan_konseling}
-                    onChange={(e) =>
-                      setNewSessionDraft({
-                        ...newSessionDraft,
-                        catatan_konseling: e.target.value,
-                      })
-                    }
-                    className="w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-slate-200 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
-                    required
-                  />
-                </div>
-
-                <div>
-                  <label
-                    htmlFor="session-tindak-lanjut"
-                    className="mb-1.5 block font-medium text-slate-300"
-                  >
-                    Rencana Tindak Lanjut (Opsional)
-                  </label>
-                  <input
-                    id="session-tindak-lanjut"
-                    type="text"
-                    placeholder="Contoh: Pemanggilan orang tua, pemantauan presensi harian..."
-                    value={newSessionDraft.tindak_lanjut}
-                    onChange={(e) =>
-                      setNewSessionDraft({
-                        ...newSessionDraft,
-                        tindak_lanjut: e.target.value,
-                      })
-                    }
-                    className="w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-slate-200 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
-                  />
-                </div>
-
-                <div className="mt-6 flex justify-end gap-3 border-t border-slate-800 pt-4">
-                  <button
-                    type="button"
-                    onClick={() => setSessionModalOpen(false)}
-                    className="rounded-lg border border-slate-700 bg-slate-800 px-4 py-2 font-medium text-slate-300 transition hover:bg-slate-700"
-                  >
-                    Batal
-                  </button>
-                  <button
-                    type="submit"
-                    className="rounded-lg bg-indigo-600 px-4 py-2 font-semibold text-white shadow transition hover:bg-indigo-500"
-                  >
-                    Simpan Sesi
-                  </button>
-                </div>
-              </form>
-            </div>
-          </div>
+            </form>
+          </Modal>
         )}
 
         {/* Modal Surat Panggilan Wali Murid (Printable View) */}
         {letterModalOpen && activeCase && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm">
-            <div className="flex max-h-[90vh] w-full max-w-2xl flex-col rounded-xl border border-slate-800 bg-slate-900 shadow-2xl">
-              <div className="flex items-center justify-between border-b border-slate-800 p-4">
-                <h3 className="text-base font-semibold text-slate-100">
-                  Pratinjau Surat Panggilan Wali Murid
-                </h3>
-                <button
-                  type="button"
-                  onClick={() => setLetterModalOpen(false)}
-                  className="rounded-lg p-1 text-slate-400 hover:bg-slate-800 hover:text-slate-200"
-                >
-                  <Icon name="x" className="h-5 w-5" />
-                </button>
-              </div>
-
-              {/* Form Konfigurasi Jadwal Pertemuan */}
-              <div className="border-b border-slate-800 bg-slate-950/60 p-4">
-                <div className="grid grid-cols-1 gap-3 sm:grid-cols-3 text-xs">
-                  <div>
-                    <label
-                      htmlFor="letter-date"
-                      className="mb-1 block font-medium text-slate-300"
-                    >
-                      Hari / Tanggal Pertemuan
-                    </label>
-                    <input
-                      id="letter-date"
-                      type="date"
-                      value={letterMeetingDate}
-                      onChange={(e) => setLetterMeetingDate(e.target.value)}
-                      className="w-full rounded border border-slate-700 bg-slate-800 px-2.5 py-1.5 text-slate-200 focus:outline-none"
-                    />
-                  </div>
-                  <div>
-                    <label
-                      htmlFor="letter-time"
-                      className="mb-1 block font-medium text-slate-300"
-                    >
-                      Waktu Pertemuan (WIB)
-                    </label>
-                    <input
-                      id="letter-time"
-                      type="time"
-                      value={letterMeetingTime}
-                      onChange={(e) => setLetterMeetingTime(e.target.value)}
-                      className="w-full rounded border border-slate-700 bg-slate-800 px-2.5 py-1.5 text-slate-200 focus:outline-none"
-                    />
-                  </div>
-                  <div>
-                    <label
-                      htmlFor="letter-room"
-                      className="mb-1 block font-medium text-slate-300"
-                    >
-                      Tempat Pertemuan
-                    </label>
-                    <input
-                      id="letter-room"
-                      type="text"
-                      value={letterMeetingRoom}
-                      onChange={(e) => setLetterMeetingRoom(e.target.value)}
-                      className="w-full rounded border border-slate-700 bg-slate-800 px-2.5 py-1.5 text-slate-200 focus:outline-none"
-                    />
-                  </div>
-                </div>
-              </div>
-
-              {/* Halaman Cetak Surat Resmi (Kop Sekolah) */}
-              <div className="flex-1 overflow-y-auto p-6">
-                <div
-                  id="printable-counseling-letter"
-                  className="mx-auto max-w-xl rounded border border-slate-300 bg-white p-8 text-black shadow-lg"
-                  style={{ fontFamily: "'Times New Roman', Times, serif" }}
-                >
-                  {/* Kop Surat */}
-                  <div className="border-b-2 border-black pb-3 text-center">
-                    <h2 className="text-lg font-bold uppercase tracking-wider">
-                      {String(
-                        companyProfile?.company_name ||
-                          "SEKOLAH PUSAT PRESTASI & GENERASI",
-                      )}
-                    </h2>
-                    {companyProfile?.branch_name ? (
-                      <p className="text-xs font-semibold uppercase">
-                        {String(companyProfile?.branch_name)}
-                      </p>
-                    ) : null}
-                    <p className="text-xs">
-                      {String(
-                        companyProfile?.address ||
-                          "Jl. Pendidikan No. 123, Komplek Edukasi",
-                      )}
-                    </p>
-                    <p className="text-xs">
-                      Telepon:{" "}
-                      {String(companyProfile?.phone || "(021) 555-1234")} |
-                      Email:{" "}
-                      {String(companyProfile?.email || "info@sekolah.sch.id")}
-                    </p>
-                  </div>
-
-                  {/* Info Nomor & Tanggal */}
-                  <div className="mt-4 flex justify-between text-xs">
-                    <div>
-                      <p>
-                        Nomor: 421.3 / BK / SPPG / {new Date().getFullYear()}
-                      </p>
-                      <p>Lampiran: -</p>
-                      <p>
-                        Perihal:{" "}
-                        <span className="font-bold underline">
-                          Surat Panggilan Orang Tua / Wali
-                        </span>
-                      </p>
-                    </div>
-                    <div className="text-right">
-                      <p>
-                        {String(companyProfile?.branch_name || "Kota")},{" "}
-                        {new Date().toLocaleDateString("id-ID", {
-                          day: "numeric",
-                          month: "long",
-                          year: "numeric",
-                        })}
-                      </p>
-                    </div>
-                  </div>
-
-                  {/* Tujuan */}
-                  <div className="mt-4 text-xs">
-                    <p>Kepada Yth.</p>
-                    <p className="font-bold">
-                      Bapak / Ibu Orang Tua / Wali Murid dari:
-                    </p>
-                    <table className="mt-1 ml-4 text-xs">
-                      <tbody>
-                        <tr>
-                          <td className="w-28 py-0.5">Nama Siswa</td>
-                          <td className="w-4">:</td>
-                          <td className="font-bold">{activeCase.nama_siswa}</td>
-                        </tr>
-                        <tr>
-                          <td className="py-0.5">Kelas / Rombel</td>
-                          <td>:</td>
-                          <td>{activeCase.nama_rombel}</td>
-                        </tr>
-                        <tr>
-                          <td className="py-0.5">NIS / NISN</td>
-                          <td>:</td>
-                          <td>{activeCase.nis || "-"}</td>
-                        </tr>
-                      </tbody>
-                    </table>
-                    <p className="mt-1">di Tempat</p>
-                  </div>
-
-                  {/* Isi Surat */}
-                  <div className="mt-4 text-xs leading-relaxed text-justify space-y-2">
-                    <p>Dengan hormat,</p>
-                    <p>
-                      Sehubungan dengan pentingnya pembinaan dan pendampingan
-                      putra/putri Bapak/Ibu di sekolah, khususnya terkait
-                      perkembangan <strong>{activeCase.kategori}</strong> siswa,
-                      dengan ini kami mengharapkan kehadiran Bapak/Ibu ke
-                      sekolah pada:
-                    </p>
-
-                    <table className="ml-6 text-xs font-semibold">
-                      <tbody>
-                        <tr>
-                          <td className="w-28 py-0.5">Hari / Tanggal</td>
-                          <td className="w-4">:</td>
-                          <td>
-                            {new Date(letterMeetingDate).toLocaleDateString(
-                              "id-ID",
-                              {
-                                weekday: "long",
-                                day: "numeric",
-                                month: "long",
-                                year: "numeric",
-                              },
-                            )}
-                          </td>
-                        </tr>
-                        <tr>
-                          <td className="py-0.5">Waktu</td>
-                          <td>:</td>
-                          <td>Pukul {letterMeetingTime} WIB s.d. Selesai</td>
-                        </tr>
-                        <tr>
-                          <td className="py-0.5">Tempat</td>
-                          <td>:</td>
-                          <td>{letterMeetingRoom}</td>
-                        </tr>
-                        <tr>
-                          <td className="py-0.5">Keperluan</td>
-                          <td>:</td>
-                          <td>
-                            Konsultasi perkembangan siswa mengenai:{" "}
-                            {activeCase.ringkasan}
-                          </td>
-                        </tr>
-                      </tbody>
-                    </table>
-
-                    <p>
-                      Mengingat pentingnya hal tersebut demi kebaikan masa depan
-                      ananda, kami sangat mengharapkan kehadiran Bapak/Ibu tepat
-                      pada waktu yang telah ditentukan.
-                    </p>
-                    <p>
-                      Demikian surat undangan pemanggilan ini kami sampaikan.
-                      Atas perhatian dan kerjasamanya, kami ucapkan terima
-                      kasih.
-                    </p>
-                  </div>
-
-                  {/* Tanda Tangan */}
-                  <div className="mt-8 grid grid-cols-2 text-center text-xs">
-                    <div>
-                      <p>Mengetahui,</p>
-                      <p>Kepala Sekolah</p>
-                      <div className="h-16" />
-                      <p className="font-bold underline">
-                        {String(
-                          companyProfile?.leader_name ||
-                            "Drs. H. Mulyono, M.Pd.",
-                        )}
-                      </p>
-                      <p>
-                        NIP.{" "}
-                        {String(
-                          companyProfile?.leader_nip || "19680512 199403 1 002",
-                        )}
-                      </p>
-                    </div>
-
-                    <div>
-                      <p>Guru Pembimbing / Konselor BK,</p>
-                      <div className="h-16" />
-                      <p className="font-bold underline">
-                        {String(
-                          activeCase.dibuat_oleh ||
-                            user?.nama_operator ||
-                            user?.username ||
-                            "Konselor BK",
-                        )}
-                      </p>
-                      <p>NIP. -</p>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <div className="flex justify-end gap-3 border-t border-slate-800 p-4">
+          <Modal
+            isOpen
+            onClose={() => setLetterModalOpen(false)}
+            title="Pratinjau Surat Panggilan Wali Murid"
+            maxWidth="max-w-2xl"
+            footer={
+              <div className="flex justify-end gap-3">
                 <button
                   type="button"
                   onClick={() => window.print()}
@@ -1557,10 +1280,243 @@ export default function BimbinganKonselingPage() {
                   Tutup
                 </button>
               </div>
+            }
+          >
+            {/* Form Konfigurasi Jadwal Pertemuan */}
+            <div className="border-b border-slate-800 bg-slate-950/60 p-4">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-3 text-xs">
+                <div>
+                  <label
+                    htmlFor="letter-date"
+                    className="mb-1 block font-medium text-slate-300"
+                  >
+                    Hari / Tanggal Pertemuan
+                  </label>
+                  <input
+                    id="letter-date"
+                    type="date"
+                    value={letterMeetingDate}
+                    onChange={(e) => setLetterMeetingDate(e.target.value)}
+                    className="w-full rounded border border-slate-700 bg-slate-800 px-2.5 py-1.5 text-slate-200 focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label
+                    htmlFor="letter-time"
+                    className="mb-1 block font-medium text-slate-300"
+                  >
+                    Waktu Pertemuan (WIB)
+                  </label>
+                  <input
+                    id="letter-time"
+                    type="time"
+                    value={letterMeetingTime}
+                    onChange={(e) => setLetterMeetingTime(e.target.value)}
+                    className="w-full rounded border border-slate-700 bg-slate-800 px-2.5 py-1.5 text-slate-200 focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label
+                    htmlFor="letter-room"
+                    className="mb-1 block font-medium text-slate-300"
+                  >
+                    Tempat Pertemuan
+                  </label>
+                  <input
+                    id="letter-room"
+                    type="text"
+                    value={letterMeetingRoom}
+                    onChange={(e) => setLetterMeetingRoom(e.target.value)}
+                    className="w-full rounded border border-slate-700 bg-slate-800 px-2.5 py-1.5 text-slate-200 focus:outline-none"
+                  />
+                </div>
+              </div>
             </div>
-          </div>
+
+            {/* Halaman Cetak Surat Resmi (Kop Sekolah) */}
+            <div className="flex-1 overflow-y-auto p-6">
+              <div
+                id="printable-counseling-letter"
+                className="mx-auto max-w-xl rounded border border-slate-300 bg-white p-8 text-black shadow-lg"
+                style={{ fontFamily: "'Times New Roman', Times, serif" }}
+              >
+                {/* Kop Surat */}
+                <div className="border-b-2 border-black pb-3 text-center">
+                  <h2 className="text-lg font-bold uppercase tracking-wider">
+                    {String(
+                      companyProfile?.company_name ||
+                        "SEKOLAH PUSAT PRESTASI & GENERASI",
+                    )}
+                  </h2>
+                  {companyProfile?.branch_name ? (
+                    <p className="text-xs font-semibold uppercase">
+                      {String(companyProfile?.branch_name)}
+                    </p>
+                  ) : null}
+                  <p className="text-xs">
+                    {String(
+                      companyProfile?.address ||
+                        "Jl. Pendidikan No. 123, Komplek Edukasi",
+                    )}
+                  </p>
+                  <p className="text-xs">
+                    Telepon: {String(companyProfile?.phone || "(021) 555-1234")}{" "}
+                    | Email:{" "}
+                    {String(companyProfile?.email || "info@sekolah.sch.id")}
+                  </p>
+                </div>
+
+                {/* Info Nomor & Tanggal */}
+                <div className="mt-4 flex justify-between text-xs">
+                  <div>
+                    <p>Nomor: 421.3 / BK / SPPG / {new Date().getFullYear()}</p>
+                    <p>Lampiran: -</p>
+                    <p>
+                      Perihal:{" "}
+                      <span className="font-bold underline">
+                        Surat Panggilan Orang Tua / Wali
+                      </span>
+                    </p>
+                  </div>
+                  <div className="text-right">
+                    <p>
+                      {String(companyProfile?.branch_name || "Kota")},{" "}
+                      {new Date().toLocaleDateString("id-ID", {
+                        day: "numeric",
+                        month: "long",
+                        year: "numeric",
+                      })}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Tujuan */}
+                <div className="mt-4 text-xs">
+                  <p>Kepada Yth.</p>
+                  <p className="font-bold">
+                    Bapak / Ibu Orang Tua / Wali Murid dari:
+                  </p>
+                  <table className="mt-1 ml-4 text-xs">
+                    <tbody>
+                      <tr>
+                        <td className="w-28 py-0.5">Nama Siswa</td>
+                        <td className="w-4">:</td>
+                        <td className="font-bold">{activeCase.nama_siswa}</td>
+                      </tr>
+                      <tr>
+                        <td className="py-0.5">Kelas / Rombel</td>
+                        <td>:</td>
+                        <td>{activeCase.nama_rombel}</td>
+                      </tr>
+                      <tr>
+                        <td className="py-0.5">NIS / NISN</td>
+                        <td>:</td>
+                        <td>{activeCase.nis || "-"}</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                  <p className="mt-1">di Tempat</p>
+                </div>
+
+                {/* Isi Surat */}
+                <div className="mt-4 text-xs leading-relaxed text-justify space-y-2">
+                  <p>Dengan hormat,</p>
+                  <p>
+                    Sehubungan dengan pentingnya pembinaan dan pendampingan
+                    putra/putri Bapak/Ibu di sekolah, khususnya terkait
+                    perkembangan <strong>{activeCase.kategori}</strong> siswa,
+                    dengan ini kami mengharapkan kehadiran Bapak/Ibu ke sekolah
+                    pada:
+                  </p>
+
+                  <table className="ml-6 text-xs font-semibold">
+                    <tbody>
+                      <tr>
+                        <td className="w-28 py-0.5">Hari / Tanggal</td>
+                        <td className="w-4">:</td>
+                        <td>
+                          {new Date(letterMeetingDate).toLocaleDateString(
+                            "id-ID",
+                            {
+                              weekday: "long",
+                              day: "numeric",
+                              month: "long",
+                              year: "numeric",
+                            },
+                          )}
+                        </td>
+                      </tr>
+                      <tr>
+                        <td className="py-0.5">Waktu</td>
+                        <td>:</td>
+                        <td>Pukul {letterMeetingTime} WIB s.d. Selesai</td>
+                      </tr>
+                      <tr>
+                        <td className="py-0.5">Tempat</td>
+                        <td>:</td>
+                        <td>{letterMeetingRoom}</td>
+                      </tr>
+                      <tr>
+                        <td className="py-0.5">Keperluan</td>
+                        <td>:</td>
+                        <td>
+                          Konsultasi perkembangan siswa mengenai:{" "}
+                          {activeCase.ringkasan}
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+
+                  <p>
+                    Mengingat pentingnya hal tersebut demi kebaikan masa depan
+                    ananda, kami sangat mengharapkan kehadiran Bapak/Ibu tepat
+                    pada waktu yang telah ditentukan.
+                  </p>
+                  <p>
+                    Demikian surat undangan pemanggilan ini kami sampaikan. Atas
+                    perhatian dan kerjasamanya, kami ucapkan terima kasih.
+                  </p>
+                </div>
+
+                {/* Tanda Tangan */}
+                <div className="mt-8 grid grid-cols-2 text-center text-xs">
+                  <div>
+                    <p>Mengetahui,</p>
+                    <p>Kepala Sekolah</p>
+                    <div className="h-16" />
+                    <p className="font-bold underline">
+                      {String(
+                        companyProfile?.leader_name || "Drs. H. Mulyono, M.Pd.",
+                      )}
+                    </p>
+                    <p>
+                      NIP.{" "}
+                      {String(
+                        companyProfile?.leader_nip || "19680512 199403 1 002",
+                      )}
+                    </p>
+                  </div>
+
+                  <div>
+                    <p>Guru Pembimbing / Konselor BK,</p>
+                    <div className="h-16" />
+                    <p className="font-bold underline">
+                      {String(
+                        activeCase.dibuat_oleh ||
+                          user?.nama_operator ||
+                          user?.username ||
+                          "Konselor BK",
+                      )}
+                    </p>
+                    <p>NIP. -</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </Modal>
         )}
       </div>
+      {dialogKonfirmasi}
     </AppShell>
   );
 }

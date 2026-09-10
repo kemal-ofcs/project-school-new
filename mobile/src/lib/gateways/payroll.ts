@@ -750,7 +750,9 @@ export async function getPayrollSlipDetail(
         };
       }
     } catch {
-      // Ignore
+      // Baris yang bentuknya tidak dikenali dilewati, bukan menjatuhkan
+      // seluruh daftar. Satu baris payroll lama berskema berbeda tidak boleh
+      // membuat riwayat penggajian gagal tampil seluruhnya.
     }
   }
   throw new Error("Slip gaji tidak ditemukan.");

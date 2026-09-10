@@ -545,8 +545,9 @@ mod tests {
             .expect("delete frozen ledger");
         assert_eq!(del_res["sukses"], true);
 
-        let frozen_after = get_frozen_ledger(&state, "ta_2026_ganjil", "Ganjil", Some("rombel_10a"))
-            .expect("get frozen ledger after delete");
+        let frozen_after =
+            get_frozen_ledger(&state, "ta_2026_ganjil", "Ganjil", Some("rombel_10a"))
+                .expect("get frozen ledger after delete");
         assert_eq!(frozen_after.as_array().expect("empty array").len(), 0);
     }
 }

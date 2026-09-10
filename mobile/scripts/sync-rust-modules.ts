@@ -43,6 +43,54 @@ const filesToSync = [
   "time_policy.rs",
 ];
 
+/**
+ * Berkas yang memuat kode SENGAJA tidak didaftarkan di biner Mobile.
+ *
+ * APA YANG MASIH MATI HARI INI — dan hanya ini:
+ * jalur WhatsApp yang bersandar pada SQLite lokal dan konfigurasi cloud-only,
+ * yaitu `desktop_queue_wa_notification`, `desktop_cancel_wa_notification`,
+ * `desktop_list_wa_notifications` (versi LOKAL), `desktop_get_wa_config`, dan
+ * `desktop_save_wa_config`, beserta fungsi pendukungnya di `wa_notification.rs`
+ * dan `TursoClient::{get,save}_wa_config`.
+ *
+ * `notifikasi_wa` berada di luar snapshot, sehingga membaca tabel LOKAL di
+ * ponsel yang bukan terminal pemindai selalu menghasilkan daftar kosong — dan
+ * kosong tidak bisa dibedakan dari "tidak ada notifikasi". Karena itu Mobile
+ * memakai `mobile_list_wa_notifications` di `wa_review.rs`, yang membaca cloud;
+ * versi lokalnya tetap tersalin tetapi tidak pernah didaftarkan. Mengantre,
+ * membatalkan, dan menyunting konfigurasi gateway sengaja tidak dibawa ke
+ * ponsel: ketiganya menyentuh pengiriman pesan ke nomor wali seorang siswa.
+ *
+ * BIMBINGAN KONSELING SUDAH TIDAK ADA DI SINI LAGI. Ketujuh command-nya kini
+ * terdaftar di Mobile dan memanggil cloud (`bk_kasus`/`bk_sesi` tidak pernah ada
+ * di SQLite lokal), sehingga kodenya hidup dan `dead_code` kembali menjaganya.
+ *
+ * Kodenya tetap TERSALIN karena `commands.rs`, `turso.rs`, dan `wa_notification.rs`
+ * wajib identik dengan Desktop, tetapi `lib.rs` Mobile tidak mendaftarkan yang
+ * di atas — sehingga rustc menandainya `dead_code`. Belasan peringatan itu tidak
+ * menunjuk satu pun cacat, dan justru itu bahayanya: ia mengubur peringatan yang
+ * benar.
+ *
+ * Daftar ini SENGAJA sempit, dan wajib MENYUSUT begitu jalur di atas didaftarkan.
+ * Dua belas berkas generated lainnya tetap diperiksa `dead_code` seperti biasa,
+ * sehingga fitur baru yang lupa didaftarkan tetap berteriak. Yang menangkap
+ * kesalahan sebenarnya di sini bukan `dead_code` melainkan `bun run audit:contract`,
+ * yang menelusuri panggilan gateway dari kedua arah: gateway yang memanggil
+ * command tak terdaftar, DAN command terdaftar yang fungsinya tidak ada.
+ */
+const dibiarkanTakTerpakai = new Set([
+  "commands.rs",
+  "turso.rs",
+  "wa_notification.rs",
+]);
+
+const KEPALA_GENERATED = (file: string) =>
+  `// BERKAS INI HASIL SALIN OTOMATIS dari web-desktop oleh
+// \`mobile/scripts/sync-rust-modules.ts\`. JANGAN disunting dengan tangan —
+// perubahannya akan tertimpa diam-diam pada sinkronisasi berikutnya.
+// Sunting sumbernya: \`web-desktop/src-tauri/src/desktop/${file}\`.
+`;
+
 for (const file of filesToSync) {
   const srcPath = join(desktopDir, file);
   let content = readFileSync(srcPath, "utf-8");
@@ -58,6 +106,14 @@ for (const file of filesToSync) {
     .replaceAll("crate::desktop::", "crate::mobile::")
     .replaceAll("use crate::desktop", "use crate::mobile")
     .replaceAll("super::super::desktop", "super::super::mobile");
+
+  // Atribut dalam (`#![...]`) WAJIB mendahului seluruh item, termasuk `use`.
+  // Komentar boleh berada di atasnya, jadi kepala berkas tetap terbaca lebih
+  // dulu oleh manusia.
+  const izin = dibiarkanTakTerpakai.has(file)
+    ? "#![allow(dead_code)] // lihat sync-rust-modules.ts: sengaja tidak didaftarkan di Mobile\n"
+    : "";
+  content = `${KEPALA_GENERATED(file)}${izin}\n${content}`;
 
   const destPath = join(mobileDir, file);
   writeFileSync(destPath, content, "utf-8");

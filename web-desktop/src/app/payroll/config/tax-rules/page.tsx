@@ -98,7 +98,9 @@ export default function TaxRulesPage() {
     try {
       await syncNow();
     } catch {
-      // Ignore
+      // Sengaja diam: kegagalan sinkronisasi TIDAK boleh menghalangi
+      // pemuatan data lokal di blok finally. Aplikasi ini offline-first, jadi
+      // jaringan yang putus adalah keadaan normal, bukan kesalahan.
     } finally {
       await loadRules();
       setIsSyncing(false);

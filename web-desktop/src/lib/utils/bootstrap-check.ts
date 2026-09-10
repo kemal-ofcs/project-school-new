@@ -94,7 +94,7 @@ export function summarizeDatabaseCheck(
       tone: "warning",
       title: "Database masih kosong",
       detail:
-        "Belum ada tabel sama sekali. Skema Absensi SPPG akan dibuat otomatis saat Superadmin pertama diaktifkan. Pastikan URL ini memang database baru milik Anda.",
+        "Belum ada tabel sama sekali. Skema Manajemen Sekolah akan dibuat otomatis saat Superadmin pertama diaktifkan. Pastikan URL ini memang database baru milik Anda.",
       canCreateSuperadmin: true,
       canUseExisting: false,
       requiresConfirmation: false,
@@ -105,7 +105,7 @@ export function summarizeDatabaseCheck(
   if (!check.schemaReady) {
     return {
       tone: "danger",
-      title: "Database terhubung, tetapi bukan skema Absensi SPPG",
+      title: "Database terhubung, tetapi bukan skema Manajemen Sekolah",
       detail: `Tabel inti yang hilang: ${check.missingTables.join(", ")}. Besar kemungkinan URL database salah. Periksa ulang sebelum melanjutkan agar database milik aplikasi lain tidak ikut diubah.`,
       canCreateSuperadmin: true,
       canUseExisting: false,
@@ -119,7 +119,7 @@ export function summarizeDatabaseCheck(
       tone: "danger",
       title: "Klaim bootstrap sudah pernah dipakai",
       detail:
-        "Skema Absensi SPPG terdeteksi, namun klaim Superadmin pada database ini sudah pernah digunakan sementara tidak ada Superadmin aktif. Aktifkan kembali akun Superadmin lama, atau gunakan database lain.",
+        "Skema Manajemen Sekolah terdeteksi, namun klaim Superadmin pada database ini sudah pernah digunakan sementara tidak ada Superadmin aktif. Aktifkan kembali akun Superadmin lama, atau gunakan database lain.",
       canCreateSuperadmin: true,
       canUseExisting: false,
       requiresConfirmation: true,
@@ -129,7 +129,7 @@ export function summarizeDatabaseCheck(
 
   return {
     tone: "success",
-    title: "Database Absensi SPPG siap diprovisioning",
+    title: "Database Manajemen Sekolah siap diprovisioning",
     detail:
       "Skema sudah lengkap dan belum memiliki Superadmin aktif. Silakan lanjutkan pembuatan akun Superadmin pertama.",
     canCreateSuperadmin: true,

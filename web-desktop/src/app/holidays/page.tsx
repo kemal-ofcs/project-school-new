@@ -303,6 +303,7 @@ export default function HolidaysPage() {
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
           <div className="relative">
             <input
+              aria-label="Cari hari libur"
               type="text"
               placeholder="Cari nama atau tanggal libur..."
               value={searchQuery}
@@ -312,6 +313,7 @@ export default function HolidaysPage() {
           </div>
           <div>
             <select
+              aria-label="Filter jenis hari libur"
               value={filterJenis}
               onChange={(e) => setFilterJenis(e.target.value)}
               className="w-full rounded-xl border border-slate-800 bg-slate-900/80 px-3 py-2.5 text-sm text-white outline-none transition focus:border-sky-500"
@@ -324,6 +326,7 @@ export default function HolidaysPage() {
           </div>
           <div>
             <select
+              aria-label="Filter tahun"
               value={filterYear}
               onChange={(e) => setFilterYear(e.target.value)}
               className="w-full rounded-xl border border-slate-800 bg-slate-900/80 px-3 py-2.5 text-sm text-white outline-none transition focus:border-sky-500"

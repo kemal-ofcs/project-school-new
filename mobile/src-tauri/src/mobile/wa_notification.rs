@@ -1,3 +1,9 @@
+// BERKAS INI HASIL SALIN OTOMATIS dari web-desktop oleh
+// `mobile/scripts/sync-rust-modules.ts`. JANGAN disunting dengan tangan —
+// perubahannya akan tertimpa diam-diam pada sinkronisasi berikutnya.
+// Sunting sumbernya: `web-desktop/src-tauri/src/desktop/wa_notification.rs`.
+#![allow(dead_code)] // lihat sync-rust-modules.ts: sengaja tidak didaftarkan di Mobile
+
 use std::collections::HashMap;
 
 use rusqlite::{params, Connection, Transaction};
@@ -81,14 +87,20 @@ pub fn purge_expired_notifications(connection: &Connection) -> Result<usize, Com
         )
         .map(|jumlah| jumlah as usize)
         .map_err(|e| {
-            CommandError::new("DB_ERROR", format!("Gagal memangkas antrean notifikasi: {e}"))
+            CommandError::new(
+                "DB_ERROR",
+                format!("Gagal memangkas antrean notifikasi: {e}"),
+            )
         })
 }
 
 /// Normalisasi nomor WhatsApp ke format kanonik `+62...`.
 /// Meniru logika `src/lib/operators/contact.ts` (Rule 40).
 pub fn normalize_phone_canonical(raw: &str) -> String {
-    let digits: String = raw.chars().filter(|c| c.is_ascii_digit() || *c == '+').collect();
+    let digits: String = raw
+        .chars()
+        .filter(|c| c.is_ascii_digit() || *c == '+')
+        .collect();
     if digits.is_empty() {
         return String::new();
     }
@@ -141,14 +153,22 @@ pub fn queue_wa_notification_tx(
     client_id: &str,
     draft: &Value,
 ) -> Result<String, CommandError> {
-    let raw_id = draft.get("id_notifikasi").and_then(Value::as_str).unwrap_or("").trim();
+    let raw_id = draft
+        .get("id_notifikasi")
+        .and_then(Value::as_str)
+        .unwrap_or("")
+        .trim();
     let id = if raw_id.is_empty() {
         new_wa_notification_id()
     } else {
         raw_id.to_owned()
     };
 
-    let dedupe_key = draft.get("dedupe_key").and_then(Value::as_str).unwrap_or("").trim();
+    let dedupe_key = draft
+        .get("dedupe_key")
+        .and_then(Value::as_str)
+        .unwrap_or("")
+        .trim();
     if dedupe_key.is_empty() {
         return Err(CommandError::new(
             "VALIDATION_ERROR",
@@ -156,8 +176,15 @@ pub fn queue_wa_notification_tx(
         ));
     }
 
-    let jenis = draft.get("jenis").and_then(Value::as_str).unwrap_or("").trim();
-    if !matches!(jenis, "scan_masuk" | "scan_pulang" | "bolos" | "ambang_alfa") {
+    let jenis = draft
+        .get("jenis")
+        .and_then(Value::as_str)
+        .unwrap_or("")
+        .trim();
+    if !matches!(
+        jenis,
+        "scan_masuk" | "scan_pulang" | "bolos" | "ambang_alfa"
+    ) {
         return Err(CommandError::new(
             "VALIDATION_ERROR",
             "Jenis notifikasi tidak valid. Pilihan: scan_masuk, scan_pulang, bolos, ambang_alfa.",
@@ -170,7 +197,11 @@ pub fn queue_wa_notification_tx(
         .map(str::trim)
         .filter(|s| !s.is_empty());
 
-    let raw_phone = draft.get("tujuan_nomor").and_then(Value::as_str).unwrap_or("").trim();
+    let raw_phone = draft
+        .get("tujuan_nomor")
+        .and_then(Value::as_str)
+        .unwrap_or("")
+        .trim();
     let tujuan_nomor = normalize_phone_canonical(raw_phone);
     if !is_valid_phone(&tujuan_nomor) {
         return Err(CommandError::new(
@@ -179,7 +210,11 @@ pub fn queue_wa_notification_tx(
         ));
     }
 
-    let isi_pesan = draft.get("isi_pesan").and_then(Value::as_str).unwrap_or("").trim();
+    let isi_pesan = draft
+        .get("isi_pesan")
+        .and_then(Value::as_str)
+        .unwrap_or("")
+        .trim();
     if isi_pesan.is_empty() {
         return Err(CommandError::new(
             "VALIDATION_ERROR",
@@ -244,7 +279,12 @@ pub fn queue_wa_notification_tx(
             now
         ],
     )
-    .map_err(|e| CommandError::new("DB_ERROR", format!("Gagal menyimpan antrean notifikasi: {e}")))?;
+    .map_err(|e| {
+        CommandError::new(
+            "DB_ERROR",
+            format!("Gagal menyimpan antrean notifikasi: {e}"),
+        )
+    })?;
 
     let payload = json!({
         "id_notifikasi": id,
@@ -258,7 +298,15 @@ pub fn queue_wa_notification_tx(
         "updated_at": now,
     });
 
-    sync::enqueue(tx, client_id, "wa-notification", "queue", &id, &payload, None)?;
+    sync::enqueue(
+        tx,
+        client_id,
+        "wa-notification",
+        "queue",
+        &id,
+        &payload,
+        None,
+    )?;
 
     Ok(id)
 }
@@ -287,16 +335,21 @@ pub fn cancel_wa_notification_tx(
             "id_notifikasi": id_notifikasi,
             "alasan": alasan,
         });
-        sync::enqueue(tx, client_id, "wa-notification", "cancel", id_notifikasi, &payload, None)?;
+        sync::enqueue(
+            tx,
+            client_id,
+            "wa-notification",
+            "cancel",
+            id_notifikasi,
+            &payload,
+            None,
+        )?;
     }
 
     Ok(())
 }
 
-pub fn queue_wa_notification(
-    state: &MobileState,
-    draft: &Value,
-) -> Result<Value, CommandError> {
+pub fn queue_wa_notification(state: &MobileState, draft: &Value) -> Result<Value, CommandError> {
     let client_id = sync::ensure_client_id(state)?;
     let mut conn = storage::database(&state.data_dir)?;
     let tx = conn.transaction().map_err(|_| CommandError::internal())?;
@@ -578,9 +631,18 @@ mod tests {
     fn test_phone_normalization() {
         assert_eq!(normalize_phone_canonical("081234567890"), "+6281234567890");
         assert_eq!(normalize_phone_canonical("6281234567890"), "+6281234567890");
-        assert_eq!(normalize_phone_canonical("+6281234567890"), "+6281234567890");
-        assert_eq!(normalize_phone_canonical("0812-3456-7890"), "+6281234567890");
-        assert_eq!(normalize_phone_canonical("+62 812 3456 7890"), "+6281234567890");
+        assert_eq!(
+            normalize_phone_canonical("+6281234567890"),
+            "+6281234567890"
+        );
+        assert_eq!(
+            normalize_phone_canonical("0812-3456-7890"),
+            "+6281234567890"
+        );
+        assert_eq!(
+            normalize_phone_canonical("+62 812 3456 7890"),
+            "+6281234567890"
+        );
         assert!(is_valid_phone("081234567890"));
         assert!(!is_valid_phone("12345"));
     }
@@ -602,16 +664,19 @@ mod tests {
         let id = res["id_notifikasi"].as_str().expect("id string");
         assert!(id.starts_with("wa_"));
 
-        let list = list_wa_notifications(&state, None, None, None, None, None).expect("list notifications");
+        let list = list_wa_notifications(&state, None, None, None, None, None)
+            .expect("list notifications");
         let items = list["items"].as_array().expect("array");
         assert_eq!(items.len(), 1);
         assert_eq!(items[0]["status"], "Menunggu");
         assert_eq!(items[0]["tujuan_nomor"], "+6281234567890");
 
-        let cancel_res = cancel_wa_notification(&state, id, Some("Dibatalkan penguji")).expect("cancel notification");
+        let cancel_res = cancel_wa_notification(&state, id, Some("Dibatalkan penguji"))
+            .expect("cancel notification");
         assert_eq!(cancel_res["sukses"], true);
 
-        let list_after = list_wa_notifications(&state, None, None, None, None, None).expect("list notifications");
+        let list_after = list_wa_notifications(&state, None, None, None, None, None)
+            .expect("list notifications");
         let items_after = list_after["items"].as_array().expect("array");
         assert_eq!(items_after[0]["status"], "Dibatalkan");
     }

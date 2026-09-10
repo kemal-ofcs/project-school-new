@@ -12,6 +12,7 @@ import {
 import { BootstrapPanel } from "@/components/BootstrapPanel";
 import { BrandLogo } from "@/components/ui/BrandLogo";
 import { FeedbackBanner } from "@/components/ui/FeedbackBanner";
+import { Modal } from "@/components/ui/Modal";
 import { triggerHaptic } from "@/lib/client/haptics";
 import { BRANDING } from "@/lib/constants/branding";
 import { useAuth } from "@/lib/context/AuthContext";
@@ -439,21 +440,32 @@ export default function LoginPage() {
 
       {/* Server Config Modal */}
       {isServerModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm">
-          <div className="w-full max-w-sm rounded-3xl border border-white/15 bg-slate-900 p-6 shadow-2xl">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-base font-bold text-white flex items-center gap-2">
-                <span>⚙️</span> Pengaturan Server API
-              </h2>
+        <Modal
+          isOpen
+          onClose={() => setIsServerModalOpen(false)}
+          title="Pengaturan Server API"
+          maxWidth="max-w-sm"
+          footer={
+            <div className="flex w-full gap-2">
               <button
                 type="button"
                 onClick={() => setIsServerModalOpen(false)}
-                className="size-8 rounded-full bg-slate-800 text-slate-400 hover:text-white flex items-center justify-center text-sm"
+                className="flex-1 min-h-10 rounded-xl border border-white/10 bg-slate-800 text-xs font-bold text-slate-300 hover:bg-slate-700 transition"
               >
-                ✕
+                Batal
+              </button>
+              <button
+                type="button"
+                disabled={isSavingServer || !customServerUrl.trim()}
+                onClick={() => handleSaveServerUrl(customServerUrl)}
+                className="flex-1 min-h-10 rounded-xl bg-sky-500 font-bold text-xs text-slate-950 hover:bg-sky-400 disabled:opacity-50 transition"
+              >
+                {isSavingServer ? "Menyimpan..." : "Simpan & Terapkan"}
               </button>
             </div>
-
+          }
+        >
+          <div>
             <p className="text-xs text-slate-300 mb-4 leading-relaxed">
               Tentukan alamat server backend yang dituju untuk autentikasi dan
               sinkronisasi data.
@@ -516,26 +528,8 @@ export default function LoginPage() {
                 {serverSaveMessage}
               </div>
             )}
-
-            <div className="flex gap-2">
-              <button
-                type="button"
-                onClick={() => setIsServerModalOpen(false)}
-                className="flex-1 min-h-10 rounded-xl border border-white/10 bg-slate-800 text-xs font-bold text-slate-300 hover:bg-slate-700 transition"
-              >
-                Batal
-              </button>
-              <button
-                type="button"
-                disabled={isSavingServer || !customServerUrl.trim()}
-                onClick={() => handleSaveServerUrl(customServerUrl)}
-                className="flex-1 min-h-10 rounded-xl bg-sky-500 font-bold text-xs text-slate-950 hover:bg-sky-400 disabled:opacity-50 transition"
-              >
-                {isSavingServer ? "Menyimpan..." : "Simpan & Terapkan"}
-              </button>
-            </div>
           </div>
-        </div>
+        </Modal>
       )}
     </div>
   );

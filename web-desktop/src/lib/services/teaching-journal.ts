@@ -80,8 +80,19 @@ export async function listTeachingJournals(filter?: {
   idGuru?: string;
   tanggalMulai?: string;
   tanggalSelesai?: string;
+  limit?: number;
 }): Promise<TeachingJournalRecord[]> {
   await ensureDbInitialized();
+  // Setiap filter di sini opsional, sehingga pemanggilan tanpa filter berarti
+  // "seluruh jurnal mengajar yang pernah dicatat" — satu baris per kelas per
+  // jam pelajaran per hari, bertambah selamanya. Batasnya dijepit di sini,
+  // pola yang sama dengan `getRiwayatScan` dan `listWaNotifications`.
+  //
+  // Bawaannya sama dengan pagar maksimumnya: 30 rombel × 8 jam × 20 hari
+  // sekolah sudah ±4.800 baris sebulan, jadi bawaan yang lebih kecil akan
+  // memotong tampilan sebulan tanpa memberi tahu siapa pun. Angka ini pagar
+  // terhadap bencana, bukan ukuran halaman.
+  const limit = Math.min(1000, Math.max(1, filter?.limit || 1000));
   const idRombel = filter?.idRombel?.trim() || null;
   const idMapel = filter?.idMapel?.trim() || null;
   const idGuru = filter?.idGuru?.trim() || null;
@@ -105,7 +116,8 @@ export async function listTeachingJournals(filter?: {
         AND (? IS NULL OR p.id_guru = ?)
         AND (? IS NULL OR p.tanggal >= ?)
         AND (? IS NULL OR p.tanggal <= ?)
-      ORDER BY p.tanggal DESC, CAST(p.jam_ke AS INTEGER) DESC;
+      ORDER BY p.tanggal DESC, CAST(p.jam_ke AS INTEGER) DESC
+      LIMIT ?;
     `,
     args: [
       idRombel,
@@ -118,6 +130,7 @@ export async function listTeachingJournals(filter?: {
       tanggalMulai,
       tanggalSelesai,
       tanggalSelesai,
+      limit,
     ],
   });
 

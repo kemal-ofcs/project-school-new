@@ -28,6 +28,7 @@ import {
 } from "@/lib/gateways/class-attendance";
 import { syncNow } from "@/lib/gateways/sync-status";
 import { getDaftarGuru } from "@/lib/gateways/teacher";
+import { useConfirmDialog } from "@/lib/hooks/useConfirmDialog";
 import { normalizeOperatorPhone } from "@/lib/operators/contact";
 import {
   buildParentNotificationText,
@@ -81,6 +82,7 @@ export default function PresensiKelasPage() {
   // sebelum tombolnya sempat nonaktif. Pada jalur Web kedua permintaan itu bisa
   // sama-sama lolos pemeriksaan duplikat dan membuat DUA sesi.
   const isSubmittingRef = useRef(false);
+  const { konfirmasi, dialogKonfirmasi } = useConfirmDialog();
 
   // Pilihan filter dibaca `loadMasterData` lewat REF, bukan lewat dependency.
   // Menjadikannya dependency membuat callback-nya lahir ulang setiap kali
@@ -188,9 +190,14 @@ export default function PresensiKelasPage() {
     // sesi yang sedang disunting. Hanya ditanyakan bila memang ada yang hilang.
     if (
       hasUnsavedAttendanceMarks(rosterItems) &&
-      !window.confirm(
-        "Tanda kehadiran yang belum disimpan akan hilang saat roster dimuat ulang. Lanjutkan?",
-      )
+      !(await konfirmasi({
+        title: "Muat ulang roster?",
+        description:
+          "Tanda kehadiran yang belum disimpan akan hilang dan seluruh siswa kembali ke status bawaan.",
+        preserved: "Presensi yang sudah tersimpan sebelumnya tidak berubah.",
+        confirmLabel: "Ya, muat ulang",
+        tone: "warning",
+      }))
     ) {
       return;
     }
@@ -216,7 +223,7 @@ export default function PresensiKelasPage() {
     } finally {
       setLoading(false);
     }
-  }, [selectedRombel, selectedDate, rosterItems]);
+  }, [selectedRombel, selectedDate, rosterItems, konfirmasi]);
 
   // Load reconciliation anomalies
   const handleLoadReconciliation = useCallback(async () => {
@@ -367,7 +374,19 @@ export default function PresensiKelasPage() {
     // Peringatan ini tidak pernah mengubah status siapa pun — gurunya yang
     // memutuskan.
     const peringatan = buildPresentWithoutGateScanWarning(rosterItems);
-    if (peringatan && !window.confirm(peringatan)) return;
+    if (
+      peringatan &&
+      !(await konfirmasi({
+        title: "Simpan presensi ini?",
+        description: peringatan,
+        preserved:
+          "Peringatan ini tidak mengubah status siapa pun — keputusannya tetap di tangan guru.",
+        confirmLabel: "Ya, simpan",
+        tone: "warning",
+      }))
+    ) {
+      return;
+    }
 
     if (isSubmittingRef.current) return;
     isSubmittingRef.current = true;
@@ -760,6 +779,7 @@ export default function PresensiKelasPage() {
               <div className="flex items-center justify-between pt-2 border-t border-white/5">
                 <div className="flex-1 max-w-lg">
                   <input
+                    aria-label="Catatan umum sesi KBM"
                     type="text"
                     value={catatanSesi}
                     onChange={(e) => setCatatanSesi(e.target.value)}
@@ -953,6 +973,7 @@ export default function PresensiKelasPage() {
                           </td>
                           <td className="px-4 py-2.5">
                             <input
+                              aria-label="Keterangan kehadiran siswa"
                               type="text"
                               value={item.catatan || ""}
                               onChange={(e) =>
@@ -1438,6 +1459,7 @@ export default function PresensiKelasPage() {
           </Modal>
         ) : null}
       </div>
+      {dialogKonfirmasi}
     </AppShell>
   );
 }

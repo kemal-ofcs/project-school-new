@@ -7,6 +7,7 @@ import { MobileAppShell } from "@/components/MobileAppShell";
 import { FeedbackBanner } from "@/components/ui/FeedbackBanner";
 import { Icon } from "@/components/ui/Icon";
 import { Modal } from "@/components/ui/Modal";
+import { canAccessArea } from "@/lib/auth/access";
 import { triggerHaptic } from "@/lib/client/haptics";
 import { shareText } from "@/lib/client/share";
 import { useAuth } from "@/lib/context/AuthContext";
@@ -88,7 +89,7 @@ function getLastMonthRange() {
 export default function MobilePayrollPortalPage() {
   const isHydrated = useHydrated();
   const router = useRouter();
-  const { isAuthenticated, isLoading: authLoading } = useAuth();
+  const { user, isAuthenticated, isLoading: authLoading } = useAuth();
   const companyName = useCompanyName();
 
   const [activeTab, setActiveTab] = useState<"estimate" | "archive">(
@@ -126,8 +127,14 @@ export default function MobilePayrollPortalPage() {
       if (empList.length > 0 && !selectedKaryawanId) {
         setSelectedKaryawanId(String(empList[0].id_unik));
       }
-    } catch {
-      // Ignore
+    } catch (err) {
+      // Diam berarti pemilih karyawan tampil kosong seolah memang tidak ada
+      // karyawan, padahal permintaannya yang gagal.
+      setFeedback({
+        type: "error",
+        message:
+          err instanceof Error ? err.message : "Daftar karyawan gagal dimuat.",
+      });
     }
   }, [selectedKaryawanId]);
 
@@ -180,8 +187,17 @@ export default function MobilePayrollPortalPage() {
       router.push("/login");
       return;
     }
+    // Otorisasi, bukan sekadar autentikasi. Tanpa baris ini setiap operator
+    // dengan sesi yang sah bisa membuka slip gaji beserta datanya.
+    //
+    // Mobile memakai static export dan tidak punya rute `/forbidden`, jadi
+    // pengalihannya ke `/dashboard`.
+    if (!canAccessArea(user, "payroll")) {
+      router.replace("/dashboard");
+      return;
+    }
     void loadEmployees();
-  }, [isHydrated, authLoading, isAuthenticated, loadEmployees, router]);
+  }, [isHydrated, authLoading, isAuthenticated, user, loadEmployees, router]);
 
   useEffect(() => {
     if (selectedKaryawanId) {
@@ -238,7 +254,9 @@ Status: Estimasi Real-Time ${companyName}`;
       );
       setFeedback({ type: "success", message: "Slip berhasil dibagikan." });
     } catch {
-      // User cancelled
+      // Pengguna menutup dialog berbagi. Itu PEMBATALAN, bukan kegagalan —
+      // menampilkan pesan error untuk keputusan yang disengaja hanya
+      // membingungkan.
     } finally {
       setSharing(false);
     }

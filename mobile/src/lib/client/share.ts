@@ -146,7 +146,8 @@ export async function shareText(
         message: "Teks slip berhasil disalin ke clipboard.",
       };
     } catch {
-      // ignore
+      // Clipboard bisa ditolak izinnya oleh WebView. Jalur berbagi utama
+      // sudah berhasil di atas; penyalinan ini hanya kemudahan tambahan.
     }
   }
 

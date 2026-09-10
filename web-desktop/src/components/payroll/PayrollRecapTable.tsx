@@ -4,12 +4,14 @@ import { useMemo, useState } from "react";
 import { Modal } from "@/components/ui/Modal";
 import type { PayrollRecapRow } from "@/lib/gateways/payroll";
 
-interface VirtualPayrollTableProps {
+interface PayrollRecapTableProps {
   data: PayrollRecapRow[];
   isLoading?: boolean;
   periodStart?: string;
   periodEnd?: string;
 }
+
+const BARIS_PER_HALAMAN = 50;
 
 const IDR = new Intl.NumberFormat("id-ID", {
   style: "currency",
@@ -17,15 +19,20 @@ const IDR = new Intl.NumberFormat("id-ID", {
   maximumFractionDigits: 0,
 });
 
-export function VirtualPayrollTable({
+export function PayrollRecapTable({
   data,
   isLoading,
   periodStart,
   periodEnd,
-}: VirtualPayrollTableProps) {
+}: PayrollRecapTableProps) {
   const [search, setSearch] = useState("");
   const [divisiFilter, setDivisiFilter] = useState("ALL");
   const [selectedRow, setSelectedRow] = useState<PayrollRecapRow | null>(null);
+
+  // Jumlah baris yang dirender sekaligus. Rekap ini satu baris per personil,
+  // jadi pada 800 karyawan seluruh tabel hidup bersamaan di DOM dan setiap
+  // ketikan pada kotak cari menilai ulang semuanya.
+  const [halaman, setHalaman] = useState(1);
 
   const divisiList = useMemo(() => {
     const set = new Set<string>();
@@ -46,6 +53,27 @@ export function VirtualPayrollTable({
     });
   }, [data, search, divisiFilter]);
 
+  const totalHalaman = Math.max(
+    1,
+    Math.ceil(filtered.length / BARIS_PER_HALAMAN),
+  );
+
+  // Halaman dijepit setelah penyaringan berubah, supaya pencarian yang
+  // mengecilkan hasil tidak meninggalkan pengguna di halaman kosong.
+  const halamanAman = Math.min(halaman, totalHalaman);
+
+  const barisTampil = useMemo(
+    () =>
+      filtered.slice(
+        (halamanAman - 1) * BARIS_PER_HALAMAN,
+        halamanAman * BARIS_PER_HALAMAN,
+      ),
+    [filtered, halamanAman],
+  );
+
+  // Total tetap dihitung atas SELURUH hasil saringan, bukan halaman yang
+  // tampak: ringkasan yang hanya menjumlahkan satu halaman adalah angka salah
+  // yang terlihat masuk akal.
   const totals = useMemo(() => {
     let hadir = 0;
     let regHours = 0;
@@ -69,6 +97,7 @@ export function VirtualPayrollTable({
       <div className="flex flex-col sm:flex-row gap-3 justify-between items-center">
         <div className="flex flex-wrap gap-2 w-full sm:w-auto">
           <input
+            aria-label="Cari karyawan"
             type="text"
             placeholder="Cari karyawan / ID..."
             value={search}
@@ -76,6 +105,7 @@ export function VirtualPayrollTable({
             className="px-3 py-1.5 text-sm bg-slate-800 border border-slate-700 rounded-lg text-slate-200 focus:outline-none focus:border-sky-500 w-full sm:w-64"
           />
           <select
+            aria-label="Filter divisi"
             value={divisiFilter}
             onChange={(e) => setDivisiFilter(e.target.value)}
             className="px-3 py-1.5 text-sm bg-slate-800 border border-slate-700 rounded-lg text-slate-200 focus:outline-none focus:border-sky-500"
@@ -125,7 +155,7 @@ export function VirtualPayrollTable({
                 </td>
               </tr>
             ) : (
-              filtered.map((row) => (
+              barisTampil.map((row) => (
                 <tr
                   key={row.id_karyawan}
                   className="hover:bg-slate-800/40 transition-colors"
@@ -204,6 +234,37 @@ export function VirtualPayrollTable({
           )}
         </table>
       </div>
+
+      {filtered.length > BARIS_PER_HALAMAN && (
+        <div className="flex flex-wrap items-center justify-between gap-3 text-xs text-slate-400">
+          <span className="font-mono">
+            Menampilkan {(halamanAman - 1) * BARIS_PER_HALAMAN + 1}–
+            {Math.min(halamanAman * BARIS_PER_HALAMAN, filtered.length)} dari{" "}
+            {filtered.length} karyawan
+          </span>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setHalaman((n) => Math.max(1, n - 1))}
+              disabled={halamanAman <= 1}
+              className="rounded-lg border border-slate-700 px-3 py-1.5 font-semibold text-slate-200 transition hover:border-sky-500 hover:text-white disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              Sebelumnya
+            </button>
+            <span className="font-mono">
+              {halamanAman} / {totalHalaman}
+            </span>
+            <button
+              type="button"
+              onClick={() => setHalaman((n) => Math.min(totalHalaman, n + 1))}
+              disabled={halamanAman >= totalHalaman}
+              className="rounded-lg border border-slate-700 px-3 py-1.5 font-semibold text-slate-200 transition hover:border-sky-500 hover:text-white disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              Berikutnya
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Modal Detail Slip Estimasi */}
       {selectedRow && (

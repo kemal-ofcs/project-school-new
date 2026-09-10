@@ -194,6 +194,7 @@ export function DatabaseBackupCard({
         </p>
 
         <input
+          aria-label="Berkas cadangan database"
           ref={fileRef}
           type="file"
           accept=".db,.sppgbak"

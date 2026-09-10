@@ -1,7 +1,7 @@
 "use client";
 
 import { requestWebApi } from "@/lib/client/api-client";
-import { isDesktopRuntime } from "@/lib/runtime/app-runtime";
+import { isDesktopRuntime, isMobileRuntime } from "@/lib/runtime/app-runtime";
 import { invokeDesktop } from "@/lib/runtime/desktop-commands";
 import { assertTersediaDiMobile } from "@/lib/runtime/mobile-unsupported";
 import type {
@@ -26,7 +26,23 @@ export type {
 export async function listWaNotificationsGateway(
   filter?: WaNotificationFilter,
 ): Promise<{ items: WaNotificationItem[] }> {
-  assertTersediaDiMobile("Tinjauan notifikasi WhatsApp");
+  // Mobile membaca CLOUD, bukan `notifikasi_wa` lokal. Tabel itu di luar
+  // `SNAPSHOT_TABLES`, sehingga perangkat yang bukan terminal pemindai selalu
+  // melihat tabel lokal kosong — dan kosong tidak bisa dibedakan dari "tidak
+  // ada notifikasi". Guard POSITIF, satu-satunya bentuk yang dikenali
+  // `splitMobileBranch` di audit kontrak.
+  if (isMobileRuntime()) {
+    return invokeDesktop<{ items: WaNotificationItem[] }>(
+      "mobile_list_wa_notifications",
+      {
+        status: filter?.status ?? null,
+        jenis: filter?.jenis ?? null,
+        idSiswa: filter?.idSiswa ?? filter?.id_siswa ?? null,
+        tanggal: filter?.tanggal ?? null,
+        limit: filter?.limit ?? null,
+      },
+    );
+  }
   if (isDesktopRuntime()) {
     return invokeDesktop<{ items: WaNotificationItem[] }>(
       "desktop_list_wa_notifications",
@@ -85,7 +101,6 @@ export async function cancelWaNotificationGateway(
 }
 
 export async function getWaConfigGateway(): Promise<WaConfig> {
-  assertTersediaDiMobile("Tinjauan notifikasi WhatsApp");
   assertTersediaDiMobile("Tinjauan notifikasi WhatsApp");
   if (isDesktopRuntime()) {
     return invokeDesktop<WaConfig>("desktop_get_wa_config");

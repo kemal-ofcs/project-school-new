@@ -297,6 +297,7 @@ export default function MobileLegerKehadiranPage() {
                 Tahun Ajaran
               </span>
               <select
+                aria-label="Tahun ajaran"
                 value={selectedTa}
                 onChange={(e) => setSelectedTa(e.target.value)}
                 className="w-full text-xs rounded-xl px-2.5 py-2 bg-slate-900 border border-slate-700 text-slate-100 focus:outline-none focus:ring-1 focus:ring-sky-500"
@@ -317,6 +318,7 @@ export default function MobileLegerKehadiranPage() {
                 Semester
               </span>
               <select
+                aria-label="Semester"
                 value={selectedSemester}
                 onChange={(e) => setSelectedSemester(e.target.value)}
                 className="w-full text-xs rounded-xl px-2.5 py-2 bg-slate-900 border border-slate-700 text-slate-100 focus:outline-none focus:ring-1 focus:ring-sky-500"
@@ -332,6 +334,7 @@ export default function MobileLegerKehadiranPage() {
               Rombongan Belajar
             </span>
             <select
+              aria-label="Rombongan belajar"
               value={selectedRombel}
               onChange={(e) => setSelectedRombel(e.target.value)}
               className="w-full text-xs rounded-xl px-2.5 py-2 bg-slate-900 border border-slate-700 text-slate-100 focus:outline-none focus:ring-1 focus:ring-sky-500"

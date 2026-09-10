@@ -145,6 +145,20 @@ pub fn run() {
             // Bimbingan Konseling dan tinjauan antrean WhatsApp SENGAJA tidak
             // ikut — lihat catatan di gateway masing-masing.
             mobile::commands::desktop_get_attendance_dashboard_metrics,
+            // Bimbingan Konseling: murni cloud (`bk_kasus`/`bk_sesi` tidak
+            // pernah ada di SQLite lokal), jadi tidak menyentuh outbox maupun
+            // SNAPSHOT_TABLES. Halamannya WAJIB mengatakan saat jaringan mati.
+            mobile::commands::desktop_list_counseling_cases,
+            mobile::commands::desktop_get_counseling_case,
+            mobile::commands::desktop_create_counseling_case,
+            mobile::commands::desktop_update_counseling_case,
+            mobile::commands::desktop_add_counseling_session,
+            mobile::commands::desktop_delete_counseling_case,
+            mobile::commands::desktop_delete_counseling_session,
+            // Tinjauan antrean WhatsApp: command khusus Mobile yang membaca CLOUD.
+            // Membaca `notifikasi_wa` LOKAL akan selalu kosong di perangkat yang
+            // bukan terminal pemindai — lihat `wa_review.rs`.
+            mobile::wa_review::mobile_list_wa_notifications,
             mobile::commands::desktop_get_server_url,
             mobile::commands::desktop_set_server_url,
             mobile::commands::desktop_get_turso_url,

@@ -153,7 +153,9 @@ export default function SettingsPage() {
         const settings = await getGeofenceSettings();
         if (!cancelled) setGeofence(settings);
       } catch {
-        // Handled
+        // Pengaturan geofence gagal dimuat: formulirnya tetap tampil dengan
+        // nilai bawaan, dan penyimpanan berikutnya menulis ulang nilainya.
+        // Tidak ada data yang hilang, jadi tidak ada yang perlu dilaporkan.
       } finally {
         if (!cancelled) setGeofenceLoading(false);
       }
@@ -1390,6 +1392,7 @@ export default function SettingsPage() {
                   </span>
                 </div>
                 <textarea
+                  aria-label="Daftar alamat IP yang diizinkan"
                   value={ipAllowlistDraft}
                   onChange={(event) => setIpAllowlistDraft(event.target.value)}
                   rows={4}
@@ -1527,6 +1530,7 @@ export default function SettingsPage() {
                   </span>
                 </div>
                 <input
+                  aria-label="Radius kantor dalam meter"
                   type="number"
                   min={10}
                   max={10000}

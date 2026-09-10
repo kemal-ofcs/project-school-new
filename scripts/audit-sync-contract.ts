@@ -33,6 +33,19 @@ const RUST_ONLY_CLOUD_TABLES = [
 	// trigger SQLite. Jalur Web menulis langsung ke database yang sama, sehingga
 	// trigger yang sama sudah ikut menaikkannya.
 	"sync_pulse",
+	// Jejak baris yang dihapus, dipasang bersama `sync_pulse` dan digerakkan
+	// trigger `AFTER DELETE` pada setiap tabel snapshot. Alasannya sama persis:
+	// jalur Web menghapus di database yang sama, sehingga trigger-nya mencatat
+	// penghapusan Web tanpa satu baris kode pun di sisi Web. Sebuah tabel yang
+	// harus DITULIS aplikasi tidak boleh masuk daftar ini — yang ini tidak
+	// pernah ditulis aplikasi mana pun.
+	//
+	// Database yang belum pernah disentuh klien Rust belum memilikinya, dan itu
+	// tidak menimbulkan celah: perangkat baru selalu menarik snapshot penuh
+	// lebih dulu sehingga titik awalnya sudah konsisten, dan tabel beserta
+	// trigger-nya terpasang pada `ensure_schema` sebelum pull inkremental
+	// pertama berjalan.
+	"sync_tombstone",
 ];
 
 const WEB_ONLY_CLOUD_TABLES: string[] = [];
@@ -340,15 +353,23 @@ const desktopCommands = [
 	read("web-desktop/src-tauri/src/desktop/payroll/commands.rs"),
 ].join("\n");
 
-// `commands.rs` DITAMBAH modul khusus Mobile (share.rs dan payroll.rs).
+// SELURUH modul Mobile dibaca, bukan daftar nama yang ditulis keras.
+//
 // Perintah yang tidak punya padanan Desktop hidup di luar berkas yang disalin
-// sync-rust-modules.ts, dan audit yang hanya membaca commands.rs akan menuduhnya
-// "terdaftar tetapi fungsinya tidak ada".
-const mobileCommands = [
-	read("mobile/src-tauri/src/mobile/commands.rs"),
-	read("mobile/src-tauri/src/mobile/share.rs"),
-	read("mobile/src-tauri/src/mobile/payroll.rs"),
-].join("\n");
+// `sync-rust-modules.ts`, dan audit yang hanya membaca `commands.rs` akan
+// menuduhnya "terdaftar tetapi fungsinya tidak ada". Sebelumnya daftar itu
+// dieja satu per satu (`share.rs`, `payroll.rs`) — dan daftar seperti itu
+// basi tanpa memberi tahu siapa pun: modul Mobile berikutnya yang lahir
+// (`wa_review.rs`) langsung dituduh, padahal kodenya benar.
+//
+// Sebuah audit yang menuduh kode yang benar akan dimatikan orang, jadi
+// cakupannya diambil dari direktorinya sendiri.
+const mobileCommands = readdirSync(
+	resolve(projectRoot, "mobile/src-tauri/src/mobile"),
+)
+	.filter((berkas) => berkas.endsWith(".rs"))
+	.map((berkas) => read(`mobile/src-tauri/src/mobile/${berkas}`))
+	.join("\n");
 const desktopBuild = read("web-desktop/src-tauri/build.rs");
 const mobileBuild = read("mobile/src-tauri/build.rs");
 const desktopCapability = read(

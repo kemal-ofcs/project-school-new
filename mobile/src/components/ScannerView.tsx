@@ -6,6 +6,7 @@ import {
 } from "@zxing/browser";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Icon } from "@/components/ui/Icon";
+import { Modal } from "@/components/ui/Modal";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { audioSynth } from "@/lib/client/audio";
 import {
@@ -629,16 +630,16 @@ export function ScannerView() {
       {/* Penahanan scan untuk foto wajah + latar. Panel menutupi layar supaya
           jelas bahwa absensi BELUM terkirim sampai fotonya diambil. */}
       {pendingScan ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/95 p-4">
-          <div className="w-full max-w-sm space-y-3 rounded-3xl border border-white/10 bg-slate-900 p-4">
+        <Modal
+          isOpen
+          onClose={closePhotoHold}
+          title="Ambil foto wajah & latar"
+          subtitle="QR terbaca — absensi ditahan"
+          maxWidth="max-w-sm"
+        >
+          <div className="space-y-3">
             <div>
-              <p className="text-[10px] font-bold uppercase tracking-wider text-amber-300">
-                QR terbaca — absensi ditahan
-              </p>
-              <h2 className="mt-1 text-base font-black text-white">
-                Ambil foto wajah &amp; latar
-              </h2>
-              <p className="mt-1 text-[11px] leading-5 text-slate-400">
+              <p className="text-[11px] leading-5 text-slate-400">
                 Hadapkan wajah ke kamera bersama latar tempat Anda berdiri. Foto
                 diambil otomatis setelah wajah terdeteksi dan Anda tahan diam
                 sejenak.
@@ -721,7 +722,7 @@ export function ScannerView() {
               </button>
             </div>
           </div>
-        </div>
+        </Modal>
       ) : null}
 
       {/* Top Camera Viewport Card */}
@@ -802,6 +803,7 @@ export function ScannerView() {
               )}
               {cameraDevices.length > 1 && (
                 <select
+                  aria-label="Kamera pemindai"
                   value={selectedDeviceId}
                   onChange={(e) => setSelectedDeviceId(e.target.value)}
                   className="rounded-xl border border-white/10 bg-slate-900 px-3 py-2 text-xs font-semibold text-slate-200 focus:outline-none focus:ring-2 focus:ring-sky-400"
@@ -883,6 +885,7 @@ export function ScannerView() {
           className="flex gap-2"
         >
           <input
+            aria-label="Kode QR manual"
             type="text"
             value={manualInput}
             onChange={(e) => setManualInput(e.target.value)}

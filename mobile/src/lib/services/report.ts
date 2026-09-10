@@ -76,8 +76,24 @@ export async function getRekapHarian(filter?: {
   tanggal_mulai?: string;
   tanggal_selesai?: string;
   divisi?: string;
+  limit?: number;
+  offset?: number;
 }) {
   await ensureDbInitialized();
+
+  // `absensi_harian` bertambah satu baris per personil per hari dan tidak
+  // pernah dipangkas: pada 800 personil, rentang satu bulan berarti ±24.000
+  // baris dalam satu balasan. Batasnya dijepit di sini — bukan diserahkan ke
+  // pemanggil — mengikuti pola `getRiwayatScan` di bawah.
+  //
+  // Bawaannya sama dengan pagar maksimumnya, dan itu disengaja: angka ini PAGAR
+  // TERHADAP BENCANA, bukan ukuran halaman. Satu hari kerja pada 800 personil
+  // dengan multi-sesi bisa melewati 1.000 baris, sehingga bawaan yang lebih
+  // kecil akan memotong SATU HARI — dan pemotongan itu tidak meninggalkan jejak
+  // apa pun di layar. Halaman yang perlu menelusuri lebih jauh wajib memaginasi
+  // lewat `limit`/`offset`, seperti yang dilakukan halaman Riwayat.
+  const limit = Math.min(2000, Math.max(1, filter?.limit || 2000));
+  const offset = Math.max(0, filter?.offset || 0);
 
   let query = `
     SELECT a.*, m.kode_karyawan, s.nama_shift, s.kode_shift
@@ -101,7 +117,9 @@ export async function getRekapHarian(filter?: {
     params.push(filter.divisi);
   }
 
-  query += " ORDER BY a.update_terakhir DESC, a.tanggal DESC, a.nama ASC;";
+  query += " ORDER BY a.update_terakhir DESC, a.tanggal DESC, a.nama ASC";
+  query += " LIMIT ? OFFSET ?;";
+  params.push(limit, offset);
 
   const res = await db.execute({ sql: query, args: params });
   return res.rows as unknown as Record<string, unknown>[];

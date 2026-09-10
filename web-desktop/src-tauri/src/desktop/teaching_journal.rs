@@ -91,8 +91,13 @@ pub fn list_teaching_journals(
     id_guru: Option<&str>,
     tanggal_mulai: Option<&str>,
     tanggal_selesai: Option<&str>,
+    limit: Option<i64>,
 ) -> Result<Value, CommandError> {
     let conn = storage::database(&state.data_dir)?;
+    // Setiap filter opsional, sehingga pemanggilan tanpa filter berarti seluruh
+    // jurnal mengajar yang pernah dicatat. Batasnya dijepit sama seperti di
+    // `teaching-journal.ts`, supaya Web dan Desktop menjawab hal yang sama.
+    let max_rows = limit.unwrap_or(1000).clamp(1, 1000);
     let sql = r#"
         SELECT j.id_jurnal, j.id_presensi_mapel, j.materi_disampaikan, j.kendala,
                j.tindak_lanjut, j.paraf_nama, j.paraf_operator, j.paraf_at,
@@ -109,13 +114,21 @@ pub fn list_teaching_journals(
           AND (?3 IS NULL OR p.id_guru = ?3)
           AND (?4 IS NULL OR p.tanggal >= ?4)
           AND (?5 IS NULL OR p.tanggal <= ?5)
-        ORDER BY p.tanggal DESC, CAST(p.jam_ke AS INTEGER) DESC;
+        ORDER BY p.tanggal DESC, CAST(p.jam_ke AS INTEGER) DESC
+        LIMIT ?6;
     "#;
 
     let mut stmt = conn.prepare(sql).map_err(|_| CommandError::internal())?;
     let rows = stmt
         .query_map(
-            params![id_rombel, id_mapel, id_guru, tanggal_mulai, tanggal_selesai],
+            params![
+                id_rombel,
+                id_mapel,
+                id_guru,
+                tanggal_mulai,
+                tanggal_selesai,
+                max_rows
+            ],
             |row| {
                 Ok(json!({
                     "id_jurnal": row.get::<_, String>(0)?,
@@ -251,13 +264,24 @@ pub fn save_teaching_journal(
         "updated_at": now,
     });
 
-    sync::enqueue(&tx, &client_id, "teaching-journal", "save", &id, &payload, None)?;
+    sync::enqueue(
+        &tx,
+        &client_id,
+        "teaching-journal",
+        "save",
+        &id,
+        &payload,
+        None,
+    )?;
     tx.commit().map_err(|_| CommandError::internal())?;
 
     Ok(json!({ "sukses": true, "id_jurnal": id }))
 }
 
-pub fn delete_teaching_journal(state: &DesktopState, id_jurnal: &str) -> Result<Value, CommandError> {
+pub fn delete_teaching_journal(
+    state: &DesktopState,
+    id_jurnal: &str,
+) -> Result<Value, CommandError> {
     let client_id = sync::ensure_client_id(state)?;
     let mut conn = storage::database(&state.data_dir)?;
     let tx = conn.transaction().map_err(|_| CommandError::internal())?;
@@ -373,7 +397,7 @@ mod tests {
         assert_eq!(saved["nama_mapel"], "Matematika");
         assert_eq!(saved["nama_rombel"], "X-A");
 
-        let list = list_teaching_journals(&state, Some("rombel_10a"), None, None, None, None)
+        let list = list_teaching_journals(&state, Some("rombel_10a"), None, None, None, None, None)
             .expect("list journals");
         assert_eq!(list.as_array().expect("array").len(), 1);
 

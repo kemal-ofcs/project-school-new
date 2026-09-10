@@ -8,6 +8,7 @@ import {
   useState,
 } from "react";
 import { createPortal } from "react-dom";
+import { useDialogFocus } from "@/lib/hooks/useDialogFocus";
 
 export interface ModalProps {
   children: ReactNode;
@@ -58,35 +59,11 @@ export function Modal({
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [isOpen, mounted]);
 
-  // Initial focus management & restoration:
-  // Hanya fokus ke dialogRef ketika modal pertama kali terbuka/mounted.
-  // JANGAN PERNAH mencuri fokus jika fokus sudah berada di dalam dialog (misal input aktif).
-  useEffect(() => {
-    if (!isOpen || !mounted) return;
-    const previousFocus = (
-      typeof document !== "undefined" ? document.activeElement : null
-    ) as HTMLElement | null;
-
-    if (
-      dialogRef.current &&
-      !dialogRef.current.contains(document.activeElement)
-    ) {
-      dialogRef.current.focus({ preventScroll: true });
-    }
-
-    return () => {
-      previousFocus?.focus?.();
-    };
-  }, [isOpen, mounted]);
-
-  useEffect(() => {
-    if (!isOpen || !mounted) return;
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    return () => {
-      document.body.style.overflow = previousOverflow;
-    };
-  }, [isOpen, mounted]);
+  // Fokus masuk saat dibuka, kembali saat ditutup, gulir latar dikunci, dan
+  // Tab tidak bisa keluar dari dialog. Keempatnya dieja sekali di
+  // `useDialogFocus` yang ikut sinkronisasi ke Mobile — sebelumnya perkara ini
+  // ditulis dua kali dan hanya build ini yang mengerjakannya.
+  useDialogFocus(dialogRef, isOpen && mounted);
 
   if (!isOpen || !mounted) return null;
 

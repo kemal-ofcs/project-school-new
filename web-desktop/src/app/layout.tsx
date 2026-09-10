@@ -27,7 +27,10 @@ const THEME_SCRIPT = `
       document.documentElement.classList.add('light');
       document.documentElement.classList.remove('dark');
     }
-  } catch (e) {}
+  } catch (e) {
+    // Skrip tema berjalan sebelum React; kegagalannya tidak boleh menjatuhkan
+    // halaman. Paling buruk pengguna melihat tema bawaan sesaat.
+  }
 })();
 `;
 

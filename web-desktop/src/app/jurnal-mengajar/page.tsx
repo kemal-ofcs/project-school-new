@@ -275,6 +275,7 @@ export default function JurnalMengajarPage() {
                 Rombongan Belajar
               </span>
               <select
+                aria-label="Rombongan belajar"
                 value={selectedRombel}
                 onChange={(e) => setSelectedRombel(e.target.value)}
                 className="w-full text-sm rounded-lg px-3 py-2 bg-slate-900 border border-slate-700 text-slate-100 focus:outline-none focus:ring-1 focus:ring-sky-500"
@@ -293,6 +294,7 @@ export default function JurnalMengajarPage() {
                 Mata Pelajaran
               </span>
               <select
+                aria-label="Mata pelajaran"
                 value={selectedMapel}
                 onChange={(e) => setSelectedMapel(e.target.value)}
                 className="w-full text-sm rounded-lg px-3 py-2 bg-slate-900 border border-slate-700 text-slate-100 focus:outline-none focus:ring-1 focus:ring-sky-500"
@@ -311,6 +313,7 @@ export default function JurnalMengajarPage() {
                 Guru Pengampu
               </span>
               <select
+                aria-label="Guru pengampu"
                 value={selectedGuru}
                 onChange={(e) => setSelectedGuru(e.target.value)}
                 className="w-full text-sm rounded-lg px-3 py-2 bg-slate-900 border border-slate-700 text-slate-100 focus:outline-none focus:ring-1 focus:ring-sky-500"
@@ -329,6 +332,7 @@ export default function JurnalMengajarPage() {
                 Tanggal Mulai
               </span>
               <input
+                aria-label="Tanggal mulai"
                 type="date"
                 value={startDate}
                 onChange={(e) => setStartDate(e.target.value)}
@@ -341,6 +345,7 @@ export default function JurnalMengajarPage() {
                 Tanggal Selesai
               </span>
               <input
+                aria-label="Tanggal selesai"
                 type="date"
                 value={endDate}
                 onChange={(e) => setEndDate(e.target.value)}

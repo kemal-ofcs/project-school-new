@@ -148,7 +148,9 @@ export default function PayrollConfigPage() {
     try {
       await syncNow();
     } catch {
-      // Ignore
+      // Sengaja diam: kegagalan sinkronisasi TIDAK boleh menghalangi pemuatan
+      // data lokal di blok finally. Aplikasi ini offline-first — jaringan yang
+      // putus adalah keadaan normal, bukan kesalahan yang perlu dilaporkan.
     } finally {
       await Promise.all([loadSalaryData(), loadComponentsData()]);
       setIsSyncing(false);
@@ -377,6 +379,7 @@ export default function PayrollConfigPage() {
           <div className="space-y-4">
             <div className="flex justify-between items-center">
               <input
+                aria-label="Cari karyawan"
                 type="text"
                 placeholder="Cari nama karyawan..."
                 value={salarySearch}

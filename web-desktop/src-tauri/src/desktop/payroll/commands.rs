@@ -167,7 +167,12 @@ pub async fn desktop_delete_salary_config(
     let tx = conn.transaction().map_err(|_| CommandError::internal())?;
 
     tx.execute("DELETE FROM salary_configs WHERE id = ?1;", params![id])
-        .map_err(|_| CommandError::new("DELETE_FAILED", "Gagal menghapus konfigurasi gaji karyawan."))?;
+        .map_err(|_| {
+            CommandError::new(
+                "DELETE_FAILED",
+                "Gagal menghapus konfigurasi gaji karyawan.",
+            )
+        })?;
 
     let client_id = sync::ensure_client_id(&state)?;
     sync::enqueue(
@@ -234,7 +239,11 @@ pub async fn desktop_save_overtime_rule(
     let tx = conn.transaction().map_err(|_| CommandError::internal())?;
 
     let rule_id = if draft.id.trim().is_empty() {
-        format!("ot-{}-{}", draft.rule_type.to_lowercase(), storage::now_epoch_seconds())
+        format!(
+            "ot-{}-{}",
+            draft.rule_type.to_lowercase(),
+            storage::now_epoch_seconds()
+        )
     } else {
         draft.id.clone()
     };
@@ -296,8 +305,11 @@ pub async fn desktop_delete_overtime_rule(
     let mut conn = storage::database(&state.data_dir)?;
     let tx = conn.transaction().map_err(|_| CommandError::internal())?;
 
-    tx.execute("DELETE FROM overtime_tier_rules WHERE id = ?1;", params![id])
-        .map_err(|_| CommandError::new("DELETE_FAILED", "Gagal menghapus jenjang lembur."))?;
+    tx.execute(
+        "DELETE FROM overtime_tier_rules WHERE id = ?1;",
+        params![id],
+    )
+    .map_err(|_| CommandError::new("DELETE_FAILED", "Gagal menghapus jenjang lembur."))?;
 
     let client_id = sync::ensure_client_id(&state)?;
     sync::enqueue(
@@ -326,7 +338,11 @@ pub async fn desktop_save_overtime_rules(
 
     for rule in rules {
         let rule_id = if rule.id.trim().is_empty() {
-            format!("ot-{}-{}", rule.rule_type.to_lowercase(), storage::now_epoch_seconds())
+            format!(
+                "ot-{}-{}",
+                rule.rule_type.to_lowercase(),
+                storage::now_epoch_seconds()
+            )
         } else {
             rule.id.clone()
         };
@@ -558,7 +574,11 @@ pub async fn desktop_save_tax_rule(
     let tx = conn.transaction().map_err(|_| CommandError::internal())?;
 
     let rule_id = if draft.id.trim().is_empty() {
-        format!("tax-{}-{}", draft.category.to_lowercase(), storage::now_epoch_seconds())
+        format!(
+            "tax-{}-{}",
+            draft.category.to_lowercase(),
+            storage::now_epoch_seconds()
+        )
     } else {
         draft.id.clone()
     };
@@ -652,7 +672,11 @@ pub async fn desktop_save_tax_rules(
 
     for rule in rules {
         let rule_id = if rule.id.trim().is_empty() {
-            format!("tax-{}-{}", rule.category.to_lowercase(), storage::now_epoch_seconds())
+            format!(
+                "tax-{}-{}",
+                rule.category.to_lowercase(),
+                storage::now_epoch_seconds()
+            )
         } else {
             rule.id.clone()
         };
@@ -717,7 +741,11 @@ pub async fn desktop_save_bpjs_rule(
     let tx = conn.transaction().map_err(|_| CommandError::internal())?;
 
     let rule_id = if draft.id.trim().is_empty() {
-        format!("bpjs-{}-{}", draft.component_code.to_lowercase(), storage::now_epoch_seconds())
+        format!(
+            "bpjs-{}-{}",
+            draft.component_code.to_lowercase(),
+            storage::now_epoch_seconds()
+        )
     } else {
         draft.id.clone()
     };
@@ -780,8 +808,11 @@ pub async fn desktop_delete_bpjs_rule(
     let mut conn = storage::database(&state.data_dir)?;
     let tx = conn.transaction().map_err(|_| CommandError::internal())?;
 
-    tx.execute("DELETE FROM bpjs_rules WHERE id = ?1 OR component_code = ?1;", params![id])
-        .map_err(|_| CommandError::new("DELETE_FAILED", "Gagal menghapus aturan BPJS."))?;
+    tx.execute(
+        "DELETE FROM bpjs_rules WHERE id = ?1 OR component_code = ?1;",
+        params![id],
+    )
+    .map_err(|_| CommandError::new("DELETE_FAILED", "Gagal menghapus aturan BPJS."))?;
 
     let client_id = sync::ensure_client_id(&state)?;
     sync::enqueue(
@@ -849,7 +880,11 @@ pub async fn desktop_save_bpjs_rules(
 
     for rule in rules {
         let rule_id = if rule.id.trim().is_empty() {
-            format!("bpjs-{}-{}", rule.component_code.to_lowercase(), storage::now_epoch_seconds())
+            format!(
+                "bpjs-{}-{}",
+                rule.component_code.to_lowercase(),
+                storage::now_epoch_seconds()
+            )
         } else {
             rule.id.clone()
         };
@@ -1090,7 +1125,8 @@ pub async fn desktop_create_payroll_run(
     }
 
     // Kalkulasi data payroll
-    let recap = desktop_get_payroll_recap(state.clone(), period_start.clone(), period_end.clone()).await?;
+    let recap =
+        desktop_get_payroll_recap(state.clone(), period_start.clone(), period_end.clone()).await?;
 
     let overtime_tiers = load_overtime_tiers(&conn, "HARI_KERJA")?;
     let holiday_tiers = load_overtime_tiers(&conn, "HARI_LIBUR")?;
@@ -1100,7 +1136,11 @@ pub async fn desktop_create_payroll_run(
 
     let tx = conn.transaction().map_err(|_| CommandError::internal())?;
 
-    let run_id = format!("PR-{}-{}", period_start.replace('-', ""), storage::now_epoch_seconds());
+    let run_id = format!(
+        "PR-{}-{}",
+        period_start.replace('-', ""),
+        storage::now_epoch_seconds()
+    );
     let now = iso_now_tx(&tx);
 
     let mut total_gross_sum = 0i64;
@@ -1128,7 +1168,8 @@ pub async fn desktop_create_payroll_run(
             PayrollCalculator::calculate_components(basic_salary, &components, &row.id_karyawan);
 
         let gross = basic_salary + overtime_salary + allowance;
-        let (bpjs_emp, bpjs_co, bpjs_breakdown) = PayrollCalculator::calculate_bpjs(gross, &bpjs_rules);
+        let (bpjs_emp, bpjs_co, bpjs_breakdown) =
+            PayrollCalculator::calculate_bpjs(gross, &bpjs_rules);
         let (pph21, tax_breakdown) =
             PayrollCalculator::calculate_pph21_ter(gross, &row.ptkp_status, &tax_rules);
 
@@ -1544,8 +1585,26 @@ pub async fn desktop_transition_payroll_status(
     let operator = require_permission(&state, required_permission)?;
     let mut conn = storage::database(&state.data_dir)?;
 
-    let (current_status_str, idempotency_key, period_start, period_end, gross, net, emp_count, created_by, created_at): (
-        String, String, String, String, i64, i64, i64, String, String
+    let (
+        current_status_str,
+        idempotency_key,
+        period_start,
+        period_end,
+        gross,
+        net,
+        emp_count,
+        created_by,
+        created_at,
+    ): (
+        String,
+        String,
+        String,
+        String,
+        i64,
+        i64,
+        i64,
+        String,
+        String,
     ) = conn
         .query_row(
             r#"
@@ -1659,7 +1718,10 @@ pub async fn desktop_transition_payroll_status(
 }
 
 // Helper loaders
-fn load_overtime_tiers(conn: &Connection, rule_type: &str) -> Result<Vec<OvertimeTierRule>, CommandError> {
+fn load_overtime_tiers(
+    conn: &Connection,
+    rule_type: &str,
+) -> Result<Vec<OvertimeTierRule>, CommandError> {
     let mut stmt = conn
         .prepare(
             r#"

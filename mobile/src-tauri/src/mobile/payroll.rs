@@ -275,7 +275,10 @@ impl PayrollCalculator {
     }
 }
 
-fn load_overtime_tiers(conn: &Connection, rule_type: &str) -> Result<Vec<OvertimeTierRule>, CommandError> {
+fn load_overtime_tiers(
+    conn: &Connection,
+    rule_type: &str,
+) -> Result<Vec<OvertimeTierRule>, CommandError> {
     let mut stmt = conn
         .prepare(
             r#"
@@ -602,10 +605,10 @@ pub async fn mobile_get_employee_payroll_estimate(
     let rate_dec = Decimal::from(rate_per_hour);
 
     let ot_index = PayrollCalculator::calculate_overtime_index(ot_hours, &overtime_tiers);
-    let basic_salary = (reg_hours * rate_dec)
-        .round_dp_with_strategy(0, RoundingStrategy::MidpointAwayFromZero);
-    let overtime_salary = (ot_index * rate_dec)
-        .round_dp_with_strategy(0, RoundingStrategy::MidpointAwayFromZero);
+    let basic_salary =
+        (reg_hours * rate_dec).round_dp_with_strategy(0, RoundingStrategy::MidpointAwayFromZero);
+    let overtime_salary =
+        (ot_index * rate_dec).round_dp_with_strategy(0, RoundingStrategy::MidpointAwayFromZero);
 
     let (allowance, deduction, comp_breakdown) =
         PayrollCalculator::calculate_components(basic_salary, &components, &emp_id);

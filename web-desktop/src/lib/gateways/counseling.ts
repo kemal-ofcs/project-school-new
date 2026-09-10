@@ -3,7 +3,6 @@
 import { requestWebApi } from "@/lib/client/api-client";
 import { isDesktopRuntime } from "@/lib/runtime/app-runtime";
 import { invokeDesktop } from "@/lib/runtime/desktop-commands";
-import { assertTersediaDiMobile } from "@/lib/runtime/mobile-unsupported";
 import type {
   CounselingCaseDetail,
   CounselingCaseDraft,
@@ -26,7 +25,6 @@ export type {
 export async function listCounselingCasesGateway(
   filter?: CounselingCaseFilter,
 ): Promise<{ items: CounselingCaseItem[] }> {
-  assertTersediaDiMobile("Bimbingan Konseling");
   if (isDesktopRuntime()) {
     return invokeDesktop<{ items: CounselingCaseItem[] }>(
       "desktop_list_counseling_cases",
@@ -51,8 +49,6 @@ export async function listCounselingCasesGateway(
 export async function getCounselingCaseGateway(
   idKasus: string,
 ): Promise<CounselingCaseDetail> {
-  assertTersediaDiMobile("Bimbingan Konseling");
-  assertTersediaDiMobile("Bimbingan Konseling");
   if (isDesktopRuntime()) {
     return invokeDesktop<CounselingCaseDetail>("desktop_get_counseling_case", {
       idKasus,
@@ -70,7 +66,6 @@ export async function getCounselingCaseGateway(
 export async function createCounselingCaseGateway(
   draft: CounselingCaseDraft,
 ): Promise<{ sukses: boolean; id_kasus: string }> {
-  assertTersediaDiMobile("Bimbingan Konseling");
   if (isDesktopRuntime()) {
     return invokeDesktop<{ sukses: boolean; id_kasus: string }>(
       "desktop_create_counseling_case",
@@ -89,7 +84,6 @@ export async function updateCounselingCaseGateway(
   idKasus: string,
   draft: Partial<CounselingCaseDraft>,
 ): Promise<{ sukses: boolean }> {
-  assertTersediaDiMobile("Bimbingan Konseling");
   if (isDesktopRuntime()) {
     return invokeDesktop<{ sukses: boolean }>(
       "desktop_update_counseling_case",
@@ -107,7 +101,6 @@ export async function updateCounselingCaseGateway(
 export async function deleteCounselingCaseGateway(
   idKasus: string,
 ): Promise<{ sukses: boolean }> {
-  assertTersediaDiMobile("Bimbingan Konseling");
   if (isDesktopRuntime()) {
     return invokeDesktop<{ sukses: boolean }>(
       "desktop_delete_counseling_case",
@@ -125,7 +118,6 @@ export async function deleteCounselingCaseGateway(
 export async function addCounselingSessionGateway(
   draft: CounselingSessionDraft,
 ): Promise<{ sukses: boolean; id_sesi: string }> {
-  assertTersediaDiMobile("Bimbingan Konseling");
   if (isDesktopRuntime()) {
     return invokeDesktop<{ sukses: boolean; id_sesi: string }>(
       "desktop_add_counseling_session",
@@ -143,7 +135,6 @@ export async function addCounselingSessionGateway(
 export async function deleteCounselingSessionGateway(
   idSesi: string,
 ): Promise<{ sukses: boolean }> {
-  assertTersediaDiMobile("Bimbingan Konseling");
   if (isDesktopRuntime()) {
     return invokeDesktop<{ sukses: boolean }>(
       "desktop_delete_counseling_session",

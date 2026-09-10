@@ -16,6 +16,7 @@ import {
   hapusGuru,
   simpanGuru,
 } from "@/lib/gateways/teacher";
+import { useConfirmDialog } from "@/lib/hooks/useConfirmDialog";
 import { useDebounce } from "@/lib/hooks/useDebounce";
 import { useHydrated } from "@/lib/hooks/useHydrated";
 
@@ -72,6 +73,7 @@ export default function GuruMobilePage() {
   const [form, setForm] = useState<GuruInput>(emptyForm());
 
   const isSubmittingRef = useRef(false);
+  const { konfirmasi, dialogKonfirmasi } = useConfirmDialog();
 
   useEffect(() => {
     if (!authLoading && !isAuthenticated) router.replace("/login");
@@ -180,7 +182,15 @@ export default function GuruMobilePage() {
   const handleDelete = useCallback(
     async (id: string) => {
       if (!canManage || isSubmittingRef.current) return;
-      if (!window.confirm("Hapus profil guru ini?")) return;
+      const setuju = await konfirmasi({
+        title: "Hapus profil guru ini?",
+        description:
+          "Profil guru dinonaktifkan dan hilang dari daftar. Penghapusannya ikut tersinkronisasi ke seluruh perangkat.",
+        preserved:
+          "Riwayat absensi, jurnal mengajar, dan presensi kelas yang pernah ia catat tetap tersimpan.",
+        confirmLabel: "Ya, hapus",
+      });
+      if (!setuju) return;
       isSubmittingRef.current = true;
       try {
         await hapusGuru(id);
@@ -197,7 +207,7 @@ export default function GuruMobilePage() {
         isSubmittingRef.current = false;
       }
     },
-    [canManage, loadData],
+    [canManage, konfirmasi, loadData],
   );
 
   if (authLoading || !isHydrated) {
@@ -267,6 +277,7 @@ export default function GuruMobilePage() {
           className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400"
         />
         <input
+          aria-label="Cari guru"
           type="search"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
@@ -527,6 +538,7 @@ export default function GuruMobilePage() {
           </form>
         </Modal>
       ) : null}
+      {dialogKonfirmasi}
     </MobileAppShell>
   );
 }

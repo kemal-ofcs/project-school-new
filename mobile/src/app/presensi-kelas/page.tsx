@@ -25,6 +25,7 @@ import {
 } from "@/lib/gateways/class-attendance";
 import { syncNow } from "@/lib/gateways/sync-status";
 import { getDaftarGuru } from "@/lib/gateways/teacher";
+import { useConfirmDialog } from "@/lib/hooks/useConfirmDialog";
 import { useHydrated } from "@/lib/hooks/useHydrated";
 import { normalizeOperatorPhone } from "@/lib/operators/contact";
 import {
@@ -75,6 +76,7 @@ export default function MobilePresensiKelasPage() {
   // sebelum tombolnya sempat nonaktif. Pada jalur Web kedua permintaan itu bisa
   // sama-sama lolos pemeriksaan duplikat dan membuat DUA sesi.
   const isSubmittingRef = useRef(false);
+  const { konfirmasi, dialogKonfirmasi } = useConfirmDialog();
 
   // Pilihan filter dibaca `loadMasterData` lewat REF, bukan lewat dependency.
   // Menjadikannya dependency membuat callback-nya lahir ulang setiap kali
@@ -158,9 +160,14 @@ export default function MobilePresensiKelasPage() {
     // sesi yang sedang disunting. Hanya ditanyakan bila memang ada yang hilang.
     if (
       hasUnsavedAttendanceMarks(rosterItems) &&
-      !window.confirm(
-        "Tanda kehadiran yang belum disimpan akan hilang saat roster dimuat ulang. Lanjutkan?",
-      )
+      !(await konfirmasi({
+        title: "Muat ulang roster?",
+        description:
+          "Tanda kehadiran yang belum disimpan akan hilang dan seluruh siswa kembali ke status bawaan.",
+        preserved: "Presensi yang sudah tersimpan sebelumnya tidak berubah.",
+        confirmLabel: "Ya, muat ulang",
+        tone: "warning",
+      }))
     ) {
       return;
     }
@@ -186,7 +193,7 @@ export default function MobilePresensiKelasPage() {
     } finally {
       setLoading(false);
     }
-  }, [selectedRombel, selectedDate, rosterItems]);
+  }, [selectedRombel, selectedDate, rosterItems, konfirmasi]);
 
   // Load reconciliation anomalies
   const handleLoadReconciliation = useCallback(async () => {
@@ -298,7 +305,19 @@ export default function MobilePresensiKelasPage() {
     // Peringatan ini tidak pernah mengubah status siapa pun — gurunya yang
     // memutuskan.
     const peringatan = buildPresentWithoutGateScanWarning(rosterItems);
-    if (peringatan && !window.confirm(peringatan)) return;
+    if (
+      peringatan &&
+      !(await konfirmasi({
+        title: "Simpan presensi ini?",
+        description: peringatan,
+        preserved:
+          "Peringatan ini tidak mengubah status siapa pun — keputusannya tetap di tangan guru.",
+        confirmLabel: "Ya, simpan",
+        tone: "warning",
+      }))
+    ) {
+      return;
+    }
 
     if (isSubmittingRef.current) return;
     isSubmittingRef.current = true;
@@ -582,6 +601,7 @@ export default function MobilePresensiKelasPage() {
 
               <div>
                 <input
+                  aria-label="Materi pokok pembelajaran"
                   type="text"
                   value={materiPokok}
                   onChange={(e) => setMateriPokok(e.target.value)}
@@ -722,12 +742,14 @@ export default function MobilePresensiKelasPage() {
           <div className="space-y-4">
             <div className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-white/10 bg-slate-900/60 p-3.5">
               <input
+                aria-label="Tanggal rekonsiliasi"
                 type="date"
                 value={reconDate}
                 onChange={(e) => setReconDate(e.target.value)}
                 className="rounded-xl border border-white/10 bg-slate-950 px-3 py-1.5 text-xs font-semibold text-white outline-none"
               />
               <select
+                aria-label="Rombongan belajar rekonsiliasi"
                 value={reconRombel}
                 onChange={(e) => setReconRombel(e.target.value)}
                 className="rounded-xl border border-white/10 bg-slate-950 px-2.5 py-1.5 text-xs font-semibold text-white outline-none"
@@ -862,6 +884,7 @@ export default function MobilePresensiKelasPage() {
           </div>
         ) : null}
       </div>
+      {dialogKonfirmasi}
     </MobileAppShell>
   );
 }

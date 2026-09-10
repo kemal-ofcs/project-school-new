@@ -298,18 +298,17 @@ impl MobileState {
         // Mode lokal: formulir tidak menampilkan kolom alamat sama sekali, jadi
         // lokasi berkas diisi di sini. Nilai yang dikirim eksplisit tetap
         // dihormati supaya pengguna bisa menaruh hub di drive lain.
-        let requested = &if requested.provider.is_local_file()
-            && requested.database_url.trim().is_empty()
-        {
-            TursoConfig::new(
-                self.local_hub_path().to_string_lossy().into_owned(),
-                String::new(),
-                requested.provider,
-                false,
-            )
-        } else {
-            requested.clone()
-        };
+        let requested =
+            &if requested.provider.is_local_file() && requested.database_url.trim().is_empty() {
+                TursoConfig::new(
+                    self.local_hub_path().to_string_lossy().into_owned(),
+                    String::new(),
+                    requested.provider,
+                    false,
+                )
+            } else {
+                requested.clone()
+            };
 
         let normalized = requested.normalized_url()?;
         let origin = normalized.origin().ascii_serialization();

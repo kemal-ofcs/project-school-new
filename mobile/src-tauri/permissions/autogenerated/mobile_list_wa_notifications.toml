@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-mobile-list-wa-notifications"
+description = "Enables the mobile_list_wa_notifications command without any pre-configured scope."
+commands.allow = ["mobile_list_wa_notifications"]
+
+[[permission]]
+identifier = "deny-mobile-list-wa-notifications"
+description = "Denies the mobile_list_wa_notifications command without any pre-configured scope."
+commands.deny = ["mobile_list_wa_notifications"]

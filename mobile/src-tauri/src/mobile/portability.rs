@@ -1,3 +1,8 @@
+// BERKAS INI HASIL SALIN OTOMATIS dari web-desktop oleh
+// `mobile/scripts/sync-rust-modules.ts`. JANGAN disunting dengan tangan —
+// perubahannya akan tertimpa diam-diam pada sinkronisasi berikutnya.
+// Sunting sumbernya: `web-desktop/src-tauri/src/desktop/portability.rs`.
+
 //! Portabilitas data: mengeluarkan dan memasukkan kembali berkas hub.
 //!
 //! Tanpa cloud, tidak ada cadangan otomatis di mana pun — customer sendiri yang
@@ -156,7 +161,8 @@ fn encrypt_backup(plain: &[u8], passphrase: &str) -> Result<Vec<u8>, CommandErro
             CommandError::new("BACKUP_FAILED", "Berkas cadangan tidak dapat dienkripsi.")
         })?;
 
-    let mut payload = Vec::with_capacity(BACKUP_MAGIC.len() + SALT_LEN + NONCE_LEN + ciphertext.len());
+    let mut payload =
+        Vec::with_capacity(BACKUP_MAGIC.len() + SALT_LEN + NONCE_LEN + ciphertext.len());
     payload.extend_from_slice(BACKUP_MAGIC);
     payload.extend_from_slice(&salt);
     payload.extend_from_slice(&nonce_bytes);
@@ -203,7 +209,7 @@ pub fn is_encrypted_backup(payload: &[u8]) -> bool {
 fn backup_file_name(encrypted: bool) -> String {
     let stamp = super::storage::now_epoch_seconds();
     let extension = if encrypted { "sppgbak" } else { "db" };
-    format!("absensi-sppg-{stamp}.{extension}")
+    format!("manajemen-sekolah-{stamp}.{extension}")
 }
 
 /// Keluarkan isi database hub ke satu berkas mandiri.
@@ -225,7 +231,10 @@ pub fn export_database(
 
     let staging_dir = state.data_dir.join("backup-staging");
     fs::create_dir_all(&staging_dir).map_err(|_| {
-        CommandError::new("BACKUP_FAILED", "Folder sementara cadangan tidak dapat dibuat.")
+        CommandError::new(
+            "BACKUP_FAILED",
+            "Folder sementara cadangan tidak dapat dibuat.",
+        )
     })?;
 
     let plain_path = staging_dir.join("hub-export.db");
@@ -398,7 +407,10 @@ fn import_payload(
 
     let staging_dir = state.data_dir.join("backup-staging");
     fs::create_dir_all(&staging_dir).map_err(|_| {
-        CommandError::new("BACKUP_FAILED", "Folder sementara cadangan tidak dapat dibuat.")
+        CommandError::new(
+            "BACKUP_FAILED",
+            "Folder sementara cadangan tidak dapat dibuat.",
+        )
     })?;
     let candidate = staging_dir.join("hub-import.db");
     let _ = fs::remove_file(&candidate);
@@ -507,7 +519,9 @@ mod tests {
 
         assert!(is_encrypted_backup(&terenkripsi));
         // Isi asli tidak boleh terbaca mentah di dalam berkas.
-        assert!(!terenkripsi.windows(asli.len()).any(|w| w == asli.as_slice()));
+        assert!(!terenkripsi
+            .windows(asli.len())
+            .any(|w| w == asli.as_slice()));
 
         let kembali = decrypt_backup(&terenkripsi, "frasa sandi kantor").expect("dekripsi");
         assert_eq!(kembali, asli);

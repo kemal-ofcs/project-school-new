@@ -25,6 +25,8 @@ export const getRekapHarian = (
     tanggal_mulai?: string;
     tanggal_selesai?: string;
     divisi?: string;
+    limit?: number;
+    offset?: number;
   } = {},
 ) => query<Record<string, unknown>[]>("daily", filter);
 export const getRiwayatScan = (

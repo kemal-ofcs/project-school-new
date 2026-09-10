@@ -888,7 +888,9 @@ async function findEffectiveBackup(
         return { row: candidate, shiftRow };
       }
     } catch {
-      // ignore
+      // Kandidat backup yang barisnya cacat dilewati, bukan menggagalkan
+      // pencarian. Absensi tetap harus bisa diproses meski satu baris
+      // penugasan pengganti tidak terbaca.
     }
   }
 

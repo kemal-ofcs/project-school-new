@@ -130,6 +130,7 @@ export default function DasborKehadiranPage() {
           actions={
             <div className="flex items-center gap-3">
               <input
+                aria-label="Tanggal dasbor kehadiran"
                 type="date"
                 value={selectedDate}
                 onChange={(e) => setSelectedDate(e.target.value)}

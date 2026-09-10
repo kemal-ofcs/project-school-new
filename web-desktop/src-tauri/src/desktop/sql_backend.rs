@@ -176,12 +176,14 @@ impl LocalTransport {
         }
 
         let connection = self.open()?;
-        connection.execute_batch("BEGIN IMMEDIATE;").map_err(|error| {
-            CommandError::new(
-                "LOCAL_SQL_ERROR",
-                format!("Transaksi database lokal tidak dapat dimulai: {error}"),
-            )
-        })?;
+        connection
+            .execute_batch("BEGIN IMMEDIATE;")
+            .map_err(|error| {
+                CommandError::new(
+                    "LOCAL_SQL_ERROR",
+                    format!("Transaksi database lokal tidak dapat dimulai: {error}"),
+                )
+            })?;
 
         for statement in &statements {
             if let Err(error) = run_statement(&connection, statement) {
@@ -207,9 +209,9 @@ fn run_statement(
     connection: &Connection,
     statement: &Statement,
 ) -> Result<QueryResult, CommandError> {
-    let mut prepared = connection.prepare(&statement.sql).map_err(|error| {
-        CommandError::new("LOCAL_SQL_ERROR", format!("{error}"))
-    })?;
+    let mut prepared = connection
+        .prepare(&statement.sql)
+        .map_err(|error| CommandError::new("LOCAL_SQL_ERROR", format!("{error}")))?;
 
     bind_arguments(&mut prepared, &statement.args)?;
 
@@ -246,7 +248,11 @@ fn run_statement(
     // pada koneksi ini, sehingga 0 dipetakan ke None agar pemanggil di hilir
     // melihat bentuk yang sama.
     let last_rowid = connection.last_insert_rowid();
-    let last_insert_rowid = if last_rowid == 0 { None } else { Some(last_rowid) };
+    let last_insert_rowid = if last_rowid == 0 {
+        None
+    } else {
+        Some(last_rowid)
+    };
 
     Ok(QueryResult {
         columns,
@@ -296,7 +302,9 @@ mod tests {
         );
         // blob: Hrana menyerahkan base64, jalur lokal wajib meng-encode sendiri.
         assert_eq!(
-            decode_hrana_cell(&json!({ "type": "blob", "base64": BASE64_STANDARD.encode([1_u8, 2, 3]) })),
+            decode_hrana_cell(
+                &json!({ "type": "blob", "base64": BASE64_STANDARD.encode([1_u8, 2, 3]) })
+            ),
             decode_local_cell(ValueRef::Blob(&[1, 2, 3])),
         );
     }

@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { MobileAppShell } from "@/components/MobileAppShell";
 import { Icon } from "@/components/ui/Icon";
+import { Modal } from "@/components/ui/Modal";
 import { canAccessArea, hasPermission } from "@/lib/auth/access";
 import { triggerHaptic } from "@/lib/client/haptics";
 import { useAuth } from "@/lib/context/AuthContext";
@@ -90,8 +91,19 @@ export default function RiwayatResetPasswordMobilePage() {
   const [approval, setApproval] = useState<ResetApprovalResult | null>(null);
 
   useEffect(() => {
-    if (!authLoading && !isAuthenticated) router.replace("/login");
-  }, [authLoading, isAuthenticated, router]);
+    if (!authLoading && !isAuthenticated) {
+      router.replace("/login");
+      return;
+    }
+    // Ditolak izin area: dipulangkan, bukan dibiarkan menatap layar kosong.
+    // Sebelumnya `canView` hanya menahan pemuatan data, sehingga operator
+    // tanpa hak melihat halaman kosong tanpa satu pun penjelasan.
+    //
+    // Mobile memakai static export dan tidak punya rute `/forbidden`.
+    if (!authLoading && isAuthenticated && !canView) {
+      router.replace("/dashboard");
+    }
+  }, [authLoading, isAuthenticated, canView, router]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -396,10 +408,23 @@ export default function RiwayatResetPasswordMobilePage() {
       </div>
 
       {approval ? (
-        <div className="fixed inset-0 z-50 grid place-items-center bg-slate-950/80 p-4">
-          <div className="w-full max-w-sm rounded-3xl border border-emerald-400/30 bg-slate-900 p-5 shadow-2xl">
-            <h2 className="text-sm font-black text-white">Kode pemulihan</h2>
-            <p className="mt-2 text-xs leading-5 text-slate-400">
+        <Modal
+          isOpen
+          onClose={() => setApproval(null)}
+          title="Kode pemulihan"
+          maxWidth="max-w-sm"
+          footer={
+            <button
+              type="button"
+              onClick={() => setApproval(null)}
+              className="min-h-11 w-full rounded-xl bg-white/10 text-xs font-black text-slate-200"
+            >
+              Saya sudah menyerahkan kodenya
+            </button>
+          }
+        >
+          <div>
+            <p className="text-xs leading-5 text-slate-400">
               Serahkan kode ini kepada{" "}
               <strong className="text-white">{approval.namaOperator}</strong>{" "}
               secara langsung. Berlaku {approval.berlakuMenit} menit dan hanya
@@ -411,38 +436,19 @@ export default function RiwayatResetPasswordMobilePage() {
             <p className="mt-2 text-[11px] leading-4 text-amber-300">
               Tidak tersimpan dan tidak dapat ditampilkan ulang.
             </p>
-            <button
-              type="button"
-              onClick={() => setApproval(null)}
-              className="mt-4 min-h-11 w-full rounded-xl bg-white/10 text-xs font-black text-slate-200"
-            >
-              Saya sudah menyerahkan kodenya
-            </button>
           </div>
-        </div>
+        </Modal>
       ) : null}
 
       {photo ? (
-        <div className="fixed inset-0 z-[80] flex items-end justify-center bg-slate-950/90 p-4 backdrop-blur-sm">
-          <div className="w-full max-w-md space-y-3 rounded-3xl border border-white/15 bg-slate-900 p-4">
-            <div className="flex items-start justify-between gap-3">
-              <div className="min-w-0">
-                <p className="truncate text-sm font-black text-white">
-                  {photo.entry.operatorName}
-                </p>
-                <p className="truncate text-[11px] text-slate-400">
-                  {formatTimestamp(photo.entry.requestedAt)}
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={() => setPhoto(null)}
-                aria-label="Tutup foto"
-                className="grid size-9 shrink-0 place-items-center rounded-xl bg-white/5 text-slate-300 active:scale-95"
-              >
-                ✕
-              </button>
-            </div>
+        <Modal
+          isOpen
+          onClose={() => setPhoto(null)}
+          title={photo.entry.operatorName}
+          subtitle={formatTimestamp(photo.entry.requestedAt)}
+          maxWidth="max-w-md"
+        >
+          <div className="space-y-3">
             {/* Foto tersimpan base64 di database cloud dan ditampilkan lewat
                 data URI — tidak ada permintaan jaringan keluar, sesuai batasan
                 CSP aplikasi Tauri. */}
@@ -458,21 +464,17 @@ export default function RiwayatResetPasswordMobilePage() {
               identitas yang diketik.
             </p>
           </div>
-        </div>
+        </Modal>
       ) : null}
 
       {confirmDelete ? (
-        <div className="fixed inset-0 z-[80] flex items-end justify-center bg-slate-950/90 p-4 backdrop-blur-sm">
-          <div className="w-full max-w-md space-y-3 rounded-3xl border border-white/15 bg-slate-900 p-4">
-            <p className="text-sm font-black text-white">Hapus riwayat ini?</p>
-            <p className="text-[11px] leading-4 text-slate-400">
-              Riwayat pengajuan {confirmDelete.operatorName} beserta foto
-              verifikasinya dihapus permanen.
-              {confirmDelete.status === "Terkirim"
-                ? " Pengajuan ini masih hidup — link resetnya ikut mati dan pemiliknya perlu mengajukan ulang."
-                : ""}
-            </p>
-            <div className="flex gap-2">
+        <Modal
+          isOpen
+          onClose={() => setConfirmDelete(null)}
+          title="Hapus riwayat ini?"
+          maxWidth="max-w-md"
+          footer={
+            <div className="flex w-full gap-2">
               <button
                 type="button"
                 onClick={() => setConfirmDelete(null)}
@@ -489,8 +491,18 @@ export default function RiwayatResetPasswordMobilePage() {
                 {busy ? "Menghapus..." : "Hapus"}
               </button>
             </div>
+          }
+        >
+          <div className="space-y-3">
+            <p className="text-[11px] leading-4 text-slate-400">
+              Riwayat pengajuan {confirmDelete.operatorName} beserta foto
+              verifikasinya dihapus permanen.
+              {confirmDelete.status === "Terkirim"
+                ? " Pengajuan ini masih hidup — link resetnya ikut mati dan pemiliknya perlu mengajukan ulang."
+                : ""}
+            </p>
           </div>
-        </div>
+        </Modal>
       ) : null}
     </MobileAppShell>
   );

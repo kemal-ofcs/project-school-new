@@ -7,12 +7,14 @@ import {
   readJsonBody,
   toApiErrorResponse,
 } from "@/lib/server/http/api-response";
+import { assertSameOriginMutation } from "@/lib/server/http/request-security";
 import { getLedgerPreview } from "@/lib/services/attendance-ledger";
 
 export const runtime = "nodejs";
 
 export async function POST(request: NextRequest) {
   try {
+    assertSameOriginMutation(request);
     await requireWebPermission(request, "attendance_ledger.view");
     await ensureServerDatabaseInitialized();
     const body = await readJsonBody<{

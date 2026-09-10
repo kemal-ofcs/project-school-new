@@ -5,17 +5,15 @@ use tauri::State;
 use zeroize::Zeroizing;
 
 use super::{
-    portability,
-    administration,
+    academic, administration, attendance_dashboard, attendance_ledger, class_attendance,
     config::DesktopState,
     models::{
         CommandError, DesktopLoginResult, DesktopRuntimeStatus, DesktopSession, DesktopSyncStatus,
         OperatorUser, SessionMode,
     },
-    academic, attendance_dashboard, attendance_ledger, class_attendance, operational, teaching_journal,
-    wa_notification,
+    operational, portability,
     remote::{self, RemoteLoginError},
-    scanner, secrets, storage, sync, turso,
+    scanner, secrets, storage, sync, teaching_journal, turso, wa_notification,
 };
 
 struct OnlineAccess {
@@ -913,7 +911,10 @@ pub async fn desktop_password_reset_lookup(
     state: State<'_, DesktopState>,
     identifier: String,
 ) -> Result<Value, CommandError> {
-    state.get_turso_client()?.password_reset_lookup(&identifier).await
+    state
+        .get_turso_client()?
+        .password_reset_lookup(&identifier)
+        .await
 }
 
 #[tauri::command]
@@ -967,7 +968,10 @@ pub async fn desktop_password_reset_inspect(
     state: State<'_, DesktopState>,
     token: String,
 ) -> Result<Value, CommandError> {
-    state.get_turso_client()?.password_reset_inspect(&token).await
+    state
+        .get_turso_client()?
+        .password_reset_inspect(&token)
+        .await
 }
 
 #[tauri::command]
@@ -984,9 +988,7 @@ pub async fn desktop_password_reset_complete(
 }
 
 #[tauri::command]
-pub async fn desktop_send_test_mail(
-    state: State<'_, DesktopState>,
-) -> Result<Value, CommandError> {
+pub async fn desktop_send_test_mail(state: State<'_, DesktopState>) -> Result<Value, CommandError> {
     let actor = require_permission(&state, "settings.manage")?;
     state.get_turso_client()?.send_test_mail(actor.id).await
 }
@@ -1493,8 +1495,6 @@ pub async fn desktop_update_scan_security(
     Ok(result)
 }
 
-
-
 #[tauri::command]
 pub fn desktop_get_corrections(
     state: State<'_, DesktopState>,
@@ -1699,7 +1699,9 @@ pub async fn desktop_update_scanner_settings(
 }
 
 #[tauri::command]
-pub fn desktop_get_app_display_name(state: State<'_, DesktopState>) -> Result<String, CommandError> {
+pub fn desktop_get_app_display_name(
+    state: State<'_, DesktopState>,
+) -> Result<String, CommandError> {
     operational::get_app_display_name(&state)
 }
 
@@ -1870,9 +1872,9 @@ pub fn desktop_import_database_bytes(
     passphrase: Option<String>,
 ) -> Result<portability::ImportReport, CommandError> {
     let operator = require_permission(&state, "database_backup.restore")?;
-    let payload = BASE64_STANDARD
-        .decode(base64_data.trim())
-        .map_err(|_| CommandError::new("BACKUP_CORRUPT", "Isi berkas cadangan tidak dapat dibaca."))?;
+    let payload = BASE64_STANDARD.decode(base64_data.trim()).map_err(|_| {
+        CommandError::new("BACKUP_CORRUPT", "Isi berkas cadangan tidak dapat dibaca.")
+    })?;
     let report = portability::import_database_bytes(
         &state,
         &payload,
@@ -2560,6 +2562,7 @@ pub fn desktop_list_teaching_journals(
     id_guru: Option<String>,
     tanggal_mulai: Option<String>,
     tanggal_selesai: Option<String>,
+    limit: Option<i64>,
 ) -> Result<Value, CommandError> {
     require_permission(&state, "teaching_journal.view")?;
     teaching_journal::list_teaching_journals(
@@ -2569,6 +2572,7 @@ pub fn desktop_list_teaching_journals(
         id_guru.as_deref(),
         tanggal_mulai.as_deref(),
         tanggal_selesai.as_deref(),
+        limit,
     )
 }
 
@@ -2742,9 +2746,7 @@ pub fn desktop_list_wa_notifications(
 
 /// Membaca konfigurasi gateway WhatsApp (Cloud-Only via Turso).
 #[tauri::command]
-pub async fn desktop_get_wa_config(
-    state: State<'_, DesktopState>,
-) -> Result<Value, CommandError> {
+pub async fn desktop_get_wa_config(state: State<'_, DesktopState>) -> Result<Value, CommandError> {
     require_permission(&state, "notification.view")?;
     state.get_turso_client()?.get_wa_config().await
 }
@@ -2791,7 +2793,10 @@ pub async fn desktop_get_counseling_case(
     id_kasus: String,
 ) -> Result<Value, CommandError> {
     require_permission(&state, "counseling.view")?;
-    state.get_turso_client()?.get_counseling_case(&id_kasus).await
+    state
+        .get_turso_client()?
+        .get_counseling_case(&id_kasus)
+        .await
 }
 
 /// Membuat kasus BK baru untuk siswa (Cloud-Only).
@@ -2953,8 +2958,7 @@ mod tests_offline_login {
     /// perangkat yang punya cache offline menjadi cara termudah melewati 2FA.
     #[test]
     fn akun_ber_2fa_ditolak_pada_jalur_offline() {
-        let error =
-            assert_offline_login_allowed(&operator(true)).expect_err("harus ditolak");
+        let error = assert_offline_login_allowed(&operator(true)).expect_err("harus ditolak");
         assert_eq!(error.code, "TOTP_REQUIRED_ONLINE");
     }
 
@@ -2974,8 +2978,7 @@ mod tests_offline_login {
     /// perangkatnya offline.
     #[test]
     fn pesan_offline_tidak_memuat_frasa_pemicu_layar_kode() {
-        let error =
-            assert_offline_login_allowed(&operator(true)).expect_err("harus ditolak");
+        let error = assert_offline_login_allowed(&operator(true)).expect_err("harus ditolak");
         for frasa in ["aplikasi autentikator", "kode 6 digit"] {
             assert!(
                 !error.message.contains(frasa),
@@ -2986,8 +2989,7 @@ mod tests_offline_login {
 
     #[test]
     fn kode_penolakan_offline_tidak_bentrok_dengan_kode_2fa_online() {
-        let error =
-            assert_offline_login_allowed(&operator(true)).expect_err("harus ditolak");
+        let error = assert_offline_login_allowed(&operator(true)).expect_err("harus ditolak");
         for online_code in ["TOTP_REQUIRED", "TOTP_INVALID", "TOTP_ENROLLMENT_REQUIRED"] {
             assert_ne!(error.code, online_code);
         }

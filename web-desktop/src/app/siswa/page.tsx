@@ -18,9 +18,11 @@ import {
   type SiswaInput,
   simpanSiswa,
 } from "@/lib/gateways/student";
+import { useConfirmDialog } from "@/lib/hooks/useConfirmDialog";
 import { normalizeOperatorPhone } from "@/lib/operators/contact";
 
 export default function SiswaPage() {
+  const { konfirmasi, dialogKonfirmasi } = useConfirmDialog();
   const { user, isAuthenticated, isLoading: authLoading } = useAuth();
   const canManage = hasPermission(user, "students.manage");
 
@@ -157,9 +159,14 @@ export default function SiswaPage() {
 
   const handleDelete = async (id: string) => {
     if (!canManage) return;
-    const ok = window.confirm(
-      "Apakah Anda yakin ingin menghapus data profil siswa ini?",
-    );
+    const ok = await konfirmasi({
+      title: "Hapus profil siswa ini?",
+      description:
+        "Profil siswa dinonaktifkan dan hilang dari daftar rombel. Penghapusannya ikut tersinkronisasi ke seluruh perangkat.",
+      preserved:
+        "Riwayat absensi gerbang, presensi kelas, dan leger kehadirannya tetap tersimpan.",
+      confirmLabel: "Ya, hapus",
+    });
     if (!ok) return;
 
     try {
@@ -287,6 +294,7 @@ export default function SiswaPage() {
         <div className="flex flex-col gap-3 rounded-2xl border border-white/10 bg-slate-900/60 p-4 shadow-xl backdrop-blur-xl sm:flex-row sm:items-center sm:justify-between">
           <div className="relative flex-1">
             <input
+              aria-label="Cari siswa"
               type="text"
               placeholder="Cari siswa berdasarkan nama, NIS, NISN, atau nama orang tua/wali..."
               value={search}
@@ -811,6 +819,7 @@ export default function SiswaPage() {
           </Modal>
         ) : null}
       </div>
+      {dialogKonfirmasi}
     </AppShell>
   );
 }

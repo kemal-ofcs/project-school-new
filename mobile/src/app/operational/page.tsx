@@ -105,8 +105,14 @@ export default function OperationalPage() {
   useEffect(() => {
     if (!authLoading && !isAuthenticated) {
       router.replace("/login");
+      return;
     }
-  }, [authLoading, isAuthenticated, router]);
+    // Otorisasi, bukan sekadar autentikasi. Mobile memakai static export dan
+    // tidak punya rute `/forbidden`, jadi pengguna tanpa hak dipulangkan.
+    if (!authLoading && isAuthenticated && !isOperational) {
+      router.replace("/dashboard");
+    }
+  }, [authLoading, isAuthenticated, isOperational, router]);
 
   // Load master data once
   useEffect(() => {
@@ -137,8 +143,15 @@ export default function OperationalPage() {
             setBckShiftId(Number(shiftData[0].id_shift || 1));
           }
         }
-      } catch {
-        // Silently handled
+      } catch (err) {
+        // Diam berarti formulir tampil tanpa daftar shift, dan operator tidak pernah tahu kenapa pilihannya kosong.
+        setFeedback({
+          type: "error",
+          message:
+            err instanceof Error
+              ? err.message
+              : "Data master gagal dimuat. Coba muat ulang.",
+        });
       } finally {
         if (!cancelled) setLoadingMaster(false);
       }
@@ -166,8 +179,15 @@ export default function OperationalPage() {
           const data = await getDaftarImport({ tanggal: targetDate });
           setImports(data || []);
         }
-      } catch {
-        // Silently handled
+      } catch (err) {
+        // Diam berarti daftar tab tampil kosong seolah memang tidak ada datanya, padahal permintaannya yang gagal.
+        setFeedback({
+          type: "error",
+          message:
+            err instanceof Error
+              ? err.message
+              : "Daftar gagal dimuat. Coba muat ulang.",
+        });
       } finally {
         setLoadingList(false);
       }
@@ -500,6 +520,7 @@ export default function OperationalPage() {
           {/* Date Picker */}
           <div className="mb-3">
             <input
+              aria-label="Tanggal absensi"
               type="date"
               value={date}
               onChange={(e) => {

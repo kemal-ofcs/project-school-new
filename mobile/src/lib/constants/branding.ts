@@ -12,7 +12,7 @@
  */
 export const BRANDING = {
   /** Nama tetap aplikasi (tidak bergantung pada nama instansi). */
-  appDisplayName: "Absensi Perusahaan",
+  appDisplayName: "Manajemen Sekolah",
   /** Nama perusahaan/instansi default (sebelum admin mengisi form Pengaturan). */
   defaultCompanyName: "YOUR COMPANY",
   defaultBranchName: "Operations Center",

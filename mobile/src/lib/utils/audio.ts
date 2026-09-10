@@ -168,7 +168,9 @@ class AudioSynthesizer {
       try {
         this.cachedVoices = window.speechSynthesis.getVoices();
       } catch {
-        // Ignore
+        // Sintesis suara adalah pelengkap, bukan syarat: WebView tanpa mesin
+        // TTS harus tetap bisa memindai. Terminal yang bisu lebih baik
+        // daripada terminal yang menolak bekerja.
       }
     }
 

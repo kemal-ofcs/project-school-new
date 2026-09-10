@@ -72,8 +72,19 @@ export default function FotoAbsensiMobilePage() {
     useState<AttendancePhotoEntry | null>(null);
 
   useEffect(() => {
-    if (!authLoading && !isAuthenticated) router.replace("/login");
-  }, [authLoading, isAuthenticated, router]);
+    if (!authLoading && !isAuthenticated) {
+      router.replace("/login");
+      return;
+    }
+    // Ditolak izin area: dipulangkan, bukan dibiarkan menatap layar kosong.
+    // Sebelumnya `canView` hanya menahan pemuatan data, sehingga operator
+    // tanpa hak melihat halaman kosong tanpa satu pun penjelasan.
+    //
+    // Mobile memakai static export dan tidak punya rute `/forbidden`.
+    if (!authLoading && isAuthenticated && !canView) {
+      router.replace("/dashboard");
+    }
+  }, [authLoading, isAuthenticated, canView, router]);
 
   const load = useCallback(async () => {
     setLoading(true);

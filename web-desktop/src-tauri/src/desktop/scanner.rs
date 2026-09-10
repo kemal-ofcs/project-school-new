@@ -127,7 +127,6 @@ pub fn setting_enabled(settings: &HashMap<String, String>, key: &str) -> bool {
         .unwrap_or(false)
 }
 
-
 // ─────────────────────────────────────────────────────────────────────────────
 // Whitelist Shift/Divisi hari libur.
 //
@@ -192,7 +191,13 @@ pub fn normalize_whitelist_scope_value(scope_type: &str, raw: &str) -> Option<St
 
 /// Menerima YYYY-MM-DD (opsional dengan bagian waktu). Selain itu `None`.
 pub fn normalize_holiday_date(raw: Option<&str>) -> Option<String> {
-    let value = raw?.trim().split('T').next().unwrap_or("").trim().to_owned();
+    let value = raw?
+        .trim()
+        .split('T')
+        .next()
+        .unwrap_or("")
+        .trim()
+        .to_owned();
     if value.len() != 10 {
         return None;
     }
@@ -388,14 +393,22 @@ fn ip_matches_entry(ip: &IpAddr, entry: &str) -> bool {
             }
             // Pergeseran sebanyak lebar tipe adalah perilaku tak terdefinisi di
             // Rust dan panik pada build debug, jadi /0 ditangani terpisah.
-            let mask = if bits == 0 { 0 } else { u32::MAX << (32 - bits) };
+            let mask = if bits == 0 {
+                0
+            } else {
+                u32::MAX << (32 - bits)
+            };
             u32::from(network) & mask == u32::from(*candidate) & mask
         }
         (IpAddr::V6(network), IpAddr::V6(candidate)) => {
             if bits > 128 {
                 return false;
             }
-            let mask = if bits == 0 { 0 } else { u128::MAX << (128 - bits) };
+            let mask = if bits == 0 {
+                0
+            } else {
+                u128::MAX << (128 - bits)
+            };
             u128::from(network) & mask == u128::from(*candidate) & mask
         }
         _ => false,
@@ -1099,7 +1112,9 @@ fn submit_internal(
                     shift_id: row.get(3)?,
                     status: row.get::<_, Option<String>>(4)?.unwrap_or_default(),
                     token: row.get::<_, Option<String>>(5)?.unwrap_or_default(),
-                    personnel_type: row.get::<_, Option<String>>(6)?.filter(|s| !s.trim().is_empty()),
+                    personnel_type: row
+                        .get::<_, Option<String>>(6)?
+                        .filter(|s| !s.trim().is_empty()),
                 })
             },
         )
@@ -1254,10 +1269,9 @@ fn submit_internal(
     // Fitur berlaku hanya bila perusahaan menghidupkannya DAN role-nya
     // menyalakannya. Sakelar induk dibaca dari setting yang ikut sinkronisasi,
     // jadi mematikannya di satu terminal langsung berlaku di semua terminal.
-    let ip_restriction_required = policy.require_ip_allowlist
-        && setting_enabled(&settings, SCAN_IP_RESTRICTION_ENABLED_KEY);
-    let photo_required =
-        policy.require_photo && setting_enabled(&settings, SCAN_PHOTO_ENABLED_KEY);
+    let ip_restriction_required =
+        policy.require_ip_allowlist && setting_enabled(&settings, SCAN_IP_RESTRICTION_ENABLED_KEY);
+    let photo_required = policy.require_photo && setting_enabled(&settings, SCAN_PHOTO_ENABLED_KEY);
 
     if ip_restriction_required {
         let allowlist = settings
@@ -1499,12 +1513,8 @@ fn submit_internal(
                 // memasukkan dirinya sendiri ke whitelist lewat body request.
                 let whitelist = load_holiday_whitelist(&transaction, &moment.date)?;
                 let kode_shift = load_kode_shift(&transaction, employee.shift_id);
-                let izin = evaluate_holiday_scan(
-                    &whitelist,
-                    &moment.date,
-                    &employee.division,
-                    kode_shift,
-                );
+                let izin =
+                    evaluate_holiday_scan(&whitelist, &moment.date, &employee.division, kode_shift);
 
                 let Some(alasan_izin) = izin else {
                     let log = rejected_log(
@@ -2138,9 +2148,7 @@ fn submit_internal(
     } else {
         "scan_pulang"
     };
-    if decision.allowed
-        && super::wa_notification::wa_notify_enabled(&settings, jenis_notifikasi)
-    {
+    if decision.allowed && super::wa_notification::wa_notify_enabled(&settings, jenis_notifikasi) {
         let parent_info: Option<(String, String, String)> = transaction
             .query_row(
                 r#"
@@ -2350,7 +2358,10 @@ mod tests {
 
         assert!(ip_matches_allowlist(&alamat("192.168.1.77"), &allowlist));
         assert!(ip_matches_allowlist(&alamat("10.0.0.5"), &allowlist));
-        assert!(ip_matches_allowlist(&alamat("2001:db8:1234::9"), &allowlist));
+        assert!(ip_matches_allowlist(
+            &alamat("2001:db8:1234::9"),
+            &allowlist
+        ));
 
         assert!(!ip_matches_allowlist(&alamat("192.168.2.77"), &allowlist));
         assert!(!ip_matches_allowlist(&alamat("10.0.0.6"), &allowlist));
@@ -2714,9 +2725,7 @@ mod tests {
     /// Sakelar hidup mengantrekan, dan hanya jenis yang dinyalakan.
     #[test]
     fn sakelar_hidup_mengantrekan_hanya_jenis_yang_dinyalakan() {
-        use super::super::wa_notification::{
-            WA_NOTIFY_SCAN_MASUK_KEY, WA_NOTIFY_SCAN_PULANG_KEY,
-        };
+        use super::super::wa_notification::{WA_NOTIFY_SCAN_MASUK_KEY, WA_NOTIFY_SCAN_PULANG_KEY};
         use super::{submit_at_with_policy, ScanSecurityPolicy};
         let (_directory, state) = fixture();
         seed_siswa_dengan_wali(&state);
@@ -2852,7 +2861,10 @@ mod tests {
             moment("2026-09-02", "08:00:00"),
         )
         .expect("scan diproses");
-        assert_eq!(hasil.get("sukses").and_then(|value| value.as_bool()), Some(false));
+        assert_eq!(
+            hasil.get("sukses").and_then(|value| value.as_bool()),
+            Some(false)
+        );
         assert_eq!(
             hasil.get("catatanSistem").and_then(|value| value.as_str()),
             Some("Foto bukti absensi wajib")
@@ -2904,9 +2916,7 @@ mod tests {
     /// atau terdeteksi tetapi di luar daftar. Keduanya WAJIB menolak.
     #[test]
     fn daftar_ip_terisi_menolak_alamat_di_luar_daftar() {
-        use super::{
-            submit_at_with_policy, ScanSecurityPolicy, SCAN_IP_RESTRICTION_ENABLED_KEY,
-        };
+        use super::{submit_at_with_policy, ScanSecurityPolicy, SCAN_IP_RESTRICTION_ENABLED_KEY};
         let (_directory, state) = fixture();
         aktifkan(&state, SCAN_IP_RESTRICTION_ENABLED_KEY);
         let connection = storage::database(&state.data_dir).expect("database lokal");
@@ -2962,7 +2972,10 @@ mod tests {
             moment("2026-09-02", "07:00:00"),
         )
         .expect("scan diproses");
-        assert_eq!(hasil.get("sukses").and_then(|value| value.as_bool()), Some(true));
+        assert_eq!(
+            hasil.get("sukses").and_then(|value| value.as_bool()),
+            Some(true)
+        );
 
         let connection = storage::database(directory.path()).expect("database lokal");
         let (jumlah_foto, base64): (i64, String) = connection
@@ -3005,7 +3018,10 @@ mod tests {
             moment("2026-09-02", "08:00:00"),
         )
         .expect("scan diproses");
-        assert_eq!(hasil.get("sukses").and_then(|value| value.as_bool()), Some(false));
+        assert_eq!(
+            hasil.get("sukses").and_then(|value| value.as_bool()),
+            Some(false)
+        );
         assert_eq!(
             hasil.get("catatanSistem").and_then(|value| value.as_str()),
             Some("Foto bukti absensi tidak valid")
@@ -3271,13 +3287,28 @@ mod tests {
         // Flag hanya ada di shift 1 (shift asal karyawan); shift 2 sengaja 0.
         seed_shift_sore(&state, 1);
 
-        let masuk = scan(&state, "K001", "TOKEN-TEST", moment("2026-08-12", "07:00:00"));
+        let masuk = scan(
+            &state,
+            "K001",
+            "TOKEN-TEST",
+            moment("2026-08-12", "07:00:00"),
+        );
         assert_eq!(masuk["jenisScan"], "Masuk");
-        let pulang = scan(&state, "K001", "TOKEN-TEST", moment("2026-08-12", "15:05:00"));
+        let pulang = scan(
+            &state,
+            "K001",
+            "TOKEN-TEST",
+            moment("2026-08-12", "15:05:00"),
+        );
         assert_eq!(pulang["jenisScan"], "Pulang");
 
         // Sesi shift 1 tuntas, jam 16:05 masuk jendela scan masuk shift 2.
-        let sesi_kedua = scan(&state, "K001", "TOKEN-TEST", moment("2026-08-12", "16:05:00"));
+        let sesi_kedua = scan(
+            &state,
+            "K001",
+            "TOKEN-TEST",
+            moment("2026-08-12", "16:05:00"),
+        );
         assert_eq!(
             sesi_kedua["sukses"], true,
             "scan lanjutan seharusnya diterima: {sesi_kedua}"
@@ -3292,10 +3323,25 @@ mod tests {
         // sehingga mengaktifkannya di shift karyawan sendiri tidak berpengaruh.
         seed_shift_sore(&state, 0);
 
-        scan(&state, "K001", "TOKEN-TEST", moment("2026-08-12", "07:00:00"));
-        scan(&state, "K001", "TOKEN-TEST", moment("2026-08-12", "15:05:00"));
+        scan(
+            &state,
+            "K001",
+            "TOKEN-TEST",
+            moment("2026-08-12", "07:00:00"),
+        );
+        scan(
+            &state,
+            "K001",
+            "TOKEN-TEST",
+            moment("2026-08-12", "15:05:00"),
+        );
 
-        let sesi_kedua = scan(&state, "K001", "TOKEN-TEST", moment("2026-08-12", "16:05:00"));
+        let sesi_kedua = scan(
+            &state,
+            "K001",
+            "TOKEN-TEST",
+            moment("2026-08-12", "16:05:00"),
+        );
         assert_eq!(sesi_kedua["sukses"], false);
         assert_ne!(sesi_kedua["idSesi"], "NORMAL-20260812-K001-2");
     }
@@ -3314,10 +3360,25 @@ mod tests {
                 .expect("set shift lanjutan");
         }
 
-        scan(&state, "K001", "TOKEN-TEST", moment("2026-08-12", "07:00:00"));
-        scan(&state, "K001", "TOKEN-TEST", moment("2026-08-12", "15:05:00"));
+        scan(
+            &state,
+            "K001",
+            "TOKEN-TEST",
+            moment("2026-08-12", "07:00:00"),
+        );
+        scan(
+            &state,
+            "K001",
+            "TOKEN-TEST",
+            moment("2026-08-12", "15:05:00"),
+        );
 
-        let sesi_kedua = scan(&state, "K001", "TOKEN-TEST", moment("2026-08-12", "16:05:00"));
+        let sesi_kedua = scan(
+            &state,
+            "K001",
+            "TOKEN-TEST",
+            moment("2026-08-12", "16:05:00"),
+        );
         assert_eq!(sesi_kedua["idSesi"], "NORMAL-20260812-K001-2");
 
         let connection = storage::database(&state.data_dir).expect("local database");
@@ -3357,9 +3418,24 @@ mod tests {
                 .expect("set shift lanjutan");
         }
 
-        scan(&state, "K001", "TOKEN-TEST", moment("2026-08-12", "07:00:00"));
-        scan(&state, "K001", "TOKEN-TEST", moment("2026-08-12", "15:05:00"));
-        let sesi_kedua = scan(&state, "K001", "TOKEN-TEST", moment("2026-08-12", "16:05:00"));
+        scan(
+            &state,
+            "K001",
+            "TOKEN-TEST",
+            moment("2026-08-12", "07:00:00"),
+        );
+        scan(
+            &state,
+            "K001",
+            "TOKEN-TEST",
+            moment("2026-08-12", "15:05:00"),
+        );
+        let sesi_kedua = scan(
+            &state,
+            "K001",
+            "TOKEN-TEST",
+            moment("2026-08-12", "16:05:00"),
+        );
         assert_eq!(sesi_kedua["sukses"], false);
 
         let connection = storage::database(&state.data_dir).expect("local database");
@@ -3397,10 +3473,25 @@ mod tests {
                 .expect("seed shift fleksibel");
         }
 
-        scan(&state, "K001", "TOKEN-TEST", moment("2026-08-12", "07:00:00"));
-        scan(&state, "K001", "TOKEN-TEST", moment("2026-08-12", "15:05:00"));
+        scan(
+            &state,
+            "K001",
+            "TOKEN-TEST",
+            moment("2026-08-12", "07:00:00"),
+        );
+        scan(
+            &state,
+            "K001",
+            "TOKEN-TEST",
+            moment("2026-08-12", "15:05:00"),
+        );
 
-        let sesi_kedua = scan(&state, "K001", "TOKEN-TEST", moment("2026-08-12", "16:05:00"));
+        let sesi_kedua = scan(
+            &state,
+            "K001",
+            "TOKEN-TEST",
+            moment("2026-08-12", "16:05:00"),
+        );
         assert_eq!(sesi_kedua["idSesi"], "NORMAL-20260812-K001-2");
     }
 
@@ -3420,10 +3511,20 @@ mod tests {
         // hanya MENGISI kolom kosong itu, jadi harus diterima. Dulu seluruh
         // baris terkunci sehingga karyawan tidak pernah bisa scan pulang.
         let (_directory, state) = fixture();
-        scan(&state, "K001", "TOKEN-TEST", moment("2026-08-12", "07:00:00"));
+        scan(
+            &state,
+            "K001",
+            "TOKEN-TEST",
+            moment("2026-08-12", "07:00:00"),
+        );
         kunci_sebagai_koreksi_admin(&state);
 
-        let hasil = scan(&state, "K001", "TOKEN-TEST", moment("2026-08-12", "15:00:00"));
+        let hasil = scan(
+            &state,
+            "K001",
+            "TOKEN-TEST",
+            moment("2026-08-12", "15:00:00"),
+        );
         assert_eq!(hasil["sukses"], true, "scan pulang ditolak: {hasil}");
 
         let connection = storage::database(&state.data_dir).expect("local database");
@@ -3444,8 +3545,18 @@ mod tests {
     #[test]
     fn koreksi_admin_yang_sudah_lengkap_tidak_bisa_ditimpa_scanner() {
         let (_directory, state) = fixture();
-        scan(&state, "K001", "TOKEN-TEST", moment("2026-08-12", "07:00:00"));
-        scan(&state, "K001", "TOKEN-TEST", moment("2026-08-12", "15:00:00"));
+        scan(
+            &state,
+            "K001",
+            "TOKEN-TEST",
+            moment("2026-08-12", "07:00:00"),
+        );
+        scan(
+            &state,
+            "K001",
+            "TOKEN-TEST",
+            moment("2026-08-12", "15:00:00"),
+        );
         kunci_sebagai_koreksi_admin(&state);
 
         let sebelum: (String, String) = {
@@ -3459,7 +3570,12 @@ mod tests {
                 .expect("attendance row")
         };
 
-        let hasil = scan(&state, "K001", "TOKEN-TEST", moment("2026-08-12", "15:30:00"));
+        let hasil = scan(
+            &state,
+            "K001",
+            "TOKEN-TEST",
+            moment("2026-08-12", "15:30:00"),
+        );
         assert_eq!(hasil["sukses"], false);
 
         let connection = storage::database(&state.data_dir).expect("local database");

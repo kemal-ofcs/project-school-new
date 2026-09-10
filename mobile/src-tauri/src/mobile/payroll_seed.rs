@@ -1,3 +1,8 @@
+// BERKAS INI HASIL SALIN OTOMATIS dari web-desktop oleh
+// `mobile/scripts/sync-rust-modules.ts`. JANGAN disunting dengan tangan —
+// perubahannya akan tertimpa diam-diam pada sinkronisasi berikutnya.
+// Sunting sumbernya: `web-desktop/src-tauri/src/desktop/payroll_seed.rs`.
+
 //! Tabel tarif default payroll — SATU sumber untuk SQLite lokal dan Turso cloud.
 //!
 //! Sebelumnya seed ditulis dua kali dengan tangan: `storage.rs` memakai id

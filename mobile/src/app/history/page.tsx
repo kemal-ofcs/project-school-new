@@ -71,8 +71,17 @@ export default function HistoryPage() {
   useEffect(() => {
     if (!authLoading && !isAuthenticated) {
       router.replace("/login");
+      return;
     }
-  }, [authLoading, isAuthenticated, router]);
+    // Ditolak izin area: dipulangkan, bukan dibiarkan menatap layar kosong.
+    // Sebelumnya `canViewHistory` hanya menahan pemuatan data, sehingga operator
+    // tanpa hak melihat halaman kosong tanpa satu pun penjelasan.
+    //
+    // Mobile memakai static export dan tidak punya rute `/forbidden`.
+    if (!authLoading && isAuthenticated && !canViewHistory) {
+      router.replace("/dashboard");
+    }
+  }, [authLoading, isAuthenticated, canViewHistory, router]);
 
   const loadData = useCallback(async (targetDate: string, tab: HistoryTab) => {
     setIsLoading(true);
@@ -254,6 +263,7 @@ export default function HistoryPage() {
           {/* Date Picker */}
           <div className="flex flex-col gap-2">
             <input
+              aria-label="Tanggal riwayat"
               type="date"
               value={date}
               onChange={(e) => handleDateChange(e.target.value)}
@@ -264,6 +274,7 @@ export default function HistoryPage() {
           {/* Search Input */}
           <div className="mt-3 relative">
             <input
+              aria-label="Cari riwayat absensi"
               type="text"
               value={search}
               onChange={(e) => setSearch(e.target.value)}

@@ -13,12 +13,12 @@ pub mod sync;
 mod time_policy;
 pub mod turso;
 
-pub mod portability;
-pub mod payroll;
 pub mod academic;
-pub mod class_attendance;
-pub mod teaching_journal;
-pub mod attendance_ledger;
 pub mod attendance_dashboard;
+pub mod attendance_ledger;
+pub mod class_attendance;
+pub mod payroll;
+pub mod portability;
+pub mod teaching_journal;
 pub mod wa_notification;
 pub use config::DesktopState;

@@ -282,6 +282,7 @@ export function TwoFactorCard() {
             cadangan.
           </p>
           <input
+            aria-label="Kode verifikasi dua langkah"
             autoComplete="one-time-code"
             maxLength={16}
             value={code}

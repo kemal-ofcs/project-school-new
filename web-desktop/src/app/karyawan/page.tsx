@@ -416,6 +416,7 @@ export default function KaryawanPage() {
           canManage ? (
             <div className="flex flex-wrap items-center gap-2 sm:gap-2.5">
               <input
+                aria-label="Berkas Excel untuk impor karyawan"
                 ref={importInputRef}
                 type="file"
                 accept=".xlsx"
@@ -494,6 +495,7 @@ export default function KaryawanPage() {
       >
         <div className="flex w-full gap-2 sm:max-w-md">
           <input
+            aria-label="Cari karyawan"
             type="text"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
@@ -510,6 +512,7 @@ export default function KaryawanPage() {
 
         <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
           <select
+            aria-label="Filter divisi"
             value={filterDivisi}
             onChange={(e) => setFilterDivisi(e.target.value)}
             className="min-h-10 rounded-xl border border-slate-800 bg-slate-950 px-3 text-xs text-slate-300 outline-none focus:border-sky-500"
@@ -523,6 +526,7 @@ export default function KaryawanPage() {
           </select>
 
           <select
+            aria-label="Filter status aktif"
             value={filterStatus}
             onChange={(e) => setFilterStatus(e.target.value)}
             className="min-h-10 rounded-xl border border-slate-800 bg-slate-950 px-3 text-xs text-slate-300 outline-none focus:border-sky-500"

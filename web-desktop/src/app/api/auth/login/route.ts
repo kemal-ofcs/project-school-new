@@ -19,6 +19,7 @@ import {
   readBoundedJsonBody,
 } from "@/lib/server/http/json-body";
 import {
+  assertSameOriginMutation,
   getClientAddress,
   isSameOriginMutation,
 } from "@/lib/server/http/request-security";
@@ -40,6 +41,7 @@ function errorResponse(message: string, status: number) {
 }
 
 export async function POST(request: NextRequest) {
+  assertSameOriginMutation(request);
   if (!isSameOriginMutation(request)) {
     return errorResponse("Origin permintaan tidak diizinkan.", 403);
   }

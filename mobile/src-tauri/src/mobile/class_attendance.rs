@@ -1,3 +1,8 @@
+// BERKAS INI HASIL SALIN OTOMATIS dari web-desktop oleh
+// `mobile/scripts/sync-rust-modules.ts`. JANGAN disunting dengan tangan —
+// perubahannya akan tertimpa diam-diam pada sinkronisasi berikutnya.
+// Sunting sumbernya: `web-desktop/src-tauri/src/desktop/class_attendance.rs`.
+
 use rusqlite::params;
 use serde_json::{json, Value};
 
@@ -464,10 +469,7 @@ pub fn get_roster_for_attendance(
 
 // ── 4. Simpan Sesi Presensi & Detail Roster (Atomic Transaksi + Outbox) ──────
 
-pub fn save_class_attendance(
-    state: &MobileState,
-    draft: &Value,
-) -> Result<Value, CommandError> {
+pub fn save_class_attendance(state: &MobileState, draft: &Value) -> Result<Value, CommandError> {
     let mut conn = storage::database(&state.data_dir)?;
     let tx = conn.transaction().map_err(|_| CommandError::internal())?;
 
@@ -659,7 +661,9 @@ pub fn save_class_attendance(
                 now,
             ],
         )
-        .map_err(|e| CommandError::new("DB_ERROR", format!("Gagal menyimpan detail presensi: {e}")))?;
+        .map_err(|e| {
+            CommandError::new("DB_ERROR", format!("Gagal menyimpan detail presensi: {e}"))
+        })?;
 
         let detail_payload = json!({
             "id_detail": id_detail,
@@ -876,7 +880,9 @@ pub fn get_attendance_reconciliation(
         gate = GATE_SUMMARY_SUBQUERY
     );
 
-    let mut stmt = conn.prepare(&bolos_sql).map_err(|_| CommandError::internal())?;
+    let mut stmt = conn
+        .prepare(&bolos_sql)
+        .map_err(|_| CommandError::internal())?;
     let mut anomalies = stmt
         .query_map(params![tanggal, id_rombel], |row| {
             Ok(json!({
@@ -1058,7 +1064,9 @@ mod tests {
         }
 
         let mut stmt = conn
-            .prepare("SELECT jam_ke FROM test_jam ORDER BY CAST(jam_ke AS INTEGER) ASC, jam_ke ASC;")
+            .prepare(
+                "SELECT jam_ke FROM test_jam ORDER BY CAST(jam_ke AS INTEGER) ASC, jam_ke ASC;",
+            )
             .unwrap();
         let sorted: Vec<String> = stmt
             .query_map([], |row| row.get(0))
@@ -1113,14 +1121,7 @@ mod tests {
                 "#,
             )
             .unwrap()
-            .exists(params![
-                "ta_1",
-                "rom_1",
-                "map_1",
-                "2026-09-07",
-                "1",
-                "pm_2"
-            ])
+            .exists(params!["ta_1", "rom_1", "map_1", "2026-09-07", "1", "pm_2"])
             .unwrap();
 
         assert!(duplicate);
@@ -1140,14 +1141,7 @@ mod tests {
                 "#,
             )
             .unwrap()
-            .exists(params![
-                "ta_1",
-                "rom_1",
-                "map_1",
-                "2026-09-07",
-                "1",
-                "pm_1"
-            ])
+            .exists(params!["ta_1", "rom_1", "map_1", "2026-09-07", "1", "pm_1"])
             .unwrap();
 
         assert!(!same_session_edit);
@@ -1186,15 +1180,17 @@ mod tests {
         );
         let mut stmt = conn.prepare(&sql).unwrap();
         let rows: Vec<(Option<String>, i64, String)> = stmt
-            .query_map([], |row| {
-                Ok((row.get(0)?, row.get(1)?, row.get(2)?))
-            })
+            .query_map([], |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)))
             .unwrap()
             .filter_map(Result::ok)
             .collect();
 
         assert_eq!(rows.len(), 1, "dua sesi harus meringkas jadi satu baris");
-        assert_eq!(rows[0].0.as_deref(), Some("07:01"), "ambil scan paling awal");
+        assert_eq!(
+            rows[0].0.as_deref(),
+            Some("07:01"),
+            "ambil scan paling awal"
+        );
         assert_eq!(rows[0].1, 1, "siswa ini hadir di gerbang");
         assert_eq!(rows[0].2, "Terlambat", "MAX dipakai agar deterministik");
     }
@@ -1236,7 +1232,11 @@ mod tests {
 
         assert_eq!(rows.len(), 2);
         assert_eq!(rows[0], ("alfa".to_owned(), 0), "status Alfa bukan hadir");
-        assert_eq!(rows[1], ("kosong".to_owned(), 0), "jam_masuk spasi bukan hadir");
+        assert_eq!(
+            rows[1],
+            ("kosong".to_owned(), 0),
+            "jam_masuk spasi bukan hadir"
+        );
     }
 
     /// Regresi: siswa yang keluar dari roster harus dibuang, bukan ditinggalkan.
@@ -1278,7 +1278,11 @@ mod tests {
             .filter(|(_, id_siswa)| !siswa_terkirim.iter().any(|kirim| kirim == id_siswa))
             .collect();
 
-        assert_eq!(stale.len(), 1, "hanya siswa yang keluar roster yang dibuang");
+        assert_eq!(
+            stale.len(),
+            1,
+            "hanya siswa yang keluar roster yang dibuang"
+        );
         assert_eq!(stale[0].0, "pmd_3");
         assert_eq!(stale[0].1, "sis_pindah");
     }
@@ -1308,17 +1312,17 @@ mod tests {
 
         // Ditolak.
         for masukan in [
-            "",       // kosong
-            "0",      // di bawah batas
-            "13",     // di atas batas
-            "abc",    // bukan angka
-            "2-1",    // terbalik
-            "3-3",    // rentang nol
-            "1-",     // tidak lengkap
-            "-2",     // tidak lengkap
-            "1-2-3",  // rentang bertingkat
-            "1,2",    // pemisah salah
-            "０",     // digit non-ASCII
+            "",      // kosong
+            "0",     // di bawah batas
+            "13",    // di atas batas
+            "abc",   // bukan angka
+            "2-1",   // terbalik
+            "3-3",   // rentang nol
+            "1-",    // tidak lengkap
+            "-2",    // tidak lengkap
+            "1-2-3", // rentang bertingkat
+            "1,2",   // pemisah salah
+            "０",    // digit non-ASCII
         ] {
             assert!(
                 normalize_jam_ke(masukan).is_err(),

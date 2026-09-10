@@ -254,7 +254,16 @@ pub fn save_academic_year(state: &DesktopState, draft: &Value) -> Result<Value, 
             is_aktif = excluded.is_aktif,
             updated_at = excluded.updated_at;
         "#,
-        params![id, nama_tahun, semester, tanggal_mulai, tanggal_selesai, is_aktif, now, now],
+        params![
+            id,
+            nama_tahun,
+            semester,
+            tanggal_mulai,
+            tanggal_selesai,
+            is_aktif,
+            now,
+            now
+        ],
     )
     .map_err(|e| CommandError::new("DB_ERROR", format!("Gagal menyimpan tahun ajaran: {e}")))?;
 
@@ -376,7 +385,10 @@ pub fn list_academic_departments(state: &DesktopState) -> Result<Value, CommandE
     Ok(json!(rows))
 }
 
-pub fn save_academic_department(state: &DesktopState, draft: &Value) -> Result<Value, CommandError> {
+pub fn save_academic_department(
+    state: &DesktopState,
+    draft: &Value,
+) -> Result<Value, CommandError> {
     let mut conn = storage::database(&state.data_dir)?;
     let tx = conn.transaction().map_err(|_| CommandError::internal())?;
 
@@ -433,7 +445,15 @@ pub fn save_academic_department(state: &DesktopState, draft: &Value) -> Result<V
         "is_aktif": is_aktif,
     });
 
-    sync::enqueue(&tx, &client_id, "academic-department", op, &id, &payload, None)?;
+    sync::enqueue(
+        &tx,
+        &client_id,
+        "academic-department",
+        op,
+        &id,
+        &payload,
+        None,
+    )?;
     tx.commit().map_err(|_| CommandError::internal())?;
 
     Ok(json!({ "sukses": true, "id_jurusan": id }))
@@ -553,7 +573,17 @@ pub fn save_academic_class(state: &DesktopState, draft: &Value) -> Result<Value,
             ruang_kelas = excluded.ruang_kelas,
             is_aktif = excluded.is_aktif;
         "#,
-        params![id, id_ta, tingkat, id_jurusan, nama_rombel, id_wali_kelas, kapasitas, ruang_kelas, is_aktif],
+        params![
+            id,
+            id_ta,
+            tingkat,
+            id_jurusan,
+            nama_rombel,
+            id_wali_kelas,
+            kapasitas,
+            ruang_kelas,
+            is_aktif
+        ],
     )
     .map_err(|e| CommandError::new("DB_ERROR", format!("Gagal menyimpan rombel: {e}")))?;
 
@@ -651,7 +681,11 @@ pub fn save_academic_subject(state: &DesktopState, draft: &Value) -> Result<Valu
     let nama = text(draft, "nama_mapel");
     let tingkat = draft.get("tingkat").and_then(Value::as_i64);
     let kelompok = text(draft, "kelompok");
-    let kelompok = if kelompok.is_empty() { "Wajib" } else { kelompok };
+    let kelompok = if kelompok.is_empty() {
+        "Wajib"
+    } else {
+        kelompok
+    };
     let beban = integer(draft, "beban_jam", 2);
     let kkm = integer(draft, "kkm", 75);
     let is_aktif = integer(draft, "is_aktif", 1);
@@ -784,7 +818,10 @@ pub fn list_academic_assignments(
     Ok(json!(rows))
 }
 
-pub fn save_academic_assignment(state: &DesktopState, draft: &Value) -> Result<Value, CommandError> {
+pub fn save_academic_assignment(
+    state: &DesktopState,
+    draft: &Value,
+) -> Result<Value, CommandError> {
     let mut conn = storage::database(&state.data_dir)?;
     let tx = conn.transaction().map_err(|_| CommandError::internal())?;
 
@@ -848,7 +885,15 @@ pub fn save_academic_assignment(state: &DesktopState, draft: &Value) -> Result<V
         "id_guru": id_guru,
     });
 
-    sync::enqueue(&tx, &client_id, "academic-assignment", "create", &id, &payload, None)?;
+    sync::enqueue(
+        &tx,
+        &client_id,
+        "academic-assignment",
+        "create",
+        &id,
+        &payload,
+        None,
+    )?;
     tx.commit().map_err(|_| CommandError::internal())?;
 
     Ok(json!({ "sukses": true, "id_penugasan": id }))
@@ -943,18 +988,23 @@ pub fn save_teacher(state: &DesktopState, draft: &Value) -> Result<Value, Comman
     let nuptk = optional_text(draft, "nuptk");
     let gelar = optional_text(draft, "gelar");
     let spesialisasi = optional_text(draft, "spesialisasi_mapel");
-    let status_peg = optional_text(draft, "status_kepegawaian").unwrap_or_else(|| "Honorer".to_owned());
+    let status_peg =
+        optional_text(draft, "status_kepegawaian").unwrap_or_else(|| "Honorer".to_owned());
     let no_hp = optional_text(draft, "no_hp");
     let lp = optional_text(draft, "lp").unwrap_or_else(|| "L".to_owned());
     let id_shift = integer(draft, "id_shift", 1);
     let status_aktif = optional_text(draft, "status_aktif").unwrap_or_else(|| "Aktif".to_owned());
 
     if nama.is_empty() {
-        return Err(CommandError::new("VALIDATION_ERROR", "Nama guru wajib diisi."));
+        return Err(CommandError::new(
+            "VALIDATION_ERROR",
+            "Nama guru wajib diisi.",
+        ));
     }
 
     let kode_karyawan = if kode.is_empty() {
-        nip.clone().unwrap_or_else(|| format!("G-{}", short_suffix(&id)))
+        nip.clone()
+            .unwrap_or_else(|| format!("G-{}", short_suffix(&id)))
     } else {
         kode.to_owned()
     };
@@ -1026,12 +1076,22 @@ pub fn save_teacher(state: &DesktopState, draft: &Value) -> Result<Value, Comman
         "#,
         params![id, nama],
     )
-    .map_err(|e| CommandError::new("DB_ERROR", format!("Gagal memastikan baris id_card guru: {e}")))?;
+    .map_err(|e| {
+        CommandError::new(
+            "DB_ERROR",
+            format!("Gagal memastikan baris id_card guru: {e}"),
+        )
+    })?;
     tx.execute(
         "UPDATE id_card SET nama = ?1, divisi = 'Tenaga Pengajar' WHERE id_unik = ?2;",
         params![nama, id],
     )
-    .map_err(|e| CommandError::new("DB_ERROR", format!("Gagal memperbarui nama di id_card guru: {e}")))?;
+    .map_err(|e| {
+        CommandError::new(
+            "DB_ERROR",
+            format!("Gagal memperbarui nama di id_card guru: {e}"),
+        )
+    })?;
 
     let op = if is_new { "create" } else { "update" };
     let payload = json!({
@@ -1203,7 +1263,9 @@ pub fn save_student(state: &DesktopState, draft: &Value) -> Result<Value, Comman
         )?;
     }
 
-    let kode_karyawan = nis.clone().unwrap_or_else(|| format!("S-{}", short_suffix(&id)));
+    let kode_karyawan = nis
+        .clone()
+        .unwrap_or_else(|| format!("S-{}", short_suffix(&id)));
 
     // `master_data.kode_karyawan` MASIH UNIQUE — itu skema lama yang stabil dan
     // tidak diubah di sini. Diperiksa lebih dulu supaya bentroknya muncul
@@ -1272,8 +1334,8 @@ pub fn save_student(state: &DesktopState, draft: &Value) -> Result<Value, Comman
             updated_at = excluded.updated_at;
         "#,
         params![
-            id, nis, nisn, nama, jk, id_rombel,
-            nama_wali, wa_wali, alamat, angkatan, status, now, now
+            id, nis, nisn, nama, jk, id_rombel, nama_wali, wa_wali, alamat, angkatan, status, now,
+            now
         ],
     )
     .map_err(|e| CommandError::new("DB_ERROR", format!("Gagal menyimpan profil siswa: {e}")))?;
@@ -1287,12 +1349,22 @@ pub fn save_student(state: &DesktopState, draft: &Value) -> Result<Value, Comman
         "#,
         params![id, nama],
     )
-    .map_err(|e| CommandError::new("DB_ERROR", format!("Gagal memastikan baris id_card siswa: {e}")))?;
+    .map_err(|e| {
+        CommandError::new(
+            "DB_ERROR",
+            format!("Gagal memastikan baris id_card siswa: {e}"),
+        )
+    })?;
     tx.execute(
         "UPDATE id_card SET nama = ?1, divisi = 'Peserta Didik' WHERE id_unik = ?2;",
         params![nama, id],
     )
-    .map_err(|e| CommandError::new("DB_ERROR", format!("Gagal memperbarui nama di id_card siswa: {e}")))?;
+    .map_err(|e| {
+        CommandError::new(
+            "DB_ERROR",
+            format!("Gagal memperbarui nama di id_card siswa: {e}"),
+        )
+    })?;
 
     let op = if is_new { "create" } else { "update" };
     let payload = json!({
@@ -1356,17 +1428,20 @@ pub fn delete_student(state: &DesktopState, id: &str) -> Result<Value, CommandEr
 pub fn backfill_missing_id_cards(state: &DesktopState) -> Result<Value, CommandError> {
     let mut conn = storage::database(&state.data_dir)?;
     let tx = conn.transaction().map_err(|_| CommandError::internal())?;
-    let inserted = tx.execute(
-        r#"
+    let inserted = tx
+        .execute(
+            r#"
         INSERT INTO id_card (id_unik, nama, divisi, idcard_status, tanggal_generate)
         SELECT m.id_unik, m.nama, m.divisi, 'Belum', date('now','+7 hours')
         FROM master_data m
         WHERE m.status_aktif = 'Aktif'
           AND NOT EXISTS (SELECT 1 FROM id_card c WHERE c.id_unik = m.id_unik);
         "#,
-        [],
-    )
-    .map_err(|e| CommandError::new("DB_ERROR", format!("Gagal melakukan backfill id_card: {e}")))?;
+            [],
+        )
+        .map_err(|e| {
+            CommandError::new("DB_ERROR", format!("Gagal melakukan backfill id_card: {e}"))
+        })?;
     tx.commit().map_err(|_| CommandError::internal())?;
     Ok(json!({ "sukses": true, "total_inserted": inserted }))
 }
@@ -1379,14 +1454,23 @@ pub fn save_student_photo(
 ) -> Result<Value, CommandError> {
     let clean_id = id_siswa.trim();
     if clean_id.is_empty() {
-        return Err(CommandError::new("VALIDATION_ERROR", "ID Siswa tidak boleh kosong."));
+        return Err(CommandError::new(
+            "VALIDATION_ERROR",
+            "ID Siswa tidak boleh kosong.",
+        ));
     }
     let clean_foto = foto_base64.trim();
     if clean_foto.is_empty() {
-        return Err(CommandError::new("VALIDATION_ERROR", "Foto base64 tidak boleh kosong."));
+        return Err(CommandError::new(
+            "VALIDATION_ERROR",
+            "Foto base64 tidak boleh kosong.",
+        ));
     }
     if clean_foto.len() > MAX_STUDENT_PHOTO_BASE64 {
-        return Err(CommandError::new("VALIDATION_ERROR", "Ukuran foto siswa melebihi batas 500 KB."));
+        return Err(CommandError::new(
+            "VALIDATION_ERROR",
+            "Ukuran foto siswa melebihi batas 500 KB.",
+        ));
     }
     // Ketiga nilai ini WAJIB sama dengan enum `foto_mime` di `sync-schema.ts`.
     // Menerima mime lain di sini berarti barisnya tersimpan mulus di perangkat
@@ -1398,9 +1482,7 @@ pub fn save_student_photo(
         other => {
             return Err(CommandError::new(
                 "VALIDATION_ERROR",
-                format!(
-                    "Format foto '{other}' tidak didukung. Gunakan JPEG, PNG, atau WebP."
-                ),
+                format!("Format foto '{other}' tidak didukung. Gunakan JPEG, PNG, atau WebP."),
             ));
         }
     };

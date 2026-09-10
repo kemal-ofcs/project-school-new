@@ -21,7 +21,10 @@ const localAppData =
   path.resolve(process.env.USERPROFILE || "", "AppData/Local");
 const targetDbPath = path.join(
   localAppData,
-  "id.sppg.absensi",
+  // Harus sama dengan `identifier` di `src-tauri/tauri.conf.json`: itulah yang
+  // menentukan folder data aplikasi. Nilai lama "id.sppg.absensi" membuat hasil
+  // migrasi mendarat di folder yang tidak pernah dibaca aplikasi baru.
+  "id.sekolah.manajemen",
   "desktop-security.db",
 );
 

@@ -1,6 +1,14 @@
 "use client";
 
-import { type KeyboardEvent, type ReactNode, useEffect, useRef } from "react";
+import {
+  type KeyboardEvent,
+  type ReactNode,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
+import { createPortal } from "react-dom";
+import { useDialogFocus } from "@/lib/hooks/useDialogFocus";
 
 interface ModalProps {
   isOpen: boolean;
@@ -11,6 +19,14 @@ interface ModalProps {
   children: ReactNode;
   maxWidth?: string;
   hideFooter?: boolean;
+  /**
+   * Baris aksi kustom di kaki dialog.
+   *
+   * Ditambahkan agar kontraknya sama dengan Modal web-desktop: tanpa ini,
+   * halaman Mobile terpaksa menaruh tombolnya di dalam badan yang bergulir,
+   * sehingga "Simpan" bisa hilang dari layar pada dialog yang panjang.
+   */
+  footer?: ReactNode;
 }
 
 export function Modal({
@@ -22,28 +38,52 @@ export function Modal({
   children,
   maxWidth = "max-w-lg",
   hideFooter = false,
+  footer,
 }: ModalProps) {
+  const dialogRef = useRef<HTMLDivElement | null>(null);
+  // Dialog baru dirender setelah komponen benar-benar terpasang.
+  //
+  // Dua alasan, dan keduanya sudah dimiliki Modal web-desktop sejak awal:
+  // createPortal menyentuh document, yang belum ada saat halaman
+  // di-prerender static export; dan tanpa portal, panel dialog tunduk pada
+  // stacking context serta overflow milik induknya — pada Mobile itu berarti
+  // ia bisa terpotong oleh navigasi bawah yang fixed.
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => {
+    setMounted(true);
+  }, []);
   const onCloseRef = useRef(onClose);
   useEffect(() => {
     onCloseRef.current = onClose;
   });
 
+  // Sebelumnya Modal Mobile TIDAK mengelola fokus sama sekali: membuka dialog
+  // meninggalkan fokus pada tombol pemicunya, di belakang backdrop, sehingga
+  // pengguna keyboard dan pembaca layar tidak pernah masuk ke dalamnya — dan
+  // gulir latar tetap berjalan di belakang panel. Hook ini juga menahan Tab
+  // agar tidak keluar, sehingga `aria-modal="true"` di bawah tidak berbohong.
+  useDialogFocus(dialogRef, isOpen && mounted);
+
   useEffect(() => {
-    if (!isOpen) return;
+    if (!isOpen || !mounted) return;
     const handleKeyDown = (e: globalThis.KeyboardEvent) => {
       if (e.key === "Escape") onCloseRef.current();
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [isOpen]);
+  }, [isOpen, mounted]);
 
-  if (!isOpen) return null;
+  if (!isOpen || !mounted) return null;
 
   const handleContainerKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
-    if (event.key === "Escape") onCloseRef.current();
+    if (event.key === "Escape") {
+      // Dihentikan supaya dialog bertumpuk tidak ikut tertutup sekaligus.
+      event.stopPropagation();
+      onCloseRef.current();
+    }
   };
 
-  return (
+  return createPortal(
     /*
      * Modal dialog diposisikan tepat di tengah layar (center-aligned)
      * dengan margin responsif, rounded-3xl modern, dan batasan tinggi
@@ -57,6 +97,7 @@ export function Modal({
       className="fixed inset-0 z-[80] flex items-center justify-center bg-slate-950/85 p-3.5 sm:p-4 backdrop-blur-md animate-in fade-in duration-200"
     >
       <div
+        ref={dialogRef}
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
@@ -96,7 +137,11 @@ export function Modal({
         </div>
 
         {/* Sticky Footer */}
-        {!hideFooter ? (
+        {footer ? (
+          <div className="flex shrink-0 items-center justify-end border-t border-white/10 bg-slate-950/80 px-5 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+            {footer}
+          </div>
+        ) : !hideFooter ? (
           <div className="flex shrink-0 items-center justify-end border-t border-white/10 bg-slate-950/80 px-5 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
             <button
               type="button"
@@ -108,6 +153,7 @@ export function Modal({
           </div>
         ) : null}
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }

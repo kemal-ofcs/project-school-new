@@ -4,12 +4,12 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { AppShell } from "@/components/AppShell";
-import { VirtualPayrollTable } from "@/components/payroll/VirtualPayrollTable";
+import { PayrollRecapTable } from "@/components/payroll/PayrollRecapTable";
 import { FeedbackBanner } from "@/components/ui/FeedbackBanner";
 import { Icon } from "@/components/ui/Icon";
 import { Modal } from "@/components/ui/Modal";
 import { PageHeader } from "@/components/ui/PageHeader";
-import { hasPermission } from "@/lib/auth/access";
+import { canAccessArea, hasPermission } from "@/lib/auth/access";
 import { useAuth } from "@/lib/context/AuthContext";
 import {
   createPayrollRun,
@@ -78,8 +78,16 @@ export default function PayrollDashboardPage() {
       router.push("/login");
       return;
     }
+    // Otorisasi, bukan sekadar autentikasi. Sebelumnya halaman ini hanya
+    // menuntut sesi yang sah, sehingga operator terminal pemindai maupun guru
+    // bisa membukanya dan melihat gaji seluruh karyawan. `hasPermission` yang
+    // ada di bawah hanya menyalakan tombol — datanya tetap termuat.
+    if (!canAccessArea(user, "payroll")) {
+      router.push("/forbidden");
+      return;
+    }
     void loadData();
-  }, [isHydrated, authLoading, isAuthenticated, loadData, router]);
+  }, [isHydrated, authLoading, isAuthenticated, user, loadData, router]);
 
   const handleCreateRun = async () => {
     if (isSubmittingRef.current) return;
@@ -230,6 +238,7 @@ export default function PayrollDashboardPage() {
               Periode Rekap:
             </span>
             <input
+              aria-label="Tanggal mulai periode rekap"
               type="date"
               value={periodStart}
               onChange={(e) => setPeriodStart(e.target.value)}
@@ -237,6 +246,7 @@ export default function PayrollDashboardPage() {
             />
             <span className="text-slate-500 text-sm">s.d.</span>
             <input
+              aria-label="Tanggal selesai periode rekap"
               type="date"
               value={periodEnd}
               onChange={(e) => setPeriodEnd(e.target.value)}
@@ -347,7 +357,7 @@ export default function PayrollDashboardPage() {
         </div>
 
         {/* Tabel Rekap Karyawan */}
-        <VirtualPayrollTable
+        <PayrollRecapTable
           data={data}
           isLoading={loading}
           periodStart={periodStart}

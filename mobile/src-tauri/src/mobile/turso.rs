@@ -1,3 +1,9 @@
+// BERKAS INI HASIL SALIN OTOMATIS dari web-desktop oleh
+// `mobile/scripts/sync-rust-modules.ts`. JANGAN disunting dengan tangan —
+// perubahannya akan tertimpa diam-diam pada sinkronisasi berikutnya.
+// Sunting sumbernya: `web-desktop/src-tauri/src/desktop/turso.rs`.
+#![allow(dead_code)] // lihat sync-rust-modules.ts: sengaja tidak didaftarkan di Mobile
+
 use std::collections::{HashMap, HashSet};
 use std::net::IpAddr;
 use std::sync::Mutex;
@@ -14,12 +20,13 @@ use zeroize::Zeroizing;
 
 use super::{
     models::{CommandError, OperatorUser},
+    // Normalisasi cakupan whitelist hari libur hidup di `scanner` bersama
+    // penilaiannya, supaya jalur cloud dan jalur scan tidak pernah bisa drift.
+    scanner,
     // Seam transport: dekoder sel Hrana dan jalur SQLite lokal. SQL-nya sama,
     // yang berbeda hanya ke mana ia dikirim.
     sql_backend::{decode_hrana_cell, LocalTransport},
-    // Normalisasi cakupan whitelist hari libur hidup di `scanner` bersama
-    // penilaiannya, supaya jalur cloud dan jalur scan tidak pernah bisa drift.
-    scanner, sync,
+    sync,
 };
 
 /// Provider database cloud yang dipakai perangkat.
@@ -702,6 +709,45 @@ struct SnapshotSource {
     sql: &'static str,
 }
 
+/// Batas jendela snapshot, dihitung SERVER dan dipakai apa adanya oleh klien.
+///
+/// WAJIB `+7 hours`: penentuan tanggal operasional memakai WIB, bukan UTC.
+/// Antara 00:00-07:00 WIB sebuah batas UTC menunjuk hari sebelumnya.
+///
+/// Nilainya dibaca sekali per pull lalu DIIKAT sebagai parameter ke setiap
+/// query berjendela DAN diumumkan ke klien. Satu sumber, satu nilai: kalau
+/// batas query dan batas yang diumumkan boleh berbeda, klien akan menghapus
+/// baris yang sebenarnya hanya berada di luar jendela query.
+const SNAPSHOT_WINDOW_SINCE_SQL: &str =
+    "SELECT date('now','+7 hours','-31 days') AS since;";
+
+/// Tabel snapshot yang ditarik dengan jendela waktu, beserta kolom tanggalnya.
+///
+/// Hanya tabel yang bertambah setiap hari operasional yang masuk sini. Tanpa
+/// jendela, satu pemindaian menaikkan `sync_pulse` `absensi_harian` sehingga
+/// SETIAP perangkat mengunduh ulang SELURUH riwayat absensi — setelah setahun
+/// ±300.000 baris, tiap siklus, di ponsel. Sinkronisasinya inkremental pada
+/// tingkat tabel tetapi dump penuh pada tingkat baris.
+///
+/// Kolomnya ikut diumumkan ke klien supaya `delete_missing` bisa dijalankan
+/// TERBATAS di dalam jendela: baris dalam jendela yang tidak ada di snapshot
+/// memang benar-benar sudah dihapus, sementara baris di luar jendela tidak
+/// boleh disimpulkan apa-apa.
+const SNAPSHOT_WINDOWS: &[(&str, &str)] = &[
+    // (nama tabel, kolom tanggal yang dibatasi)
+    ("absensi_harian", "tanggal"),
+    ("log_scan", "tanggal_kerja"),
+    ("koreksi_admin", "tanggal"),
+    ("import_offline", "timestamp_input"),
+];
+
+fn snapshot_window_column(table: &str) -> Option<&'static str> {
+    SNAPSHOT_WINDOWS
+        .iter()
+        .find(|(nama, _)| *nama == table)
+        .map(|(_, kolom)| *kolom)
+}
+
 const SNAPSHOT_SOURCES: &[SnapshotSource] = &[
     SnapshotSource {
         payload_key: "employees",
@@ -746,22 +792,22 @@ const SNAPSHOT_SOURCES: &[SnapshotSource] = &[
     SnapshotSource {
         payload_key: "corrections",
         table: "koreksi_admin",
-        sql: "SELECT * FROM koreksi_admin;",
+        sql: "SELECT * FROM koreksi_admin WHERE date(tanggal) >= ?;",
     },
     SnapshotSource {
         payload_key: "imports",
         table: "import_offline",
-        sql: "SELECT * FROM import_offline;",
+        sql: "SELECT * FROM import_offline WHERE date(timestamp_input) >= ?;",
     },
     SnapshotSource {
         payload_key: "attendance",
         table: "absensi_harian",
-        sql: "SELECT * FROM absensi_harian;",
+        sql: "SELECT * FROM absensi_harian WHERE date(tanggal) >= ?\n-- sengaja-utuh: sudah dibatasi jendela 31 hari lewat parameter di atas. LIMIT tetap DILARANG: memotong di tengah jendela membuat perangkat menarik sebagian lalu menganggapnya lengkap, dan kegagalan itu tidak meninggalkan jejak.\n;",
     },
     SnapshotSource {
         payload_key: "scanLogs",
         table: "log_scan",
-        sql: "SELECT * FROM log_scan ORDER BY timestamp_scan;",
+        sql: "SELECT * FROM log_scan WHERE date(tanggal_kerja) >= ? ORDER BY timestamp_scan\n-- sengaja-utuh: sudah dibatasi jendela 31 hari lewat parameter di atas. TIDAK memakai LIMIT seperti snapshot.ts: LIMIT memotong di tengah jendela, sehingga baris yang hilang tidak bisa dibedakan dari baris yang dihapus.\n;",
     },
     SnapshotSource {
         payload_key: "salaryConfigs",
@@ -796,7 +842,7 @@ const SNAPSHOT_SOURCES: &[SnapshotSource] = &[
     SnapshotSource {
         payload_key: "payrollItems",
         table: "payroll_items",
-        sql: "SELECT * FROM payroll_items ORDER BY created_at;",
+        sql: "SELECT * FROM payroll_items ORDER BY created_at\n-- sengaja-utuh: slip gaji yang hilang dari snapshot akan dianggap belum pernah dibuat; tumbuh per periode gaji, bukan per hari.\n;",
     },
     SnapshotSource {
         payload_key: "payrollAuditLogs",
@@ -855,22 +901,22 @@ const SNAPSHOT_SOURCES: &[SnapshotSource] = &[
     SnapshotSource {
         payload_key: "presensiMapel",
         table: "presensi_mapel",
-        sql: "SELECT * FROM presensi_mapel ORDER BY tanggal DESC, jam_ke ASC;",
+        sql: "SELECT * FROM presensi_mapel ORDER BY tanggal DESC, jam_ke ASC\n-- sengaja-utuh: header sesi presensi harus utuh; memotongnya membuat total_* pada header tidak punya pasangan detail di perangkat lain.\n;",
     },
     SnapshotSource {
         payload_key: "presensiMapelDetail",
         table: "presensi_mapel_detail",
-        sql: "SELECT * FROM presensi_mapel_detail ORDER BY id_presensi_mapel, id_siswa;",
+        sql: "SELECT * FROM presensi_mapel_detail ORDER BY id_presensi_mapel, id_siswa\n-- sengaja-utuh: tabel yang tumbuh PALING cepat di daftar ini (satu baris per siswa per jam pelajaran) dan tetap tanpa jendela waktu sama sekali; memotongnya menghasilkan rekonsiliasi palsu.\n;",
     },
     SnapshotSource {
         payload_key: "jurnalMengajar",
         table: "jurnal_mengajar",
-        sql: "SELECT * FROM jurnal_mengajar ORDER BY updated_at DESC;",
+        sql: "SELECT * FROM jurnal_mengajar ORDER BY updated_at DESC\n-- sengaja-utuh: jurnal yang hilang dari snapshot akan tampak belum pernah ditulis, dan guru akan menulisnya dua kali.\n;",
     },
     SnapshotSource {
         payload_key: "legerKehadiran",
         table: "leger_kehadiran",
-        sql: "SELECT * FROM leger_kehadiran ORDER BY id_tahun_ajaran, semester, id_rombel, id_siswa;",
+        sql: "SELECT * FROM leger_kehadiran ORDER BY id_tahun_ajaran, semester, id_rombel, id_siswa\n-- sengaja-utuh: nilai resmi rapor yang sudah dibekukan; baris yang hilang akan dibekukan ulang dengan angka berbeda.\n;",
     },
 ];
 
@@ -901,11 +947,7 @@ impl TursoClient {
     ///
     /// `base_url` tetap diminta karena dipakai sebagai identitas asal
     /// (`server_origin`) yang mengikat snapshot kredensial di vault perangkat.
-    pub fn local_file(
-        base_url: Url,
-        path: impl Into<std::path::PathBuf>,
-        http: Client,
-    ) -> Self {
+    pub fn local_file(base_url: Url, path: impl Into<std::path::PathBuf>, http: Client) -> Self {
         Self {
             base_url,
             auth_token: Zeroizing::new(String::new()),
@@ -1280,10 +1322,7 @@ impl TursoClient {
     /// `next_retry_at = NULL` — gagal PERMANEN, datanya hilang tanpa jalan
     /// pulih dari UI. Keunikannya kini ditegakkan di lapisan aplikasi, pola
     /// yang sama dengan `hari_libur_whitelist`.
-    async fn rebuild_without_unique(
-        &self,
-        spec: &UniqueRelaxation,
-    ) -> Result<(), CommandError> {
+    async fn rebuild_without_unique(&self, spec: &UniqueRelaxation) -> Result<(), CommandError> {
         let UniqueRelaxation {
             table,
             create_sql,
@@ -1449,6 +1488,19 @@ impl TursoClient {
                     verified_at TEXT,
                     sent_at TEXT,
                     used_at TEXT,
+                    -- Siapa yang menyetujui permintaan ini, dan kapan.
+                    --
+                    -- `password_reset.approve` masuk SENSITIVE_MUTATION_PERMISSIONS
+                    -- karena menyetujui berarti menyerahkan kendali sebuah akun
+                    -- kepada orang yang sedang berdiri di depan layar. Jejaknya
+                    -- menempel pada permintaan yang disetujui, bukan di tabel lain:
+                    -- sebelumnya kedua penulis meng-INSERT ke `role_permission_audit`
+                    -- dengan empat kolom yang tidak pernah ada di sana, errornya
+                    -- dibuang diam-diam, dan catatan itu tidak pernah tertulis
+                    -- sekalipun. NULL berarti belum disetujui, atau baris lama dari
+                    -- sebelum kolom ini ada.
+                    approved_by INTEGER,
+                    approved_at TEXT,
                     expires_at TEXT NOT NULL,
                     request_ip_hash TEXT,
                     user_agent_hash TEXT,
@@ -2505,6 +2557,11 @@ impl TursoClient {
             ("sync_operation_receipt", "actor_operator_id", "ALTER TABLE sync_operation_receipt ADD COLUMN actor_operator_id INTEGER;"),
             ("sync_operation_receipt", "receipt_json", "ALTER TABLE sync_operation_receipt ADD COLUMN receipt_json TEXT NOT NULL DEFAULT '{}';"),
             ("sync_operation_receipt", "processed_at", "ALTER TABLE sync_operation_receipt ADD COLUMN processed_at TEXT;"),
+            // Jejak persetujuan "Lupa Password". Database yang sudah terlanjur
+            // dibuat sebelum kolom ini ada tetap disembuhkan oleh klien mana pun
+            // yang menyentuhnya, Web maupun Desktop/Mobile.
+            ("password_reset_request", "approved_by", "ALTER TABLE password_reset_request ADD COLUMN approved_by INTEGER;"),
+            ("password_reset_request", "approved_at", "ALTER TABLE password_reset_request ADD COLUMN approved_at TEXT;"),
             // Kolom berikut hanya dibuat jalur provisioning Rust, sehingga
             // database yang lahir dari jalur Web tidak memilikinya. Ditambahkan
             // di sini supaya klien mana pun bisa menyembuhkannya. Nullable:
@@ -2703,7 +2760,8 @@ impl TursoClient {
     /// PASAL_17 kedua di cloud dan seluruh perangkat menarik tarif dobel itu.
     /// Daftar id sengaja eksplisit supaya tarif buatan admin tidak pernah tersentuh.
     async fn purge_legacy_rate_rows(&self) -> Result<(), CommandError> {
-        let placeholders = vec!["?"; crate::mobile::payroll_seed::LEGACY_RATE_IDS.len()].join(", ");
+        let placeholders =
+            vec!["?"; crate::mobile::payroll_seed::LEGACY_RATE_IDS.len()].join(", ");
         let args: Vec<Value> = crate::mobile::payroll_seed::LEGACY_RATE_IDS
             .iter()
             .map(|id| json!(id))
@@ -2764,6 +2822,41 @@ impl TursoClient {
                 );"#,
                 vec![],
             ),
+            // Jejak baris yang DIHAPUS di cloud.
+            //
+            // Tanpa ini, penghapusan tidak pernah sampai ke perangkat lain untuk
+            // 25 dari 32 tabel snapshot: `apply_table` hanya menyimpulkan
+            // penghapusan dari KETIDAKHADIRAN baris di snapshot, dan itu hanya
+            // menyala pada tabel ber-`delete_missing`. Rombel, mapel, jurnal
+            // mengajar, detail presensi, dan leger yang dihapus admin tetap
+            // hidup selamanya di setiap perangkat lain.
+            //
+            // Digerakkan TRIGGER, sama seperti `sync_pulse`, dan itulah yang
+            // membuatnya benar: jalur Web menulis langsung ke database yang
+            // sama, sehingga penghapusan dari Web ikut tercatat tanpa satu baris
+            // kode pun di sisi Web. Sebuah changelog aplikasi tidak bisa begitu
+            // — `sync_changelog` hanya memuat event yang lewat push Rust, dan
+            // `sync_change_log` hanya yang lewat jalur Web.
+            //
+            // TIDAK dipangkas dengan sengaja. Barisnya kecil (tiga kolom) dan
+            // hanya lahir saat ada penghapusan, sementara memangkasnya
+            // menciptakan tebing: perangkat yang kursornya lebih tua daripada
+            // baris terlama akan melewatkan penghapusan tanpa cara apa pun
+            // untuk mengetahuinya. Tabel ini juga tidak pernah ikut snapshot,
+            // jadi ukurannya tidak menyentuh penyimpanan perangkat.
+            Statement::new(
+                r#"CREATE TABLE IF NOT EXISTS sync_tombstone (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    table_name TEXT NOT NULL,
+                    entity_key TEXT NOT NULL,
+                    deleted_at TEXT NOT NULL
+                );"#,
+                vec![],
+            ),
+            Statement::new(
+                "CREATE INDEX IF NOT EXISTS idx_sync_tombstone_id ON sync_tombstone(id);",
+                vec![],
+            ),
         ];
         for source in SNAPSHOT_SOURCES {
             let table = source.table;
@@ -2786,6 +2879,26 @@ impl TursoClient {
                           ON CONFLICT(table_name) DO UPDATE SET
                             revision = revision + 1,
                             updated_at = datetime('now');
+                        END;"#
+                    ),
+                    vec![],
+                ));
+            }
+
+            // Trigger tombstone. Kolom identitasnya diambil dari
+            // `SNAPSHOT_TABLES` — satu-satunya tempat yang tahu — bukan dieja
+            // ulang di sini: kolom yang salah membuat tombstone menunjuk baris
+            // yang keliru, dan tidak ada yang akan menyadarinya.
+            if let Some(entity_column) =
+                sync::snapshot_table_by_name(table).map(sync::SnapshotTable::entity_column)
+            {
+                statements.push(Statement::new(
+                    format!(
+                        r#"CREATE TRIGGER IF NOT EXISTS trg_sync_tombstone_{table}
+                        AFTER DELETE ON {table}
+                        BEGIN
+                          INSERT INTO sync_tombstone (table_name, entity_key, deleted_at)
+                          VALUES ('{table}', CAST(OLD.{entity_column} AS TEXT), datetime('now'));
                         END;"#
                     ),
                     vec![],
@@ -2935,7 +3048,9 @@ impl TursoClient {
                 .and_then(Value::as_str)
                 .map(|username| username.to_owned());
             check.operator_count = self
-                .count_scalar("SELECT COUNT(*) AS total FROM master_operator WHERE status = 'Aktif';")
+                .count_scalar(
+                    "SELECT COUNT(*) AS total FROM master_operator WHERE status = 'Aktif';",
+                )
                 .await?;
         }
         if has_table("master_data") {
@@ -3195,12 +3310,16 @@ impl TursoClient {
             vec![json!(secret), json!(operator_id)],
         )
         .await?;
-        let label = format!("Absensi SPPG:{}", row.username);
+        // Issuer WAJIB sama dengan `BRANDING.appDisplayName` di TypeScript:
+        // satu akun yang sama tidak boleh muncul dengan dua nama berbeda di
+        // aplikasi autentikator bergantung build mana yang mendaftarkannya.
+        // Rust tidak bisa mengimpor BRANDING, jadi nilainya dicerminkan di sini.
+        let label = format!("Manajemen Sekolah:{}", row.username);
         Ok(json!({
             "setup": {
                 "secret": secret,
                 "otpauthUri": format!(
-                    "otpauth://totp/{}?secret={}&issuer=Absensi%20SPPG&algorithm=SHA1&digits=6&period=30",
+                    "otpauth://totp/{}?secret={}&issuer=Manajemen%20Sekolah&algorithm=SHA1&digits=6&period=30",
                     urlencoding_minimal(&label),
                     secret
                 ),
@@ -3267,7 +3386,11 @@ impl TursoClient {
                 "Verifikasi dua langkah memang belum aktif.",
             ));
         }
-        if require_proof && !self.consume_totp_or_recovery(operator_id, &row, code).await? {
+        if require_proof
+            && !self
+                .consume_totp_or_recovery(operator_id, &row, code)
+                .await?
+        {
             return Err(CommandError::new(
                 "FORBIDDEN",
                 "Kode verifikasi tidak cocok.",
@@ -3578,6 +3701,55 @@ impl TursoClient {
         Ok(Some(pulse))
     }
 
+    /// Baris yang dihapus di cloud sejak `cursor`, beserta kursor barunya.
+    ///
+    /// Mengembalikan daftar kosong dan kursor lama bila tabelnya belum ada —
+    /// database cloud yang belum pernah disentuh klien versi ini. Perangkat
+    /// akan mencobanya lagi siklus berikutnya, setelah `ensure_schema`
+    /// memasang tabel dan trigger-nya.
+    async fn fetch_tombstones(&self, cursor: i64) -> (Vec<Value>, i64) {
+        let Ok(result) = self
+            .query_one(
+                "SELECT id, table_name, entity_key FROM sync_tombstone WHERE id > ? ORDER BY id\n-- batas: hanya tombstone yang belum diterapkan perangkat ini, dan kursornya maju tiap siklus sehingga himpunan ini mengecil ke nol.\n;",
+                vec![json!(cursor)],
+            )
+            .await
+        else {
+            return (Vec::new(), cursor);
+        };
+        let mut tertinggi = cursor;
+        let mut rows = Vec::new();
+        for row in result.to_objects() {
+            let id = row
+                .get("id")
+                .and_then(|value| {
+                    value
+                        .as_i64()
+                        .or_else(|| value.as_str().and_then(|text| text.parse().ok()))
+                })
+                .unwrap_or(0);
+            // Kursor maju untuk SETIAP baris yang terbaca, termasuk yang
+            // dilewati. Kalau baris cacat tidak ikut memajukannya, kursor
+            // berhenti tepat sebelum baris itu dan perangkat membacanya ulang
+            // setiap siklus, selamanya — sekaligus tidak pernah sampai ke
+            // tombstone sesudahnya.
+            if id > tertinggi {
+                tertinggi = id;
+            }
+            let (Some(table), Some(entity_key)) = (
+                row.get("table_name").and_then(Value::as_str),
+                row.get("entity_key").and_then(Value::as_str),
+            ) else {
+                continue;
+            };
+            if table.is_empty() || entity_key.is_empty() {
+                continue;
+            }
+            rows.push(json!({ "table": table, "entityKey": entity_key }));
+        }
+        (rows, tertinggi)
+    }
+
     /// Menarik snapshot cloud. Bila `wanted` diisi, hanya tabel di dalamnya yang
     /// dibaca — kunci payload tabel lain sengaja tidak dimunculkan sama sekali
     /// agar `sync::apply_table` memperlakukannya sebagai "tidak dikirim" dan
@@ -3586,6 +3758,7 @@ impl TursoClient {
         &self,
         last_revision: i64,
         wanted: Option<&HashSet<String>>,
+        tombstone_cursor: i64,
     ) -> Result<Value, CommandError> {
         self.ensure_schema_current().await?;
         let sources: Vec<&SnapshotSource> = SNAPSHOT_SOURCES
@@ -3600,9 +3773,44 @@ impl TursoClient {
         let mut max_rev = last_revision;
 
         if !sources.is_empty() {
+            // Batas jendela dibaca SEKALI dari jam server, lalu dipakai untuk
+            // dua hal sekaligus: mengikat setiap query berjendela, dan
+            // diumumkan ke klien. Satu nilai, sehingga batas pengambilan dan
+            // batas penghapusan tidak mungkin berbeda.
+            let window_since = if sources
+                .iter()
+                .any(|source| snapshot_window_column(source.table).is_some())
+            {
+                self.query_one(SNAPSHOT_WINDOW_SINCE_SQL, vec![])
+                    .await?
+                    .to_objects()
+                    .into_iter()
+                    .next()
+                    .and_then(|row| row.get("since").and_then(Value::as_str).map(str::to_owned))
+            } else {
+                None
+            };
+
+            let mut windows = serde_json::Map::new();
             let mut statements: Vec<Statement> = sources
                 .iter()
-                .map(|source| Statement::new(source.sql, vec![]))
+                .map(|source| {
+                    match (snapshot_window_column(source.table), window_since.as_ref()) {
+                        (Some(column), Some(since)) => {
+                            windows.insert(
+                                source.payload_key.to_owned(),
+                                json!({ "column": column, "since": since }),
+                            );
+                            Statement::new(source.sql, vec![json!(since)])
+                        }
+                        // Tanpa batas yang terbaca, jendelanya tidak diumumkan
+                        // dan query-nya tidak bisa diikat: lebih baik gagal di
+                        // sini daripada mengirim query berparameter tanpa
+                        // parameternya.
+                        (Some(_), None) => Statement::new(source.sql, vec![json!(Value::Null)]),
+                        (None, _) => Statement::new(source.sql, vec![]),
+                    }
+                })
                 .collect();
             statements.push(Statement::new(
                 "SELECT COALESCE(MAX(id), 0) AS max_rev FROM sync_changelog;",
@@ -3631,7 +3839,25 @@ impl TursoClient {
                     res.to_objects().into_iter().map(|map| json!(map)).collect();
                 snapshot[source.payload_key] = json!(rows_json);
             }
+
+            // Diumumkan HANYA untuk tabel yang benar-benar ikut ditarik siklus
+            // ini. `sync::apply_table` memakainya untuk menjalankan
+            // `delete_missing` terbatas di dalam jendela.
+            if !windows.is_empty() {
+                snapshot["windows"] = Value::Object(windows);
+            }
         }
+
+        // Tombstone dibaca TERPISAH dan kegagalannya tidak mematikan pull.
+        // Database cloud lama belum punya tabelnya, dan sebuah pipeline yang
+        // salah satu statement-nya gagal akan menggagalkan seluruh tarikan —
+        // menukar "penghapusan belum menyebar" dengan "tidak ada data sama
+        // sekali yang menyebar". Pola yang sama dipakai `fetch_sync_pulse`.
+        let (tombstones, tombstone_cursor_baru) = self.fetch_tombstones(tombstone_cursor).await;
+        if !tombstones.is_empty() {
+            snapshot["tombstones"] = json!(tombstones);
+        }
+        snapshot["tombstoneCursor"] = json!(tombstone_cursor_baru);
 
         snapshot["revision"] = json!(max_rev);
         Ok(json!({ "snapshot": snapshot }))
@@ -3745,7 +3971,7 @@ impl TursoClient {
             let result = self
                 .query_one(
                     format!(
-                        "SELECT id_sesi, sumber, update_terakhir, COALESCE(jam_masuk, '') AS jam_masuk, COALESCE(jam_pulang, '') AS jam_pulang, COALESCE(status_kehadiran, '') AS status_kehadiran FROM absensi_harian WHERE id_sesi IN ({placeholders});"
+                        "SELECT id_sesi, sumber, update_terakhir, COALESCE(jam_masuk, '') AS jam_masuk, COALESCE(jam_pulang, '') AS jam_pulang, COALESCE(status_kehadiran, '') AS status_kehadiran FROM absensi_harian WHERE id_sesi IN ({placeholders})\n-- batas: satu baris per id_sesi dalam batch ini, dan push_events menolak batch di atas 50 event. Jumlah placeholder-nya karena itu tidak pernah melebihi 50.\n;"
                     ),
                     guarded_sessions.iter().map(|id| json!(id)).collect(),
                 )
@@ -4182,12 +4408,10 @@ impl TursoClient {
             .get("status")
             .and_then(Value::as_str)
             .unwrap_or("Aktif");
-        let email = normalize_operator_email(
-            draft.get("email").and_then(Value::as_str).unwrap_or(""),
-        );
-        let no_hp = normalize_operator_phone(
-            draft.get("no_hp").and_then(Value::as_str).unwrap_or(""),
-        );
+        let email =
+            normalize_operator_email(draft.get("email").and_then(Value::as_str).unwrap_or(""));
+        let no_hp =
+            normalize_operator_phone(draft.get("no_hp").and_then(Value::as_str).unwrap_or(""));
 
         if kode_operator.is_empty()
             || nama_operator.is_empty()
@@ -4532,8 +4756,7 @@ impl TursoClient {
             return Ok(facts);
         };
         facts.target_exists = true;
-        facts.target_is_superadmin =
-            target.get("is_superadmin").and_then(Value::as_i64) == Some(1);
+        facts.target_is_superadmin = target.get("is_superadmin").and_then(Value::as_i64) == Some(1);
         facts.target_is_active = target.get("status").and_then(Value::as_str) == Some("Aktif");
         let kode = target
             .get("kode_operator")
@@ -5086,6 +5309,71 @@ impl TursoClient {
         Ok(json!({ "sukses": true }))
     }
 
+    /// Baca antrean notifikasi WhatsApp dari CLOUD.
+    ///
+    /// Ini bukan duplikat `wa_notification::list_wa_notifications`, yang membaca
+    /// SQLite LOKAL. Perbedaannya menentukan: `notifikasi_wa` berada di luar
+    /// `SNAPSHOT_TABLES`, sehingga barisnya hanya lahir di perangkat yang
+    /// melakukan pemindaian lalu didorong ke cloud — ia TIDAK pernah ditarik
+    /// kembali. Sebuah perangkat yang bukan terminal pemindai karena itu selalu
+    /// melihat tabel lokal yang kosong, dan kosong itu tidak bisa dibedakan dari
+    /// "tidak ada notifikasi". Layar yang tampak sehat sambil berbohong lebih
+    /// buruk daripada layar yang berkata tidak tersedia.
+    ///
+    /// Query dan jepitan batasnya adalah cerminan `listWaNotifications` di
+    /// `src/lib/services/wa-notification.ts` dan WAJIB tetap sama — bawaan 200,
+    /// maksimum 1000. Batas yang berbeda membuat Web dan aplikasi menampilkan
+    /// potongan antrean yang berlainan untuk filter yang sama.
+    pub async fn list_wa_notifications_cloud(
+        &self,
+        status: Option<&str>,
+        jenis: Option<&str>,
+        id_siswa: Option<&str>,
+        tanggal: Option<&str>,
+        limit: Option<i64>,
+    ) -> Result<Value, CommandError> {
+        self.ensure_schema_current().await?;
+        let mut sql = String::from(
+            r#"
+            SELECT n.id_notifikasi, n.dedupe_key, n.jenis, n.id_siswa,
+                   n.tujuan_nomor, n.isi_pesan, n.status, n.attempt_count,
+                   n.last_error, n.sent_at, n.created_at, n.updated_at,
+                   COALESCE(s.nama_lengkap, m.nama, '') AS nama_siswa,
+                   COALESCE(r.nama_rombel, m.divisi, '') AS nama_rombel
+            FROM notifikasi_wa n
+            LEFT JOIN siswa_data s ON s.id_siswa = n.id_siswa
+            LEFT JOIN akademik_rombel r ON r.id_rombel = s.id_rombel
+            LEFT JOIN master_data m ON m.id_unik = n.id_siswa
+            WHERE 1=1
+            "#,
+        );
+        let mut args: Vec<Value> = Vec::new();
+
+        if let Some(st) = status.filter(|s| !s.trim().is_empty() && *s != "Semua") {
+            sql.push_str(" AND n.status = ?");
+            args.push(json!(st.trim()));
+        }
+        if let Some(jn) = jenis.filter(|j| !j.trim().is_empty() && *j != "Semua") {
+            sql.push_str(" AND n.jenis = ?");
+            args.push(json!(jn.trim()));
+        }
+        if let Some(sid) = id_siswa.filter(|id| !id.trim().is_empty()) {
+            sql.push_str(" AND n.id_siswa = ?");
+            args.push(json!(sid.trim()));
+        }
+        if let Some(tgl) = tanggal.filter(|t| !t.trim().is_empty()) {
+            sql.push_str(" AND n.created_at LIKE ?");
+            args.push(json!(format!("{}%", tgl.trim())));
+        }
+
+        sql.push_str(" ORDER BY n.created_at DESC");
+        let max_rows = limit.unwrap_or(200).clamp(1, 1000);
+        sql.push_str(&format!(" LIMIT {max_rows};"));
+
+        let res = self.query_one(&sql, args).await?;
+        Ok(json!({ "items": res.to_objects() }))
+    }
+
     pub async fn list_counseling_cases(
         &self,
         id_tahun_ajaran: Option<&str>,
@@ -5195,23 +5483,62 @@ impl TursoClient {
         Ok(obj)
     }
 
-    pub async fn create_counseling_case(&self, draft: &Value, actor: &str) -> Result<Value, CommandError> {
+    pub async fn create_counseling_case(
+        &self,
+        draft: &Value,
+        actor: &str,
+    ) -> Result<Value, CommandError> {
         self.ensure_schema_current().await?;
-        let id_siswa = draft.get("id_siswa").and_then(Value::as_str).unwrap_or("").trim();
-        let id_tahun_ajaran = draft.get("id_tahun_ajaran").and_then(Value::as_str).unwrap_or("").trim();
-        let kategori = draft.get("kategori").and_then(Value::as_str).unwrap_or("kedisiplinan").trim();
-        let ringkasan = draft.get("ringkasan").and_then(Value::as_str).unwrap_or("").trim();
-        let kronologi = draft.get("kronologi").and_then(Value::as_str).map(str::trim);
-        let status = draft.get("status").and_then(Value::as_str).unwrap_or("Terbuka").trim();
+        let id_siswa = draft
+            .get("id_siswa")
+            .and_then(Value::as_str)
+            .unwrap_or("")
+            .trim();
+        let id_tahun_ajaran = draft
+            .get("id_tahun_ajaran")
+            .and_then(Value::as_str)
+            .unwrap_or("")
+            .trim();
+        let kategori = draft
+            .get("kategori")
+            .and_then(Value::as_str)
+            .unwrap_or("kedisiplinan")
+            .trim();
+        let ringkasan = draft
+            .get("ringkasan")
+            .and_then(Value::as_str)
+            .unwrap_or("")
+            .trim();
+        let kronologi = draft
+            .get("kronologi")
+            .and_then(Value::as_str)
+            .map(str::trim);
+        let status = draft
+            .get("status")
+            .and_then(Value::as_str)
+            .unwrap_or("Terbuka")
+            .trim();
 
         if id_siswa.is_empty() || id_tahun_ajaran.is_empty() || ringkasan.is_empty() {
-            return Err(CommandError::new("VALIDATION_ERROR", "ID Siswa, Tahun Ajaran, dan Ringkasan kasus wajib diisi."));
+            return Err(CommandError::new(
+                "VALIDATION_ERROR",
+                "ID Siswa, Tahun Ajaran, dan Ringkasan kasus wajib diisi.",
+            ));
         }
-        if !matches!(kategori, "kedisiplinan" | "akademik" | "kehadiran" | "sosial") {
-            return Err(CommandError::new("VALIDATION_ERROR", "Kategori kasus tidak valid."));
+        if !matches!(
+            kategori,
+            "kedisiplinan" | "akademik" | "kehadiran" | "sosial"
+        ) {
+            return Err(CommandError::new(
+                "VALIDATION_ERROR",
+                "Kategori kasus tidak valid.",
+            ));
         }
         if !matches!(status, "Terbuka" | "Dalam Bimbingan" | "Selesai") {
-            return Err(CommandError::new("VALIDATION_ERROR", "Status kasus tidak valid."));
+            return Err(CommandError::new(
+                "VALIDATION_ERROR",
+                "Status kasus tidak valid.",
+            ));
         }
 
         let mut bytes = [0u8; 16];
@@ -5229,30 +5556,51 @@ impl TursoClient {
                 json!(id_tahun_ajaran),
                 json!(kategori),
                 json!(ringkasan),
-                match kronologi { Some(k) if !k.is_empty() => json!(k), _ => json!(null) },
+                match kronologi {
+                    Some(k) if !k.is_empty() => json!(k),
+                    _ => json!(null),
+                },
                 json!(status),
                 json!(actor),
             ],
-        ).await?;
+        )
+        .await?;
 
         Ok(json!({ "sukses": true, "id_kasus": id_kasus }))
     }
 
-    pub async fn update_counseling_case(&self, id_kasus: &str, draft: &Value) -> Result<Value, CommandError> {
+    pub async fn update_counseling_case(
+        &self,
+        id_kasus: &str,
+        draft: &Value,
+    ) -> Result<Value, CommandError> {
         self.ensure_schema_current().await?;
         let mut updates = Vec::new();
         let mut args = Vec::new();
 
         if let Some(kategori) = draft.get("kategori").and_then(Value::as_str).map(str::trim) {
-            if !matches!(kategori, "kedisiplinan" | "akademik" | "kehadiran" | "sosial") {
-                return Err(CommandError::new("VALIDATION_ERROR", "Kategori kasus tidak valid."));
+            if !matches!(
+                kategori,
+                "kedisiplinan" | "akademik" | "kehadiran" | "sosial"
+            ) {
+                return Err(CommandError::new(
+                    "VALIDATION_ERROR",
+                    "Kategori kasus tidak valid.",
+                ));
             }
             updates.push("kategori = ?");
             args.push(json!(kategori));
         }
-        if let Some(ringkasan) = draft.get("ringkasan").and_then(Value::as_str).map(str::trim) {
+        if let Some(ringkasan) = draft
+            .get("ringkasan")
+            .and_then(Value::as_str)
+            .map(str::trim)
+        {
             if ringkasan.is_empty() {
-                return Err(CommandError::new("VALIDATION_ERROR", "Ringkasan tidak boleh kosong."));
+                return Err(CommandError::new(
+                    "VALIDATION_ERROR",
+                    "Ringkasan tidak boleh kosong.",
+                ));
             }
             updates.push("ringkasan = ?");
             args.push(json!(ringkasan));
@@ -5263,7 +5611,10 @@ impl TursoClient {
         }
         if let Some(status) = draft.get("status").and_then(Value::as_str).map(str::trim) {
             if !matches!(status, "Terbuka" | "Dalam Bimbingan" | "Selesai") {
-                return Err(CommandError::new("VALIDATION_ERROR", "Status kasus tidak valid."));
+                return Err(CommandError::new(
+                    "VALIDATION_ERROR",
+                    "Status kasus tidak valid.",
+                ));
             }
             updates.push("status = ?");
             args.push(json!(status));
@@ -5275,7 +5626,10 @@ impl TursoClient {
 
         updates.push("updated_at = datetime('now')");
         args.push(json!(id_kasus));
-        let sql = format!("UPDATE bk_kasus SET {} WHERE id_kasus = ?;", updates.join(", "));
+        let sql = format!(
+            "UPDATE bk_kasus SET {} WHERE id_kasus = ?;",
+            updates.join(", ")
+        );
         self.query_one(&sql, args).await?;
 
         Ok(json!({ "sukses": true }))
@@ -5284,21 +5638,50 @@ impl TursoClient {
     pub async fn delete_counseling_case(&self, id_kasus: &str) -> Result<Value, CommandError> {
         self.ensure_schema_current().await?;
         self.execute_atomic(vec![
-            Statement::new("DELETE FROM bk_sesi WHERE id_kasus = ?;", vec![json!(id_kasus)]),
-            Statement::new("DELETE FROM bk_kasus WHERE id_kasus = ?;", vec![json!(id_kasus)]),
-        ]).await?;
+            Statement::new(
+                "DELETE FROM bk_sesi WHERE id_kasus = ?;",
+                vec![json!(id_kasus)],
+            ),
+            Statement::new(
+                "DELETE FROM bk_kasus WHERE id_kasus = ?;",
+                vec![json!(id_kasus)],
+            ),
+        ])
+        .await?;
         Ok(json!({ "sukses": true }))
     }
 
-    pub async fn add_counseling_session(&self, draft: &Value, counselor: &str) -> Result<Value, CommandError> {
+    pub async fn add_counseling_session(
+        &self,
+        draft: &Value,
+        counselor: &str,
+    ) -> Result<Value, CommandError> {
         self.ensure_schema_current().await?;
-        let id_kasus = draft.get("id_kasus").and_then(Value::as_str).unwrap_or("").trim();
-        let tanggal = draft.get("tanggal").and_then(Value::as_str).unwrap_or("").trim();
-        let catatan = draft.get("catatan_konseling").and_then(Value::as_str).unwrap_or("").trim();
-        let tindak_lanjut = draft.get("tindak_lanjut").and_then(Value::as_str).map(str::trim);
+        let id_kasus = draft
+            .get("id_kasus")
+            .and_then(Value::as_str)
+            .unwrap_or("")
+            .trim();
+        let tanggal = draft
+            .get("tanggal")
+            .and_then(Value::as_str)
+            .unwrap_or("")
+            .trim();
+        let catatan = draft
+            .get("catatan_konseling")
+            .and_then(Value::as_str)
+            .unwrap_or("")
+            .trim();
+        let tindak_lanjut = draft
+            .get("tindak_lanjut")
+            .and_then(Value::as_str)
+            .map(str::trim);
 
         if id_kasus.is_empty() || tanggal.is_empty() || catatan.is_empty() {
-            return Err(CommandError::new("VALIDATION_ERROR", "ID Kasus, tanggal, dan catatan konseling wajib diisi."));
+            return Err(CommandError::new(
+                "VALIDATION_ERROR",
+                "ID Kasus, tanggal, dan catatan konseling wajib diisi.",
+            ));
         }
 
         let mut bytes = [0u8; 16];
@@ -5332,7 +5715,11 @@ impl TursoClient {
 
     pub async fn delete_counseling_session(&self, id_sesi: &str) -> Result<Value, CommandError> {
         self.ensure_schema_current().await?;
-        self.query_one("DELETE FROM bk_sesi WHERE id_sesi = ?;", vec![json!(id_sesi)]).await?;
+        self.query_one(
+            "DELETE FROM bk_sesi WHERE id_sesi = ?;",
+            vec![json!(id_sesi)],
+        )
+        .await?;
         Ok(json!({ "sukses": true }))
     }
 }
@@ -5498,7 +5885,10 @@ async fn insert_payroll_audit_log(
                 json!(row.get("action").and_then(Value::as_str).unwrap_or("")),
                 json!(row.get("old_status").and_then(Value::as_str)),
                 json!(row.get("new_status").and_then(Value::as_str).unwrap_or("")),
-                json!(row.get("performed_by").and_then(Value::as_str).unwrap_or("")),
+                json!(row
+                    .get("performed_by")
+                    .and_then(Value::as_str)
+                    .unwrap_or("")),
                 json!(row.get("notes").and_then(Value::as_str)),
                 json!(row.get("created_at").and_then(Value::as_str).unwrap_or("")),
             ],
@@ -5652,9 +6042,15 @@ fn canonical_sync_route(domain: &str, operation: &str) -> Option<(&'static str, 
         ("academic_class" | "academic-class" | "rombel", "create") => ("academic-class", "create"),
         ("academic_class" | "academic-class" | "rombel", "update") => ("academic-class", "update"),
         ("academic_class" | "academic-class" | "rombel", "delete") => ("academic-class", "delete"),
-        ("academic_subject" | "academic-subject" | "mapel", "create") => ("academic-subject", "create"),
-        ("academic_subject" | "academic-subject" | "mapel", "update") => ("academic-subject", "update"),
-        ("academic_subject" | "academic-subject" | "mapel", "delete") => ("academic-subject", "delete"),
+        ("academic_subject" | "academic-subject" | "mapel", "create") => {
+            ("academic-subject", "create")
+        }
+        ("academic_subject" | "academic-subject" | "mapel", "update") => {
+            ("academic-subject", "update")
+        }
+        ("academic_subject" | "academic-subject" | "mapel", "delete") => {
+            ("academic-subject", "delete")
+        }
         ("academic_assignment" | "academic-assignment" | "guru_mapel" | "guru-mapel", "create") => {
             ("academic-assignment", "create")
         }
@@ -5670,39 +6066,56 @@ fn canonical_sync_route(domain: &str, operation: &str) -> Option<(&'static str, 
         ("student-photo" | "student_photo" | "siswa-foto" | "siswa_foto", "save") => {
             ("student-photo", "save")
         }
-        ("class-attendance" | "class_attendance" | "presensi-mapel" | "presensi_mapel", "create") => {
-            ("class-attendance", "create")
-        }
-        ("class-attendance" | "class_attendance" | "presensi-mapel" | "presensi_mapel", "update") => {
-            ("class-attendance", "update")
-        }
-        ("class-attendance" | "class_attendance" | "presensi-mapel" | "presensi_mapel", "delete") => {
-            ("class-attendance", "delete")
-        }
-        ("class-attendance-detail" | "class_attendance_detail" | "presensi-mapel-detail" | "presensi_mapel_detail", "save") => {
-            ("class-attendance-detail", "save")
-        }
-        ("class-attendance-detail" | "class_attendance_detail" | "presensi-mapel-detail" | "presensi_mapel_detail", "delete") => {
-            ("class-attendance-detail", "delete")
-        }
-        ("teaching-journal" | "teaching_journal" | "jurnal-mengajar" | "jurnal_mengajar", "save" | "create" | "update") => {
-            ("teaching-journal", "save")
-        }
-        ("teaching-journal" | "teaching_journal" | "jurnal-mengajar" | "jurnal_mengajar", "delete") => {
-            ("teaching-journal", "delete")
-        }
-        ("attendance-ledger" | "attendance_ledger" | "leger-kehadiran" | "leger_kehadiran", "freeze" | "save" | "create") => {
-            ("attendance-ledger", "freeze")
-        }
-        ("attendance-ledger" | "attendance_ledger" | "leger-kehadiran" | "leger_kehadiran", "delete") => {
-            ("attendance-ledger", "delete")
-        }
-        ("wa-notification" | "wa_notification" | "notifikasi-wa" | "notifikasi_wa", "queue" | "create" | "save") => {
-            ("wa-notification", "queue")
-        }
-        ("wa-notification" | "wa_notification" | "notifikasi-wa" | "notifikasi_wa", "cancel" | "delete") => {
-            ("wa-notification", "cancel")
-        }
+        (
+            "class-attendance" | "class_attendance" | "presensi-mapel" | "presensi_mapel",
+            "create",
+        ) => ("class-attendance", "create"),
+        (
+            "class-attendance" | "class_attendance" | "presensi-mapel" | "presensi_mapel",
+            "update",
+        ) => ("class-attendance", "update"),
+        (
+            "class-attendance" | "class_attendance" | "presensi-mapel" | "presensi_mapel",
+            "delete",
+        ) => ("class-attendance", "delete"),
+        (
+            "class-attendance-detail"
+            | "class_attendance_detail"
+            | "presensi-mapel-detail"
+            | "presensi_mapel_detail",
+            "save",
+        ) => ("class-attendance-detail", "save"),
+        (
+            "class-attendance-detail"
+            | "class_attendance_detail"
+            | "presensi-mapel-detail"
+            | "presensi_mapel_detail",
+            "delete",
+        ) => ("class-attendance-detail", "delete"),
+        (
+            "teaching-journal" | "teaching_journal" | "jurnal-mengajar" | "jurnal_mengajar",
+            "save" | "create" | "update",
+        ) => ("teaching-journal", "save"),
+        (
+            "teaching-journal" | "teaching_journal" | "jurnal-mengajar" | "jurnal_mengajar",
+            "delete",
+        ) => ("teaching-journal", "delete"),
+        (
+            "attendance-ledger" | "attendance_ledger" | "leger-kehadiran" | "leger_kehadiran",
+            "freeze" | "save" | "create",
+        ) => ("attendance-ledger", "freeze"),
+        (
+            "attendance-ledger" | "attendance_ledger" | "leger-kehadiran" | "leger_kehadiran",
+            "delete",
+        ) => ("attendance-ledger", "delete"),
+        (
+            "wa-notification" | "wa_notification" | "notifikasi-wa" | "notifikasi_wa",
+            "queue" | "create" | "save",
+        ) => ("wa-notification", "queue"),
+        (
+            "wa-notification" | "wa_notification" | "notifikasi-wa" | "notifikasi_wa",
+            "cancel" | "delete",
+        ) => ("wa-notification", "cancel"),
         _ => return None,
     };
     sync::is_canonical_sync_route(route.0, route.1).then_some(route)
@@ -5885,7 +6298,10 @@ async fn apply_event_to_turso(
                                 .and_then(Value::as_str)
                                 .unwrap_or("Aktif")),
                             json!(row.get("catatan").and_then(Value::as_str)),
-                            json!(row.get("jenis_personil").and_then(Value::as_str).unwrap_or("Pegawai")),
+                            json!(row
+                                .get("jenis_personil")
+                                .and_then(Value::as_str)
+                                .unwrap_or("Pegawai")),
                             json!(row.get("tanggal_mulai_aktif").and_then(Value::as_str)),
                             json!(row.get("tanggal_selesai_aktif").and_then(Value::as_str)),
                         ],
@@ -6208,7 +6624,13 @@ async fn apply_event_to_turso(
                             .unwrap_or(120)),
                         json!(row
                             .get("izinkan_multi_sesi")
-                            .map(|v| if v.as_bool().unwrap_or(false) || v.as_i64().unwrap_or(0) == 1 { 1 } else { 0 })
+                            .map(|v| {
+                                if v.as_bool().unwrap_or(false) || v.as_i64().unwrap_or(0) == 1 {
+                                    1
+                                } else {
+                                    0
+                                }
+                            })
                             .unwrap_or(0)),
                         json!(row
                             .get("shift_lanjutan_id")
@@ -6368,9 +6790,8 @@ async fn apply_event_to_turso(
                     .and_then(Value::as_str)
                     .unwrap_or("");
                 if !id_foto.is_empty() && !foto_base64.is_empty() {
-                    let text = |key: &str| {
-                        json!(photo.get(key).and_then(Value::as_str).unwrap_or(""))
-                    };
+                    let text =
+                        |key: &str| json!(photo.get(key).and_then(Value::as_str).unwrap_or(""));
                     turso
                         .query_one(
                             r#"INSERT INTO absensi_foto (
@@ -6963,7 +7384,11 @@ async fn apply_event_to_turso(
                 .and_then(Value::as_str)
                 .filter(|id| !id.is_empty())
                 .unwrap_or(entity_key);
-            let id = if id.is_empty() { "default_template" } else { id };
+            let id = if id.is_empty() {
+                "default_template"
+            } else {
+                id
+            };
             let elements_raw = row.get("elements_json").or_else(|| row.get("elements"));
             let mut current = match elements_raw {
                 Some(Value::String(text)) => {
@@ -7010,7 +7435,9 @@ async fn apply_event_to_turso(
                 .map(|v| {
                     if v.as_bool().unwrap_or(false)
                         || v.as_i64().unwrap_or(0) == 1
-                        || v.as_str().map(|s| s == "1" || s.eq_ignore_ascii_case("true")).unwrap_or(false)
+                        || v.as_str()
+                            .map(|s| s == "1" || s.eq_ignore_ascii_case("true"))
+                            .unwrap_or(false)
                     {
                         1
                     } else {
@@ -7090,7 +7517,10 @@ async fn apply_event_to_turso(
                         vec![
                             json!(id),
                             json!(row.get("id_karyawan").and_then(Value::as_str).unwrap_or("")),
-                            json!(row.get("rate_per_hour").and_then(Value::as_i64).unwrap_or(0)),
+                            json!(row
+                                .get("rate_per_hour")
+                                .and_then(Value::as_i64)
+                                .unwrap_or(0)),
                             json!(row
                                 .get("ptkp_status")
                                 .and_then(Value::as_str)
@@ -7289,7 +7719,10 @@ async fn apply_event_to_turso(
                             .get("idempotency_key")
                             .and_then(Value::as_str)
                             .unwrap_or("")),
-                        json!(run.get("period_start").and_then(Value::as_str).unwrap_or("")),
+                        json!(run
+                            .get("period_start")
+                            .and_then(Value::as_str)
+                            .unwrap_or("")),
                         json!(run.get("period_end").and_then(Value::as_str).unwrap_or("")),
                         json!(run.get("status").and_then(Value::as_str).unwrap_or("DRAFT")),
                         json!(run
@@ -7333,7 +7766,10 @@ async fn apply_event_to_turso(
                             vec![
                                 json!(item_id),
                                 json!(run_id),
-                                json!(item.get("id_karyawan").and_then(Value::as_str).unwrap_or("")),
+                                json!(item
+                                    .get("id_karyawan")
+                                    .and_then(Value::as_str)
+                                    .unwrap_or("")),
                                 json!(item
                                     .get("nama_karyawan")
                                     .and_then(Value::as_str)
@@ -7355,13 +7791,22 @@ async fn apply_event_to_turso(
                                     .get("total_overtime_index")
                                     .and_then(Value::as_f64)
                                     .unwrap_or(0.0)),
-                                json!(item.get("rate_per_hour").and_then(Value::as_i64).unwrap_or(0)),
-                                json!(item.get("basic_salary").and_then(Value::as_i64).unwrap_or(0)),
+                                json!(item
+                                    .get("rate_per_hour")
+                                    .and_then(Value::as_i64)
+                                    .unwrap_or(0)),
+                                json!(item
+                                    .get("basic_salary")
+                                    .and_then(Value::as_i64)
+                                    .unwrap_or(0)),
                                 json!(item
                                     .get("overtime_salary")
                                     .and_then(Value::as_i64)
                                     .unwrap_or(0)),
-                                json!(item.get("gross_salary").and_then(Value::as_i64).unwrap_or(0)),
+                                json!(item
+                                    .get("gross_salary")
+                                    .and_then(Value::as_i64)
+                                    .unwrap_or(0)),
                                 json!(item
                                     .get("total_allowances")
                                     .and_then(Value::as_i64)
@@ -7378,7 +7823,10 @@ async fn apply_event_to_turso(
                                     .get("bpjs_company_total")
                                     .and_then(Value::as_i64)
                                     .unwrap_or(0)),
-                                json!(item.get("pph21_amount").and_then(Value::as_i64).unwrap_or(0)),
+                                json!(item
+                                    .get("pph21_amount")
+                                    .and_then(Value::as_i64)
+                                    .unwrap_or(0)),
                                 json!(item.get("net_salary").and_then(Value::as_i64).unwrap_or(0)),
                                 json!(item
                                     .get("breakdown_snapshot")
@@ -7398,7 +7846,10 @@ async fn apply_event_to_turso(
         ("payroll", "transition-status") => {
             let run_id = payload.get("id").and_then(Value::as_str).unwrap_or("");
             let status = payload.get("status").and_then(Value::as_str).unwrap_or("");
-            let updated_at = payload.get("updated_at").and_then(Value::as_str).unwrap_or("");
+            let updated_at = payload
+                .get("updated_at")
+                .and_then(Value::as_str)
+                .unwrap_or("");
             if !run_id.is_empty() && !status.is_empty() {
                 turso
                     .query_one(
@@ -7412,13 +7863,29 @@ async fn apply_event_to_turso(
             }
         }
         ("academic-year", "create" | "update") => {
-            let row = payload.get("academic_year").or_else(|| payload.get("akademikTahunAjaran")).unwrap_or(payload);
-            let id = row.get("id_tahun_ajaran").and_then(Value::as_str).filter(|v| !v.is_empty()).unwrap_or(entity_key);
+            let row = payload
+                .get("academic_year")
+                .or_else(|| payload.get("akademikTahunAjaran"))
+                .unwrap_or(payload);
+            let id = row
+                .get("id_tahun_ajaran")
+                .and_then(Value::as_str)
+                .filter(|v| !v.is_empty())
+                .unwrap_or(entity_key);
             if !id.is_empty() {
                 let nama = row.get("nama_tahun").and_then(Value::as_str).unwrap_or("");
-                let semester = row.get("semester").and_then(Value::as_str).unwrap_or("Ganjil");
-                let tgl_mulai = row.get("tanggal_mulai").and_then(Value::as_str).unwrap_or("");
-                let tgl_selesai = row.get("tanggal_selesai").and_then(Value::as_str).unwrap_or("");
+                let semester = row
+                    .get("semester")
+                    .and_then(Value::as_str)
+                    .unwrap_or("Ganjil");
+                let tgl_mulai = row
+                    .get("tanggal_mulai")
+                    .and_then(Value::as_str)
+                    .unwrap_or("");
+                let tgl_selesai = row
+                    .get("tanggal_selesai")
+                    .and_then(Value::as_str)
+                    .unwrap_or("");
                 let is_aktif = row.get("is_aktif").and_then(Value::as_i64).unwrap_or(0);
                 let created_at = row.get("created_at").and_then(Value::as_str).unwrap_or("");
                 let updated_at = row.get("updated_at").and_then(Value::as_str).unwrap_or("");
@@ -7458,25 +7925,45 @@ async fn apply_event_to_turso(
             }
         }
         ("academic-year", "delete") => {
-            let id = payload.get("id_tahun_ajaran").and_then(Value::as_str).filter(|v| !v.is_empty()).unwrap_or(entity_key);
+            let id = payload
+                .get("id_tahun_ajaran")
+                .and_then(Value::as_str)
+                .filter(|v| !v.is_empty())
+                .unwrap_or(entity_key);
             if !id.is_empty() {
-                turso.query_one(
-                    "DELETE FROM akademik_tahun_ajaran WHERE id_tahun_ajaran = ?;",
-                    vec![json!(id)],
-                ).await?;
+                turso
+                    .query_one(
+                        "DELETE FROM akademik_tahun_ajaran WHERE id_tahun_ajaran = ?;",
+                        vec![json!(id)],
+                    )
+                    .await?;
             }
         }
         ("academic-department", "create" | "update") => {
-            let row = payload.get("academic_department").or_else(|| payload.get("akademikJurusan")).unwrap_or(payload);
-            let id = row.get("id_jurusan").and_then(Value::as_str).filter(|v| !v.is_empty()).unwrap_or(entity_key);
+            let row = payload
+                .get("academic_department")
+                .or_else(|| payload.get("akademikJurusan"))
+                .unwrap_or(payload);
+            let id = row
+                .get("id_jurusan")
+                .and_then(Value::as_str)
+                .filter(|v| !v.is_empty())
+                .unwrap_or(entity_key);
             if !id.is_empty() {
-                let kode = row.get("kode_jurusan").and_then(Value::as_str).unwrap_or("");
-                let nama = row.get("nama_jurusan").and_then(Value::as_str).unwrap_or("");
+                let kode = row
+                    .get("kode_jurusan")
+                    .and_then(Value::as_str)
+                    .unwrap_or("");
+                let nama = row
+                    .get("nama_jurusan")
+                    .and_then(Value::as_str)
+                    .unwrap_or("");
                 let deskripsi = row.get("deskripsi").and_then(Value::as_str);
                 let is_aktif = row.get("is_aktif").and_then(Value::as_i64).unwrap_or(1);
 
-                turso.query_one(
-                    r#"INSERT INTO akademik_jurusan (
+                turso
+                    .query_one(
+                        r#"INSERT INTO akademik_jurusan (
                         id_jurusan, kode_jurusan, nama_jurusan, deskripsi, is_aktif
                     ) VALUES (?, ?, ?, ?, ?)
                     ON CONFLICT(id_jurusan) DO UPDATE SET
@@ -7484,24 +7971,47 @@ async fn apply_event_to_turso(
                         nama_jurusan = excluded.nama_jurusan,
                         deskripsi = excluded.deskripsi,
                         is_aktif = excluded.is_aktif;"#,
-                    vec![json!(id), json!(kode), json!(nama), json!(deskripsi), json!(is_aktif)],
-                ).await?;
+                        vec![
+                            json!(id),
+                            json!(kode),
+                            json!(nama),
+                            json!(deskripsi),
+                            json!(is_aktif),
+                        ],
+                    )
+                    .await?;
             }
         }
         ("academic-department", "delete") => {
-            let id = payload.get("id_jurusan").and_then(Value::as_str).filter(|v| !v.is_empty()).unwrap_or(entity_key);
+            let id = payload
+                .get("id_jurusan")
+                .and_then(Value::as_str)
+                .filter(|v| !v.is_empty())
+                .unwrap_or(entity_key);
             if !id.is_empty() {
-                turso.query_one(
-                    "DELETE FROM akademik_jurusan WHERE id_jurusan = ?;",
-                    vec![json!(id)],
-                ).await?;
+                turso
+                    .query_one(
+                        "DELETE FROM akademik_jurusan WHERE id_jurusan = ?;",
+                        vec![json!(id)],
+                    )
+                    .await?;
             }
         }
         ("academic-class", "create" | "update") => {
-            let row = payload.get("academic_class").or_else(|| payload.get("akademikRombel")).unwrap_or(payload);
-            let id = row.get("id_rombel").and_then(Value::as_str).filter(|v| !v.is_empty()).unwrap_or(entity_key);
+            let row = payload
+                .get("academic_class")
+                .or_else(|| payload.get("akademikRombel"))
+                .unwrap_or(payload);
+            let id = row
+                .get("id_rombel")
+                .and_then(Value::as_str)
+                .filter(|v| !v.is_empty())
+                .unwrap_or(entity_key);
             if !id.is_empty() {
-                let id_ta = row.get("id_tahun_ajaran").and_then(Value::as_str).unwrap_or("");
+                let id_ta = row
+                    .get("id_tahun_ajaran")
+                    .and_then(Value::as_str)
+                    .unwrap_or("");
                 let tingkat = row.get("tingkat").and_then(Value::as_i64).unwrap_or(10);
                 let id_jurusan = row.get("id_jurusan").and_then(Value::as_str);
                 let nama = row.get("nama_rombel").and_then(Value::as_str).unwrap_or("");
@@ -7531,22 +8041,38 @@ async fn apply_event_to_turso(
             }
         }
         ("academic-class", "delete") => {
-            let id = payload.get("id_rombel").and_then(Value::as_str).filter(|v| !v.is_empty()).unwrap_or(entity_key);
+            let id = payload
+                .get("id_rombel")
+                .and_then(Value::as_str)
+                .filter(|v| !v.is_empty())
+                .unwrap_or(entity_key);
             if !id.is_empty() {
-                turso.query_one(
-                    "DELETE FROM akademik_rombel WHERE id_rombel = ?;",
-                    vec![json!(id)],
-                ).await?;
+                turso
+                    .query_one(
+                        "DELETE FROM akademik_rombel WHERE id_rombel = ?;",
+                        vec![json!(id)],
+                    )
+                    .await?;
             }
         }
         ("academic-subject", "create" | "update") => {
-            let row = payload.get("academic_subject").or_else(|| payload.get("akademikMapel")).unwrap_or(payload);
-            let id = row.get("id_mapel").and_then(Value::as_str).filter(|v| !v.is_empty()).unwrap_or(entity_key);
+            let row = payload
+                .get("academic_subject")
+                .or_else(|| payload.get("akademikMapel"))
+                .unwrap_or(payload);
+            let id = row
+                .get("id_mapel")
+                .and_then(Value::as_str)
+                .filter(|v| !v.is_empty())
+                .unwrap_or(entity_key);
             if !id.is_empty() {
                 let kode = row.get("kode_mapel").and_then(Value::as_str).unwrap_or("");
                 let nama = row.get("nama_mapel").and_then(Value::as_str).unwrap_or("");
                 let tingkat = row.get("tingkat").and_then(Value::as_i64);
-                let kelompok = row.get("kelompok").and_then(Value::as_str).unwrap_or("Wajib");
+                let kelompok = row
+                    .get("kelompok")
+                    .and_then(Value::as_str)
+                    .unwrap_or("Wajib");
                 let beban = row.get("beban_jam").and_then(Value::as_i64).unwrap_or(2);
                 let kkm = row.get("kkm").and_then(Value::as_i64).unwrap_or(75);
                 let is_aktif = row.get("is_aktif").and_then(Value::as_i64).unwrap_or(1);
@@ -7571,25 +8097,42 @@ async fn apply_event_to_turso(
             }
         }
         ("academic-subject", "delete") => {
-            let id = payload.get("id_mapel").and_then(Value::as_str).filter(|v| !v.is_empty()).unwrap_or(entity_key);
+            let id = payload
+                .get("id_mapel")
+                .and_then(Value::as_str)
+                .filter(|v| !v.is_empty())
+                .unwrap_or(entity_key);
             if !id.is_empty() {
-                turso.query_one(
-                    "DELETE FROM akademik_mapel WHERE id_mapel = ?;",
-                    vec![json!(id)],
-                ).await?;
+                turso
+                    .query_one(
+                        "DELETE FROM akademik_mapel WHERE id_mapel = ?;",
+                        vec![json!(id)],
+                    )
+                    .await?;
             }
         }
         ("academic-assignment", "create") => {
-            let row = payload.get("academic_assignment").or_else(|| payload.get("akademikGuruMapel")).unwrap_or(payload);
-            let id = row.get("id_penugasan").and_then(Value::as_str).filter(|v| !v.is_empty()).unwrap_or(entity_key);
+            let row = payload
+                .get("academic_assignment")
+                .or_else(|| payload.get("akademikGuruMapel"))
+                .unwrap_or(payload);
+            let id = row
+                .get("id_penugasan")
+                .and_then(Value::as_str)
+                .filter(|v| !v.is_empty())
+                .unwrap_or(entity_key);
             if !id.is_empty() {
-                let id_ta = row.get("id_tahun_ajaran").and_then(Value::as_str).unwrap_or("");
+                let id_ta = row
+                    .get("id_tahun_ajaran")
+                    .and_then(Value::as_str)
+                    .unwrap_or("");
                 let id_rombel = row.get("id_rombel").and_then(Value::as_str).unwrap_or("");
                 let id_mapel = row.get("id_mapel").and_then(Value::as_str).unwrap_or("");
                 let id_guru = row.get("id_guru").and_then(Value::as_str).unwrap_or("");
 
-                turso.query_one(
-                    r#"INSERT INTO akademik_guru_mapel (
+                turso
+                    .query_one(
+                        r#"INSERT INTO akademik_guru_mapel (
                         id_penugasan, id_tahun_ajaran, id_rombel, id_mapel, id_guru
                     ) VALUES (?, ?, ?, ?, ?)
                     ON CONFLICT(id_penugasan) DO UPDATE SET
@@ -7597,28 +8140,51 @@ async fn apply_event_to_turso(
                         id_rombel = excluded.id_rombel,
                         id_mapel = excluded.id_mapel,
                         id_guru = excluded.id_guru;"#,
-                    vec![json!(id), json!(id_ta), json!(id_rombel), json!(id_mapel), json!(id_guru)],
-                ).await?;
+                        vec![
+                            json!(id),
+                            json!(id_ta),
+                            json!(id_rombel),
+                            json!(id_mapel),
+                            json!(id_guru),
+                        ],
+                    )
+                    .await?;
             }
         }
         ("academic-assignment", "delete") => {
-            let id = payload.get("id_penugasan").and_then(Value::as_str).filter(|v| !v.is_empty()).unwrap_or(entity_key);
+            let id = payload
+                .get("id_penugasan")
+                .and_then(Value::as_str)
+                .filter(|v| !v.is_empty())
+                .unwrap_or(entity_key);
             if !id.is_empty() {
-                turso.query_one(
-                    "DELETE FROM akademik_guru_mapel WHERE id_penugasan = ?;",
-                    vec![json!(id)],
-                ).await?;
+                turso
+                    .query_one(
+                        "DELETE FROM akademik_guru_mapel WHERE id_penugasan = ?;",
+                        vec![json!(id)],
+                    )
+                    .await?;
             }
         }
         ("teacher", "create" | "update") => {
-            let row = payload.get("teacher").or_else(|| payload.get("guruData")).unwrap_or(payload);
-            let id = row.get("id_guru").and_then(Value::as_str).filter(|v| !v.is_empty()).unwrap_or(entity_key);
+            let row = payload
+                .get("teacher")
+                .or_else(|| payload.get("guruData"))
+                .unwrap_or(payload);
+            let id = row
+                .get("id_guru")
+                .and_then(Value::as_str)
+                .filter(|v| !v.is_empty())
+                .unwrap_or(entity_key);
             if !id.is_empty() {
                 let nip = row.get("nip").and_then(Value::as_str);
                 let nuptk = row.get("nuptk").and_then(Value::as_str);
                 let gelar = row.get("gelar").and_then(Value::as_str);
                 let spesialisasi = row.get("spesialisasi_mapel").and_then(Value::as_str);
-                let status_peg = row.get("status_kepegawaian").and_then(Value::as_str).unwrap_or("Honorer");
+                let status_peg = row
+                    .get("status_kepegawaian")
+                    .and_then(Value::as_str)
+                    .unwrap_or("Honorer");
                 let created_at = row.get("created_at").and_then(Value::as_str).unwrap_or("");
                 let updated_at = row.get("updated_at").and_then(Value::as_str).unwrap_or("");
 
@@ -7649,21 +8215,34 @@ async fn apply_event_to_turso(
             }
         }
         ("teacher", "delete") => {
-            let id = payload.get("id_guru").and_then(Value::as_str).filter(|v| !v.is_empty()).unwrap_or(entity_key);
+            let id = payload
+                .get("id_guru")
+                .and_then(Value::as_str)
+                .filter(|v| !v.is_empty())
+                .unwrap_or(entity_key);
             if !id.is_empty() {
-                turso.query_one(
-                    "DELETE FROM guru_data WHERE id_guru = ?;",
-                    vec![json!(id)],
-                ).await?;
+                turso
+                    .query_one("DELETE FROM guru_data WHERE id_guru = ?;", vec![json!(id)])
+                    .await?;
             }
         }
         ("student", "create" | "update") => {
-            let row = payload.get("student").or_else(|| payload.get("siswaData")).unwrap_or(payload);
-            let id = row.get("id_siswa").and_then(Value::as_str).filter(|v| !v.is_empty()).unwrap_or(entity_key);
+            let row = payload
+                .get("student")
+                .or_else(|| payload.get("siswaData"))
+                .unwrap_or(payload);
+            let id = row
+                .get("id_siswa")
+                .and_then(Value::as_str)
+                .filter(|v| !v.is_empty())
+                .unwrap_or(entity_key);
             if !id.is_empty() {
                 let nis = row.get("nis").and_then(Value::as_str);
                 let nisn = row.get("nisn").and_then(Value::as_str);
-                let nama = row.get("nama_lengkap").and_then(Value::as_str).unwrap_or("");
+                let nama = row
+                    .get("nama_lengkap")
+                    .and_then(Value::as_str)
+                    .unwrap_or("");
                 let jk = row.get("jenis_kelamin").and_then(Value::as_str);
                 let id_rombel = row.get("id_rombel").and_then(Value::as_str).unwrap_or("");
                 let nama_wali = row.get("nama_wali").and_then(Value::as_str);
@@ -7674,8 +8253,9 @@ async fn apply_event_to_turso(
                 let created_at = row.get("created_at").and_then(Value::as_str).unwrap_or("");
                 let updated_at = row.get("updated_at").and_then(Value::as_str).unwrap_or("");
 
-                turso.query_one(
-                    r#"INSERT INTO siswa_data (
+                turso
+                    .query_one(
+                        r#"INSERT INTO siswa_data (
                         id_siswa, nis, nisn, nama_lengkap, jenis_kelamin, id_rombel, nama_wali,
                         no_whatsapp_wali, alamat, angkatan, status, created_at, updated_at
                     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -7691,24 +8271,41 @@ async fn apply_event_to_turso(
                         angkatan = excluded.angkatan,
                         status = excluded.status,
                         updated_at = excluded.updated_at;"#,
-                    vec![
-                        json!(id), json!(nis), json!(nisn), json!(nama), json!(jk),
-                        json!(id_rombel), json!(nama_wali), json!(wa_wali), json!(alamat),
-                        json!(angkatan), json!(status), json!(created_at), json!(updated_at)
-                    ],
-                ).await?;
+                        vec![
+                            json!(id),
+                            json!(nis),
+                            json!(nisn),
+                            json!(nama),
+                            json!(jk),
+                            json!(id_rombel),
+                            json!(nama_wali),
+                            json!(wa_wali),
+                            json!(alamat),
+                            json!(angkatan),
+                            json!(status),
+                            json!(created_at),
+                            json!(updated_at),
+                        ],
+                    )
+                    .await?;
 
                 // Sama seperti pada guru: baris `master_data` siswa diurus rute
                 // `employee/update` + `employee/token`, bukan ditulis di sini.
             }
         }
         ("student", "delete") => {
-            let id = payload.get("id_siswa").and_then(Value::as_str).filter(|v| !v.is_empty()).unwrap_or(entity_key);
+            let id = payload
+                .get("id_siswa")
+                .and_then(Value::as_str)
+                .filter(|v| !v.is_empty())
+                .unwrap_or(entity_key);
             if !id.is_empty() {
-                turso.query_one(
-                    "DELETE FROM siswa_data WHERE id_siswa = ?;",
-                    vec![json!(id)],
-                ).await?;
+                turso
+                    .query_one(
+                        "DELETE FROM siswa_data WHERE id_siswa = ?;",
+                        vec![json!(id)],
+                    )
+                    .await?;
             }
         }
         // Foto profil siswa. `siswa_foto` sengaja DI LUAR `SNAPSHOT_TABLES` —
@@ -7732,10 +8329,7 @@ async fn apply_event_to_turso(
                     .and_then(Value::as_str)
                     .filter(|v| !v.is_empty())
                     .unwrap_or("image/jpeg");
-                let updated_at = row
-                    .get("updated_at")
-                    .and_then(Value::as_str)
-                    .unwrap_or("");
+                let updated_at = row.get("updated_at").and_then(Value::as_str).unwrap_or("");
                 turso
                     .query_one(
                         r#"INSERT INTO siswa_foto (id_siswa, foto_mime, foto_base64, updated_at)
@@ -7750,10 +8344,20 @@ async fn apply_event_to_turso(
             }
         }
         ("class-attendance", "create" | "update") => {
-            let row = payload.get("class_attendance").or_else(|| payload.get("presensiMapel")).unwrap_or(payload);
-            let id = row.get("id_presensi_mapel").and_then(Value::as_str).filter(|v| !v.is_empty()).unwrap_or(entity_key);
+            let row = payload
+                .get("class_attendance")
+                .or_else(|| payload.get("presensiMapel"))
+                .unwrap_or(payload);
+            let id = row
+                .get("id_presensi_mapel")
+                .and_then(Value::as_str)
+                .filter(|v| !v.is_empty())
+                .unwrap_or(entity_key);
             if !id.is_empty() {
-                let id_ta = row.get("id_tahun_ajaran").and_then(Value::as_str).unwrap_or("");
+                let id_ta = row
+                    .get("id_tahun_ajaran")
+                    .and_then(Value::as_str)
+                    .unwrap_or("");
                 let id_rombel = row.get("id_rombel").and_then(Value::as_str).unwrap_or("");
                 let id_mapel = row.get("id_mapel").and_then(Value::as_str).unwrap_or("");
                 let id_guru = row.get("id_guru").and_then(Value::as_str).unwrap_or("");
@@ -7765,12 +8369,16 @@ async fn apply_event_to_turso(
                 let total_izin = row.get("total_izin").and_then(Value::as_i64).unwrap_or(0);
                 let total_sakit = row.get("total_sakit").and_then(Value::as_i64).unwrap_or(0);
                 let total_alfa = row.get("total_alfa").and_then(Value::as_i64).unwrap_or(0);
-                let total_dispensasi = row.get("total_dispensasi").and_then(Value::as_i64).unwrap_or(0);
+                let total_dispensasi = row
+                    .get("total_dispensasi")
+                    .and_then(Value::as_i64)
+                    .unwrap_or(0);
                 let created_at = row.get("created_at").and_then(Value::as_str).unwrap_or("");
                 let updated_at = row.get("updated_at").and_then(Value::as_str).unwrap_or("");
 
-                turso.query_one(
-                    r#"INSERT INTO presensi_mapel (
+                turso
+                    .query_one(
+                        r#"INSERT INTO presensi_mapel (
                         id_presensi_mapel, id_tahun_ajaran, id_rombel, id_mapel, id_guru,
                         tanggal, jam_ke, materi_pokok, catatan, total_hadir, total_izin,
                         total_sakit, total_alfa, total_dispensasi, created_at, updated_at
@@ -7790,33 +8398,64 @@ async fn apply_event_to_turso(
                         total_alfa = excluded.total_alfa,
                         total_dispensasi = excluded.total_dispensasi,
                         updated_at = excluded.updated_at;"#,
-                    vec![
-                        json!(id), json!(id_ta), json!(id_rombel), json!(id_mapel), json!(id_guru),
-                        json!(tanggal), json!(jam_ke), json!(materi), json!(catatan),
-                        json!(total_hadir), json!(total_izin), json!(total_sakit), json!(total_alfa),
-                        json!(total_dispensasi), json!(created_at), json!(updated_at)
-                    ],
-                ).await?;
+                        vec![
+                            json!(id),
+                            json!(id_ta),
+                            json!(id_rombel),
+                            json!(id_mapel),
+                            json!(id_guru),
+                            json!(tanggal),
+                            json!(jam_ke),
+                            json!(materi),
+                            json!(catatan),
+                            json!(total_hadir),
+                            json!(total_izin),
+                            json!(total_sakit),
+                            json!(total_alfa),
+                            json!(total_dispensasi),
+                            json!(created_at),
+                            json!(updated_at),
+                        ],
+                    )
+                    .await?;
             }
         }
         ("class-attendance", "delete") => {
-            let id = payload.get("id_presensi_mapel").and_then(Value::as_str).filter(|v| !v.is_empty()).unwrap_or(entity_key);
+            let id = payload
+                .get("id_presensi_mapel")
+                .and_then(Value::as_str)
+                .filter(|v| !v.is_empty())
+                .unwrap_or(entity_key);
             if !id.is_empty() {
-                turso.query_one(
-                    "DELETE FROM presensi_mapel_detail WHERE id_presensi_mapel = ?;",
-                    vec![json!(id)],
-                ).await?;
-                turso.query_one(
-                    "DELETE FROM presensi_mapel WHERE id_presensi_mapel = ?;",
-                    vec![json!(id)],
-                ).await?;
+                turso
+                    .query_one(
+                        "DELETE FROM presensi_mapel_detail WHERE id_presensi_mapel = ?;",
+                        vec![json!(id)],
+                    )
+                    .await?;
+                turso
+                    .query_one(
+                        "DELETE FROM presensi_mapel WHERE id_presensi_mapel = ?;",
+                        vec![json!(id)],
+                    )
+                    .await?;
             }
         }
         ("class-attendance-detail", "save") => {
-            let row = payload.get("class_attendance_detail").or_else(|| payload.get("presensiMapelDetail")).unwrap_or(payload);
-            let id = row.get("id_detail").and_then(Value::as_str).filter(|v| !v.is_empty()).unwrap_or(entity_key);
+            let row = payload
+                .get("class_attendance_detail")
+                .or_else(|| payload.get("presensiMapelDetail"))
+                .unwrap_or(payload);
+            let id = row
+                .get("id_detail")
+                .and_then(Value::as_str)
+                .filter(|v| !v.is_empty())
+                .unwrap_or(entity_key);
             if !id.is_empty() {
-                let id_presensi = row.get("id_presensi_mapel").and_then(Value::as_str).unwrap_or("");
+                let id_presensi = row
+                    .get("id_presensi_mapel")
+                    .and_then(Value::as_str)
+                    .unwrap_or("");
                 let id_siswa = row.get("id_siswa").and_then(Value::as_str).unwrap_or("");
                 let status = row.get("status").and_then(Value::as_str).unwrap_or("Hadir");
                 let catatan = row.get("catatan").and_then(Value::as_str);
@@ -7858,10 +8497,20 @@ async fn apply_event_to_turso(
             }
         }
         ("teaching-journal", "save") => {
-            let row = payload.get("teaching_journal").or_else(|| payload.get("jurnalMengajar")).unwrap_or(payload);
-            let id = row.get("id_jurnal").and_then(Value::as_str).filter(|v| !v.is_empty()).unwrap_or(entity_key);
+            let row = payload
+                .get("teaching_journal")
+                .or_else(|| payload.get("jurnalMengajar"))
+                .unwrap_or(payload);
+            let id = row
+                .get("id_jurnal")
+                .and_then(Value::as_str)
+                .filter(|v| !v.is_empty())
+                .unwrap_or(entity_key);
             if !id.is_empty() {
-                let id_presensi = row.get("id_presensi_mapel").and_then(Value::as_str).unwrap_or("");
+                let id_presensi = row
+                    .get("id_presensi_mapel")
+                    .and_then(Value::as_str)
+                    .unwrap_or("");
                 let materi = row.get("materi_disampaikan").and_then(Value::as_str);
                 let kendala = row.get("kendala").and_then(Value::as_str);
                 let tindak_lanjut = row.get("tindak_lanjut").and_then(Value::as_str);
@@ -7871,8 +8520,9 @@ async fn apply_event_to_turso(
                 let created_at = row.get("created_at").and_then(Value::as_str).unwrap_or("");
                 let updated_at = row.get("updated_at").and_then(Value::as_str).unwrap_or("");
 
-                turso.query_one(
-                    r#"INSERT INTO jurnal_mengajar (
+                turso
+                    .query_one(
+                        r#"INSERT INTO jurnal_mengajar (
                         id_jurnal, id_presensi_mapel, materi_disampaikan, kendala, tindak_lanjut,
                         paraf_nama, paraf_operator, paraf_at, created_at, updated_at
                     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -7885,45 +8535,85 @@ async fn apply_event_to_turso(
                         paraf_operator = excluded.paraf_operator,
                         paraf_at = excluded.paraf_at,
                         updated_at = excluded.updated_at;"#,
-                    vec![
-                        json!(id), json!(id_presensi), json!(materi), json!(kendala),
-                        json!(tindak_lanjut), json!(paraf_nama), json!(paraf_operator),
-                        json!(paraf_at), json!(created_at), json!(updated_at)
-                    ],
-                ).await?;
+                        vec![
+                            json!(id),
+                            json!(id_presensi),
+                            json!(materi),
+                            json!(kendala),
+                            json!(tindak_lanjut),
+                            json!(paraf_nama),
+                            json!(paraf_operator),
+                            json!(paraf_at),
+                            json!(created_at),
+                            json!(updated_at),
+                        ],
+                    )
+                    .await?;
             }
         }
         ("teaching-journal", "delete") => {
-            let id = payload.get("id_jurnal").and_then(Value::as_str).filter(|v| !v.is_empty()).unwrap_or(entity_key);
+            let id = payload
+                .get("id_jurnal")
+                .and_then(Value::as_str)
+                .filter(|v| !v.is_empty())
+                .unwrap_or(entity_key);
             if !id.is_empty() {
-                turso.query_one(
-                    "DELETE FROM jurnal_mengajar WHERE id_jurnal = ?;",
-                    vec![json!(id)],
-                ).await?;
+                turso
+                    .query_one(
+                        "DELETE FROM jurnal_mengajar WHERE id_jurnal = ?;",
+                        vec![json!(id)],
+                    )
+                    .await?;
             }
         }
         ("attendance-ledger", "freeze") => {
-            let row = payload.get("attendance_ledger").or_else(|| payload.get("legerKehadiran")).unwrap_or(payload);
-            let id = row.get("id_leger").and_then(Value::as_str).filter(|v| !v.is_empty()).unwrap_or(entity_key);
+            let row = payload
+                .get("attendance_ledger")
+                .or_else(|| payload.get("legerKehadiran"))
+                .unwrap_or(payload);
+            let id = row
+                .get("id_leger")
+                .and_then(Value::as_str)
+                .filter(|v| !v.is_empty())
+                .unwrap_or(entity_key);
             if !id.is_empty() {
-                let id_ta = row.get("id_tahun_ajaran").and_then(Value::as_str).unwrap_or("");
-                let semester = row.get("semester").and_then(Value::as_str).unwrap_or("Ganjil");
+                let id_ta = row
+                    .get("id_tahun_ajaran")
+                    .and_then(Value::as_str)
+                    .unwrap_or("");
+                let semester = row
+                    .get("semester")
+                    .and_then(Value::as_str)
+                    .unwrap_or("Ganjil");
                 let id_siswa = row.get("id_siswa").and_then(Value::as_str).unwrap_or("");
                 let id_rombel = row.get("id_rombel").and_then(Value::as_str).unwrap_or("");
-                let total_hari_efektif = row.get("total_hari_efektif").and_then(Value::as_i64).unwrap_or(0);
+                let total_hari_efektif = row
+                    .get("total_hari_efektif")
+                    .and_then(Value::as_i64)
+                    .unwrap_or(0);
                 let hadir = row.get("hadir").and_then(Value::as_i64).unwrap_or(0);
                 let izin = row.get("izin").and_then(Value::as_i64).unwrap_or(0);
                 let sakit = row.get("sakit").and_then(Value::as_i64).unwrap_or(0);
                 let alfa = row.get("alfa").and_then(Value::as_i64).unwrap_or(0);
                 let dispensasi = row.get("dispensasi").and_then(Value::as_i64).unwrap_or(0);
-                let persen_kehadiran = row.get("persen_kehadiran").and_then(Value::as_f64).unwrap_or(0.0);
-                let dibekukan_at = row.get("dibekukan_at").and_then(Value::as_str).unwrap_or("");
-                let dibekukan_oleh = row.get("dibekukan_oleh").and_then(Value::as_str).unwrap_or("");
+                let persen_kehadiran = row
+                    .get("persen_kehadiran")
+                    .and_then(Value::as_f64)
+                    .unwrap_or(0.0);
+                let dibekukan_at = row
+                    .get("dibekukan_at")
+                    .and_then(Value::as_str)
+                    .unwrap_or("");
+                let dibekukan_oleh = row
+                    .get("dibekukan_oleh")
+                    .and_then(Value::as_str)
+                    .unwrap_or("");
                 let created_at = row.get("created_at").and_then(Value::as_str).unwrap_or("");
                 let updated_at = row.get("updated_at").and_then(Value::as_str).unwrap_or("");
 
-                turso.query_one(
-                    r#"INSERT INTO leger_kehadiran (
+                turso
+                    .query_one(
+                        r#"INSERT INTO leger_kehadiran (
                         id_leger, id_tahun_ajaran, semester, id_siswa, id_rombel,
                         total_hari_efektif, hadir, izin, sakit, alfa, dispensasi,
                         persen_kehadiran, dibekukan_at, dibekukan_oleh, created_at, updated_at
@@ -7943,26 +8633,54 @@ async fn apply_event_to_turso(
                         dibekukan_at = excluded.dibekukan_at,
                         dibekukan_oleh = excluded.dibekukan_oleh,
                         updated_at = excluded.updated_at;"#,
-                    vec![
-                        json!(id), json!(id_ta), json!(semester), json!(id_siswa), json!(id_rombel),
-                        json!(total_hari_efektif), json!(hadir), json!(izin), json!(sakit),
-                        json!(alfa), json!(dispensasi), json!(persen_kehadiran),
-                        json!(dibekukan_at), json!(dibekukan_oleh), json!(created_at), json!(updated_at)
-                    ],
-                ).await?;
+                        vec![
+                            json!(id),
+                            json!(id_ta),
+                            json!(semester),
+                            json!(id_siswa),
+                            json!(id_rombel),
+                            json!(total_hari_efektif),
+                            json!(hadir),
+                            json!(izin),
+                            json!(sakit),
+                            json!(alfa),
+                            json!(dispensasi),
+                            json!(persen_kehadiran),
+                            json!(dibekukan_at),
+                            json!(dibekukan_oleh),
+                            json!(created_at),
+                            json!(updated_at),
+                        ],
+                    )
+                    .await?;
             }
         }
         ("attendance-ledger", "delete") => {
-            let id = payload.get("id_leger").and_then(Value::as_str).filter(|v| !v.is_empty()).unwrap_or(entity_key);
+            let id = payload
+                .get("id_leger")
+                .and_then(Value::as_str)
+                .filter(|v| !v.is_empty())
+                .unwrap_or(entity_key);
             if !id.is_empty() {
-                turso.query_one(
-                    "DELETE FROM leger_kehadiran WHERE id_leger = ?;",
-                    vec![json!(id)],
-                ).await?;
+                turso
+                    .query_one(
+                        "DELETE FROM leger_kehadiran WHERE id_leger = ?;",
+                        vec![json!(id)],
+                    )
+                    .await?;
             } else {
-                let id_ta = payload.get("id_tahun_ajaran").and_then(Value::as_str).unwrap_or("");
-                let sem = payload.get("semester").and_then(Value::as_str).unwrap_or("");
-                let id_rombel = payload.get("id_rombel").and_then(Value::as_str).unwrap_or("");
+                let id_ta = payload
+                    .get("id_tahun_ajaran")
+                    .and_then(Value::as_str)
+                    .unwrap_or("");
+                let sem = payload
+                    .get("semester")
+                    .and_then(Value::as_str)
+                    .unwrap_or("");
+                let id_rombel = payload
+                    .get("id_rombel")
+                    .and_then(Value::as_str)
+                    .unwrap_or("");
                 if !id_ta.is_empty() && !sem.is_empty() && !id_rombel.is_empty() {
                     turso.query_one(
                         "DELETE FROM leger_kehadiran WHERE id_tahun_ajaran = ? AND semester = ? AND id_rombel = ?;",
@@ -7972,20 +8690,40 @@ async fn apply_event_to_turso(
             }
         }
         ("wa-notification", "queue") => {
-            let row = payload.get("wa_notification").or_else(|| payload.get("notifikasiWa")).unwrap_or(payload);
-            let id = row.get("id_notifikasi").and_then(Value::as_str).filter(|v| !v.is_empty()).unwrap_or(entity_key);
+            let row = payload
+                .get("wa_notification")
+                .or_else(|| payload.get("notifikasiWa"))
+                .unwrap_or(payload);
+            let id = row
+                .get("id_notifikasi")
+                .and_then(Value::as_str)
+                .filter(|v| !v.is_empty())
+                .unwrap_or(entity_key);
             if !id.is_empty() {
                 let dedupe_key = row.get("dedupe_key").and_then(Value::as_str).unwrap_or("");
-                let jenis = row.get("jenis").and_then(Value::as_str).unwrap_or("scan_masuk");
+                let jenis = row
+                    .get("jenis")
+                    .and_then(Value::as_str)
+                    .unwrap_or("scan_masuk");
                 let id_siswa = row.get("id_siswa").and_then(Value::as_str);
-                let tujuan_nomor = row.get("tujuan_nomor").and_then(Value::as_str).unwrap_or("");
+                let tujuan_nomor = row
+                    .get("tujuan_nomor")
+                    .and_then(Value::as_str)
+                    .unwrap_or("");
                 let isi_pesan = row.get("isi_pesan").and_then(Value::as_str).unwrap_or("");
-                let status = row.get("status").and_then(Value::as_str).unwrap_or("Menunggu");
+                let status = row
+                    .get("status")
+                    .and_then(Value::as_str)
+                    .unwrap_or("Menunggu");
                 let created_at = row.get("created_at").and_then(Value::as_str).unwrap_or("");
-                let updated_at = row.get("updated_at").and_then(Value::as_str).unwrap_or(created_at);
+                let updated_at = row
+                    .get("updated_at")
+                    .and_then(Value::as_str)
+                    .unwrap_or(created_at);
 
-                turso.query_one(
-                    r#"INSERT INTO notifikasi_wa (
+                turso
+                    .query_one(
+                        r#"INSERT INTO notifikasi_wa (
                         id_notifikasi, dedupe_key, jenis, id_siswa, tujuan_nomor,
                         isi_pesan, status, attempt_count, created_at, updated_at
                     ) VALUES (?, ?, ?, ?, ?, ?, ?, 0, ?, ?)
@@ -7997,17 +8735,30 @@ async fn apply_event_to_turso(
                         isi_pesan = excluded.isi_pesan,
                         status = excluded.status,
                         updated_at = excluded.updated_at;"#,
-                    vec![
-                        json!(id), json!(dedupe_key), json!(jenis),
-                        match id_siswa { Some(s) if !s.is_empty() => json!(s), _ => json!(null) },
-                        json!(tujuan_nomor), json!(isi_pesan), json!(status),
-                        json!(created_at), json!(updated_at)
-                    ],
-                ).await?;
+                        vec![
+                            json!(id),
+                            json!(dedupe_key),
+                            json!(jenis),
+                            match id_siswa {
+                                Some(s) if !s.is_empty() => json!(s),
+                                _ => json!(null),
+                            },
+                            json!(tujuan_nomor),
+                            json!(isi_pesan),
+                            json!(status),
+                            json!(created_at),
+                            json!(updated_at),
+                        ],
+                    )
+                    .await?;
             }
         }
         ("wa-notification", "cancel") => {
-            let id = payload.get("id_notifikasi").and_then(Value::as_str).filter(|v| !v.is_empty()).unwrap_or(entity_key);
+            let id = payload
+                .get("id_notifikasi")
+                .and_then(Value::as_str)
+                .filter(|v| !v.is_empty())
+                .unwrap_or(entity_key);
             if !id.is_empty() {
                 turso.query_one(
                     "UPDATE notifikasi_wa SET status = 'Dibatalkan', updated_at = datetime('now') WHERE id_notifikasi = ?;",
@@ -8025,7 +8776,6 @@ async fn apply_event_to_turso(
 
     Ok(())
 }
-
 
 /// Umur satu permintaan sebelum verifikasi wajah selesai (menit).
 /// Penggantian tantangan yang boleh diminta satu permintaan reset.
@@ -8114,13 +8864,11 @@ fn parse_liveness_report(raw: &str) -> (String, Vec<String>) {
             items
                 .iter()
                 .filter_map(|item| {
-                    item.as_str()
-                        .map(str::to_string)
-                        .or_else(|| {
-                            item.get("challenge")
-                                .and_then(Value::as_str)
-                                .map(str::to_string)
-                        })
+                    item.as_str().map(str::to_string).or_else(|| {
+                        item.get("challenge")
+                            .and_then(Value::as_str)
+                            .map(str::to_string)
+                    })
                 })
                 .collect()
         })
@@ -8705,7 +9453,11 @@ impl TursoClient {
             .to_objects()
             .into_iter()
             .next()
-            .and_then(|item| item.get("expires_at").and_then(Value::as_str).map(str::to_string))
+            .and_then(|item| {
+                item.get("expires_at")
+                    .and_then(Value::as_str)
+                    .map(str::to_string)
+            })
             .unwrap_or_default();
 
         Ok(json!({
@@ -9097,17 +9849,28 @@ impl TursoClient {
         }
 
         let reset_token = random_reset_token();
+        // `approved_by`/`approved_at` ikut di dalam UPDATE yang sama, bukan di
+        // pernyataan terpisah: persetujuan dan catatan siapa yang menyetujuinya
+        // harus lahir atau gagal bersama. Bentuk sebelumnya adalah INSERT
+        // terpisah ke `role_permission_audit` dengan empat kolom yang tidak
+        // pernah ada di tabel itu, dan errornya dibuang `.ok()` — sehingga
+        // catatan persetujuan tidak pernah tertulis satu kali pun.
         let update_sql = format!(
             r#"UPDATE password_reset_request
                SET token_hash = ?, status = 'Terkirim', delivery_status = 'Disetujui',
                    delivery_error = NULL, sent_at = datetime('now'),
+                   approved_by = ?, approved_at = datetime('now'),
                    expires_at = datetime('now', '+{RESET_TOKEN_TTL_MINUTES} minutes')
                WHERE id = ? AND status = 'Menunggu Verifikasi';"#
         );
         let applied = self
             .query_one(
                 update_sql,
-                vec![json!(sha256_hex(&reset_token)), json!(request_id)],
+                vec![
+                    json!(sha256_hex(&reset_token)),
+                    json!(actor_id),
+                    json!(request_id),
+                ],
             )
             .await?;
         if applied.rows_affected == 0 {
@@ -9116,13 +9879,6 @@ impl TursoClient {
                 "Permintaan ini sudah diproses oleh orang lain.",
             ));
         }
-
-        self.query_one(
-            "INSERT INTO role_permission_audit (actor_operator_id, action, detail, created_at) VALUES (?, 'password-reset-approve', ?, datetime('now'));",
-            vec![json!(actor_id), json!(request_id)],
-        )
-        .await
-        .ok();
 
         Ok(json!({
             "sukses": true,
@@ -9537,9 +10293,7 @@ impl TursoClient {
         // Kunci hanya ditimpa ketika formulir mengirim kunci baru: UI tidak
         // pernah menerima kunci tersimpan sehingga selalu mengirim string kosong.
         let next_key = if api_key.is_empty() { stored } else { api_key };
-        let base_url = field("reset_base_url")
-            .trim_end_matches('/')
-            .to_string();
+        let base_url = field("reset_base_url").trim_end_matches('/').to_string();
 
         self.query_one(
             r#"INSERT INTO app_mail_config (
@@ -9712,11 +10466,19 @@ impl TursoClient {
         if !status.is_success() {
             let body = response.text().await.unwrap_or_default();
             return Err(MailFailure {
-                message: format!("Penyedia email menolak pengiriman (HTTP {}).", status.as_u16()),
+                message: format!(
+                    "Penyedia email menolak pengiriman (HTTP {}).",
+                    status.as_u16()
+                ),
                 detail: format!(
                     "HTTP {} dari {provider}: {}",
                     status.as_u16(),
-                    body.split_whitespace().collect::<Vec<_>>().join(" ").chars().take(400).collect::<String>()
+                    body.split_whitespace()
+                        .collect::<Vec<_>>()
+                        .join(" ")
+                        .chars()
+                        .take(400)
+                        .collect::<String>()
                 ),
             });
         }
@@ -9883,12 +10645,9 @@ pub fn mask_operator_email(value: &str) -> String {
         .saturating_sub(head.chars().count() + tail.chars().count())
         .max(2);
     let masked_domain = match domain.find('.') {
-        Some(dot) if dot > 1 => format!(
-            "{}{}{}",
-            &domain[..1],
-            "*".repeat(dot - 1),
-            &domain[dot..]
-        ),
+        Some(dot) if dot > 1 => {
+            format!("{}{}{}", &domain[..1], "*".repeat(dot - 1), &domain[dot..])
+        }
         _ => domain.to_string(),
     };
     format!("{head}{}{tail}@{masked_domain}", "*".repeat(hidden))
@@ -10093,7 +10852,6 @@ pub fn normalize_recovery_code(value: &str) -> String {
 }
 
 fn validate_bootstrap_draft(draft: &BootstrapSuperadminDraft) -> Result<(), CommandError> {
-
     let code = draft.kode_operator.trim().to_ascii_uppercase();
     let name = draft.nama_operator.trim();
     let username = draft.username.trim();
@@ -10268,9 +11026,18 @@ mod tests {
     #[test]
     fn base32_decoding_forgives_human_typing() {
         let rapi = decode_base32("GEZDGNBVGY3TQOJQ").expect("base32");
-        assert_eq!(decode_base32("gezd gnbv gy3t qojq").as_deref(), Some(&rapi[..]));
-        assert_eq!(decode_base32("GEZD-GNBV-GY3T-QOJQ").as_deref(), Some(&rapi[..]));
-        assert_eq!(decode_base32("GEZDGNBVGY3TQOJQ====").as_deref(), Some(&rapi[..]));
+        assert_eq!(
+            decode_base32("gezd gnbv gy3t qojq").as_deref(),
+            Some(&rapi[..])
+        );
+        assert_eq!(
+            decode_base32("GEZD-GNBV-GY3T-QOJQ").as_deref(),
+            Some(&rapi[..])
+        );
+        assert_eq!(
+            decode_base32("GEZDGNBVGY3TQOJQ====").as_deref(),
+            Some(&rapi[..])
+        );
         // Karakter di luar alfabet base32 ditolak, bukan diam-diam dilewati.
         assert!(decode_base32("GEZD0189").is_none());
     }
@@ -10402,12 +11169,10 @@ mod tests {
             reset_history: 1,
             ..bersih
         };
-        assert!(
-            assert_operator_deletable(&punya_riwayat_reset)
-                .expect_err("riwayat reset")
-                .message
-                .contains("riwayat pengajuan reset password")
-        );
+        assert!(assert_operator_deletable(&punya_riwayat_reset)
+            .expect_err("riwayat reset")
+            .message
+            .contains("riwayat pengajuan reset password"));
 
         // Histori transaksi diperiksa lebih dulu daripada riwayat reset, sama
         // seperti urutan di jalur Web.
@@ -10461,7 +11226,10 @@ mod tests {
             "operator @sppg.id",
             "a@b@c.id",
         ] {
-            assert!(!is_valid_operator_email(invalid), "harus ditolak: {invalid}");
+            assert!(
+                !is_valid_operator_email(invalid),
+                "harus ditolak: {invalid}"
+            );
         }
     }
 
@@ -10550,7 +11318,9 @@ mod tests {
             "https://my-db.turso.io/"
         );
         assert_eq!(
-            turso("https://my-db.turso.io/path?query=1").unwrap().as_str(),
+            turso("https://my-db.turso.io/path?query=1")
+                .unwrap()
+                .as_str(),
             "https://my-db.turso.io/"
         );
         assert!(turso("ftp://my-db.turso.io").is_err());
@@ -10583,15 +11353,24 @@ mod tests {
         // VPS berisi IP publik: HTTP polos di sana mengirim Auth Token dan data
         // absensi tanpa enkripsi, jadi harus ditolak sampai pengguna menyatakan
         // menerima risikonya secara eksplisit.
-        let error = normalize_database_url("http://203.0.113.10:8080", DatabaseProvider::SelfHosted, false)
-            .expect_err("host publik ber-HTTP harus ditolak tanpa opt-in");
+        let error = normalize_database_url(
+            "http://203.0.113.10:8080",
+            DatabaseProvider::SelfHosted,
+            false,
+        )
+        .expect_err("host publik ber-HTTP harus ditolak tanpa opt-in");
         assert_eq!(error.code, "TURSO_URL_INSECURE");
-        assert!(
-            normalize_database_url("http://203.0.113.10:8080", DatabaseProvider::SelfHosted, true)
-                .is_ok()
-        );
+        assert!(normalize_database_url(
+            "http://203.0.113.10:8080",
+            DatabaseProvider::SelfHosted,
+            true
+        )
+        .is_ok());
         // Opt-in tidak boleh menular ke provider Turso terkelola.
-        assert!(normalize_database_url("http://203.0.113.10:8080", DatabaseProvider::Turso, true).is_err());
+        assert!(
+            normalize_database_url("http://203.0.113.10:8080", DatabaseProvider::Turso, true)
+                .is_err()
+        );
     }
 
     #[test]
@@ -10836,7 +11615,10 @@ mod tests {
             // membiarkannya terbuka berarti siapa pun bisa membuat Superadmin
             // kedua tanpa melewati satu pun pemeriksaan hak akses.
             let sesudah = client.bootstrap_status().await.expect("status bootstrap");
-            assert!(!sesudah.required, "bootstrap harus tertutup setelah akun pertama dibuat");
+            assert!(
+                !sesudah.required,
+                "bootstrap harus tertutup setelah akun pertama dibuat"
+            );
 
             let operator = client
                 .authenticate_operator("superadmin.uji", "KataSandiUji#2026", None)
@@ -10876,69 +11658,98 @@ mod tests {
             .build()
             .expect("runtime uji");
         runtime.block_on(async {
-        let dir = tempfile::tempdir().expect("direktori sementara");
-        let hub = dir.path().join("sppg-hub.db");
+            let dir = tempfile::tempdir().expect("direktori sementara");
+            let hub = dir.path().join("sppg-hub.db");
 
-        let client = TursoClient::local_file(
-            Url::parse(LOCAL_FILE_ORIGIN).expect("origin lokal"),
-            &hub,
-            Client::new(),
-        );
-        client.ensure_schema().await.expect("provisioning lokal");
+            let client = TursoClient::local_file(
+                Url::parse(LOCAL_FILE_ORIGIN).expect("origin lokal"),
+                &hub,
+                Client::new(),
+            );
+            client.ensure_schema().await.expect("provisioning lokal");
 
-        let connection = rusqlite::Connection::open(&hub).expect("buka hub");
+            let connection = rusqlite::Connection::open(&hub).expect("buka hub");
 
-        // Ke-42 tabel yang dituntut `isDatabaseSchemaReady` di `db-schema.ts`.
-        // Daftar ini sengaja dieja ulang di sini: kalau salah satunya berhenti
-        // dibuat, aplikasi Web akan menganggap database selamanya belum siap.
-        for table in [
-            "master_data", "id_card", "master_operator", "tbl_shift",
-            "setting_gex_system", "log_scan", "absensi_harian",
-            "backup_karyawan", "koreksi_admin", "audit_absensi", "app_role",
-            "app_permission", "role_permission", "app_session",
-            "auth_login_rate_limit", "sync_operation_receipt",
-            "sync_change_log", "sync_changelog", "app_bootstrap_state",
-            "import_offline", "tbl_hari_libur", "company_profile",
-            "id_card_template", "salary_configs", "overtime_tier_rules",
-            "payroll_components", "tax_rules", "bpjs_rules", "payroll_runs",
-            "payroll_items", "payroll_audit_logs", "password_reset_request",
-            "app_mail_config", "absensi_foto", "hari_libur_whitelist",
-            "akademik_tahun_ajaran", "akademik_jurusan", "akademik_rombel",
-            "akademik_mapel", "akademik_guru_mapel", "guru_data", "siswa_data",
-        ] {
-            let ada: i64 = connection
-                .query_row(
-                    "SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = ?1;",
-                    [table],
-                    |row| row.get(0),
-                )
-                .unwrap_or(0);
-            assert_eq!(ada, 1, "tabel '{table}' tidak dibuat oleh ensure_schema()");
-        }
+            // Ke-42 tabel yang dituntut `isDatabaseSchemaReady` di `db-schema.ts`.
+            // Daftar ini sengaja dieja ulang di sini: kalau salah satunya berhenti
+            // dibuat, aplikasi Web akan menganggap database selamanya belum siap.
+            for table in [
+                "master_data",
+                "id_card",
+                "master_operator",
+                "tbl_shift",
+                "setting_gex_system",
+                "log_scan",
+                "absensi_harian",
+                "backup_karyawan",
+                "koreksi_admin",
+                "audit_absensi",
+                "app_role",
+                "app_permission",
+                "role_permission",
+                "app_session",
+                "auth_login_rate_limit",
+                "sync_operation_receipt",
+                "sync_change_log",
+                "sync_changelog",
+                "app_bootstrap_state",
+                "import_offline",
+                "tbl_hari_libur",
+                "company_profile",
+                "id_card_template",
+                "salary_configs",
+                "overtime_tier_rules",
+                "payroll_components",
+                "tax_rules",
+                "bpjs_rules",
+                "payroll_runs",
+                "payroll_items",
+                "payroll_audit_logs",
+                "password_reset_request",
+                "app_mail_config",
+                "absensi_foto",
+                "hari_libur_whitelist",
+                "akademik_tahun_ajaran",
+                "akademik_jurusan",
+                "akademik_rombel",
+                "akademik_mapel",
+                "akademik_guru_mapel",
+                "guru_data",
+                "siswa_data",
+            ] {
+                let ada: i64 = connection
+                    .query_row(
+                        "SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = ?1;",
+                        [table],
+                        |row| row.get(0),
+                    )
+                    .unwrap_or(0);
+                assert_eq!(ada, 1, "tabel '{table}' tidak dibuat oleh ensure_schema()");
+            }
 
-        // Penghitung perubahan per tabel: tanpa ini, setiap siklus tarik akan
-        // menganggap seluruh tabel berpotensi berubah.
-        let pulse: i64 = connection
+            // Penghitung perubahan per tabel: tanpa ini, setiap siklus tarik akan
+            // menganggap seluruh tabel berpotensi berubah.
+            let pulse: i64 = connection
             .query_row(
                 "SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = 'sync_pulse';",
                 [],
                 |row| row.get(0),
             )
             .unwrap_or(0);
-        assert_eq!(pulse, 1, "sync_pulse tidak dibuat");
+            assert_eq!(pulse, 1, "sync_pulse tidak dibuat");
 
-        let versi: i64 = connection
-            .query_row(
-                "SELECT COALESCE(MAX(version), 0) FROM schema_migration WHERE version > 0;",
-                [],
-                |row| row.get(0),
-            )
-            .expect("versi skema");
-        assert_eq!(
-            versi,
-            crate::mobile::sync::CLIENT_SCHEMA_VERSION,
-            "versi skema hasil provisioning lokal berbeda dari versi klien"
-        );
+            let versi: i64 = connection
+                .query_row(
+                    "SELECT COALESCE(MAX(version), 0) FROM schema_migration WHERE version > 0;",
+                    [],
+                    |row| row.get(0),
+                )
+                .expect("versi skema");
+            assert_eq!(
+                versi,
+                crate::mobile::sync::CLIENT_SCHEMA_VERSION,
+                "versi skema hasil provisioning lokal berbeda dari versi klien"
+            );
         });
     }
 
@@ -11000,12 +11811,9 @@ mod tests {
     fn origin_mode_lokal_stabil_dan_tidak_bergantung_isi_path() {
         let a = normalize_database_url("C:/data/sppg-hub.db", DatabaseProvider::LocalFile, false)
             .expect("origin lokal");
-        let b = normalize_database_url(
-            "/home/pengguna/lain.db",
-            DatabaseProvider::LocalFile,
-            false,
-        )
-        .expect("origin lokal");
+        let b =
+            normalize_database_url("/home/pengguna/lain.db", DatabaseProvider::LocalFile, false)
+                .expect("origin lokal");
 
         assert_eq!(a, b);
         assert_eq!(a.as_str().trim_end_matches('/'), LOCAL_FILE_ORIGIN);
@@ -11192,8 +12000,12 @@ mod tests {
         assert!(is_recoverable_schema_error(
             "SQLite error: table tbl_shift has no column named shift_lanjutan_id"
         ));
-        assert!(is_recoverable_schema_error("no such column: shift_lanjutan_id"));
-        assert!(is_recoverable_schema_error("SQLite error: no such table: tbl_shift"));
+        assert!(is_recoverable_schema_error(
+            "no such column: shift_lanjutan_id"
+        ));
+        assert!(is_recoverable_schema_error(
+            "SQLite error: no such table: tbl_shift"
+        ));
 
         // Konflik data yang sebenarnya tidak boleh memicu migrasi ulang.
         assert!(!is_recoverable_schema_error(
@@ -11202,7 +12014,9 @@ mod tests {
         assert!(!is_recoverable_schema_error(
             "Data absensi sudah dikoreksi admin dan tidak boleh ditimpa sumber lain."
         ));
-        assert!(!is_recoverable_schema_error("UNIQUE constraint failed: tbl_shift.kode_shift"));
+        assert!(!is_recoverable_schema_error(
+            "UNIQUE constraint failed: tbl_shift.kode_shift"
+        ));
     }
 
     #[test]
@@ -11227,16 +12041,16 @@ mod tests {
         // Scanner terminal berada di bawah Koreksi Admin pada hierarki prioritas.
         let ditolak =
             assert_attendance_precondition("attendance", "scan", &payload, Some(&dikoreksi));
-        assert_eq!(
-            ditolak.unwrap_err().code,
-            "TURSO_SYNC_ATTENDANCE_PROTECTED"
-        );
+        assert_eq!(ditolak.unwrap_err().code, "TURSO_SYNC_ATTENDANCE_PROTECTED");
 
         // Import offline juga tidak boleh menimpa koreksi admin.
-        assert!(
-            assert_attendance_precondition("offline-import", "row", &payload, Some(&dikoreksi))
-                .is_err()
-        );
+        assert!(assert_attendance_precondition(
+            "offline-import",
+            "row",
+            &payload,
+            Some(&dikoreksi)
+        )
+        .is_err());
 
         // Koreksi admin berikutnya tetap boleh menulis.
         assert!(
@@ -11266,7 +12080,8 @@ mod tests {
         });
 
         assert!(
-            assert_attendance_precondition("attendance", "scan", &payload, Some(&dikoreksi)).is_ok()
+            assert_attendance_precondition("attendance", "scan", &payload, Some(&dikoreksi))
+                .is_ok()
         );
 
         // Menghapus jam masuk yang diisi admin tetap terlarang.

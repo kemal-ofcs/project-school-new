@@ -37,8 +37,13 @@ const rootDir = path.resolve(import.meta.dir, "..");
  * langsung ke Turso sehingga trigger yang sama sudah ikut menaikkannya. Setiap
  * penambahan pada daftar ini WAJIB disertai alasan seperti ini — tanpa itu,
  * daftar ini akan pelan-pelan berubah menjadi tempat menyembunyikan drift.
+ *
+ * `sync_tombstone` dipasang bersama `sync_pulse` dan alasannya sama persis:
+ * isinya ditulis trigger `AFTER DELETE`, bukan aplikasi, sehingga penghapusan
+ * yang dilakukan jalur Web ikut tercatat tanpa satu baris kode pun di sisi Web.
+ * Sebuah tabel yang harus DITULIS aplikasi tidak boleh masuk daftar ini.
  */
-const CLOUD_ONLY_IN_RUST = new Set(["sync_pulse"]);
+const CLOUD_ONLY_IN_RUST = new Set(["sync_pulse", "sync_tombstone"]);
 
 let failures = 0;
 let warnings = 0;

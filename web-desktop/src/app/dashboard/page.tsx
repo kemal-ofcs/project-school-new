@@ -833,6 +833,7 @@ export default function DashboardPage() {
 
               {filterMode === "single" ? (
                 <input
+                  aria-label="Tanggal filter"
                   type="date"
                   value={startDate}
                   onChange={(e) => {
@@ -844,6 +845,7 @@ export default function DashboardPage() {
               ) : (
                 <div className="flex items-center gap-1.5 font-mono text-xs">
                   <input
+                    aria-label="Tanggal mulai rentang"
                     type="date"
                     value={startDate}
                     onChange={(e) => setStartDate(e.target.value)}
@@ -851,6 +853,7 @@ export default function DashboardPage() {
                   />
                   <span className="text-slate-400 text-xs font-sans">s/d</span>
                   <input
+                    aria-label="Tanggal selesai rentang"
                     type="date"
                     value={endDate}
                     onChange={(e) => setEndDate(e.target.value)}
@@ -917,6 +920,7 @@ export default function DashboardPage() {
               {/* Search Bar */}
               <div className="relative flex-1 min-w-[200px] max-w-md">
                 <input
+                  aria-label="Cari karyawan"
                   type="text"
                   placeholder="Cari nama karyawan, NIK, atau divisi..."
                   value={searchQuery}
@@ -956,6 +960,7 @@ export default function DashboardPage() {
               {/* Division Filter */}
               {availableDivisions.length > 0 ? (
                 <select
+                  aria-label="Filter divisi"
                   value={divisionFilter}
                   onChange={(e) => {
                     setDivisionFilter(e.target.value);
@@ -975,6 +980,7 @@ export default function DashboardPage() {
               {/* Status Filter (Daily only) */}
               {activeTab === "harian" ? (
                 <select
+                  aria-label="Filter status kehadiran"
                   value={statusFilter}
                   onChange={(e) => {
                     setStatusFilter(e.target.value);
@@ -996,6 +1002,7 @@ export default function DashboardPage() {
             <div className="flex items-center gap-2 text-xs text-slate-400 font-mono">
               <span>Baris:</span>
               <select
+                aria-label="Jumlah baris per halaman"
                 value={rowsPerPage}
                 onChange={(e) => {
                   setRowsPerPage(Number(e.target.value));

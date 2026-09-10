@@ -575,11 +575,8 @@ pub fn create_correction(
     // Shift fleksibel (00:00-23:59) tidak punya rentang jadwal, jadi jam koreksi
     // apa pun sah. Tanpa pengecualian ini shift karyawan dianggap "tidak cocok"
     // lalu diam-diam dipindahkan ke shift reguler oleh deteksi di bawah.
-    let shift_awal_fleksibel = super::time_policy::is_flexible_shift(
-        &shift_config.0,
-        &shift_config.1,
-        shift_config.2,
-    );
+    let shift_awal_fleksibel =
+        super::time_policy::is_flexible_shift(&shift_config.0, &shift_config.1, shift_config.2);
     if explicit_shift.is_none()
         && (is_in_check || is_out_check)
         && !correction_time.is_empty()
@@ -666,11 +663,8 @@ pub fn create_correction(
 
     // shift_config bisa berganti akibat Smart Shift Detection di atas, jadi
     // status fleksibel dihitung ulang dari shift yang benar-benar dipakai.
-    let shift_fleksibel = super::time_policy::is_flexible_shift(
-        &shift_config.0,
-        &shift_config.1,
-        shift_config.2,
-    );
+    let shift_fleksibel =
+        super::time_policy::is_flexible_shift(&shift_config.0, &shift_config.1, shift_config.2);
 
     if matches!(correction_type, "Sakit" | "Izin" | "Dispen" | "Alfa") {
         scan_kind = correction_type;
@@ -1770,6 +1764,20 @@ pub fn dashboard_data(
             };
             format!("a.tanggal = '{date}'")
         };
+        // `absensi_harian` bertambah satu baris per personil per hari dan tidak
+        // pernah dipangkas: rentang satu bulan pada 800 personil berarti ±24.000
+        // baris dalam satu balasan IPC. Batasnya dijepit di sini persis seperti
+        // di `report.ts`, supaya Web dan Desktop memberi jawaban yang sama.
+        let limit = filter
+            .get("limit")
+            .and_then(Value::as_i64)
+            .unwrap_or(2000)
+            .clamp(1, 2000);
+        let offset = filter
+            .get("offset")
+            .and_then(Value::as_i64)
+            .unwrap_or(0)
+            .max(0);
         return rows_as_json(
             &connection,
             &format!(
@@ -1806,7 +1814,8 @@ pub fn dashboard_data(
           )
           FROM absensi_harian a LEFT JOIN master_data m ON a.id_karyawan = m.id_unik
           LEFT JOIN tbl_shift s ON a.id_shift = s.id_shift WHERE {date_clause}
-          AND ('{division}' = '' OR a.kelas_divisi = '{division}') ORDER BY a.update_terakhir DESC, a.tanggal DESC, a.nama;
+          AND ('{division}' = '' OR a.kelas_divisi = '{division}') ORDER BY a.update_terakhir DESC, a.tanggal DESC, a.nama
+          LIMIT {limit} OFFSET {offset};
         "#
             ),
         );

@@ -33,6 +33,7 @@ import {
 	collectRepairDdl,
 	openDatabaseFromDdl,
 } from "./lib/cloud-schema";
+import { petikRust } from "./lib/rust-literals";
 
 const rootDir = path.resolve(import.meta.dir, "..");
 
@@ -109,17 +110,47 @@ function petaKonstanta(sumber: string): Map<string, string> {
 	return peta;
 }
 
-/** Ambil calon literal SQL dari sebuah berkas Rust atau TypeScript. */
+/**
+ * Ambil calon literal SQL dari sebuah berkas Rust atau TypeScript.
+ *
+ * Sisi Rust dulu membaca `r#"…"#` SAJA. Gerbang ini ada justru karena Fase 4
+ * meloloskan sembilan kolom yang tidak pernah ada lewat gerbang yang seluruhnya
+ * hijau — dan selama ia hanya membaca raw string, ke-32 query `SNAPSHOT_SOURCES`
+ * di `turso.rs` (yang semuanya berbentuk `sql: "SELECT …"`) tidak pernah
+ * sekalipun diserahkan ke SQLite. Sebuah gerbang yang menyembunyikan
+ * cakupannya sendiri membusuk menjadi lulus palsu, persis seperti
+ * `schema-audit.ts` lama.
+ *
+ * Modul tes dikeluarkan, dan itu tidak mengurangi apa pun yang nyata. SQL di
+ * dalam tes berjalan di atas tabel fixture yang baru dibuat saat runtime —
+ * `t`, `test_jam`, `absensi` — sehingga mem-`prepare`-nya terhadap skema
+ * sebenarnya hanya menghasilkan "no such table" atas kode yang benar. Lagi pula
+ * `cargo test` MENJALANKAN query itu sungguhan terhadap skema hasil
+ * `storage::initialize`, yang merupakan bentuk pemeriksaan lebih kuat daripada
+ * `prepare` dan memang bentuk yang dianjurkan repo ini.
+ */
 function literalSql(sumber: string, jenis: "rust" | "ts"): string[] {
 	if (jenis === "rust") {
-		return [...sumber.matchAll(/r#"([\s\S]*?)"#/g)].map(
-			(cocok) => cocok[1] as string,
+		return petikRust(sumber, { tanpaModulTes: true }).map(
+			(literal) => literal.isi,
 		);
 	}
 	return [...sumber.matchAll(/`([\s\S]*?)`/g)].map((cocok) => cocok[1] as string);
 }
 
-const AWALAN_QUERY = /^\s*(SELECT|WITH|INSERT|UPDATE|DELETE)\b/i;
+/**
+ * Sebuah literal baru dianggap calon query bila kata kerjanya benar-benar
+ * diikuti sasaran, bukan sekadar diawali kata kerja.
+ *
+ * Bentuk lamanya (`^(SELECT|WITH|INSERT|UPDATE|DELETE)\b`) cukup selama yang
+ * dibaca hanya raw string. Begitu literal kutip biasa ikut terbaca, pola itu
+ * mulai menuduh string yang bukan SQL sama sekali: `sync::enqueue(…, "update",
+ * …)` dan `(…, "delete", …)` adalah NAMA OPERASI outbox, dan hanya di
+ * `academic.rs` ada 14 di antaranya. Menuduh kode yang benar adalah cara
+ * tercepat membuat gerbang ini dimatikan orang.
+ */
+const AWALAN_QUERY =
+	/^\s*(?:(?:SELECT|WITH)\s+\S|INSERT\s+(?:OR\s+\w+\s+)?INTO\s+\S|UPDATE\s+\S|DELETE\s+FROM\s+\S)/i;
 
 /**
  * Pisahkan literal multi-statement menjadi pernyataan tunggal.
@@ -226,7 +257,14 @@ function periksaBerkas(
 		// literal di atas, menyisakan `${` yang menggantung. Menuntut bentuk
 		// lengkap `${…}` membuat penggalan itu lolos ke SQLite dan dilaporkan
 		// sebagai cacat kode, padahal ia cacat pembacaan audit ini sendiri.
-		if (/\$\{|\{[A-Za-z_][A-Za-z0-9_]*\}/.test(sql)) {
+		//
+		// Bentuk POSISIONAL `{}` ikut dihitung di sini. Selama yang terbaca hanya
+		// raw string, satu-satunya placeholder yang muncul adalah `{nama}`;
+		// begitu literal kutip biasa ikut terbaca, `format!("INSERT INTO {} …")`
+		// milik `apply_table` dan para perakit `UPDATE … SET {}` ikut terbawa,
+		// dan menyerahkannya ke SQLite melaporkan "unrecognized token" atas kode
+		// yang sepenuhnya benar. Itu cacat pembacaan audit ini, bukan cacat SQL.
+		if (/\$\{|\{[A-Za-z0-9_]*(?::[^}]*)?\}/.test(sql)) {
 			hasil.takTerbaca++;
 			continue;
 		}

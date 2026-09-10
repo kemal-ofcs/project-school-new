@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import { MobileAppShell } from "@/components/MobileAppShell";
 import { Icon } from "@/components/ui/Icon";
+import { canAccessArea } from "@/lib/auth/access";
 import { triggerHaptic } from "@/lib/client/haptics";
 import { useAuth } from "@/lib/context/AuthContext";
 import type { SyncConflict, SyncStatus } from "@/lib/gateways/sync-status";
@@ -20,7 +21,8 @@ import {
 } from "@/lib/gateways/sync-status";
 
 export default function SyncPage() {
-  const { isAuthenticated, isLoading: authLoading } = useAuth();
+  const { user, isAuthenticated, isLoading: authLoading } = useAuth();
+  const canViewSync = canAccessArea(user, "sync");
   const router = useRouter();
 
   const [status, setStatus] = useState<SyncStatus | null>(null);
@@ -31,8 +33,17 @@ export default function SyncPage() {
   useEffect(() => {
     if (!authLoading && !isAuthenticated) {
       router.replace("/login");
+      return;
     }
-  }, [authLoading, isAuthenticated, router]);
+    // Otorisasi, bukan sekadar autentikasi. Mobile memakai static export dan
+    // tidak punya rute `/forbidden`, jadi pengguna tanpa hak dipulangkan.
+    //
+    // Halaman ini menampilkan konflik sinkronisasi, yang memuat payload lintas
+    // domain — termasuk payroll dan Bimbingan Konseling.
+    if (!authLoading && isAuthenticated && !canViewSync) {
+      router.replace("/dashboard");
+    }
+  }, [authLoading, isAuthenticated, canViewSync, router]);
 
   const loadStatus = useCallback(async () => {
     try {
@@ -40,8 +51,15 @@ export default function SyncPage() {
       setStatus(data);
       const conf = await getSyncConflicts();
       setConflicts(conf);
-    } catch {
-      // Ignored silently
+    } catch (err) {
+      // Diam berarti layar menampilkan status LAMA seolah masih berlaku —
+      // pada halaman yang justru dibuka untuk memastikan sinkronisasi sehat,
+      // itu kebalikan dari gunanya.
+      setMessage(
+        err instanceof Error
+          ? err.message
+          : "Status sinkronisasi gagal dibaca.",
+      );
     }
   }, []);
 
@@ -107,8 +125,14 @@ export default function SyncPage() {
     try {
       await retryFailedSync();
       await handleSyncNow();
-    } catch {
-      // Handled
+    } catch (err) {
+      // Diam berarti operator menekan "coba ulang" dan tidak terjadi apa pun
+      // yang terlihat — ia akan menekannya berkali-kali tanpa tahu penyebabnya.
+      setMessage(
+        err instanceof Error
+          ? err.message
+          : "Percobaan ulang sinkronisasi gagal.",
+      );
     }
   };
 
@@ -157,8 +181,14 @@ export default function SyncPage() {
     try {
       await clearFailedSync();
       await loadStatus();
-    } catch {
-      // Handled
+    } catch (err) {
+      // Alasan yang sama: tombol yang tidak memberi jawaban apa pun membuat
+      // orang mengira antreannya sudah bersih padahal belum.
+      setMessage(
+        err instanceof Error
+          ? err.message
+          : "Antrean gagal tidak dapat dibersihkan.",
+      );
     }
   };
 

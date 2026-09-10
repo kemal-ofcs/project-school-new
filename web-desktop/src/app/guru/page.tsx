@@ -18,8 +18,10 @@ import {
   hapusGuru,
   simpanGuru,
 } from "@/lib/gateways/teacher";
+import { useConfirmDialog } from "@/lib/hooks/useConfirmDialog";
 
 export default function GuruPage() {
+  const { konfirmasi, dialogKonfirmasi } = useConfirmDialog();
   const { user, isAuthenticated, isLoading: authLoading } = useAuth();
   const canManage = hasPermission(user, "teachers.manage");
 
@@ -160,9 +162,14 @@ export default function GuruPage() {
 
   const handleDelete = async (id: string) => {
     if (!canManage) return;
-    const ok = window.confirm(
-      "Apakah Anda yakin ingin menghapus data guru ini?",
-    );
+    const ok = await konfirmasi({
+      title: "Hapus profil guru ini?",
+      description:
+        "Profil guru dinonaktifkan dan hilang dari daftar. Penghapusannya ikut tersinkronisasi ke seluruh perangkat.",
+      preserved:
+        "Riwayat absensi, jurnal mengajar, dan presensi kelas yang pernah ia catat tetap tersimpan.",
+      confirmLabel: "Ya, hapus",
+    });
     if (!ok) return;
 
     try {
@@ -287,6 +294,7 @@ export default function GuruPage() {
         <div className="flex flex-col gap-3 rounded-2xl border border-white/10 bg-slate-900/60 p-4 shadow-xl backdrop-blur-xl sm:flex-row sm:items-center sm:justify-between">
           <div className="relative flex-1">
             <input
+              aria-label="Cari guru"
               type="text"
               placeholder="Cari guru berdasarkan nama, NIP, NUPTK, atau bidang mapel..."
               value={search}
@@ -796,6 +804,7 @@ export default function GuruPage() {
           </Modal>
         ) : null}
       </div>
+      {dialogKonfirmasi}
     </AppShell>
   );
 }

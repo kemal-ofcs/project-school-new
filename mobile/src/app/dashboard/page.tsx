@@ -29,6 +29,7 @@ export default function DashboardPage() {
   const [metrics, setMetrics] = useState<DashboardMetrics | null>(null);
   const [recentScans, setRecentScans] = useState<Record<string, unknown>[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!authLoading && !isAuthenticated) {
@@ -48,8 +49,17 @@ export default function DashboardPage() {
           setMetrics(metricData);
           setRecentScans(scansData || []);
         }
-      } catch {
-        // Handled silently
+      } catch (err) {
+        // Diam berarti dasbor tampil kosong dan tidak bisa dibedakan dari hari
+        // yang memang belum ada aktivitasnya — pelajaran yang sama dengan
+        // dasbor kehadiran yang dulu menyamarkan kegagalan query menjadi nol.
+        if (!cancelled) {
+          setLoadError(
+            err instanceof Error
+              ? err.message
+              : "Data dasbor gagal dimuat. Tarik ke bawah untuk mencoba lagi.",
+          );
+        }
       } finally {
         if (!cancelled) setIsLoading(false);
       }
@@ -82,6 +92,12 @@ export default function DashboardPage() {
   return (
     <MobileAppShell>
       <div className="flex flex-col gap-4">
+        {loadError ? (
+          <div className="rounded-2xl border border-rose-400/30 bg-rose-400/10 p-3 text-xs text-rose-200">
+            {loadError}
+          </div>
+        ) : null}
+
         {/* Time & Shift Card */}
         <div className="relative overflow-hidden rounded-3xl border border-white/15 bg-gradient-to-br from-slate-900 via-slate-900/90 to-sky-950/40 p-5 shadow-2xl backdrop-blur-xl">
           <div className="flex items-center justify-between">
