@@ -4675,3 +4675,78 @@ mod tests {
         assert_eq!(failed_count, 0);
     }
 }
+
+#[cfg(test)]
+mod tests_identitas_klien {
+    use super::{ensure_client_id, storage, MobileState};
+    use std::sync::{Mutex, RwLock};
+
+    fn fixture() -> (tempfile::TempDir, MobileState) {
+        let dir = tempfile::tempdir().expect("tempdir");
+        storage::initialize(dir.path()).expect("init db");
+        let state = MobileState {
+            server_origin: RwLock::new("http://localhost:3000".to_string()),
+            offline_max_age_hours: 24,
+            data_dir: dir.path().to_path_buf(),
+            http: reqwest::Client::new(),
+            turso_config: RwLock::new(None),
+            session: Mutex::new(None),
+            vault_lock: Mutex::new(()),
+        };
+        (dir, state)
+    }
+
+    /// Tanpa identitas yang sudah tersemai, panggilan DI DALAM transaksi tulis
+    /// gagal — dan ini yang menjatuhkan 35 operasi di perangkat baru.
+    ///
+    /// `ensure_client_id` membuka koneksi SQLite kedua dan menyisipkan barisnya
+    /// bila belum ada. Transaksi pemanggil sudah memegang kunci tulis, sehingga
+    /// penyisipan itu menunggu selama `busy_timeout` lalu menyerah. Tes ini
+    /// karena itu memang lambat beberapa detik; kelambatannya justru bagian
+    /// dari yang dibuktikan.
+    #[test]
+    fn tanpa_semai_gagal_di_dalam_transaksi_tulis() {
+        let (_dir, state) = fixture();
+        let mut connection = storage::database(&state.data_dir).expect("db");
+        let transaction = connection.transaction().expect("transaction");
+        transaction
+            .execute(
+                "INSERT INTO setting_gex_system (key, value) VALUES ('penanda', '1');",
+                [],
+            )
+            .expect("ambil kunci tulis");
+
+        assert!(
+            ensure_client_id(&state).is_err(),
+            "penyisipan identitas dari koneksi kedua tidak mungkin berhasil \
+             selagi transaksi pemanggil memegang kunci tulis"
+        );
+    }
+
+    /// Setelah disemai di luar transaksi, panggilan yang sama aman.
+    ///
+    /// Inilah yang dijamin `MobileState::seed_client_identity`: barisnya sudah
+    /// ada, sehingga ke-35 pemanggilan di dalam transaksi hanya MEMBACA — dan
+    /// membaca dari koneksi kedua aman di WAL meski ada transaksi tulis
+    /// terbuka.
+    #[test]
+    fn setelah_disemai_aman_di_dalam_transaksi_tulis() {
+        let (_dir, state) = fixture();
+        let disemai = ensure_client_id(&state).expect("semai di luar transaksi");
+
+        let mut connection = storage::database(&state.data_dir).expect("db");
+        let transaction = connection.transaction().expect("transaction");
+        transaction
+            .execute(
+                "INSERT INTO setting_gex_system (key, value) VALUES ('penanda', '1');",
+                [],
+            )
+            .expect("ambil kunci tulis");
+
+        assert_eq!(
+            ensure_client_id(&state).expect("baca identitas"),
+            disemai,
+            "identitasnya harus sama, dan dibaca tanpa menulis apa pun"
+        );
+    }
+}
