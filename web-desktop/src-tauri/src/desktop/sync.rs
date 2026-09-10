@@ -2916,6 +2916,11 @@ pub async fn synchronize(
     // penyimpanan, bukan alasan menjatuhkan sinkronisasi yang sudah berhasil.
     if let Ok(mut connection) = storage::database(&state.data_dir) {
         let _ = super::wa_notification::purge_expired_notifications(&connection);
+        // Salinan lokal foto absensi: tabel yang tumbuh paling cepat dalam
+        // ukuran byte, bukan jumlah baris. Dijalankan SETELAH push supaya foto
+        // yang baru diambil sempat terkirim lebih dulu; yang belum terkirim
+        // dilindungi penjaga outbox di dalam fungsinya sendiri.
+        let _ = super::scanner::purge_local_scan_photos(&connection);
         let _ = prune_settled_outbox(&mut connection);
     }
 
@@ -4416,6 +4421,58 @@ mod tests {
              menuntut keputusan sadar karena seluruh kunci cache dan revisi berbasis domain. \
              Domain bersama saat ini: {:?}",
             bersama.iter().map(|(domain, _)| *domain).collect::<Vec<_>>()
+        );
+    }
+
+    /// Retensi foto lokal tidak boleh memusnahkan bukti yang belum terkirim.
+    ///
+    /// Foto yang event scan-nya masih menggantung di outbox hanya ada di
+    /// perangkat ini — cloud belum pernah melihatnya. Membuangnya berarti
+    /// memusnahkan satu-satunya salinan bukti kehadiran seseorang.
+    #[test]
+    fn retensi_foto_lokal_melindungi_bukti_yang_belum_terkirim() {
+        let (_directory, state) = fixture();
+        let connection = storage::database(&state.data_dir).expect("local database");
+        let lama = format!(
+            "-{} days",
+            super::super::scanner::SCAN_PHOTO_LOCAL_RETENTION_DAYS + 5
+        );
+        connection
+            .execute_batch(&format!(
+                r#"
+        INSERT INTO absensi_foto (id_foto, id_sesi, tanggal_kerja, id_karyawan, nama,
+          jenis_scan, timestamp_scan, foto_base64, created_at)
+        VALUES
+          ('f-terkirim', 'sesi-a', date('now','+7 hours','{lama}'), 'E1', 'Satu',
+           'masuk', '2026-01-01 07:00:00', 'xxx', '2026-01-01 07:00:00'),
+          ('f-menggantung', 'sesi-b', date('now','+7 hours','{lama}'), 'E2', 'Dua',
+           'masuk', '2026-01-01 07:00:00', 'yyy', '2026-01-01 07:00:00'),
+          ('f-baru', 'sesi-c', date('now','+7 hours'), 'E3', 'Tiga',
+           'masuk', '2026-01-01 07:00:00', 'zzz', '2026-01-01 07:00:00');
+
+        INSERT INTO desktop_sync_outbox (event_id, client_id, domain, operation, entity_key,
+          payload_json, status, attempt_count, created_at, updated_at)
+        VALUES ('ev-gantung', 'c', 'attendance', 'scan', 'scan:-1',
+          '{{"attendance":{{"id_sesi":"sesi-b"}}}}', 'pending', 0, 0, 0);
+        "#
+            ))
+            .expect("seed foto");
+
+        let dibuang =
+            super::super::scanner::purge_local_scan_photos(&connection).expect("purge foto");
+        assert_eq!(dibuang, 1, "hanya foto lama yang sudah terkirim yang dibuang");
+
+        let tersisa: Vec<String> = connection
+            .prepare("SELECT id_foto FROM absensi_foto ORDER BY id_foto;")
+            .expect("prepare")
+            .query_map([], |row| row.get(0))
+            .expect("query")
+            .filter_map(Result::ok)
+            .collect();
+        assert_eq!(
+            tersisa,
+            vec!["f-baru".to_string(), "f-menggantung".to_string()],
+            "foto yang outbox-nya menggantung dan foto yang masih baru harus utuh"
         );
     }
 

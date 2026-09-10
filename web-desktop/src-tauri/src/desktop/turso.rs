@@ -9261,7 +9261,10 @@ impl TursoClient {
         }
         let result = self
             .query_one(
-                "DELETE FROM absensi_foto WHERE tanggal_kerja <= date('now', ?);",
+                // `tanggal_kerja` adalah tanggal operasional WIB, jadi batasnya
+                // wajib WIB juga. `date('now')` UTC memangkas satu hari lebih
+                // sedikit antara pukul 00:00-07:00 WIB.
+                "DELETE FROM absensi_foto WHERE tanggal_kerja <= date('now','+7 hours', ?);",
                 vec![json!(format!("-{days} days"))],
             )
             .await?;

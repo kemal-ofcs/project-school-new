@@ -1446,16 +1446,37 @@ pub async fn desktop_purge_attendance_photos(
     older_than_days: i64,
 ) -> Result<Value, CommandError> {
     require_permission(&state, "attendance_photo.delete")?;
-    let result = state
-        .get_turso_client()?
-        .purge_attendance_photos(older_than_days)
-        .await?;
+
+    // Penghapusan LOKAL dijalankan lebih dulu, dan kegagalan cloud tidak
+    // membatalkannya. Bentuk sebelumnya menaruh `get_turso_client()?` dan
+    // `.await?` di depan, sehingga tanpa jaringan command berhenti sebelum
+    // menyentuh SQLite — ruang lokal tidak pernah bisa direbut kembali, justru
+    // di terminal pemindai yang paling mungkin kehabisan ruang DAN paling
+    // mungkin sedang offline.
+    //
+    // `date('now','+7 hours')`: `tanggal_kerja` adalah tanggal operasional WIB.
+    // Batas UTC menunjuk sehari lebih awal antara pukul 00:00-07:00 WIB.
     let connection = storage::database(&state.data_dir)?;
-    let _ = connection.execute(
-        "DELETE FROM absensi_foto WHERE tanggal_kerja < date('now', ?);",
-        rusqlite::params![format!("-{} day", older_than_days.max(0))],
-    );
-    Ok(result)
+    let dihapus_lokal = connection
+        .execute(
+            "DELETE FROM absensi_foto WHERE tanggal_kerja < date('now','+7 hours', ?);",
+            rusqlite::params![format!("-{} day", older_than_days.max(0))],
+        )
+        .unwrap_or(0);
+
+    match state.get_turso_client() {
+        Ok(turso) => {
+            let result = turso.purge_attendance_photos(older_than_days).await?;
+            Ok(result)
+        }
+        // Belum ada database cloud yang terkonfigurasi. Yang lokal sudah
+        // terpangkas, dan itu yang dilaporkan — bukan kegagalan.
+        Err(_) => Ok(json!({
+            "sukses": true,
+            "deleted": dihapus_lokal,
+            "hanyaLokal": true,
+        })),
+    }
 }
 
 /// Pengaturan keamanan absensi: sakelar induk fitur + daftar IP.

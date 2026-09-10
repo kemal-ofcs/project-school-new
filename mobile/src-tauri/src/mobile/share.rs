@@ -56,10 +56,10 @@ pub fn share_desktop_file(
 }
 
 /// Nama command dipertahankan persis seperti sebelumnya karena frontend
-/// memanggilnya lewat `invoke("desktop_share_file", ...)` di
+/// memanggilnya lewat `invoke("mobile_share_file", ...)` di
 /// `src/lib/client/share.ts`.
 #[tauri::command]
-pub fn desktop_share_file(
+pub fn mobile_share_file(
     filename: String,
     base64_data: String,
     title: Option<String>,

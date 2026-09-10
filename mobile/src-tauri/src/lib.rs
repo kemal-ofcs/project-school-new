@@ -119,7 +119,7 @@ pub fn run() {
             mobile::commands::desktop_import_database_bytes,
             mobile::commands::desktop_get_data_folder,
             mobile::commands::desktop_save_file,
-            mobile::share::desktop_share_file,
+            mobile::share::mobile_share_file,
             mobile::share::mobile_export_database_to_device,
             mobile::commands::desktop_get_holidays,
             mobile::commands::desktop_get_holiday_whitelist,

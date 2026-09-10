@@ -99,7 +99,7 @@
     "allow-desktop-import-database-bytes",
     "allow-desktop-get-data-folder",
     "allow-desktop-save-file",
-    "allow-desktop-share-file",
+    "allow-mobile-share-file",
     "allow-mobile-export-database-to-device",
     "allow-desktop-get-company-profile",
     "allow-desktop-update-company-profile",

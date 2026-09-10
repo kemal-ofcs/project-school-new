@@ -88,6 +88,22 @@ pub struct PayrollRecapRow {
 pub struct PayrollCalculator;
 
 impl PayrollCalculator {
+    /// Upah dari MENIT bulat dan tarif per jam.
+    ///
+    /// Cerminan `PayrollCalculator::wage_from_minutes` di
+    /// `web-desktop/src-tauri/src/desktop/payroll/engine.rs`, dan wajib tetap
+    /// sama: berkas ini SATU-SATUNYA salinan mesin payroll yang berada di luar
+    /// daftar salin `sync-rust-modules.ts`, sehingga tidak ada alat yang
+    /// menjaganya selain kesengajaan.
+    ///
+    /// Membagi lebih dulu membuang presisi SEBELUM pembulatan: `11/60` bukan
+    /// pecahan yang berhenti, jadi hasil kalinya menjadi 3437,4999… dan nilai
+    /// yang seharusnya 3437,5 tepat dibulatkan ke bawah.
+    pub fn wage_from_minutes(minutes: i64, rate_per_hour: i64) -> Decimal {
+        ((Decimal::from(minutes) * Decimal::from(rate_per_hour)) / Decimal::from(60))
+            .round_dp_with_strategy(0, RoundingStrategy::MidpointAwayFromZero)
+    }
+
     pub fn calculate_overtime_index(
         overtime_hours: Decimal,
         tiers: &[OvertimeTierRule],
@@ -492,8 +508,8 @@ pub async fn mobile_get_payroll_recap(
             let rate_dec = Decimal::from(agg.rate_per_hour);
 
             let ot_index = PayrollCalculator::calculate_overtime_index(ot_hours, &overtime_tiers);
-            let basic_salary = (reg_hours * rate_dec)
-                .round_dp_with_strategy(0, RoundingStrategy::MidpointAwayFromZero);
+            let basic_salary =
+                PayrollCalculator::wage_from_minutes(agg.jam_kerja_menit, agg.rate_per_hour);
             let overtime_salary = (ot_index * rate_dec)
                 .round_dp_with_strategy(0, RoundingStrategy::MidpointAwayFromZero);
 

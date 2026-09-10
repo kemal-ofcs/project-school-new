@@ -94,7 +94,7 @@ const MOBILE_COMMANDS: &[&str] = &[
     "desktop_import_database_bytes",
     "desktop_get_data_folder",
     "desktop_save_file",
-    "desktop_share_file",
+    "mobile_share_file",
     "mobile_export_database_to_device",
     "desktop_get_holidays",
     "desktop_get_holiday_whitelist",
@@ -193,6 +193,47 @@ fn expose_build_value(name: &str, local: &HashMap<String, String>) -> Option<Str
     value
 }
 
+/// Hentikan build RELEASE bila masa login offline belum ditetapkan.
+///
+/// `option_env!` dievaluasi saat KOMPILASI, bukan saat jalan. Pada build debug
+/// nilai kosong jatuh ke default sehingga `tauri dev` selalu bekerja dan
+/// masalahnya tidak pernah terlihat. Pada build release TIDAK ada default:
+/// `"".parse::<u64>()` gagal, `MobileState::initialize(...)?` di setup hook
+/// mengembalikan Err, Tauri membatalkan startup, dan jendelanya tertutup
+/// seketika TANPA PESAN APA PUN.
+///
+/// `.env*` di-gitignore, jadi setiap mesin baru dan setiap clone mengulang
+/// kegagalan itu — dan yang menanggungnya adalah pengguna akhir, bukan yang
+/// membangunnya. Pada Android ini yang terjadi: APK tetap terbangun dan Gradle
+/// melapor hijau.
+///
+/// Karena itu kegagalannya dipindahkan ke sini, ke waktu build, tempat orang
+/// yang bisa memperbaikinya masih berdiri di depan layar. Angka ini kebijakan
+/// keamanan — berapa lama perangkat yang hilang masih bisa dipakai masuk tanpa
+/// jaringan — jadi ia memang harus ditetapkan sadar, bukan dijatuhkan ke
+/// default diam-diam.
+fn assert_offline_hours_present_on_release(value: Option<&str>) {
+    if env::var("PROFILE").as_deref() != Ok("release") {
+        return;
+    }
+    let pesan = match value {
+        None => "SPPG_OFFLINE_AUTH_MAX_AGE_HOURS belum diisi".to_owned(),
+        Some(raw) => match raw.parse::<u64>() {
+            Ok(jam) if (1..=720).contains(&jam) => return,
+            Ok(jam) => format!("nilainya {jam}, di luar rentang 1-720"),
+            Err(_) => format!("nilainya '{raw}' bukan angka"),
+        },
+    };
+    panic!(
+        "\n\nBUILD RELEASE DIHENTIKAN: {pesan}.\n\n\
+         Tanpa nilai ini aplikasi TETAP TERBANGUN tetapi MATI SAAT DIBUKA, tanpa\n\
+         pesan apa pun ke pengguna. Salin `.env.example` menjadi `.env` di folder\n\
+         workspace ini lalu isi SPPG_OFFLINE_AUTH_MAX_AGE_HOURS (1-720 jam).\n\n\
+         Angka itu kebijakan keamanan: berapa lama perangkat yang hilang masih\n\
+         bisa dipakai masuk tanpa jaringan.\n"
+    );
+}
+
 fn main() {
     println!("cargo:rerun-if-changed=../.env");
     let local = local_build_values();
@@ -200,7 +241,8 @@ fn main() {
     expose_build_value("TURSO_AUTH_TOKEN", &local);
     expose_build_value("SPPG_API_BASE_URL", &local);
     expose_build_value("SPPG_DEV_API_BASE_URL", &local);
-    expose_build_value("SPPG_OFFLINE_AUTH_MAX_AGE_HOURS", &local);
+    let offline_hours = expose_build_value("SPPG_OFFLINE_AUTH_MAX_AGE_HOURS", &local);
+    assert_offline_hours_present_on_release(offline_hours.as_deref());
 
     tauri_build::try_build(
         tauri_build::Attributes::new()
