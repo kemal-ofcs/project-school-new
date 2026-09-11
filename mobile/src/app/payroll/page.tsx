@@ -7,7 +7,7 @@ import { MobileAppShell } from "@/components/MobileAppShell";
 import { FeedbackBanner } from "@/components/ui/FeedbackBanner";
 import { Icon } from "@/components/ui/Icon";
 import { Modal } from "@/components/ui/Modal";
-import { canAccessArea } from "@/lib/auth/access";
+import { canAccessArea, hasPermission } from "@/lib/auth/access";
 import { triggerHaptic } from "@/lib/client/haptics";
 import { shareText } from "@/lib/client/share";
 import { useAuth } from "@/lib/context/AuthContext";
@@ -91,6 +91,9 @@ export default function MobilePayrollPortalPage() {
   const router = useRouter();
   const { user, isAuthenticated, isLoading: authLoading } = useAuth();
   const companyName = useCompanyName();
+  // Administrasi payroll (modul `payroll_admin`, salinan modul Desktop).
+  const canViewPayrollAdmin = hasPermission(user, "payroll.view");
+  const canManagePayrollConfig = hasPermission(user, "payroll.config.manage");
 
   const [activeTab, setActiveTab] = useState<"estimate" | "archive">(
     "estimate",
@@ -322,6 +325,39 @@ Status: Estimasi Real-Time ${companyName}`;
             onClose={() => setFeedback(null)}
           />
         )}
+
+        {/* Administrasi Payroll (izin payroll.view; tiap aksi dijaga izinnya sendiri) */}
+        {canViewPayrollAdmin ? (
+          <div className="rounded-2xl border border-emerald-500/20 bg-emerald-950/20 p-3">
+            <p className="mb-2 text-[11px] font-black uppercase tracking-wider text-emerald-300">
+              Administrasi Payroll
+            </p>
+            <Link
+              href="/payroll/runs"
+              onClick={() => triggerHaptic("light")}
+              className="flex min-h-11 items-center justify-between gap-2 rounded-xl border border-white/10 bg-slate-900/80 px-3 text-xs font-bold text-slate-200 transition active:scale-95"
+            >
+              <span className="flex items-center gap-2">
+                <Icon name="history" className="size-4 text-emerald-300" />
+                Batch Payroll &amp; Persetujuan
+              </span>
+              <Icon name="chevron-right" className="size-4 text-slate-500" />
+            </Link>
+            {canManagePayrollConfig ? (
+              <Link
+                href="/payroll/config"
+                onClick={() => triggerHaptic("light")}
+                className="mt-2 flex min-h-11 items-center justify-between gap-2 rounded-xl border border-white/10 bg-slate-900/80 px-3 text-xs font-bold text-slate-200 transition active:scale-95"
+              >
+                <span className="flex items-center gap-2">
+                  <Icon name="settings" className="size-4 text-emerald-300" />
+                  Rate Gaji &amp; Komponen
+                </span>
+                <Icon name="chevron-right" className="size-4 text-slate-500" />
+              </Link>
+            ) : null}
+          </div>
+        ) : null}
 
         {/* Tab Navigation */}
         <div className="grid grid-cols-2 gap-2 p-1 bg-slate-900 border border-slate-800 rounded-2xl">

@@ -1,19 +1,30 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { MobileAppShell } from "@/components/MobileAppShell";
 import { FeedbackBanner } from "@/components/ui/FeedbackBanner";
+import { Icon } from "@/components/ui/Icon";
+import { Modal } from "@/components/ui/Modal";
 import { canAccessArea, hasPermission } from "@/lib/auth/access";
 import { triggerHaptic } from "@/lib/client/haptics";
 import { useAuth } from "@/lib/context/AuthContext";
+import { getDaftarTahunAjaran } from "@/lib/gateways/academic";
 import {
   addCounselingSessionGateway,
   type CounselingCaseDetail,
   type CounselingCaseItem,
+  type CounselingCategory,
+  type CounselingStatus,
+  createCounselingCaseGateway,
+  deleteCounselingCaseGateway,
+  deleteCounselingSessionGateway,
   getCounselingCaseGateway,
   listCounselingCasesGateway,
+  updateCounselingCaseGateway,
 } from "@/lib/gateways/counseling";
+import { getDaftarSiswa } from "@/lib/gateways/student";
+import { useConfirmDialog } from "@/lib/hooks/useConfirmDialog";
 
 /**
  * Bimbingan Konseling versi genggam.
@@ -28,12 +39,49 @@ import {
  * dari "belum ada kasus" — pelajaran yang sama dengan `unwrap_or(0)` di dasbor
  * Rust, hanya dalam bentuk antarmuka.
  *
- * Halaman ini tidak menyentuh SQLite lokal, outbox, maupun `SNAPSHOT_TABLES`.
+ * Halaman ini tidak MENULIS ke SQLite lokal, outbox, maupun `SNAPSHOT_TABLES`.
+ * Satu-satunya bacaan lokal adalah daftar siswa & tahun ajaran untuk formulir
+ * "Catat Kasus Baru" — keduanya memang tabel tersinkronisasi biasa.
  */
 
 const BATAS_KASUS = 100;
 
 const STATUS_PILIHAN = ["Semua", "Terbuka", "Dalam Bimbingan", "Selesai"];
+
+const STATUS_KASUS: CounselingStatus[] = [
+  "Terbuka",
+  "Dalam Bimbingan",
+  "Selesai",
+];
+
+const KATEGORI_KASUS: { value: CounselingCategory; label: string }[] = [
+  { value: "kedisiplinan", label: "Kedisiplinan" },
+  { value: "akademik", label: "Akademik" },
+  { value: "kehadiran", label: "Kehadiran / Bolos" },
+  { value: "sosial", label: "Sosial / Perilaku" },
+];
+
+const CATATAN_JARINGAN =
+  "Bimbingan Konseling menulis langsung ke cloud, jadi fitur ini membutuhkan koneksi.";
+
+interface CaseForm {
+  id_siswa: string;
+  kategori: CounselingCategory;
+  status: CounselingStatus;
+  ringkasan: string;
+  kronologi: string;
+}
+
+const FORM_KOSONG: CaseForm = {
+  id_siswa: "",
+  kategori: "kedisiplinan",
+  status: "Terbuka",
+  ringkasan: "",
+  kronologi: "",
+};
+
+const INPUT =
+  "min-h-11 w-full rounded-xl border border-white/10 bg-slate-950/60 px-3 py-2 text-sm text-white";
 
 function warnaStatus(status: string) {
   if (status === "Selesai")
@@ -60,6 +108,15 @@ export default function BimbinganKonselingMobilePage() {
   const { user, isAuthenticated, isLoading: authLoading } = useAuth();
   const canView = canAccessArea(user, "bimbingan_konseling");
   const canManage = hasPermission(user, "counseling.manage");
+  const canDelete = hasPermission(user, "counseling.delete");
+  const { konfirmasi, dialogKonfirmasi } = useConfirmDialog();
+
+  const [createOpen, setCreateOpen] = useState(false);
+  const [caseForm, setCaseForm] = useState<CaseForm>(FORM_KOSONG);
+  const [createError, setCreateError] = useState<string | null>(null);
+  const [students, setStudents] = useState<Record<string, unknown>[]>([]);
+  const [studentFilter, setStudentFilter] = useState("");
+  const [activeYearId, setActiveYearId] = useState("");
 
   const [cases, setCases] = useState<CounselingCaseItem[]>([]);
   const [detail, setDetail] = useState<CounselingCaseDetail | null>(null);
@@ -174,6 +231,183 @@ export default function BimbinganKonselingMobilePage() {
     }
   };
 
+  const filteredStudents = useMemo(() => {
+    const kata = studentFilter.trim().toLowerCase();
+    if (!kata) return students;
+    return students.filter(
+      (s) =>
+        String(s.nama_lengkap ?? "")
+          .toLowerCase()
+          .includes(kata) ||
+        String(s.nis ?? "")
+          .toLowerCase()
+          .includes(kata),
+    );
+  }, [students, studentFilter]);
+
+  const bukaBuatKasus = async () => {
+    triggerHaptic("light");
+    setCaseForm(FORM_KOSONG);
+    setStudentFilter("");
+    setCreateError(null);
+    setCreateOpen(true);
+    try {
+      // Daftar siswa & tahun ajaran dibaca dari SQLite lokal (keduanya ikut
+      // sinkronisasi); hanya kasusnya sendiri yang cloud-only.
+      const [siswa, tahun] = await Promise.all([
+        getDaftarSiswa(),
+        getDaftarTahunAjaran(),
+      ]);
+      setStudents(siswa);
+      const aktif = tahun.find((t) => Number(t.is_aktif) === 1);
+      setActiveYearId(aktif ? String(aktif.id_tahun_ajaran) : "");
+      if (!aktif) {
+        setCreateError(
+          "Belum ada tahun ajaran aktif. Aktifkan tahun ajaran di menu Akademik lebih dulu.",
+        );
+      }
+    } catch (err) {
+      setCreateError(
+        err instanceof Error
+          ? err.message
+          : "Daftar siswa atau tahun ajaran gagal dimuat.",
+      );
+    }
+  };
+
+  const simpanKasusBaru = async () => {
+    if (!canManage || isSubmittingRef.current) return;
+    if (!caseForm.id_siswa || !caseForm.ringkasan.trim()) {
+      setCreateError("Siswa dan ringkasan kasus wajib diisi.");
+      return;
+    }
+    if (!activeYearId) {
+      setCreateError(
+        "Belum ada tahun ajaran aktif. Aktifkan tahun ajaran di menu Akademik lebih dulu.",
+      );
+      return;
+    }
+    isSubmittingRef.current = true;
+    setMenyimpan(true);
+    setCreateError(null);
+    try {
+      const hasil = await createCounselingCaseGateway({
+        id_siswa: caseForm.id_siswa,
+        id_tahun_ajaran: activeYearId,
+        kategori: caseForm.kategori,
+        ringkasan: caseForm.ringkasan.trim(),
+        kronologi: caseForm.kronologi.trim() || null,
+        status: caseForm.status,
+      });
+      triggerHaptic("success");
+      setCreateOpen(false);
+      setFeedback("Kasus Bimbingan Konseling berhasil dicatat.");
+      await muatKasus();
+      if (hasil.id_kasus) await bukaDetail(hasil.id_kasus);
+    } catch (err) {
+      triggerHaptic("error");
+      setCreateError(
+        err instanceof Error
+          ? `${err.message} — kasus belum tersimpan. ${CATATAN_JARINGAN}`
+          : "Gagal mencatat kasus baru.",
+      );
+    } finally {
+      isSubmittingRef.current = false;
+      setMenyimpan(false);
+    }
+  };
+
+  const ubahStatus = async (nextStatus: CounselingStatus) => {
+    if (!detail || !canManage || isSubmittingRef.current) return;
+    if (detail.status === nextStatus) return;
+    isSubmittingRef.current = true;
+    setMenyimpan(true);
+    try {
+      await updateCounselingCaseGateway(detail.id_kasus, {
+        status: nextStatus,
+      });
+      triggerHaptic("success");
+      setDetail({ ...detail, status: nextStatus });
+      setFeedback(`Status kasus diperbarui menjadi ${nextStatus}.`);
+      setError(null);
+      await muatKasus();
+    } catch (err) {
+      triggerHaptic("error");
+      setError(
+        err instanceof Error
+          ? `${err.message} — status belum berubah. ${CATATAN_JARINGAN}`
+          : "Gagal memperbarui status kasus.",
+      );
+    } finally {
+      isSubmittingRef.current = false;
+      setMenyimpan(false);
+    }
+  };
+
+  const hapusKasus = async () => {
+    if (!detail || !canDelete || isSubmittingRef.current) return;
+    const ok = await konfirmasi({
+      title: `Hapus rekam jejak BK ${detail.nama_siswa}?`,
+      description: `Kasus ini beserta ${detail.sesi.length} sesi konselingnya dihapus permanen dari cloud dan tidak dapat dipulihkan.`,
+      preserved: "Data absensi dan presensi kelas siswa tidak ikut terhapus.",
+      confirmLabel: "Ya, hapus rekam jejak",
+      tone: "danger",
+    });
+    if (!ok || isSubmittingRef.current) return;
+    isSubmittingRef.current = true;
+    setMenyimpan(true);
+    try {
+      await deleteCounselingCaseGateway(detail.id_kasus);
+      triggerHaptic("success");
+      setDetail(null);
+      setFeedback("Kasus Bimbingan Konseling berhasil dihapus.");
+      setError(null);
+      await muatKasus();
+    } catch (err) {
+      triggerHaptic("error");
+      setError(
+        err instanceof Error
+          ? `${err.message} — kasus belum terhapus. ${CATATAN_JARINGAN}`
+          : "Gagal menghapus kasus.",
+      );
+    } finally {
+      isSubmittingRef.current = false;
+      setMenyimpan(false);
+    }
+  };
+
+  const hapusSesi = async (idSesi: string, tanggal: string) => {
+    if (!detail || !canDelete || isSubmittingRef.current) return;
+    const ok = await konfirmasi({
+      title: "Hapus catatan sesi ini?",
+      description: `Catatan sesi ${formatTanggal(tanggal)} beserta tindak lanjutnya dihapus permanen dari rekam jejak kasus.`,
+      preserved: "Kasus induknya dan sesi lainnya tetap tersimpan.",
+      confirmLabel: "Ya, hapus sesi",
+      tone: "danger",
+    });
+    if (!ok || isSubmittingRef.current) return;
+    isSubmittingRef.current = true;
+    setMenyimpan(true);
+    try {
+      await deleteCounselingSessionGateway(idSesi);
+      triggerHaptic("success");
+      setFeedback("Sesi konseling berhasil dihapus.");
+      setError(null);
+      await bukaDetail(detail.id_kasus);
+      await muatKasus();
+    } catch (err) {
+      triggerHaptic("error");
+      setError(
+        err instanceof Error
+          ? `${err.message} — sesi belum terhapus. ${CATATAN_JARINGAN}`
+          : "Gagal menghapus sesi konseling.",
+      );
+    } finally {
+      isSubmittingRef.current = false;
+      setMenyimpan(false);
+    }
+  };
+
   return (
     <MobileAppShell>
       <div className="flex flex-col gap-4 text-slate-100">
@@ -256,6 +490,47 @@ export default function BimbinganKonselingMobilePage() {
                   {detail.kronologi}
                 </p>
               ) : null}
+
+              {canManage ? (
+                <fieldset className="mt-4">
+                  <legend className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">
+                    Status kasus
+                  </legend>
+                  <div className="mt-1.5 grid grid-cols-3 gap-1.5">
+                    {STATUS_KASUS.map((pilihan) => {
+                      const aktif = detail.status === pilihan;
+                      return (
+                        <button
+                          key={pilihan}
+                          type="button"
+                          onClick={() => void ubahStatus(pilihan)}
+                          disabled={menyimpan || aktif}
+                          aria-pressed={aktif}
+                          className={`min-h-10 rounded-xl border px-1.5 text-[11px] font-bold transition active:scale-95 disabled:cursor-default ${
+                            aktif
+                              ? warnaStatus(pilihan)
+                              : "border-white/10 bg-slate-950/60 text-slate-400"
+                          }`}
+                        >
+                          {pilihan}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </fieldset>
+              ) : null}
+
+              {canDelete ? (
+                <button
+                  type="button"
+                  onClick={() => void hapusKasus()}
+                  disabled={menyimpan}
+                  className="mt-3 flex min-h-10 w-full items-center justify-center gap-2 rounded-xl border border-rose-500/25 bg-rose-500/10 text-xs font-bold text-rose-300 active:scale-95 disabled:opacity-50"
+                >
+                  <Icon name="trash" className="size-4" />
+                  Hapus rekam jejak kasus
+                </button>
+              ) : null}
             </div>
 
             <div className="rounded-3xl border border-white/10 bg-slate-900/80 p-4">
@@ -277,8 +552,23 @@ export default function BimbinganKonselingMobilePage() {
                         <span className="text-xs font-bold text-white">
                           {formatTanggal(sesi.tanggal)}
                         </span>
-                        <span className="text-[10px] text-slate-500">
-                          {sesi.konselor}
+                        <span className="flex items-center gap-2">
+                          <span className="text-[10px] text-slate-500">
+                            {sesi.konselor}
+                          </span>
+                          {canDelete ? (
+                            <button
+                              type="button"
+                              onClick={() =>
+                                void hapusSesi(sesi.id_sesi, sesi.tanggal)
+                              }
+                              disabled={menyimpan}
+                              aria-label={`Hapus sesi ${formatTanggal(sesi.tanggal)}`}
+                              className="grid size-8 place-items-center rounded-lg border border-rose-500/25 bg-rose-500/10 text-rose-300 active:scale-95 disabled:opacity-50"
+                            >
+                              <Icon name="trash" className="size-3.5" />
+                            </button>
+                          ) : null}
                         </span>
                       </div>
                       <p className="mt-1 whitespace-pre-line text-xs text-slate-300">
@@ -366,6 +656,17 @@ export default function BimbinganKonselingMobilePage() {
           </>
         ) : (
           <>
+            {canManage ? (
+              <button
+                type="button"
+                onClick={() => void bukaBuatKasus()}
+                className="flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl bg-indigo-500 text-sm font-black text-white shadow-lg transition hover:bg-indigo-400 active:scale-95"
+              >
+                <Icon name="plus" className="size-5" />
+                Catat Kasus Baru
+              </button>
+            ) : null}
+
             <div className="rounded-3xl border border-white/10 bg-slate-900/80 p-3">
               <label
                 htmlFor="bk-filter-status"
@@ -466,6 +767,198 @@ export default function BimbinganKonselingMobilePage() {
           </>
         )}
       </div>
+
+      <Modal
+        isOpen={createOpen}
+        onClose={() => {
+          if (!menyimpan) setCreateOpen(false);
+        }}
+        title="Catat Kasus Baru"
+        titleId="bk-create-case-title"
+        maxWidth="max-w-md"
+        footer={
+          <div className="flex w-full items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setCreateOpen(false)}
+              disabled={menyimpan}
+              className="min-h-11 flex-1 rounded-xl border border-white/10 bg-white/5 text-xs font-bold text-slate-300 active:scale-95 disabled:opacity-50"
+            >
+              Batal
+            </button>
+            <button
+              type="submit"
+              form="bk-create-case-form"
+              disabled={menyimpan || !activeYearId}
+              className="min-h-11 flex-1 rounded-xl bg-indigo-500 text-xs font-black text-white shadow-lg active:scale-95 disabled:opacity-50"
+            >
+              {menyimpan ? "Menyimpan..." : "Simpan Kasus"}
+            </button>
+          </div>
+        }
+      >
+        <form
+          id="bk-create-case-form"
+          onSubmit={(event) => {
+            event.preventDefault();
+            void simpanKasusBaru();
+          }}
+          className="flex flex-col gap-3 text-xs"
+        >
+          {createError ? (
+            <FeedbackBanner
+              type="error"
+              message={createError}
+              onClose={() => setCreateError(null)}
+              className="text-xs"
+            />
+          ) : null}
+
+          <div className="flex flex-col gap-1.5">
+            <label
+              htmlFor="bk-create-filter-siswa"
+              className="text-[10px] font-semibold uppercase tracking-wide text-slate-400"
+            >
+              Siswa
+            </label>
+            <input
+              id="bk-create-filter-siswa"
+              type="search"
+              value={studentFilter}
+              onChange={(event) => setStudentFilter(event.target.value)}
+              placeholder="Saring nama / NIS..."
+              className={INPUT}
+            />
+            <select
+              aria-label="Pilih siswa"
+              value={caseForm.id_siswa}
+              onChange={(event) =>
+                setCaseForm((prev) => ({
+                  ...prev,
+                  id_siswa: event.target.value,
+                }))
+              }
+              required
+              className={INPUT}
+            >
+              <option value="">
+                -- Pilih siswa ({filteredStudents.length}) --
+              </option>
+              {filteredStudents.map((s) => (
+                <option key={String(s.id_siswa)} value={String(s.id_siswa)}>
+                  {String(s.nama_lengkap)} · {String(s.nama_rombel || "-")} ·
+                  NIS {String(s.nis || "-")}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <label
+                htmlFor="bk-create-kategori"
+                className="mb-1 block text-[10px] font-semibold uppercase tracking-wide text-slate-400"
+              >
+                Kategori
+              </label>
+              <select
+                id="bk-create-kategori"
+                value={caseForm.kategori}
+                onChange={(event) =>
+                  setCaseForm((prev) => ({
+                    ...prev,
+                    kategori:
+                      KATEGORI_KASUS.find((k) => k.value === event.target.value)
+                        ?.value ?? "kedisiplinan",
+                  }))
+                }
+                className={INPUT}
+              >
+                {KATEGORI_KASUS.map((k) => (
+                  <option key={k.value} value={k.value}>
+                    {k.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label
+                htmlFor="bk-create-status"
+                className="mb-1 block text-[10px] font-semibold uppercase tracking-wide text-slate-400"
+              >
+                Status awal
+              </label>
+              <select
+                id="bk-create-status"
+                value={caseForm.status}
+                onChange={(event) =>
+                  setCaseForm((prev) => ({
+                    ...prev,
+                    status:
+                      STATUS_KASUS.find((s) => s === event.target.value) ??
+                      "Terbuka",
+                  }))
+                }
+                className={INPUT}
+              >
+                {STATUS_KASUS.map((s) => (
+                  <option key={s} value={s}>
+                    {s}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          <div>
+            <label
+              htmlFor="bk-create-ringkasan"
+              className="mb-1 block text-[10px] font-semibold uppercase tracking-wide text-slate-400"
+            >
+              Ringkasan kasus
+            </label>
+            <input
+              id="bk-create-ringkasan"
+              value={caseForm.ringkasan}
+              onChange={(event) =>
+                setCaseForm((prev) => ({
+                  ...prev,
+                  ringkasan: event.target.value,
+                }))
+              }
+              required
+              className={INPUT}
+            />
+          </div>
+
+          <div>
+            <label
+              htmlFor="bk-create-kronologi"
+              className="mb-1 block text-[10px] font-semibold uppercase tracking-wide text-slate-400"
+            >
+              Kronologi (opsional)
+            </label>
+            <textarea
+              id="bk-create-kronologi"
+              rows={4}
+              value={caseForm.kronologi}
+              onChange={(event) =>
+                setCaseForm((prev) => ({
+                  ...prev,
+                  kronologi: event.target.value,
+                }))
+              }
+              className={INPUT}
+            />
+          </div>
+
+          <p className="text-[10px] leading-4 text-slate-500">
+            Kasus dicatat pada tahun ajaran aktif dan disimpan langsung di cloud
+            — tidak pernah di perangkat ini.
+          </p>
+        </form>
+      </Modal>
+      {dialogKonfirmasi}
     </MobileAppShell>
   );
 }

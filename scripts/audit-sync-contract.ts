@@ -363,10 +363,15 @@ const desktopCommands = [
 // (`wa_review.rs`) langsung dituduh, padahal kodenya benar.
 //
 // Sebuah audit yang menuduh kode yang benar akan dimatikan orang, jadi
-// cakupannya diambil dari direktorinya sendiri.
-const mobileCommands = readdirSync(
-	resolve(projectRoot, "mobile/src-tauri/src/mobile"),
+// cakupannya diambil dari direktorinya sendiri — TERMASUK subfolder: modul
+// `payroll_admin/` (salinan `desktop/payroll/*`) mendefinisikan 23 command
+// administrasi payroll di `payroll_admin/commands.rs`.
+const mobileCommands = (
+	readdirSync(resolve(projectRoot, "mobile/src-tauri/src/mobile"), {
+		recursive: true,
+	}) as string[]
 )
+	.map((berkas) => berkas.replaceAll("\\", "/"))
 	.filter((berkas) => berkas.endsWith(".rs"))
 	.map((berkas) => read(`mobile/src-tauri/src/mobile/${berkas}`))
 	.join("\n");

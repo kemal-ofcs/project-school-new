@@ -109,6 +109,8 @@ export async function shareDataUrl(
 
   // 4. Fallback: Simpan ke media penyimpanan lokal
   const downloadRes = await downloadDataUrl(dataUrl, filename);
+  // Di Android ini membuka dialog "Simpan ke…"; menutupnya = pembatalan.
+  if (downloadRes.cancelled) return { sukses: false, cancelled: true };
   return {
     sukses: downloadRes.sukses,
     message: downloadRes.path

@@ -11,6 +11,21 @@ Dokumen ini mendokumentasikan aturan logika bisnis, penanganan shift malam linta
 - Saat scan pulang dilakukan setelah jam 00:00 (dini hari), sistem wajib merekonsiliasi scan tersebut ke sesi kerja H-1 yang belum tertutup.
 - Buffer waktu toleransi shift malam diperhitungkan agar keterlambatan scan pulang tidak dianggap sebagai scan masuk baru untuk hari berikutnya.
 
+### Jendela Scan Masuk & Jam Kerja (schema versi 21):
+Jendelanya tersusun MUNDUR dari Jam Masuk (contoh 07:00, awal 120, batas 60, toleransi 30):
+
+```
+04:00 ─ Awal Absen Masuk ─ 06:00 ─ Tepat Waktu ─ 07:00 ─ Terlambat ─ 07:30
+```
+
+- **Tepat Waktu** = (Jam Masuk − Batas Masuk Tepat Waktu) s/d Jam Masuk.
+- **Awal Absen Masuk** ("Datang Lebih Awal") dihitung mundur dari awal jendela Tepat Waktu; sebelum itu absen masih ditutup.
+- **Terlambat** = setelah Jam Masuk s/d Jam Masuk + Toleransi, dan menitnya diukur dari Jam Masuk. Lewat dari itu scanner menolak dan karyawan menghubungi Admin/Operator — karena itu Koreksi Admin sengaja boleh mencatat jam masuk sampai sebelum Jam Pulang (`diDalamRentangKoreksiMasuk`), sedangkan import tetap memakai jendela scanner.
+- **Jam Kerja Normal** = (Jam Pulang − Jam Masuk) − Istirahat.
+- **Jam kerja aktual** dimulai dari max(scan masuk, Jam Masuk): datang awal tidak menambah jam kerja/lembur.
+- **Istirahat** mulai pada Jam Masuk + Offset Potong Istirahat; pulang setelah titik itu dipotong istirahat PENUH, sebelumnya tidak dipotong.
+- Rumusnya dieja sekali per bahasa dan diuji dengan vektor yang sama: `time-policy.ts` (`jendelaScanMasuk`, `hitungMenitKerjaPadaGarisWaktu`, `hitungUlangAbsensiDariJam`) dan `time_policy.rs` (`entry_window_offsets`, `calculate_work_on_timeline`, `recalculate_from_clock`). Seluruh jalur admin (koreksi, edit riwayat, import, hapus log, sync-push) WAJIB memanggil fungsi itu, bukan menghitung sendiri.
+
 ---
 
 ## 2. Otomasi Generate Alfa (Auto-Alfa Runner)

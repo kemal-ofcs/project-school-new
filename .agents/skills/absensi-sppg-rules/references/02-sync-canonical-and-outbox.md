@@ -195,7 +195,10 @@ sementara siklus otomatis berjalan untuk SETIAP peran termasuk `scanner`), dan
 disemai sekali saat mount lewat `getSyncStatus()` supaya siklus PERTAMA pun
 sudah tahu jawabannya.
 
-> `models.rs` TIDAK ikut disalin `sync-rust-modules.ts` sedangkan `sync.rs` ikut.
+> `models.rs` (yang di akar `desktop/`) TIDAK ikut disalin `sync-rust-modules.ts`
+> sedangkan `sync.rs` ikut. Jangan tertukar dengan `desktop/payroll/models.rs`:
+> berkas itu IKUT disalin, bersama `mod.rs`/`commands.rs`/`engine.rs`, ke
+> `mobile/payroll_admin/`.
 > Setiap field baru pada `DesktopSyncStatus` wajib ditambahkan manual di
 > `mobile/src-tauri/src/mobile/models.rs`, atau build Mobile gagal begitu
 > salinan `sync.rs` yang baru masuk.

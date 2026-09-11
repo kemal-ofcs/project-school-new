@@ -13,6 +13,7 @@ import {
   deletePasswordResetHistory,
   getPasswordResetHistory,
   getPasswordResetPhoto,
+  purgePasswordResetHistory,
   type ResetApprovalResult,
 } from "@/lib/gateways/password-reset-history";
 import {
@@ -33,6 +34,15 @@ const STATUS_STYLE: Record<ResetHistoryStatus, string> = {
 };
 
 const FILTERS: StatusFilter[] = ["SEMUA", ...RESET_HISTORY_STATUSES];
+
+/** Batas umur riwayat yang dibersihkan — sama dengan halaman Web/Desktop. */
+const PURGE_DAYS = 90;
+
+const MESSAGE_STYLE = {
+  success: "border-emerald-400/25 bg-emerald-400/10 text-emerald-200",
+  warning: "border-amber-400/25 bg-amber-400/10 text-amber-200",
+  error: "border-rose-400/25 bg-rose-400/10 text-rose-200",
+} as const;
 
 /**
  * Stempel waktu ditulis SQLite dalam UTC ("2026-08-29 10:15:00"). `new Date()`
@@ -78,9 +88,10 @@ export default function RiwayatResetPasswordMobilePage() {
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<{
-    tone: "success" | "error";
+    tone: keyof typeof MESSAGE_STYLE;
     text: string;
   } | null>(null);
+  const [purgeOpen, setPurgeOpen] = useState(false);
   const [photo, setPhoto] = useState<{
     entry: ResetHistoryEntry;
     src: string;
@@ -172,6 +183,39 @@ export default function RiwayatResetPasswordMobilePage() {
   };
 
   /**
+   * Hapus massal riwayat lama yang sudah SELESAI (Terpakai, Kedaluwarsa,
+   * Dibatalkan) beserta fotonya. Pengajuan yang masih berjalan tidak tersentuh.
+   */
+  const runPurge = async () => {
+    if (isSubmittingRef.current) return;
+    setBusy(true);
+    isSubmittingRef.current = true;
+    try {
+      const result = await purgePasswordResetHistory(PURGE_DAYS);
+      triggerHaptic(result.deleted > 0 ? "success" : "light");
+      setPurgeOpen(false);
+      setMessage({
+        tone: result.deleted > 0 ? "success" : "warning",
+        text:
+          result.deleted > 0
+            ? `${result.deleted} riwayat lama berhasil dibersihkan.`
+            : `Tidak ada riwayat selesai yang lebih tua dari ${PURGE_DAYS} hari.`,
+      });
+      await load();
+    } catch (error) {
+      triggerHaptic("error");
+      setMessage({
+        tone: "error",
+        text:
+          error instanceof Error ? error.message : "Pembersihan riwayat gagal.",
+      });
+    } finally {
+      isSubmittingRef.current = false;
+      setBusy(false);
+    }
+  };
+
+  /**
    * Setujui permintaan, lalu tampilkan kodenya.
    *
    * Kode ini tidak disimpan dalam bentuk asli di mana pun — database hanya
@@ -249,11 +293,7 @@ export default function RiwayatResetPasswordMobilePage() {
               <button
                 type="button"
                 onClick={() => setMessage(null)}
-                className={`rounded-2xl border p-3 text-left text-[11px] leading-4 ${
-                  message.tone === "success"
-                    ? "border-emerald-400/25 bg-emerald-400/10 text-emerald-200"
-                    : "border-rose-400/25 bg-rose-400/10 text-rose-200"
-                }`}
+                className={`rounded-2xl border p-3 text-left text-[11px] leading-4 ${MESSAGE_STYLE[message.tone]}`}
               >
                 {message.text}
               </button>
@@ -278,6 +318,21 @@ export default function RiwayatResetPasswordMobilePage() {
                 </button>
               ))}
             </div>
+
+            {canDelete ? (
+              <button
+                type="button"
+                onClick={() => {
+                  triggerHaptic("warning");
+                  setPurgeOpen(true);
+                }}
+                disabled={busy}
+                className="flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border border-rose-400/30 bg-rose-400/10 text-xs font-black text-rose-200 transition active:scale-95 disabled:opacity-50"
+              >
+                <Icon name="trash" className="size-4" />
+                Bersihkan riwayat &gt; {PURGE_DAYS} hari
+              </button>
+            ) : null}
 
             {loading ? (
               <div className="grid min-h-40 place-items-center rounded-3xl border border-white/10 bg-slate-900/70 text-xs text-slate-400">
@@ -500,6 +555,49 @@ export default function RiwayatResetPasswordMobilePage() {
               {confirmDelete.status === "Terkirim"
                 ? " Pengajuan ini masih hidup — link resetnya ikut mati dan pemiliknya perlu mengajukan ulang."
                 : ""}
+            </p>
+          </div>
+        </Modal>
+      ) : null}
+
+      {purgeOpen ? (
+        <Modal
+          isOpen
+          onClose={() => {
+            if (!busy) setPurgeOpen(false);
+          }}
+          title="Bersihkan riwayat lama?"
+          maxWidth="max-w-md"
+          footer={
+            <div className="flex w-full gap-2">
+              <button
+                type="button"
+                onClick={() => setPurgeOpen(false)}
+                disabled={busy}
+                className="min-h-11 flex-1 rounded-xl border border-white/15 px-3 text-xs font-bold text-slate-300 active:scale-95 disabled:opacity-50"
+              >
+                Batal
+              </button>
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => void runPurge()}
+                className="min-h-11 flex-1 rounded-xl bg-rose-500 px-3 text-xs font-black text-white active:scale-95 disabled:opacity-50"
+              >
+                {busy ? "Membersihkan..." : "Bersihkan sekarang"}
+              </button>
+            </div>
+          }
+        >
+          <div className="space-y-3">
+            <p className="text-xs leading-5 text-slate-300">
+              Semua riwayat berstatus Terpakai, Kedaluwarsa, atau Dibatalkan
+              yang lebih tua dari {PURGE_DAYS} hari dihapus permanen beserta
+              foto verifikasi wajahnya.
+            </p>
+            <p className="rounded-2xl border border-emerald-400/20 bg-emerald-400/10 p-2.5 text-[11px] leading-4 text-emerald-200">
+              Yang TETAP ada: pengajuan yang masih berjalan (Menunggu Verifikasi
+              dan Terkirim) serta akun operatornya.
             </p>
           </div>
         </Modal>

@@ -21,6 +21,20 @@
  * itu gagal. Ia dirangkai ke setiap perintah build Android di `package.json`,
  * sehingga tidak ada yang perlu diingat siapa pun.
  *
+ * PENANDATANGANAN — kegagalan kedua dengan bentuk yang sama.
+ * Template Tauri juga TIDAK memasang `signingConfig` pada build release. APK
+ * tetap terbentuk (namanya berakhiran `-unsigned.apk`), Gradle tetap hijau,
+ * lalu Android menolak memasangnya dengan pesan "paket tidak valid". Ini yang
+ * terjadi setelah identifier diganti dan `tauri android init` dijalankan ulang:
+ * baris penandatanganan yang dulu ditambahkan manual ikut hilang. Bila blok
+ * release belum punya `signingConfig` sama sekali, skrip ini memasang kunci
+ * DEBUG — sama dengan workspace absensi-sppg asal. Konsekuensinya: APK hanya
+ * cocok untuk dipasang langsung (sideload), bukan Play Store, dan APK yang
+ * di-build di mesin lain bertanda tangan berbeda sehingga tidak bisa
+ * memperbarui instalasi yang ada. Untuk distribusi resmi, ganti dengan
+ * keystore rilis sendiri — skrip ini tidak menimpa `signingConfig` yang sudah
+ * dipasang.
+ *
  * Aturan lengkapnya:
  * `.agents/skills/absensi-sppg-rules/references/04-hardware-and-android-lifecycle.md`
  */
@@ -99,6 +113,13 @@ if (!/isShrinkResources\s*=/.test(badan)) {
   );
   berubah = true;
 }
+// Tanpa signingConfig, APK release keluar TANPA tanda tangan dan Android
+// menolaknya ("paket tidak valid"). Hanya dipasang bila belum ada sama sekali,
+// supaya keystore rilis yang kelak dipasang tidak tertimpa.
+if (!/signingConfig\s*=/.test(badan)) {
+  badan = `\n            signingConfig = signingConfigs.getByName("debug")${badan}`;
+  berubah = true;
+}
 if (berubah) {
   isiGradle = isiGradle.replace(
     blokRelease,
@@ -134,6 +155,11 @@ if (!/isMinifyEnabled\s*=\s*false/.test(releaseAkhir)) {
 }
 if (/isMinifyEnabled\s*=\s*true/.test(releaseAkhir)) {
   gagal.push("build.gradle.kts: masih ada `isMinifyEnabled = true`");
+}
+if (!/signingConfig\s*=/.test(releaseAkhir)) {
+  gagal.push(
+    "build.gradle.kts: build release tanpa `signingConfig` — APK tidak akan bisa dipasang",
+  );
 }
 for (const baris of aturan) {
   if (!proguardAkhir.includes(baris)) {

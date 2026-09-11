@@ -7,6 +7,8 @@ import { DatabaseBackupCard } from "@/components/DatabaseBackupCard";
 import { MailSettingsCard } from "@/components/MailSettingsCard";
 import { MobileAppShell } from "@/components/MobileAppShell";
 import { PasswordRecoveryCard } from "@/components/PasswordRecoveryCard";
+import { CompanyProfileCard } from "@/components/settings/CompanyProfileCard";
+import { ScannerSafetyCard } from "@/components/settings/ScannerSafetyCard";
 import { ThemeSettingsCard } from "@/components/ThemeSettingsCard";
 import { TwoFactorCard } from "@/components/TwoFactorCard";
 import { Icon } from "@/components/ui/Icon";
@@ -62,6 +64,14 @@ export default function SettingsPage() {
   const isOnline = useOnlineStatus();
   const canOperational = canAccessArea(user, "operational");
   const canShift = canAccessArea(user, "shift");
+  const canHolidays = canAccessArea(user, "holidays");
+  const canIdCards = canAccessArea(user, "idcards");
+  // Sama seperti halaman Master Operator Web/Desktop: hanya Superadmin.
+  const canManageOperators = Boolean(user?.isSuperadmin);
+  // Izin yang dituntut backend untuk profil instansi & nama aplikasi.
+  const canManageCompanyProfile = hasPermission(user, "settings.manage");
+  // Halaman /sync memulangkan pengguna tanpa area ini; pintasannya ikut.
+  const canViewSync = canAccessArea(user, "sync");
   const canPayroll = canAccessArea(user, "payroll");
   const canAkademik = canAccessArea(user, "akademik");
   const canGuru = canAccessArea(user, "guru");
@@ -656,6 +666,60 @@ export default function SettingsPage() {
           </div>
         ) : null}
 
+        {/* Hari Libur & Whitelist Scan (butuh izin holidays.view) */}
+        {canHolidays ? (
+          <div className="rounded-3xl border border-teal-500/20 bg-gradient-to-br from-teal-950/30 via-slate-900/80 to-slate-900/90 p-4 backdrop-blur-md">
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2.5">
+                <div className="grid size-9 place-items-center rounded-xl bg-teal-500/20 text-teal-300">
+                  <Icon name="calendar" className="size-5" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-white">
+                    Hari Libur &amp; Whitelist
+                  </h3>
+                  <p className="text-[11px] text-slate-400">
+                    Kalender libur &amp; Shift/Divisi yang tetap boleh scan
+                  </p>
+                </div>
+              </div>
+              <Link
+                href="/holidays"
+                onClick={() => triggerHaptic("light")}
+                className="whitespace-nowrap rounded-xl bg-teal-500 px-3.5 py-1.5 text-xs font-black text-slate-950 shadow-md transition hover:bg-teal-400 active:scale-95"
+              >
+                Kelola &rarr;
+              </Link>
+            </div>
+          </div>
+        ) : null}
+
+        {/* ID Card: daftar & status cetak (area idcards) */}
+        {canIdCards ? (
+          <div className="rounded-3xl border border-sky-500/20 bg-gradient-to-br from-sky-950/30 via-slate-900/80 to-slate-900/90 p-4 backdrop-blur-md">
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2.5">
+                <div className="grid size-9 place-items-center rounded-xl bg-sky-500/20 text-sky-300">
+                  <Icon name="id-card" className="size-5" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-white">ID Card</h3>
+                  <p className="text-[11px] text-slate-400">
+                    Status cetak kartu, pratinjau &amp; simpan gambar
+                  </p>
+                </div>
+              </div>
+              <Link
+                href="/id-cards"
+                onClick={() => triggerHaptic("light")}
+                className="whitespace-nowrap rounded-xl bg-sky-500 px-3.5 py-1.5 text-xs font-black text-slate-950 shadow-md transition hover:bg-sky-400 active:scale-95"
+              >
+                Buka &rarr;
+              </Link>
+            </div>
+          </div>
+        ) : null}
+
         {/* Struktur Akademik */}
         {canAkademik ? (
           <div className="rounded-3xl border border-amber-500/20 bg-gradient-to-br from-amber-950/30 via-slate-900/80 to-slate-900/90 p-4 backdrop-blur-md">
@@ -970,6 +1034,40 @@ export default function SettingsPage() {
             </div>
           </div>
         ) : null}
+
+        {/* Master Operator: akun, role & permission (khusus Superadmin) */}
+        {canManageOperators ? (
+          <div className="rounded-3xl border border-amber-500/20 bg-gradient-to-br from-amber-950/25 via-slate-900/80 to-slate-900/90 p-4 backdrop-blur-md">
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2.5">
+                <div className="grid size-9 place-items-center rounded-xl bg-amber-500/20 text-amber-300">
+                  <Icon name="users" className="size-5" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-white">
+                    Master Operator
+                  </h3>
+                  <p className="text-[11px] text-slate-400">
+                    Akun operator, role dinamis &amp; permission
+                  </p>
+                </div>
+              </div>
+              <Link
+                href="/operators"
+                onClick={() => triggerHaptic("light")}
+                className="whitespace-nowrap rounded-xl bg-amber-400 px-3.5 py-1.5 text-xs font-black text-slate-950 shadow-md transition hover:bg-amber-300 active:scale-95"
+              >
+                Kelola &rarr;
+              </Link>
+            </div>
+          </div>
+        ) : null}
+
+        {/* Profil instansi, nama aplikasi, logo & TTD ID Card */}
+        {canManageCompanyProfile ? <CompanyProfileCard /> : null}
+
+        {/* Keamanan pemindai (backend menolak selain Superadmin) */}
+        {user?.isSuperadmin ? <ScannerSafetyCard /> : null}
 
         {/* Email Sistem: satu-satunya jalur pengiriman link Lupa Password. */}
         {canManageAutoAlfa ? <MailSettingsCard /> : null}
@@ -1307,31 +1405,33 @@ export default function SettingsPage() {
           <DatabaseBackupCard provider={tursoProvider} />
         ) : null}
 
-        {/* Pusat Sinkronisasi Shortcut */}
-        <div className="rounded-3xl border border-sky-500/20 bg-gradient-to-br from-sky-950/30 via-slate-900/80 to-slate-900/90 p-4 backdrop-blur-md">
-          <div className="flex items-center justify-between gap-3 mb-2">
-            <div className="flex items-center gap-2.5">
-              <div className="grid size-9 place-items-center rounded-xl bg-sky-500/20 text-sky-300">
-                <Icon name="sync" className="size-5" />
+        {/* Pusat Sinkronisasi Shortcut (area sync) */}
+        {canViewSync ? (
+          <div className="rounded-3xl border border-sky-500/20 bg-gradient-to-br from-sky-950/30 via-slate-900/80 to-slate-900/90 p-4 backdrop-blur-md">
+            <div className="flex items-center justify-between gap-3 mb-2">
+              <div className="flex items-center gap-2.5">
+                <div className="grid size-9 place-items-center rounded-xl bg-sky-500/20 text-sky-300">
+                  <Icon name="sync" className="size-5" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-white">
+                    Pusat Sinkronisasi Data
+                  </h3>
+                  <p className="text-[11px] text-slate-400">
+                    Antrean outbox offline, riwayat push & snapshot
+                  </p>
+                </div>
               </div>
-              <div>
-                <h3 className="text-sm font-bold text-white">
-                  Pusat Sinkronisasi Data
-                </h3>
-                <p className="text-[11px] text-slate-400">
-                  Antrean outbox offline, riwayat push & snapshot
-                </p>
-              </div>
+              <Link
+                href="/sync"
+                onClick={() => triggerHaptic("light")}
+                className="rounded-xl bg-sky-400 px-3.5 py-1.5 text-xs font-black text-slate-950 shadow-md hover:bg-sky-300 active:scale-95 transition"
+              >
+                Buka →
+              </Link>
             </div>
-            <Link
-              href="/sync"
-              onClick={() => triggerHaptic("light")}
-              className="rounded-xl bg-sky-400 px-3.5 py-1.5 text-xs font-black text-slate-950 shadow-md hover:bg-sky-300 active:scale-95 transition"
-            >
-              Buka →
-            </Link>
           </div>
-        </div>
+        ) : null}
 
         {/* Keamanan absensi: sakelar induk fitur + daftar IP */}
         {canManageGeofence ? (

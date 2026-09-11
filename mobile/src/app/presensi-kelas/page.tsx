@@ -17,7 +17,9 @@ import {
 import {
   type AttendanceAnomalyItem,
   type ClassAttendanceSession,
+  deleteClassAttendance,
   getDaftarSesiPresensi,
+  getDetailSesiPresensi,
   getRekonsiliasiPresensi,
   getRosterUntukPresensi,
   type StudentAttendanceDetailItem,
@@ -41,6 +43,7 @@ export default function MobilePresensiKelasPage() {
   const { user, isAuthenticated, isLoading: authLoading } = useAuth();
   const router = useRouter();
   const canManage = hasPermission(user, "class_attendance.manage");
+  const canDelete = hasPermission(user, "class_attendance.delete");
 
   const [activeTab, setActiveTab] = useState<TabKey>("input");
   const [loading, setLoading] = useState(false);
@@ -64,6 +67,18 @@ export default function MobilePresensiKelasPage() {
   );
   const [selectedJamKe, setSelectedJamKe] = useState<string>("1-2");
   const [materiPokok, setMateriPokok] = useState<string>("");
+  // Catatan umum sesi WAJIB ikut dimuat dan dikirim ulang saat menyunting:
+  // penyimpanan menulis `catatan` apa adanya, jadi form tanpa kolom ini akan
+  // menghapus catatan yang ditulis dari Web/Desktop tanpa sepengetahuan guru.
+  const [catatanSesi, setCatatanSesi] = useState<string>("");
+  // Sesi riwayat yang sedang disunting (padanan "Sunting" di Web). Selama
+  // terisi, penyimpanan MENIMPA sesi itu alih-alih membuat sesi baru.
+  const [editingSession, setEditingSession] =
+    useState<ClassAttendanceSession | null>(null);
+  const [openingSessionId, setOpeningSessionId] = useState<string | null>(null);
+  const [deletingSessionId, setDeletingSessionId] = useState<string | null>(
+    null,
+  );
 
   // Roster items for active input session
   const [rosterItems, setRosterItems] = useState<StudentAttendanceDetailItem[]>(
@@ -172,6 +187,10 @@ export default function MobilePresensiKelasPage() {
       return;
     }
 
+    // Roster baru berarti sesi baru. Tetap dalam mode sunting di sini akan
+    // menimpa sesi lama dengan roster yang seluruhnya kembali ke status bawaan.
+    setEditingSession(null);
+    setCatatanSesi("");
     setLoading(true);
     setFeedback(null);
     triggerHaptic("light");
@@ -327,6 +346,7 @@ export default function MobilePresensiKelasPage() {
 
     try {
       const draft = {
+        id_presensi_mapel: editingSession?.id_presensi_mapel,
         id_tahun_ajaran: selectedTa,
         id_rombel: selectedRombel,
         id_mapel: selectedMapel,
@@ -334,6 +354,7 @@ export default function MobilePresensiKelasPage() {
         tanggal: selectedDate,
         jam_ke: selectedJamKe,
         materi_pokok: materiPokok || null,
+        catatan: catatanSesi || null,
         items: rosterItems.map((item) => ({
           id_siswa: item.id_siswa,
           status: item.status,
@@ -345,8 +366,11 @@ export default function MobilePresensiKelasPage() {
       triggerHaptic("success");
       setFeedback({
         tone: "success",
-        message: "Presensi kelas KBM berhasil disimpan.",
+        message: editingSession
+          ? "Perubahan sesi presensi berhasil disimpan."
+          : "Presensi kelas KBM berhasil disimpan.",
       });
+      setEditingSession(null);
     } catch (err: unknown) {
       triggerHaptic("error");
       setFeedback({
@@ -359,6 +383,110 @@ export default function MobilePresensiKelasPage() {
     } finally {
       isSubmittingRef.current = false;
       setSavingAttendance(false);
+    }
+  };
+
+  // Membuka sesi riwayat ke tab Input dengan status per siswa yang TERSIMPAN
+  // (padanan "Sunting" di Web). Tanpa izin kelola, layar yang sama berfungsi
+  // sebagai tampilan rincian — tombol simpannya memang tidak dirender.
+  const handleOpenSession = async (session: ClassAttendanceSession) => {
+    if (openingSessionId) return;
+    if (
+      hasUnsavedAttendanceMarks(rosterItems) &&
+      !(await konfirmasi({
+        title: "Buka sesi ini?",
+        description:
+          "Roster yang sedang Anda isi akan diganti isi sesi ini. Tanda kehadiran yang belum disimpan akan hilang.",
+        preserved: "Presensi yang sudah tersimpan sebelumnya tidak berubah.",
+        confirmLabel: "Ya, buka",
+        tone: "warning",
+      }))
+    ) {
+      return;
+    }
+    setOpeningSessionId(session.id_presensi_mapel);
+    setFeedback(null);
+    triggerHaptic("light");
+    try {
+      const data = await getDetailSesiPresensi(session.id_presensi_mapel);
+      setSelectedTa(String(data.session.id_tahun_ajaran));
+      setSelectedRombel(String(data.session.id_rombel));
+      setSelectedMapel(String(data.session.id_mapel));
+      setSelectedGuru(String(data.session.id_guru));
+      setSelectedDate(data.session.tanggal);
+      setSelectedJamKe(data.session.jam_ke);
+      setMateriPokok(data.session.materi_pokok || "");
+      setCatatanSesi(data.session.catatan || "");
+      setRosterItems(data.details);
+      setEditingSession(data.session);
+      setActiveTab("input");
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    } catch (err: unknown) {
+      setFeedback({
+        tone: "error",
+        message:
+          err instanceof Error
+            ? err.message
+            : "Gagal memuat rincian sesi presensi.",
+      });
+    } finally {
+      setOpeningSessionId(null);
+    }
+  };
+
+  const handleCancelEdit = () => {
+    triggerHaptic("light");
+    setEditingSession(null);
+    setRosterItems([]);
+    setMateriPokok("");
+    setCatatanSesi("");
+  };
+
+  const handleDeleteSession = async (session: ClassAttendanceSession) => {
+    if (!canDelete || isSubmittingRef.current) return;
+    const confirmed = await konfirmasi({
+      title: "Hapus sesi presensi?",
+      description: (
+        <>
+          Sesi{" "}
+          <strong>
+            {session.nama_rombel} – {session.nama_mapel}
+          </strong>{" "}
+          ({session.tanggal}, jam ke-{session.jam_ke}) beserta seluruh status
+          kehadiran siswanya akan dihapus dari semua perangkat. Sesi yang sudah
+          punya jurnal mengajar ditolak — hapus jurnalnya lebih dulu.
+        </>
+      ),
+      preserved:
+        "Scan gerbang siswa (absensi harian) tidak tersentuh — yang hilang hanya presensi mapel sesi ini.",
+      confirmLabel: "Hapus permanen",
+      tone: "danger",
+    });
+    if (!confirmed || isSubmittingRef.current) return;
+    isSubmittingRef.current = true;
+    setDeletingSessionId(session.id_presensi_mapel);
+    try {
+      await deleteClassAttendance(session.id_presensi_mapel);
+      triggerHaptic("success");
+      if (editingSession?.id_presensi_mapel === session.id_presensi_mapel) {
+        setEditingSession(null);
+        setRosterItems([]);
+      }
+      setFeedback({
+        tone: "success",
+        message: "Sesi presensi berhasil dihapus.",
+      });
+      void handleLoadHistory();
+    } catch (err: unknown) {
+      triggerHaptic("error");
+      setFeedback({
+        tone: "error",
+        message:
+          err instanceof Error ? err.message : "Gagal menghapus sesi presensi.",
+      });
+    } finally {
+      isSubmittingRef.current = false;
+      setDeletingSessionId(null);
     }
   };
 
@@ -480,6 +608,36 @@ export default function MobilePresensiKelasPage() {
         {/* TAB 1: INPUT PRESENSI KBM */}
         {activeTab === "input" ? (
           <div className="space-y-4">
+            {editingSession ? (
+              <div className="flex items-start justify-between gap-3 rounded-2xl border border-amber-500/30 bg-amber-500/10 p-3.5">
+                <div className="min-w-0">
+                  <p className="text-[10px] font-black uppercase tracking-wider text-amber-300">
+                    {canManage ? "Mode sunting" : "Rincian sesi"}
+                  </p>
+                  <p className="truncate text-sm font-bold text-white">
+                    {editingSession.nama_rombel} – {editingSession.nama_mapel}
+                  </p>
+                  <p className="text-[11px] text-slate-400">
+                    {editingSession.tanggal} · Jam ke-{editingSession.jam_ke} ·{" "}
+                    {editingSession.nama_guru}
+                  </p>
+                  {canManage ? (
+                    <p className="mt-1 text-[10px] leading-4 text-slate-400">
+                      Rombel dan tanggal dikunci karena roster milik sesi ini.
+                      Simpan akan menimpa sesi ini, bukan membuat sesi baru.
+                    </p>
+                  ) : null}
+                </div>
+                <button
+                  type="button"
+                  onClick={handleCancelEdit}
+                  className="shrink-0 rounded-xl border border-white/10 bg-slate-900/80 px-3 py-1.5 text-xs font-bold text-slate-200 active:scale-95"
+                >
+                  {canManage ? "Batal Sunting" : "Tutup"}
+                </button>
+              </div>
+            ) : null}
+
             {/* Header Form Card */}
             <div className="rounded-2xl border border-white/10 bg-slate-900/60 p-4 space-y-3">
               <div className="grid grid-cols-2 gap-2.5">
@@ -494,7 +652,8 @@ export default function MobilePresensiKelasPage() {
                     id="mobile-input-rombel"
                     value={selectedRombel}
                     onChange={(e) => setSelectedRombel(e.target.value)}
-                    className="w-full rounded-xl border border-white/10 bg-slate-950 px-2.5 py-2 text-xs font-semibold text-white outline-none"
+                    disabled={Boolean(editingSession)}
+                    className="w-full rounded-xl border border-white/10 bg-slate-950 px-2.5 py-2 text-xs font-semibold text-white outline-none disabled:opacity-60"
                   >
                     {rombelList.map((r) => (
                       <option
@@ -545,7 +704,8 @@ export default function MobilePresensiKelasPage() {
                     type="date"
                     value={selectedDate}
                     onChange={(e) => setSelectedDate(e.target.value)}
-                    className="w-full rounded-xl border border-white/10 bg-slate-950 px-2.5 py-2 text-xs font-semibold text-white outline-none"
+                    disabled={Boolean(editingSession)}
+                    className="w-full rounded-xl border border-white/10 bg-slate-950 px-2.5 py-2 text-xs font-semibold text-white outline-none disabled:opacity-60"
                   />
                 </div>
 
@@ -610,14 +770,27 @@ export default function MobilePresensiKelasPage() {
                 />
               </div>
 
-              <button
-                type="button"
-                onClick={handleLoadRoster}
-                disabled={loading}
-                className="w-full rounded-xl bg-sky-500 py-2.5 text-xs font-black text-slate-950 shadow transition active:scale-[0.98] disabled:opacity-50"
-              >
-                {loading ? "Memuat..." : "Tampilkan Roster Siswa"}
-              </button>
+              <div>
+                <input
+                  aria-label="Catatan umum sesi KBM"
+                  type="text"
+                  value={catatanSesi}
+                  onChange={(e) => setCatatanSesi(e.target.value)}
+                  placeholder="Catatan umum sesi KBM (opsional)..."
+                  className="w-full rounded-xl border border-white/10 bg-slate-950 px-3 py-2 text-xs text-white placeholder-slate-500 outline-none"
+                />
+              </div>
+
+              {editingSession ? null : (
+                <button
+                  type="button"
+                  onClick={handleLoadRoster}
+                  disabled={loading}
+                  className="w-full rounded-xl bg-sky-500 py-2.5 text-xs font-black text-slate-950 shadow transition active:scale-[0.98] disabled:opacity-50"
+                >
+                  {loading ? "Memuat..." : "Tampilkan Roster Siswa"}
+                </button>
+              )}
             </div>
 
             {/* Roster List Card */}
@@ -638,13 +811,15 @@ export default function MobilePresensiKelasPage() {
                       A:{metrics.alfa}
                     </span>
                   </div>
-                  <button
-                    type="button"
-                    onClick={handleMarkAllHadir}
-                    className="rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-2.5 py-1 text-[11px] font-bold text-emerald-300"
-                  >
-                    Semua Hadir
-                  </button>
+                  {canManage ? (
+                    <button
+                      type="button"
+                      onClick={handleMarkAllHadir}
+                      className="rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-2.5 py-1 text-[11px] font-bold text-emerald-300"
+                    >
+                      Semua Hadir
+                    </button>
+                  ) : null}
                 </div>
 
                 <div className="space-y-2">
@@ -697,6 +872,8 @@ export default function MobilePresensiKelasPage() {
                               onClick={() =>
                                 updateStudentStatus(item.id_siswa, opt.key)
                               }
+                              disabled={Boolean(editingSession) && !canManage}
+                              aria-pressed={isActive}
                               className={`py-1.5 rounded-lg text-xs font-black transition ${
                                 isActive
                                   ? opt.tone === "emerald"
@@ -729,7 +906,9 @@ export default function MobilePresensiKelasPage() {
                   >
                     {savingAttendance
                       ? "Menyimpan..."
-                      : "Simpan Presensi Kelas"}
+                      : editingSession
+                        ? "Simpan Perubahan Sesi"
+                        : "Simpan Presensi Kelas"}
                   </button>
                 ) : null}
               </div>
@@ -853,7 +1032,7 @@ export default function MobilePresensiKelasPage() {
                   className="rounded-2xl border border-white/10 bg-slate-900/60 p-4 space-y-2"
                 >
                   <div className="flex items-start justify-between gap-2">
-                    <div>
+                    <div className="min-w-0">
                       <span className="font-bold text-sm text-white block">
                         {session.nama_rombel} - {session.nama_mapel}
                       </span>
@@ -861,6 +1040,11 @@ export default function MobilePresensiKelasPage() {
                         {session.tanggal} · Jam ke-{session.jam_ke} ·{" "}
                         {session.nama_guru}
                       </p>
+                      {session.materi_pokok ? (
+                        <p className="mt-0.5 truncate text-[11px] text-slate-500">
+                          Materi: {session.materi_pokok}
+                        </p>
+                      ) : null}
                     </div>
                   </div>
 
@@ -877,6 +1061,37 @@ export default function MobilePresensiKelasPage() {
                     <span className="rounded bg-rose-500/20 px-1.5 py-0.5 font-bold text-rose-300">
                       A:{session.total_alfa}
                     </span>
+                    {session.total_dispensasi > 0 ? (
+                      <span className="rounded bg-purple-500/20 px-1.5 py-0.5 font-bold text-purple-300">
+                        D:{session.total_dispensasi}
+                      </span>
+                    ) : null}
+                  </div>
+
+                  <div className="flex items-center justify-end gap-1.5 pt-1">
+                    <button
+                      type="button"
+                      onClick={() => void handleOpenSession(session)}
+                      disabled={openingSessionId !== null}
+                      className="min-h-9 rounded-lg border border-white/10 bg-white/5 px-3 text-[11px] font-bold text-sky-300 active:scale-95 disabled:opacity-50"
+                    >
+                      {openingSessionId === session.id_presensi_mapel
+                        ? "Memuat..."
+                        : canManage
+                          ? "Sunting"
+                          : "Lihat Rincian"}
+                    </button>
+                    {canDelete ? (
+                      <button
+                        type="button"
+                        onClick={() => void handleDeleteSession(session)}
+                        disabled={deletingSessionId !== null}
+                        aria-label={`Hapus sesi ${session.nama_rombel} ${session.nama_mapel} ${session.tanggal}`}
+                        className="grid size-9 place-items-center rounded-lg border border-rose-500/25 bg-rose-500/10 text-rose-300 active:scale-95 disabled:opacity-50"
+                      >
+                        <Icon name="trash" className="size-4" />
+                      </button>
+                    ) : null}
                   </div>
                 </div>
               ))

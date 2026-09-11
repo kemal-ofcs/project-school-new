@@ -129,36 +129,12 @@ const expectedUnsyncedColumns: Record<string, string[]> = {
   tax_rules: ["created_at"],
 };
 
-// Command payroll khusus Desktop. `src/lib/gateways/payroll.ts` adalah salinan
-// dari web-desktop, jadi fungsinya ikut terbawa ke Mobile walau Rust Mobile
-// tidak mendaftarkannya. Aman selama UI Mobile tidak memanggilnya — Mobile
-// hanya membaca slip lewat command mobile-only. Kalau ada layar Mobile yang
-// mulai memakai salah satunya, hapus dari daftar ini dan daftarkan command-nya.
-const expectedMobileOnlyUnregisteredCommands = [
-  "desktop_create_payroll_run",
-  "desktop_delete_bpjs_rule",
-  "desktop_delete_overtime_rule",
-  "desktop_delete_payroll_component",
-  "desktop_delete_salary_config",
-  "desktop_delete_tax_rule",
-  "desktop_get_bpjs_rules",
-  "desktop_get_overtime_rules",
-  "desktop_get_payroll_components",
-  "desktop_get_payroll_recap",
-  "desktop_get_payroll_run_detail",
-  "desktop_get_salary_configs",
-  "desktop_get_tax_rules",
-  "desktop_list_payroll_runs",
-  "desktop_save_bpjs_rule",
-  "desktop_save_bpjs_rules",
-  "desktop_save_overtime_rule",
-  "desktop_save_overtime_rules",
-  "desktop_save_payroll_component",
-  "desktop_save_salary_config",
-  "desktop_save_tax_rule",
-  "desktop_save_tax_rules",
-  "desktop_transition_payroll_status",
-];
+// Command yang dipanggil gateway bersama tetapi SENGAJA tidak didaftarkan di
+// build Mobile. Dulu berisi 23 command administrasi payroll; sejak 2026-09-11
+// modul itu disalin ke `mobile/payroll_admin/` oleh `sync-rust-modules.ts` dan
+// didaftarkan, sehingga daftarnya kosong. Isi hanya bila sebuah command memang
+// tidak boleh ada di Mobile — daftar yang basi membuat audit ini gagal.
+const expectedMobileOnlyUnregisteredCommands: string[] = [];
 
 /**
  * Indeks yang memakai kolom hasil `ensure_column` tidak boleh berada di dalam

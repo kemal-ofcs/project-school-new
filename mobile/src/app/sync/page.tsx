@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { MobileAppShell } from "@/components/MobileAppShell";
 import { Icon } from "@/components/ui/Icon";
 import { canAccessArea } from "@/lib/auth/access";
@@ -10,6 +10,7 @@ import { useAuth } from "@/lib/context/AuthContext";
 import type { SyncConflict, SyncStatus } from "@/lib/gateways/sync-status";
 import {
   clearFailedSync,
+  forceResyncSettings,
   getSyncConflicts,
   getSyncStatus,
   resolveSyncConflicts,
@@ -29,6 +30,8 @@ export default function SyncPage() {
   const [conflicts, setConflicts] = useState<SyncConflict[]>([]);
   const [isSyncing, setIsSyncing] = useState<boolean>(false);
   const [message, setMessage] = useState<string>("");
+  const isResyncingRef = useRef(false);
+  const [isResyncing, setIsResyncing] = useState(false);
 
   useEffect(() => {
     if (!authLoading && !isAuthenticated) {
@@ -133,6 +136,39 @@ export default function SyncPage() {
           ? err.message
           : "Percobaan ulang sinkronisasi gagal.",
       );
+    }
+  };
+
+  /**
+   * Antrekan ulang data master lokal — Shift, Template ID Card, Profil
+   * Instansi, Hari Libur, dan Pengaturan Sistem (kecuali kunci khusus
+   * perangkat) — lalu kirim ke server. Sama dengan tombol "Kirim ulang
+   * pengaturan lokal" di Pengaturan Web/Desktop (`force_enqueue_settings`).
+   */
+  const handleResyncSettings = async () => {
+    if (isResyncingRef.current) return;
+    isResyncingRef.current = true;
+    setIsResyncing(true);
+    setMessage("");
+    triggerHaptic("light");
+    try {
+      const result = await forceResyncSettings();
+      if (result) {
+        setStatus(result.status);
+        setConflicts(await getSyncConflicts());
+        triggerHaptic("success");
+        setMessage(`${result.enqueue.pesan} Sinkronisasi ke server berhasil.`);
+      }
+    } catch (err) {
+      triggerHaptic("error");
+      setMessage(
+        err instanceof Error
+          ? err.message
+          : "Gagal menyinkronkan ulang pengaturan ke server.",
+      );
+    } finally {
+      isResyncingRef.current = false;
+      setIsResyncing(false);
     }
   };
 
@@ -262,6 +298,23 @@ export default function SyncPage() {
               {isSyncing ? "Menyinkronkan..." : "Sinkronkan Sekarang"}
             </span>
           </button>
+
+          <button
+            type="button"
+            onClick={() => void handleResyncSettings()}
+            disabled={isSyncing || isResyncing}
+            className="mt-2 flex min-h-11 w-full items-center justify-center gap-2 rounded-2xl border border-sky-400/40 bg-sky-400/10 text-xs font-bold text-sky-200 transition active:scale-[0.98] disabled:opacity-50"
+          >
+            <Icon name="upload" className="size-4" />
+            {isResyncing
+              ? "Mengirim ulang pengaturan..."
+              : "Kirim ulang pengaturan lokal"}
+          </button>
+          <p className="mt-1.5 text-center text-[10px] leading-4 text-slate-500">
+            Kirim ulang Shift, Profil Instansi, Template ID Card, Hari Libur
+            &amp; Pengaturan Sistem perangkat ini ke server bila server
+            tertinggal.
+          </p>
         </div>
 
         {/* Outbox Metrics Grid */}

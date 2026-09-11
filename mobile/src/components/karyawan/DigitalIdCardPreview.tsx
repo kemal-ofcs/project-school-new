@@ -28,6 +28,12 @@ import type { CardSide } from "@/types/id-card";
 interface DigitalIdCardPreviewProps {
   /** Data lengkap satu baris karyawan dari SQLite. */
   employee: Record<string, unknown>;
+  /**
+   * Dipanggil setelah gambar kartu BENAR-BENAR tersimpan (bukan dibatalkan).
+   * Halaman ID Card memakainya untuk menandai kartu "Tercetak", sama seperti
+   * halaman ID Card Web/Desktop saat PNG disimpan.
+   */
+  onSaved?: (side: CardSide) => void;
 }
 
 type QrStatus = "loading" | "ready" | "no-token" | "error";
@@ -37,7 +43,10 @@ type QrStatus = "loading" | "ready" | "no-token" | "error";
  * Mendukung template kustom resmi dari Desktop/Cloud dengan rendering Canvas 300 DPI,
  * serta fungsi Bagikan (Native Android Share Sheet) dan Simpan (MediaStore & Notifikasi).
  */
-export function DigitalIdCardPreview({ employee }: DigitalIdCardPreviewProps) {
+export function DigitalIdCardPreview({
+  employee,
+  onSaved,
+}: DigitalIdCardPreviewProps) {
   const logoDataUrl = useAppLogo();
 
   // Template State
@@ -312,11 +321,16 @@ export function DigitalIdCardPreview({ employee }: DigitalIdCardPreviewProps) {
     try {
       const dataUrl = await getCardDataUrl(cardSide);
       const res = await downloadDataUrl(dataUrl, filename);
+      // Menutup dialog "Simpan ke…" adalah pembatalan, bukan keberhasilan.
+      if (res.cancelled) return;
       triggerHaptic("success");
       setFeedback({
         type: "success",
-        text: `ID Card (${sideLabel}) berhasil disimpan ke ${res.path || "perangkat"}!`,
+        text: res.path
+          ? `ID Card (${sideLabel}) berhasil disimpan ke ${res.path}!`
+          : `ID Card (${sideLabel}) berhasil disimpan.`,
       });
+      onSaved?.(cardSide);
     } catch (err) {
       triggerHaptic("error");
       setFeedback({
