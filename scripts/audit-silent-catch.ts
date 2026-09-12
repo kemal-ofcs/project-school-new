@@ -25,7 +25,7 @@ import fs from "node:fs";
 import path from "node:path";
 
 const rootDir = path.resolve(import.meta.dir, "..");
-const WORKSPACES = ["web-desktop", "mobile"];
+const WORKSPACES = ["web-desktop", "mobile", "web-public"];
 
 /** Komentar yang tidak menjelaskan apa pun. */
 const KOSONG_MAKNA =

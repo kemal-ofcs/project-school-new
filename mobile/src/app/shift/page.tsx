@@ -395,6 +395,10 @@ export default function MobileShiftPage() {
 
   const handleDeleteShift = async () => {
     if (!deleteConfirmShift) return;
+    // Penjaga klik ganda: state penanda proses baru terlihat setelah
+    // render berikutnya, sehingga dua klik cepat sama-sama melewatinya.
+    if (isSubmittingRef.current) return;
+    isSubmittingRef.current = true;
     setIsDeleting(true);
     setErrorMsg(null);
     triggerHaptic("warning");
@@ -422,6 +426,7 @@ export default function MobileShiftPage() {
       setDeleteConfirmShift(null);
     } finally {
       setIsDeleting(false);
+      isSubmittingRef.current = false;
     }
   };
 

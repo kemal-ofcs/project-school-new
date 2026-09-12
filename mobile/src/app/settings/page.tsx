@@ -42,6 +42,7 @@ import {
   type TursoConnectionStatus,
   testTursoConnection,
 } from "@/lib/gateways/turso-config";
+import { useConfirmDialog } from "@/lib/hooks/useConfirmDialog";
 import { useOnlineStatus } from "@/lib/hooks/useOnlineStatus";
 import {
   DATABASE_PROVIDER_OPTIONS,
@@ -58,6 +59,8 @@ export default function SettingsPage() {
   // dijadwalkan, sehingga dua klik dalam satu tick React sama-sama membaca
   // nilai lama dan keduanya lolos. Dideklarasikan di ATAS, sebelum setiap
   // early return, supaya urutan hook tidak pernah berubah antar-render.
+  // Konfirmasi aksi merusak memakai dialog APLIKASI, bukan dialog bawaan peramban.
+  const { konfirmasi, dialogKonfirmasi } = useConfirmDialog();
   const isSubmittingRef = useRef(false);
 
   const { user, isAuthenticated, isLoading: authLoading, logout } = useAuth();
@@ -224,7 +227,16 @@ export default function SettingsPage() {
 
   const handleLogout = async () => {
     triggerHaptic("warning");
-    if (confirm("Apakah Anda yakin ingin keluar dari akun operator ini?")) {
+    if (
+      await konfirmasi({
+        title: "Keluar dari akun ini?",
+        description:
+          "Sesi di perangkat ini diakhiri dan Anda perlu masuk kembali dengan kata sandi.",
+        preserved:
+          "Data yang sudah tersimpan dan antrean sinkronisasi tidak hilang.",
+        confirmLabel: "Ya, keluar",
+      })
+    ) {
       await logout();
       router.replace("/login");
     }
@@ -536,7 +548,15 @@ export default function SettingsPage() {
 
   const handleTursoClear = async () => {
     if (
-      !confirm("Hapus konfigurasi database cloud Turso dari perangkat ini?")
+      !(await konfirmasi({
+        title: "Hapus konfigurasi database cloud?",
+        description:
+          "Perangkat ini berhenti tersambung ke database sekolah sampai dikonfigurasi ulang.",
+        preserved:
+          "Data di cloud tidak terhapus; perangkat lain tetap tersambung seperti biasa.",
+        confirmLabel: "Ya, hapus konfigurasi",
+        tone: "danger",
+      }))
     ) {
       return;
     }
@@ -1796,6 +1816,8 @@ export default function SettingsPage() {
           <span>Keluar dari Akun</span>
         </button>
       </div>
+
+      {dialogKonfirmasi}
     </MobileAppShell>
   );
 }

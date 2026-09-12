@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-mobile-queue-wa-notification"
+description = "Enables the mobile_queue_wa_notification command without any pre-configured scope."
+commands.allow = ["mobile_queue_wa_notification"]
+
+[[permission]]
+identifier = "deny-mobile-queue-wa-notification"
+description = "Denies the mobile_queue_wa_notification command without any pre-configured scope."
+commands.deny = ["mobile_queue_wa_notification"]

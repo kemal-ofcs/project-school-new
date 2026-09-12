@@ -2,7 +2,7 @@
   "name": "app-template-root",
   "private": true,
   "scripts": {
-    "setup": "bun install --cwd web-desktop && bun install --cwd mobile",
+    "setup": "bun install --cwd web-desktop && bun install --cwd mobile && bun install --cwd web-public",
     "audit:schema": "bun scripts/schema-audit.ts",
     "audit:contract": "bun scripts/audit-sync-contract.ts",
     "audit:sql": "bun scripts/audit-sql.ts",
@@ -15,8 +15,9 @@
     "audit:silent-catch": "bun scripts/audit-silent-catch.ts",
     "audit:list-bound": "bun scripts/audit-list-bound.ts",
     "sync:mobile": "cd mobile && bun scripts/sync-frontend-lib.ts && bun scripts/sync-rust-modules.ts",
-    "check:quick": "bun scripts/schema-audit.ts && bun scripts/audit-sync-contract.ts && bun scripts/audit-sql.ts && bun scripts/audit-ui-guard.ts && bun scripts/audit-a11y.ts && bun scripts/audit-page-guard.ts && bun scripts/audit-dialog.ts && bun scripts/audit-route-guard.ts && bun scripts/audit-confirm.ts && bun scripts/audit-silent-catch.ts && bun scripts/audit-list-bound.ts && cd web-desktop && bun run check:quick && cd ../mobile && bun run check:quick",
-    "check": "bun scripts/schema-audit.ts && bun scripts/audit-sync-contract.ts && bun scripts/audit-sql.ts && bun scripts/audit-ui-guard.ts && bun scripts/audit-a11y.ts && bun scripts/audit-page-guard.ts && bun scripts/audit-dialog.ts && bun scripts/audit-route-guard.ts && bun scripts/audit-confirm.ts && bun scripts/audit-silent-catch.ts && bun scripts/audit-list-bound.ts && cd web-desktop && bun run check && cd ../mobile && bun run check",
+    "sync:public": "cd web-public && bun scripts/sync-shared-lib.ts",
+    "check:quick": "bun scripts/schema-audit.ts && bun scripts/audit-sync-contract.ts && bun scripts/audit-sql.ts && bun scripts/audit-ui-guard.ts && bun scripts/audit-a11y.ts && bun scripts/audit-page-guard.ts && bun scripts/audit-dialog.ts && bun scripts/audit-route-guard.ts && bun scripts/audit-confirm.ts && bun scripts/audit-silent-catch.ts && bun scripts/audit-list-bound.ts && cd web-desktop && bun run check:quick && cd ../mobile && bun run check:quick && cd ../web-public && bun run check:quick",
+    "check": "bun scripts/schema-audit.ts && bun scripts/audit-sync-contract.ts && bun scripts/audit-sql.ts && bun scripts/audit-ui-guard.ts && bun scripts/audit-a11y.ts && bun scripts/audit-page-guard.ts && bun scripts/audit-dialog.ts && bun scripts/audit-route-guard.ts && bun scripts/audit-confirm.ts && bun scripts/audit-silent-catch.ts && bun scripts/audit-list-bound.ts && cd web-desktop && bun run check && cd ../mobile && bun run check && cd ../web-public && bun run check",
     "rename": "bun scripts/rename-project.ts",
     "verify:identity": "bun scripts/verify-identity.ts",
     "verify:template": "bun scripts/verify-template.ts"

@@ -1,0 +1,41 @@
+{
+  "name": "sekolah-web-public",
+  "version": "0.1.0",
+  "private": true,
+  "packageManager": "bun@1.3.14",
+  "engines": {
+    "node": ">=22",
+    "bun": ">=1.3.0"
+  },
+  "scripts": {
+    "dev": "next dev --webpack",
+    "build": "next build",
+    "start": "next start",
+    "lint": "biome check .",
+    "format": "biome format --write",
+    "typecheck": "tsc --noEmit",
+    "test": "bun scripts/run-tests.ts",
+    "sync:shared": "bun scripts/sync-shared-lib.ts",
+    "check:quick": "bun run lint && bun run typecheck && bun run test",
+    "check": "bun run check:quick"
+  },
+  "dependencies": {
+    "@libsql/client": "0.17.4",
+    "@tailwindcss/postcss": "^4.3.3",
+    "next": "16.3.0",
+    "postcss": "^8.5.26",
+    "react": "19.2.8",
+    "react-dom": "19.2.8",
+    "server-only": "^0.0.1",
+    "tailwindcss": "^4.3.3",
+    "zod": "4.3.6"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "2.4.2",
+    "@types/bun": "1.3.14",
+    "@types/node": "^20",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "typescript": "^5"
+  }
+}

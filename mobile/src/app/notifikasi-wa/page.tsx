@@ -1,16 +1,22 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { MobileAppShell } from "@/components/MobileAppShell";
 import { FeedbackBanner } from "@/components/ui/FeedbackBanner";
-import { canAccessArea } from "@/lib/auth/access";
+import { Modal } from "@/components/ui/Modal";
+import { canAccessArea, hasPermission } from "@/lib/auth/access";
 import { triggerHaptic } from "@/lib/client/haptics";
 import { useAuth } from "@/lib/context/AuthContext";
 import {
+  cancelWaNotificationGateway,
+  getWaConfigGateway,
   listWaNotificationsGateway,
+  saveWaConfigGateway,
+  type WaConfig,
   type WaNotificationItem,
 } from "@/lib/gateways/wa-notification";
+import { useConfirmDialog } from "@/lib/hooks/useConfirmDialog";
 
 /**
  * Tinjauan antrean WhatsApp versi genggam — HANYA BACA, dan dari CLOUD.
@@ -25,9 +31,21 @@ import {
  * Konsekuensinya halaman ini MENUNTUT JARINGAN, dan kegagalannya wajib berkata
  * apa adanya alih-alih menampilkan daftar kosong.
  *
- * Sengaja tanpa aksi ubah: membatalkan atau mengantre ulang notifikasi menyentuh
- * jalur pengiriman pesan ke nomor wali seorang siswa — tidak bisa ditarik
- * kembali — dan itu keputusan yang pantas dibuat di layar besar.
+ * PARITAS DENGAN DESKTOP. Versi pertama halaman ini sengaja hanya-baca, dengan
+ * alasan "membatalkan menyentuh pengiriman pesan ke nomor wali, dan itu pantas
+ * dibuat di layar besar". Alasan itu keliru sebagai aturan: justru pembatalan
+ * adalah tindakan yang paling mendesak waktunya — pesan yang salah harus
+ * dihentikan SEBELUM terkirim, dan orang yang menyadarinya sering sedang tidak
+ * di depan laptop. Menutupnya tidak membuat keputusan itu lebih hati-hati, ia
+ * hanya membuatnya terlambat.
+ *
+ * Yang dijaga bukan kewenangannya melainkan kebenarannya: pembatalan dan
+ * pengantrean di Mobile menuju CLOUD lewat `mobile_cancel_wa_notification` dan
+ * `mobile_queue_wa_notification`. Memakai ulang command Desktop di sini akan
+ * mengubah SQLite lokal yang tidak pernah punya barisnya — `UPDATE` mengenai
+ * nol baris, tidak ada event outbox, dan tombolnya mengembalikan sukses tanpa
+ * membatalkan apa pun. Tombol yang berbohong lebih buruk daripada tombol yang
+ * tidak ada.
  */
 
 const BATAS_ANTREAN = 200;
@@ -74,6 +92,20 @@ export default function NotifikasiWaMobilePage() {
   const [tanggal, setTanggal] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [kabar, setKabar] = useState("");
+  const [modalConfig, setModalConfig] = useState(false);
+  const [config, setConfig] = useState<WaConfig | null>(null);
+  const { konfirmasi, dialogKonfirmasi } = useConfirmDialog();
+
+  /**
+   * Penjaga klik ganda.
+   *
+   * Di halaman ini akibatnya bukan data ganda melainkan pembatalan yang
+   * berlomba: dua permintaan pada baris yang sama, dan yang kedua menemukan
+   * statusnya sudah bukan `Menunggu` lalu melapor gagal — padahal pembatalannya
+   * berhasil. Pengguna akan mengira pesannya tetap terkirim.
+   */
+  const isSubmittingRef = useRef(false);
 
   // Mobile memakai static export dan tidak punya rute `/forbidden`, jadi
   // proteksinya lewat `router.replace`, bukan `redirect()`.
@@ -117,6 +149,72 @@ export default function NotifikasiWaMobilePage() {
     void muat();
   }, [authLoading, isAuthenticated, canView, muat]);
 
+  const bolehBatalkan = hasPermission(user, "notification.delete");
+  const bolehKelola = hasPermission(user, "notification.manage");
+
+  async function batalkan(item: WaNotificationItem) {
+    const setuju = await konfirmasi({
+      title: "Batalkan pesan ini?",
+      description: (
+        <>
+          Pesan untuk <strong>{item.nama_siswa || item.tujuan_nomor}</strong>{" "}
+          tidak akan dikirim. Pembatalan hanya berlaku selama pesannya masih
+          berstatus Menunggu.
+        </>
+      ),
+      preserved:
+        "Pesan lain dalam antrean dan riwayat pengiriman tidak terpengaruh.",
+      confirmLabel: "Batalkan pesan",
+      tone: "warning",
+    });
+    if (!setuju) return;
+
+    if (isSubmittingRef.current) return;
+    isSubmittingRef.current = true;
+    setError(null);
+    try {
+      await cancelWaNotificationGateway(item.id_notifikasi);
+      setKabar("Pesan dibatalkan.");
+      await muat();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Pesan gagal dibatalkan.");
+    } finally {
+      isSubmittingRef.current = false;
+    }
+  }
+
+  async function bukaPengaturan() {
+    setError(null);
+    try {
+      setConfig(await getWaConfigGateway());
+      setModalConfig(true);
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : "Pengaturan gateway gagal dimuat.",
+      );
+    }
+  }
+
+  async function simpanPengaturan(peristiwa: React.FormEvent<HTMLFormElement>) {
+    peristiwa.preventDefault();
+    if (!config) return;
+    if (isSubmittingRef.current) return;
+    isSubmittingRef.current = true;
+    setError(null);
+
+    try {
+      await saveWaConfigGateway(config);
+      setKabar("Pengaturan gateway disimpan.");
+      setModalConfig(false);
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : "Pengaturan gagal disimpan.",
+      );
+    } finally {
+      isSubmittingRef.current = false;
+    }
+  }
+
   return (
     <MobileAppShell>
       <div className="flex flex-col gap-4 text-slate-100">
@@ -144,19 +242,38 @@ export default function NotifikasiWaMobilePage() {
               <path d="m15 18-6-6 6-6" />
             </svg>
           </button>
-          <div>
-            <h1 className="text-lg font-black text-white">Antrean WhatsApp</h1>
+          <div className="min-w-0 flex-1">
+            <h1 className="font-black text-lg text-white">Antrean WhatsApp</h1>
             <p className="text-[11px] text-slate-400">
               Dibaca dari cloud · membutuhkan koneksi
             </p>
           </div>
+          {bolehKelola ? (
+            <button
+              className="shrink-0 rounded-xl border border-white/15 px-3 py-2 font-bold text-[11px] text-white"
+              onClick={() => {
+                triggerHaptic("light");
+                void bukaPengaturan();
+              }}
+              type="button"
+            >
+              Gateway
+            </button>
+          ) : null}
         </div>
 
         {error ? (
           <FeedbackBanner
-            type="error"
             message={error}
             onClose={() => setError(null)}
+            type="error"
+          />
+        ) : null}
+        {kabar ? (
+          <FeedbackBanner
+            message={kabar}
+            onClose={() => setKabar("")}
+            type="success"
           />
         ) : null}
 
@@ -255,11 +372,127 @@ export default function NotifikasiWaMobilePage() {
                     <span>{item.attempt_count}x percobaan</span>
                   ) : null}
                 </div>
+                {/* Hanya baris yang masih Menunggu yang bisa dibatalkan —
+                    pesan yang sudah terkirim tidak bisa ditarik kembali, dan
+                    menawarkan tombolnya hanya menjanjikan yang tidak bisa
+                    ditepati. */}
+                {bolehBatalkan && item.status === "Menunggu" ? (
+                  <button
+                    className="mt-3 rounded-xl border border-amber-400/40 px-3 py-1.5 font-bold text-[11px] text-amber-200"
+                    onClick={() => {
+                      triggerHaptic("light");
+                      void batalkan(item);
+                    }}
+                    type="button"
+                  >
+                    Batalkan pesan
+                  </button>
+                ) : null}
               </li>
             ))}
           </ul>
         )}
       </div>
+
+      <Modal
+        isOpen={modalConfig}
+        onClose={() => setModalConfig(false)}
+        title="Gateway WhatsApp"
+      >
+        {config ? (
+          <form className="space-y-3 text-sm" onSubmit={simpanPengaturan}>
+            <div>
+              <label
+                className="block text-slate-400 text-xs"
+                htmlFor="wa-cfg-provider"
+              >
+                Provider
+              </label>
+              <select
+                className="mt-1 w-full rounded-xl border border-white/10 bg-slate-950 px-3 py-2 text-white"
+                id="wa-cfg-provider"
+                onChange={(e) =>
+                  setConfig((c) =>
+                    c
+                      ? {
+                          ...c,
+                          provider: e.target.value as WaConfig["provider"],
+                        }
+                      : c,
+                  )
+                }
+                value={config.provider}
+              >
+                <option value="fonnte">Fonnte</option>
+                <option value="wablas">Wablas</option>
+                <option value="custom">Custom</option>
+              </select>
+            </div>
+            <div>
+              <label
+                className="block text-slate-400 text-xs"
+                htmlFor="wa-cfg-key"
+              >
+                API key
+              </label>
+              <input
+                className="mt-1 w-full rounded-xl border border-white/10 bg-slate-950 px-3 py-2 text-white"
+                id="wa-cfg-key"
+                onChange={(e) =>
+                  setConfig((c) => (c ? { ...c, apiKey: e.target.value } : c))
+                }
+                type="password"
+                value={config.apiKey ?? ""}
+              />
+            </div>
+            <div>
+              <label
+                className="block text-slate-400 text-xs"
+                htmlFor="wa-cfg-url"
+              >
+                API URL <span className="text-[10px]">(opsional)</span>
+              </label>
+              <input
+                className="mt-1 w-full rounded-xl border border-white/10 bg-slate-950 px-3 py-2 text-white"
+                id="wa-cfg-url"
+                onChange={(e) =>
+                  setConfig((c) => (c ? { ...c, apiUrl: e.target.value } : c))
+                }
+                type="url"
+                value={config.apiUrl ?? ""}
+              />
+            </div>
+            <div className="flex items-center gap-2">
+              <input
+                checked={config.isActive}
+                id="wa-cfg-aktif"
+                onChange={(e) =>
+                  setConfig((c) =>
+                    c ? { ...c, isActive: e.target.checked } : c,
+                  )
+                }
+                type="checkbox"
+              />
+              <label className="text-slate-300 text-xs" htmlFor="wa-cfg-aktif">
+                Aktifkan pengiriman WhatsApp
+              </label>
+            </div>
+            <p className="text-[11px] text-slate-500 leading-relaxed">
+              Sakelar jenis notifikasi (scan masuk, pulang, bolos, ambang alfa)
+              ikut sinkronisasi dan diatur di halaman Pengaturan — sakelar itu
+              dibaca saat MENGANTRE, bukan saat mengirim.
+            </p>
+            <button
+              className="w-full rounded-xl bg-indigo-500 px-4 py-3 font-bold text-sm text-white"
+              type="submit"
+            >
+              Simpan pengaturan
+            </button>
+          </form>
+        ) : null}
+      </Modal>
+
+      {dialogKonfirmasi}
     </MobileAppShell>
   );
 }

@@ -73,6 +73,14 @@ const SUMBER: Array<{ dir: string; ext: ".ts" | ".rs" }> = [
 	{ dir: "web-desktop/src/lib/server", ext: ".ts" },
 	{ dir: "web-desktop/src-tauri/src/desktop", ext: ".rs" },
 	{ dir: "mobile/src-tauri/src/mobile", ext: ".rs" },
+	// Situs publik, sejak Fase 5.0. Portal wali membaca `absensi_harian` dan
+	// `presensi_mapel_detail` — dua tabel yang tumbuh setiap hari operasional —
+	// dan membacanya untuk pengunjung yang tidak diundang siapa pun. Di panel
+	// admin, query tak berbatas menghasilkan halaman yang lambat bagi satu
+	// operator; di sini ia menghasilkan endpoint yang bisa dipanggil berulang
+	// dari luar.
+	{ dir: "web-public/src/lib/services", ext: ".ts" },
+	{ dir: "web-public/src/lib/server", ext: ".ts" },
 ];
 
 interface Pelanggaran {

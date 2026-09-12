@@ -11,6 +11,7 @@ const filesToSync = [
   "scanner.rs",
   "academic.rs",
   "class_attendance.rs",
+  "grades.rs",
   "teaching_journal.rs",
   "attendance_ledger.rs",
   "attendance_dashboard.rs",

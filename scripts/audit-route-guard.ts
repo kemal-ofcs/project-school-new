@@ -28,7 +28,16 @@ import fs from "node:fs";
 import path from "node:path";
 
 const rootDir = path.resolve(import.meta.dir, "..");
-const API_DIR = path.join(rootDir, "web-desktop/src/app/api");
+// Dua situs, satu aturan. `web-public` ikut sejak Fase 5.0, dan di sana
+// alasannya berbeda dari yang dieja di atas: endpoint-nya melayani internet
+// terbuka tanpa sesi sama sekali, sehingga pendaftaran PMB dan permintaan kode
+// OTP bisa dipicu dari halaman mana pun milik siapa pun. Pemeriksaan asal
+// permintaan bukan lapisan tambahan di sana — ia satu-satunya yang ada sebelum
+// rate limit.
+const API_DIRS = [
+	path.join(rootDir, "web-desktop/src/app/api"),
+	path.join(rootDir, "web-public/src/app/api"),
+];
 
 const METODE_MUTASI = /export\s+(?:async\s+)?function\s+(POST|PUT|PATCH|DELETE)\b/;
 // Menuntut PANGGILAN, bukan sekadar penyebutan nama. Baris impor pun memuat
@@ -56,7 +65,7 @@ let total = 0;
 let terjaga = 0;
 const pelanggaran: string[] = [];
 
-for (const berkasAbsolut of kumpulkanRoute(API_DIR)) {
+for (const berkasAbsolut of API_DIRS.flatMap((dir) => kumpulkanRoute(dir))) {
 	const sumber = fs.readFileSync(berkasAbsolut, "utf8");
 	if (!METODE_MUTASI.test(sumber)) continue;
 

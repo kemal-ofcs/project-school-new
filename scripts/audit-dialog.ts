@@ -10,7 +10,12 @@ import fs from "node:fs";
 import path from "node:path";
 
 const rootDir = path.resolve(import.meta.dir, "..");
-const WORKSPACES = ["web-desktop", "mobile"];
+// `web-public` ikut sejak Fase 5.0, sebelum satu pun modal ditulis di sana.
+// Itu disengaja: tujuh belas overlay buatan tangan di web-desktop lahir satu
+// per satu, masing-masing tampak wajar saat ditulis, dan baru terlihat sebagai
+// pola setelah menumpuk. Memasang gerbangnya sejak hari pertama lebih murah
+// daripada mengulang pembersihan yang sama di workspace ketiga.
+const WORKSPACES = ["web-desktop", "mobile", "web-public"];
 
 function kumpulkan(dir: string, hasil: string[] = []): string[] {
   if (!fs.existsSync(dir)) return hasil;

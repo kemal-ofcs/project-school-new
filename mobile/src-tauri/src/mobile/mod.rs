@@ -17,6 +17,7 @@ pub mod academic;
 pub mod attendance_dashboard;
 pub mod attendance_ledger;
 pub mod class_attendance;
+pub mod grades;
 pub mod payroll;
 // Administrasi payroll: SALINAN `desktop/payroll/*` oleh sync-rust-modules.ts.
 pub mod payroll_admin;

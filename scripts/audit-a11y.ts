@@ -32,7 +32,13 @@ import fs from "node:fs";
 import path from "node:path";
 
 const rootDir = path.resolve(import.meta.dir, "..");
-const WORKSPACES = ["web-desktop", "mobile"];
+// `web-public` ikut sejak Fase 5.0. Justru di sanalah aturan ini paling
+// menggigit: formulir PMB diisi orang yang belum pernah melihat aplikasi ini,
+// pada perangkat yang tidak dipilihkan sekolah, dan seringkali dibantu orang
+// lain. Kontrol tanpa nama di panel admin merepotkan operator yang hafal
+// letaknya; kontrol tanpa nama di formulir pendaftaran membuat orang salah
+// mengisi berkas anaknya.
+const WORKSPACES = ["web-desktop", "mobile", "web-public"];
 
 interface Pelanggaran {
 	berkas: string;

@@ -363,6 +363,23 @@ for (const berkas of kumpulkanBerkas(
 	sasaran.push({ berkas, jenis: "ts" });
 }
 
+// Situs publik, sejak Fase 5.1. Ia membaca database yang sama tetapi TIDAK
+// memilikinya: seluruh tabel dan kolom yang disebutnya dibuat jalur
+// provisioning lain, dan ia sendiri tidak punya satu pun `CREATE TABLE` yang
+// bisa menambal salah ketik. Justru karena itu ia paling butuh diperiksa di
+// sini — sebuah `m.nama_lengkap` yang salah hanyalah teks di dalam string bagi
+// lint maupun typecheck, dan baru berbunyi sebagai halaman 500 di hadapan
+// calon pendaftar.
+for (const direktori of [
+	"web-public/src/lib",
+	"web-public/src/app",
+]) {
+	for (const berkas of kumpulkanBerkas(path.join(rootDir, direktori), ".ts")) {
+		if (berkas.endsWith(".test.ts")) continue;
+		sasaran.push({ berkas, jenis: "ts" });
+	}
+}
+
 // ── Pemeriksaan ─────────────────────────────────────────────────────────────
 heading("Hasil per berkas");
 

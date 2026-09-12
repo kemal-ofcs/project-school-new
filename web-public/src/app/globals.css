@@ -1,0 +1,49 @@
+@import "tailwindcss";
+
+/*
+ * Palet situs publik.
+ *
+ * Ditulis terang-dulu, kebalikan dari panel admin yang basis JSX-nya gelap.
+ * Alasannya bukan selera: halaman publik dibuka di ponsel, di luar ruangan,
+ * oleh orang tua yang mencari alamat sekolah — dan mode terang terbaca di sana.
+ * Panel admin dipakai berjam-jam di ruang kantor, dan basis gelapnya benar
+ * untuk itu. Dua konteks berbeda, dua bawaan berbeda.
+ */
+:root {
+  --latar: #ffffff;
+  --latar-lembut: #f8fafc;
+  --garis: #e2e8f0;
+  --teks: #0f172a;
+  --teks-lembut: #475569;
+  --aksen: #0f766e;
+  --aksen-teks: #ffffff;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --latar: #0f172a;
+    --latar-lembut: #1e293b;
+    --garis: #334155;
+    --teks: #f1f5f9;
+    --teks-lembut: #94a3b8;
+    --aksen: #2dd4bf;
+    --aksen-teks: #042f2e;
+  }
+}
+
+@theme inline {
+  --color-latar: var(--latar);
+  --color-latar-lembut: var(--latar-lembut);
+  --color-garis: var(--garis);
+  --color-teks: var(--teks);
+  --color-teks-lembut: var(--teks-lembut);
+  --color-aksen: var(--aksen);
+  --color-aksen-teks: var(--aksen-teks);
+}
+
+body {
+  background: var(--latar);
+  color: var(--teks);
+  font-family:
+    ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}

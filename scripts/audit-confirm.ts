@@ -32,18 +32,67 @@ import fs from "node:fs";
 import path from "node:path";
 
 const rootDir = path.resolve(import.meta.dir, "..");
-const WORKSPACES = ["web-desktop", "mobile"];
+const WORKSPACES = ["web-desktop", "mobile", "web-public"];
 
-/** Panggilan dialog sistem, bukan sekadar penyebutan namanya. */
-const DIALOG_SISTEM = /\b(?:window\.)?(confirm|alert|prompt)\s*\(/g;
+/**
+ * Panggilan dialog sistem, dengan atau tanpa awalan `window.`.
+ *
+ * Versi pertama audit ini HANYA mencari `window.confirm(`, dengan alasan bahwa
+ * `confirm` juga nama yang wajar untuk variabel atau prop. Alasannya masuk akal,
+ * akibatnya tidak: empat belas panggilan `confirm(` telanjang tersebar di
+ * sepuluh berkas — menghapus aturan BPJS, jenjang lembur, lapisan pajak, jadwal
+ * mengajar, konfigurasi database, bahkan logout — dan tidak satu pun pernah
+ * terlihat audit ini. `confirm(` telanjang adalah pemanggilan global yang sama
+ * persis dengan `window.confirm(`; yang berbeda hanya ejaannya.
+ *
+ * Kekhawatiran aslinya tetap dijawab, tetapi dengan cara yang benar: nama yang
+ * DIIKAT secara lokal di berkas itu (import, const/let, parameter, destructure)
+ * memang bukan pemanggilan global, dan dikecualikan lewat `terikatLokal`.
+ * Mengecualikan berdasarkan bukti di berkasnya jauh lebih tepat daripada
+ * mengecualikan seluruh bentuk ejaannya.
+ */
+const DIALOG_SISTEM = /(^|[^.\w$])(confirm|alert|prompt)\s*\(/gm;
 
-/** `confirm(` juga nama yang wajar untuk variabel/prop; hanya panggilan global yang dicari. */
-const GLOBAL_SAJA = /\bwindow\.(confirm|alert|prompt)\s*\(/g;
+/**
+ * Apakah nama itu punya pengikatan lokal di berkas ini.
+ *
+ * Kalau ya, pemanggilannya bukan dialog sistem melainkan fungsi milik berkas
+ * itu sendiri — dan audit yang menuduh kode benar akan dimatikan orang.
+ */
+function terikatLokal(sumber: string, nama: string): boolean {
+	const pola = [
+		new RegExp(`\\b(?:const|let|var|function)\\s+${nama}\\b`),
+		new RegExp(`\\bimport\\s+[^;]*\\b${nama}\\b[^;]*from`),
+		new RegExp(`\\b${nama}\\s*[:=]\\s*(?:async\\s*)?\\(`),
+		new RegExp(`\\{[^}]*\\b${nama}\\b[^}]*\\}\\s*=`),
+	];
+	return pola.some((p) => p.test(sumber));
+}
 
 interface Pelanggaran {
 	berkas: string;
 	baris: number;
 	cuplikan: string;
+}
+
+/**
+ * Buang komentar SEBELUM memindai, dengan panjang berkas dipertahankan.
+ *
+ * Tanpa ini, komentar yang MENJELASKAN aturan ini akan dituduh melanggarnya —
+ * dan itu bukan kekhawatiran teoretis: begitu audit ini diperketat, dua
+ * pelanggaran pertamanya adalah dua baris komentar yang menerangkan mengapa
+ * `confirm()` telanjang dilarang. Sebuah audit yang menuduh kode benar akan
+ * dimatikan orang.
+ *
+ * Karakternya diganti spasi alih-alih dihapus supaya nomor baris dan indeks
+ * yang dilaporkan tetap menunjuk posisi aslinya di berkas.
+ */
+function tanpaKomentar(sumber: string): string {
+	return sumber
+		.replace(/\/\*[\s\S]*?\*\//g, (cocok) => cocok.replace(/[^\n]/g, " "))
+		.replace(/(^|[^:])\/\/[^\n]*/g, (cocok, awalan: string) =>
+			awalan + cocok.slice(awalan.length).replace(/./g, " "),
+		);
 }
 
 function heading(text: string) {
@@ -75,19 +124,28 @@ for (const workspace of WORKSPACES) {
 			path.join(rootDir, workspace, direktori),
 		)) {
 			diperiksa++;
-			const sumber = fs.readFileSync(berkasAbsolut, "utf8");
+			const sumber = tanpaKomentar(fs.readFileSync(berkasAbsolut, "utf8"));
 			const berkas = path
 				.relative(rootDir, berkasAbsolut)
 				.split(path.sep)
 				.join("/");
 
-			for (const cocok of sumber.matchAll(GLOBAL_SAJA)) {
+			for (const cocok of sumber.matchAll(DIALOG_SISTEM)) {
 				if (cocok.index === undefined) continue;
+				const nama = cocok[2] as string;
+				// `window.confirm(` selalu dialog sistem. `confirm(` telanjang
+				// hanya dikecualikan bila berkasnya memang mengikat nama itu.
+				const eksplisit = sumber
+					.slice(Math.max(0, cocok.index - 7), cocok.index + 8)
+					.includes(`window.${nama}`);
+				if (!eksplisit && terikatLokal(sumber, nama)) continue;
+
+				const mulai = cocok.index + (cocok[1]?.length ?? 0);
 				pelanggaran.push({
 					berkas,
-					baris: sumber.slice(0, cocok.index).split("\n").length,
+					baris: sumber.slice(0, mulai).split("\n").length,
 					cuplikan: sumber
-						.slice(cocok.index, cocok.index + 80)
+						.slice(mulai, mulai + 80)
 						.split("\n")[0] as string,
 				});
 			}

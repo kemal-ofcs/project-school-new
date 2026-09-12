@@ -38,8 +38,23 @@ const WORKSPACES = ["web-desktop", "mobile"];
  * Sengaja awalan, bukan potongan di mana saja: `updateStatusIdCard` bermutasi,
  * sedangkan `getLastUpdate` tidak.
  */
+/**
+ * Awalan nama fungsi gateway yang MENGUBAH keadaan.
+ *
+ * Daftarnya dua bahasa, dan bagian keduanya lahir dari celah yang nyata: sampai
+ * Fase 6 seluruh awalan di sini berbahasa Inggris, sementara gateway yang lebih
+ * baru dinamai Indonesia (`simpanPenilaian`, `hapusPendaftarPmb`,
+ * `ubahStatusPendaftarPmb`, `jadikanSiswaDariPmb`). Semuanya lolos audit ini
+ * tanpa diperiksa sama sekali — halamannya kebetulan memang terjaga, tetapi
+ * tidak ada yang memverifikasinya, dan halaman berikutnya yang lupa tidak akan
+ * tertangkap.
+ *
+ * Menambah awalan membuat audit lebih KETAT, bukan lebih longgar; itu selalu
+ * boleh. Yang dilarang adalah memangkas daftarnya agar kode yang melanggar
+ * lewat.
+ */
 const AWALAN_MUTASI =
-	/^(save|create|update|delete|cancel|queue|submit|insert|edit|generate|import|reset|approve|revoke|assign|toggle|purge|drain|backfill|freeze|remove|add|send|apply|restore|promote|link|unlink|bulk)[A-Z]/;
+	/^(save|create|update|delete|cancel|queue|submit|insert|edit|generate|import|reset|approve|revoke|assign|toggle|purge|drain|backfill|freeze|remove|add|send|apply|restore|promote|link|unlink|bulk|simpan|hapus|ubah|buat|batalkan|jadikan|kirim|tambah|aktifkan|nonaktifkan|pulihkan|setujui|tolak|pindah|daftarkan|unggah|terbitkan)[A-Z]/;
 
 const PENJAGA = "isSubmittingRef";
 

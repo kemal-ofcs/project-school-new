@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { MobileAppShell } from "@/components/MobileAppShell";
 import { Icon } from "@/components/ui/Icon";
 import { canAccessArea } from "@/lib/auth/access";
@@ -25,6 +25,7 @@ import {
   prosesImportOffline,
 } from "@/lib/gateways/offline-import";
 import { getDaftarShift } from "@/lib/gateways/shift";
+import { useConfirmDialog } from "@/lib/hooks/useConfirmDialog";
 
 type OperationalTab = "koreksi" | "backup" | "manual";
 
@@ -77,6 +78,19 @@ export default function OperationalPage() {
     message: string;
   } | null>(null);
   const [busy, setBusy] = useState<boolean>(false);
+
+  // Konfirmasi aksi merusak memakai dialog APLIKASI, bukan `confirm()` bawaan
+  // WebView. Ketiga pemakaian lamanya lolos `audit:confirm` karena auditnya
+  // hanya mencari `window.confirm(`, sementara `confirm(` telanjang adalah
+  // pemanggilan global yang sama persis.
+  const { konfirmasi, dialogKonfirmasi } = useConfirmDialog();
+
+  // Penjaga klik ganda (aturan 5). Keempat handler yang menulis di halaman ini
+  // sebelumnya tanpa penjaga karena nama gatewaynya berbahasa Indonesia dan
+  // lolos dari daftar kata kerja audit yang saat itu hanya berbahasa Inggris.
+  // State penanda sibuk tidak cukup: ia baru terlihat setelah render berikutnya,
+  // sehingga dua ketukan cepat sama-sama membacanya `false`.
+  const isSubmittingRef = useRef(false);
 
   // Form State: Koreksi Admin
   const [korKaryawanId, setKorKaryawanId] = useState<string>("");
@@ -279,6 +293,7 @@ export default function OperationalPage() {
       });
     } finally {
       setBusy(false);
+      isSubmittingRef.current = false;
     }
   };
 
@@ -299,6 +314,8 @@ export default function OperationalPage() {
       });
       return;
     }
+    if (isSubmittingRef.current) return;
+    isSubmittingRef.current = true;
     setBusy(true);
     setFeedback(null);
     try {
@@ -399,7 +416,18 @@ export default function OperationalPage() {
 
   // Delete Action Handlers
   const handleDeleteKoreksi = async (idReferensi: string) => {
-    if (!confirm("Batalkan dan hapus data koreksi admin ini?")) return;
+    if (
+      !(await konfirmasi({
+        title: "Hapus koreksi admin ini?",
+        description:
+          "Baris koreksi dibatalkan dan dihapus; absensi yang dikoreksinya kembali ke nilai sebelum koreksi.",
+        preserved: "Riwayat absensi hari lain tidak terpengaruh.",
+        confirmLabel: "Ya, hapus",
+      }))
+    )
+      return;
+    if (isSubmittingRef.current) return;
+    isSubmittingRef.current = true;
     setFeedback(null);
     try {
       const res = await hapusKoreksiAdmin(idReferensi);
@@ -424,11 +452,25 @@ export default function OperationalPage() {
         message:
           err instanceof Error ? err.message : "Koreksi admin gagal dihapus.",
       });
+    } finally {
+      isSubmittingRef.current = false;
     }
   };
 
   const handleCancelBackup = async (idBackup: string) => {
-    if (!confirm("Batalkan penugasan backup ini?")) return;
+    if (
+      !(await konfirmasi({
+        title: "Batalkan penugasan backup ini?",
+        description:
+          "Karyawan pengganti tidak lagi terdaftar menggantikan siapa pun pada tanggal itu.",
+        preserved:
+          "Absensi yang sudah tercatat atas penugasan ini tetap tersimpan.",
+        confirmLabel: "Ya, batalkan",
+      }))
+    )
+      return;
+    if (isSubmittingRef.current) return;
+    isSubmittingRef.current = true;
     setFeedback(null);
     try {
       const res = await batalkanPenugasanBackup(idBackup);
@@ -458,11 +500,24 @@ export default function OperationalPage() {
             ? err.message
             : "Penugasan backup gagal dibatalkan.",
       });
+    } finally {
+      isSubmittingRef.current = false;
     }
   };
 
   const handleDeleteImport = async (eventKey: string) => {
-    if (!confirm("Hapus entri manual ini?")) return;
+    if (
+      !(await konfirmasi({
+        title: "Hapus entri manual ini?",
+        description: "Baris impor manual ini dihapus permanen dari antrean.",
+        preserved:
+          "Absensi yang sudah terbentuk dari entri ini tidak ikut terhapus.",
+        confirmLabel: "Ya, hapus",
+      }))
+    )
+      return;
+    if (isSubmittingRef.current) return;
+    isSubmittingRef.current = true;
     setFeedback(null);
     try {
       const res = await hapusImportOffline(eventKey);
@@ -487,6 +542,8 @@ export default function OperationalPage() {
         message:
           err instanceof Error ? err.message : "Entri manual gagal dihapus.",
       });
+    } finally {
+      isSubmittingRef.current = false;
     }
   };
 
@@ -1120,6 +1177,8 @@ export default function OperationalPage() {
           </div>
         )}
       </div>
+
+      {dialogKonfirmasi}
     </MobileAppShell>
   );
 }

@@ -50,3 +50,44 @@ pub async fn mobile_list_wa_notifications(
         )
         .await
 }
+
+/// Batalkan antrean WhatsApp — di CLOUD, bukan SQLite lokal.
+///
+/// Pasangan `mobile_list_wa_notifications` di atas, dan ada karena alasan yang
+/// sama persis. `desktop_cancel_wa_notification` membatalkan baris di SQLite
+/// LOKAL; sebuah ponsel yang bukan terminal pemindai tidak pernah punya baris
+/// itu, sehingga `UPDATE` mengenai NOL baris, tidak mendaftarkan event outbox
+/// apa pun, dan tetap mengembalikan sukses.
+///
+/// Hasilnya adalah tombol "Batalkan" yang tidak membatalkan apa pun — pada
+/// pesan yang tetap akan terkirim ke nomor wali seorang siswa. Itulah sebabnya
+/// memakai ulang command Desktop di sini bukan penghematan melainkan cacat.
+#[tauri::command]
+pub async fn mobile_cancel_wa_notification(
+    state: State<'_, MobileState>,
+    id_notifikasi: String,
+) -> Result<Value, CommandError> {
+    require_permission(&state, "notification.delete")?;
+    state
+        .get_turso_client()?
+        .cancel_wa_notification_cloud(&id_notifikasi)
+        .await
+}
+
+/// Antre satu pesan WhatsApp — di CLOUD, bukan SQLite lokal.
+///
+/// Halaman Mobile menampilkan antrean cloud, jadi barisnya harus lahir di sana.
+/// Menulis ke SQLite lokal membuat pesan yang baru diantre tidak muncul di layar
+/// yang baru saja dipakai mengantrekannya, sampai siklus sinkronisasi berikutnya
+/// — dan orang akan mengantre dua kali.
+#[tauri::command]
+pub async fn mobile_queue_wa_notification(
+    state: State<'_, MobileState>,
+    draft: Value,
+) -> Result<Value, CommandError> {
+    require_permission(&state, "notification.manage")?;
+    state
+        .get_turso_client()?
+        .queue_wa_notification_cloud(&draft)
+        .await
+}
