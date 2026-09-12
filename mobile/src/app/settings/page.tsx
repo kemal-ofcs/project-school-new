@@ -8,6 +8,7 @@ import { MailSettingsCard } from "@/components/MailSettingsCard";
 import { MobileAppShell } from "@/components/MobileAppShell";
 import { PasswordRecoveryCard } from "@/components/PasswordRecoveryCard";
 import { CompanyProfileCard } from "@/components/settings/CompanyProfileCard";
+import { JamPelajaranCard } from "@/components/settings/JamPelajaranCard";
 import { ScannerSafetyCard } from "@/components/settings/ScannerSafetyCard";
 import { ThemeSettingsCard } from "@/components/ThemeSettingsCard";
 import { TwoFactorCard } from "@/components/TwoFactorCard";
@@ -1071,6 +1072,9 @@ export default function SettingsPage() {
 
         {/* Email Sistem: satu-satunya jalur pengiriman link Lupa Password. */}
         {canManageAutoAlfa ? <MailSettingsCard /> : null}
+
+        {/* Jam pelajaran sekolah: batas sesi presensi & lama satu JP. */}
+        {canManageCompanyProfile ? <JamPelajaranCard /> : null}
 
         {/* Auto Generate Alfa (butuh izin settings.manage / alfa.trigger) */}
         {canSeeAutoAlfa ? (

@@ -10,6 +10,7 @@ import { canAccessArea, hasPermission } from "@/lib/auth/access";
 import { triggerHaptic } from "@/lib/client/haptics";
 import { createQrPng, employeeQrPayload } from "@/lib/client/qr-code";
 import { useAuth } from "@/lib/context/AuthContext";
+import { getDaftarShift } from "@/lib/gateways/shift";
 import {
   type GuruInput,
   getDaftarGuru,
@@ -19,16 +20,12 @@ import {
 import { useConfirmDialog } from "@/lib/hooks/useConfirmDialog";
 import { useDebounce } from "@/lib/hooks/useDebounce";
 import { useHydrated } from "@/lib/hooks/useHydrated";
+import {
+  STATUS_KEPEGAWAIAN_GURU as STATUS_KEPEGAWAIAN,
+  shiftLabel,
+} from "@/lib/validations/personnel";
 
-const STATUS_KEPEGAWAIAN = [
-  "Honorer",
-  "PNS",
-  "PPPK",
-  "GTY",
-  "Kontrak",
-] as const;
-
-function emptyForm(): GuruInput {
+function emptyForm(idShift?: number): GuruInput {
   return {
     id_guru: "",
     nama: "",
@@ -40,7 +37,7 @@ function emptyForm(): GuruInput {
     status_kepegawaian: "Honorer",
     no_hp: "",
     lp: "L",
-    id_shift: 1,
+    id_shift: idShift,
     status_aktif: "Aktif",
   };
 }
@@ -59,6 +56,10 @@ export default function GuruMobilePage() {
   const canManage = hasPermission(user, "teachers.manage");
 
   const [guru, setGuru] = useState<Record<string, unknown>[]>([]);
+  const [shifts, setShifts] = useState<Record<string, unknown>[]>([]);
+  // Daftar shift menuntut `shifts.view`; tanpa izin itu halaman tetap jalan,
+  // tetapi pemilih jam scan menjelaskan kenapa ia kosong.
+  const [shiftError, setShiftError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
@@ -96,6 +97,17 @@ export default function GuruMobilePage() {
       }
     } finally {
       if (!silent) setLoading(false);
+    }
+    try {
+      setShifts(await getDaftarShift());
+      setShiftError(null);
+    } catch (err: unknown) {
+      setShifts([]);
+      setShiftError(
+        err instanceof Error
+          ? `Daftar shift tidak bisa dimuat: ${err.message}`
+          : "Daftar shift tidak bisa dimuat.",
+      );
     }
   }, []);
 
@@ -242,7 +254,9 @@ export default function GuruMobilePage() {
           <button
             type="button"
             onClick={() => {
-              setForm(emptyForm());
+              setForm(
+                emptyForm(shifts[0] ? Number(shifts[0].id_shift) : undefined),
+              );
               setFormOpen(true);
               triggerHaptic("light");
             }}
@@ -519,6 +533,41 @@ export default function GuruMobilePage() {
                 <option value="Aktif">Aktif</option>
                 <option value="Nonaktif">Nonaktif</option>
               </select>
+            </label>
+            <label className="text-[11px] font-semibold text-slate-300">
+              Shift / Jam Scan
+              <select
+                value={form.id_shift ?? ""}
+                disabled={shifts.length === 0}
+                onChange={(e) =>
+                  setForm((p) => ({
+                    ...p,
+                    id_shift: e.target.value
+                      ? Number(e.target.value)
+                      : undefined,
+                  }))
+                }
+                className="mt-1 w-full rounded-xl border border-white/10 bg-slate-800/60 px-3 py-2 text-sm text-white outline-none focus:border-indigo-500 disabled:opacity-60"
+              >
+                {form.id_shift === undefined ? (
+                  <option value="">
+                    {form.id_guru
+                      ? "Pertahankan shift saat ini"
+                      : "Shift bawaan (shift 1)"}
+                  </option>
+                ) : null}
+                {shifts.map((s) => (
+                  <option key={Number(s.id_shift)} value={Number(s.id_shift)}>
+                    {shiftLabel(s)}
+                  </option>
+                ))}
+              </select>
+              <span className="mt-1 block text-[10px] font-normal text-slate-400">
+                {shiftError ??
+                  (shifts.length === 0
+                    ? "Belum ada shift. Buat shift di menu Shift."
+                    : "Scan masuk hanya diterima di sekitar jam masuk shift ini.")}
+              </span>
             </label>
             <div className="mt-1 flex gap-2">
               <button

@@ -23,8 +23,10 @@ import { useAuth } from "@/lib/context/AuthContext";
 import {
   deleteOvertimeRule,
   getOvertimeRules,
+  getTeacherOvertimePolicy,
   type OvertimeTierRuleRow,
   saveOvertimeRule,
+  saveTeacherOvertimePolicy,
 } from "@/lib/gateways/payroll";
 
 /*
@@ -115,10 +117,20 @@ export default function MobileOvertimeRulesPage() {
     }
   }, [authLoading, isAuthenticated, user, router]);
 
+  // Sakelar lembur guru. Bawaannya menyala, sama seperti nilai yang dibaca
+  // backend ketika kuncinya belum pernah disimpan, supaya layar tidak sempat
+  // menampilkan "mati" pada pemasangan yang lemburnya sebenarnya berjalan.
+  const [teacherOvertime, setTeacherOvertime] = useState(true);
+
   const loadRules = useCallback(async (silent = false) => {
     if (!silent) setLoading(true);
     try {
-      setRules(await getOvertimeRules());
+      const [data, policy] = await Promise.all([
+        getOvertimeRules(),
+        getTeacherOvertimePolicy(),
+      ]);
+      setRules(data);
+      setTeacherOvertime(policy);
     } catch (err) {
       if (!silent) {
         setFeedback({
@@ -145,6 +157,34 @@ export default function MobileOvertimeRulesPage() {
       window.removeEventListener("sppg:sync-completed", onSyncCompleted);
     };
   }, [loadRules]);
+
+  const toggleTeacherOvertime = async (enabled: boolean) => {
+    if (isSubmittingRef.current) return;
+    isSubmittingRef.current = true;
+    // Layar mengikuti pilihan lebih dulu, lalu dikembalikan bila simpannya
+    // gagal: sakelar yang diam setelah disentuh terbaca sebagai aplikasi macet.
+    setTeacherOvertime(enabled);
+    try {
+      await saveTeacherOvertimePolicy(enabled);
+      setFeedback({
+        type: "success",
+        message: enabled
+          ? "Lembur guru dihitung kembali pada rekap penggajian."
+          : "Lembur guru tidak lagi dihitung. Jam mengajar pada tanggal libur tetap dibayar dengan rate pokok.",
+      });
+    } catch (err) {
+      setTeacherOvertime(!enabled);
+      setFeedback({
+        type: "error",
+        message:
+          err instanceof Error
+            ? err.message
+            : "Gagal menyimpan sakelar lembur guru.",
+      });
+    } finally {
+      isSubmittingRef.current = false;
+    }
+  };
 
   const openAdd = (ruleType: RuleType) => {
     triggerHaptic("light");
@@ -311,6 +351,36 @@ export default function MobileOvertimeRulesPage() {
             onClose={() => setFeedback(null)}
           />
         ) : null}
+
+        {/* Sakelar lembur guru: kebijakan sekolah, bukan setelan perangkat. */}
+        <section className="flex flex-col gap-2.5 rounded-2xl border border-white/10 bg-slate-900/60 p-3.5">
+          <div>
+            <h2 className="text-sm font-bold text-white">Lembur untuk Guru</h2>
+            <p className="mt-0.5 text-[11px] leading-4 text-slate-500">
+              Sebagian sekolah memberi guru upah lembur seperti karyawan,
+              sebagian tidak. Ketika dimatikan, jenjang di bawah ini tidak
+              berlaku bagi personil berjenis Guru — jam mengajar mereka pada
+              tanggal libur tetap dibayar dengan rate pokok per jam, bukan
+              hangus. Karyawan non-guru tidak terpengaruh.
+            </p>
+          </div>
+          <label className="flex items-center gap-3 text-[11px] font-semibold text-slate-300">
+            <input
+              type="checkbox"
+              checked={teacherOvertime}
+              onChange={(event) =>
+                void toggleTeacherOvertime(event.target.checked)
+              }
+              disabled={loading}
+              className="size-4 rounded border-white/20 bg-slate-950 accent-sky-500"
+            />
+            <span>
+              {teacherOvertime
+                ? "Lembur guru dihitung"
+                : "Lembur guru tidak dihitung"}
+            </span>
+          </label>
+        </section>
 
         {RULE_SECTIONS.map((section) => {
           const sectionRules = rules.filter(

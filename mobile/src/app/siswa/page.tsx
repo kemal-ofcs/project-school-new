@@ -11,6 +11,7 @@ import { triggerHaptic } from "@/lib/client/haptics";
 import { createQrPng, employeeQrPayload } from "@/lib/client/qr-code";
 import { useAuth } from "@/lib/context/AuthContext";
 import { getDaftarRombel } from "@/lib/gateways/academic";
+import { getDaftarShift } from "@/lib/gateways/shift";
 import {
   getDaftarSiswa,
   hapusSiswa,
@@ -21,16 +22,9 @@ import { useConfirmDialog } from "@/lib/hooks/useConfirmDialog";
 import { useDebounce } from "@/lib/hooks/useDebounce";
 import { useHydrated } from "@/lib/hooks/useHydrated";
 import { normalizeOperatorPhone } from "@/lib/operators/contact";
+import { STATUS_SISWA, shiftLabel } from "@/lib/validations/personnel";
 
-const STATUS_SISWA = [
-  "Aktif",
-  "Lulus",
-  "Pindah",
-  "Keluar",
-  "Drop Out",
-] as const;
-
-function emptyForm(idRombel = ""): SiswaInput {
+function emptyForm(idRombel = "", idShift?: number): SiswaInput {
   return {
     id_siswa: "",
     nama_lengkap: "",
@@ -43,6 +37,7 @@ function emptyForm(idRombel = ""): SiswaInput {
     alamat: "",
     angkatan: new Date().getFullYear(),
     status: "Aktif",
+    id_shift: idShift,
   };
 }
 
@@ -63,6 +58,10 @@ export default function SiswaMobilePage() {
 
   const [siswa, setSiswa] = useState<Record<string, unknown>[]>([]);
   const [rombel, setRombel] = useState<Record<string, unknown>[]>([]);
+  const [shifts, setShifts] = useState<Record<string, unknown>[]>([]);
+  // Daftar shift menuntut `shifts.view`; tanpa izin itu halaman tetap jalan,
+  // tetapi pemilih jam scan menjelaskan kenapa ia kosong.
+  const [shiftError, setShiftError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
@@ -107,6 +106,17 @@ export default function SiswaMobilePage() {
         }
       } finally {
         if (!silent) setLoading(false);
+      }
+      try {
+        setShifts(await getDaftarShift());
+        setShiftError(null);
+      } catch (err: unknown) {
+        setShifts([]);
+        setShiftError(
+          err instanceof Error
+            ? `Daftar shift tidak bisa dimuat: ${err.message}`
+            : "Daftar shift tidak bisa dimuat.",
+        );
       }
     },
     [filterRombel],
@@ -169,6 +179,7 @@ export default function SiswaMobilePage() {
       alamat: String(item.alamat ?? ""),
       angkatan: Number(item.angkatan ?? new Date().getFullYear()),
       status: String(item.status ?? "Aktif"),
+      id_shift: item.id_shift ? Number(item.id_shift) : undefined,
     });
     setFormOpen(true);
   }, []);
@@ -256,7 +267,10 @@ export default function SiswaMobilePage() {
             type="button"
             onClick={() => {
               setForm(
-                emptyForm(filterRombel || String(rombel[0]?.id_rombel ?? "")),
+                emptyForm(
+                  filterRombel || String(rombel[0]?.id_rombel ?? ""),
+                  shifts[0] ? Number(shifts[0].id_shift) : undefined,
+                ),
               );
               setFormOpen(true);
               triggerHaptic("light");
@@ -585,6 +599,41 @@ export default function SiswaMobilePage() {
                   </option>
                 ))}
               </select>
+            </label>
+            <label className="text-[11px] font-semibold text-slate-300">
+              Shift / Jam Scan
+              <select
+                value={form.id_shift ?? ""}
+                disabled={shifts.length === 0}
+                onChange={(e) =>
+                  setForm((p) => ({
+                    ...p,
+                    id_shift: e.target.value
+                      ? Number(e.target.value)
+                      : undefined,
+                  }))
+                }
+                className="mt-1 w-full rounded-xl border border-white/10 bg-slate-800/60 px-3 py-2 text-sm text-white outline-none focus:border-sky-500 disabled:opacity-60"
+              >
+                {form.id_shift === undefined ? (
+                  <option value="">
+                    {form.id_siswa
+                      ? "Pertahankan shift saat ini"
+                      : "Shift bawaan (shift 1)"}
+                  </option>
+                ) : null}
+                {shifts.map((s) => (
+                  <option key={Number(s.id_shift)} value={Number(s.id_shift)}>
+                    {shiftLabel(s)}
+                  </option>
+                ))}
+              </select>
+              <span className="mt-1 block text-[10px] font-normal text-slate-400">
+                {shiftError ??
+                  (shifts.length === 0
+                    ? "Belum ada shift. Buat shift khusus siswa di menu Shift."
+                    : "Scan masuk hanya diterima di sekitar jam masuk shift ini.")}
+              </span>
             </label>
             <div className="mt-1 flex gap-2">
               <button

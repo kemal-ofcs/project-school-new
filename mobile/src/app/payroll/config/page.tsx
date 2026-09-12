@@ -33,6 +33,15 @@ import {
   savePayrollComponent,
   saveSalaryConfig,
 } from "@/lib/gateways/payroll";
+import {
+  APPLIES_TO_ALL,
+  isStudentPersonnel,
+  labelAppliesTo,
+  PAYROLL_CALC_TYPE_LABEL,
+  PAYROLL_CALC_TYPES,
+  type PayrollCalcType,
+  TEACHER_EMPLOYMENT_STATUSES,
+} from "@/lib/validations/payroll-policy";
 
 /*
  * Konfigurasi penggajian untuk Mobile — padanan
@@ -63,6 +72,11 @@ const RULE_LINKS = [
     subtitle: "Pengali Hari Kerja vs Hari Libur",
   },
   {
+    href: "/payroll/config/jp-rates",
+    title: "Tarif Honor per Jam Pelajaran",
+    subtitle: "Tarif per mapel, dan tarif khusus per guru",
+  },
+  {
     href: "/payroll/config/tax-rules",
     title: "PPh 21 (TER & Pasal 17)",
     subtitle: "Tarif Efektif PMK 168/2023 & UU HPP",
@@ -78,6 +92,8 @@ interface SalaryDraft {
   id: string;
   id_karyawan: string;
   rate: string;
+  /** Tarif bawaan per jam pelajaran; nol berarti tidak dibayar per JP. */
+  rateJp: string;
   ptkp_status: string;
   effective_date: string;
 }
@@ -86,7 +102,7 @@ interface ComponentDraft {
   id: string;
   name: string;
   category: "ALLOWANCE" | "DEDUCTION";
-  calc_type: "FIXED" | "PERCENTAGE";
+  calc_type: PayrollCalcType;
   value: string;
   applies_to: string;
   is_active: number;
@@ -174,16 +190,38 @@ export default function MobilePayrollConfigPage() {
     };
   }, [loadData]);
 
+  // Siswa tinggal di `master_data` yang sama dengan guru dan karyawan, dan
+  // daftar personil mengambil tabel itu apa adanya. Tanpa saringan ini, daftar
+  // penerima gaji dan penerima tunjangan memuat seluruh siswa sekolah.
+  const payrollPersonnel = useMemo(
+    () => employees.filter((emp) => !isStudentPersonnel(emp.jenis_personil)),
+    [employees],
+  );
+
+  // Divisi diambil dari data personil yang ada, bukan daftar tetap: nama divisi
+  // memang ditulis sekolahnya sendiri.
+  const divisiList = useMemo(
+    () =>
+      Array.from(
+        new Set(
+          payrollPersonnel
+            .map((emp) => String(emp.divisi ?? "").trim())
+            .filter((divisi) => divisi !== ""),
+        ),
+      ).sort(),
+    [payrollPersonnel],
+  );
+
   const employeeNames = useMemo(() => {
     const map = new Map<string, { nama: string; divisi: string }>();
-    for (const emp of employees) {
+    for (const emp of payrollPersonnel) {
       map.set(String(emp.id_unik), {
         nama: String(emp.nama ?? ""),
         divisi: emp.divisi ? String(emp.divisi) : "",
       });
     }
     return map;
-  }, [employees]);
+  }, [payrollPersonnel]);
 
   const today = todayLocal();
 
@@ -201,8 +239,8 @@ export default function MobilePayrollConfigPage() {
 
   const pickerEmployees = useMemo(() => {
     const keyword = employeeFilter.trim().toLowerCase();
-    if (!keyword) return employees;
-    return employees.filter(
+    if (!keyword) return payrollPersonnel;
+    return payrollPersonnel.filter(
       (emp) =>
         String(emp.nama ?? "")
           .toLowerCase()
@@ -211,7 +249,7 @@ export default function MobilePayrollConfigPage() {
           .toLowerCase()
           .includes(keyword),
     );
-  }, [employees, employeeFilter]);
+  }, [payrollPersonnel, employeeFilter]);
 
   const openNewSalary = () => {
     triggerHaptic("light");
@@ -221,6 +259,7 @@ export default function MobilePayrollConfigPage() {
       id: "",
       id_karyawan: "",
       rate: "25000",
+      rateJp: "0",
       ptkp_status: "TK/0",
       effective_date: today,
     });
@@ -233,6 +272,7 @@ export default function MobilePayrollConfigPage() {
       id: cfg.id,
       id_karyawan: cfg.id_karyawan,
       rate: String(cfg.rate_per_hour),
+      rateJp: String(cfg.rate_per_jp ?? 0),
       ptkp_status: cfg.ptkp_status || "TK/0",
       effective_date: cfg.effective_date,
     });
@@ -249,6 +289,11 @@ export default function MobilePayrollConfigPage() {
     // saat deserialisasi dengan pesan yang tidak bisa dipahami pengguna.
     if (!Number.isInteger(rate) || rate <= 0) {
       setFormError("Rate per jam harus bilangan bulat lebih dari 0.");
+      return;
+    }
+    const rateJp = Number(salaryDraft.rateJp || 0);
+    if (!Number.isInteger(rateJp) || rateJp < 0) {
+      setFormError("Tarif per jam pelajaran harus bilangan bulat, minimal 0.");
       return;
     }
     if (!salaryDraft.effective_date) {
@@ -274,6 +319,7 @@ export default function MobilePayrollConfigPage() {
         id: existing?.id ?? salaryDraft.id,
         id_karyawan: salaryDraft.id_karyawan,
         rate_per_hour: rate,
+        rate_per_jp: rateJp,
         ptkp_status: salaryDraft.ptkp_status,
         effective_date: salaryDraft.effective_date,
       });
@@ -596,11 +642,10 @@ export default function MobilePayrollConfigPage() {
               <ul className="flex flex-col gap-2">
                 {components.map((comp) => {
                   const isAllowance = comp.category === "ALLOWANCE";
-                  const recipient =
-                    comp.applies_to === "ALL"
-                      ? "Semua karyawan"
-                      : employeeNames.get(comp.applies_to)?.nama ||
-                        comp.applies_to;
+                  const recipient = labelAppliesTo(
+                    comp.applies_to,
+                    (id) => employeeNames.get(id)?.nama || id,
+                  );
                   return (
                     <li
                       key={comp.id}
@@ -621,9 +666,11 @@ export default function MobilePayrollConfigPage() {
                           }`}
                         >
                           {isAllowance ? "+" : "−"}
-                          {comp.calc_type === "FIXED"
-                            ? IDR.format(comp.default_value)
-                            : `${comp.default_value}%`}
+                          {comp.calc_type === "PERCENTAGE"
+                            ? `${comp.default_value}%`
+                            : IDR.format(comp.default_value)}
+                          {comp.calc_type === "PER_JP" ? " /JP" : ""}
+                          {comp.calc_type === "PER_HADIR" ? " /hari" : ""}
                         </p>
                       </div>
                       <div className="mt-2 flex items-end justify-between gap-2">
@@ -638,9 +685,9 @@ export default function MobilePayrollConfigPage() {
                             {isAllowance ? "Tunjangan" : "Potongan"}
                           </span>
                           <span className="rounded-md border border-white/10 bg-slate-950/60 px-2 py-0.5 text-slate-400">
-                            {comp.calc_type === "FIXED"
-                              ? "Nominal tetap"
-                              : "% gaji pokok"}
+                            {PAYROLL_CALC_TYPE_LABEL[
+                              comp.calc_type as PayrollCalcType
+                            ] ?? comp.calc_type}
                           </span>
                           {comp.is_active === 0 ? (
                             <span className="rounded-md border border-white/15 bg-slate-500/15 px-2 py-0.5 font-bold text-slate-400">
@@ -760,6 +807,29 @@ export default function MobilePayrollConfigPage() {
                   required
                   className={`${CONFIG_INPUT_CLASS} font-mono`}
                 />
+              </div>
+              <div>
+                <label htmlFor="salary-rate-jp" className={CONFIG_LABEL_CLASS}>
+                  Tarif bawaan (Rp/JP)
+                </label>
+                <input
+                  id="salary-rate-jp"
+                  type="number"
+                  inputMode="numeric"
+                  min={0}
+                  step={1}
+                  value={salaryDraft.rateJp}
+                  onChange={(event) =>
+                    setSalaryDraft((prev) =>
+                      prev ? { ...prev, rateJp: event.target.value } : prev,
+                    )
+                  }
+                  className={`${CONFIG_INPUT_CLASS} font-mono`}
+                />
+                <p className="mt-1 text-[11px] text-slate-500">
+                  Honor per jam pelajaran bila mapel yang diajar belum punya
+                  tarif sendiri. Nol berarti tidak dibayar per JP.
+                </p>
               </div>
               <div>
                 <label htmlFor="salary-ptkp" className={CONFIG_LABEL_CLASS}>
@@ -889,26 +959,81 @@ export default function MobilePayrollConfigPage() {
                       prev
                         ? {
                             ...prev,
-                            calc_type: event.target.value as
-                              | "FIXED"
-                              | "PERCENTAGE",
+                            calc_type: event.target.value as PayrollCalcType,
                           }
                         : prev,
                     )
                   }
                   className={CONFIG_INPUT_CLASS}
                 >
-                  <option value="FIXED">Nominal (Rp)</option>
-                  <option value="PERCENTAGE">% Gaji pokok</option>
+                  {PAYROLL_CALC_TYPES.map((calcType) => (
+                    <option key={calcType} value={calcType}>
+                      {PAYROLL_CALC_TYPE_LABEL[calcType]}
+                    </option>
+                  ))}
                 </select>
               </div>
             </div>
 
             <div>
+              <label
+                htmlFor="component-applies-to"
+                className={CONFIG_LABEL_CLASS}
+              >
+                Berlaku untuk
+              </label>
+              <select
+                id="component-applies-to"
+                value={componentDraft.applies_to || APPLIES_TO_ALL}
+                onChange={(event) =>
+                  setComponentDraft((prev) =>
+                    prev ? { ...prev, applies_to: event.target.value } : prev,
+                  )
+                }
+                className={CONFIG_INPUT_CLASS}
+              >
+                <option value={APPLIES_TO_ALL}>Semua personil digaji</option>
+                <optgroup label="Kelompok">
+                  <option value="PERSONIL:Guru">Semua guru</option>
+                  <option value="PERSONIL:Pegawai">
+                    Semua karyawan (non-guru)
+                  </option>
+                  {TEACHER_EMPLOYMENT_STATUSES.map((status) => (
+                    <option key={status} value={`STATUS:${status}`}>
+                      Guru berstatus {status}
+                    </option>
+                  ))}
+                  {divisiList.map((divisi) => (
+                    <option key={divisi} value={`DIVISI:${divisi}`}>
+                      Divisi {divisi}
+                    </option>
+                  ))}
+                </optgroup>
+                <optgroup label="Perorangan">
+                  {payrollPersonnel.map((emp) => (
+                    <option
+                      key={String(emp.id_unik)}
+                      value={String(emp.id_unik)}
+                    >
+                      {String(emp.nama)}
+                      {emp.divisi ? ` (${String(emp.divisi)})` : ""}
+                    </option>
+                  ))}
+                </optgroup>
+              </select>
+              <p className="mt-1 text-[11px] text-slate-500">
+                Kelompok dinilai saat payroll dihitung, jadi guru yang baru
+                masuk ikut terhitung tanpa disunting lagi. Pilih perorangan
+                untuk tunjangan milik satu orang, misalnya tunjangan wali kelas.
+                Siswa tidak pernah menerima komponen payroll.
+              </p>
+            </div>
+
+            <div>
               <label htmlFor="component-value" className={CONFIG_LABEL_CLASS}>
-                {componentDraft.calc_type === "FIXED"
-                  ? "Nominal (Rp)"
-                  : "Persentase (%)"}
+                {componentDraft.calc_type === "PERCENTAGE"
+                  ? "Persentase (%)"
+                  : "Nominal (Rp)"}
               </label>
               <input
                 id="component-value"

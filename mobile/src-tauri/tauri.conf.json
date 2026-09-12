@@ -1,6 +1,6 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "manajemen-sekolah-mobile",
+  "productName": "Absensi Sekolah",
   "version": "0.1.0",
   "identifier": "id.sekolah.manajemen.mobile",
   "build": {
@@ -12,7 +12,7 @@
   "app": {
     "windows": [
       {
-        "title": "Manajemen Sekolah Mobile",
+        "title": "Absensi Sekolah",
         "width": 430,
         "height": 932,
         "resizable": true,

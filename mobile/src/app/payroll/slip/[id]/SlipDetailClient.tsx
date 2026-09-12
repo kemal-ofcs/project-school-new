@@ -266,6 +266,16 @@ Status: LUNAS / DIBAYAR`;
                     </span>
                   </div>
                 )}
+                {(slip.teaching_salary ?? 0) > 0 && (
+                  <div className="flex justify-between items-center pt-1.5">
+                    <span className="text-slate-400">
+                      Honor Mengajar ({slip.total_teaching_jp ?? 0} JP)
+                    </span>
+                    <span className="font-mono font-semibold text-sky-400">
+                      {IDR.format(slip.teaching_salary ?? 0)}
+                    </span>
+                  </div>
+                )}
                 {allowances.map((a) => (
                   <div
                     key={a.id}
