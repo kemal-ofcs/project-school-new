@@ -370,6 +370,18 @@ Dokumen ini adalah **standar tertinggi (Golden Standard)** pengembangan pada pro
   3. Deklarasi fungsi `pub fn desktop_...`
 - DILARANG meletakkan komentar dokumentasi `///` di antara `#[tauri::command]` dan nama fungsi `pub fn ...`. Komentar panjang (>200 karakter) di sela atribut mematahkan regex audit dan membuat command dilaporkan tidak terdefinisi (*missing defined command*), menggagalkan seluruh gerbang kualitas.
 
+### 4.45 Prioritas Native Save Dialog Sebelum Web File System Access API (Anti-Silent Abort)
+- Pengecekan runtime native `if (isDesktopRuntime())` **WAJIB diletakkan di urutan PERTAMA** pada utilitas simpan berkas (`saveFileWithPicker`), SEBELUM pengecekan browser API `if ("showSaveFilePicker" in window)`.
+- **Anatomi Masalah:**
+  - WebView Android (Chromium) mengekspos `"showSaveFilePicker" in window === true`.
+  - Namun WebView tidak mengimplementasikan antarmuka dialog pemilih berkas native OS, sehingga memanggilnya langsung melempar `AbortError`.
+  - Blok `catch` menangkap `AbortError` dan mengembalikan `{ sukses: false, cancelled: true }`.
+  - Komponen UI yang memeriksa `if (res.cancelled) return;` langsung keluar diam-diam tanpa memanggil command Rust (`mobile_save_file_to_device` via Storage Access Framework di Android atau `desktop_save_file` di Desktop).
+- **Aturan Implementasi:**
+  1. Prioritaskan runtime native: `if (isDesktopRuntime()) { return await downloadDataUrl(dataUrl, defaultFilename); }`.
+  2. Gunakan `showSaveFilePicker` HANYA untuk browser web biasa (`isDesktopRuntime() === false`), dan panggil langsung tanpa jeda asinkron `FileReader` agar gesture klik (*transient user activation*) tetap segar dan tidak diblokir browser desktop.
+  3. Sediakan fallback terakhir `downloadBlob` (anchor click) untuk browser yang tidak mendukung picker.
+
 ---
 
 ## 5. Modul Referensi Mendalam (`references/`)

@@ -8,6 +8,13 @@ import { Icon } from "@/components/ui/Icon";
 import { Modal } from "@/components/ui/Modal";
 import { canAccessArea, hasPermission } from "@/lib/auth/access";
 import { triggerHaptic } from "@/lib/client/haptics";
+import {
+  describeImportReport,
+  downloadStudentTemplate,
+  exportStudents,
+  readStudentWorkbook,
+  runPersonnelImport,
+} from "@/lib/client/personnel-workbook";
 import { createQrPng, employeeQrPayload } from "@/lib/client/qr-code";
 import { useAuth } from "@/lib/context/AuthContext";
 import { getDaftarRombel } from "@/lib/gateways/academic";
@@ -18,6 +25,7 @@ import {
   type SiswaInput,
   simpanSiswa,
 } from "@/lib/gateways/student";
+import { syncNow } from "@/lib/gateways/sync-status";
 import { useConfirmDialog } from "@/lib/hooks/useConfirmDialog";
 import { useDebounce } from "@/lib/hooks/useDebounce";
 import { useHydrated } from "@/lib/hooks/useHydrated";
@@ -65,6 +73,8 @@ export default function SiswaMobilePage() {
   const [loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
+  const [bulkWorking, setBulkWorking] = useState(false);
+  const importInputRef = useRef<HTMLInputElement>(null);
 
   const [search, setSearch] = useState("");
   const debouncedSearch = useDebounce(search, 200);
@@ -234,6 +244,79 @@ export default function SiswaMobilePage() {
     [canManage, konfirmasi, loadData],
   );
 
+  const handleImport = async (file: File) => {
+    if (!canManage || isSubmittingRef.current) return;
+    isSubmittingRef.current = true;
+    setBulkWorking(true);
+    try {
+      const baris = await readStudentWorkbook(file, {
+        rombel,
+        shifts,
+      });
+      const report = await runPersonnelImport(baris, (draft) =>
+        simpanSiswa(draft, { tundaSinkronisasi: true }),
+      );
+      let catatanSinkron = "";
+      if (report.berhasil > 0) {
+        try {
+          await syncNow();
+        } catch (err) {
+          catatanSinkron = ` Data tersimpan; sinkronisasi otomatis akan dicoba (${
+            err instanceof Error ? err.message : "gagal menghubungi database"
+          }).`;
+        }
+      }
+      setSuccessMsg(
+        describeImportReport(report, "peserta didik") + catatanSinkron,
+      );
+      await loadData();
+    } catch (err) {
+      setErrorMsg(err instanceof Error ? err.message : "Impor Excel gagal.");
+    } finally {
+      isSubmittingRef.current = false;
+      setBulkWorking(false);
+      if (importInputRef.current) importInputRef.current.value = "";
+    }
+  };
+
+  const reportSaved = (
+    result: { cancelled?: boolean; path?: string | null },
+    label: string,
+  ) => {
+    if (result.cancelled) return;
+    setSuccessMsg(
+      result.path
+        ? `${label} berhasil disimpan di: ${result.path}`
+        : `${label} berhasil diunduh.`,
+    );
+  };
+
+  const handleExport = async () => {
+    try {
+      reportSaved(await exportStudents(filtered, shifts), "Data peserta didik");
+    } catch (err) {
+      setErrorMsg(
+        err instanceof Error ? err.message : "Gagal mengekspor data.",
+      );
+    }
+  };
+
+  const handleDownloadTemplate = async () => {
+    try {
+      reportSaved(
+        await downloadStudentTemplate({
+          rombel,
+          shifts,
+        }),
+        "Template impor",
+      );
+    } catch (err) {
+      setErrorMsg(
+        err instanceof Error ? err.message : "Gagal mengunduh template.",
+      );
+    }
+  };
+
   if (authLoading || !isHydrated) {
     return (
       <MobileAppShell>
@@ -263,23 +346,67 @@ export default function SiswaMobilePage() {
           </p>
         </div>
         {canManage ? (
-          <button
-            type="button"
-            onClick={() => {
-              setForm(
-                emptyForm(
-                  filterRombel || String(rombel[0]?.id_rombel ?? ""),
-                  shifts[0] ? Number(shifts[0].id_shift) : undefined,
-                ),
-              );
-              setFormOpen(true);
-              triggerHaptic("light");
-            }}
-            aria-label="Tambah siswa baru"
-            className="grid size-10 place-items-center rounded-2xl bg-gradient-to-tr from-sky-500 to-blue-600 text-on-accent shadow-lg shadow-sky-500/30 transition-all hover:brightness-110 active:scale-90"
-          >
-            <Icon name="plus" className="size-5" />
-          </button>
+          <div className="flex gap-2">
+            <input
+              type="file"
+              accept=".xlsx"
+              className="hidden"
+              aria-label="Pilih berkas Excel untuk diimpor"
+              ref={importInputRef}
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (file) void handleImport(file);
+              }}
+            />
+            <button
+              type="button"
+              disabled={bulkWorking}
+              onClick={handleDownloadTemplate}
+              aria-label="Unduh Template Excel"
+              className="grid size-10 place-items-center rounded-2xl bg-slate-800 text-slate-300 shadow-sm transition-all hover:bg-slate-700 active:scale-90 disabled:opacity-50"
+            >
+              <Icon name="document" className="size-5" />
+            </button>
+            <button
+              type="button"
+              disabled={bulkWorking}
+              onClick={() => importInputRef.current?.click()}
+              aria-label="Impor dari Excel"
+              className="grid size-10 place-items-center rounded-2xl bg-slate-800 text-slate-300 shadow-sm transition-all hover:bg-slate-700 active:scale-90 disabled:opacity-50"
+            >
+              <Icon name="upload" className="size-5" />
+            </button>
+            <button
+              type="button"
+              disabled={bulkWorking}
+              onClick={handleExport}
+              aria-label="Ekspor ke Excel"
+              className="grid size-10 place-items-center rounded-2xl bg-slate-800 text-slate-300 shadow-sm transition-all hover:bg-slate-700 active:scale-90 disabled:opacity-50"
+            >
+              <Icon name="download" className="size-5" />
+            </button>
+            <button
+              type="button"
+              disabled={bulkWorking}
+              onClick={() => {
+                setForm(
+                  emptyForm(
+                    rombel[0] ? String(rombel[0].id_rombel) : "",
+                    shifts[0] ? Number(shifts[0].id_shift) : undefined,
+                  ),
+                );
+                setFormOpen(true);
+                triggerHaptic("light");
+              }}
+              aria-label="Tambah siswa baru"
+              className="grid size-10 place-items-center rounded-2xl bg-gradient-to-tr from-indigo-500 to-violet-600 text-on-accent shadow-lg shadow-indigo-500/30 transition-all hover:brightness-110 active:scale-90 disabled:opacity-50"
+            >
+              <Icon
+                name={bulkWorking ? "refresh" : "plus"}
+                className={`size-5 ${bulkWorking ? "animate-spin" : ""}`}
+              />
+            </button>
+          </div>
         ) : null}
       </div>
 

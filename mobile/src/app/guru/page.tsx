@@ -8,9 +8,17 @@ import { Icon } from "@/components/ui/Icon";
 import { Modal } from "@/components/ui/Modal";
 import { canAccessArea, hasPermission } from "@/lib/auth/access";
 import { triggerHaptic } from "@/lib/client/haptics";
+import {
+  describeImportReport,
+  downloadTeacherTemplate,
+  exportTeachers,
+  readTeacherWorkbook,
+  runPersonnelImport,
+} from "@/lib/client/personnel-workbook";
 import { createQrPng, employeeQrPayload } from "@/lib/client/qr-code";
 import { useAuth } from "@/lib/context/AuthContext";
 import { getDaftarShift } from "@/lib/gateways/shift";
+import { syncNow } from "@/lib/gateways/sync-status";
 import {
   type GuruInput,
   getDaftarGuru,
@@ -63,6 +71,8 @@ export default function GuruMobilePage() {
   const [loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
+  const [bulkWorking, setBulkWorking] = useState(false);
+  const importInputRef = useRef<HTMLInputElement>(null);
 
   const [search, setSearch] = useState("");
   const debouncedSearch = useDebounce(search, 200);
@@ -222,6 +232,68 @@ export default function GuruMobilePage() {
     [canManage, konfirmasi, loadData],
   );
 
+  const handleImport = async (file: File) => {
+    if (!canManage || isSubmittingRef.current) return;
+    isSubmittingRef.current = true;
+    setBulkWorking(true);
+    try {
+      const baris = await readTeacherWorkbook(file, { shifts });
+      const report = await runPersonnelImport(baris, (draft) =>
+        simpanGuru(draft, { tundaSinkronisasi: true }),
+      );
+      let catatanSinkron = "";
+      if (report.berhasil > 0) {
+        try {
+          await syncNow();
+        } catch (err) {
+          catatanSinkron = ` Data tersimpan; sinkronisasi otomatis akan dicoba (${
+            err instanceof Error ? err.message : "gagal menghubungi database"
+          }).`;
+        }
+      }
+      setSuccessMsg(describeImportReport(report, "guru") + catatanSinkron);
+      await loadData();
+    } catch (err) {
+      setErrorMsg(err instanceof Error ? err.message : "Impor Excel gagal.");
+    } finally {
+      isSubmittingRef.current = false;
+      setBulkWorking(false);
+      if (importInputRef.current) importInputRef.current.value = "";
+    }
+  };
+
+  const reportSaved = (
+    result: { cancelled?: boolean; path?: string | null },
+    label: string,
+  ) => {
+    if (result.cancelled) return;
+    setSuccessMsg(
+      result.path
+        ? `${label} berhasil disimpan di: ${result.path}`
+        : `${label} berhasil diunduh.`,
+    );
+  };
+
+  const handleExport = async () => {
+    try {
+      reportSaved(await exportTeachers(filtered, shifts), "Data guru");
+    } catch (err) {
+      setErrorMsg(
+        err instanceof Error ? err.message : "Gagal mengekspor data.",
+      );
+    }
+  };
+
+  const handleDownloadTemplate = async () => {
+    try {
+      reportSaved(await downloadTeacherTemplate(shifts), "Template impor");
+    } catch (err) {
+      setErrorMsg(
+        err instanceof Error ? err.message : "Gagal mengunduh template.",
+      );
+    }
+  };
+
   if (authLoading || !isHydrated) {
     return (
       <MobileAppShell>
@@ -251,20 +323,64 @@ export default function GuruMobilePage() {
           </p>
         </div>
         {canManage ? (
-          <button
-            type="button"
-            onClick={() => {
-              setForm(
-                emptyForm(shifts[0] ? Number(shifts[0].id_shift) : undefined),
-              );
-              setFormOpen(true);
-              triggerHaptic("light");
-            }}
-            aria-label="Tambah guru baru"
-            className="grid size-10 place-items-center rounded-2xl bg-gradient-to-tr from-indigo-500 to-violet-600 text-on-accent shadow-lg shadow-indigo-500/30 transition-all hover:brightness-110 active:scale-90"
-          >
-            <Icon name="plus" className="size-5" />
-          </button>
+          <div className="flex gap-2">
+            <input
+              type="file"
+              accept=".xlsx"
+              className="hidden"
+              aria-label="Pilih berkas Excel untuk diimpor"
+              ref={importInputRef}
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (file) void handleImport(file);
+              }}
+            />
+            <button
+              type="button"
+              disabled={bulkWorking}
+              onClick={handleDownloadTemplate}
+              aria-label="Unduh Template Excel"
+              className="grid size-10 place-items-center rounded-2xl bg-slate-800 text-slate-300 shadow-sm transition-all hover:bg-slate-700 active:scale-90 disabled:opacity-50"
+            >
+              <Icon name="document" className="size-5" />
+            </button>
+            <button
+              type="button"
+              disabled={bulkWorking}
+              onClick={() => importInputRef.current?.click()}
+              aria-label="Impor dari Excel"
+              className="grid size-10 place-items-center rounded-2xl bg-slate-800 text-slate-300 shadow-sm transition-all hover:bg-slate-700 active:scale-90 disabled:opacity-50"
+            >
+              <Icon name="upload" className="size-5" />
+            </button>
+            <button
+              type="button"
+              disabled={bulkWorking}
+              onClick={handleExport}
+              aria-label="Ekspor ke Excel"
+              className="grid size-10 place-items-center rounded-2xl bg-slate-800 text-slate-300 shadow-sm transition-all hover:bg-slate-700 active:scale-90 disabled:opacity-50"
+            >
+              <Icon name="download" className="size-5" />
+            </button>
+            <button
+              type="button"
+              disabled={bulkWorking}
+              onClick={() => {
+                setForm(
+                  emptyForm(shifts[0] ? Number(shifts[0].id_shift) : undefined),
+                );
+                setFormOpen(true);
+                triggerHaptic("light");
+              }}
+              aria-label="Tambah guru baru"
+              className="grid size-10 place-items-center rounded-2xl bg-gradient-to-tr from-indigo-500 to-violet-600 text-on-accent shadow-lg shadow-indigo-500/30 transition-all hover:brightness-110 active:scale-90 disabled:opacity-50"
+            >
+              <Icon
+                name={bulkWorking ? "refresh" : "plus"}
+                className={`size-5 ${bulkWorking ? "animate-spin" : ""}`}
+              />
+            </button>
+          </div>
         ) : null}
       </div>
 

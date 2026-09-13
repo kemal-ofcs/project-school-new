@@ -249,6 +249,32 @@ if (existsSync(stringsXml)) {
   }
 }
 
+// ── 4b. Aktifkan WebView Debugging di MainActivity ─────────────────────────
+const mainActivityPath = join(
+  akarMobile,
+  "src-tauri/gen/android/app/src/main/java",
+  ...identifier.split("."),
+  "MainActivity.kt",
+);
+
+if (existsSync(mainActivityPath)) {
+  let isiActivity = readFileSync(mainActivityPath, "utf8");
+  if (!isiActivity.includes("setWebContentsDebuggingEnabled")) {
+    if (!isiActivity.includes("import android.webkit.WebView")) {
+      isiActivity = isiActivity.replace(
+        "import android.os.Bundle",
+        "import android.os.Bundle\nimport android.webkit.WebView",
+      );
+    }
+    isiActivity = isiActivity.replace(
+      "super.onCreate(savedInstanceState)",
+      "super.onCreate(savedInstanceState)\n    WebView.setWebContentsDebuggingEnabled(true)",
+    );
+    writeFileSync(mainActivityPath, isiActivity);
+    berubah = true;
+  }
+}
+
 // ── 5. Verifikasi — inilah yang membedakan skrip ini dari sekadar menambal ──
 const gradleAkhir = readFileSync(gradle, "utf8");
 const releaseAkhir = blokRelease.exec(gradleAkhir)?.[2] ?? "";

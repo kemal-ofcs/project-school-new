@@ -33,7 +33,55 @@ bun run check             # + cargo test
 bun run audit:schema      # JALANKAN DDL keempat lapisan, bandingkan hasilnya
 bun run audit:contract    # route kanonik, tabel snapshot, permission, command
 bun run verify:template   # semua gerbang sekaligus; --rust ikut cargo test
+
+# Playwright E2E (web-desktop/ saja)
+cd web-desktop
+bun run test:e2e          # jalankan semua E2E test (butuh dev server & .env.test)
+bun run test:e2e:ui       # mode interaktif dengan UI Playwright
+bun run test:e2e:report   # buka HTML report setelah test selesai
+bun run test:e2e:install  # install Chromium browser (sekali saja)
 ```
+
+## Pengujian End-to-End dengan Playwright
+
+Playwright dipakai untuk menguji **Web path** di `web-desktop/` — lapisan UI,
+alur bisnis, validasi form, dan penjagaan akses (80% coverage target).
+
+### Batas yang Tegas
+
+| Yang Diuji Playwright | Yang TIDAK Diuji Playwright |
+| :-- | :-- |
+| Login/logout form, redirect, error message | Logika Rust (tugas `cargo test`) |
+| `canAccessArea` guard → redirect `/forbidden` | IPC `invoke()` ke Tauri backend |
+| Validasi form (field kosong, enum, format HP) | Push outbox ke Turso Cloud |
+| Filter search, filter status, sync-completed event | SQLite lokal (tugas `cargo test`) |
+| Responsivitas viewport mobile (simulasi) | QR scan kamera (tugas Maestro APK) |
+
+### Aturan Penulisan Test Playwright
+
+1. **Credential via `.env.test` saja** — DILARANG hardcode username/password di file test.
+   Gunakan `process.env.PLAYWRIGHT_SUPERADMIN_USERNAME` dan selalu tambahkan
+   `test.skip(!username, "Set .env.test dulu")` jika bergantung pada credential real.
+
+2. **Selector via ID elemen** — Gunakan `#username-input`, `#password-input` (bukan CSS class
+   yang bisa berubah sewaktu-waktu). Elemen yang tidak punya ID wajib diberi `id` yang unik
+   dan deskriptif sebelum menulis test (sesuai aturan SEO & aksesibilitas).
+
+3. **storageState untuk session** — Login hanya dilakukan sekali di `setup-superadmin.ts`
+   dan `setup-limited.ts`. Test individual menggunakan `storageState` dari file JSON.
+   DILARANG login ulang di setiap test (lambat dan tidak perlu).
+
+4. **Route mock untuk API berbayar** — Test yang menguji flow seperti password reset
+   atau 2FA WAJIB menggunakan `page.route(...)` untuk mock response, bukan menghit
+   endpoint real yang bisa terkena rate limit.
+
+5. **`test:e2e` TERPISAH dari `check` pipeline** — Playwright membutuhkan dev server aktif
+   dan database cloud real. Jangan pernah masukkan `test:e2e` ke `bun run check` atau
+   `bun run check:quick`. Jalankan manual: `cd web-desktop && bun run test:e2e`.
+
+6. **Akun test khusus** — Buat akun superadmin dan operator terbatas KHUSUS untuk testing,
+   berbeda dari akun production. Gunakan `bun run bootstrap:superadmin` untuk membuat
+   superadmin test pertama.
 
 Jalankan `bun run check` **sekali di akhir**, setelah perubahan selesai utuh.
 Menjalankannya berulang di tengah penulisan hanya membuang waktu.
@@ -240,6 +288,17 @@ untuk database baru, dan `ALTER TABLE` (`ensure_column` di Rust,
     DILARANG meletakkan komentar dokumentasi `///` di antara `#[tauri::command]` dan nama fungsi `pub fn ...`.
     Komentar panjang (>200 karakter) di sela atribut mematahkan regex audit dan membuat command dilaporkan tidak
     terdefinisi (*missing defined command*), menggagalkan seluruh gerbang kualitas.
+46. Prioritas Native Save Dialog sebelum Web File System Access API (Anti-Silent Abort pada WebView & Browser):
+    Pengecekan runtime native `if (isDesktopRuntime())` WAJIB ditaruh di urutan PERTAMA pada fungsi penyimpanan berkas
+    (`saveFileWithPicker`), SEBELUM pengecekan API browser `if ('showSaveFilePicker' in window)`.
+    Penyebab: WebView Android modern (Chromium) mengekspos properti `window.showSaveFilePicker === true`, namun WebView
+    TIDAK mengimplementasikan dialog pemilih berkas bawaan browser desktop secara penuh sehingga pemanggilannya langsung
+    melempar `AbortError`. Blok catch yang menganggap `AbortError` sebagai pembatalan oleh pengguna (`cancelled: true`)
+    menyebabkan proses ekspor/unduh berkas berhenti diam-diam (*silent return*) tanpa pernah memanggil command Rust native
+    (`mobile_save_file_to_device` via SAF di Android atau `desktop_save_file` di Desktop).
+    Selain itu, di browser laptop (Web), pemanggilan `showSaveFilePicker` wajib dilakukan langsung tanpa didahului operasi
+    asinkron berat/FileReader yang dapat mematikan token *transient user activation* (gesture klik mouse), agar dialog simpan
+    browser laptop tidak diblokir oleh browser security policy.
 
 ## Pemulihan password & verifikasi dua langkah
 

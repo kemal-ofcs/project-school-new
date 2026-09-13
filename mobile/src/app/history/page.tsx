@@ -69,15 +69,17 @@ async function fetchAllPages(
   return all;
 }
 
-const fetchAllScanLogs = (tanggal: string) =>
+const fetchAllScanLogs = (tanggal_mulai: string, tanggal_selesai: string) =>
   fetchAllPages(
-    (limit, offset) => getRiwayatScan({ tanggal, limit, offset }),
+    (limit, offset) =>
+      getRiwayatScan({ tanggal_mulai, tanggal_selesai, limit, offset }),
     SCAN_PAGE_SIZE,
   );
 
-const fetchAllDaily = (tanggal: string) =>
+const fetchAllDaily = (tanggal_mulai: string, tanggal_selesai: string) =>
   fetchAllPages(
-    (limit, offset) => getRekapHarian({ tanggal, limit, offset }),
+    (limit, offset) =>
+      getRekapHarian({ tanggal_mulai, tanggal_selesai, limit, offset }),
     DAILY_PAGE_SIZE,
   );
 
@@ -137,7 +139,10 @@ export default function HistoryPage() {
   const canDeleteHistory = hasPermission(user, "history.delete");
 
   const [activeTab, setActiveTab] = useState<HistoryTab>("daily");
-  const [date, setDate] = useState<string>(
+  const [tanggalMulai, setTanggalMulai] = useState<string>(
+    () => new Date().toISOString().split("T")[0],
+  );
+  const [tanggalSelesai, setTanggalSelesai] = useState<string>(
     () => new Date().toISOString().split("T")[0],
   );
   const [dailyRecords, setDailyRecords] = useState<Record<string, unknown>[]>(
@@ -188,49 +193,61 @@ export default function HistoryPage() {
     }
   }, [authLoading, isAuthenticated, canViewHistory, router]);
 
-  const loadData = useCallback(async (targetDate: string, tab: HistoryTab) => {
-    setIsLoading(true);
-    try {
-      if (tab === "daily") {
-        setDailyRecords(await fetchAllDaily(targetDate));
-      } else {
-        setScanLogs(await fetchAllScanLogs(targetDate));
+  const loadData = useCallback(
+    async (mulai: string, selesai: string, tab: HistoryTab) => {
+      setIsLoading(true);
+      try {
+        if (tab === "daily") {
+          setDailyRecords(await fetchAllDaily(mulai, selesai));
+        } else {
+          setScanLogs(await fetchAllScanLogs(mulai, selesai));
+        }
+      } catch {
+        if (tab === "daily") setDailyRecords([]);
+        else setScanLogs([]);
+      } finally {
+        setIsLoading(false);
       }
-    } catch {
-      if (tab === "daily") setDailyRecords([]);
-      else setScanLogs([]);
-    } finally {
-      setIsLoading(false);
-    }
-  }, []);
+    },
+    [],
+  );
 
   useEffect(() => {
     if (isAuthenticated && canViewHistory) {
-      void loadData(date, activeTab);
+      void loadData(tanggalMulai, tanggalSelesai, activeTab);
     }
-  }, [date, activeTab, isAuthenticated, canViewHistory, loadData]);
+  }, [
+    tanggalMulai,
+    tanggalSelesai,
+    activeTab,
+    isAuthenticated,
+    canViewHistory,
+    loadData,
+  ]);
 
   useEffect(() => {
     const onSyncCompleted = () => {
       if (isAuthenticated && canViewHistory) {
-        void loadData(date, activeTab);
+        void loadData(tanggalMulai, tanggalSelesai, activeTab);
       }
     };
     window.addEventListener("sppg:sync-completed", onSyncCompleted);
     return () => {
       window.removeEventListener("sppg:sync-completed", onSyncCompleted);
     };
-  }, [date, activeTab, isAuthenticated, canViewHistory, loadData]);
+  }, [
+    tanggalMulai,
+    tanggalSelesai,
+    activeTab,
+    isAuthenticated,
+    canViewHistory,
+    loadData,
+  ]);
 
   const handleTabChange = (tab: HistoryTab) => {
     triggerHaptic("light");
     setActiveTab(tab);
     setStatusFilter("Semua");
-  };
-
-  const handleDateChange = (newDate: string) => {
-    triggerHaptic("light");
-    setDate(newDate);
   };
 
   const openEditDaily = (rec: Record<string, unknown>) => {
@@ -240,7 +257,7 @@ export default function HistoryPage() {
       id_sesi: String(rec.id_sesi || ""),
       nama: String(rec.nama || ""),
       id_karyawan: String(rec.id_karyawan || ""),
-      tanggal: String(rec.tanggal || date),
+      tanggal: String(rec.tanggal || tanggalMulai),
       jam_masuk: toTimeInput(rec.jam_masuk),
       jam_pulang: toTimeInput(rec.jam_pulang),
       status_kehadiran: String(rec.status_kehadiran || "Hadir"),
@@ -285,7 +302,7 @@ export default function HistoryPage() {
         triggerHaptic("success");
         setFeedback({ type: "success", message: result.pesan });
         setEditData(null);
-        void loadData(date, activeTab);
+        void loadData(tanggalMulai, tanggalSelesai, activeTab);
       } else {
         triggerHaptic("error");
         setFeedback({ type: "error", message: result.pesan });
@@ -313,7 +330,7 @@ export default function HistoryPage() {
         triggerHaptic("success");
         setFeedback({ type: "success", message: result.pesan });
         setDeleteTarget(null);
-        void loadData(date, activeTab);
+        void loadData(tanggalMulai, tanggalSelesai, activeTab);
       } else {
         triggerHaptic("error");
         setFeedback({ type: "error", message: result.pesan });
@@ -394,8 +411,8 @@ export default function HistoryPage() {
     try {
       const data =
         activeTab === "daily"
-          ? buildDailyExport(rows, date)
-          : buildScanLogExport(rows, date);
+          ? buildDailyExport(rows, tanggalMulai, tanggalSelesai)
+          : buildScanLogExport(rows, tanggalMulai, tanggalSelesai);
       const res =
         format === "csv"
           ? await exportToCsv(data.filename, data.headers, data.rows)
@@ -413,6 +430,7 @@ export default function HistoryPage() {
         message: `${rows.length} baris diekspor ke ${format === "csv" ? "CSV" : "Excel"}${res.path ? ` (${res.path})` : ""}.`,
       });
     } catch (err) {
+      console.error("Ekspor riwayat gagal:", err);
       triggerHaptic("error");
       setFeedback({
         type: "error",
@@ -465,7 +483,7 @@ export default function HistoryPage() {
             </h2>
             <button
               type="button"
-              onClick={() => loadData(date, activeTab)}
+              onClick={() => loadData(tanggalMulai, tanggalSelesai, activeTab)}
               aria-label="Muat ulang data"
               className="grid size-9 place-items-center rounded-xl bg-white/10 text-slate-300 hover:bg-white/20 active:scale-95 transition"
             >
@@ -504,15 +522,38 @@ export default function HistoryPage() {
             </button>
           </div>
 
-          {/* Date Picker */}
-          <div className="flex flex-col gap-2">
-            <input
-              type="date"
-              aria-label="Tanggal riwayat"
-              value={date}
-              onChange={(e) => handleDateChange(e.target.value)}
-              className="w-full rounded-2xl border border-white/15 bg-slate-950 px-4 py-2.5 text-xs font-semibold text-white focus:border-sky-400 focus:outline-none font-mono"
-            />
+          {/* Date Pickers */}
+          <div className="grid grid-cols-2 gap-2">
+            <div className="flex flex-col gap-1">
+              <span className="text-[10px] text-slate-400 font-semibold uppercase px-1">
+                Dari Tanggal
+              </span>
+              <input
+                type="date"
+                aria-label="Tanggal mulai"
+                value={tanggalMulai}
+                onChange={(e) => {
+                  triggerHaptic("light");
+                  setTanggalMulai(e.target.value);
+                }}
+                className="w-full rounded-2xl border border-white/15 bg-slate-950 px-4 py-2.5 text-xs font-semibold text-white focus:border-sky-400 focus:outline-none font-mono"
+              />
+            </div>
+            <div className="flex flex-col gap-1">
+              <span className="text-[10px] text-slate-400 font-semibold uppercase px-1">
+                Sampai Tanggal
+              </span>
+              <input
+                type="date"
+                aria-label="Tanggal selesai"
+                value={tanggalSelesai}
+                onChange={(e) => {
+                  triggerHaptic("light");
+                  setTanggalSelesai(e.target.value);
+                }}
+                className="w-full rounded-2xl border border-white/15 bg-slate-950 px-4 py-2.5 text-xs font-semibold text-white focus:border-sky-400 focus:outline-none font-mono"
+              />
+            </div>
           </div>
 
           {/* Search Input */}

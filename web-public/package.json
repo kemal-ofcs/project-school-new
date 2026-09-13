@@ -17,7 +17,8 @@
     "test": "bun scripts/run-tests.ts",
     "sync:shared": "bun scripts/sync-shared-lib.ts",
     "check:quick": "bun run lint && bun run typecheck && bun run test",
-    "check": "bun run check:quick"
+    "check": "bun run check:quick",
+    "cek:skema": "bun scripts/cek-skema.ts"
   },
   "dependencies": {
     "@libsql/client": "0.17.4",

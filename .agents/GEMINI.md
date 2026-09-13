@@ -77,10 +77,54 @@ Aturan ini bersifat **GLOBAL** untuk seluruh workspace dan wajib ditaati oleh AI
 | **Tidak memvalidasi MIME type dan format string di backend Rust** | Nilai cacat lolos di SQLite lokal (loose typing), lalu ditolak CHECK constraint / Zod di LibSQL cloud, memicu failed outbox permanen (*permanent outbox jam*) | Rust backend WAJIB memvalidasi whitelist enum/MIME (`image/jpeg`, `image/png`, `image/webp`), batas ukuran (base64 maks 500 KB / 2 MB) SESUAI PERSIS dengan Zod validator sebelum menulis ke DB lokal dan outbox |
 | **Scoping permission parsial domain tunggal pada command yang menyentuh seluruh personil (`master_data`)** | Eskalasi hak akses (*privilege escalation*): pengelola siswa bisa menerbitkan/memanipulasi kartu guru dan staf karyawan kantor | Command multi-entitas lintas personil (seperti `desktop_backfill_id_cards`) WAJIB dijaga oleh `employees.manage`, bukan `students.manage` |
 | **Meletakkan doc comment `///` di antara `#[tauri::command]` dan `pub fn`** | Regex parser `audit-sync-contract.ts` gagal mencocokkan nama command jika komentar >200 char, audit gagal dengan error command hilang | Doc comment `///` WAJIB selalu sebelum `#[tauri::command]`, lalu diikuti `pub fn desktop_...` |
+| **Hardcode credential di file test Playwright** | Credential bocor ke Git history jika file .spec.ts tidak sengaja di-commit | Selalu baca credential dari `process.env.PLAYWRIGHT_*` yang diload dari `.env.test` (di .gitignore) |
+| **Memasukkan `bun run test:e2e` ke dalam pipeline `bun run check`** | Pipeline `check` gagal di environment CI tanpa dev server aktif dan koneksi Turso cloud | `test:e2e` dijalankan MANUAL terpisah; tidak pernah masuk ke `check` atau `check:quick` |
+| **Menggunakan CSS class selector di Playwright alih-alih ID elemen** | CSS class bisa berubah kapan saja (refactor Tailwind, rename komponen) dan mematikan seluruh test suite sekaligus | Gunakan `#element-id` yang stabil; tambahkan `id` unik ke elemen baru sebelum menulis test |
+| **Memeriksa `showSaveFilePicker` sebelum `isDesktopRuntime()` pada utilitas download** | WebView Android melaporkan `showSaveFilePicker` true tapi melempar `AbortError`, memicu silent return dan dialog SAF Android tidak pernah muncul | Wajib prioritaskan `isDesktopRuntime()` di urutan pertama pada `saveFileWithPicker`, lalu fallback ke `showSaveFilePicker` hanya untuk web browser murni |
 
 ---
 
-## 3. 52 Aturan Emas Arsitektur & Rekayasa (The 52 Golden Rules)
+## 3.5 Pengujian End-to-End dengan Playwright
+
+Playwright hanya diinstall dan dikonfigurasi di `web-desktop/` — menguji **Web path**
+(`isDesktopRuntime() === false`) yang mengalirkan semua request ke `/api/...`.
+
+### Pembagian Tanggung Jawab Pengujian
+
+| Layer | Tool | Scope |
+| :-- | :-- | :-- |
+| UI + Alur Bisnis Web | **Playwright** (`web-desktop/tests/`) | Login, RBAC guard, form CRUD, filter, viewport mobile |
+| Logika Rust + Sinkronisasi | **cargo test** (`bun run test:rust`) | outbox, sync, storage, turso, scanner |
+| Lifecycle Mobile + Offline Sync | **Maestro** (APK Android) | Airplane mode sync, kamera, background/foreground |
+
+### Aturan Wajib Playwright
+
+1. Credential wajib di `.env.test` (di `.gitignore`) — baca via `process.env.PLAYWRIGHT_*`.
+2. Selector wajib `#id-elemen` (stabil) — bukan CSS class (rapuh).
+3. Session disimpan via `storageState` — tidak login ulang per test.
+4. Mock `page.route(...)` untuk API rate-limited (password reset, 2FA, email).
+5. `test:e2e` **tidak masuk** `bun run check` — jalankan manual: `cd web-desktop && bun run test:e2e`.
+6. Akun test terpisah dari production — buat via `bun run bootstrap:superadmin`.
+
+### Struktur Test
+
+```
+web-desktop/tests/
+├── fixtures/
+│   ├── setup-superadmin.ts   # login sekali → storageState superadmin
+│   ├── setup-limited.ts      # login sekali → storageState operator terbatas
+│   ├── auth.fixture.ts       # helper loginViaForm, logoutViaApi
+│   └── test-data.ts          # konstanta sesuai CHECK constraint DB
+├── auth/                     # login, logout, lupa-password
+├── rbac/                     # area-guard, redirect-unauthenticated
+├── siswa/                    # CRUD siswa, filter, sync-completed
+├── guru/                     # CRUD guru
+└── dashboard/                # render, error JS, mobile viewport
+```
+
+---
+
+
 
 ### 1. Arsitektur 2-Tier Turso & Dekompresi Payload (Reqwest Gzip/Brotli)
 - Desktop dan Mobile berkomunikasi langsung ke Database Cloud LibSQL/Turso via `/v2/pipeline`.
