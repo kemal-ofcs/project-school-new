@@ -1,89 +1,67 @@
-import Link from "next/link";
+import { FacilitiesSection } from "@/components/landing/FacilitiesSection";
+import { FaqSection } from "@/components/landing/FaqSection";
+import { HeroSection } from "@/components/landing/HeroSection";
+import { PillarsSection } from "@/components/landing/PillarsSection";
+import { PmbOverviewSection } from "@/components/landing/PmbOverviewSection";
+import { ProgramsSection } from "@/components/landing/ProgramsSection";
+import { StickyAction } from "@/components/landing/StickyActionMobile";
 import { ProfilBelumLengkap } from "@/components/SiteChrome";
 import { StatusTidakTerbaca } from "@/components/StatusData";
-import { muatProfilSekolah } from "@/lib/server/school-data";
+import { muatGelombangAktif } from "@/lib/server/pmb-data";
+import { muatProfilSekolah, muatProgramStudi } from "@/lib/server/school-data";
 import { namaTampil } from "@/lib/services/school-profile";
 
-const PINTU_MASUK = [
-  {
-    href: "/pmb",
-    judul: "Pendaftaran Siswa Baru",
-    teks: "Informasi gelombang, syarat berkas, dan alur pendaftaran.",
-  },
-  {
-    href: "/program",
-    judul: "Program Keahlian",
-    teks: "Jurusan yang dibuka dan penjelasan singkatnya.",
-  },
-  {
-    href: "/kontak",
-    judul: "Hubungi Sekolah",
-    teks: "Alamat, nomor telepon, dan surel resmi.",
-  },
-] as const;
-
 export default async function Beranda() {
-  const hasil = await muatProfilSekolah();
+  // Pemuatan data paralel dari database Turso
+  const [hasilProfil, hasilProgram, hasilGelombang] = await Promise.all([
+    muatProfilSekolah(),
+    muatProgramStudi(),
+    muatGelombangAktif(),
+  ]);
 
-  if (hasil.status !== "ok") {
+  if (hasilProfil.status !== "ok") {
     return (
       <main className="mx-auto max-w-5xl px-6 py-16">
-        <StatusTidakTerbaca hasil={hasil} konteks="Informasi sekolah" />
+        <StatusTidakTerbaca hasil={hasilProfil} konteks="Informasi sekolah" />
       </main>
     );
   }
 
-  const profil = hasil.data;
+  const profil = hasilProfil.data;
   const nama = namaTampil(profil);
+  const programStudi = hasilProgram.status === "ok" ? hasilProgram.data : [];
+  const gelombangAktif =
+    hasilGelombang.status === "ok" ? hasilGelombang.data : null;
 
   return (
-    <main className="mx-auto max-w-5xl px-6 py-14">
-      <section>
-        <h1 className="font-semibold text-3xl leading-tight sm:text-4xl">
-          {nama}
-        </h1>
-        {profil.namaCabang ? (
-          <p className="mt-2 text-teks-lembut">{profil.namaCabang}</p>
-        ) : null}
-        {profil.alamat ? (
-          <p className="mt-4 max-w-2xl text-base text-teks-lembut leading-relaxed">
-            {profil.alamat}
-          </p>
-        ) : null}
-        {profil.belumDikonfigurasi || !profil.namaSekolah ? (
-          <div className="mt-6 max-w-2xl">
-            <ProfilBelumLengkap />
-          </div>
-        ) : null}
-      </section>
+    <main className="flex flex-col w-full">
+      {/* Peringatan jika profil administrator belum dilengkapi */}
+      {profil.belumDikonfigurasi || !profil.namaSekolah ? (
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 pt-6">
+          <ProfilBelumLengkap />
+        </div>
+      ) : null}
 
-      <section className="mt-12">
-        <h2 className="font-semibold text-xl">Mulai dari sini</h2>
-        <ul className="mt-5 grid gap-4 sm:grid-cols-3">
-          {PINTU_MASUK.map((pintu) => (
-            <li key={pintu.href}>
-              <Link
-                className="block h-full rounded-lg border border-garis p-5 transition-colors hover:border-aksen"
-                href={pintu.href}
-              >
-                <span className="font-medium">{pintu.judul}</span>
-                <span className="mt-2 block text-sm text-teks-lembut leading-relaxed">
-                  {pintu.teks}
-                </span>
-              </Link>
-            </li>
-          ))}
-        </ul>
-      </section>
+      {/* 1. Hero Section dengan countdown gelombang & quick stats */}
+      <HeroSection namaSekolah={nama} gelombangAktif={gelombangAktif} />
 
-      <section className="mt-12 rounded-lg border border-garis bg-latar-lembut p-6">
-        <h2 className="font-semibold text-lg">Portal Wali Murid</h2>
-        <p className="mt-2 max-w-2xl text-sm text-teks-lembut leading-relaxed">
-          Orang tua akan dapat memeriksa kehadiran anaknya di halaman ini
-          menggunakan nomor induk siswa dan kode yang dikirim ke nomor WhatsApp
-          wali yang terdaftar di sekolah. Fitur ini sedang disiapkan.
-        </p>
-      </section>
+      {/* 2. 4 Pilar Keunggulan & Sambutan Pimpinan */}
+      <PillarsSection profil={profil} />
+
+      {/* 3. Program Keahlian / Jurusan (Dari DB) & Ekstrakurikuler */}
+      <ProgramsSection programStudi={programStudi} />
+
+      {/* 4. Fasilitas Kampus Unggulan dengan Modal Preview */}
+      <FacilitiesSection />
+
+      {/* 5. Alur PMB 4 Tahapan & Rincian Gelombang Aktif */}
+      <PmbOverviewSection gelombangAktif={gelombangAktif} />
+
+      {/* 6. FAQ Accordion Interaktif */}
+      <FaqSection />
+
+      {/* 7. Floating WhatsApp Desktop & Sticky Action Bar Mobile */}
+      <StickyAction nomorTelepon={profil.telepon} />
     </main>
   );
 }

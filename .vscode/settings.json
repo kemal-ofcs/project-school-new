@@ -1,0 +1,4 @@
+{
+  "biome.configPath": "biome.json",
+  "css.lint.unknownAtRules": "ignore"
+}

@@ -1,37 +1,163 @@
 @import "tailwindcss";
 
 /*
- * Palet situs publik.
+ * Palet situs publik & Master Design System (SPPG Web-Public).
  *
- * Ditulis terang-dulu, kebalikan dari panel admin yang basis JSX-nya gelap.
- * Alasannya bukan selera: halaman publik dibuka di ponsel, di luar ruangan,
- * oleh orang tua yang mencari alamat sekolah — dan mode terang terbaca di sana.
- * Panel admin dipakai berjam-jam di ruang kantor, dan basis gelapnya benar
- * untuk itu. Dua konteks berbeda, dua bawaan berbeda.
+ * Ditulis Light-First, kebalikan dari panel admin yang basis JSX-nya gelap.
+ * Halaman publik dibuka di ponsel, di luar ruangan, oleh orang tua yang mencari informasi sekolah
+ * — dan mode terang terbaca optimal di sana.
+ * Mode gelap didukung penuh baik via prefers-color-scheme maupun class 'dark' (toggle manual).
  */
 :root {
-  --latar: #ffffff;
-  --latar-lembut: #f8fafc;
-  --garis: #e2e8f0;
-  --teks: #0f172a;
-  --teks-lembut: #475569;
-  --aksen: #0f766e;
-  --aksen-teks: #ffffff;
+  /* Design Tokens - Light Mode */
+  --background: #f8f9ff;
+  --foreground: #0b1c30;
+  --card: #ffffff;
+  --card-foreground: #0b1c30;
+  --popover: #ffffff;
+  --popover-foreground: #0b1c30;
+
+  /* Prestige Academic Navy */
+  --primary: #00236f;
+  --primary-foreground: #ffffff;
+  --primary-container: #1e3a8a;
+  --primary-container-foreground: #ffffff;
+
+  /* Royal Amber Gold */
+  --secondary: #855300;
+  --secondary-foreground: #ffffff;
+  --secondary-container: #fea619;
+  --secondary-container-foreground: #2a1700;
+
+  /* Forest Emerald */
+  --accent: #004b22;
+  --accent-foreground: #ffffff;
+
+  --muted: #eff4ff;
+  --muted-foreground: #475569;
+  --border: #e2e8f0;
+  --input: #e2e8f0;
+  --ring: #00236f;
+  --radius: 0.5rem;
+
+  --destructive: #ba1a1a;
+  --destructive-foreground: #ffffff;
+
+  /* Backward compatibility with existing web-public tokens */
+  --latar: var(--background);
+  --latar-lembut: var(--muted);
+  --garis: var(--border);
+  --teks: var(--foreground);
+  --teks-lembut: var(--muted-foreground);
+  --aksen: var(--primary);
+  --aksen-teks: var(--primary-foreground);
+}
+
+.dark,
+html[data-theme="dark"] {
+  --background: #0b1320;
+  --foreground: #f1f5f9;
+  --card: #162032;
+  --card-foreground: #f8fafc;
+  --popover: #162032;
+  --popover-foreground: #f8fafc;
+
+  --primary: #90a8ff;
+  --primary-foreground: #00164e;
+  --primary-container: #1e293b;
+  --primary-container-foreground: #f1f5f9;
+
+  --secondary: #ffb95f;
+  --secondary-foreground: #2a1700;
+  --secondary-container: #fea619;
+  --secondary-container-foreground: #2a1700;
+
+  --accent: #2dd4bf;
+  --accent-foreground: #042f2e;
+
+  --muted: #162032;
+  --muted-foreground: #94a3b8;
+  --border: #26354a;
+  --input: #26354a;
+  --ring: #90a8ff;
+
+  --destructive: #ffb4ab;
+  --destructive-foreground: #690005;
+
+  --latar: var(--background);
+  --latar-lembut: var(--muted);
+  --garis: var(--border);
+  --teks: var(--foreground);
+  --teks-lembut: var(--muted-foreground);
+  --aksen: var(--primary);
+  --aksen-teks: var(--primary-foreground);
 }
 
 @media (prefers-color-scheme: dark) {
-  :root {
-    --latar: #0f172a;
-    --latar-lembut: #1e293b;
-    --garis: #334155;
-    --teks: #f1f5f9;
-    --teks-lembut: #94a3b8;
-    --aksen: #2dd4bf;
-    --aksen-teks: #042f2e;
+  :root:not(.light):not([data-theme="light"]) {
+    --background: #0b1320;
+    --foreground: #f1f5f9;
+    --card: #162032;
+    --card-foreground: #f8fafc;
+    --popover: #162032;
+    --popover-foreground: #f8fafc;
+
+    --primary: #90a8ff;
+    --primary-foreground: #00164e;
+    --primary-container: #1e293b;
+    --primary-container-foreground: #f1f5f9;
+
+    --secondary: #ffb95f;
+    --secondary-foreground: #2a1700;
+    --secondary-container: #fea619;
+    --secondary-container-foreground: #2a1700;
+
+    --accent: #2dd4bf;
+    --accent-foreground: #042f2e;
+
+    --muted: #162032;
+    --muted-foreground: #94a3b8;
+    --border: #26354a;
+    --input: #26354a;
+    --ring: #90a8ff;
+
+    --destructive: #ffb4ab;
+    --destructive-foreground: #690005;
+
+    --latar: var(--background);
+    --latar-lembut: var(--muted);
+    --garis: var(--border);
+    --teks: var(--foreground);
+    --teks-lembut: var(--muted-foreground);
+    --aksen: var(--primary);
+    --aksen-teks: var(--primary-foreground);
   }
 }
 
+/* Tailwind CSS v4 Theme Mapping */
 @theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary-container: var(--primary-container);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary-container: var(--secondary-container);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+
   --color-latar: var(--latar);
   --color-latar-lembut: var(--latar-lembut);
   --color-garis: var(--garis);
@@ -41,9 +167,22 @@
   --color-aksen-teks: var(--aksen-teks);
 }
 
+/* Safe Area Inset utilities for mobile phones */
+.pb-safe {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+.pt-safe {
+  padding-top: env(safe-area-inset-top, 0px);
+}
+
 body {
-  background: var(--latar);
-  color: var(--teks);
+  background-color: var(--background);
+  color: var(--foreground);
   font-family:
-    ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
+    sans-serif;
+  transition:
+    background-color 0.3s ease,
+    color 0.3s ease;
+  overflow-x: hidden;
 }
