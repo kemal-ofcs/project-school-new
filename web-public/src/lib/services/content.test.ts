@@ -3,6 +3,7 @@ import { createClient } from "@libsql/client";
 import {
   DEFAULT_PAGE_CONTENT,
   readArticleBySlug,
+  readArticleCoverBySlug,
   readPageContent,
   readPublishedArticles,
 } from "./content";
@@ -101,5 +102,47 @@ describe("Tahap D: web-public Content Service & Fallback Contract", () => {
     expect(kontenUpdate["profil.sejarah"]).toBe(
       DEFAULT_PAGE_CONTENT.profil["profil.sejarah"],
     );
+  });
+
+  /**
+   * Endpoint gambar sampul bersifat PUBLIK, jadi syarat `status = 'Terbit'`
+   * harus ada di query gambarnya sendiri — bukan hanya di query artikelnya.
+   * Tanpa itu, sampul artikel yang masih Draft bisa diambil siapa pun yang
+   * menebak slug-nya, padahal artikelnya belum diterbitkan.
+   */
+  test("readArticleCoverBySlug menolak artikel Draft dan baris tanpa gambar", async () => {
+    const client = dbMemori();
+    await setupDatabase(client);
+
+    const gambar = "data:image/png;base64,iVBORw0KGgo=";
+    await client.execute({
+      sql: `INSERT INTO berita (id_berita, judul, slug, ringkasan, isi, gambar_sampul, status, created_at) VALUES
+            ('c-1', 'Terbit Bergambar', 'terbit-bergambar', 'R', 'K', ?, 'Terbit', '2026-09-17 08:00:00'),
+            ('c-2', 'Draft Bergambar', 'draft-bergambar', 'R', 'K', ?, 'Draft', '2026-09-17 08:00:00'),
+            ('c-3', 'Terbit Tanpa Gambar', 'terbit-polos', 'R', 'K', NULL, 'Terbit', '2026-09-17 08:00:00'),
+            ('c-4', 'Terbit Gambar Kosong', 'terbit-kosong', 'R', 'K', '   ', 'Terbit', '2026-09-17 08:00:00');`,
+      args: [gambar, gambar],
+    });
+
+    expect(await readArticleCoverBySlug(client, "terbit-bergambar")).toBe(
+      gambar,
+    );
+    // Draft: tidak boleh bocor meski slug-nya benar.
+    expect(await readArticleCoverBySlug(client, "draft-bergambar")).toBeNull();
+    expect(await readArticleCoverBySlug(client, "terbit-polos")).toBeNull();
+    // Hanya spasi diperlakukan sama dengan kosong.
+    expect(await readArticleCoverBySlug(client, "terbit-kosong")).toBeNull();
+    expect(await readArticleCoverBySlug(client, "tidak-ada")).toBeNull();
+    expect(await readArticleCoverBySlug(client, "  ")).toBeNull();
+
+    // Daftar publik membawa PENANDA-nya, bukan gambarnya — itulah yang membuat
+    // satu muat halaman tidak lagi mengangkut megabyte base64.
+    const daftar = await readPublishedArticles(client);
+    const bergambar = daftar.find((a) => a.slug === "terbit-bergambar");
+    const polos = daftar.find((a) => a.slug === "terbit-polos");
+    expect(bergambar?.punya_gambar).toBe(true);
+    expect(polos?.punya_gambar).toBe(false);
+    expect(bergambar).toBeDefined();
+    expect("gambar_sampul" in (bergambar as object)).toBe(false);
   });
 });

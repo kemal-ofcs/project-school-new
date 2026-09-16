@@ -85,12 +85,13 @@ export default async function HalamanDetailBerita({ params }: Props) {
         </header>
 
         {/* Gambar Sampul */}
-        {article.gambar_sampul ? (
+        {article.punya_gambar ? (
           <div className="overflow-hidden rounded-2xl border border-garis bg-slate-900 shadow-md">
-            {/* biome-ignore lint/performance/noImgElement: Data URI dari database cloud */}
+            {/* biome-ignore lint/performance/noImgElement: gambar dari database cloud, bukan aset build */}
             <img
-              src={article.gambar_sampul}
+              src={`/api/konten/berita/${encodeURIComponent(article.slug)}/gambar`}
               alt={article.judul}
+              decoding="async"
               className="w-full max-h-[450px] object-cover"
             />
           </div>

@@ -5,7 +5,18 @@ export interface PublicArticleItem {
   judul: string;
   slug: string;
   ringkasan: string;
-  gambar_sampul: string | null;
+  /**
+   * Apakah artikel ini punya gambar sampul — BUKAN gambarnya sendiri.
+   *
+   * Gambarnya diambil terpisah lewat `GET /api/konten/berita/<slug>/gambar`.
+   * Versi pertama halaman ini menyisipkan data URI-nya langsung ke dalam HTML:
+   * dengan batas 500 KB per gambar dan 20 artikel per halaman, satu kali muat
+   * bisa mengirim sekitar 10 MB — dan base64 menambah sepertiga lagi di atas
+   * ukuran aslinya. Daftar di panel admin sudah lama tidak mengambil kolom ini
+   * dengan alasan yang persis sama; halaman yang paling banyak dikunjungi
+   * justru yang belum mengikutinya.
+   */
+  punya_gambar: boolean;
   tanggal_terbit: string | null;
   penulis: string | null;
   created_at: string;
@@ -65,7 +76,9 @@ export async function readPublishedArticles(
 ): Promise<PublicArticleItem[]> {
   const boundedLimit = Math.max(1, Math.min(limit, 50));
   const res = await client.execute({
-    sql: `SELECT id_berita, judul, slug, ringkasan, gambar_sampul, tanggal_terbit, penulis, created_at
+    sql: `SELECT id_berita, judul, slug, ringkasan,
+                 CASE WHEN COALESCE(TRIM(gambar_sampul), '') <> '' THEN 1 ELSE 0 END AS punya_gambar,
+                 tanggal_terbit, penulis, created_at
             FROM berita
            WHERE status = 'Terbit'
         ORDER BY COALESCE(tanggal_terbit, created_at) DESC
@@ -73,7 +86,38 @@ export async function readPublishedArticles(
     args: [boundedLimit],
   });
 
-  return res.rows as unknown as PublicArticleItem[];
+  return res.rows.map((row) => ({
+    ...(row as unknown as PublicArticleItem),
+    punya_gambar: Number(row.punya_gambar) === 1,
+  }));
+}
+
+/**
+ * Data URI gambar sampul satu artikel terbit, atau null.
+ *
+ * Dipisahkan dari pembacaan artikelnya supaya kolom yang besar itu hanya
+ * melintas ketika benar-benar diminta. `status = 'Terbit'` diulang di sini —
+ * endpoint gambarnya publik, dan tanpa syarat itu sampul artikel yang masih
+ * Draft bisa diambil siapa pun yang menebak slug-nya.
+ */
+export async function readArticleCoverBySlug(
+  client: Client,
+  slug: string,
+): Promise<string | null> {
+  const cleanSlug = String(slug || "").trim();
+  if (!cleanSlug) return null;
+
+  const res = await client.execute({
+    sql: `SELECT gambar_sampul
+            FROM berita
+           WHERE slug = ? AND status = 'Terbit'
+           LIMIT 1;`,
+    args: [cleanSlug],
+  });
+
+  const nilai = res.rows[0]?.gambar_sampul;
+  const bersih = String(nilai ?? "").trim();
+  return bersih ? bersih : null;
 }
 
 /**
@@ -87,15 +131,21 @@ export async function readArticleBySlug(
   if (!cleanSlug) return null;
 
   const res = await client.execute({
-    sql: `SELECT id_berita, judul, slug, ringkasan, isi, gambar_sampul, tanggal_terbit, penulis, created_at
+    sql: `SELECT id_berita, judul, slug, ringkasan, isi,
+                 CASE WHEN COALESCE(TRIM(gambar_sampul), '') <> '' THEN 1 ELSE 0 END AS punya_gambar,
+                 tanggal_terbit, penulis, created_at
             FROM berita
            WHERE slug = ? AND status = 'Terbit'
            LIMIT 1;`,
     args: [cleanSlug],
   });
 
-  if (res.rows.length === 0) return null;
-  return res.rows[0] as unknown as PublicArticleDetail;
+  const baris = res.rows[0];
+  if (!baris) return null;
+  return {
+    ...(baris as unknown as PublicArticleDetail),
+    punya_gambar: Number(baris.punya_gambar) === 1,
+  };
 }
 
 /**

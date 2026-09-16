@@ -59,11 +59,13 @@ export default async function HalamanBerita() {
               >
                 {/* Gambar Sampul atau Fallback Visual */}
                 <div className="relative aspect-video w-full overflow-hidden bg-slate-100 dark:bg-slate-800">
-                  {item.gambar_sampul ? (
-                    // biome-ignore lint/performance/noImgElement: Data URI dari database cloud
+                  {item.punya_gambar ? (
+                    // biome-ignore lint/performance/noImgElement: gambar dari database cloud, bukan aset build
                     <img
-                      src={item.gambar_sampul}
+                      src={`/api/konten/berita/${encodeURIComponent(item.slug)}/gambar`}
                       alt={item.judul}
+                      loading="lazy"
+                      decoding="async"
                       className="h-full w-full object-cover transition duration-300 group-hover:scale-105"
                     />
                   ) : (
