@@ -7,17 +7,20 @@ import { ProgramsSection } from "@/components/landing/ProgramsSection";
 import { StickyAction } from "@/components/landing/StickyActionMobile";
 import { ProfilBelumLengkap } from "@/components/SiteChrome";
 import { StatusTidakTerbaca } from "@/components/StatusData";
+import { muatKontenHalaman } from "@/lib/server/content-data";
 import { muatGelombangAktif } from "@/lib/server/pmb-data";
 import { muatProfilSekolah, muatProgramStudi } from "@/lib/server/school-data";
 import { namaTampil } from "@/lib/services/school-profile";
 
 export default async function Beranda() {
   // Pemuatan data paralel dari database Turso
-  const [hasilProfil, hasilProgram, hasilGelombang] = await Promise.all([
-    muatProfilSekolah(),
-    muatProgramStudi(),
-    muatGelombangAktif(),
-  ]);
+  const [hasilProfil, hasilProgram, hasilGelombang, hasilKonten] =
+    await Promise.all([
+      muatProfilSekolah(),
+      muatProgramStudi(),
+      muatGelombangAktif(),
+      muatKontenHalaman("landing"),
+    ]);
 
   if (hasilProfil.status !== "ok") {
     return (
@@ -32,6 +35,7 @@ export default async function Beranda() {
   const programStudi = hasilProgram.status === "ok" ? hasilProgram.data : [];
   const gelombangAktif =
     hasilGelombang.status === "ok" ? hasilGelombang.data : null;
+  const kontenLanding = hasilKonten.status === "ok" ? hasilKonten.data : {};
 
   return (
     <main className="flex flex-col w-full">
@@ -43,7 +47,12 @@ export default async function Beranda() {
       ) : null}
 
       {/* 1. Hero Section dengan countdown gelombang & quick stats */}
-      <HeroSection namaSekolah={nama} gelombangAktif={gelombangAktif} />
+      <HeroSection
+        namaSekolah={nama}
+        gelombangAktif={gelombangAktif}
+        heroTitle={kontenLanding["landing.hero_title"]}
+        heroSubtitle={kontenLanding["landing.hero_subtitle"]}
+      />
 
       {/* 2. 4 Pilar Keunggulan & Sambutan Pimpinan */}
       <PillarsSection profil={profil} />

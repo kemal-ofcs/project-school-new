@@ -15,9 +15,16 @@ import type { GelombangAktif } from "@/lib/services/pmb";
 interface HeroSectionProps {
   namaSekolah: string;
   gelombangAktif: GelombangAktif | null;
+  heroTitle?: string;
+  heroSubtitle?: string;
 }
 
-export function HeroSection({ namaSekolah, gelombangAktif }: HeroSectionProps) {
+export function HeroSection({
+  namaSekolah,
+  gelombangAktif,
+  heroTitle,
+  heroSubtitle,
+}: HeroSectionProps) {
   return (
     <section className="relative overflow-hidden bg-primary text-primary-foreground py-16 sm:py-24 lg:py-28">
       {/* Background Decorative Pattern */}
@@ -67,14 +74,13 @@ export function HeroSection({ namaSekolah, gelombangAktif }: HeroSectionProps) {
           </div>
 
           <h1 className="font-extrabold text-3xl tracking-tight sm:text-5xl lg:text-6xl text-white leading-tight">
-            Wujudkan Generasi Pemimpin Cerdas, Berkarakter & Berdaya Saing
-            Global
+            {heroTitle ||
+              "Wujudkan Generasi Pemimpin Cerdas, Berkarakter & Berdaya Saing Global"}
           </h1>
 
           <p className="text-base sm:text-lg text-white/85 leading-relaxed max-w-2xl font-normal">
-            Pendidikan holistik memadukan ketangguhan karakter moral, pengayaan
-            kurikulum internasional, serta ekosistem pembelajaran modern
-            berbasis riset dan teknologi masa depan.
+            {heroSubtitle ||
+              "Pendidikan holistik memadukan ketangguhan karakter moral, pengayaan kurikulum internasional, serta ekosistem pembelajaran modern berbasis riset dan teknologi masa depan."}
           </p>
         </div>
 

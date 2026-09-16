@@ -229,6 +229,12 @@ const MOBILE_COMMANDS: &[&str] = &[
     "desktop_backfill_id_cards",
     "desktop_save_student_photo",
     "desktop_get_student_photo",
+    "desktop_list_articles",
+    "desktop_get_article",
+    "desktop_save_article",
+    "desktop_delete_article",
+    "desktop_get_page_content",
+    "desktop_save_page_content",
 ];
 
 fn local_build_values() -> HashMap<String, String> {

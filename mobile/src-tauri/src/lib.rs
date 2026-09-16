@@ -271,6 +271,12 @@ pub fn run() {
             mobile::commands::desktop_backfill_id_cards,
             mobile::commands::desktop_save_student_photo,
             mobile::commands::desktop_get_student_photo,
+            mobile::commands::desktop_list_articles,
+            mobile::commands::desktop_get_article,
+            mobile::commands::desktop_save_article,
+            mobile::commands::desktop_delete_article,
+            mobile::commands::desktop_get_page_content,
+            mobile::commands::desktop_save_page_content,
         ])
         .run(tauri::generate_context!())
         .unwrap_or_else(|error| {

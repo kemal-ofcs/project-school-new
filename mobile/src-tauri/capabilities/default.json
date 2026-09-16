@@ -233,6 +233,12 @@
     "allow-desktop-delete-frozen-ledger",
     "allow-desktop-backfill-id-cards",
     "allow-desktop-save-student-photo",
-    "allow-desktop-get-student-photo"
+    "allow-desktop-get-student-photo",
+    "allow-desktop-list-articles",
+    "allow-desktop-get-article",
+    "allow-desktop-save-article",
+    "allow-desktop-delete-article",
+    "allow-desktop-get-page-content",
+    "allow-desktop-save-page-content"
   ]
 }
