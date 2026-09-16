@@ -85,6 +85,7 @@ Dokumen ini adalah **standar tertinggi (Golden Standard)** pengembangan pada pro
 | **Tidak memvalidasi MIME type dan format string di backend Rust** | Nilai cacat lolos di SQLite lokal (loose typing), lalu ditolak CHECK constraint / Zod di LibSQL cloud, memicu failed outbox permanen (*permanent outbox jam*) | Rust backend WAJIB memvalidasi whitelist enum/MIME (`image/jpeg`, `image/png`, `image/webp`), batas ukuran (base64 maks 500 KB / 2 MB) SESUAI PERSIS dengan Zod validator sebelum menulis ke DB lokal dan outbox |
 | **Scoping permission parsial domain tunggal pada command yang menyentuh seluruh personil (`master_data`)** | Eskalasi hak akses (*privilege escalation*): pengelola siswa bisa menerbitkan/memanipulasi kartu guru dan staf karyawan kantor | Command multi-entitas lintas personil (seperti `desktop_backfill_id_cards`) WAJIB dijaga oleh `employees.manage`, bukan `students.manage` |
 | **Meletakkan doc comment `///` di antara `#[tauri::command]` dan `pub fn`** | Regex parser `audit-sync-contract.ts` gagal mencocokkan nama command jika komentar >200 char, audit gagal dengan error command hilang | Doc comment `///` WAJIB selalu sebelum `#[tauri::command]`, lalu diikuti `pub fn desktop_...` |
+| **Mengandalkan daftar uji lama tanpa memperluas verifikasi untuk fitur/modifikasi baru** | Fitur baru lolos semu (*false confidence*), atau pengujian integritas bawaan (switch DB purge, schema sentinel, DDL parity) panic/gagal karena entitas baru belum dipetakan | Wajib susun **Delta Verification Matrix** untuk setiap penambahan/modifikasi fitur baru (skema, route, command, RBAC, edge cases) sebelum menjalankan verification plan |
 
 ---
 
@@ -382,6 +383,20 @@ Dokumen ini adalah **standar tertinggi (Golden Standard)** pengembangan pada pro
   2. Gunakan `showSaveFilePicker` HANYA untuk browser web biasa (`isDesktopRuntime() === false`), dan panggil langsung tanpa jeda asinkron `FileReader` agar gesture klik (*transient user activation*) tetap segar dan tidak diblokir browser desktop.
   3. Sediakan fallback terakhir `downloadBlob` (anchor click) untuk browser yang tidak mendukung picker.
 
+### 4.46 Protokol Wajib Perluasan Verifikasi & Delta Verification Matrix (Anti-Stale Test Blindspot)
+- **Prinsip Utama:** Setelah SEMUA penambahan ataupun modifikasi fitur baru/lama selesai dieksekusi, dan SEBELUM menjalankan "Verification Plan", AI Agent **WAJIB memperluas daftar verifikasi (Extended Verification)** secara spesifik untuk menguji fitur baru serta mencegah terjadinya regresi atau diskrepansi dan mendeteksi bug/error sedini mungkin.
+- **Mengapa Mengandalkan Daftar Uji Lama DILARANG:**
+  1. *Test Blindspot:* Fitur baru memiliki branching logika, formula data, constraint database, dan permission baru. Mengandalkan daftar uji lama menciptakan *false confidence*, di mana fitur baru bisa lolos tanpa pernah diuji kasus batasnya.
+  2. *Regression Guard Panic:* Guard integritas bawaan (seperti `every_local_table_is_classified_for_database_switch`, `every_snapshot_table_is_purged_on_database_switch`, dan `provisioning_lokal_membangun_seluruh_tabel_cloud`) membandingkan seluruh tabel dan versi skema aktif terhadap ekspektasi tes. Entitas baru yang belum dipetakan akan memicu kegagalan fatal pada `cargo test`.
+- **Standar 7 Pilar Delta Verification Matrix:**
+  1. *Skema & DDL Parity:* Sinkronkan `CURRENT_SCHEMA_VERSION`, `CLIENT_SCHEMA_VERSION` (Rust), sentinel negatif `-20xx`, `REQUIRED_TABLE_COUNT`, dan klasifikasi `storage::CLOUD_MIRRORED_TABLES` (di Desktop dan Mobile).
+  2. *Isolasi Tabel (Cloud-Only vs Snapshot vs Device-Local):* Pastikan tabel biner/kredensial diisolasi dengan tepat sesuai Rule 24 & Rule 42.
+  3. *IPC Commands & Route Contracts:* Daftarkan command baru di 4 lapisan (`commands.rs`, `lib.rs`, `build.rs`, `default.json`) dan uji via `audit:contract`.
+  4. *RBAC Least-Privilege Guard:* Verifikasi permission baru di `catalog.ts` dan kunci mutasi sensitif di `SENSITIVE_MUTATION_PERMISSIONS`. Uji penolakan HTTP 403 / error Rust untuk role non-otoritas.
+  5. *Edge Cases Logika & Keamanan Data:* Verifikasi sanitasi input, normalisasi huruf besar/kecil, fallback null/empty, anti-race condition (`INSERT OR IGNORE`), session invalidation/revocation seketika saat reset sandi, dan proteksi brute-force.
+  6. *UI/UX Layout & Media Isolation:* Verifikasi rendering tema (dark/light), dropdown colors, dialog focus trap, dan isolasi media cetak (`@media print`).
+  7. *Regresi Zero-Breakage & Paritas Mobile:* Verifikasi alur fitur eksisting tetap utuh 100%, sinkronkan `bun run sync:mobile`, dan pastikan `cargo test` kedua workspace exit code 0.
+
 ---
 
 ## 5. Modul Referensi Mendalam (`references/`)
@@ -402,7 +417,7 @@ Untuk detail implementasi teknis setiap area, rujuk file referensi berikut:
 ```mermaid
 flowchart TD
     Phase1[Tahap 1: Pre-Flight Investigation] --> Phase2[Tahap 2: Atomic Implementation]
-    Phase2 --> Phase3[Tahap 3: Single-Pass Post-Flight Verification]
+    Phase2 --> Phase3[Tahap 3: Extended Post-Flight Verification]
     
     subgraph Phase1 [Tahap 1: Investigasi Tanpa Asumsi]
         A1[Periksa DDL storage.rs, db-schema.ts, sync-schema.ts]
@@ -416,10 +431,11 @@ flowchart TD
         B3[Decoupled lifecycle kamera & GPS caching]
     end
     
-    subgraph Phase3 [Tahap 3: Verifikasi Komprehensif Satu Langkah]
-        C1[bun run check di root workspace]
-        C2[Verifikasi exit code 0 tanpa error/drift]
-        C3[Sajikan laporan final yang jelas & ringkas]
+    subgraph Phase3 [Tahap 3: Verifikasi Komprehensif Diperluas]
+        C1[Susun Delta Verification Matrix untuk fitur baru/modifikasi]
+        C2[Uji unit test baru, schema audit, & contract audit]
+        C3[bun run check di root: cargo test kedua workspace]
+        C4[Verifikasi exit code 0 tanpa error/drift/regresi]
     end
 ```
 

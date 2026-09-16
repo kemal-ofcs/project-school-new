@@ -1,0 +1,102 @@
+Investigasi lengkap. Berikut plan-nya untuk Anda setujui.
+
+Soal **Remote Control**: itu tidak bisa saya nyalakan dari dalam sesi yang sedang jalan — ia ditentukan saat sesi dibuat. Jalankan `claude --remote-control` untuk sesi baru, atau ketik `/remote-control` di sesi interaktif Anda. Sesi background ini sendiri tidak bisa berpindah mode di tengah jalan.
+
+---
+
+# Temuan Investigasi
+
+## Poin 2 — ID_UNIK
+
+- PK siswa adalah `siswa_data.id_siswa`, guru `guru_data.id_guru`; keduanya sekaligus menjadi `master_data.id_unik`.
+- Dibuat otomatis dan tidak pernah lewat form: TS `sis_${crypto.randomUUID()}` (`web-desktop/src/lib/services/academic.ts:790`), Rust `new_academic_id("sis_")` (`academic.rs:1607`).
+- Form siswa dan guru **tidak punya field ID sama sekali** — bukan "terkunci", memang tidak ada. Yang ada hanya NIS/NISN dan NIP/NUPTK.
+- ID itu dirujuk luas: `master_data`, `absensi_harian.id_karyawan`, `log_scan`, `id_card`, `siswa_foto`, `absensi_foto`, `presensi_mapel_detail`, `leger_kehadiran`, `nilai_siswa`, `notifikasi_wa.id_siswa`, `pmb_pendaftar`, plus `qr_code` berformat `id|token` dan `entity_key` di outbox/`desktop_entity_revision` yang sudah terkirim ke cloud.
+
+## Poin 3 — WA notifikasi: dua sebab terpisah
+
+**Sebab A — `bolos` dan `ambang_alfa` tidak punya produsen sama sekali.** Enum Zod, CHECK constraint, kunci sakelar, dan filter pengirim semuanya sudah ada, tetapi tidak ada satu baris kode pun yang mengantre kedua jenis itu. `fase4.md:120` memang merencanakannya ("rekonsiliasi bolos, ambang alfa") tetapi tidak pernah dibangun. Jadi pengujian "alfa" Anda memang tidak akan pernah memunculkan apa pun.
+
+**Sebab B — `scan_masuk`/`scan_pulang` butuh tiga syarat sekaligus** (`scanner.rs:2204`): sakelar `wa_notify_*` di `setting_gex_system` bernilai `'true'` (bawaannya MATI), personil terbaca sebagai siswa, dan `no_whatsapp_wali` valid. Sakelarnya hanya bisa dinyalakan dari form konfigurasi di halaman `/notifikasi-wa` — tidak ada di Pengaturan — dan cerminannya ditulis lewat jalur cloud (`turso.rs:5618`), sehingga terminal baru melihatnya setelah satu siklus pull berhasil.
+
+Kabar baiknya, definisi "bolos" sudah ada dan tinggal dipakai ulang: `attendance-dashboard.ts:221` sudah menghitungnya sebagai siswa yang lewat gerbang (`hadir_gerbang = 1`) tetapi berstatus `Alfa` di presensi mapel pada tanggal yang sama.
+
+## Poin 4 — Landing page
+
+Sebagian besar ternyata **sudah ada**:
+
+- **PMB sudah lengkap.** Halaman `/pmb` ada di web-desktop dan mobile: CRUD gelombang, daftar/detail/berkas pendaftar, ubah status, hapus, dan promosi jadi siswa. Gateway `pmb.ts` sudah bercabang Desktop/Web. Tidak perlu dibangun ulang.
+- **Portal wali sudah jalan** dan sudah membaca data nyata (kehadiran, presensi, nilai, rapor, profil).
+- Yang benar-benar kosong: **berita, profil, program, kontak** di `web-public` semuanya statis hardcoded (31–84 baris, nol query database). Halaman berita bahkan hanya menampilkan komponen `DaftarKosong`. Tidak ada tabelnya, tidak ada panel adminnya.
+
+## Poin 5 — Portal wali
+
+Login sekarang: NIS/NISN → OTP 6 digit → sesi. OTP dikirim ke `no_whatsapp_wali` **lewat gateway WhatsApp yang sama dengan poin 3**. Selama gateway itu belum aktif, portal wali praktis tidak bisa dimasuki siapa pun — ini yang menjelaskan kenapa Anda minta password. `siswa_data` belum punya kolom `unit` maupun `password`; schema version sekarang 28.
+
+---
+
+# Rencana Implementasi
+
+## Tahap A — Poin 2: ID manual siswa & guru
+
+1. Tambah field "ID Unik" di form tambah siswa (`web-desktop/src/app/siswa/page.tsx`) dan guru (`guru/page.tsx`), lalu cerminkan ke mobile.
+2. Validasi terpusat baru `src/lib/validations/personnel-id.ts` (format, panjang, karakter aman) dengan cerminan Rust di `academic.rs`, diuji dengan vektor kembar — pola yang sama seperti `ip-allowlist` dan `holiday-whitelist`.
+3. Keunikan ditegakkan di lapisan aplikasi (`assert_unique`), **bukan** UNIQUE constraint — tabel ini ikut sinkronisasi.
+4. Kosong = tetap auto-generate seperti sekarang, sehingga alur lama tidak berubah.
+5. Saat edit, ID ditampilkan terkunci (lihat pertanyaan Q1).
+
+## Tahap B — Poin 3: WA notifikasi
+
+1. **Produsen `bolos`**: antre saat sesi presensi kelas disimpan, pakai ulang definisi `attendance-dashboard.ts` — siswa `hadir_gerbang = 1` tetapi `presensi_mapel_detail.status = 'Alfa'`. Ditulis di `class-attendance.ts` (Web) dan padanan Rust-nya, di dalam transaksi yang sama.
+2. **Produsen `ambang_alfa`**: dievaluasi di `AutoAlfaRunner` setelah generate alfa, dengan ambang dan periode dari `setting_gex_system` (lihat Q2).
+3. **Sakelar dipindah/dicerminkan ke Pengaturan** supaya tidak tersembunyi di satu halaman, dan status efektifnya ditampilkan di `/notifikasi-wa` ("sakelar hidup tetapi belum tersinkron ke terminal ini").
+4. **Diagnostik di halaman `/notifikasi-wa`**: ketika tabel kosong, tampilkan alasannya (sakelar mati / gateway belum aktif / belum ada siswa bernomor wali) alih-alih daftar kosong yang ambigu.
+5. Dedupe key untuk keduanya supaya satu kejadian tidak mengirim dua pesan.
+
+## Tahap C — Poin 4: CMS konten publik
+
+1. Tabel baru **cloud-only** `konten_publik` + `berita` (mengikuti pola `pmb_*`, bukan `SNAPSHOT_TABLES` — ini konten situs, tidak berguna offline, dan memuat gambar).
+2. Command Rust `desktop_*` + route `POST /api/...` + gateway `content.ts`, meniru struktur `pmb.ts` yang sudah terbukti.
+3. Halaman admin `/konten` di web-desktop dan mobile, dijaga permission baru `content.view` / `content.manage` / `content.delete`.
+4. `web-public` berhenti hardcode: `berita`, `profil`, `program`, `kontak` membaca tabel itu, dengan isi sekarang dipakai sebagai seed awal supaya situs tidak mendadak kosong.
+
+## Tahap D — Poin 5: Portal wali dengan password
+
+1. Migrasi schema **v29**: `siswa_data.unit` dan kolom password (lihat Q4/Q5), lengkap di empat lapis — `storage.rs`, `turso.rs` `ensure_column`, `db-schema.ts` + `db-migrations.ts`, `sync-schema.ts`, dan daftar kolom `SNAPSHOT_TABLES`/`SNAPSHOT_SOURCES`.
+2. Kolom `unit` dan password masuk form siswa; ganti password dijaga permission baru `students.reset_wali_password` yang masuk `SENSITIVE_MUTATION_PERMISSIONS`.
+3. `web-public/src/lib/services/wali-auth.ts`: tambah jalur verifikasi password di samping OTP.
+4. Aksi massal "terbitkan password" per rombel/unit, hasilnya bisa dicetak untuk dibagikan ke wali.
+
+## Tahap E — Verifikasi
+
+`bun run check` sekali di akhir (bukan di tengah), mencakup audit skema, kontrak sync, SQL, ui-guard, a11y, page-guard, list-bound, dan cargo test.
+
+---
+
+# Pertanyaan Sebelum Eksekusi
+
+**Q1 (poin 2) — ID lama boleh diubah atau tidak?**
+Mengisi ID saat tambah baru itu aman. Tetapi **mengubah ID siswa/guru yang sudah ada** berarti mengganti primary key yang dirujuk belasan tabel di atas, plus baris yang sudah terlanjur ada di cloud dengan ID lama, plus QR code yang sudah dicetak jadi tidak valid. Saya sarankan: bebas diisi saat tambah baru, terkunci saat edit. Kalau Anda tetap ingin bisa diubah, saya buat sebagai aksi terpisah "Ubah ID Unik" dengan konfirmasi eksplisit dan cascade atomik — bukan field biasa di form. Mana yang Anda mau?
+
+**Q2 (poin 3) — definisi "ambang alfa"?**
+Berapa jumlah alfa dan dalam periode apa yang memicu pesan ke wali? Misalnya "3 alfa dalam 30 hari terakhir", atau "5 alfa dalam satu semester". Saya akan buat angkanya bisa diatur di Pengaturan, tapi saya perlu nilai bawaannya dari Anda.
+
+**Q3 (poin 4) — cakupan CMS?**
+Cukup **berita** saja, atau sekalian **profil, program, dan kontak** supaya seluruh landing page bisa diisi dari panel admin? Dan apakah berita perlu gambar sampul (berpengaruh ke batas ukuran payload)?
+
+**Q4 (poin 5) — password menggantikan OTP, atau tambahan di atasnya?**
+Kalimat Anda "tambahan keamanan 1 kolom yaitu password" bisa dibaca dua arah. Saya sarankan: **password jadi jalur utama** (karena tidak butuh jaringan maupun gateway WA), dan OTP tetap ada sebagai opsi kedua ketika gateway WA aktif. Setuju?
+
+**Q5 (poin 5) — ini yang paling perlu keputusan Anda.**
+Password berformula `NISN + unit` bisa dihitung siapa pun yang tahu NISN anak itu — dan NISN bukan rahasia, tercetak di banyak dokumen. Ada dua pilihan:
+- **(a)** Password acak sekali terbit, disimpan sebagai hash, ditampilkan sekali ke admin untuk dibagikan, dan bisa diterbitkan ulang. Ini pola yang sudah dipakai kode pemulihan Superadmin di aplikasi ini. Lebih aman, tetapi admin tidak bisa "mengintip" password yang sudah terbit.
+- **(b)** Password formula `NISN + unit` seperti permintaan Anda. Admin selalu bisa memberitahukannya ulang tanpa reset, tetapi praktis siapa pun yang tahu NISN bisa masuk melihat nilai dan absensi anak itu.
+
+Saya sarankan (a). Kalau Anda tetap memilih (b), saya kerjakan sesuai permintaan dan saya pasang minimal rate limit plus kewajiban ganti password saat login pertama.
+
+**Q6 (poin 5) — daftar nilai `unit`?**
+Apakah `TK, SD, SMP, SMA, SMK` sudah cukup, atau ada yang lain (MI/MTs/MA, KB/PAUD)? Nilainya masuk CHECK constraint cloud, jadi menambah nilai baru nanti berarti migrasi lagi — lebih baik lengkap sejak awal.
+
+**Q7 — urutan pengerjaan.** Saya usul urutan A → B → C → D karena D paling besar dan menyentuh schema. Kalau ada yang lebih mendesak, sebutkan saja.
+
+needs input: jawaban Q1–Q7 di atas (paling krusial: Q1 ID lama boleh diubah atau tidak, Q5 password hash-acak vs formula NISN+unit, Q6 daftar nilai unit) sebelum saya mulai menulis kode.

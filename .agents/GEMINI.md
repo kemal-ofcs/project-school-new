@@ -81,6 +81,7 @@ Aturan ini bersifat **GLOBAL** untuk seluruh workspace dan wajib ditaati oleh AI
 | **Memasukkan `bun run test:e2e` ke dalam pipeline `bun run check`** | Pipeline `check` gagal di environment CI tanpa dev server aktif dan koneksi Turso cloud | `test:e2e` dijalankan MANUAL terpisah; tidak pernah masuk ke `check` atau `check:quick` |
 | **Menggunakan CSS class selector di Playwright alih-alih ID elemen** | CSS class bisa berubah kapan saja (refactor Tailwind, rename komponen) dan mematikan seluruh test suite sekaligus | Gunakan `#element-id` yang stabil; tambahkan `id` unik ke elemen baru sebelum menulis test |
 | **Memeriksa `showSaveFilePicker` sebelum `isDesktopRuntime()` pada utilitas download** | WebView Android melaporkan `showSaveFilePicker` true tapi melempar `AbortError`, memicu silent return dan dialog SAF Android tidak pernah muncul | Wajib prioritaskan `isDesktopRuntime()` di urutan pertama pada `saveFileWithPicker`, lalu fallback ke `showSaveFilePicker` hanya untuk web browser murni |
+| **Mengandalkan daftar uji lama tanpa memperluas verifikasi untuk fitur/modifikasi baru** | Fitur baru lolos semu (*false confidence*), atau pengujian integritas bawaan (switch DB purge, schema sentinel, DDL parity) panic/gagal karena entitas baru belum dipetakan | Wajib susun **Delta Verification Matrix** untuk setiap penambahan/modifikasi fitur baru (skema, route, command, RBAC, edge cases) sebelum menjalankan verification plan |
 
 ---
 
@@ -404,11 +405,12 @@ flowchart LR
 2. **Tahap 2 (Implementation):**
    - Terapkan logika defensif, Zod validation `.strict()`, penegakan keunikan di level aplikasi, generation token absensi untuk personil, dan transaksi atomik `db.batch`.
    - Pastikan handler cloud outbox idempoten dan memelihara konsistensi multi-tabel.
-3. **Tahap 3 (Post-Flight Quality Gate):**
+3. **Tahap 3 (Post-Flight Quality Gate & Extended Verification):**
+   - **Perluasan Verifikasi Wajib (Delta Verification Matrix):** Setelah implementasi selesai dan SEBELUM menjalankan verification plan, AI Agent WAJIB menyusun daftar uji yang diperluas khusus untuk fitur baru/modifikasi (skema versi, tabel baru di `storage::CLOUD_MIRRORED_TABLES`, isolasi cloud-only, route/command IPC baru di 4 lapisan, permission RBAC, edge cases, dan zero-breakage regresi). Mengandalkan daftar uji lama DILARANG KERAS.
    - Jalankan `bun run audit:schema` dan `bun run audit:contract`.
    - Sinkronkan pustaka bersama via `bun run sync:mobile`.
    - Jalankan `bun run check:quick` untuk audit, linter, typecheck, dan unit test.
-   - Jalankan `bun run check` (termasuk kompilasi Rust) sebelum mengakhiri fase pekerjaan.
+   - Jalankan `bun run check` (termasuk kompilasi Rust / `cargo test` kedua workspace) sebelum mengakhiri fase pekerjaan.
 
 ---
 

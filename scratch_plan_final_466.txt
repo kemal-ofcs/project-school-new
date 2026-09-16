@@ -1,0 +1,57 @@
+Semua pertanyaan terjawab. Berikut plan final.
+
+# Plan Final — Poin 2–5
+
+Keputusan Anda: ID lama terkunci · ambang 3 alfa/30 hari, sekali per periode, dievaluasi setelah Generate Alfa · CMS keempat halaman, dengan gambar sampul dan sakelar Terbit/Draft · password wali formula `NISN + unit`, jalur utama, OTP opsional · `unit` jadi master data dinamis di halaman Akademik.
+
+Urutannya saya susun ulang: **unit dan ID Unik dikerjakan bersamaan** karena keduanya menyentuh form peserta didik yang sama — kalau dipisah, form itu dibongkar dua kali.
+
+---
+
+## Tahap A — Master Unit + ID Unik manual (schema v29)
+
+**Tabel tersinkronisasi baru `akademik_unit`**: PK TEXT buatan klien (`unt-<128 bit acak>`), `nama_unit`, `urutan`, `status_aktif`. Tanpa UNIQUE constraint — keunikan nama lewat `assert_unique` di lapisan aplikasi.
+**Kolom baru `siswa_data.unit`** TEXT menyimpan *nama* unit, tanpa CHECK. Nama, bukan id, karena id berbeda antar perangkat — pola yang sama dengan `hari_libur_whitelist`.
+
+Empat lapis + rute kanonik: `storage.rs`, `turso.rs` (`ensure_column` + `SNAPSHOT_SOURCES`), `db-schema.ts` + `db-migrations.ts`, `sync-schema.ts`, `SNAPSHOT_TABLES`, dan dua rute `academic-unit/save` + `academic-unit/delete` di `CANONICAL_SYNC_ROUTES`.
+
+**CRUD unit** di halaman Akademik, sebaris dengan Tahun Ajaran / Jurusan / Rombel.
+**Dropdown unit** di form tambah/edit peserta didik.
+**Field ID Unik** di form tambah siswa dan guru: kosong = auto-generate seperti sekarang, terkunci (read-only) saat edit. Validasi di `src/lib/validations/personnel-id.ts` dengan cerminan Rust di `academic.rs`, diuji vektor kembar seperti `ip-allowlist`.
+
+## Tahap B — Password portal wali
+
+Password disimpan **di tabel cloud-only `wali_kredensial`** (`id_siswa`, `password_hash`, `changed_at`), bukan kolom di `siswa_data`. Alasannya: `siswa_data` ikut sinkronisasi, jadi menaruh hash password di sana menyalinnya ke setiap terminal pemindai di lobi — penalaran yang sama dengan `bk_kasus`.
+
+- Password awal = formula `NISN + unit`, sehingga admin selalu bisa memberitahukannya ke wali tanpa reset.
+- Wajib ganti saat login pertama (`changed_at IS NULL`).
+- Rate limit pada endpoint login wali.
+- `web-public/src/lib/services/wali-auth.ts`: password jadi jalur utama, OTP tetap tersedia kalau gateway WA aktif.
+- Permission baru `students.reset_wali_password`, masuk `SENSITIVE_MUTATION_PERMISSIONS`.
+- Aksi massal "terbitkan password" per rombel/unit, hasilnya bisa dicetak.
+
+## Tahap C — WA notifikasi
+
+**Produsen `bolos`** — dibuat saat sesi presensi kelas disimpan, dalam transaksi yang sama. Definisinya dipakai ulang dari `attendance-dashboard.ts:221`: siswa lewat gerbang (`hadir_gerbang = 1`) tetapi `presensi_mapel_detail.status = 'Alfa'` pada tanggal yang sama. Dedupe `bolos:{id_siswa}:{tanggal}`.
+
+**Produsen `ambang_alfa`** — dievaluasi sekali sehari setelah Generate Alfa (`AutoAlfaRunner`): 3 alfa dalam 30 hari terakhir, satu pesan per periode. Dedupe `ambang_alfa:{id_siswa}:{periode}`. Angka 3 dan 30 disimpan di `setting_gex_system` supaya bisa diubah tanpa build ulang.
+
+**Sakelar dan diagnostik** — keempat sakelar `wa_notify_*` dicerminkan ke Pengaturan (sekarang hanya ada di `/notifikasi-wa`), dan ketika tabel antrean kosong halaman itu menyebutkan alasannya: sakelar mati / gateway belum aktif / belum ada siswa bernomor wali. Daftar kosong yang sebenarnya konfigurasi mati tidak bisa dibedakan dari "memang belum ada".
+
+## Tahap D — CMS landing page
+
+Dua tabel **cloud-only** (pola `pmb_*`): `berita` (judul, slug, ringkasan, isi, gambar sampul base64 maks 500 KB, status Draft/Terbit, tanggal terbit) dan `konten_publik` (key-value per halaman untuk profil, program, kontak).
+
+Command Rust `desktop_*` + route POST + gateway `content.ts`, meniru struktur `pmb.ts`. Halaman admin `/konten` di web-desktop dan mobile, permission `content.view` / `content.manage` / `content.delete` (yang terakhir masuk `SENSITIVE_MUTATION_PERMISSIONS`).
+
+`web-public` berhenti hardcode: berita, profil, program, kontak membaca tabel itu. Isi statis yang ada sekarang dipakai sebagai seed awal supaya situs tidak mendadak kosong saat fitur ini aktif.
+
+## Tahap E — Verifikasi
+
+`bun run check` **sekali di akhir** — mencakup audit skema, kontrak sync, SQL, ui-guard, a11y, page-guard, dialog, route-guard, list-bound, lint, typecheck, test TS dan cargo test kedua workspace.
+
+---
+
+Dua catatan yang saya ubah dari usul awal, supaya Anda tahu: password wali pindah ke tabel cloud-only alih-alih kolom di `siswa_data`, dan `unit` tidak memakai CHECK constraint karena sekarang dinamis.
+
+Setuju dengan plan ini? Kalau ya, saya mulai dari Tahap A.

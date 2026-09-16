@@ -1,4 +1,14 @@
 {
   "biome.configPath": "biome.json",
-  "css.lint.unknownAtRules": "ignore"
+  "css.lint.unknownAtRules": "ignore",
+  "terminal.integrated.env.windows": {
+    "ANTHROPIC_BASE_URL": null,
+    "OPENAI_API_BASE": null,
+    "ENABLE_TOOL_SEARCH": null,
+    "HEADROOM_PORT": null,
+    "HEADROOM_HOST": null,
+    "HEADROOM_MODE": null,
+    "HEADROOM_BACKEND": null,
+    "HEADROOM_TELEMETRY": null
+  }
 }

@@ -299,6 +299,17 @@ untuk database baru, dan `ALTER TABLE` (`ensure_column` di Rust,
     Selain itu, di browser laptop (Web), pemanggilan `showSaveFilePicker` wajib dilakukan langsung tanpa didahului operasi
     asinkron berat/FileReader yang dapat mematikan token *transient user activation* (gesture klik mouse), agar dialog simpan
     browser laptop tidak diblokir oleh browser security policy.
+47. Protokol wajib perluasan verifikasi sebelum penutupan fase (Mandatory Extended Verification & Delta Verification Matrix):
+    Setelah seluruh penambahan atau modifikasi fitur baru/lama selesai dieksekusi, dan SEBELUM menjalankan verification plan,
+    daftar verifikasi WAJIB diperluas (*extended verification*) secara spesifik untuk menguji fitur baru serta mencegah
+    terjadinya regresi, diskrepansi, dan menemukan bug/error sedini mungkin. Mengandalkan daftar uji lama DILARANG KERAS
+    karena daftar lama tidak relevan dengan penambahan baru: fitur baru bisa lolos semu (*false confidence*) tanpa teruji,
+    atau pengujian integritas bawaan (seperti switch DB purge `every_local_table_is_classified_for_database_switch`, sentinel skema,
+    dan snapshot purge) akan gagal (*panic*) karena entitas baru belum dipetakan. Rencana verifikasi wajib memuat
+    Delta Verification Matrix yang memetakan: (1) Paritas skema, DDL, dan versi di 4 lapisan; (2) Isolasi tabel
+    (Cloud-Only vs Snapshot vs Device-Local); (3) Kontrak IPC command di 4 lapisan Tauri; (4) Penegakan RBAC sensitif;
+    (5) Edge cases logika bisnis, formula data, dan anti-race condition; (6) Isolasi styling UI (@media print);
+    dan (7) Regresi fitur eksisting serta paritas sinkronisasi mobile (`sync:mobile`).
 
 ## Pemulihan password & verifikasi dua langkah
 
