@@ -33,6 +33,7 @@ const PMB_MIGRATION_VERSION = 26;
 const WALI_PORTAL_MIGRATION_VERSION = 27;
 const GRADES_MIGRATION_VERSION = 28;
 const ACADEMIC_UNIT_MIGRATION_VERSION = 29;
+const WALI_KREDENSIAL_MIGRATION_VERSION = 30;
 
 /**
  * v21 — aturan jam scan baru: Jam Kerja Normal = (Jam Pulang − Jam Masuk) −
@@ -1804,6 +1805,22 @@ export async function runDatabaseMigrations(client: Client) {
     args: [ACADEMIC_UNIT_MIGRATION_VERSION, now],
   });
 
+  await client.execute(`
+    CREATE TABLE IF NOT EXISTS wali_kredensial (
+      id_siswa TEXT PRIMARY KEY,
+      password_hash TEXT NOT NULL,
+      changed_at TEXT,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+  `);
+
+  await client.execute({
+    sql: `INSERT OR IGNORE INTO schema_migration (version, name, applied_at)
+          VALUES (?, 'wali-kredensial', ?);`,
+    args: [WALI_KREDENSIAL_MIGRATION_VERSION, now],
+  });
+
   await client.execute(
     "CREATE INDEX IF NOT EXISTS idx_presensi_mapel_lookup ON presensi_mapel(id_tahun_ajaran, id_rombel, id_mapel, tanggal);",
   );
@@ -1925,5 +1942,9 @@ export async function runDatabaseMigrations(client: Client) {
 
   await client.execute(
     "CREATE INDEX IF NOT EXISTS idx_akademik_unit_urut ON akademik_unit(status_aktif, urutan, nama_unit);",
+  );
+
+  await client.execute(
+    "CREATE INDEX IF NOT EXISTS idx_wali_kredensial_siswa ON wali_kredensial(id_siswa);",
   );
 }

@@ -46,7 +46,7 @@ describe("Schema Consistency & Zero-Drift Guard", () => {
         'jurnal_mengajar', 'leger_kehadiran', 'siswa_foto',
         'notifikasi_wa', 'app_wa_config', 'bk_kasus', 'bk_sesi',
         'pmb_gelombang', 'pmb_pendaftar', 'pmb_berkas',
-        'wali_otp', 'wali_session',
+        'wali_otp', 'wali_session', 'wali_kredensial',
         'nilai_penilaian', 'nilai_siswa'
       );
     `);

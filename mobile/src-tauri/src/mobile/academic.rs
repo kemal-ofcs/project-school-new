@@ -2071,6 +2071,270 @@ pub fn backfill_missing_id_cards(state: &MobileState) -> Result<Value, CommandEr
     Ok(json!({ "sukses": true, "total_inserted": inserted }))
 }
 
+// ── Kredensial portal wali murid ────────────────────────────────────────────
+//
+// Seluruhnya membaca dan menulis SQLite LOKAL, lalu mendorong perubahannya
+// lewat outbox — bukan memanggil cloud langsung. Itu yang membuat penerbitan
+// dan reset password wali tetap bisa dilakukan tanpa jaringan pada pemasangan
+// Turso maupun server sendiri, bukan hanya pada Mode Database Lokal.
+//
+// Pencabutan sesi wali TIDAK dikerjakan di sini. `wali_session` hidup di cloud
+// saja — terminal yang sedang offline tidak memilikinya, sehingga menulisnya
+// di lokal hanya akan mengenai nol baris lalu melapor sukses. Gantinya,
+// handler `wali-credential/save` di `turso.rs` yang mencabut sesi begitu
+// perubahan kredensialnya sampai. Hasilnya sama untuk terminal online, dan
+// benar untuk yang offline: sesinya dicabut saat sinkronisasi menyusul.
+
+/// Password bawaan wali: `NISN + unit`, huruf besar, tanpa pemisah.
+///
+/// Dieja SATU kali di Rust dan dicerminkan `hitungPasswordDefaultWali` di
+/// `web-public/src/lib/services/wali-auth.ts`. Kedua sisi menghitung nilai yang
+/// sama untuk siswa yang sama: yang satu menerbitkannya, yang lain
+/// memverifikasi ketikan wali terhadapnya.
+fn wali_default_password(nis: &str, nisn: &str, unit: &str) -> String {
+    let nomor = if !nisn.trim().is_empty() {
+        nisn.trim()
+    } else {
+        nis.trim()
+    };
+    format!("{}{}", nomor, unit.trim().to_uppercase())
+}
+
+/// `belum_ada` (tidak pernah diterbitkan), `bawaan` (masih password sistem),
+/// atau `diubah`. Nilai yang sama dipakai UI Desktop, Mobile, dan Web.
+fn wali_credential_status(has_hash: bool, changed_at: Option<&str>) -> &'static str {
+    if !has_hash {
+        "belum_ada"
+    } else if changed_at.is_none() {
+        "bawaan"
+    } else {
+        "diubah"
+    }
+}
+
+/// Satu baris identitas siswa yang dibutuhkan untuk menghitung password bawaan.
+struct WaliIdentitas {
+    nis: String,
+    nisn: String,
+    unit: String,
+    has_hash: bool,
+    changed_at: Option<String>,
+}
+
+fn baca_wali_identitas(
+    conn: &rusqlite::Connection,
+    id_siswa: &str,
+) -> Result<WaliIdentitas, CommandError> {
+    conn.query_row(
+        r#"SELECT COALESCE(s.nis, ''), COALESCE(s.nisn, ''), COALESCE(m.unit, ''),
+                  k.password_hash, k.changed_at
+             FROM siswa_data s
+             LEFT JOIN master_data m ON m.id_unik = s.id_siswa
+             LEFT JOIN wali_kredensial k ON k.id_siswa = s.id_siswa
+            WHERE s.id_siswa = ?1 LIMIT 1;"#,
+        params![id_siswa],
+        |row| {
+            let hash: Option<String> = row.get(3)?;
+            Ok(WaliIdentitas {
+                nis: row.get(0)?,
+                nisn: row.get(1)?,
+                unit: row.get(2)?,
+                has_hash: hash.is_some(),
+                changed_at: row.get(4)?,
+            })
+        },
+    )
+    .optional()
+    .map_err(|_| CommandError::internal())?
+    .ok_or_else(|| CommandError::new("NOT_FOUND", "Siswa tidak ditemukan."))
+}
+
+pub fn get_wali_credential_status(
+    state: &MobileState,
+    id_siswa: &str,
+) -> Result<Value, CommandError> {
+    let conn = storage::database(&state.data_dir)?;
+    let identitas = baca_wali_identitas(&conn, id_siswa)?;
+
+    Ok(json!({
+        "idSiswa": id_siswa,
+        "status": wali_credential_status(identitas.has_hash, identitas.changed_at.as_deref()),
+        "changedAt": identitas.changed_at,
+        "defaultPassword": wali_default_password(&identitas.nis, &identitas.nisn, &identitas.unit),
+    }))
+}
+
+/// Tulis kredensial bawaan untuk satu siswa, di dalam transaksi pemanggil.
+fn terbitkan_kredensial_wali(
+    tx: &rusqlite::Transaction<'_>,
+    client_id: &str,
+    id_siswa: &str,
+    password_hash: &str,
+) -> Result<(), CommandError> {
+    tx.execute(
+        r#"INSERT INTO wali_kredensial (
+               id_siswa, password_hash, changed_at, created_at, updated_at
+           ) VALUES (?1, ?2, NULL, datetime('now'), datetime('now'))
+           ON CONFLICT(id_siswa) DO UPDATE SET
+               password_hash = excluded.password_hash,
+               changed_at = NULL,
+               updated_at = datetime('now');"#,
+        params![id_siswa, password_hash],
+    )
+    .map_err(|e| CommandError::new("DB_ERROR", format!("Gagal menyimpan kredensial: {e}")))?;
+
+    // `changed_at` dikirim eksplisit sebagai null: itu penanda "masih password
+    // bawaan" yang menahan wali di layar ganti password, dan menghilangkannya
+    // dari payload akan membuat cloud mempertahankan nilai lamanya.
+    sync::enqueue(
+        tx,
+        client_id,
+        "wali-credential",
+        "save",
+        id_siswa,
+        &json!({
+            "id_siswa": id_siswa,
+            "password_hash": password_hash,
+            "changed_at": Value::Null,
+        }),
+        None,
+    )?;
+    Ok(())
+}
+
+pub fn reset_wali_password(
+    state: &MobileState,
+    id_siswa: &str,
+) -> Result<Value, CommandError> {
+    let mut conn = storage::database(&state.data_dir)?;
+    let tx = conn.transaction().map_err(|_| CommandError::internal())?;
+    let identitas = baca_wali_identitas(&tx, id_siswa)?;
+
+    let default_password =
+        wali_default_password(&identitas.nis, &identitas.nisn, &identitas.unit);
+    let password_hash = super::turso::hash_password_pbkdf2(&default_password);
+
+    let client_id = sync::ensure_client_id(state)?;
+    terbitkan_kredensial_wali(&tx, &client_id, id_siswa, &password_hash)?;
+    tx.commit().map_err(|_| CommandError::internal())?;
+
+    Ok(json!({ "sukses": true, "defaultPassword": default_password }))
+}
+
+/// Daftar siswa aktif beserta identitas dan status kredensialnya.
+fn daftar_wali_kredensial(
+    conn: &rusqlite::Connection,
+    id_siswa_list: Option<&[String]>,
+) -> Result<Vec<Value>, CommandError> {
+    let dasar = r#"SELECT s.id_siswa, COALESCE(s.nis, ''), COALESCE(s.nisn, ''),
+                          s.nama_lengkap, r.nama_rombel, COALESCE(m.unit, ''),
+                          k.password_hash, k.changed_at
+                     FROM siswa_data s
+                     JOIN akademik_rombel r ON r.id_rombel = s.id_rombel
+                     LEFT JOIN master_data m ON m.id_unik = s.id_siswa
+                     LEFT JOIN wali_kredensial k ON k.id_siswa = s.id_siswa
+                    WHERE s.status = 'Aktif'"#;
+
+    let (sql, args): (String, Vec<String>) = match id_siswa_list {
+        Some(list) if !list.is_empty() => {
+            let placeholders = vec!["?"; list.len()].join(", ");
+            (
+                format!(
+                    "{dasar} AND s.id_siswa IN ({placeholders}) ORDER BY r.nama_rombel, s.nama_lengkap;"
+                ),
+                list.to_vec(),
+            )
+        }
+        Some(_) => return Ok(Vec::new()),
+        // -- batas: dibatasi siswa berstatus Aktif di satu sekolah, bukan tabel
+        // yang tumbuh tiap hari operasional; keluarannya dipakai mencetak slip
+        // akun untuk seluruh siswa sekaligus sehingga memotongnya akan membuat
+        // sebagian wali tidak pernah menerima kredensialnya.
+        None => (
+            format!("{dasar} ORDER BY r.nama_rombel, s.nama_lengkap;"),
+            Vec::new(),
+        ),
+    };
+
+    let mut stmt = conn.prepare(&sql).map_err(|_| CommandError::internal())?;
+    let rows = stmt
+        .query_map(rusqlite::params_from_iter(args.iter()), |row| {
+            let nis: String = row.get(1)?;
+            let nisn: String = row.get(2)?;
+            let unit: String = row.get(5)?;
+            let hash: Option<String> = row.get(6)?;
+            let changed_at: Option<String> = row.get(7)?;
+            Ok(json!({
+                "idSiswa": row.get::<_, String>(0)?,
+                "namaSiswa": row.get::<_, String>(3)?,
+                "nis": if nis.is_empty() { Value::Null } else { json!(nis) },
+                "nisn": if nisn.is_empty() { Value::Null } else { json!(nisn) },
+                "rombel": row.get::<_, String>(4)?,
+                "unit": if unit.trim().is_empty() {
+                    Value::Null
+                } else {
+                    json!(unit.trim().to_uppercase())
+                },
+                "defaultPassword": wali_default_password(&nis, &nisn, &unit),
+                "status": wali_credential_status(hash.is_some(), changed_at.as_deref()),
+            }))
+        })
+        .map_err(|_| CommandError::internal())?
+        .filter_map(Result::ok)
+        .collect::<Vec<_>>();
+
+    Ok(rows)
+}
+
+pub fn bulk_issue_wali_passwords(
+    state: &MobileState,
+    id_siswa_list: Option<Vec<String>>,
+) -> Result<Value, CommandError> {
+    let mut conn = storage::database(&state.data_dir)?;
+    let tx = conn.transaction().map_err(|_| CommandError::internal())?;
+    let daftar = daftar_wali_kredensial(&tx, id_siswa_list.as_deref())?;
+
+    if daftar.is_empty() {
+        return Ok(json!({ "sukses": true, "count": 0, "credentials": [] }));
+    }
+
+    let client_id = sync::ensure_client_id(state)?;
+    for baris in &daftar {
+        let id_siswa = baris.get("idSiswa").and_then(Value::as_str).unwrap_or("");
+        let password = baris
+            .get("defaultPassword")
+            .and_then(Value::as_str)
+            .unwrap_or("");
+        if id_siswa.is_empty() {
+            continue;
+        }
+        let hash = super::turso::hash_password_pbkdf2(password);
+        terbitkan_kredensial_wali(&tx, &client_id, id_siswa, &hash)?;
+    }
+
+    // Status dibaca ULANG setelah penerbitan supaya yang dikembalikan adalah
+    // keadaan sesudahnya (`bawaan`), bukan keadaan sebelum tombol ditekan.
+    let hasil = daftar_wali_kredensial(&tx, id_siswa_list.as_deref())?;
+    tx.commit().map_err(|_| CommandError::internal())?;
+
+    Ok(json!({
+        "sukses": true,
+        "count": hasil.len(),
+        "credentials": hasil,
+    }))
+}
+
+pub fn get_wali_credentials_for_printing(
+    state: &MobileState,
+    id_siswa_list: Option<Vec<String>>,
+) -> Result<Value, CommandError> {
+    let conn = storage::database(&state.data_dir)?;
+    Ok(json!(daftar_wali_kredensial(
+        &conn,
+        id_siswa_list.as_deref()
+    )?))
+}
+
 pub fn save_student_photo(
     state: &MobileState,
     id_siswa: &str,

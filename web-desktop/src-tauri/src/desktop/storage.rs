@@ -598,6 +598,25 @@ pub fn initialize(path: &Path) -> Result<(), String> {
       );
       CREATE INDEX IF NOT EXISTS idx_local_akademik_unit_urut
         ON akademik_unit(status_aktif, urutan, nama_unit);
+      -- Kredensial login portal wali murid.
+      --
+      -- Ada di SQLite lokal, bukan hanya di cloud, supaya menerbitkan ulang
+      -- password wali tetap bisa dilakukan tanpa jaringan pada pemasangan
+      -- Turso maupun server sendiri — bukan cuma pada Mode Database Lokal.
+      -- Mutasinya lewat outbox seperti tabel tersinkronisasi lain.
+      --
+      -- Yang tersimpan hanya HASH-nya. `changed_at` NULL berarti password
+      -- masih yang diterbitkan sistem; portal wali menahan pemiliknya di layar
+      -- ganti password selama nilainya masih NULL.
+      CREATE TABLE IF NOT EXISTS wali_kredensial (
+        id_siswa TEXT PRIMARY KEY,
+        password_hash TEXT NOT NULL,
+        changed_at TEXT,
+        created_at TEXT NOT NULL DEFAULT (datetime('now')),
+        updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+      );
+      CREATE INDEX IF NOT EXISTS idx_local_wali_kredensial_siswa
+        ON wali_kredensial(id_siswa);
       CREATE TABLE IF NOT EXISTS absensi_foto (
         id_foto TEXT PRIMARY KEY,
         id_sesi TEXT,
@@ -1510,6 +1529,7 @@ pub(crate) const CLOUD_MIRRORED_TABLES: &[&str] = &[
     "tax_rules",
     "bpjs_rules",
     "akademik_tahun_ajaran",
+    "akademik_unit",
     "akademik_jurusan",
     "akademik_rombel",
     "akademik_mapel",

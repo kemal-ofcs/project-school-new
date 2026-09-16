@@ -908,6 +908,11 @@ const SNAPSHOT_SOURCES: &[SnapshotSource] = &[
         sql: "SELECT * FROM akademik_tahun_ajaran ORDER BY tanggal_mulai DESC;",
     },
     SnapshotSource {
+        payload_key: "waliKredensial",
+        table: "wali_kredensial",
+        sql: "SELECT * FROM wali_kredensial ORDER BY id_siswa;",
+    },
+    SnapshotSource {
         payload_key: "akademikUnit",
         table: "akademik_unit",
         sql: "SELECT * FROM akademik_unit ORDER BY urutan, nama_unit;",
@@ -2128,6 +2133,7 @@ impl TursoClient {
                 ('academic.manage', 'Kelola Struktur Akademik', 'Akademik', 'Menambah, mengubah, dan menghapus struktur akademik.', 1, 401),
                 ('students.view', 'Lihat Data Siswa', 'Akademik', 'Melihat daftar dan profil siswa.', 1, 410),
                 ('students.manage', 'Kelola Data Siswa', 'Akademik', 'Menambah, mengedit, dan menghapus data siswa.', 1, 411),
+                ('students.reset_wali_password', 'Reset / Terbitkan Password Wali', 'Akademik', 'Menerbitkan dan mereset password akun wali murid.', 1, 412),
                 ('teachers.view', 'Lihat Data Guru & PTK', 'Akademik', 'Melihat data guru dan tenaga kependidikan.', 1, 420),
                 ('teachers.manage', 'Kelola Data Guru & PTK', 'Akademik', 'Mengelola data guru dan penugasan mapel.', 1, 421),
                 ('class_attendance.view', 'Lihat Presensi Jam Mapel', 'Akademik', 'Melihat presensi per jam mata pelajaran dan deteksi bolos.', 1, 430),
@@ -2802,6 +2808,17 @@ impl TursoClient {
             ),
             Statement::new("CREATE INDEX IF NOT EXISTS idx_wali_otp_subjek ON wali_otp(subjek, subjek_id, status, created_at DESC);", vec![]),
             Statement::new("CREATE INDEX IF NOT EXISTS idx_wali_session_siswa ON wali_session(id_siswa, expires_at);", vec![]),
+            Statement::new(
+                r#"CREATE TABLE IF NOT EXISTS wali_kredensial (
+                    id_siswa TEXT PRIMARY KEY,
+                    password_hash TEXT NOT NULL,
+                    changed_at TEXT,
+                    created_at TEXT NOT NULL,
+                    updated_at TEXT NOT NULL
+                );"#,
+                vec![],
+            ),
+            Statement::new("CREATE INDEX IF NOT EXISTS idx_wali_kredensial_siswa ON wali_kredensial(id_siswa);", vec![]),
             // ── v28: Modul nilai akademik ──
             //
             // Berbeda dari seluruh tabel Fase 5: kedua tabel ini IKUT
@@ -2877,7 +2894,9 @@ impl TursoClient {
                 (20, 'phase-4-notification-and-counseling', datetime('now')),
                 (26, 'pmb-online', datetime('now')),
                 (27, 'wali-portal', datetime('now')),
-                (28, 'academic-grades', datetime('now'));"#,
+                (28, 'academic-grades', datetime('now')),
+                (29, 'academic-unit', datetime('now')),
+                (30, 'wali-kredensial', datetime('now'));"#,
                 vec![],
             ),
         ];
@@ -3184,6 +3203,11 @@ impl TursoClient {
             vec![],
         )
         .await?;
+        self.query_one(
+            "INSERT OR IGNORE INTO schema_migration (version, name, applied_at) VALUES (-2015, 'wali-kredensial-v1', datetime('now'));",
+            vec![],
+        )
+        .await?;
 
         Ok(())
     }
@@ -3454,7 +3478,7 @@ impl TursoClient {
                 // Sentinel WAJIB dinaikkan setiap kali ensure_schema menambah
                 // tabel atau kolom — nilainya di sini dan pada INSERT di atas
                 // harus selalu sama.
-                "SELECT COUNT(*) AS total FROM schema_migration WHERE version = -2014;",
+                "SELECT COUNT(*) AS total FROM schema_migration WHERE version = -2015;",
                 vec![],
             )
             .await
@@ -7080,6 +7104,12 @@ fn canonical_sync_route(domain: &str, operation: &str) -> Option<(&'static str, 
         ("academic_department" | "academic-department" | "department" | "jurusan", "delete") => {
             ("academic-department", "delete")
         }
+        ("wali_credential" | "wali-credential" | "wali-kredensial", "save") => {
+            ("wali-credential", "save")
+        }
+        ("wali_credential" | "wali-credential" | "wali-kredensial", "delete") => {
+            ("wali-credential", "delete")
+        }
         ("academic_unit" | "academic-unit" | "unit", "create") => ("academic-unit", "create"),
         ("academic_unit" | "academic-unit" | "unit", "update") => ("academic-unit", "update"),
         ("academic_unit" | "academic-unit" | "unit", "delete") => ("academic-unit", "delete"),
@@ -9077,6 +9107,76 @@ async fn apply_event_to_turso(
                 turso
                     .query_one(
                         "DELETE FROM akademik_tahun_ajaran WHERE id_tahun_ajaran = ?;",
+                        vec![json!(id)],
+                    )
+                    .await?;
+            }
+        }
+        ("wali-credential", "save") => {
+            let row = payload
+                .get("wali_credential")
+                .or_else(|| payload.get("waliKredensial"))
+                .unwrap_or(payload);
+            let id = row
+                .get("id_siswa")
+                .and_then(Value::as_str)
+                .filter(|v| !v.is_empty())
+                .unwrap_or(entity_key);
+            let hash = row
+                .get("password_hash")
+                .and_then(Value::as_str)
+                .unwrap_or("");
+            if !id.is_empty() && !hash.is_empty() {
+                // `changed_at` diteruskan APA ADANYA, termasuk NULL. Nilainya
+                // adalah pembeda antara password yang masih bawaan sistem dan
+                // yang sudah diganti wali; menormalkannya jadi `datetime('now')`
+                // akan membuat portal berhenti menahan akun yang passwordnya
+                // masih bisa ditebak dari dokumen anak.
+                let changed_at = row.get("changed_at").and_then(Value::as_str);
+                turso
+                    .query_one(
+                        r#"INSERT INTO wali_kredensial (
+                        id_siswa, password_hash, changed_at, created_at, updated_at
+                    ) VALUES (?, ?, ?, datetime('now'), datetime('now'))
+                    ON CONFLICT(id_siswa) DO UPDATE SET
+                        password_hash = excluded.password_hash,
+                        changed_at = excluded.changed_at,
+                        updated_at = datetime('now');"#,
+                        vec![json!(id), json!(hash), json!(changed_at)],
+                    )
+                    .await?;
+
+                // Pencabutan sesi hidup DI SINI, bukan di perintah Desktop yang
+                // menerbitkan kredensialnya. `wali_session` cloud-only: terminal
+                // yang sedang offline tidak memilikinya, jadi UPDATE di lokal
+                // akan mengenai nol baris lalu melapor sukses — password sudah
+                // berganti sementara sesi lama tetap hidup. Dengan diterapkan
+                // saat event-nya sampai, hasilnya sama untuk terminal online dan
+                // benar untuk yang offline.
+                //
+                // Hanya berlaku pada kredensial yang BARU diterbitkan admin
+                // (`changed_at` NULL). Wali yang mengganti passwordnya sendiri
+                // lewat portal tidak boleh ikut ditendang dari sesinya sendiri.
+                if changed_at.is_none() {
+                    turso
+                        .query_one(
+                            "UPDATE wali_session SET revoked_at = datetime('now'), revoked_reason = 'admin_reset' WHERE id_siswa = ? AND revoked_at IS NULL;",
+                            vec![json!(id)],
+                        )
+                        .await?;
+                }
+            }
+        }
+        ("wali-credential", "delete") => {
+            let id = payload
+                .get("id_siswa")
+                .and_then(Value::as_str)
+                .filter(|v| !v.is_empty())
+                .unwrap_or(entity_key);
+            if !id.is_empty() {
+                turso
+                    .query_one(
+                        "DELETE FROM wali_kredensial WHERE id_siswa = ?;",
                         vec![json!(id)],
                     )
                     .await?;
@@ -12001,6 +12101,7 @@ impl TursoClient {
         self.deliver_mail(to, "Pemulihan Password Absensi SPPG", &body_text)
             .await
     }
+
 }
 
 /// Normalisasi email operator: disimpan lowercase karena index unik
@@ -12968,7 +13069,7 @@ mod tests {
                    (3, 3, 'Fleksibel', '00:00', '23:59', 1439, 0),
                    (4, 4, 'Fleksibel Nol', '08:00', '17:00', 0, 60),
                    (5, 5, 'Pendek', '07:00', '07:30', 30, 60);
-                 DELETE FROM schema_migration WHERE version IN (21, -2014);",
+                 DELETE FROM schema_migration WHERE version IN (21, -2014, -2015);",
             )
             .expect("siapkan shift lama");
         runtime.block_on(async {

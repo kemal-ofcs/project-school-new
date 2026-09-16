@@ -99,6 +99,9 @@ describe("dynamic RBAC migration", () => {
       // `master_data.unit`, sumber dropdown Unit di formulir peserta didik,
       // guru/PTK, dan karyawan.
       29,
+      // v30 — kredensial portal wali murid: tabel `wali_kredensial` (cloud-only)
+      // untuk autentikasi kata sandi dan manajemen akun wali di panel admin.
+      30,
     ]);
 
     const sessionColumns = await client.execute(

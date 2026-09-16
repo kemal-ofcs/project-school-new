@@ -14,6 +14,7 @@ import {
   periksaRateLimit,
 } from "@/lib/services/rate-limit";
 import {
+  autentikasiPasswordWali,
   cariSiswaUntukOtp,
   terbitkanSesiWali,
   verifikasiOtp,
@@ -22,20 +23,81 @@ import {
 export const runtime = "nodejs";
 
 /**
- * Verifikasi kode dan terbitkan sesi wali.
- *
- * Nomor induk dikirim ulang bersama kodenya alih-alih disimpan di sesi
- * sementara: tidak ada keadaan setengah-masuk yang perlu dipelihara, dan
- * pencarian siswanya diulang dari database sehingga anak yang statusnya berubah
- * di antara dua langkah tidak bisa lagi dimasuki.
+ * Verifikasi kredensial (Kata Sandi atau OTP WhatsApp) dan terbitkan sesi wali.
  */
 export async function POST(request: Request) {
   try {
     assertSameOriginMutation(request);
 
     const client = await getReadyPublicDatabase();
-    const kunci = await kunciRateLimit("wali-masuk", getClientAddress(request));
+    const body = (await request.json().catch(() => ({}))) as {
+      metode?: "password" | "otp";
+      nomorInduk?: string;
+      password?: string;
+      kode?: string;
+    };
+    const nomorInduk = String(body.nomorInduk ?? "").trim();
+    const isPasswordMode = body.metode === "password" || Boolean(body.password);
 
+    if (isPasswordMode) {
+      const password = String(body.password ?? "");
+      const kunci = await kunciRateLimit(
+        "wali-masuk-password",
+        getClientAddress(request),
+      );
+      const batas = await periksaRateLimit(client, kunci);
+      if (!batas.diizinkan) {
+        return NextResponse.json(
+          {
+            error: "TERLALU_BANYAK_PERMINTAAN",
+            message: `Terlalu banyak percobaan. Coba lagi dalam ${Math.ceil(batas.cobaLagiDetik / 60)} menit.`,
+          },
+          {
+            status: 429,
+            headers: { "Retry-After": String(batas.cobaLagiDetik) },
+          },
+        );
+      }
+      await catatPercobaan(client, kunci, KEBIJAKAN_CEK_STATUS);
+
+      if (!nomorInduk || !password) {
+        return NextResponse.json(
+          {
+            error: "VALIDATION_ERROR",
+            message: "Nomor induk dan kata sandi wajib diisi.",
+          },
+          { status: 400 },
+        );
+      }
+
+      const hasil = await autentikasiPasswordWali(client, nomorInduk, password);
+      if (!hasil.sukses || !hasil.idSiswa) {
+        return NextResponse.json(
+          {
+            error: "KATA_SANDI_TIDAK_COCOK",
+            message: "Nomor induk atau kata sandi tidak cocok.",
+          },
+          { status: 401 },
+        );
+      }
+
+      const { token } = await terbitkanSesiWali(
+        client,
+        hasil.idSiswa,
+        hasil.nomorWali ?? "",
+        request.headers.get("user-agent"),
+      );
+
+      const jawaban = NextResponse.json({
+        masuk: true,
+        perluGantiPassword: Boolean(hasil.perluGantiPassword),
+      });
+      jawaban.cookies.set(COOKIE_SESI_WALI, token, OPSI_COOKIE_SESI);
+      return jawaban;
+    }
+
+    // Alur Masuk via OTP WhatsApp
+    const kunci = await kunciRateLimit("wali-masuk", getClientAddress(request));
     const batas = await periksaRateLimit(client, kunci);
     if (!batas.diizinkan) {
       return NextResponse.json(
@@ -51,13 +113,7 @@ export async function POST(request: Request) {
     }
     await catatPercobaan(client, kunci, KEBIJAKAN_CEK_STATUS);
 
-    const body = (await request.json().catch(() => ({}))) as {
-      nomorInduk?: string;
-      kode?: string;
-    };
-    const nomorInduk = String(body.nomorInduk ?? "").trim();
     const kode = String(body.kode ?? "").trim();
-
     if (!nomorInduk || !/^\d{6}$/.test(kode)) {
       return NextResponse.json(
         {
@@ -70,8 +126,6 @@ export async function POST(request: Request) {
 
     const siswa = await cariSiswaUntukOtp(client, nomorInduk);
     if (!siswa) {
-      // Bentuk balasan yang sama dengan kode salah: layar ini tidak boleh bisa
-      // dipakai memetakan NIS mana yang terdaftar.
       return NextResponse.json(
         {
           error: "KODE_TIDAK_COCOK",
@@ -102,7 +156,10 @@ export async function POST(request: Request) {
       request.headers.get("user-agent"),
     );
 
-    const jawaban = NextResponse.json({ masuk: true });
+    const jawaban = NextResponse.json({
+      masuk: true,
+      perluGantiPassword: false,
+    });
     jawaban.cookies.set(COOKIE_SESI_WALI, token, OPSI_COOKIE_SESI);
     return jawaban;
   } catch (error) {

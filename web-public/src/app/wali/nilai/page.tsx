@@ -1,6 +1,5 @@
-import { redirect } from "next/navigation";
 import { getReadyPublicDatabase } from "@/lib/server/db";
-import { ambilSesiWali } from "@/lib/server/wali-session";
+import { wajibSesiWaliSiap } from "@/lib/server/wali-session";
 import {
   bacaNilaiAnak,
   modulNilaiTersedia,
@@ -23,8 +22,7 @@ import { PesanGagal } from "../PesanGagal";
  * pada dua dari tiga keadaan itu.
  */
 export default async function HalamanNilai() {
-  const sesi = await ambilSesiWali();
-  if (!sesi) redirect("/wali");
+  const sesi = await wajibSesiWaliSiap();
 
   let tersedia = false;
   let perMapel: NilaiPerMapel[] = [];

@@ -2612,6 +2612,55 @@ pub fn desktop_delete_student(
     academic::delete_student(&state, &id)
 }
 
+/// Membaca status kredensial login wali murid.
+///
+/// Keempat perintah kredensial wali membaca dan menulis SQLite LOKAL, bukan
+/// cloud. Versi pertamanya memanggil `get_turso_client()` langsung, sehingga
+/// menerbitkan atau me-reset password wali mustahil dilakukan saat jaringan
+/// mati pada pemasangan Turso maupun server sendiri — padahal justru itu
+/// keadaan yang paling sering dialami operator sekolah. Perubahannya menyusul
+/// lewat outbox seperti mutasi lain.
+#[tauri::command]
+pub fn desktop_get_wali_credential_status(
+    state: State<'_, DesktopState>,
+    id_siswa: String,
+) -> Result<Value, CommandError> {
+    require_permission(&state, "students.view")?;
+    academic::get_wali_credential_status(&state, &id_siswa)
+}
+
+/// Reset kata sandi wali murid ke bawaan. Sesi aktifnya dicabut oleh handler
+/// `wali-credential/save` di sisi cloud begitu perubahannya sampai — sengaja,
+/// karena `wali_session` cloud-only dan tidak ada di terminal yang offline.
+#[tauri::command]
+pub fn desktop_reset_wali_password(
+    state: State<'_, DesktopState>,
+    id_siswa: String,
+) -> Result<Value, CommandError> {
+    require_permission(&state, "students.reset_wali_password")?;
+    academic::reset_wali_password(&state, &id_siswa)
+}
+
+/// Penerbitan massal kredensial awal wali murid.
+#[tauri::command]
+pub fn desktop_bulk_issue_wali_passwords(
+    state: State<'_, DesktopState>,
+    id_siswa_list: Option<Vec<String>>,
+) -> Result<Value, CommandError> {
+    require_permission(&state, "students.reset_wali_password")?;
+    academic::bulk_issue_wali_passwords(&state, id_siswa_list)
+}
+
+/// Membaca daftar kredensial wali murid untuk cetak slip akun.
+#[tauri::command]
+pub fn desktop_get_wali_credentials_for_printing(
+    state: State<'_, DesktopState>,
+    id_siswa_list: Option<Vec<String>>,
+) -> Result<Value, CommandError> {
+    require_permission(&state, "students.view")?;
+    academic::get_wali_credentials_for_printing(&state, id_siswa_list)
+}
+
 // ── Perintah Presensi Mapel Kelas & Rekonsiliasi Deteksi Bolos (Fase 2) ─────
 
 #[tauri::command]

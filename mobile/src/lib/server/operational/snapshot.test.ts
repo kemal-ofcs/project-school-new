@@ -50,6 +50,8 @@ describe("readOperationalSnapshot", () => {
           result(),
           // akademik_tahun_ajaran
           result(),
+          // wali_kredensial (kredensial portal wali, schema v30)
+          result(),
           // akademik_unit (unit satuan pendidikan, schema v29)
           result(),
           // akademik_jurusan, akademik_rombel, akademik_mapel,
@@ -73,7 +75,7 @@ describe("readOperationalSnapshot", () => {
     const snapshot = await readOperationalSnapshot(client);
 
     expect(receivedMode).toBe("read");
-    expect(receivedStatementCount).toBe(37);
+    expect(receivedStatementCount).toBe(38);
     expect(snapshot.revision).toBe(12);
     expect(snapshot.employees).toEqual([
       { id_unik: "employee-1", nama: "Operator Uji" },
@@ -103,13 +105,13 @@ describe("readOperationalSnapshot", () => {
   });
 });
 
-/** Klien tiruan: 37 hasil batch kosong, plus `execute` yang bisa diatur. */
+/** Klien tiruan: 38 hasil batch kosong, plus `execute` yang bisa diatur. */
 function clientDenganExecute(
   execute: (arg: { sql: string; args: unknown[] }) => Promise<ResultSet>,
 ) {
   return {
     batch: async () => [
-      ...Array.from({ length: 36 }, () => result()),
+      ...Array.from({ length: 37 }, () => result()),
       result([{ revision: 5 }]),
     ],
     execute,

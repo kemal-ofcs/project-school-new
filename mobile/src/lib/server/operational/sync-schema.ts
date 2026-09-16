@@ -700,6 +700,32 @@ export const operationalSyncEventSchema = z.union([
       })
       .strict(),
   ),
+  // Kredensial portal wali. Hanya HASH-nya yang pernah menyeberang; password
+  // aslinya tidak pernah meninggalkan perangkat yang menerbitkannya.
+  //
+  // `changed_at` sengaja nullable dan TIDAK punya nilai bawaan: NULL berarti
+  // password masih yang diterbitkan sistem, dan portal wali memakai persis itu
+  // untuk menahan pemiliknya di layar ganti password.
+  eventSchema(
+    "wali-credential",
+    "save",
+    z
+      .object({
+        id_siswa: shortText.min(1),
+        password_hash: shortText.min(1),
+        changed_at: optionalShortText,
+      })
+      .strict(),
+  ),
+  eventSchema(
+    "wali-credential",
+    "delete",
+    z
+      .object({
+        id_siswa: optionalShortText,
+      })
+      .strict(),
+  ),
   eventSchema(
     "academic-unit",
     "create",

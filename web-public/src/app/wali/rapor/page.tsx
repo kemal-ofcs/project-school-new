@@ -1,12 +1,10 @@
-import { redirect } from "next/navigation";
 import { getReadyPublicDatabase } from "@/lib/server/db";
-import { ambilSesiWali } from "@/lib/server/wali-session";
+import { wajibSesiWaliSiap } from "@/lib/server/wali-session";
 import { bacaLeger } from "@/lib/services/wali-data";
 import { PesanGagal } from "../PesanGagal";
 
 export default async function HalamanRapor() {
-  const sesi = await ambilSesiWali();
-  if (!sesi) redirect("/wali");
+  const sesi = await wajibSesiWaliSiap();
 
   let baris: Awaited<ReturnType<typeof bacaLeger>>;
   try {

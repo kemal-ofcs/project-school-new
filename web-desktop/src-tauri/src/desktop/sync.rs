@@ -19,7 +19,7 @@ use super::{
 /// `CURRENT_SCHEMA_VERSION` di `web-desktop/src/lib/db-schema.ts` setiap kali
 /// migrasi baru ditambahkan, karena keduanya membaca tabel `schema_migration`
 /// yang sama di Turso.
-pub const CLIENT_SCHEMA_VERSION: i64 = 29;
+pub const CLIENT_SCHEMA_VERSION: i64 = 30;
 
 /// Hanya `cloud > client` yang berbahaya; `cloud <= client` adalah kondisi normal.
 fn is_client_schema_outdated(cloud_version: i64) -> bool {
@@ -612,6 +612,21 @@ const SNAPSHOT_TABLES: &[SnapshotTable] = &[
         delete_missing: false,
     },
     SnapshotTable {
+        payload_key: "waliKredensial",
+        domain: "wali-credential",
+        table: "wali_kredensial",
+        columns: &[
+            "id_siswa",
+            "password_hash",
+            "changed_at",
+            "created_at",
+            "updated_at",
+        ],
+        conflict_column: "id_siswa",
+        entity_column: "id_siswa",
+        delete_missing: false,
+    },
+    SnapshotTable {
         payload_key: "akademikUnit",
         domain: "academic-unit",
         table: "akademik_unit",
@@ -966,6 +981,12 @@ const CANONICAL_SYNC_ROUTES: &[(&str, &str)] = &[
     ("teaching-schedule", "update"),
     ("wa-notification", "cancel"),
     ("wa-notification", "queue"),
+    // Kredensial portal wali. Rutenya TERPISAH dari `student/update` supaya
+    // izin `students.reset_wali_password` benar-benar menjadi batas: kalau
+    // password ikut menumpang payload siswa, siapa pun yang boleh menyimpan
+    // siswa ikut bisa menimpanya.
+    ("wali-credential", "delete"),
+    ("wali-credential", "save"),
 ];
 
 pub(super) fn is_canonical_sync_route(domain: &str, operation: &str) -> bool {
