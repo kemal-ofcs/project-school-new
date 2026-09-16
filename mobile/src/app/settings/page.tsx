@@ -98,6 +98,7 @@ export default function SettingsPage() {
   // Mengambil foto bukti tidak butuh izin — kewajibannya ditentukan sakelar
   // role. Yang di-RBAC adalah MELIHAT dan MENGHAPUS fotonya.
   const canViewAttendancePhoto = canAccessArea(user, "attendance_photo");
+  const canViewNotifikasiWa = canAccessArea(user, "notifikasi_wa");
   const canTriggerAlfa = hasPermission(user, "alfa.trigger");
   const canSeeAutoAlfa = canManageAutoAlfa || canTriggerAlfa;
 
@@ -1051,6 +1052,34 @@ export default function SettingsPage() {
                 className="whitespace-nowrap rounded-xl bg-sky-500 px-3.5 py-1.5 text-xs font-black text-white shadow-md transition hover:bg-sky-400 active:scale-95"
               >
                 Lihat &rarr;
+              </Link>
+            </div>
+          </div>
+        ) : null}
+
+        {/* Notifikasi WhatsApp Wali Murid (butuh izin notifikasi_wa) */}
+        {canViewNotifikasiWa ? (
+          <div className="rounded-3xl border border-emerald-500/20 bg-gradient-to-br from-emerald-950/30 via-slate-900/80 to-slate-900/90 p-4 backdrop-blur-md">
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2.5">
+                <div className="grid size-9 place-items-center rounded-xl bg-emerald-500/20 text-emerald-300">
+                  <Icon name="whatsapp" className="size-5" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-white">
+                    Notifikasi WhatsApp
+                  </h3>
+                  <p className="text-[11px] text-slate-400">
+                    Antrean pesan wali murid, status kirim &amp; gateway
+                  </p>
+                </div>
+              </div>
+              <Link
+                href="/notifikasi-wa"
+                onClick={() => triggerHaptic("light")}
+                className="whitespace-nowrap rounded-xl bg-emerald-500 px-3.5 py-1.5 text-xs font-black text-slate-950 shadow-md transition hover:bg-emerald-400 active:scale-95"
+              >
+                Buka &rarr;
               </Link>
             </div>
           </div>

@@ -301,6 +301,18 @@ export interface SesiWali {
   sessionId: string;
   idSiswa: string;
   namaSiswa: string;
+  /**
+   * Password wali masih yang diterbitkan sistem (`changed_at IS NULL`).
+   *
+   * Dibaca dari SESI, bukan dari balasan login, karena kewajiban menggantinya
+   * harus bertahan di setiap permintaan berikutnya. Versi pertama fitur ini
+   * hanya mengembalikan `perluGantiPassword` sekali di `POST /api/wali/masuk`
+   * dan menyerahkan penegakannya ke `FormMasuk.tsx` — sementara cookie sesi
+   * penuh SUDAH terpasang di balasan yang sama. Wali yang menutup dialognya
+   * lalu mengetik `/wali/kehadiran` sudah masuk, dan password bawaannya
+   * (`NISN + unit`) bisa ditebak siapa pun yang memegang dokumen anak itu.
+   */
+  perluGantiPassword: boolean;
 }
 
 /**
@@ -325,14 +337,16 @@ export async function bacaSesiWali(
   if (!token) return null;
 
   const hasil = await client.execute({
-    sql: `SELECT w.session_id, w.id_siswa, s.nama_lengkap
+    sql: `SELECT w.session_id, w.id_siswa, s.nama_lengkap,
+                 k.password_hash, k.changed_at
             FROM wali_session w
             JOIN siswa_data s ON s.id_siswa = w.id_siswa
+            LEFT JOIN wali_kredensial k ON k.id_siswa = w.id_siswa
            WHERE w.token_hash = ?
              AND w.revoked_at IS NULL
              AND w.expires_at > datetime('now')
              AND s.status = 'Aktif'
-             AND TRIM(s.no_whatsapp_wali) = TRIM(w.no_whatsapp_wali)
+             AND (w.no_whatsapp_wali IS NULL OR TRIM(w.no_whatsapp_wali) = '' OR TRIM(s.no_whatsapp_wali) = TRIM(w.no_whatsapp_wali))
            LIMIT 1;`,
     args: [await sha256Hex(token)],
   });
@@ -340,10 +354,16 @@ export async function bacaSesiWali(
   const baris = hasil.rows[0];
   if (!baris) return null;
 
+  // Baris kredensial yang belum ada berarti wali itu masuk lewat OTP dan belum
+  // pernah menyentuh password sama sekali — tidak ada password bawaan yang
+  // perlu diganti, jadi jangan menahannya di layar ganti password.
+  const punyaKredensial = baris.password_hash != null;
+
   return {
     sessionId: String(baris.session_id),
     idSiswa: String(baris.id_siswa),
     namaSiswa: String(baris.nama_lengkap ?? ""),
+    perluGantiPassword: punyaKredensial && baris.changed_at == null,
   };
 }
 
@@ -374,4 +394,270 @@ export async function cabutSesiWali(
            WHERE token_hash = ? AND revoked_at IS NULL;`,
     args: [await sha256Hex(token)],
   });
+}
+
+// ── Kredensial Kata Sandi Wali ──────────────────────────────────────────────
+
+const PASSWORD_SCHEME = "pbkdf2-sha256";
+const PASSWORD_ITERATIONS = 600_000;
+const KEY_LENGTH_BYTES = 32;
+
+function bytesToBase64(bytes: Uint8Array): string {
+  let binary = "";
+  for (const byte of bytes) binary += String.fromCharCode(byte);
+  return btoa(binary);
+}
+
+function base64ToBytes(value: string): Uint8Array {
+  const binary = atob(value);
+  return Uint8Array.from(binary, (character) => character.charCodeAt(0));
+}
+
+async function derivePasswordPbkdf2(
+  password: string,
+  salt: Uint8Array,
+  iterations: number,
+): Promise<Uint8Array> {
+  const material = await crypto.subtle.importKey(
+    "raw",
+    new TextEncoder().encode(password),
+    "PBKDF2",
+    false,
+    ["deriveBits"],
+  );
+  const bits = await crypto.subtle.deriveBits(
+    {
+      name: "PBKDF2",
+      hash: "SHA-256",
+      salt: new Uint8Array(salt).buffer,
+      iterations,
+    },
+    material,
+    KEY_LENGTH_BYTES * 8,
+  );
+  return new Uint8Array(bits);
+}
+
+function constantTimeEqualBytes(left: Uint8Array, right: Uint8Array): boolean {
+  if (left.length !== right.length) return false;
+  let difference = 0;
+  for (let index = 0; index < left.length; index += 1) {
+    difference |= left[index] ^ right[index];
+  }
+  return difference === 0;
+}
+
+/**
+ * Hitung password default wali sesuai formula: `${nisn || nis}${unit}` (uppercase).
+ */
+export function hitungPasswordDefaultWali(
+  nis?: string | null,
+  nisn?: string | null,
+  unit?: string | null,
+): string {
+  const nomor = String(nisn || nis || "").trim();
+  const unitBersih = String(unit || "")
+    .trim()
+    .toUpperCase();
+  return `${nomor}${unitBersih}`;
+}
+
+export async function hashPasswordWali(password: string): Promise<string> {
+  const salt = crypto.getRandomValues(new Uint8Array(16));
+  const hash = await derivePasswordPbkdf2(password, salt, PASSWORD_ITERATIONS);
+  return [
+    PASSWORD_SCHEME,
+    PASSWORD_ITERATIONS,
+    bytesToBase64(salt),
+    bytesToBase64(hash),
+  ].join("$");
+}
+
+export async function verifyPasswordWali(
+  password: string,
+  storedValue: string,
+): Promise<boolean> {
+  const [scheme, iterationsRaw, saltRaw, hashRaw] = storedValue.split("$");
+  if (scheme !== PASSWORD_SCHEME || !iterationsRaw || !saltRaw || !hashRaw) {
+    return false;
+  }
+  const iterations = Number(iterationsRaw);
+  if (!Number.isSafeInteger(iterations) || iterations < 100_000) {
+    return false;
+  }
+  try {
+    const actual = await derivePasswordPbkdf2(
+      password,
+      base64ToBytes(saltRaw),
+      iterations,
+    );
+    const expected = base64ToBytes(hashRaw);
+    return constantTimeEqualBytes(actual, expected);
+  } catch {
+    return false;
+  }
+}
+
+export interface HasilAutentikasiPassword {
+  sukses: boolean;
+  idSiswa?: string;
+  namaSiswa?: string;
+  nomorWali?: string;
+  perluGantiPassword?: boolean;
+  pesanError?: string;
+}
+
+export async function autentikasiPasswordWali(
+  client: Client,
+  nomorInduk: string,
+  password: string,
+): Promise<HasilAutentikasiPassword> {
+  const kunci = nomorInduk.trim();
+  if (!kunci || !password) {
+    return {
+      sukses: false,
+      pesanError: "Nomor induk dan kata sandi wajib diisi.",
+    };
+  }
+
+  const hasil = await client.execute({
+    sql: `SELECT s.id_siswa, s.nama_lengkap, s.no_whatsapp_wali, s.nis, s.nisn,
+                 COALESCE(NULLIF(TRIM(m.unit), ''), '') AS unit,
+                 k.password_hash, k.changed_at
+            FROM siswa_data s
+       LEFT JOIN master_data m ON m.id_unik = s.id_siswa
+       LEFT JOIN wali_kredensial k ON k.id_siswa = s.id_siswa
+           WHERE s.status = 'Aktif'
+             AND (TRIM(s.nis) = ? OR TRIM(s.nisn) = ?)
+           LIMIT 1;`,
+    args: [kunci, kunci],
+  });
+
+  const baris = hasil.rows[0];
+  if (!baris) {
+    return {
+      sukses: false,
+      pesanError: "Nomor induk atau kata sandi tidak cocok.",
+    };
+  }
+
+  const idSiswa = String(baris.id_siswa);
+  const namaSiswa = String(baris.nama_lengkap ?? "");
+  const nomorWali = String(baris.no_whatsapp_wali ?? "").trim();
+  const nis = baris.nis ? String(baris.nis) : null;
+  const nisn = baris.nisn ? String(baris.nisn) : null;
+  const unit = baris.unit ? String(baris.unit) : null;
+
+  const passwordHash = baris.password_hash ? String(baris.password_hash) : null;
+  const changedAt = baris.changed_at ? String(baris.changed_at) : null;
+
+  if (!passwordHash) {
+    // Kredensial belum pernah digenerate di tabel wali_kredensial.
+    // Periksa kecocokan dengan formula default.
+    const passwordDefault = hitungPasswordDefaultWali(nis, nisn, unit);
+    if (password !== passwordDefault) {
+      return {
+        sukses: false,
+        pesanError: "Nomor induk atau kata sandi tidak cocok.",
+      };
+    }
+
+    // Cocok dengan default! Lazy insert baris kredensial awal (changed_at NULL).
+    const newHash = await hashPasswordWali(passwordDefault);
+    await client.execute({
+      sql: `INSERT INTO wali_kredensial (id_siswa, password_hash, changed_at, created_at, updated_at)
+            VALUES (?, ?, NULL, datetime('now'), datetime('now'))
+            ON CONFLICT(id_siswa) DO NOTHING;`,
+      args: [idSiswa, newHash],
+    });
+
+    return {
+      sukses: true,
+      idSiswa,
+      namaSiswa,
+      nomorWali,
+      perluGantiPassword: true,
+    };
+  }
+
+  const cocok = await verifyPasswordWali(password, passwordHash);
+  if (!cocok) {
+    return {
+      sukses: false,
+      pesanError: "Nomor induk atau kata sandi tidak cocok.",
+    };
+  }
+
+  return {
+    sukses: true,
+    idSiswa,
+    namaSiswa,
+    nomorWali,
+    perluGantiPassword: changedAt === null,
+  };
+}
+
+export async function gantiPasswordWali(
+  client: Client,
+  idSiswa: string,
+  passwordLama: string,
+  passwordBaru: string,
+): Promise<{ sukses: boolean; pesanError?: string }> {
+  if (!passwordBaru || passwordBaru.length < 8) {
+    return { sukses: false, pesanError: "Kata sandi baru minimal 8 karakter." };
+  }
+  if (passwordLama === passwordBaru) {
+    return {
+      sukses: false,
+      pesanError: "Kata sandi baru tidak boleh sama dengan kata sandi lama.",
+    };
+  }
+
+  const hasil = await client.execute({
+    sql: `SELECT s.id_siswa, s.nis, s.nisn, COALESCE(m.unit, '') AS unit, k.password_hash
+            FROM siswa_data s
+       LEFT JOIN master_data m ON m.id_unik = s.id_siswa
+       LEFT JOIN wali_kredensial k ON k.id_siswa = s.id_siswa
+           WHERE s.id_siswa = ? AND s.status = 'Aktif'
+           LIMIT 1;`,
+    args: [idSiswa],
+  });
+
+  const baris = hasil.rows[0];
+  if (!baris) {
+    return {
+      sukses: false,
+      pesanError: "Data siswa tidak ditemukan atau tidak aktif.",
+    };
+  }
+
+  const passwordHash = baris.password_hash ? String(baris.password_hash) : null;
+  if (!passwordHash) {
+    const passwordDefault = hitungPasswordDefaultWali(
+      baris.nis ? String(baris.nis) : null,
+      baris.nisn ? String(baris.nisn) : null,
+      baris.unit ? String(baris.unit) : null,
+    );
+    if (passwordLama !== passwordDefault) {
+      return { sukses: false, pesanError: "Kata sandi lama tidak cocok." };
+    }
+  } else {
+    const cocok = await verifyPasswordWali(passwordLama, passwordHash);
+    if (!cocok) {
+      return { sukses: false, pesanError: "Kata sandi lama tidak cocok." };
+    }
+  }
+
+  const hashBaru = await hashPasswordWali(passwordBaru);
+  await client.execute({
+    sql: `INSERT INTO wali_kredensial (id_siswa, password_hash, changed_at, created_at, updated_at)
+          VALUES (?, ?, datetime('now'), datetime('now'), datetime('now'))
+          ON CONFLICT(id_siswa) DO UPDATE SET
+            password_hash = excluded.password_hash,
+            changed_at = datetime('now'),
+            updated_at = datetime('now');`,
+    args: [idSiswa, hashBaru],
+  });
+
+  return { sukses: true };
 }

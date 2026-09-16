@@ -17,7 +17,7 @@ import {
 } from "@/lib/client/personnel-workbook";
 import { createQrPng, employeeQrPayload } from "@/lib/client/qr-code";
 import { useAuth } from "@/lib/context/AuthContext";
-import { getDaftarRombel } from "@/lib/gateways/academic";
+import { getDaftarRombel, getDaftarUnit } from "@/lib/gateways/academic";
 import { getDaftarShift } from "@/lib/gateways/shift";
 import {
   getDaftarSiswa,
@@ -26,6 +26,11 @@ import {
   simpanSiswa,
 } from "@/lib/gateways/student";
 import { syncNow } from "@/lib/gateways/sync-status";
+import {
+  getWaliCredentialStatus,
+  resetWaliPassword,
+  type WaliCredentialStatus,
+} from "@/lib/gateways/wali-credential";
 import { useConfirmDialog } from "@/lib/hooks/useConfirmDialog";
 import { useDebounce } from "@/lib/hooks/useDebounce";
 import { useHydrated } from "@/lib/hooks/useHydrated";
@@ -46,6 +51,7 @@ function emptyForm(idRombel = "", idShift?: number): SiswaInput {
     angkatan: new Date().getFullYear(),
     status: "Aktif",
     id_shift: idShift,
+    unit: "",
   };
 }
 
@@ -63,6 +69,7 @@ export default function SiswaMobilePage() {
 
   const canView = canAccessArea(user, "siswa");
   const canManage = hasPermission(user, "students.manage");
+  const canResetWali = hasPermission(user, "students.reset_wali_password");
 
   const [siswa, setSiswa] = useState<Record<string, unknown>[]>([]);
   const [rombel, setRombel] = useState<Record<string, unknown>[]>([]);
@@ -85,6 +92,17 @@ export default function SiswaMobilePage() {
   const [qrPng, setQrPng] = useState<string | null>(null);
   const [formOpen, setFormOpen] = useState(false);
   const [form, setForm] = useState<SiswaInput>(emptyForm());
+  // Berdiri sendiri, bukan diturunkan dari `form.id_siswa` — sejak ID bisa
+  // diketik saat menambah, ID terisi tidak lagi berarti "sedang mengubah".
+  const [isEditing, setIsEditing] = useState(false);
+  const [unitList, setUnitList] = useState<Record<string, unknown>[]>([]);
+
+  const [waliModal, setWaliModal] = useState<{
+    student: Record<string, unknown>;
+    statusInfo: WaliCredentialStatus | null;
+    loading: boolean;
+    resetting: boolean;
+  } | null>(null);
 
   const isSubmittingRef = useRef(false);
   const { konfirmasi, dialogKonfirmasi } = useConfirmDialog();
@@ -101,12 +119,16 @@ export default function SiswaMobilePage() {
     async (silent = false) => {
       if (!silent) setLoading(true);
       try {
-        const [sData, rData] = await Promise.all([
+        const [sData, rData, uData] = await Promise.all([
           getDaftarSiswa(filterRombel || undefined),
           getDaftarRombel(),
+          getDaftarUnit(),
         ]);
         setSiswa(sData);
         setRombel(rData);
+        // Hanya unit aktif yang masuk dropdown; unit nonaktif tetap tersimpan
+        // pada personil lama supaya datanya tidak hilang saat dipensiunkan.
+        setUnitList(uData.filter((u) => Number(u.status_aktif) === 1));
         setErrorMsg(null);
       } catch (err: unknown) {
         if (!silent) {
@@ -190,7 +212,9 @@ export default function SiswaMobilePage() {
       angkatan: Number(item.angkatan ?? new Date().getFullYear()),
       status: String(item.status ?? "Aktif"),
       id_shift: item.id_shift ? Number(item.id_shift) : undefined,
+      unit: String(item.unit ?? ""),
     });
+    setIsEditing(true);
     setFormOpen(true);
   }, []);
 
@@ -243,6 +267,70 @@ export default function SiswaMobilePage() {
     },
     [canManage, konfirmasi, loadData],
   );
+
+  const handleOpenWali = useCallback(async (item: Record<string, unknown>) => {
+    const idSiswa = String(item.id_siswa);
+    setWaliModal({
+      student: item,
+      statusInfo: null,
+      loading: true,
+      resetting: false,
+    });
+    try {
+      const status = await getWaliCredentialStatus(idSiswa);
+      setWaliModal((prev) =>
+        prev && String(prev.student.id_siswa) === idSiswa
+          ? { ...prev, statusInfo: status, loading: false }
+          : prev,
+      );
+    } catch (err) {
+      setErrorMsg(
+        err instanceof Error
+          ? err.message
+          : "Gagal memeriksa status akun wali.",
+      );
+      setWaliModal(null);
+    }
+  }, []);
+
+  const handleResetWali = useCallback(async () => {
+    if (!waliModal || !canResetWali || isSubmittingRef.current) return;
+    const idSiswa = String(waliModal.student.id_siswa);
+    const nama = String(waliModal.student.nama_lengkap || "siswa ini");
+    const setuju = await konfirmasi({
+      title: `Reset sandi wali ${nama}?`,
+      description:
+        "Sandi akan kembali ke bawaan (NISN/NIS + Unit) dan sesi login wali yang aktif akan dicabut.",
+      confirmLabel: "Ya, reset",
+    });
+    if (!setuju) return;
+
+    if (isSubmittingRef.current) return;
+    isSubmittingRef.current = true;
+    setWaliModal((prev) => (prev ? { ...prev, resetting: true } : null));
+
+    try {
+      const res = await resetWaliPassword(idSiswa);
+      setSuccessMsg(
+        `Sandi akun wali ${nama} direset ke: ${res.defaultPassword}`,
+      );
+      triggerHaptic("success");
+      const updatedStatus = await getWaliCredentialStatus(idSiswa);
+      setWaliModal((prev) =>
+        prev && String(prev.student.id_siswa) === idSiswa
+          ? { ...prev, statusInfo: updatedStatus, resetting: false }
+          : prev,
+      );
+    } catch (err) {
+      setErrorMsg(
+        err instanceof Error ? err.message : "Gagal mereset sandi wali.",
+      );
+      triggerHaptic("error");
+      setWaliModal((prev) => (prev ? { ...prev, resetting: false } : null));
+    } finally {
+      isSubmittingRef.current = false;
+    }
+  }, [waliModal, canResetWali, konfirmasi]);
 
   const handleImport = async (file: File) => {
     if (!canManage || isSubmittingRef.current) return;
@@ -395,6 +483,7 @@ export default function SiswaMobilePage() {
                     shifts[0] ? Number(shifts[0].id_shift) : undefined,
                   ),
                 );
+                setIsEditing(false);
                 setFormOpen(true);
                 triggerHaptic("light");
               }}
@@ -542,6 +631,15 @@ export default function SiswaMobilePage() {
                           Wali
                         </a>
                       ) : null}
+                      {canResetWali ? (
+                        <button
+                          type="button"
+                          onClick={() => void handleOpenWali(item)}
+                          className="rounded-lg border border-amber-500/20 bg-amber-500/10 px-2 py-0.5 text-[10px] font-bold text-amber-300 active:scale-95"
+                        >
+                          Akun Wali
+                        </button>
+                      ) : null}
                       {canManage ? (
                         <>
                           <button
@@ -600,7 +698,7 @@ export default function SiswaMobilePage() {
         <Modal
           isOpen
           onClose={() => setFormOpen(false)}
-          title={form.id_siswa ? "Ubah Data Siswa" : "Tambah Siswa"}
+          title={isEditing ? "Ubah Data Siswa" : "Tambah Siswa"}
         >
           <form
             onSubmit={(e) => {
@@ -609,6 +707,41 @@ export default function SiswaMobilePage() {
             }}
             className="flex flex-col gap-3 py-1"
           >
+            <label className="text-[11px] font-semibold text-slate-300">
+              ID Unik
+              <input
+                value={form.id_siswa ?? ""}
+                readOnly={isEditing}
+                disabled={isEditing}
+                placeholder="Kosongkan untuk dibuatkan otomatis"
+                onChange={(e) =>
+                  setForm((p) => ({ ...p, id_siswa: e.target.value }))
+                }
+                className="mt-1 w-full rounded-xl border border-white/10 bg-slate-800/60 px-3 py-2 font-mono text-sm text-white outline-none focus:border-sky-500 disabled:cursor-not-allowed disabled:text-slate-400"
+              />
+              <span className="mt-1 block text-[10px] font-normal text-slate-500">
+                {isEditing
+                  ? "ID tidak dapat diubah; ia kunci absensi, kartu, nilai, dan QR yang sudah tercetak."
+                  : "Boleh diisi sendiri. Dikosongkan berarti dibuatkan sistem."}
+              </span>
+            </label>
+            <label className="text-[11px] font-semibold text-slate-300">
+              Unit
+              <select
+                value={form.unit ?? ""}
+                onChange={(e) =>
+                  setForm((p) => ({ ...p, unit: e.target.value }))
+                }
+                className="mt-1 w-full rounded-xl border border-white/10 bg-slate-800/60 px-3 py-2 text-sm text-white outline-none focus:border-sky-500"
+              >
+                <option value="">Tidak ditentukan</option>
+                {unitList.map((u) => (
+                  <option key={String(u.id_unit)} value={String(u.nama_unit)}>
+                    {String(u.nama_unit)}
+                  </option>
+                ))}
+              </select>
+            </label>
             <label className="text-[11px] font-semibold text-slate-300">
               Nama Lengkap
               <input
@@ -744,7 +877,7 @@ export default function SiswaMobilePage() {
               >
                 {form.id_shift === undefined ? (
                   <option value="">
-                    {form.id_siswa
+                    {isEditing
                       ? "Pertahankan shift saat ini"
                       : "Shift bawaan (shift 1)"}
                   </option>
@@ -781,6 +914,68 @@ export default function SiswaMobilePage() {
         </Modal>
       ) : null}
       {dialogKonfirmasi}
+      {waliModal ? (
+        <Modal
+          isOpen
+          onClose={() => setWaliModal(null)}
+          title="Akun Portal Wali"
+          subtitle={String(waliModal.student.nama_lengkap ?? "")}
+        >
+          <div className="flex flex-col gap-3 py-2 text-xs">
+            {waliModal.loading ? (
+              <div className="flex flex-col items-center justify-center py-6 text-slate-400">
+                <div className="size-6 animate-spin rounded-full border-2 border-sky-500 border-t-transparent" />
+                <p className="mt-2 text-[11px]">Memeriksa status...</p>
+              </div>
+            ) : waliModal.statusInfo ? (
+              <>
+                <div className="rounded-xl border border-white/10 bg-slate-900/60 p-3">
+                  <div className="text-[11px] text-slate-400">Status Akun</div>
+                  <div className="mt-1 font-semibold text-white">
+                    {waliModal.statusInfo.status === "diubah" ? (
+                      <span className="text-emerald-400">
+                        Sandi Sudah Diubah Wali
+                      </span>
+                    ) : (
+                      <span className="text-amber-400">Masih Sandi Bawaan</span>
+                    )}
+                  </div>
+                </div>
+
+                <div className="rounded-xl border border-white/10 bg-slate-900/60 p-3">
+                  <div className="text-[11px] text-slate-400">
+                    Kata Sandi Bawaan
+                  </div>
+                  <div className="mt-1 font-mono text-sm font-bold text-sky-300 select-all">
+                    {waliModal.statusInfo.defaultPassword}
+                  </div>
+                  <p className="mt-1 text-[10px] text-slate-500">
+                    Formula: NISN/NIS + UNIT (huruf besar)
+                  </p>
+                </div>
+
+                <div className="mt-2 flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setWaliModal(null)}
+                    className="flex-1 rounded-xl border border-white/10 bg-slate-800 py-2 text-xs font-semibold text-slate-300"
+                  >
+                    Tutup
+                  </button>
+                  <button
+                    type="button"
+                    disabled={waliModal.resetting}
+                    onClick={() => void handleResetWali()}
+                    className="flex-1 rounded-xl bg-amber-500 py-2 text-xs font-bold text-slate-950 shadow-md transition hover:bg-amber-400 disabled:opacity-50"
+                  >
+                    {waliModal.resetting ? "Mereset..." : "Reset Sandi"}
+                  </button>
+                </div>
+              </>
+            ) : null}
+          </div>
+        </Modal>
+      ) : null}
     </MobileAppShell>
   );
 }

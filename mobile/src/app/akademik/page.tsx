@@ -30,16 +30,19 @@ import {
   getDaftarPenugasanGuru,
   getDaftarRombel,
   getDaftarTahunAjaran,
+  getDaftarUnit,
   hapusJurusan,
   hapusMapel,
   hapusPenugasanGuru,
   hapusRombel,
   hapusTahunAjaran,
+  hapusUnit,
   simpanJurusan,
   simpanMapel,
   simpanPenugasanGuru,
   simpanRombel,
   simpanTahunAjaran,
+  simpanUnit,
 } from "@/lib/gateways/academic";
 import { getDaftarSesiPresensi } from "@/lib/gateways/class-attendance";
 import { getDaftarGuru } from "@/lib/gateways/teacher";
@@ -50,6 +53,7 @@ type Rows = Record<string, unknown>[];
 
 const TABS: [AcademicKind, string][] = [
   ["tahun_ajaran", "Tahun Ajaran"],
+  ["unit", "Unit"],
   ["rombel", "Rombel"],
   ["mapel", "Mapel"],
   ["jurusan", "Jurusan"],
@@ -86,6 +90,7 @@ export default function AkademikMobilePage() {
   const [rombel, setRombel] = useState<Rows>([]);
   const [mapel, setMapel] = useState<Rows>([]);
   const [jurusan, setJurusan] = useState<Rows>([]);
+  const [unit, setUnit] = useState<Rows>([]);
   const [guru, setGuru] = useState<Rows>([]);
   const [penugasan, setPenugasan] = useState<Rows>([]);
   const [selectedTa, setSelectedTa] = useState("");
@@ -121,14 +126,16 @@ export default function AkademikMobilePage() {
   const loadData = useCallback(async (silent = false) => {
     if (!silent) setLoading(true);
     try {
-      const [ta, jur, map, gr] = await Promise.all([
+      const [ta, jur, map, gr, unt] = await Promise.all([
         getDaftarTahunAjaran(),
         getDaftarJurusan(),
         getDaftarMapel(),
         getDaftarGuru(),
+        getDaftarUnit(),
       ]);
       setTahunAjaran(ta);
       setJurusan(jur);
+      setUnit(unt);
       setMapel(map);
       setGuru(gr);
 
@@ -235,6 +242,15 @@ export default function AkademikMobilePage() {
         tanggal_selesai: sixMonths,
         is_aktif: 0,
       },
+      unit: {
+        kind: "unit",
+        nama_unit: "",
+        keterangan: "",
+        // Diletakkan di belakang daftar yang sudah ada supaya unit baru tidak
+        // melompat ke urutan pertama dropdown formulir personil.
+        urutan: String(unit.length),
+        status_aktif: 1,
+      },
       jurusan: {
         kind: "jurusan",
         kode_jurusan: "",
@@ -286,6 +302,15 @@ export default function AkademikMobilePage() {
         tanggal_mulai: String(item.tanggal_mulai ?? ""),
         tanggal_selesai: String(item.tanggal_selesai ?? ""),
         is_aktif: Number(item.is_aktif) === 1 ? 1 : 0,
+      });
+    } else if (kind === "unit") {
+      setDraft({
+        kind,
+        id: String(item.id_unit),
+        nama_unit: String(item.nama_unit ?? ""),
+        keterangan: item.keterangan ? String(item.keterangan) : "",
+        urutan: String(item.urutan ?? 0),
+        status_aktif: Number(item.status_aktif ?? 1) === 1 ? 1 : 0,
       });
     } else if (kind === "jurusan") {
       setDraft({
@@ -351,6 +376,7 @@ export default function AkademikMobilePage() {
     setFormError(null);
     try {
       if (parsed.kind === "tahun_ajaran") await simpanTahunAjaran(parsed.input);
+      else if (parsed.kind === "unit") await simpanUnit(parsed.input);
       else if (parsed.kind === "jurusan") await simpanJurusan(parsed.input);
       else if (parsed.kind === "rombel") await simpanRombel(parsed.input);
       else if (parsed.kind === "mapel") await simpanMapel(parsed.input);
@@ -508,8 +534,15 @@ export default function AkademikMobilePage() {
           tersinkronisasi ke seluruh perangkat.
         </>
       ),
+      // Unit tidak ikut pra-pemeriksaan `findUsage`: menghitung personil per
+      // unit menuntut menarik SELURUH master_data ke ponsel, dan gateway-nya
+      // tidak bisa menyaring berdasarkan unit. Backend tetap menolaknya
+      // (`ensure_academic_unused`), jadi yang diubah hanya janjinya di layar —
+      // mengaku "sudah diperiksa" padahal belum adalah kalimat yang salah.
       preserved:
-        "Sudah diperiksa: tidak ada siswa, rombel, penugasan, atau riwayat presensi yang masih memakainya.",
+        kind === "unit"
+          ? "Personil yang masih memakai unit ini akan menahan penghapusannya; pesan penolakannya muncul setelah tombol ditekan."
+          : "Sudah diperiksa: tidak ada siswa, rombel, penugasan, atau riwayat presensi yang masih memakainya.",
       confirmLabel: "Ya, hapus",
       tone: "danger",
     });
@@ -518,6 +551,7 @@ export default function AkademikMobilePage() {
     setBusy(true);
     try {
       if (kind === "tahun_ajaran") await hapusTahunAjaran(id);
+      else if (kind === "unit") await hapusUnit(id);
       else if (kind === "jurusan") await hapusJurusan(id);
       else if (kind === "rombel") await hapusRombel(id);
       else if (kind === "mapel") await hapusMapel(id);
@@ -547,6 +581,7 @@ export default function AkademikMobilePage() {
 
   const rowsByTab: Record<AcademicKind, Rows> = {
     tahun_ajaran: tahunAjaran,
+    unit,
     rombel,
     mapel,
     jurusan,
@@ -781,6 +816,42 @@ export default function AkademikMobilePage() {
                           onEdit={() => openEdit("mapel", item)}
                           onDelete={() =>
                             void handleDelete("mapel", id, item, label)
+                          }
+                        />
+                      ) : null
+                    }
+                  />
+                );
+              })
+            : null}
+
+          {tab === "unit"
+            ? unit.map((item) => {
+                const id = String(item.id_unit);
+                const label = `Unit ${String(item.nama_unit)}`;
+                return (
+                  <RowCard
+                    key={id}
+                    title={String(item.nama_unit)}
+                    subtitle={
+                      item.keterangan
+                        ? String(item.keterangan)
+                        : "Tanpa keterangan"
+                    }
+                    badge={
+                      <span className="shrink-0 rounded-lg border border-white/10 bg-slate-800 px-2 py-1 text-[10px] font-bold text-slate-300">
+                        #{String(item.urutan ?? 0)}
+                      </span>
+                    }
+                    inactive={Number(item.status_aktif ?? 1) === 0}
+                    actions={
+                      canManage ? (
+                        <RowActions
+                          busy={busy}
+                          label={label}
+                          onEdit={() => openEdit("unit", item)}
+                          onDelete={() =>
+                            void handleDelete("unit", id, item, label)
                           }
                         />
                       ) : null

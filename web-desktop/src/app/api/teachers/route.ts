@@ -33,6 +33,7 @@ export async function POST(request: NextRequest) {
         lp?: string | null;
         id_shift?: number;
         status_aktif?: string;
+        unit?: string;
       };
       id?: string;
     }>(request);

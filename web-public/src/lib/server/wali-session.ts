@@ -1,6 +1,7 @@
 import "server-only";
 
 import { cookies } from "next/headers";
+import { redirect } from "next/navigation";
 import { cache } from "react";
 import { getReadyPublicDatabase } from "@/lib/server/db";
 import {
@@ -52,3 +53,28 @@ export const ambilSesiWali = cache(async (): Promise<SesiWali | null> => {
     return null;
   }
 });
+
+/**
+ * Sesi wali yang SUDAH boleh melihat data anak — atau pengalihan.
+ *
+ * Dipakai oleh kelima halaman data portal. Dua penolakannya sengaja hidup di
+ * SATU tempat, bukan disalin ke tiap halaman:
+ *
+ * 1. Tanpa sesi → layar masuk.
+ * 2. Password masih bawaan sistem (`changed_at IS NULL`) → layar ganti
+ *    password, dan TIDAK bisa dilewati.
+ *
+ * Yang kedua itu penegakan yang sebenarnya. Versi pertama fitur password wali
+ * hanya mengembalikan `perluGantiPassword` sekali di balasan login sementara
+ * cookie sesi penuh sudah ikut terpasang di balasan yang sama, sehingga layar
+ * ganti password hanyalah dialog di sisi klien: menutupnya lalu mengetik
+ * `/wali/kehadiran` sudah cukup untuk masuk. Password bawaannya berformula
+ * `NISN + unit` — bisa dihitung siapa pun yang memegang dokumen anak itu —
+ * jadi kewajiban menggantinya adalah satu-satunya penyeimbangnya.
+ */
+export async function wajibSesiWaliSiap(): Promise<SesiWali> {
+  const sesi = await ambilSesiWali();
+  if (!sesi) redirect("/wali");
+  if (sesi.perluGantiPassword) redirect("/wali/ganti-password");
+  return sesi;
+}

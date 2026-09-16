@@ -38,6 +38,7 @@ const DEFAULT_FORM: KaryawanInput = {
   jenis_personil: "Pegawai",
   tanggal_mulai_aktif: new Date().toLocaleDateString("en-CA"),
   tanggal_selesai_aktif: "",
+  unit: "",
 };
 
 interface EmployeeFormModalProps {
@@ -49,6 +50,8 @@ interface EmployeeFormModalProps {
   initialData: KaryawanInput | null;
   /** Daftar shift yang tersedia untuk dipilih. */
   shifts: Record<string, unknown>[];
+  /** Unit satuan pendidikan aktif; kosong berarti belum ada yang didaftarkan di menu Akademik. */
+  units: Record<string, unknown>[];
   /** Callback menutup modal tanpa menyimpan. */
   onClose: () => void;
   /** Callback sukses menyimpan — menerima pesan konfirmasi. */
@@ -64,6 +67,7 @@ export function EmployeeFormModal({
   mode,
   initialData,
   shifts,
+  units,
   onClose,
   onSuccess,
 }: EmployeeFormModalProps) {
@@ -287,6 +291,31 @@ export function EmployeeFormModal({
               className={inputClass()}
             />
           </div>
+        </div>
+
+        {/* Unit satuan pendidikan — dibaca dari menu Akademik → Unit. */}
+        <div>
+          <label
+            htmlFor="employee-unit"
+            className="text-slate-400 block mb-1 font-semibold"
+          >
+            Unit:
+          </label>
+          <select
+            id="employee-unit"
+            value={formData.unit ?? ""}
+            onChange={(e) =>
+              setFormData((prev) => ({ ...prev, unit: e.target.value }))
+            }
+            className={inputClass()}
+          >
+            <option value="">Tidak ditentukan</option>
+            {units.map((u) => (
+              <option key={String(u.id_unit)} value={String(u.nama_unit)}>
+                {String(u.nama_unit)}
+              </option>
+            ))}
+          </select>
         </div>
 
         {/* 6, 7, 8. Gender, Shift & Personil */}

@@ -1,10 +1,13 @@
 import { describe, expect, test } from "bun:test";
 import { createClient } from "@libsql/client";
 import {
+  autentikasiPasswordWali,
   bacaSesiWali,
   buatKodeOtp,
   cabutSesiWali,
   cariSiswaUntukOtp,
+  gantiPasswordWali,
+  hitungPasswordDefaultWali,
   OTP_MAKS_PERCOBAAN,
   samarkanNomor,
   terbitkanOtp,
@@ -26,6 +29,7 @@ async function siapkanDatabase() {
       no_whatsapp_wali TEXT,
       alamat TEXT,
       angkatan INTEGER NOT NULL,
+      unit TEXT,
       status TEXT NOT NULL DEFAULT 'Aktif'
         CHECK (status IN ('Aktif', 'Lulus', 'Pindah', 'Keluar', 'Drop Out')),
       created_at TEXT NOT NULL,
@@ -54,13 +58,28 @@ async function siapkanDatabase() {
       session_id TEXT PRIMARY KEY,
       token_hash TEXT UNIQUE NOT NULL,
       id_siswa TEXT NOT NULL,
-      no_whatsapp_wali TEXT NOT NULL,
+      no_whatsapp_wali TEXT,
       created_at TEXT NOT NULL,
       expires_at TEXT NOT NULL,
       last_seen_at TEXT NOT NULL,
       revoked_at TEXT,
       revoked_reason TEXT,
       user_agent_hash TEXT
+    );
+  `);
+  await client.execute(`
+    CREATE TABLE IF NOT EXISTS master_data (
+      id_unik TEXT PRIMARY KEY,
+      unit TEXT
+    );
+  `);
+  await client.execute(`
+    CREATE TABLE IF NOT EXISTS wali_kredensial (
+      id_siswa TEXT PRIMARY KEY,
+      password_hash TEXT NOT NULL,
+      changed_at TEXT,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
     );
   `);
   return client;
@@ -76,21 +95,27 @@ async function tambahSiswa(
     nisn?: string;
     status?: string;
     wa?: string | null;
+    unit?: string | null;
   } = {},
 ) {
   await client.execute({
     sql: `INSERT INTO siswa_data (
             id_siswa, nis, nisn, nama_lengkap, id_rombel, nama_wali,
-            no_whatsapp_wali, angkatan, status, created_at, updated_at
+            no_whatsapp_wali, angkatan, unit, status, created_at, updated_at
           ) VALUES (?, ?, ?, 'Anisa Putri', 'rom-1', 'Budi Santoso',
-                    ?, 2026, ?, datetime('now'), datetime('now'));`,
+                    ?, 2026, ?, ?, datetime('now'), datetime('now'));`,
     args: [
       opsi.id ?? "sis-1",
       opsi.nis ?? "1001",
       opsi.nisn ?? "0091001",
       opsi.wa === undefined ? "+6281200000000" : opsi.wa,
+      opsi.unit ?? "SMP",
       opsi.status ?? "Aktif",
     ],
+  });
+  await client.execute({
+    sql: `INSERT OR REPLACE INTO master_data (id_unik, unit) VALUES (?, ?);`,
+    args: [opsi.id ?? "sis-1", opsi.unit ?? "SMP"],
   });
 }
 
@@ -362,5 +387,101 @@ describe("sesi wali", () => {
     // Menghapus cookie saja tidak cukup: tokennya tetap sah bila sempat
     // disalin. "Keluar" harus berarti keluar.
     expect(await bacaSesiWali(client, token)).toBeNull();
+  });
+});
+
+describe("kredensial kata sandi portal wali", () => {
+  test("hitungPasswordDefaultWali menghitung formula nisn/nis + unit uppercase", () => {
+    expect(hitungPasswordDefaultWali("1001", "0091001", "SMP")).toBe(
+      "0091001SMP",
+    );
+    expect(hitungPasswordDefaultWali("1001", "", "smp")).toBe("1001SMP");
+    expect(hitungPasswordDefaultWali("1001", null, null)).toBe("1001");
+    expect(hitungPasswordDefaultWali("1001", "0091001", "  smk ")).toBe(
+      "0091001SMK",
+    );
+  });
+
+  test("autentikasi login pertama dengan password default sukses dan menandai perlu ganti", async () => {
+    const client = await siapkanDatabase();
+    await tambahSiswa(client, {
+      id: "sis-1",
+      nis: "1001",
+      nisn: "0091001",
+      unit: "SMP",
+    });
+
+    // Login pertama menggunakan password bawaan: 0091001SMP
+    const login = await autentikasiPasswordWali(
+      client,
+      "0091001",
+      "0091001SMP",
+    );
+    expect(login.sukses).toBe(true);
+    expect(login.idSiswa).toBe("sis-1");
+    expect(login.perluGantiPassword).toBe(true);
+
+    // Verifikasi row wali_kredensial tercipta di database dengan changed_at NULL
+    const check = await client.execute(
+      "SELECT id_siswa, changed_at FROM wali_kredensial WHERE id_siswa = 'sis-1';",
+    );
+    expect(check.rows.length).toBe(1);
+    expect(check.rows[0]?.changed_at).toBeNull();
+  });
+
+  test("autentikasi dengan password salah ditolak", async () => {
+    const client = await siapkanDatabase();
+    await tambahSiswa(client, {
+      id: "sis-1",
+      nis: "1001",
+      nisn: "0091001",
+      unit: "SMP",
+    });
+
+    const login = await autentikasiPasswordWali(
+      client,
+      "0091001",
+      "passwordSalah123",
+    );
+    expect(login.sukses).toBe(false);
+  });
+
+  test("ganti password memperbarui kredensial dan menonaktifkan perluGantiPassword", async () => {
+    const client = await siapkanDatabase();
+    await tambahSiswa(client, {
+      id: "sis-1",
+      nis: "1001",
+      nisn: "0091001",
+      unit: "SMP",
+    });
+
+    // Initial default auth
+    await autentikasiPasswordWali(client, "0091001", "0091001SMP");
+
+    // Ganti password ke yang baru
+    const ubah = await gantiPasswordWali(
+      client,
+      "sis-1",
+      "0091001SMP",
+      "KataSandiBaru#2026",
+    );
+    expect(ubah.sukses).toBe(true);
+
+    // Login dengan password baru
+    const loginBaru = await autentikasiPasswordWali(
+      client,
+      "0091001",
+      "KataSandiBaru#2026",
+    );
+    expect(loginBaru.sukses).toBe(true);
+    expect(loginBaru.perluGantiPassword).toBe(false);
+
+    // Login dengan password lama sekarang ditolak
+    const loginLama = await autentikasiPasswordWali(
+      client,
+      "0091001",
+      "0091001SMP",
+    );
+    expect(loginLama.sukses).toBe(false);
   });
 });
