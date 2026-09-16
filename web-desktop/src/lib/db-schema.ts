@@ -2,8 +2,8 @@ import type { Client } from "@libsql/client";
 import { BRANDING } from "@/lib/constants/branding";
 import { runDatabaseMigrations } from "./db-migrations";
 
-export const CURRENT_SCHEMA_VERSION = 28;
-export const REQUIRED_TABLE_COUNT = 61;
+export const CURRENT_SCHEMA_VERSION = 29;
+export const REQUIRED_TABLE_COUNT = 62;
 
 export async function isDatabaseSchemaReady(client: Client) {
   try {
@@ -26,7 +26,7 @@ export async function isDatabaseSchemaReady(client: Client) {
             'tarif_jp',
             'password_reset_request', 'app_mail_config', 'absensi_foto',
             'hari_libur_whitelist',
-            'akademik_tahun_ajaran', 'akademik_jurusan', 'akademik_rombel',
+            'akademik_tahun_ajaran', 'akademik_unit', 'akademik_jurusan', 'akademik_rombel',
             'akademik_mapel', 'akademik_guru_mapel', 'akademik_jam_pelajaran',
             'jadwal_mengajar', 'guru_data', 'siswa_data',
             'presensi_mapel', 'presensi_mapel_detail',
@@ -71,7 +71,12 @@ export async function initDatabaseSchema(client: Client) {
         jenis_personil TEXT,
         tanggal_mulai_aktif DATE,
         tanggal_selesai_aktif DATE,
-        status_backup TEXT DEFAULT 'NORMAL'
+        status_backup TEXT DEFAULT 'NORMAL',
+        -- Unit satuan pendidikan (TK/SD/SMP/...). Menyimpan NAMA unit, bukan id
+        -- akademik_unit: id itu dibuat per perangkat, namanya yang sama di
+        -- semua perangkat. Tanpa CHECK — daftarnya dikelola user di halaman
+        -- Akademik, jadi unit baru tidak boleh menuntut migrasi skema.
+        unit TEXT
       );
     `);
 

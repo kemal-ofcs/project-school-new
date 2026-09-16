@@ -902,6 +902,11 @@ const SNAPSHOT_SOURCES: &[SnapshotSource] = &[
         sql: "SELECT * FROM akademik_tahun_ajaran ORDER BY tanggal_mulai DESC;",
     },
     SnapshotSource {
+        payload_key: "akademikUnit",
+        table: "akademik_unit",
+        sql: "SELECT * FROM akademik_unit ORDER BY urutan, nama_unit;",
+    },
+    SnapshotSource {
         payload_key: "akademikJurusan",
         table: "akademik_jurusan",
         sql: "SELECT * FROM akademik_jurusan ORDER BY kode_jurusan;",
@@ -2412,6 +2417,22 @@ impl TursoClient {
                 vec![],
             ),
             Statement::new(
+                // Unit satuan pendidikan, dikelola user di halaman Akademik.
+                // Tanpa UNIQUE pada `nama_unit`: dua perangkat offline boleh
+                // mendaftarkan nama sama, dan UNIQUE akan membuat push sync-nya
+                // gagal PERMANEN (`next_retry_at = NULL`). Dicegah di aplikasi.
+                r#"CREATE TABLE IF NOT EXISTS akademik_unit (
+                    id_unit TEXT PRIMARY KEY,
+                    nama_unit TEXT NOT NULL,
+                    keterangan TEXT,
+                    urutan INTEGER NOT NULL DEFAULT 0,
+                    status_aktif INTEGER NOT NULL DEFAULT 1 CHECK (status_aktif IN (0, 1)),
+                    created_at TEXT NOT NULL,
+                    updated_at TEXT NOT NULL
+                );"#,
+                vec![],
+            ),
+            Statement::new(
                 r#"CREATE TABLE IF NOT EXISTS akademik_jurusan (
                     id_jurusan TEXT PRIMARY KEY,
                     kode_jurusan TEXT NOT NULL,
@@ -2971,6 +2992,12 @@ impl TursoClient {
             ("payroll_items", "total_teaching_jp", "ALTER TABLE payroll_items ADD COLUMN total_teaching_jp INTEGER NOT NULL DEFAULT 0;"),
             ("payroll_items", "teaching_salary", "ALTER TABLE payroll_items ADD COLUMN teaching_salary INTEGER NOT NULL DEFAULT 0;"),
             ("salary_configs", "rate_per_jp", "ALTER TABLE salary_configs ADD COLUMN rate_per_jp INTEGER NOT NULL DEFAULT 0;"),
+            // Unit satuan pendidikan (schema versi 29). Database cloud yang
+            // sudah ada sudah memiliki master_data, sehingga CREATE TABLE IF NOT
+            // EXISTS di pipeline tidak akan menambahkan kolomnya. Nullable:
+            // baris personil lama memang belum punya unit, dan memaksanya NOT
+            // NULL akan menolak seluruh ALTER pada database yang sudah berisi.
+            ("master_data", "unit", "ALTER TABLE master_data ADD COLUMN unit TEXT;"),
         ] {
             self.ensure_column(table, column, sql).await?;
         }
@@ -7047,6 +7074,9 @@ fn canonical_sync_route(domain: &str, operation: &str) -> Option<(&'static str, 
         ("academic_department" | "academic-department" | "department" | "jurusan", "delete") => {
             ("academic-department", "delete")
         }
+        ("academic_unit" | "academic-unit" | "unit", "create") => ("academic-unit", "create"),
+        ("academic_unit" | "academic-unit" | "unit", "update") => ("academic-unit", "update"),
+        ("academic_unit" | "academic-unit" | "unit", "delete") => ("academic-unit", "delete"),
         ("academic_class" | "academic-class" | "rombel", "create") => ("academic-class", "create"),
         ("academic_class" | "academic-class" | "rombel", "update") => ("academic-class", "update"),
         ("academic_class" | "academic-class" | "rombel", "delete") => ("academic-class", "delete"),
@@ -7302,9 +7332,10 @@ async fn apply_event_to_turso(
                         r#"INSERT INTO master_data (
                             id_unik, kode_karyawan, nama, divisi, jabatan_status, no_hp,
                             lp, id_shift, status_aktif, catatan, jenis_personil,
-                            tanggal_mulai_aktif, tanggal_selesai_aktif, status_backup
-                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'NORMAL')
+                            tanggal_mulai_aktif, tanggal_selesai_aktif, unit, status_backup
+                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'NORMAL')
                         ON CONFLICT(id_unik) DO UPDATE SET
+                            unit = excluded.unit,
                             kode_karyawan = excluded.kode_karyawan,
                             nama = excluded.nama,
                             divisi = excluded.divisi,
@@ -7337,6 +7368,7 @@ async fn apply_event_to_turso(
                                 .unwrap_or("Pegawai")),
                             json!(row.get("tanggal_mulai_aktif").and_then(Value::as_str)),
                             json!(row.get("tanggal_selesai_aktif").and_then(Value::as_str)),
+                            json!(row.get("unit").and_then(Value::as_str)),
                         ],
                     )
                     .await?;
@@ -7393,9 +7425,10 @@ async fn apply_event_to_turso(
                         id_unik, kode_karyawan, nama, divisi, jabatan_status, no_hp, lp,
                         id_shift, status_aktif, tanggal_daftar, catatan, token_absensi,
                         qr_code, status_qr, jenis_personil, tanggal_mulai_aktif,
-                        tanggal_selesai_aktif, status_backup
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        tanggal_selesai_aktif, unit, status_backup
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     ON CONFLICT(id_unik) DO UPDATE SET
+                        unit = excluded.unit,
                         kode_karyawan = excluded.kode_karyawan,
                         nama = excluded.nama,
                         divisi = excluded.divisi,
@@ -7438,6 +7471,7 @@ async fn apply_event_to_turso(
                             json!(row.get("jenis_personil").and_then(Value::as_str)),
                             json!(row.get("tanggal_mulai_aktif").and_then(Value::as_str)),
                             json!(row.get("tanggal_selesai_aktif").and_then(Value::as_str)),
+                            json!(row.get("unit").and_then(Value::as_str)),
                             json!(row
                                 .get("status_backup")
                                 .and_then(Value::as_str)
@@ -9037,6 +9071,60 @@ async fn apply_event_to_turso(
                 turso
                     .query_one(
                         "DELETE FROM akademik_tahun_ajaran WHERE id_tahun_ajaran = ?;",
+                        vec![json!(id)],
+                    )
+                    .await?;
+            }
+        }
+        ("academic-unit", "create" | "update") => {
+            let row = payload
+                .get("academic_unit")
+                .or_else(|| payload.get("akademikUnit"))
+                .unwrap_or(payload);
+            let id = row
+                .get("id_unit")
+                .and_then(Value::as_str)
+                .filter(|v| !v.is_empty())
+                .unwrap_or(entity_key);
+            if !id.is_empty() {
+                let nama = row.get("nama_unit").and_then(Value::as_str).unwrap_or("");
+                let keterangan = row.get("keterangan").and_then(Value::as_str);
+                let urutan = row.get("urutan").and_then(Value::as_i64).unwrap_or(0);
+                let status_aktif = row.get("status_aktif").and_then(Value::as_i64).unwrap_or(1);
+
+                turso
+                    .query_one(
+                        r#"INSERT INTO akademik_unit (
+                        id_unit, nama_unit, keterangan, urutan, status_aktif,
+                        created_at, updated_at
+                    ) VALUES (?, ?, ?, ?, ?, datetime('now'), datetime('now'))
+                    ON CONFLICT(id_unit) DO UPDATE SET
+                        nama_unit = excluded.nama_unit,
+                        keterangan = excluded.keterangan,
+                        urutan = excluded.urutan,
+                        status_aktif = excluded.status_aktif,
+                        updated_at = datetime('now');"#,
+                        vec![
+                            json!(id),
+                            json!(nama),
+                            json!(keterangan),
+                            json!(urutan),
+                            json!(status_aktif),
+                        ],
+                    )
+                    .await?;
+            }
+        }
+        ("academic-unit", "delete") => {
+            let id = payload
+                .get("id_unit")
+                .and_then(Value::as_str)
+                .filter(|v| !v.is_empty())
+                .unwrap_or(entity_key);
+            if !id.is_empty() {
+                turso
+                    .query_one(
+                        "DELETE FROM akademik_unit WHERE id_unit = ?;",
                         vec![json!(id)],
                     )
                     .await?;
@@ -13198,6 +13286,7 @@ mod tests {
                 "absensi_foto",
                 "hari_libur_whitelist",
                 "akademik_tahun_ajaran",
+                "akademik_unit",
                 "akademik_jurusan",
                 "akademik_rombel",
                 "akademik_mapel",

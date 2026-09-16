@@ -18,7 +18,7 @@ import {
 } from "@/lib/client/personnel-workbook";
 import { createQrPng, employeeQrPayload } from "@/lib/client/qr-code";
 import { useAuth } from "@/lib/context/AuthContext";
-import { getDaftarRombel } from "@/lib/gateways/academic";
+import { getDaftarRombel, getDaftarUnit } from "@/lib/gateways/academic";
 import { getDaftarShift } from "@/lib/gateways/shift";
 import {
   getDaftarSiswa,
@@ -60,6 +60,12 @@ export default function SiswaPage() {
   // Modal State
   const [showModal, setShowModal] = useState(false);
   const [saving, setSaving] = useState(false);
+  // Penanda mode edit BERDIRI SENDIRI, tidak diturunkan dari `formData.id_siswa`.
+  // Sejak ID bisa diketik saat menambah, `id_siswa` yang terisi tidak lagi
+  // berarti "sedang mengedit" — judul modal dan penguncian field ikut salah
+  // begitu operator mengetik karakter pertama ID-nya.
+  const [isEditing, setIsEditing] = useState(false);
+  const [unitList, setUnitList] = useState<Record<string, unknown>[]>([]);
   const [formData, setFormData] = useState<SiswaInput>({
     id_siswa: "",
     nama_lengkap: "",
@@ -85,12 +91,16 @@ export default function SiswaPage() {
   const loadData = useCallback(async () => {
     setLoading(true);
     try {
-      const [sData, rData] = await Promise.all([
+      const [sData, rData, uData] = await Promise.all([
         getDaftarSiswa(filterRombel || undefined),
         getDaftarRombel(),
+        getDaftarUnit(),
       ]);
       setSiswaList(sData);
       setRombelList(rData);
+      // Hanya unit aktif yang masuk dropdown; unit nonaktif tetap tersimpan
+      // pada personil lama supaya datanya tidak hilang saat unit dipensiunkan.
+      setUnitList(uData.filter((u) => Number(u.status_aktif) === 1));
     } catch (err) {
       setFeedback({
         tone: "error",
@@ -163,11 +173,14 @@ export default function SiswaPage() {
       angkatan: new Date().getFullYear(),
       status: "Aktif",
       id_shift: shiftList[0] ? Number(shiftList[0].id_shift) : undefined,
+      unit: "",
     });
+    setIsEditing(false);
     setShowModal(true);
   };
 
   const handleOpenEdit = (item: Record<string, unknown>) => {
+    setIsEditing(true);
     setFormData({
       id_siswa: String(item.id_siswa),
       nama_lengkap: String(item.nama_lengkap),
@@ -183,6 +196,7 @@ export default function SiswaPage() {
       angkatan: Number(item.angkatan || new Date().getFullYear()),
       status: item.status ? String(item.status) : "Aktif",
       id_shift: item.id_shift ? Number(item.id_shift) : undefined,
+      unit: item.unit ? String(item.unit) : "",
     });
     setShowModal(true);
   };
@@ -680,17 +694,70 @@ export default function SiswaPage() {
           <Modal
             isOpen={true}
             onClose={() => setShowModal(false)}
-            title={
-              formData.id_siswa
-                ? "Edit Data Peserta Didik"
-                : "Tambah Siswa Baru"
-            }
+            title={isEditing ? "Edit Data Peserta Didik" : "Tambah Siswa Baru"}
             maxWidth="max-w-xl"
           >
             <form
               onSubmit={(e) => void handleSave(e)}
               className="flex flex-col gap-4 py-2"
             >
+              <div>
+                <label
+                  htmlFor="siswa-id"
+                  className="block text-xs font-semibold text-slate-300"
+                >
+                  ID Unik
+                </label>
+                <input
+                  id="siswa-id"
+                  type="text"
+                  value={formData.id_siswa || ""}
+                  readOnly={isEditing}
+                  disabled={isEditing}
+                  placeholder="Kosongkan untuk dibuatkan otomatis"
+                  onChange={(e) =>
+                    setFormData({ ...formData, id_siswa: e.target.value })
+                  }
+                  className="mt-1 w-full rounded-xl border border-white/10 bg-slate-900 px-3 py-2 font-mono text-sm text-slate-100 focus:border-sky-500 focus:outline-none disabled:cursor-not-allowed disabled:text-slate-400"
+                />
+                <p className="mt-1 text-xs text-slate-500">
+                  {isEditing
+                    ? "ID tidak dapat diubah. Ia menjadi kunci absensi, kartu, nilai, dan QR yang sudah tercetak."
+                    : "Boleh diisi sendiri. Dikosongkan berarti sistem yang membuatkannya."}
+                </p>
+              </div>
+              <div>
+                <label
+                  htmlFor="siswa-unit"
+                  className="block text-xs font-semibold text-slate-300"
+                >
+                  Unit
+                </label>
+                <select
+                  id="siswa-unit"
+                  value={formData.unit || ""}
+                  onChange={(e) =>
+                    setFormData({ ...formData, unit: e.target.value })
+                  }
+                  className="mt-1 w-full rounded-xl border border-white/10 bg-slate-900 px-3 py-2 text-sm text-slate-100 focus:border-sky-500 focus:outline-none"
+                >
+                  <option value="">Tidak ditentukan</option>
+                  {unitList.map((u) => (
+                    <option
+                      key={String(u.id_unit)}
+                      value={String(u.nama_unit)}
+                      className="bg-slate-900"
+                    >
+                      {String(u.nama_unit)}
+                    </option>
+                  ))}
+                </select>
+                {unitList.length === 0 ? (
+                  <p className="mt-1 text-xs text-slate-500">
+                    Belum ada unit. Tambahkan lewat menu Akademik → Unit.
+                  </p>
+                ) : null}
+              </div>
               <div>
                 <label
                   htmlFor="siswa-nama"

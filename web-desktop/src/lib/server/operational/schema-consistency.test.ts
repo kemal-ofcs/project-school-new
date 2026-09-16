@@ -39,7 +39,7 @@ describe("Schema Consistency & Zero-Drift Guard", () => {
         'tarif_jp',
         'password_reset_request', 'app_mail_config', 'absensi_foto',
         'hari_libur_whitelist',
-        'akademik_tahun_ajaran', 'akademik_jurusan', 'akademik_rombel',
+        'akademik_tahun_ajaran', 'akademik_unit', 'akademik_jurusan', 'akademik_rombel',
         'akademik_mapel', 'akademik_guru_mapel', 'akademik_jam_pelajaran',
         'jadwal_mengajar', 'guru_data', 'siswa_data',
         'presensi_mapel', 'presensi_mapel_detail',

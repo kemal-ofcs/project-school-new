@@ -12,6 +12,7 @@ import { Icon } from "@/components/ui/Icon";
 import { canAccessArea, hasPermission } from "@/lib/auth/access";
 import { triggerHaptic } from "@/lib/client/haptics";
 import { useAuth } from "@/lib/context/AuthContext";
+import { getDaftarUnit } from "@/lib/gateways/academic";
 import {
   getDaftarKaryawan,
   type KaryawanInput,
@@ -45,6 +46,7 @@ export default function KaryawanPage() {
   // ─── Data & Loading State ───────────────────────────────────────────────────
   const [employees, setEmployees] = useState<Record<string, unknown>[]>([]);
   const [shifts, setShifts] = useState<Record<string, unknown>[]>([]);
+  const [units, setUnits] = useState<Record<string, unknown>[]>([]);
   const [loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
@@ -89,15 +91,19 @@ export default function KaryawanPage() {
     async (silent = false) => {
       if (!silent) setLoading(true);
       try {
-        const [empData, shiftData] = await Promise.all([
+        const [empData, shiftData, unitData] = await Promise.all([
           getDaftarKaryawan({
             search: debouncedSearch || undefined,
             status_aktif: filterStatus || undefined,
           }),
           getDaftarShift(),
+          getDaftarUnit(),
         ]);
         setEmployees(empData);
         setShifts(shiftData);
+        // Hanya unit aktif yang masuk dropdown; unit nonaktif tetap tersimpan
+        // pada personil lama supaya datanya tidak hilang saat dipensiunkan.
+        setUnits(unitData.filter((u) => Number(u.status_aktif) === 1));
         setErrorMsg(null);
       } catch (err: unknown) {
         if (!silent) {
@@ -196,6 +202,7 @@ export default function KaryawanPage() {
         jenis_personil: String(emp.jenis_personil ?? "Pegawai"),
         tanggal_mulai_aktif: String(emp.tanggal_mulai_aktif ?? ""),
         tanggal_selesai_aktif: String(emp.tanggal_selesai_aktif ?? ""),
+        unit: String(emp.unit ?? ""),
       };
       setFormMode("edit");
       setFormInitialData(initData);
@@ -462,6 +469,7 @@ export default function KaryawanPage() {
           mode={formMode}
           initialData={formInitialData}
           shifts={shifts}
+          units={units}
           onClose={() => setFormOpen(false)}
           onSuccess={handleFormSuccess}
         />

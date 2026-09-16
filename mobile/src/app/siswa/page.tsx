@@ -17,7 +17,7 @@ import {
 } from "@/lib/client/personnel-workbook";
 import { createQrPng, employeeQrPayload } from "@/lib/client/qr-code";
 import { useAuth } from "@/lib/context/AuthContext";
-import { getDaftarRombel } from "@/lib/gateways/academic";
+import { getDaftarRombel, getDaftarUnit } from "@/lib/gateways/academic";
 import { getDaftarShift } from "@/lib/gateways/shift";
 import {
   getDaftarSiswa,
@@ -46,6 +46,7 @@ function emptyForm(idRombel = "", idShift?: number): SiswaInput {
     angkatan: new Date().getFullYear(),
     status: "Aktif",
     id_shift: idShift,
+    unit: "",
   };
 }
 
@@ -85,6 +86,10 @@ export default function SiswaMobilePage() {
   const [qrPng, setQrPng] = useState<string | null>(null);
   const [formOpen, setFormOpen] = useState(false);
   const [form, setForm] = useState<SiswaInput>(emptyForm());
+  // Berdiri sendiri, bukan diturunkan dari `form.id_siswa` — sejak ID bisa
+  // diketik saat menambah, ID terisi tidak lagi berarti "sedang mengubah".
+  const [isEditing, setIsEditing] = useState(false);
+  const [unitList, setUnitList] = useState<Record<string, unknown>[]>([]);
 
   const isSubmittingRef = useRef(false);
   const { konfirmasi, dialogKonfirmasi } = useConfirmDialog();
@@ -101,12 +106,16 @@ export default function SiswaMobilePage() {
     async (silent = false) => {
       if (!silent) setLoading(true);
       try {
-        const [sData, rData] = await Promise.all([
+        const [sData, rData, uData] = await Promise.all([
           getDaftarSiswa(filterRombel || undefined),
           getDaftarRombel(),
+          getDaftarUnit(),
         ]);
         setSiswa(sData);
         setRombel(rData);
+        // Hanya unit aktif yang masuk dropdown; unit nonaktif tetap tersimpan
+        // pada personil lama supaya datanya tidak hilang saat dipensiunkan.
+        setUnitList(uData.filter((u) => Number(u.status_aktif) === 1));
         setErrorMsg(null);
       } catch (err: unknown) {
         if (!silent) {
@@ -190,7 +199,9 @@ export default function SiswaMobilePage() {
       angkatan: Number(item.angkatan ?? new Date().getFullYear()),
       status: String(item.status ?? "Aktif"),
       id_shift: item.id_shift ? Number(item.id_shift) : undefined,
+      unit: String(item.unit ?? ""),
     });
+    setIsEditing(true);
     setFormOpen(true);
   }, []);
 
@@ -395,6 +406,7 @@ export default function SiswaMobilePage() {
                     shifts[0] ? Number(shifts[0].id_shift) : undefined,
                   ),
                 );
+                setIsEditing(false);
                 setFormOpen(true);
                 triggerHaptic("light");
               }}
@@ -600,7 +612,7 @@ export default function SiswaMobilePage() {
         <Modal
           isOpen
           onClose={() => setFormOpen(false)}
-          title={form.id_siswa ? "Ubah Data Siswa" : "Tambah Siswa"}
+          title={isEditing ? "Ubah Data Siswa" : "Tambah Siswa"}
         >
           <form
             onSubmit={(e) => {
@@ -609,6 +621,41 @@ export default function SiswaMobilePage() {
             }}
             className="flex flex-col gap-3 py-1"
           >
+            <label className="text-[11px] font-semibold text-slate-300">
+              ID Unik
+              <input
+                value={form.id_siswa ?? ""}
+                readOnly={isEditing}
+                disabled={isEditing}
+                placeholder="Kosongkan untuk dibuatkan otomatis"
+                onChange={(e) =>
+                  setForm((p) => ({ ...p, id_siswa: e.target.value }))
+                }
+                className="mt-1 w-full rounded-xl border border-white/10 bg-slate-800/60 px-3 py-2 font-mono text-sm text-white outline-none focus:border-sky-500 disabled:cursor-not-allowed disabled:text-slate-400"
+              />
+              <span className="mt-1 block text-[10px] font-normal text-slate-500">
+                {isEditing
+                  ? "ID tidak dapat diubah; ia kunci absensi, kartu, nilai, dan QR yang sudah tercetak."
+                  : "Boleh diisi sendiri. Dikosongkan berarti dibuatkan sistem."}
+              </span>
+            </label>
+            <label className="text-[11px] font-semibold text-slate-300">
+              Unit
+              <select
+                value={form.unit ?? ""}
+                onChange={(e) =>
+                  setForm((p) => ({ ...p, unit: e.target.value }))
+                }
+                className="mt-1 w-full rounded-xl border border-white/10 bg-slate-800/60 px-3 py-2 text-sm text-white outline-none focus:border-sky-500"
+              >
+                <option value="">Tidak ditentukan</option>
+                {unitList.map((u) => (
+                  <option key={String(u.id_unit)} value={String(u.nama_unit)}>
+                    {String(u.nama_unit)}
+                  </option>
+                ))}
+              </select>
+            </label>
             <label className="text-[11px] font-semibold text-slate-300">
               Nama Lengkap
               <input
@@ -744,7 +791,7 @@ export default function SiswaMobilePage() {
               >
                 {form.id_shift === undefined ? (
                   <option value="">
-                    {form.id_siswa
+                    {isEditing
                       ? "Pertahankan shift saat ini"
                       : "Shift bawaan (shift 1)"}
                   </option>

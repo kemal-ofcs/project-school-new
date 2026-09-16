@@ -6,6 +6,7 @@ import type {
   MapelInput,
   RombelInput,
   TahunAjaranInput,
+  UnitInput,
 } from "@/lib/gateways/academic";
 
 /*
@@ -19,6 +20,7 @@ import type {
 
 export type AcademicKind =
   | "tahun_ajaran"
+  | "unit"
   | "rombel"
   | "mapel"
   | "jurusan"
@@ -41,6 +43,14 @@ export type AcademicDraft =
       tanggal_mulai: string;
       tanggal_selesai: string;
       is_aktif: number;
+    }
+  | {
+      kind: "unit";
+      id?: string;
+      nama_unit: string;
+      keterangan: string;
+      urutan: string;
+      status_aktif: number;
     }
   | {
       kind: "jurusan";
@@ -84,6 +94,7 @@ export type AcademicDraft =
 
 export const KIND_LABEL: Record<AcademicKind, string> = {
   tahun_ajaran: "Tahun Ajaran",
+  unit: "Unit Satuan Pendidikan",
   rombel: "Rombel",
   mapel: "Mata Pelajaran",
   jurusan: "Jurusan",
@@ -92,6 +103,7 @@ export const KIND_LABEL: Record<AcademicKind, string> = {
 
 type AcademicInput =
   | { kind: "tahun_ajaran"; input: TahunAjaranInput }
+  | { kind: "unit"; input: UnitInput }
   | { kind: "jurusan"; input: JurusanInput }
   | { kind: "rombel"; input: RombelInput }
   | { kind: "mapel"; input: MapelInput }
@@ -123,6 +135,22 @@ export function toAcademicInput(
           tanggal_mulai: draft.tanggal_mulai,
           tanggal_selesai: draft.tanggal_selesai,
           is_aktif: draft.is_aktif,
+        },
+      };
+    }
+    case "unit": {
+      if (!draft.nama_unit.trim()) return { error: "Nama unit wajib diisi." };
+      const urutan = wholeNumberIn(draft.urutan || "0", 0, 999);
+      if (urutan === null)
+        return { error: "Urutan tampil harus bilangan bulat 0–999." };
+      return {
+        kind: draft.kind,
+        input: {
+          id_unit: draft.id,
+          nama_unit: draft.nama_unit.trim(),
+          keterangan: draft.keterangan.trim() || null,
+          urutan,
+          status_aktif: draft.status_aktif,
         },
       };
     }
@@ -345,6 +373,69 @@ export function AkademikFormFields({
               }
             />
           )}
+        </>
+      );
+    case "unit":
+      return (
+        <>
+          <div>
+            <label htmlFor="ak-unit-nama" className={LABEL}>
+              Nama unit
+            </label>
+            <input
+              id="ak-unit-nama"
+              value={draft.nama_unit}
+              onChange={(e) =>
+                onChange({ ...draft, nama_unit: e.target.value })
+              }
+              placeholder="TK / SD / SMP"
+              required
+              className={INPUT}
+            />
+            <p className="mt-1 text-xs text-slate-500">
+              Nama inilah yang tersimpan pada data personil. Mengubahnya ikut
+              memindahkan semua personil yang memakai unit ini.
+            </p>
+          </div>
+          <div className="grid grid-cols-3 gap-2">
+            <div className="col-span-2">
+              <label htmlFor="ak-unit-ket" className={LABEL}>
+                Keterangan (opsional)
+              </label>
+              <input
+                id="ak-unit-ket"
+                value={draft.keterangan}
+                onChange={(e) =>
+                  onChange({ ...draft, keterangan: e.target.value })
+                }
+                className={INPUT}
+              />
+            </div>
+            <div>
+              <label htmlFor="ak-unit-urut" className={LABEL}>
+                Urutan
+              </label>
+              <input
+                id="ak-unit-urut"
+                type="number"
+                min={0}
+                value={draft.urutan}
+                onChange={(e) => onChange({ ...draft, urutan: e.target.value })}
+                className={INPUT}
+              />
+            </div>
+          </div>
+          {draft.id ? (
+            <ActiveToggle
+              id="ak-unit-aktif"
+              checked={draft.status_aktif === 1}
+              label="Unit aktif"
+              hint="Unit nonaktif tidak muncul di dropdown formulir personil, tetapi data lama tetap utuh."
+              onChange={(checked) =>
+                onChange({ ...draft, status_aktif: checked ? 1 : 0 })
+              }
+            />
+          ) : null}
         </>
       );
     case "jurusan":

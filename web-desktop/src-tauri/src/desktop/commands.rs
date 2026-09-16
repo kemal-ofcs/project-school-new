@@ -2393,6 +2393,35 @@ pub fn desktop_set_active_academic_year(
     academic::set_active_academic_year(&state, &id)
 }
 
+/// Daftar unit satuan pendidikan. Dibaca juga oleh formulir peserta didik,
+/// guru/PTK, dan karyawan — bukan hanya halaman Akademik — sehingga izinnya
+/// `academic.view`, yang sudah ikut paket bawaan Admin dan Operator.
+#[tauri::command]
+pub fn desktop_get_academic_units(
+    state: State<'_, DesktopState>,
+) -> Result<Value, CommandError> {
+    require_permission(&state, "academic.view")?;
+    academic::list_academic_units(&state)
+}
+
+#[tauri::command]
+pub fn desktop_save_academic_unit(
+    state: State<'_, DesktopState>,
+    draft: Value,
+) -> Result<Value, CommandError> {
+    require_permission(&state, "academic.manage")?;
+    academic::save_academic_unit(&state, &draft)
+}
+
+#[tauri::command]
+pub fn desktop_delete_academic_unit(
+    state: State<'_, DesktopState>,
+    id: String,
+) -> Result<Value, CommandError> {
+    require_permission(&state, "academic.manage")?;
+    academic::delete_academic_unit(&state, &id)
+}
+
 #[tauri::command]
 pub fn desktop_get_academic_departments(
     state: State<'_, DesktopState>,

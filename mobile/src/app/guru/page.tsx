@@ -17,6 +17,7 @@ import {
 } from "@/lib/client/personnel-workbook";
 import { createQrPng, employeeQrPayload } from "@/lib/client/qr-code";
 import { useAuth } from "@/lib/context/AuthContext";
+import { getDaftarUnit } from "@/lib/gateways/academic";
 import { getDaftarShift } from "@/lib/gateways/shift";
 import { syncNow } from "@/lib/gateways/sync-status";
 import {
@@ -47,6 +48,7 @@ function emptyForm(idShift?: number): GuruInput {
     lp: "L",
     id_shift: idShift,
     status_aktif: "Aktif",
+    unit: "",
   };
 }
 
@@ -82,6 +84,10 @@ export default function GuruMobilePage() {
   const [qrPng, setQrPng] = useState<string | null>(null);
   const [formOpen, setFormOpen] = useState(false);
   const [form, setForm] = useState<GuruInput>(emptyForm());
+  // Berdiri sendiri, bukan diturunkan dari `form.id_guru` — sejak ID bisa
+  // diketik saat menambah, ID terisi tidak lagi berarti "sedang mengubah".
+  const [isEditing, setIsEditing] = useState(false);
+  const [unitList, setUnitList] = useState<Record<string, unknown>[]>([]);
 
   const isSubmittingRef = useRef(false);
   const { konfirmasi, dialogKonfirmasi } = useConfirmDialog();
@@ -97,7 +103,14 @@ export default function GuruMobilePage() {
   const loadData = useCallback(async (silent = false) => {
     if (!silent) setLoading(true);
     try {
-      setGuru(await getDaftarGuru());
+      const [gData, uData] = await Promise.all([
+        getDaftarGuru(),
+        getDaftarUnit(),
+      ]);
+      setGuru(gData);
+      // Hanya unit aktif yang masuk dropdown; unit nonaktif tetap tersimpan
+      // pada personil lama supaya datanya tidak hilang saat dipensiunkan.
+      setUnitList(uData.filter((u) => Number(u.status_aktif) === 1));
       setErrorMsg(null);
     } catch (err: unknown) {
       if (!silent) {
@@ -178,7 +191,9 @@ export default function GuruMobilePage() {
       lp: String(item.lp ?? "L"),
       id_shift: Number(item.id_shift ?? 1),
       status_aktif: String(item.status_aktif ?? "Aktif"),
+      unit: String(item.unit ?? ""),
     });
+    setIsEditing(true);
     setFormOpen(true);
   }, []);
 
@@ -369,6 +384,7 @@ export default function GuruMobilePage() {
                 setForm(
                   emptyForm(shifts[0] ? Number(shifts[0].id_shift) : undefined),
                 );
+                setIsEditing(false);
                 setFormOpen(true);
                 triggerHaptic("light");
               }}
@@ -539,7 +555,7 @@ export default function GuruMobilePage() {
         <Modal
           isOpen
           onClose={() => setFormOpen(false)}
-          title={form.id_guru ? "Ubah Data Guru" : "Tambah Guru"}
+          title={isEditing ? "Ubah Data Guru" : "Tambah Guru"}
         >
           <form
             onSubmit={(e) => {
@@ -548,6 +564,41 @@ export default function GuruMobilePage() {
             }}
             className="flex flex-col gap-3 py-1"
           >
+            <label className="text-[11px] font-semibold text-slate-300">
+              ID Unik
+              <input
+                value={form.id_guru ?? ""}
+                readOnly={isEditing}
+                disabled={isEditing}
+                placeholder="Kosongkan untuk dibuatkan otomatis"
+                onChange={(e) =>
+                  setForm((p) => ({ ...p, id_guru: e.target.value }))
+                }
+                className="mt-1 w-full rounded-xl border border-white/10 bg-slate-800/60 px-3 py-2 font-mono text-sm text-white outline-none focus:border-indigo-500 disabled:cursor-not-allowed disabled:text-slate-400"
+              />
+              <span className="mt-1 block text-[10px] font-normal text-slate-500">
+                {isEditing
+                  ? "ID tidak dapat diubah; ia kunci absensi, kartu, dan QR yang sudah tercetak."
+                  : "Boleh diisi sendiri. Dikosongkan berarti dibuatkan sistem."}
+              </span>
+            </label>
+            <label className="text-[11px] font-semibold text-slate-300">
+              Unit
+              <select
+                value={form.unit ?? ""}
+                onChange={(e) =>
+                  setForm((p) => ({ ...p, unit: e.target.value }))
+                }
+                className="mt-1 w-full rounded-xl border border-white/10 bg-slate-800/60 px-3 py-2 text-sm text-white outline-none focus:border-indigo-500"
+              >
+                <option value="">Tidak ditentukan</option>
+                {unitList.map((u) => (
+                  <option key={String(u.id_unit)} value={String(u.nama_unit)}>
+                    {String(u.nama_unit)}
+                  </option>
+                ))}
+              </select>
+            </label>
             <label className="text-[11px] font-semibold text-slate-300">
               Nama Lengkap
               <input
@@ -667,7 +718,7 @@ export default function GuruMobilePage() {
               >
                 {form.id_shift === undefined ? (
                   <option value="">
-                    {form.id_guru
+                    {isEditing
                       ? "Pertahankan shift saat ini"
                       : "Shift bawaan (shift 1)"}
                   </option>

@@ -85,10 +85,6 @@ fn sqlite_now(transaction: &rusqlite::Transaction<'_>) -> String {
 /// Mengiris `&id[4..10]` langsung akan PANIC pada id yang lebih pendek atau
 /// yang batas karakternya bukan di byte ke-10 — dan id pada jalur sunting
 /// datang dari luar, bukan selalu dari `new_academic_id`.
-fn short_suffix(id: &str) -> String {
-    id.chars().skip(4).take(6).collect()
-}
-
 /// Pastikan personil punya `token_absensi`, dan kembalikan `(token, qr, baru)`.
 ///
 /// Terminal pemindai membandingkan `token_absensi` apa adanya dan menuntut isi
@@ -334,6 +330,12 @@ const YEAR_USAGE: &[(&str, &str)] = &[
 const DEPARTMENT_USAGE: &[(&str, &str)] = &[
     ("SELECT COUNT(*) FROM akademik_rombel WHERE id_jurusan = ?1;", "rombel"),
 ];
+// Dicocokkan dengan NAMA unit, bukan id: `master_data.unit` menyimpan nama
+// supaya nilainya berarti sama di setiap perangkat. Pemanggilnya menukar id
+// menjadi nama lebih dulu.
+const UNIT_USAGE: &[(&str, &str)] = &[
+    ("SELECT COUNT(*) FROM master_data WHERE unit = ?1;", "personil"),
+];
 const CLASS_USAGE: &[(&str, &str)] = &[
     ("SELECT COUNT(*) FROM siswa_data WHERE id_rombel = ?1;", "siswa"),
     ("SELECT COUNT(*) FROM akademik_guru_mapel WHERE id_rombel = ?1;", "penugasan guru"),
@@ -462,6 +464,194 @@ pub fn set_active_academic_year(state: &DesktopState, id: &str) -> Result<Value,
 }
 
 // ── 2. Jurusan ──────────────────────────────────────────────────────────────
+
+// ── 1b. Unit satuan pendidikan ──────────────────────────────────────────────
+//
+// Dipakai sebagai dropdown di formulir peserta didik, guru/PTK, dan karyawan.
+// `master_data.unit` menyimpan NAMA unit, bukan `id_unit`: id dibuat per
+// perangkat, sedangkan nama itulah yang berarti sama di semua perangkat.
+
+pub fn list_academic_units(state: &DesktopState) -> Result<Value, CommandError> {
+    let conn = storage::database(&state.data_dir)?;
+    let mut stmt = conn
+        .prepare(
+            r#"
+            SELECT id_unit, nama_unit, keterangan, urutan, status_aktif
+            FROM akademik_unit
+            ORDER BY urutan ASC, nama_unit ASC;
+            "#,
+        )
+        .map_err(|_| CommandError::internal())?;
+
+    let rows = stmt
+        .query_map([], |row| {
+            Ok(json!({
+                "id_unit": row.get::<_, String>(0)?,
+                "nama_unit": row.get::<_, String>(1)?,
+                "keterangan": row.get::<_, Option<String>>(2)?,
+                "urutan": row.get::<_, i64>(3)?,
+                "status_aktif": row.get::<_, i64>(4)?,
+            }))
+        })
+        .map_err(|_| CommandError::internal())?
+        .filter_map(Result::ok)
+        .collect::<Vec<_>>();
+
+    Ok(json!(rows))
+}
+
+pub fn save_academic_unit(state: &DesktopState, draft: &Value) -> Result<Value, CommandError> {
+    let mut conn = storage::database(&state.data_dir)?;
+    let tx = conn.transaction().map_err(|_| CommandError::internal())?;
+
+    let is_new = text(draft, "id_unit").is_empty();
+    let id = if is_new {
+        new_academic_id("unt_")
+    } else {
+        text(draft, "id_unit").to_owned()
+    };
+
+    let nama = text(draft, "nama_unit");
+    let keterangan = optional_text(draft, "keterangan");
+    let urutan = integer(draft, "urutan", 0);
+    let status_aktif = integer(draft, "status_aktif", 1);
+
+    if nama.is_empty() {
+        return Err(CommandError::new(
+            "VALIDATION_ERROR",
+            "Nama unit wajib diisi.",
+        ));
+    }
+
+    assert_unique_value(
+        &tx,
+        "akademik_unit",
+        "nama_unit",
+        "id_unit",
+        nama,
+        &id,
+        "Nama unit ini sudah terdaftar.",
+    )?;
+
+    // Nama lama dibaca SEBELUM ditimpa. Bila berubah, personil yang memakainya
+    // ikut dipindahkan dalam transaksi yang sama — tanpa itu, mengganti "SMP"
+    // menjadi "SMP Islam" meninggalkan setiap siswa menunjuk unit yang sudah
+    // tidak ada, dan dropdown-nya tampil kosong tanpa satu pun pesan.
+    let nama_lama: Option<String> = tx
+        .query_row(
+            "SELECT nama_unit FROM akademik_unit WHERE id_unit = ?1;",
+            params![id],
+            |row| row.get(0),
+        )
+        .optional()
+        .map_err(|_| CommandError::internal())?;
+
+    tx.execute(
+        r#"
+        INSERT INTO akademik_unit (
+            id_unit, nama_unit, keterangan, urutan, status_aktif, created_at, updated_at
+        ) VALUES (?1, ?2, ?3, ?4, ?5, datetime('now'), datetime('now'))
+        ON CONFLICT(id_unit) DO UPDATE SET
+            nama_unit = excluded.nama_unit,
+            keterangan = excluded.keterangan,
+            urutan = excluded.urutan,
+            status_aktif = excluded.status_aktif,
+            updated_at = datetime('now');
+        "#,
+        params![id, nama, keterangan, urutan, status_aktif],
+    )
+    .map_err(|e| CommandError::new("DB_ERROR", format!("Gagal menyimpan unit: {e}")))?;
+
+    let client_id = sync::ensure_client_id(state)?;
+
+    if let Some(lama) = nama_lama.filter(|lama| lama != nama) {
+        let terdampak: Vec<String> = {
+            let mut stmt = tx
+                .prepare("SELECT id_unik FROM master_data WHERE unit = ?1;")
+                .map_err(|_| CommandError::internal())?;
+            let ids = stmt
+                .query_map(params![lama], |row| row.get::<_, String>(0))
+                .map_err(|_| CommandError::internal())?
+                .filter_map(Result::ok)
+                .collect::<Vec<_>>();
+            ids
+        };
+        tx.execute(
+            "UPDATE master_data SET unit = ?1 WHERE unit = ?2;",
+            params![nama, lama],
+        )
+        .map_err(|e| CommandError::new("DB_ERROR", format!("Gagal memindahkan unit: {e}")))?;
+
+        // Setiap baris yang berubah butuh event outbox-nya sendiri: cloud
+        // menerapkan perubahan per entitas, jadi rename yang hanya mengirim
+        // event unit akan benar di perangkat ini dan salah di semua yang lain.
+        //
+        // Dikirim sebagai SNAPSHOT baris utuh, bukan `{id_unik, unit}` saja:
+        // `employeeUpdatePayload` di `sync-schema.ts` menuntut `kode_karyawan`,
+        // `nama`, dan `divisi` sebagai field WAJIB. Payload sebagian akan
+        // ditolak validatornya di cloud, dan penolakan itu mengunci outbox
+        // secara PERMANEN (`next_retry_at = NULL`) — satu rename unit akan
+        // menghentikan seluruh sinkronisasi perangkat ini.
+        for id_unik in terdampak {
+            sync::enqueue_employee_snapshot(&tx, &client_id, &id_unik)?;
+        }
+    }
+
+    let op = if is_new { "create" } else { "update" };
+    let payload = json!({
+        "id_unit": id,
+        "nama_unit": nama,
+        "keterangan": keterangan,
+        "urutan": urutan,
+        "status_aktif": status_aktif,
+    });
+
+    sync::enqueue(&tx, &client_id, "academic-unit", op, &id, &payload, None)?;
+    tx.commit().map_err(|_| CommandError::internal())?;
+
+    Ok(json!({ "sukses": true, "id_unit": id }))
+}
+
+pub fn delete_academic_unit(state: &DesktopState, id: &str) -> Result<Value, CommandError> {
+    let mut conn = storage::database(&state.data_dir)?;
+    let tx = conn.transaction().map_err(|_| CommandError::internal())?;
+
+    let nama: Option<String> = tx
+        .query_row(
+            "SELECT nama_unit FROM akademik_unit WHERE id_unit = ?1;",
+            params![id],
+            |row| row.get(0),
+        )
+        .optional()
+        .map_err(|_| CommandError::internal())?;
+
+    if let Some(nama) = nama.as_deref() {
+        ensure_academic_unused(
+            &tx,
+            "Unit",
+            UNIT_USAGE,
+            nama,
+            "Pindahkan personilnya ke unit lain, atau nonaktifkan unit ini saja.",
+        )?;
+    }
+
+    tx.execute("DELETE FROM akademik_unit WHERE id_unit = ?1;", params![id])
+        .map_err(|e| CommandError::new("DB_ERROR", format!("Gagal menghapus unit: {e}")))?;
+
+    let client_id = sync::ensure_client_id(state)?;
+    sync::enqueue(
+        &tx,
+        &client_id,
+        "academic-unit",
+        "delete",
+        id,
+        &json!({ "id_unit": id }),
+        None,
+    )?;
+    tx.commit().map_err(|_| CommandError::internal())?;
+
+    Ok(json!({ "sukses": true }))
+}
 
 pub fn list_academic_departments(state: &DesktopState) -> Result<Value, CommandError> {
     let conn = storage::database(&state.data_dir)?;
@@ -1335,7 +1525,7 @@ pub fn list_teachers(state: &DesktopState) -> Result<Value, CommandError> {
         SELECT g.id_guru, g.nip, g.nuptk, g.gelar, g.spesialisasi_mapel, g.status_kepegawaian,
                g.created_at, g.updated_at,
                m.kode_karyawan, m.nama, m.divisi, m.jabatan_status, m.no_hp, m.lp,
-               m.status_aktif, m.id_shift, m.token_absensi, m.qr_code, m.status_qr
+               m.status_aktif, m.id_shift, m.token_absensi, m.qr_code, m.status_qr, m.unit
         FROM guru_data g
         JOIN master_data m ON m.id_unik = g.id_guru
         ORDER BY m.nama ASC;
@@ -1364,6 +1554,7 @@ pub fn list_teachers(state: &DesktopState) -> Result<Value, CommandError> {
                 "token_absensi": row.get::<_, Option<String>>(16)?,
                 "qr_code": row.get::<_, Option<String>>(17)?,
                 "status_qr": row.get::<_, Option<String>>(18)?,
+                "unit": row.get::<_, Option<String>>(19)?,
             }))
         })
         .map_err(|_| CommandError::internal())?
@@ -1387,6 +1578,7 @@ pub fn save_teacher(state: &DesktopState, draft: &Value) -> Result<Value, Comman
 
     let nama = text(draft, "nama");
     let kode = text(draft, "kode_karyawan");
+    let unit = text(draft, "unit");
     let nip = optional_text(draft, "nip");
     let nuptk = optional_text(draft, "nuptk");
     let gelar = optional_text(draft, "gelar");
@@ -1405,9 +1597,15 @@ pub fn save_teacher(state: &DesktopState, draft: &Value) -> Result<Value, Comman
         ));
     }
 
+    // Cadangannya ID UTUH, bukan irisannya. `short_suffix` dulu membuang empat
+    // karakter pertama dan mengambil enam berikutnya, mengasumsikan setiap ID
+    // berawalan `ptk_` buatan sistem. Begitu operator mengetik ID sendiri lewat
+    // formulir atau impor Excel, irisan itu mencomot karakter acak dari tengah
+    // ID-nya — itulah "kode berubah jadi gabungan angka dan huruf" yang
+    // dilaporkan. `kode_karyawan` UNIQUE dan ID sudah primary key, jadi memakai
+    // ID utuh sekaligus menjamin keunikan yang tidak pernah dijamin irisan.
     let kode_karyawan = if kode.is_empty() {
-        nip.clone()
-            .unwrap_or_else(|| format!("G-{}", short_suffix(&id)))
+        nip.clone().unwrap_or_else(|| id.clone())
     } else {
         kode.to_owned()
     };
@@ -1434,8 +1632,8 @@ pub fn save_teacher(state: &DesktopState, draft: &Value) -> Result<Value, Comman
         INSERT INTO master_data (
             id_unik, kode_karyawan, nama, divisi, jabatan_status, no_hp, lp,
             id_shift, status_aktif, tanggal_daftar, catatan, token_absensi, qr_code,
-            status_qr, jenis_personil, status_backup
-        ) VALUES (?1, ?2, ?3, 'Tenaga Pengajar', 'Guru', ?4, ?5, COALESCE(?6, 1), ?7, date('now','+7 hours'), 'Data PTK Sekolah', ?8, ?9, 'Generated', 'GURU', 'NORMAL')
+            status_qr, jenis_personil, unit, status_backup
+        ) VALUES (?1, ?2, ?3, 'Tenaga Pengajar', 'Guru', ?4, ?5, COALESCE(?6, 1), ?7, date('now','+7 hours'), 'Data PTK Sekolah', ?8, ?9, 'Generated', 'GURU', NULLIF(?10, ''), 'NORMAL')
         ON CONFLICT(id_unik) DO UPDATE SET
             kode_karyawan = excluded.kode_karyawan,
             nama = excluded.nama,
@@ -1446,9 +1644,13 @@ pub fn save_teacher(state: &DesktopState, draft: &Value) -> Result<Value, Comman
             token_absensi = excluded.token_absensi,
             qr_code = excluded.qr_code,
             status_qr = excluded.status_qr,
-            jenis_personil = 'GURU';
+            jenis_personil = 'GURU',
+            -- Draft tanpa `unit` (formulir lama, impor tanpa kolom unit) tidak
+            -- boleh mengosongkan unit yang sudah dipilih; pola yang sama dengan
+            -- `id_shift` di baris atas.
+            unit = COALESCE(NULLIF(?10, ''), master_data.unit);
         "#,
-        params![id, kode_karyawan, nama, no_hp, lp, id_shift, status_aktif, token, qr_code],
+        params![id, kode_karyawan, nama, no_hp, lp, id_shift, status_aktif, token, qr_code, unit],
     )
     .map_err(|e| CommandError::new("DB_ERROR", format!("Gagal menyimpan identitas personil guru: {e}")))?;
 
@@ -1557,7 +1759,8 @@ pub fn list_students(state: &DesktopState, id_rombel: Option<&str>) -> Result<Va
                s.nama_wali, s.no_whatsapp_wali, s.alamat, s.angkatan, s.status,
                s.created_at, s.updated_at,
                r.nama_rombel, r.tingkat,
-               m.token_absensi, m.qr_code, m.status_qr, m.id_shift
+               m.token_absensi, m.qr_code, m.status_qr, m.id_shift, m.unit,
+               m.kode_karyawan
         FROM siswa_data s
         JOIN akademik_rombel r ON r.id_rombel = s.id_rombel
         LEFT JOIN master_data m ON m.id_unik = s.id_siswa
@@ -1588,6 +1791,8 @@ pub fn list_students(state: &DesktopState, id_rombel: Option<&str>) -> Result<Va
                 "qr_code": row.get::<_, Option<String>>(16)?,
                 "status_qr": row.get::<_, Option<String>>(17)?,
                 "id_shift": row.get::<_, Option<i64>>(18)?,
+                "unit": row.get::<_, Option<String>>(19)?,
+                "kode_karyawan": row.get::<_, Option<String>>(20)?,
             }))
         })
         .map_err(|_| CommandError::internal())?
@@ -1610,6 +1815,7 @@ pub fn save_student(state: &DesktopState, draft: &Value) -> Result<Value, Comman
     };
 
     let nama = text(draft, "nama_lengkap");
+    let unit = text(draft, "unit");
     let nis = optional_text(draft, "nis");
     let nisn = optional_text(draft, "nisn");
     let jk = optional_text(draft, "jenis_kelamin").unwrap_or_else(|| "L".to_owned());
@@ -1668,9 +1874,12 @@ pub fn save_student(state: &DesktopState, draft: &Value) -> Result<Value, Comman
         )?;
     }
 
-    let kode_karyawan = nis
-        .clone()
-        .unwrap_or_else(|| format!("S-{}", short_suffix(&id)));
+    // Sama seperti guru: ID utuh, bukan irisannya. Lihat catatan di
+    // `save_teacher`. Kode eksplisit dari formulir/impor menang lebih dulu,
+    // supaya sekolah yang memakai penomoran sendiri tidak dipaksa memakai NIS.
+    let kode_karyawan = optional_text(draft, "kode_karyawan")
+        .or_else(|| nis.clone())
+        .unwrap_or_else(|| id.clone());
 
     // `master_data.kode_karyawan` MASIH UNIQUE — itu skema lama yang stabil dan
     // tidak diubah di sini. Diperiksa lebih dulu supaya bentroknya muncul
@@ -1694,8 +1903,8 @@ pub fn save_student(state: &DesktopState, draft: &Value) -> Result<Value, Comman
         INSERT INTO master_data (
             id_unik, kode_karyawan, nama, divisi, jabatan_status, lp,
             id_shift, status_aktif, tanggal_daftar, catatan, token_absensi, qr_code,
-            status_qr, jenis_personil, status_backup
-        ) VALUES (?1, ?2, ?3, 'Peserta Didik', 'Siswa', ?4, COALESCE(?8, 1), ?5, date('now','+7 hours'), 'Data Siswa Sekolah', ?6, ?7, 'Generated', 'SISWA', 'NORMAL')
+            status_qr, jenis_personil, unit, status_backup
+        ) VALUES (?1, ?2, ?3, 'Peserta Didik', 'Siswa', ?4, COALESCE(?8, 1), ?5, date('now','+7 hours'), 'Data Siswa Sekolah', ?6, ?7, 'Generated', 'SISWA', NULLIF(?9, ''), 'NORMAL')
         ON CONFLICT(id_unik) DO UPDATE SET
             kode_karyawan = excluded.kode_karyawan,
             nama = excluded.nama,
@@ -1705,7 +1914,10 @@ pub fn save_student(state: &DesktopState, draft: &Value) -> Result<Value, Comman
             token_absensi = excluded.token_absensi,
             qr_code = excluded.qr_code,
             status_qr = excluded.status_qr,
-            jenis_personil = 'SISWA';
+            jenis_personil = 'SISWA',
+            -- Lihat catatan di `save_teacher`: draft tanpa `unit` tidak boleh
+            -- mengosongkan unit yang sudah dipilih.
+            unit = COALESCE(NULLIF(?9, ''), master_data.unit);
         "#,
         params![
             id,
@@ -1715,7 +1927,8 @@ pub fn save_student(state: &DesktopState, draft: &Value) -> Result<Value, Comman
             if status == "Aktif" { "Aktif" } else { "Nonaktif" },
             token,
             qr_code,
-            id_shift
+            id_shift,
+            unit
         ],
     )
     .map_err(|e| CommandError::new("DB_ERROR", format!("Gagal menyimpan identitas personil siswa: {e}")))?;
@@ -2001,6 +2214,62 @@ mod tests {
                 |row| row.get(0),
             )
             .expect("baris master_data")
+    }
+
+    fn kode_of(state: &DesktopState, id: &str) -> String {
+        storage::database(&state.data_dir)
+            .expect("database lokal")
+            .query_row(
+                "SELECT kode_karyawan FROM master_data WHERE id_unik = ?1;",
+                params![id],
+                |row| row.get(0),
+            )
+            .expect("baris master_data")
+    }
+
+    /// ID yang diketik operator TIDAK BOLEH diiris untuk membuat kode personil.
+    /// Cadangan lama `format!("S-{}", short_suffix(&id))` membuang empat karakter
+    /// pertama lalu mengambil enam berikutnya — benar hanya bila ID berawalan
+    /// `sis_` buatan sistem. Begitu ID diisi sendiri lewat formulir atau impor
+    /// Excel, irisan itu mencomot karakter acak dari tengahnya, dan operator
+    /// melihat kode berubah menjadi gabungan angka dan huruf yang tidak ia tulis.
+    #[test]
+    fn kode_personil_memakai_id_utuh_bukan_irisannya() {
+        let (_dir, state) = fixture();
+
+        // Tanpa NIS dan tanpa kode: cadangannya ID UTUH.
+        save_student(
+            &state,
+            &json!({
+                "id_siswa": "SISWA-2026-0001",
+                "nama_lengkap": "Siswa Tanpa NIS",
+                "id_rombel": "rom-1"
+            }),
+        )
+        .expect("siswa dengan ID manual");
+        assert_eq!(kode_of(&state, "SISWA-2026-0001"), "SISWA-2026-0001");
+
+        // Kode eksplisit menang atas NIS.
+        save_student(
+            &state,
+            &json!({
+                "id_siswa": "SISWA-2026-0002",
+                "kode_karyawan": "KS-002",
+                "nis": "2026002",
+                "nama_lengkap": "Siswa Berkode",
+                "id_rombel": "rom-1"
+            }),
+        )
+        .expect("siswa dengan kode eksplisit");
+        assert_eq!(kode_of(&state, "SISWA-2026-0002"), "KS-002");
+
+        // Guru: NIP kosong, kode kosong -> ID utuh.
+        save_teacher(
+            &state,
+            &json!({ "id_guru": "GURU-2026-0001", "nama": "Guru Tanpa NIP" }),
+        )
+        .expect("guru dengan ID manual");
+        assert_eq!(kode_of(&state, "GURU-2026-0001"), "GURU-2026-0001");
     }
 
     /// Jam scan siswa ditentukan shift-nya. Dulu siswa SELALU ditulis ke shift 1

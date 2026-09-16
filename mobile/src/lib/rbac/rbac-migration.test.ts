@@ -95,6 +95,10 @@ describe("dynamic RBAC migration", () => {
       27,
       // v28 — modul nilai akademik (tabel TERSINKRONISASI pertama sejak Fase 4).
       28,
+      // v29 — unit satuan pendidikan: tabel `akademik_unit` dan kolom
+      // `master_data.unit`, sumber dropdown Unit di formulir peserta didik,
+      // guru/PTK, dan karyawan.
+      29,
     ]);
 
     const sessionColumns = await client.execute(

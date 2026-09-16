@@ -406,7 +406,15 @@ pub fn initialize(path: &Path) -> Result<(), String> {
         jenis_personil TEXT,
         tanggal_mulai_aktif TEXT,
         tanggal_selesai_aktif TEXT,
-        status_backup TEXT DEFAULT 'NORMAL'
+        status_backup TEXT DEFAULT 'NORMAL',
+        -- Unit satuan pendidikan (TK/SD/SMP/...). Menyimpan NAMA unit, bukan
+        -- id: id `akademik_unit` dibuat per perangkat, sedangkan nama itulah
+        -- yang sama di semua perangkat. Sengaja TANPA CHECK — daftar unitnya
+        -- dikelola user di halaman Akademik, jadi nilai baru tidak boleh
+        -- menuntut migrasi skema. Ia di `master_data` dan bukan `siswa_data`
+        -- karena dropdown-nya dipakai peserta didik, guru/PTK, DAN karyawan,
+        -- dan ketiga halaman itu menulis ke tabel ini.
+        unit TEXT
       );
       CREATE TABLE IF NOT EXISTS id_card (
         id_card_id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -573,6 +581,23 @@ pub fn initialize(path: &Path) -> Result<(), String> {
         ON hari_libur_whitelist(scope_type, scope_value, status_aktif);
       CREATE INDEX IF NOT EXISTS idx_local_hari_libur_whitelist_tanggal
         ON hari_libur_whitelist(tanggal_libur, status_aktif);
+      -- Unit satuan pendidikan (TK, SD, SMP, ...), dikelola user di halaman
+      -- Akademik. PK TEXT dibuat klien — bukan AUTOINCREMENT, yang akan
+      -- menunjuk unit berbeda di tiap perangkat begitu tersinkronisasi.
+      -- Tanpa UNIQUE pada `nama_unit`: dua perangkat offline boleh mendaftarkan
+      -- nama yang sama, dan sebuah UNIQUE akan membuat push sync-nya gagal
+      -- PERMANEN. Duplikatnya dicegah di lapisan aplikasi dengan pesan ramah.
+      CREATE TABLE IF NOT EXISTS akademik_unit (
+        id_unit TEXT PRIMARY KEY,
+        nama_unit TEXT NOT NULL,
+        keterangan TEXT,
+        urutan INTEGER NOT NULL DEFAULT 0,
+        status_aktif INTEGER NOT NULL DEFAULT 1 CHECK (status_aktif IN (0, 1)),
+        created_at TEXT NOT NULL DEFAULT (datetime('now')),
+        updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+      );
+      CREATE INDEX IF NOT EXISTS idx_local_akademik_unit_urut
+        ON akademik_unit(status_aktif, urutan, nama_unit);
       CREATE TABLE IF NOT EXISTS absensi_foto (
         id_foto TEXT PRIMARY KEY,
         id_sesi TEXT,
@@ -1221,6 +1246,16 @@ pub fn initialize(path: &Path) -> Result<(), String> {
         "tbl_shift",
         "izinkan_multi_sesi",
         "ALTER TABLE tbl_shift ADD COLUMN izinkan_multi_sesi INTEGER DEFAULT 0;",
+    )?;
+
+    // Unit satuan pendidikan (v29). Database lokal yang dibuat sebelum versi ini
+    // sudah punya `master_data`, sehingga CREATE TABLE IF NOT EXISTS di atas
+    // tidak akan menambahkan kolomnya — hanya ALTER yang bisa.
+    ensure_column(
+        &connection,
+        "master_data",
+        "unit",
+        "ALTER TABLE master_data ADD COLUMN unit TEXT;",
     )?;
 
     // Pemisahan jam kerja hari libur (v14). Database lokal yang dibuat sebelum

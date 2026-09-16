@@ -57,7 +57,7 @@ pub fn list_employees(state: &DesktopState, filter: &Value) -> Result<Value, Com
         m.catatan, m.status_qr, m.jenis_personil, m.tanggal_mulai_aktif,
         m.tanggal_selesai_aktif, m.status_backup, s.nama_shift,
         c.idcard_status, c.idcard_pdf_url, c.link_qr_png,
-        m.token_absensi, m.qr_code
+        m.token_absensi, m.qr_code, m.unit
       FROM master_data m
       LEFT JOIN tbl_shift s ON m.id_shift = s.id_shift
       LEFT JOIN id_card c ON m.id_unik = c.id_unik
@@ -93,6 +93,7 @@ pub fn list_employees(state: &DesktopState, filter: &Value) -> Result<Value, Com
                 "link_qr_png": row.get::<_, Option<String>>(19)?,
                 "token_absensi": row.get::<_, Option<String>>(20)?,
                 "qr_code": row.get::<_, Option<String>>(21)?,
+                "unit": row.get::<_, Option<String>>(22)?,
             }))
         })
         .map_err(|_| CommandError::internal())?;
@@ -154,8 +155,8 @@ pub fn create_employee(state: &DesktopState, draft: &Value) -> Result<Value, Com
         id_unik, kode_karyawan, nama, divisi, jabatan_status, no_hp, lp,
         id_shift, status_aktif, tanggal_daftar, catatan, token_absensi, qr_code,
         status_qr, jenis_personil, tanggal_mulai_aktif, tanggal_selesai_aktif,
-        status_backup
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Generated', ?, ?, ?, 'NORMAL');
+        unit, status_backup
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Generated', ?, ?, ?, ?, 'NORMAL');
       "#,
             params![
                 id,
@@ -186,6 +187,7 @@ pub fn create_employee(state: &DesktopState, draft: &Value) -> Result<Value, Com
                     text(draft, "tanggal_mulai_aktif")
                 },
                 text(draft, "tanggal_selesai_aktif"),
+                text(draft, "unit"),
             ],
         )
         .map_err(|error| {
@@ -304,8 +306,8 @@ pub fn import_employees(state: &DesktopState, drafts: &[Value]) -> Result<Value,
                 id_unik, kode_karyawan, nama, divisi, jabatan_status, no_hp, lp,
                 id_shift, status_aktif, tanggal_daftar, catatan, token_absensi, qr_code,
                 status_qr, jenis_personil, tanggal_mulai_aktif, tanggal_selesai_aktif,
-                status_backup
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Generated', ?, ?, ?, 'NORMAL');
+                unit, status_backup
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Generated', ?, ?, ?, ?, 'NORMAL');
             "#,
             params![
                 id,
@@ -340,6 +342,7 @@ pub fn import_employees(state: &DesktopState, drafts: &[Value]) -> Result<Value,
                 },
                 start_date,
                 text(draft, "tanggal_selesai_aktif"),
+                text(draft, "unit"),
             ],
         );
 
@@ -421,7 +424,10 @@ pub fn update_employee(
         jenis_personil = ?,
         tanggal_mulai_aktif = ?,
         tanggal_selesai_aktif = ?,
-        tanggal_daftar = COALESCE(NULLIF(?, ''), tanggal_daftar)
+        tanggal_daftar = COALESCE(NULLIF(?, ''), tanggal_daftar),
+        -- Kosong berarti "jangan ubah", sama seperti kolom di atas: klien lama
+        -- yang belum mengirim `unit` tidak boleh menghapus unit tersimpan.
+        unit = COALESCE(NULLIF(?, ''), unit)
       WHERE id_unik = ?;
       "#,
             params![
@@ -439,6 +445,7 @@ pub fn update_employee(
                 tanggal_mulai_aktif,
                 tanggal_selesai_aktif,
                 tanggal_daftar,
+                text(draft, "unit"),
                 id,
             ],
         )

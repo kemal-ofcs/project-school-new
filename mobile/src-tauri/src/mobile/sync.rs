@@ -24,7 +24,7 @@ use super::{
 /// `CURRENT_SCHEMA_VERSION` di `web-desktop/src/lib/db-schema.ts` setiap kali
 /// migrasi baru ditambahkan, karena keduanya membaca tabel `schema_migration`
 /// yang sama di Turso.
-pub const CLIENT_SCHEMA_VERSION: i64 = 28;
+pub const CLIENT_SCHEMA_VERSION: i64 = 29;
 
 /// Hanya `cloud > client` yang berbahaya; `cloud <= client` adalah kondisi normal.
 fn is_client_schema_outdated(cloud_version: i64) -> bool {
@@ -106,6 +106,7 @@ const SNAPSHOT_TABLES: &[SnapshotTable] = &[
             "tanggal_mulai_aktif",
             "tanggal_selesai_aktif",
             "status_backup",
+            "unit",
         ],
         conflict_column: "id_unik",
         entity_column: "id_unik",
@@ -616,6 +617,23 @@ const SNAPSHOT_TABLES: &[SnapshotTable] = &[
         delete_missing: false,
     },
     SnapshotTable {
+        payload_key: "akademikUnit",
+        domain: "academic-unit",
+        table: "akademik_unit",
+        columns: &[
+            "id_unit",
+            "nama_unit",
+            "keterangan",
+            "urutan",
+            "status_aktif",
+            "created_at",
+            "updated_at",
+        ],
+        conflict_column: "id_unit",
+        entity_column: "id_unit",
+        delete_missing: false,
+    },
+    SnapshotTable {
         payload_key: "akademikJurusan",
         domain: "academic-department",
         table: "akademik_jurusan",
@@ -888,6 +906,9 @@ const CANONICAL_SYNC_ROUTES: &[(&str, &str)] = &[
     ("academic-subject", "create"),
     ("academic-subject", "delete"),
     ("academic-subject", "update"),
+    ("academic-unit", "create"),
+    ("academic-unit", "delete"),
+    ("academic-unit", "update"),
     ("academic-year", "create"),
     ("academic-year", "delete"),
     ("academic-year", "update"),
@@ -1591,7 +1612,8 @@ pub fn enqueue_employee_snapshot(
           'status_qr', COALESCE(status_qr, ''), 'jenis_personil', COALESCE(jenis_personil, ''),
           'tanggal_mulai_aktif', COALESCE(tanggal_mulai_aktif, ''),
           'tanggal_selesai_aktif', COALESCE(tanggal_selesai_aktif, ''),
-          'status_backup', COALESCE(status_backup, 'NORMAL')
+          'status_backup', COALESCE(status_backup, 'NORMAL'),
+          'unit', COALESCE(unit, '')
         ) FROM master_data WHERE id_unik = ?;
         "#,
             params![employee_id],
