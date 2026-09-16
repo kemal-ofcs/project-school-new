@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { MobileAppShell } from "@/components/MobileAppShell";
+import { WaQueueEmptyDiagnostic } from "@/components/notifikasi-wa/WaQueueEmptyDiagnostic";
 import { FeedbackBanner } from "@/components/ui/FeedbackBanner";
 import { Modal } from "@/components/ui/Modal";
 import { canAccessArea, hasPermission } from "@/lib/auth/access";
@@ -147,6 +148,9 @@ export default function NotifikasiWaMobilePage() {
   useEffect(() => {
     if (authLoading || !isAuthenticated || !canView) return;
     void muat();
+    getWaConfigGateway()
+      .then(setConfig)
+      .catch(() => null);
   }, [authLoading, isAuthenticated, canView, muat]);
 
   const bolehBatalkan = hasPermission(user, "notification.delete");
@@ -329,9 +333,16 @@ export default function NotifikasiWaMobilePage() {
             <div className="size-8 animate-spin rounded-full border-4 border-indigo-500 border-t-transparent" />
           </div>
         ) : items.length === 0 && !error ? (
-          <div className="rounded-2xl border border-white/10 bg-slate-900/60 p-6 text-center text-xs text-slate-400">
-            Tidak ada notifikasi pada filter ini.
-          </div>
+          <WaQueueEmptyDiagnostic
+            config={config}
+            hasActiveFilter={status !== "Semua" || Boolean(tanggal)}
+            onResetFilter={() => {
+              setStatus("Semua");
+              setTanggal("");
+            }}
+            onOpenConfig={bukaPengaturan}
+            canManage={bolehKelola}
+          />
         ) : (
           <ul className="flex flex-col gap-2">
             {items.map((item) => (

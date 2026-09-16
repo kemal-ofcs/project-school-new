@@ -1552,6 +1552,7 @@ pub(crate) const CLOUD_MIRRORED_TABLES: &[&str] = &[
     "absensi_foto",
     "siswa_foto",
     "notifikasi_wa",
+    "wali_kredensial",
 ];
 
 /// Tabel lokal yang SENGAJA tidak ikut `CLOUD_MIRRORED_TABLES`.

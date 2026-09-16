@@ -5645,6 +5645,40 @@ impl TursoClient {
             let mut obj = json!(row);
             obj["api_key"] = json!("");
             obj["has_api_key"] = json!(has_api_key);
+
+            let settings_res = self
+                .query_one(
+                    "SELECT key, value FROM setting_gex_system WHERE key IN (?, ?);",
+                    vec![
+                        json!(super::wa_notification::WA_NOTIFY_AMBANG_ALFA_LIMIT_KEY),
+                        json!(super::wa_notification::WA_NOTIFY_AMBANG_ALFA_DAYS_KEY),
+                    ],
+                )
+                .await
+                .ok();
+            let mut ambang_limit = super::wa_notification::DEFAULT_AMBANG_ALFA_LIMIT;
+            let mut ambang_days = super::wa_notification::DEFAULT_AMBANG_ALFA_DAYS;
+            if let Some(s_res) = settings_res {
+                for r in s_res.to_objects() {
+                    let k = r.get("key").and_then(Value::as_str).unwrap_or("");
+                    let v = r.get("value").and_then(Value::as_str).unwrap_or("");
+                    if k == super::wa_notification::WA_NOTIFY_AMBANG_ALFA_LIMIT_KEY {
+                        if let Ok(parsed) = v.trim().parse::<i64>() {
+                            if parsed > 0 {
+                                ambang_limit = parsed;
+                            }
+                        }
+                    } else if k == super::wa_notification::WA_NOTIFY_AMBANG_ALFA_DAYS_KEY {
+                        if let Ok(parsed) = v.trim().parse::<i64>() {
+                            if parsed > 0 {
+                                ambang_days = parsed;
+                            }
+                        }
+                    }
+                }
+            }
+            obj["ambangAlfaLimit"] = json!(ambang_limit);
+            obj["ambangAlfaDays"] = json!(ambang_days);
             Ok(obj)
         } else {
             Ok(json!({
@@ -5660,6 +5694,8 @@ impl TursoClient {
                 "scan_pulang_enabled": 0,
                 "bolos_enabled": 1,
                 "ambang_alfa_enabled": 1,
+                "ambangAlfaLimit": super::wa_notification::DEFAULT_AMBANG_ALFA_LIMIT,
+                "ambangAlfaDays": super::wa_notification::DEFAULT_AMBANG_ALFA_DAYS,
                 "created_at": "",
                 "updated_at": ""
             }))
@@ -5821,6 +5857,34 @@ impl TursoClient {
                 vec![json!(key), json!(if aktif != 0 { "true" } else { "false" })],
             ));
         }
+
+        let ambang_limit = draft
+            .get("ambangAlfaLimit")
+            .and_then(Value::as_i64)
+            .filter(|&v| v > 0)
+            .unwrap_or(super::wa_notification::DEFAULT_AMBANG_ALFA_LIMIT);
+        let ambang_days = draft
+            .get("ambangAlfaDays")
+            .and_then(Value::as_i64)
+            .filter(|&v| v > 0)
+            .unwrap_or(super::wa_notification::DEFAULT_AMBANG_ALFA_DAYS);
+
+        statements.push(Statement::new(
+            r#"INSERT INTO setting_gex_system (key, value) VALUES (?, ?)
+            ON CONFLICT(key) DO UPDATE SET value = excluded.value;"#,
+            vec![
+                json!(super::wa_notification::WA_NOTIFY_AMBANG_ALFA_LIMIT_KEY),
+                json!(ambang_limit.to_string()),
+            ],
+        ));
+        statements.push(Statement::new(
+            r#"INSERT INTO setting_gex_system (key, value) VALUES (?, ?)
+            ON CONFLICT(key) DO UPDATE SET value = excluded.value;"#,
+            vec![
+                json!(super::wa_notification::WA_NOTIFY_AMBANG_ALFA_DAYS_KEY),
+                json!(ambang_days.to_string()),
+            ],
+        ));
 
         self.execute_atomic(statements).await?;
 
