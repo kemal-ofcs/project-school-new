@@ -5997,6 +5997,7 @@ impl TursoClient {
     /// Syarat `status = 'Menunggu'` dipertahankan: pesan yang sudah terkirim
     /// tidak bisa ditarik kembali, dan menandainya "Dibatalkan" hanya membuat
     /// jejaknya berbohong.
+    #[allow(dead_code)]
     pub async fn cancel_wa_notification_cloud(
         &self,
         id_notifikasi: &str,
@@ -6029,6 +6030,7 @@ impl TursoClient {
     /// `status` sengaja tidak diterima dari pemanggil: baris baru SELALU
     /// `Menunggu`. Menerimanya berarti membuka jalan bagi klien untuk menulis
     /// `Terkirim` pada pesan yang tidak pernah dikirim.
+    #[allow(dead_code)]
     pub async fn queue_wa_notification_cloud(
         &self,
         draft: &Value,
@@ -6977,6 +6979,7 @@ impl TursoClient {
         Ok(json!(row))
     }
 
+    #[allow(dead_code)]
     pub async fn get_article_by_slug(&self, slug: &str) -> Result<Value, CommandError> {
         self.ensure_schema_current().await?;
         let res = self
