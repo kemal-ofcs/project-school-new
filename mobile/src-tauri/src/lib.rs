@@ -178,6 +178,7 @@ pub fn run() {
             mobile::wa_review::mobile_queue_wa_notification,
             mobile::commands::desktop_get_wa_config,
             mobile::commands::desktop_save_wa_config,
+            mobile::commands::desktop_drain_wa_queue,
             mobile::commands::desktop_get_server_url,
             mobile::commands::desktop_set_server_url,
             mobile::commands::desktop_get_turso_url,

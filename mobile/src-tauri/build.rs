@@ -136,6 +136,7 @@ const MOBILE_COMMANDS: &[&str] = &[
     "mobile_queue_wa_notification",
     "desktop_get_wa_config",
     "desktop_save_wa_config",
+    "desktop_drain_wa_queue",
     "desktop_get_server_url",
     "desktop_set_server_url",
     "desktop_get_turso_url",

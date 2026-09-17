@@ -11,6 +11,7 @@ import { triggerHaptic } from "@/lib/client/haptics";
 import { useAuth } from "@/lib/context/AuthContext";
 import {
   cancelWaNotificationGateway,
+  drainWaQueueGateway,
   getWaConfigGateway,
   listWaNotificationsGateway,
   saveWaConfigGateway,
@@ -58,6 +59,8 @@ const JENIS_LABEL: Record<string, string> = {
   scan_pulang: "Scan Pulang",
   bolos: "Bolos",
   ambang_alfa: "Ambang Alfa",
+  koreksi_admin: "Koreksi Admin",
+  import_manual: "Import Manual",
 };
 
 function warnaStatus(status: string) {
@@ -155,6 +158,8 @@ export default function NotifikasiWaMobilePage() {
 
   const bolehBatalkan = hasPermission(user, "notification.delete");
   const bolehKelola = hasPermission(user, "notification.manage");
+  const bolehKirim = hasPermission(user, "notification.send");
+  const totalMenunggu = items.filter((i) => i.status === "Menunggu").length;
 
   async function batalkan(item: WaNotificationItem) {
     const setuju = await konfirmasi({
@@ -182,6 +187,41 @@ export default function NotifikasiWaMobilePage() {
       await muat();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Pesan gagal dibatalkan.");
+    } finally {
+      isSubmittingRef.current = false;
+    }
+  }
+
+  /**
+   * Kuras antrean sekarang, tanpa menunggu penjadwal.
+   *
+   * Pengirimannya berjalan di server aplikasi — lihat `drainWaQueueGateway`.
+   * Hasilnya dilaporkan apa adanya termasuk saat nol pesan terkirim: sebuah
+   * tombol yang selalu menjawab "berhasil" tidak membedakan antrean kosong dari
+   * gateway yang menolak.
+   */
+  async function kirimAntrean() {
+    if (isSubmittingRef.current || !bolehKirim) return;
+    const setuju = await konfirmasi({
+      title: `Kirim ${totalMenunggu} pesan menunggu sekarang?`,
+      description:
+        "Pesan dikirim ke nomor wali murid lewat gateway WhatsApp dan tidak dapat ditarik kembali.",
+      preserved:
+        "Hanya baris berstatus Menunggu yang dikirim. Baris yang sudah Terkirim, Gagal, atau Dibatalkan tidak disentuh.",
+      confirmLabel: "Ya, kirim sekarang",
+      tone: "warning",
+    });
+    if (!setuju) return;
+
+    isSubmittingRef.current = true;
+    setError(null);
+    try {
+      const hasil = await drainWaQueueGateway();
+      if (hasil.sukses) setKabar(hasil.message);
+      else setError(hasil.message);
+      await muat();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Antrean gagal dikuras.");
     } finally {
       isSubmittingRef.current = false;
     }
@@ -252,6 +292,19 @@ export default function NotifikasiWaMobilePage() {
               Dibaca dari cloud · membutuhkan koneksi
             </p>
           </div>
+          {bolehKirim ? (
+            <button
+              className="shrink-0 rounded-xl bg-emerald-600 px-3 py-2 font-bold text-[11px] text-white disabled:opacity-50"
+              disabled={loading || totalMenunggu === 0}
+              onClick={() => {
+                triggerHaptic("light");
+                void kirimAntrean();
+              }}
+              type="button"
+            >
+              Kirim ({totalMenunggu})
+            </button>
+          ) : null}
           {bolehKelola ? (
             <button
               className="shrink-0 rounded-xl border border-white/15 px-3 py-2 font-bold text-[11px] text-white"

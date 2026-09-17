@@ -143,6 +143,7 @@
     "allow-mobile-queue-wa-notification",
     "allow-desktop-get-wa-config",
     "allow-desktop-save-wa-config",
+    "allow-desktop-drain-wa-queue",
     "allow-desktop-get-server-url",
     "allow-desktop-set-server-url",
     "allow-desktop-get-turso-url",
