@@ -16,6 +16,7 @@ import {
   updateHolidayWhitelist,
 } from "@/lib/gateways/holiday-whitelist";
 import { getDaftarShift } from "@/lib/gateways/shift";
+import { subscribeSyncCompleted } from "@/lib/gateways/sync-status";
 
 /*
  * Cerminan Mobile dari `web-desktop/src/components/HolidayWhitelistPanel.tsx`.
@@ -110,13 +111,9 @@ export function HolidayWhitelistPanel({ canManage }: { canManage: boolean }) {
 
   // Tarik-untuk-segarkan memancarkan event ini; muat ulang tanpa spinner.
   useEffect(() => {
-    const onSyncCompleted = () => {
+    return subscribeSyncCompleted(() => {
       void loadData(true);
-    };
-    window.addEventListener("sppg:sync-completed", onSyncCompleted);
-    return () => {
-      window.removeEventListener("sppg:sync-completed", onSyncCompleted);
-    };
+    });
   }, [loadData]);
 
   const shiftLabel = useMemo(() => {

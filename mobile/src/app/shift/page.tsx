@@ -21,6 +21,7 @@ import {
   tambahShift,
   updateShift,
 } from "@/lib/gateways/shift";
+import { subscribeSyncCompleted } from "@/lib/gateways/sync-status";
 import { useDebounce } from "@/lib/hooks/useDebounce";
 import {
   firstValidationMessage,
@@ -175,13 +176,9 @@ export default function MobileShiftPage() {
   }, [isAuthenticated, canView, loadShifts]);
 
   useEffect(() => {
-    const onSyncCompleted = () => {
+    return subscribeSyncCompleted(() => {
       void loadShifts(true);
-    };
-    window.addEventListener("sppg:sync-completed", onSyncCompleted);
-    return () => {
-      window.removeEventListener("sppg:sync-completed", onSyncCompleted);
-    };
+    });
   }, [loadShifts]);
 
   const updateFormField = <K extends keyof ShiftInput>(

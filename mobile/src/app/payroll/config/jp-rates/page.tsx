@@ -29,6 +29,7 @@ import {
   type JpRateRow,
   saveJpRate,
 } from "@/lib/gateways/payroll";
+import { subscribeSyncCompleted } from "@/lib/gateways/sync-status";
 import { isTeacherPersonnel } from "@/lib/validations/payroll-policy";
 
 /*
@@ -117,13 +118,9 @@ export default function MobileJpRatesPage() {
   }, [isAuthenticated, canManage, loadData]);
 
   useEffect(() => {
-    const onSyncCompleted = () => {
+    return subscribeSyncCompleted(() => {
       void loadData(true);
-    };
-    window.addEventListener("sppg:sync-completed", onSyncCompleted);
-    return () => {
-      window.removeEventListener("sppg:sync-completed", onSyncCompleted);
-    };
+    });
   }, [loadData]);
 
   const openAdd = () => {

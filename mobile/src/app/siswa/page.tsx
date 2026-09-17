@@ -25,7 +25,7 @@ import {
   type SiswaInput,
   simpanSiswa,
 } from "@/lib/gateways/student";
-import { syncNow } from "@/lib/gateways/sync-status";
+import { subscribeSyncCompleted, syncNow } from "@/lib/gateways/sync-status";
 import {
   getWaliCredentialStatus,
   resetWaliPassword,
@@ -159,10 +159,7 @@ export default function SiswaMobilePage() {
   }, [isHydrated, isAuthenticated, canView, loadData]);
 
   useEffect(() => {
-    const onSyncCompleted = () => void loadData(true);
-    window.addEventListener("sppg:sync-completed", onSyncCompleted);
-    return () =>
-      window.removeEventListener("sppg:sync-completed", onSyncCompleted);
+    return subscribeSyncCompleted(() => void loadData(true));
   }, [loadData]);
 
   // Pencarian dan status disaring di klien: gateway hanya menerima filter

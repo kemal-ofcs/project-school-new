@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { MobileAppShell } from "@/components/MobileAppShell";
 import { Icon } from "@/components/ui/Icon";
+import { StatTile } from "@/components/ui/StatTile";
 import { canAccessArea } from "@/lib/auth/access";
 import { triggerHaptic } from "@/lib/client/haptics";
 import { useAuth } from "@/lib/context/AuthContext";
@@ -56,25 +57,6 @@ function skorTone(skor: number) {
   if (skor >= 90) return "text-emerald-400";
   if (skor >= 70) return "text-amber-400";
   return "text-rose-400";
-}
-
-function StatTile({
-  label,
-  value,
-  tone = "text-white",
-}: {
-  label: string;
-  value: number | string;
-  tone?: string;
-}) {
-  return (
-    <div className="rounded-2xl border border-white/10 bg-slate-950/60 p-3">
-      <div className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">
-        {label}
-      </div>
-      <div className={`mt-0.5 text-xl font-black ${tone}`}>{value}</div>
-    </div>
-  );
 }
 
 export default function AuditAbsensiMobilePage() {

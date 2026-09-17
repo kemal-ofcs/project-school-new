@@ -17,6 +17,7 @@ import {
   getRiwayatScan,
   hapusLogScan,
 } from "@/lib/gateways/report";
+import { subscribeSyncCompleted } from "@/lib/gateways/sync-status";
 import { useDebounce } from "@/lib/hooks/useDebounce";
 import { buildDailyExport, buildScanLogExport } from "./history-export";
 
@@ -226,15 +227,11 @@ export default function HistoryPage() {
   ]);
 
   useEffect(() => {
-    const onSyncCompleted = () => {
+    return subscribeSyncCompleted(() => {
       if (isAuthenticated && canViewHistory) {
         void loadData(tanggalMulai, tanggalSelesai, activeTab);
       }
-    };
-    window.addEventListener("sppg:sync-completed", onSyncCompleted);
-    return () => {
-      window.removeEventListener("sppg:sync-completed", onSyncCompleted);
-    };
+    });
   }, [
     tanggalMulai,
     tanggalSelesai,

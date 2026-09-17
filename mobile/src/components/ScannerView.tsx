@@ -30,7 +30,10 @@ import {
 } from "@/lib/contracts/scanner";
 import { getScanSecurity } from "@/lib/gateways/scan-security";
 import { submitTerminalScan } from "@/lib/gateways/scanner";
-import { requestSyncNow } from "@/lib/gateways/sync-status";
+import {
+  requestSyncNow,
+  subscribeSyncCompleted,
+} from "@/lib/gateways/sync-status";
 
 type ScanLogItem = {
   id: string;
@@ -65,10 +68,10 @@ export function ScannerView() {
         .catch(() => undefined);
     };
     muat();
-    window.addEventListener("sppg:sync-completed", muat);
+    const lepas = subscribeSyncCompleted(muat);
     return () => {
       cancelled = true;
-      window.removeEventListener("sppg:sync-completed", muat);
+      lepas();
     };
   }, []);
 

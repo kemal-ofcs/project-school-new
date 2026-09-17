@@ -8,6 +8,7 @@ import {
   getTopKaryawanTerajin,
   type RekapBulananItem,
 } from "@/lib/gateways/report";
+import { subscribeSyncCompleted } from "@/lib/gateways/sync-status";
 import { useDebounce } from "@/lib/hooks/useDebounce";
 
 /*
@@ -82,13 +83,9 @@ export function DashboardInsights() {
   }, [load]);
 
   useEffect(() => {
-    const onSyncCompleted = () => {
+    return subscribeSyncCompleted(() => {
       void load(true);
-    };
-    window.addEventListener("sppg:sync-completed", onSyncCompleted);
-    return () => {
-      window.removeEventListener("sppg:sync-completed", onSyncCompleted);
-    };
+    });
   }, [load]);
 
   const monthLabel = useMemo(

@@ -13,6 +13,7 @@ import { useAuth } from "@/lib/context/AuthContext";
 import { getDaftarKaryawan } from "@/lib/gateways/employee";
 import { getDaftarIdCard, updateStatusIdCard } from "@/lib/gateways/id-card";
 import { backfillKartuPelajar } from "@/lib/gateways/student";
+import { subscribeSyncCompleted } from "@/lib/gateways/sync-status";
 import { useDebounce } from "@/lib/hooks/useDebounce";
 
 /*
@@ -122,13 +123,9 @@ export default function MobileIdCardsPage() {
   }, [isAuthenticated, canView, load]);
 
   useEffect(() => {
-    const onSyncCompleted = () => {
+    return subscribeSyncCompleted(() => {
       void load(true);
-    };
-    window.addEventListener("sppg:sync-completed", onSyncCompleted);
-    return () => {
-      window.removeEventListener("sppg:sync-completed", onSyncCompleted);
-    };
+    });
   }, [load]);
 
   const filtered = useMemo(() => {

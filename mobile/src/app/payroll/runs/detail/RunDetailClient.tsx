@@ -19,6 +19,7 @@ import {
   type PayrollRunDetail,
   transitionPayrollStatus,
 } from "@/lib/gateways/payroll";
+import { subscribeSyncCompleted } from "@/lib/gateways/sync-status";
 
 /*
  * Detail batch payroll untuk Mobile — padanan
@@ -108,13 +109,9 @@ export default function RunDetailClient() {
   }, [isAuthenticated, canView, loadDetail]);
 
   useEffect(() => {
-    const onSyncCompleted = () => {
+    return subscribeSyncCompleted(() => {
       void loadDetail(true);
-    };
-    window.addEventListener("sppg:sync-completed", onSyncCompleted);
-    return () => {
-      window.removeEventListener("sppg:sync-completed", onSyncCompleted);
-    };
+    });
   }, [loadDetail]);
 
   const run = detail?.run;

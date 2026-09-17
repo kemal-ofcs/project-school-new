@@ -4,15 +4,10 @@
  * Desktop/Web bisa digabung tanpa menata ulang kolom.
  */
 
+import { formatDisplayDate } from "@/lib/utils/date-display";
+
 type Row = Record<string, unknown>;
 type Cell = string | number;
-
-function formatDisplayDate(value: unknown): string {
-  if (!value || typeof value !== "string") return "-";
-  if (/^\d{2}\/\d{2}\/\d{4}/.test(value)) return value;
-  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(value);
-  return m ? `${m[3]}/${m[2]}/${m[1]}` : value;
-}
 
 /**
  * Stempel waktu ditulis apa adanya dari database (bentuk SQLite tanpa zona),

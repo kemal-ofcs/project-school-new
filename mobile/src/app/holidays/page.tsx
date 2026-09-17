@@ -19,6 +19,7 @@ import {
   tambahHariLibur,
   updateHariLibur,
 } from "@/lib/gateways/holiday";
+import { subscribeSyncCompleted } from "@/lib/gateways/sync-status";
 import { useDebounce } from "@/lib/hooks/useDebounce";
 
 /*
@@ -126,13 +127,9 @@ export default function MobileHolidaysPage() {
   }, [isAuthenticated, canView, loadData]);
 
   useEffect(() => {
-    const onSyncCompleted = () => {
+    return subscribeSyncCompleted(() => {
       void loadData(true);
-    };
-    window.addEventListener("sppg:sync-completed", onSyncCompleted);
-    return () => {
-      window.removeEventListener("sppg:sync-completed", onSyncCompleted);
-    };
+    });
   }, [loadData]);
 
   const availableYears = useMemo(

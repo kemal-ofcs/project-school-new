@@ -35,7 +35,6 @@ import { dirname, join } from "node:path";
  *                                     ditulis dua kali akan salah di salah
  *                                     satunya, dan yang membayar tagihan pesan
  *                                     gagal adalah sekolah.
- *   validations/wa-notification.ts    Konstanta yang dipakai modul di atas.
  *
  * YANG SENGAJA TIDAK DISALIN, dan harus tetap begitu:
  *
@@ -73,7 +72,6 @@ const filesToCopy = [
   "lib/operators/contact.ts",
   "lib/operators/contact.test.ts",
   "lib/services/wa-provider.ts",
-  "lib/validations/wa-notification.ts",
 ];
 
 const desktopSrc = join(import.meta.dir, "../../web-desktop/src");

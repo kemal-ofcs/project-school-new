@@ -17,6 +17,7 @@ import {
   listPayrollRuns,
   type PayrollRunRow,
 } from "@/lib/gateways/payroll";
+import { subscribeSyncCompleted } from "@/lib/gateways/sync-status";
 
 /*
  * Daftar batch payroll + pembuatan batch baru untuk Mobile — padanan
@@ -120,13 +121,9 @@ export default function MobilePayrollRunsPage() {
   }, [isAuthenticated, canView, loadRuns]);
 
   useEffect(() => {
-    const onSyncCompleted = () => {
+    return subscribeSyncCompleted(() => {
       void loadRuns(true);
-    };
-    window.addEventListener("sppg:sync-completed", onSyncCompleted);
-    return () => {
-      window.removeEventListener("sppg:sync-completed", onSyncCompleted);
-    };
+    });
   }, [loadRuns]);
 
   const openCreate = () => {

@@ -22,6 +22,7 @@ import {
   updateRole,
 } from "@/lib/gateways/master-operator";
 import { getScanSecurity } from "@/lib/gateways/scan-security";
+import { subscribeSyncCompleted } from "@/lib/gateways/sync-status";
 import { adminDisableTwoFactor } from "@/lib/gateways/two-factor";
 import { useDebounce } from "@/lib/hooks/useDebounce";
 import type { OperatorDraft, OperatorRecord } from "@/lib/operators/types";
@@ -203,13 +204,9 @@ export default function MobileMasterOperatorPage() {
   }, [loadData]);
 
   useEffect(() => {
-    const onSyncCompleted = () => {
+    return subscribeSyncCompleted(() => {
       void loadData(true);
-    };
-    window.addEventListener("sppg:sync-completed", onSyncCompleted);
-    return () => {
-      window.removeEventListener("sppg:sync-completed", onSyncCompleted);
-    };
+    });
   }, [loadData]);
 
   const filteredOperators = useMemo(() => {

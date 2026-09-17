@@ -18,6 +18,7 @@ import {
   type MobileSlipDetail,
   type MobileSlipSummary,
 } from "@/lib/gateways/payroll";
+import { subscribeSyncCompleted } from "@/lib/gateways/sync-status";
 import { useCompanyName } from "@/lib/hooks/useCompanyName";
 import { useHydrated } from "@/lib/hooks/useHydrated";
 
@@ -213,14 +214,12 @@ export default function MobilePayrollPortalPage() {
   }, [selectedKaryawanId, activeTab, loadEstimate, loadSlips]);
 
   useEffect(() => {
-    const handleSync = () => {
+    return subscribeSyncCompleted(() => {
       if (selectedKaryawanId) {
         if (activeTab === "estimate") void loadEstimate();
         else void loadSlips();
       }
-    };
-    window.addEventListener("sppg:sync-completed", handleSync);
-    return () => window.removeEventListener("sppg:sync-completed", handleSync);
+    });
   }, [selectedKaryawanId, activeTab, loadEstimate, loadSlips]);
 
   // Muat ulang manual kini lewat gestur tarik-ke-bawah di MobileAppShell:

@@ -28,6 +28,7 @@ import {
   saveTaxRule,
   type TaxRuleRow,
 } from "@/lib/gateways/payroll";
+import { subscribeSyncCompleted } from "@/lib/gateways/sync-status";
 
 /*
  * Lapisan tarif PPh 21 (Pasal 17 & TER A/B/C) untuk Mobile — padanan
@@ -141,13 +142,9 @@ export default function MobileTaxRulesPage() {
   }, [isAuthenticated, canManage, loadRules]);
 
   useEffect(() => {
-    const onSyncCompleted = () => {
+    return subscribeSyncCompleted(() => {
       void loadRules(true);
-    };
-    window.addEventListener("sppg:sync-completed", onSyncCompleted);
-    return () => {
-      window.removeEventListener("sppg:sync-completed", onSyncCompleted);
-    };
+    });
   }, [loadRules]);
 
   const categoryRules = rules.filter((r) => r.category === activeCategory);

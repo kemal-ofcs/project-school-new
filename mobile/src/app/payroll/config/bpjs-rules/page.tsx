@@ -28,6 +28,7 @@ import {
   getBpjsRules,
   saveBpjsRule,
 } from "@/lib/gateways/payroll";
+import { subscribeSyncCompleted } from "@/lib/gateways/sync-status";
 
 /*
  * Aturan iuran BPJS untuk Mobile — padanan
@@ -113,13 +114,9 @@ export default function MobileBpjsRulesPage() {
   }, [isAuthenticated, canManage, loadRules]);
 
   useEffect(() => {
-    const onSyncCompleted = () => {
+    return subscribeSyncCompleted(() => {
       void loadRules(true);
-    };
-    window.addEventListener("sppg:sync-completed", onSyncCompleted);
-    return () => {
-      window.removeEventListener("sppg:sync-completed", onSyncCompleted);
-    };
+    });
   }, [loadRules]);
 
   const openAdd = () => {

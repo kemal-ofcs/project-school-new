@@ -19,6 +19,7 @@ import {
   toggleStatusKaryawan,
 } from "@/lib/gateways/employee";
 import { getDaftarShift } from "@/lib/gateways/shift";
+import { subscribeSyncCompleted } from "@/lib/gateways/sync-status";
 import { useDebounce } from "@/lib/hooks/useDebounce";
 import { useHydrated } from "@/lib/hooks/useHydrated";
 
@@ -129,10 +130,7 @@ export default function KaryawanPage() {
 
   // Reaktivitas sinkronisasi real-time (Rule 4.16)
   useEffect(() => {
-    const onSyncCompleted = () => void loadData(true);
-    window.addEventListener("sppg:sync-completed", onSyncCompleted);
-    return () =>
-      window.removeEventListener("sppg:sync-completed", onSyncCompleted);
+    return subscribeSyncCompleted(() => void loadData(true));
   }, [loadData]);
 
   // ─── Filter Client-Side (status_backup) ─────────────────────────────────────

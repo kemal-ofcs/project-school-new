@@ -45,6 +45,7 @@ import {
   simpanUnit,
 } from "@/lib/gateways/academic";
 import { getDaftarSesiPresensi } from "@/lib/gateways/class-attendance";
+import { subscribeSyncCompleted } from "@/lib/gateways/sync-status";
 import { getDaftarGuru } from "@/lib/gateways/teacher";
 import { useConfirmDialog } from "@/lib/hooks/useConfirmDialog";
 import { useHydrated } from "@/lib/hooks/useHydrated";
@@ -183,10 +184,7 @@ export default function AkademikMobilePage() {
   }, [isHydrated, isAuthenticated, canView, loadData]);
 
   useEffect(() => {
-    const onSyncCompleted = () => void loadData(true);
-    window.addEventListener("sppg:sync-completed", onSyncCompleted);
-    return () =>
-      window.removeEventListener("sppg:sync-completed", onSyncCompleted);
+    return subscribeSyncCompleted(() => void loadData(true));
   }, [loadData]);
 
   const changeTaFilter = async (taId: string) => {

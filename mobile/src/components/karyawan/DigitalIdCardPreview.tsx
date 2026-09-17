@@ -21,7 +21,7 @@ import {
   getIdCardTemplate,
   type IdCardTemplateConfig,
 } from "@/lib/gateways/id-card-template";
-import { syncNow } from "@/lib/gateways/sync-status";
+import { subscribeSyncCompleted, syncNow } from "@/lib/gateways/sync-status";
 import { useAppLogo } from "@/lib/hooks/useAppLogo";
 import type { CardSide } from "@/types/id-card";
 
@@ -118,13 +118,9 @@ export function DigitalIdCardPreview({
 
   // Reaktif terhadap event sync selesai (latar belakang Turso Cloud)
   useEffect(() => {
-    const onSyncCompleted = () => {
+    return subscribeSyncCompleted(() => {
       void loadTemplateAndCompany();
-    };
-    window.addEventListener("sppg:sync-completed", onSyncCompleted);
-    return () => {
-      window.removeEventListener("sppg:sync-completed", onSyncCompleted);
-    };
+    });
   }, [loadTemplateAndCompany]);
 
   // 2. Generate QR Code Data URL on-demand

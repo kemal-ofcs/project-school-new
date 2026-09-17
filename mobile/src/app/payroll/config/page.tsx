@@ -33,6 +33,7 @@ import {
   savePayrollComponent,
   saveSalaryConfig,
 } from "@/lib/gateways/payroll";
+import { subscribeSyncCompleted } from "@/lib/gateways/sync-status";
 import {
   APPLIES_TO_ALL,
   isStudentPersonnel,
@@ -181,13 +182,9 @@ export default function MobilePayrollConfigPage() {
   }, [isAuthenticated, canManage, loadData]);
 
   useEffect(() => {
-    const onSyncCompleted = () => {
+    return subscribeSyncCompleted(() => {
       void loadData(true);
-    };
-    window.addEventListener("sppg:sync-completed", onSyncCompleted);
-    return () => {
-      window.removeEventListener("sppg:sync-completed", onSyncCompleted);
-    };
+    });
   }, [loadData]);
 
   // Siswa tinggal di `master_data` yang sama dengan guru dan karyawan, dan

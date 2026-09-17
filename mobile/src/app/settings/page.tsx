@@ -35,6 +35,7 @@ import {
   getScanSecurity,
   saveScanSecurity,
 } from "@/lib/gateways/scan-security";
+import { subscribeSyncCompleted } from "@/lib/gateways/sync-status";
 import {
   clearTursoConfig,
   getDatabaseConfig,
@@ -218,11 +219,11 @@ export default function SettingsPage() {
         void loadAutoAlfa();
       }
     };
-    window.addEventListener("sppg:sync-completed", onSyncCompleted);
+    const lepas = subscribeSyncCompleted(onSyncCompleted);
 
     return () => {
       cancelled = true;
-      window.removeEventListener("sppg:sync-completed", onSyncCompleted);
+      lepas();
     };
   }, [isAuthenticated, canManageGeofence, canSeeAutoAlfa, user?.isSuperadmin]);
 

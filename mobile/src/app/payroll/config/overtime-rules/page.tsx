@@ -28,6 +28,7 @@ import {
   saveOvertimeRule,
   saveTeacherOvertimePolicy,
 } from "@/lib/gateways/payroll";
+import { subscribeSyncCompleted } from "@/lib/gateways/sync-status";
 
 /*
  * Aturan jenjang lembur (PP 35/2021) untuk Mobile — padanan
@@ -149,13 +150,9 @@ export default function MobileOvertimeRulesPage() {
   }, [isAuthenticated, canManage, loadRules]);
 
   useEffect(() => {
-    const onSyncCompleted = () => {
+    return subscribeSyncCompleted(() => {
       void loadRules(true);
-    };
-    window.addEventListener("sppg:sync-completed", onSyncCompleted);
-    return () => {
-      window.removeEventListener("sppg:sync-completed", onSyncCompleted);
-    };
+    });
   }, [loadRules]);
 
   const toggleTeacherOvertime = async (enabled: boolean) => {

@@ -19,7 +19,7 @@ import { createQrPng, employeeQrPayload } from "@/lib/client/qr-code";
 import { useAuth } from "@/lib/context/AuthContext";
 import { getDaftarUnit } from "@/lib/gateways/academic";
 import { getDaftarShift } from "@/lib/gateways/shift";
-import { syncNow } from "@/lib/gateways/sync-status";
+import { subscribeSyncCompleted, syncNow } from "@/lib/gateways/sync-status";
 import {
   type GuruInput,
   getDaftarGuru,
@@ -139,10 +139,7 @@ export default function GuruMobilePage() {
   }, [isHydrated, isAuthenticated, canView, loadData]);
 
   useEffect(() => {
-    const onSyncCompleted = () => void loadData(true);
-    window.addEventListener("sppg:sync-completed", onSyncCompleted);
-    return () =>
-      window.removeEventListener("sppg:sync-completed", onSyncCompleted);
+    return subscribeSyncCompleted(() => void loadData(true));
   }, [loadData]);
 
   const filtered = useMemo(() => {
