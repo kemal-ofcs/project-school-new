@@ -2,13 +2,17 @@
 
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState, useTransition } from "react";
+import { CollectionRepeater } from "@/components/content/CollectionRepeater";
 import { MobileAppShell } from "@/components/MobileAppShell";
 import { FeedbackBanner } from "@/components/ui/FeedbackBanner";
 import { Icon } from "@/components/ui/Icon";
 import { Modal } from "@/components/ui/Modal";
 import { canAccessArea, hasPermission } from "@/lib/auth/access";
 import { triggerHaptic } from "@/lib/client/haptics";
-import { LANDING_PAGE_SUBSECTIONS } from "@/lib/constants/landing-cms-fields";
+import {
+  KOLEKSI_LANDING,
+  LANDING_PAGE_SUBSECTIONS,
+} from "@/lib/constants/landing-cms-fields";
 import { useAuth } from "@/lib/context/AuthContext";
 import {
   type ArticleDraft,
@@ -67,6 +71,10 @@ export default function KontenMobilePage() {
   >("profil");
   const [landingSubTab, setLandingSubTab] = useState<string>("hero_stats");
   const [contentMap, setContentMap] = useState<PageContentMap>({});
+  // Item koleksi disimpan terurai; diserialisasi jadi JSON hanya saat menyimpan.
+  const [koleksiItems, setKoleksiItems] = useState<
+    Record<string, Record<string, unknown>[]>
+  >({});
   const [loadingHalaman, setLoadingHalaman] = useState(false);
 
   const muatBerita = useCallback(async () => {
@@ -91,7 +99,29 @@ export default function KontenMobilePage() {
     setGalat(null);
     try {
       const res = await ambilKontenHalaman(hal);
-      setContentMap(res.items || {});
+      const items = res.items || {};
+      setContentMap(items);
+      // JSON rusak = koleksi kosong, bukan galat: satu baris cacat tidak boleh
+      // mengunci seluruh panel konten.
+      const terurai: Record<string, Record<string, unknown>[]> = {};
+      for (const koleksi of Object.values(KOLEKSI_LANDING)) {
+        let daftar: Record<string, unknown>[] = [];
+        try {
+          const mentah = JSON.parse(String(items[koleksi.kunci] ?? "[]"));
+          if (Array.isArray(mentah)) {
+            daftar = mentah.filter(
+              (item): item is Record<string, unknown> =>
+                typeof item === "object" &&
+                item !== null &&
+                !Array.isArray(item),
+            );
+          }
+        } catch {
+          daftar = [];
+        }
+        terurai[koleksi.kunci] = daftar;
+      }
+      setKoleksiItems(terurai);
     } catch (err) {
       setGalat(
         err instanceof Error
@@ -199,7 +229,17 @@ export default function KontenMobilePage() {
     setGalat(null);
     startTransition(async () => {
       try {
-        await simpanKontenHalaman(halamanTab, contentMap);
+        // Koleksi kosong disimpan sebagai string kosong, bukan "[]": situs
+        // publik mengabaikan nilai kosong, sehingga menghapus seluruh item
+        // mengembalikan tampilan ke isi bawaannya alih-alih bagian kosong.
+        const denganKoleksi = { ...contentMap };
+        for (const koleksi of Object.values(KOLEKSI_LANDING)) {
+          const daftar = koleksiItems[koleksi.kunci] ?? [];
+          denganKoleksi[koleksi.kunci] =
+            daftar.length > 0 ? JSON.stringify(daftar) : "";
+        }
+        await simpanKontenHalaman(halamanTab, denganKoleksi);
+        setContentMap(denganKoleksi);
         triggerHaptic("success");
         setKabar("Konten halaman berhasil diperbarui.");
       } catch (err) {
@@ -418,65 +458,88 @@ export default function KontenMobilePage() {
               </p>
             ) : (
               <div className="rounded-2xl border border-white/10 bg-slate-900 p-4 space-y-3">
-                {halamanTab === "landing" ? (
-                  (() => {
-                    const currentSub =
-                      LANDING_PAGE_SUBSECTIONS.find(
-                        (s) => s.id === landingSubTab,
-                      ) ?? LANDING_PAGE_SUBSECTIONS[0];
-                    return currentSub.fields.map((field) => {
-                      const value = contentMap[field.key] ?? "";
-                      return (
-                        <div key={field.key}>
-                          <label
-                            htmlFor={`input-hal-${field.key}`}
-                            className="block text-[11px] font-bold text-slate-300 mb-1"
-                          >
-                            {field.label}
-                          </label>
-                          {field.description ? (
-                            <p className="mb-1 text-[10px] text-sky-400/90">
-                              ℹ️ {field.description}
-                            </p>
-                          ) : null}
-                          {field.type === "textarea" ? (
-                            <textarea
-                              id={`input-hal-${field.key}`}
-                              aria-label={field.label}
-                              rows={field.rows || 2}
-                              value={value}
-                              onChange={(e) =>
-                                setContentMap((prev) => ({
-                                  ...prev,
-                                  [field.key]: e.target.value,
-                                }))
-                              }
-                              placeholder={field.placeholder}
-                              disabled={!canManage}
-                              className="w-full rounded-xl border border-white/10 bg-slate-800 p-2.5 text-xs text-white focus:border-sky-400 focus:outline-none"
-                            />
-                          ) : (
-                            <input
-                              id={`input-hal-${field.key}`}
-                              aria-label={field.label}
-                              type="text"
-                              value={value}
-                              onChange={(e) =>
-                                setContentMap((prev) => ({
-                                  ...prev,
-                                  [field.key]: e.target.value,
-                                }))
-                              }
-                              placeholder={field.placeholder}
-                              disabled={!canManage}
-                              className="w-full rounded-xl border border-white/10 bg-slate-800 p-2.5 text-xs text-white focus:border-sky-400 focus:outline-none"
-                            />
-                          )}
-                        </div>
-                      );
-                    });
-                  })()
-                ) : Object.keys(contentMap).length === 0 ? (
+                {halamanTab === "landing"
+                  ? (() => {
+                      const currentSub =
+                        LANDING_PAGE_SUBSECTIONS.find(
+                          (s) => s.id === landingSubTab,
+                        ) ?? LANDING_PAGE_SUBSECTIONS[0];
+                      return currentSub.fields.map((field) => {
+                        const value = contentMap[field.key] ?? "";
+                        return (
+                          <div key={field.key}>
+                            <label
+                              htmlFor={`input-hal-${field.key}`}
+                              className="block text-[11px] font-bold text-slate-300 mb-1"
+                            >
+                              {field.label}
+                            </label>
+                            {field.description ? (
+                              <p className="mb-1 text-[10px] text-sky-400/90">
+                                ℹ️ {field.description}
+                              </p>
+                            ) : null}
+                            {field.type === "textarea" ? (
+                              <textarea
+                                id={`input-hal-${field.key}`}
+                                aria-label={field.label}
+                                rows={field.rows || 2}
+                                value={value}
+                                onChange={(e) =>
+                                  setContentMap((prev) => ({
+                                    ...prev,
+                                    [field.key]: e.target.value,
+                                  }))
+                                }
+                                placeholder={field.placeholder}
+                                disabled={!canManage}
+                                className="w-full rounded-xl border border-white/10 bg-slate-800 p-2.5 text-xs text-white focus:border-sky-400 focus:outline-none"
+                              />
+                            ) : (
+                              <input
+                                id={`input-hal-${field.key}`}
+                                aria-label={field.label}
+                                type="text"
+                                value={value}
+                                onChange={(e) =>
+                                  setContentMap((prev) => ({
+                                    ...prev,
+                                    [field.key]: e.target.value,
+                                  }))
+                                }
+                                placeholder={field.placeholder}
+                                disabled={!canManage}
+                                className="w-full rounded-xl border border-white/10 bg-slate-800 p-2.5 text-xs text-white focus:border-sky-400 focus:outline-none"
+                              />
+                            )}
+                          </div>
+                        );
+                      });
+                    })()
+                  : null}
+
+                {halamanTab === "landing" && KOLEKSI_LANDING[landingSubTab] ? (
+                  <CollectionRepeater
+                    label={KOLEKSI_LANDING[landingSubTab].label}
+                    description={KOLEKSI_LANDING[landingSubTab].description}
+                    kunci={KOLEKSI_LANDING[landingSubTab].kunci}
+                    fields={KOLEKSI_LANDING[landingSubTab].fields}
+                    items={
+                      koleksiItems[KOLEKSI_LANDING[landingSubTab].kunci] ?? []
+                    }
+                    maksItem={KOLEKSI_LANDING[landingSubTab].maksItem}
+                    disabled={!canManage}
+                    onChange={(items) =>
+                      setKoleksiItems((prev) => ({
+                        ...prev,
+                        [KOLEKSI_LANDING[landingSubTab].kunci]: items,
+                      }))
+                    }
+                  />
+                ) : null}
+
+                {halamanTab === "landing" ? null : Object.keys(contentMap)
+                    .length === 0 ? (
                   <p className="text-xs text-slate-400">
                     Belum ada data khusus untuk bagian ini.
                   </p>

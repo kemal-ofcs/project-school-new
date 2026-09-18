@@ -21,6 +21,12 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  bangunKoleksi,
+  KUNCI_KOLEKSI,
+  normalisasiFasilitas,
+  uraiKoleksi,
+} from "@/lib/services/landing-collections";
 
 const FASILITAS = [
   {
@@ -127,50 +133,44 @@ export function FacilitiesSection({ konten = {} }: FacilitiesSectionProps) {
     konten["landing.fasilitas_subtitle"] ||
     "Sarana dan prasarana berstandar internasional yang dirancang untuk kenyamanan belajar, kesehatan raga, dan eksplorasi kreativitas tanpa batas.";
 
-  const facilitiesList = [
-    {
-      icon: FASILITAS[0].icon,
-      name: konten["landing.fasilitas1_name"] || FASILITAS[0].name,
-      tag: konten["landing.fasilitas1_tag"] || FASILITAS[0].tag,
-      shortDesc: konten["landing.fasilitas1_desc"] || FASILITAS[0].shortDesc,
-      specs: parseSpecs(konten["landing.fasilitas1_specs"], FASILITAS[0].specs),
-    },
-    {
-      icon: FASILITAS[1].icon,
-      name: konten["landing.fasilitas2_name"] || FASILITAS[1].name,
-      tag: konten["landing.fasilitas2_tag"] || FASILITAS[1].tag,
-      shortDesc: konten["landing.fasilitas2_desc"] || FASILITAS[1].shortDesc,
-      specs: parseSpecs(konten["landing.fasilitas2_specs"], FASILITAS[1].specs),
-    },
-    {
-      icon: FASILITAS[2].icon,
-      name: konten["landing.fasilitas3_name"] || FASILITAS[2].name,
-      tag: konten["landing.fasilitas3_tag"] || FASILITAS[2].tag,
-      shortDesc: konten["landing.fasilitas3_desc"] || FASILITAS[2].shortDesc,
-      specs: parseSpecs(konten["landing.fasilitas3_specs"], FASILITAS[2].specs),
-    },
-    {
-      icon: FASILITAS[3].icon,
-      name: konten["landing.fasilitas4_name"] || FASILITAS[3].name,
-      tag: konten["landing.fasilitas4_tag"] || FASILITAS[3].tag,
-      shortDesc: konten["landing.fasilitas4_desc"] || FASILITAS[3].shortDesc,
-      specs: parseSpecs(konten["landing.fasilitas4_specs"], FASILITAS[3].specs),
-    },
-    {
-      icon: FASILITAS[4].icon,
-      name: konten["landing.fasilitas5_name"] || FASILITAS[4].name,
-      tag: konten["landing.fasilitas5_tag"] || FASILITAS[4].tag,
-      shortDesc: konten["landing.fasilitas5_desc"] || FASILITAS[4].shortDesc,
-      specs: parseSpecs(konten["landing.fasilitas5_specs"], FASILITAS[5].specs),
-    },
-    {
-      icon: FASILITAS[5].icon,
-      name: konten["landing.fasilitas6_name"] || FASILITAS[5].name,
-      tag: konten["landing.fasilitas6_tag"] || FASILITAS[5].tag,
-      shortDesc: konten["landing.fasilitas6_desc"] || FASILITAS[5].shortDesc,
-      specs: parseSpecs(konten["landing.fasilitas6_specs"], FASILITAS[5].specs),
-    },
-  ];
+  // Jumlah fasilitas ditentukan isinya, bukan kode. Kunci bernomor lama tetap
+  // dibaca sebagai lapis kedua supaya konten yang sudah diisi lewat panel versi
+  // sebelumnya tidak lenyap saat aplikasi diperbarui.
+  const fasilitasLama = FASILITAS.map((bawaan, i) => ({
+    name: konten[`landing.fasilitas${i + 1}_name`] || bawaan.name,
+    tag: konten[`landing.fasilitas${i + 1}_tag`] || bawaan.tag,
+    desc: konten[`landing.fasilitas${i + 1}_desc`] || bawaan.shortDesc,
+    specs: parseSpecs(konten[`landing.fasilitas${i + 1}_specs`], bawaan.specs),
+  }));
+  const adaFasilitasLama = FASILITAS.some(
+    (_, i) =>
+      konten[`landing.fasilitas${i + 1}_name`] ||
+      konten[`landing.fasilitas${i + 1}_tag`] ||
+      konten[`landing.fasilitas${i + 1}_desc`] ||
+      konten[`landing.fasilitas${i + 1}_specs`],
+  );
+
+  const fasilitasFinal = bangunKoleksi(
+    uraiKoleksi(konten[KUNCI_KOLEKSI.fasilitas]),
+    adaFasilitasLama ? fasilitasLama : [],
+    FASILITAS.map(({ name, tag, shortDesc, specs }) => ({
+      name,
+      tag,
+      desc: shortDesc,
+      specs: [...specs],
+    })),
+    normalisasiFasilitas,
+  );
+
+  // `shortDesc` dipertahankan sebagai nama field yang dipakai JSX di bawah;
+  // koleksinya menyimpannya sebagai `desc` supaya seragam dengan blok lain.
+  const facilitiesList = fasilitasFinal.map((item, i) => ({
+    icon: FASILITAS[i % FASILITAS.length].icon,
+    name: item.name,
+    tag: item.tag,
+    shortDesc: item.desc,
+    specs: item.specs,
+  }));
 
   const [selectedFacility, setSelectedFacility] = React.useState<
     (typeof facilitiesList)[number] | null

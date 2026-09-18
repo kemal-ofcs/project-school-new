@@ -32,6 +32,7 @@ export function EmployeeCard({ employee, onOpenDetail }: EmployeeCardProps) {
   const idUnik = String(employee.id_unik ?? "-");
   const divisi = String(employee.divisi ?? "-");
   const jabatan = String(employee.jabatan_status ?? "-");
+  const unit = String(employee.unit ?? "").trim();
   const namaShift = String(employee.nama_shift ?? "Belum Ada Shift");
   const statusAktif = String(employee.status_aktif ?? "Aktif");
   const statusBackup = String(employee.status_backup ?? "NORMAL");
@@ -91,6 +92,13 @@ export function EmployeeCard({ employee, onOpenDetail }: EmployeeCardProps) {
 
       {/* Baris Badge Status */}
       <div className="flex items-center gap-2 mt-3 flex-wrap">
+        {/* Badge Unit — hanya muncul bila unitnya sudah diisi; baris lama yang
+            belum punya unit tidak perlu memamerkan kekosongannya di kartu. */}
+        {unit ? (
+          <span className="inline-flex items-center rounded-full border border-violet-500/30 bg-violet-500/10 px-2.5 py-0.5 text-[10px] font-semibold text-violet-300">
+            {unit}
+          </span>
+        ) : null}
         {/* Badge Shift */}
         <span className="inline-flex items-center gap-1 rounded-full border border-sky-500/30 bg-sky-500/10 px-2.5 py-0.5 text-[10px] font-semibold text-sky-300">
           <Icon name="clock" className="size-3" />

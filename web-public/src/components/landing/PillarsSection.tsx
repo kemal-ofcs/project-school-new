@@ -9,6 +9,12 @@ import {
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
+import {
+  bangunKoleksi,
+  KUNCI_KOLEKSI,
+  normalisasiPilar,
+  uraiKoleksi,
+} from "@/lib/services/landing-collections";
 import type { SchoolProfile } from "@/lib/services/school-profile";
 
 const PILAR = [
@@ -54,32 +60,35 @@ export function PillarsSection({ profil, konten = {} }: PillarsSectionProps) {
     konten["landing.pillars_badge"] ||
     "Green & Digital Eco-Campus Bersertifikasi";
 
-  const pillarsData = [
-    {
-      icon: PILAR[0].icon,
-      title: konten["landing.pilar1_title"] || PILAR[0].title,
-      desc: konten["landing.pilar1_desc"] || PILAR[0].desc,
-      tag: konten["landing.pilar1_tag"] || PILAR[0].tag,
-    },
-    {
-      icon: PILAR[1].icon,
-      title: konten["landing.pilar2_title"] || PILAR[1].title,
-      desc: konten["landing.pilar2_desc"] || PILAR[1].desc,
-      tag: konten["landing.pilar2_tag"] || PILAR[1].tag,
-    },
-    {
-      icon: PILAR[2].icon,
-      title: konten["landing.pilar3_title"] || PILAR[2].title,
-      desc: konten["landing.pilar3_desc"] || PILAR[2].desc,
-      tag: konten["landing.pilar3_tag"] || PILAR[2].tag,
-    },
-    {
-      icon: PILAR[3].icon,
-      title: konten["landing.pilar4_title"] || PILAR[3].title,
-      desc: konten["landing.pilar4_desc"] || PILAR[3].desc,
-      tag: konten["landing.pilar4_tag"] || PILAR[3].tag,
-    },
-  ];
+  // Jumlah pilar ditentukan isinya, bukan kode. Kunci bernomor lama tetap
+  // dibaca sebagai lapis kedua supaya konten yang sudah diisi lewat panel versi
+  // sebelumnya tidak lenyap saat aplikasi diperbarui.
+  const pilarLama = PILAR.map((bawaan, i) => ({
+    title: konten[`landing.pilar${i + 1}_title`] || bawaan.title,
+    desc: konten[`landing.pilar${i + 1}_desc`] || bawaan.desc,
+    tag: konten[`landing.pilar${i + 1}_tag`] || bawaan.tag,
+  }));
+  const adaKunciLama = PILAR.some(
+    (_, i) =>
+      konten[`landing.pilar${i + 1}_title`] ||
+      konten[`landing.pilar${i + 1}_desc`] ||
+      konten[`landing.pilar${i + 1}_tag`],
+  );
+
+  const pilarFinal = bangunKoleksi(
+    uraiKoleksi(konten[KUNCI_KOLEKSI.pilar]),
+    adaKunciLama ? pilarLama : [],
+    PILAR.map(({ title, desc, tag }) => ({ title, desc, tag })),
+    normalisasiPilar,
+  );
+
+  // Ikonnya tidak bisa datang dari database — ia komponen React. Paletnya
+  // diputar berdasarkan posisi, sehingga pilar kelima dan seterusnya tetap
+  // punya ikon tanpa menuntut orang yang mengisi konten memilih satu.
+  const pillarsData = pilarFinal.map((item, i) => ({
+    ...item,
+    icon: PILAR[i % PILAR.length].icon,
+  }));
 
   const namaPimpinan =
     konten["landing.sambutan_nama"] || profil.namaPimpinan || "Nanang Kosim";

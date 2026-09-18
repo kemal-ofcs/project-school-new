@@ -311,8 +311,21 @@ export async function readPageContent(
       ...fallback,
       ...dbMap,
     };
-  } catch {
-    // Jika tabel belum siap di database, gunakan fallback default
+  } catch (error) {
+    // Tabelnya belum ada, atau databasenya tidak terjangkau. Situs tetap
+    // dilayani memakai nilai bawaan — halaman publik tidak boleh mati hanya
+    // karena satu tabel CMS belum dibuat.
+    //
+    // Tetapi kegagalannya WAJIB tercatat. Versi pertama menelannya tanpa jejak
+    // apa pun, dan bentuk kegagalannya menyesatkan: admin menyimpan konten,
+    // panel melapor sukses, situs publik tetap menampilkan teks bawaan, dan
+    // tidak ada satu pun tempat yang menjelaskan kenapa. Penyebab paling
+    // sering adalah `TURSO_DATABASE_URL` yang belum disetel di workspace ini —
+    // lihat `web-public/.env.example`.
+    console.error(
+      `[web-public] konten halaman '${cleanHalaman}' gagal dibaca, memakai nilai bawaan:`,
+      error,
+    );
     return fallback;
   }
 }

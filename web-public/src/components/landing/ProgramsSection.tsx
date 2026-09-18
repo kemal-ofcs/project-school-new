@@ -15,6 +15,12 @@ import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  bangunKoleksi,
+  KUNCI_KOLEKSI,
+  normalisasiEkskul,
+  uraiKoleksi,
+} from "@/lib/services/landing-collections";
 import type { ProgramStudi } from "@/lib/services/school-profile";
 
 const EKSKUL = [
@@ -73,44 +79,34 @@ export function ProgramsSection({
     konten["landing.ekskul_subtitle"] ||
     "Pilihan kurikulum terintegrasi dan wadah ekstrakurikuler komprehensif untuk mengasah potensi intelektual, artistik, dan kepemimpinan setiap siswa.";
 
-  const ekskulList = [
-    {
-      icon: EKSKUL[0].icon,
-      title: konten["landing.ekskul1_title"] || EKSKUL[0].title,
-      category: konten["landing.ekskul1_cat"] || EKSKUL[0].category,
-      desc: konten["landing.ekskul1_desc"] || EKSKUL[0].desc,
-    },
-    {
-      icon: EKSKUL[1].icon,
-      title: konten["landing.ekskul2_title"] || EKSKUL[1].title,
-      category: konten["landing.ekskul2_cat"] || EKSKUL[1].category,
-      desc: konten["landing.ekskul2_desc"] || EKSKUL[1].desc,
-    },
-    {
-      icon: EKSKUL[2].icon,
-      title: konten["landing.ekskul3_title"] || EKSKUL[2].title,
-      category: konten["landing.ekskul3_cat"] || EKSKUL[2].category,
-      desc: konten["landing.ekskul3_desc"] || EKSKUL[2].desc,
-    },
-    {
-      icon: EKSKUL[3].icon,
-      title: konten["landing.ekskul4_title"] || EKSKUL[3].title,
-      category: konten["landing.ekskul4_cat"] || EKSKUL[3].category,
-      desc: konten["landing.ekskul4_desc"] || EKSKUL[3].desc,
-    },
-    {
-      icon: EKSKUL[4].icon,
-      title: konten["landing.ekskul5_title"] || EKSKUL[4].title,
-      category: konten["landing.ekskul5_cat"] || EKSKUL[4].category,
-      desc: konten["landing.ekskul5_desc"] || EKSKUL[4].desc,
-    },
-    {
-      icon: EKSKUL[5].icon,
-      title: konten["landing.ekskul6_title"] || EKSKUL[5].title,
-      category: konten["landing.ekskul6_cat"] || EKSKUL[5].category,
-      desc: konten["landing.ekskul6_desc"] || EKSKUL[5].desc,
-    },
-  ];
+  // Jumlah ekstrakurikuler ditentukan isinya, bukan kode. Kunci bernomor lama
+  // tetap dibaca sebagai lapis kedua supaya konten yang sudah diisi lewat panel
+  // versi sebelumnya tidak lenyap saat aplikasi diperbarui.
+  const ekskulLama = EKSKUL.map((bawaan, i) => ({
+    title: konten[`landing.ekskul${i + 1}_title`] || bawaan.title,
+    category: konten[`landing.ekskul${i + 1}_cat`] || bawaan.category,
+    desc: konten[`landing.ekskul${i + 1}_desc`] || bawaan.desc,
+  }));
+  const adaEkskulLama = EKSKUL.some(
+    (_, i) =>
+      konten[`landing.ekskul${i + 1}_title`] ||
+      konten[`landing.ekskul${i + 1}_cat`] ||
+      konten[`landing.ekskul${i + 1}_desc`],
+  );
+
+  const ekskulFinal = bangunKoleksi(
+    uraiKoleksi(konten[KUNCI_KOLEKSI.ekskul]),
+    adaEkskulLama ? ekskulLama : [],
+    EKSKUL.map(({ title, category, desc }) => ({ title, category, desc })),
+    normalisasiEkskul,
+  );
+
+  // Ikon diputar berdasarkan posisi: ia komponen React, tidak bisa disimpan di
+  // database, dan item ke-N di luar bawaan tetap harus punya satu.
+  const ekskulList = ekskulFinal.map((item, i) => ({
+    ...item,
+    icon: EKSKUL[i % EKSKUL.length].icon,
+  }));
 
   return (
     <section className="py-20 sm:py-28 bg-muted/40 border-y border-border">

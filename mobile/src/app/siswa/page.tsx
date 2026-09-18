@@ -35,7 +35,12 @@ import { useConfirmDialog } from "@/lib/hooks/useConfirmDialog";
 import { useDebounce } from "@/lib/hooks/useDebounce";
 import { useHydrated } from "@/lib/hooks/useHydrated";
 import { normalizeOperatorPhone } from "@/lib/operators/contact";
-import { STATUS_SISWA, shiftLabel } from "@/lib/validations/personnel";
+import {
+  opsiFilterUnit,
+  STATUS_SISWA,
+  shiftLabel,
+  TANPA_UNIT,
+} from "@/lib/validations/personnel";
 
 function emptyForm(idRombel = "", idShift?: number): SiswaInput {
   return {
@@ -87,6 +92,7 @@ export default function SiswaMobilePage() {
   const debouncedSearch = useDebounce(search, 200);
   const [filterRombel, setFilterRombel] = useState("");
   const [filterStatus, setFilterStatus] = useState("");
+  const [filterUnit, setFilterUnit] = useState("");
 
   const [detail, setDetail] = useState<Record<string, unknown> | null>(null);
   const [qrPng, setQrPng] = useState<string | null>(null);
@@ -168,6 +174,16 @@ export default function SiswaMobilePage() {
     const q = debouncedSearch.trim().toLowerCase();
     return siswa.filter((item) => {
       if (filterStatus && String(item.status) !== filterStatus) return false;
+      if (filterUnit) {
+        const unitBaris = String(item.unit || "").trim();
+        if (
+          filterUnit === TANPA_UNIT
+            ? unitBaris !== ""
+            : unitBaris !== filterUnit
+        ) {
+          return false;
+        }
+      }
       if (!q) return true;
       return [item.nama_lengkap, item.nis, item.nisn, item.nama_wali].some(
         (field) =>
@@ -176,7 +192,12 @@ export default function SiswaMobilePage() {
             .includes(q),
       );
     });
-  }, [siswa, debouncedSearch, filterStatus]);
+  }, [siswa, debouncedSearch, filterStatus, filterUnit]);
+
+  const unitOptions = useMemo(
+    () => opsiFilterUnit(unitList, siswa),
+    [unitList, siswa],
+  );
 
   const handleShowQr = useCallback(async (item: Record<string, unknown>) => {
     setDetail(item);
@@ -543,6 +564,20 @@ export default function SiswaMobilePage() {
           ))}
         </select>
         <select
+          value={filterUnit}
+          onChange={(e) => setFilterUnit(e.target.value)}
+          aria-label="Saring berdasarkan unit"
+          className="shrink-0 rounded-xl border border-white/10 bg-slate-800/60 px-3 py-2 text-xs font-semibold text-white outline-none focus:border-sky-500"
+        >
+          <option value="">Semua Unit</option>
+          <option value={TANPA_UNIT}>(Tanpa unit)</option>
+          {unitOptions.map((nama) => (
+            <option key={nama} value={nama}>
+              {nama}
+            </option>
+          ))}
+        </select>
+        <select
           value={filterStatus}
           onChange={(e) => setFilterStatus(e.target.value)}
           aria-label="Saring berdasarkan status"
@@ -600,6 +635,11 @@ export default function SiswaMobilePage() {
                       {String(item.nama_rombel || "-")}
                     </p>
                     <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                      {item.unit ? (
+                        <span className="rounded-lg border border-violet-500/20 bg-violet-500/10 px-2 py-0.5 text-[10px] font-bold text-violet-300">
+                          {String(item.unit)}
+                        </span>
+                      ) : null}
                       <span
                         className={`rounded-lg px-2 py-0.5 text-[10px] font-bold ${
                           String(item.status) === "Aktif"

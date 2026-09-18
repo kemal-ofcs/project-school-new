@@ -35,6 +35,11 @@ const filesToCopy = [
   "components/AutoAlfaRunner.tsx",
   "components/AutoSyncRunner.tsx",
   "components/LivenessCapture.tsx",
+  // Editor koleksi berulang CMS landing. Tidak punya perilaku khusus platform
+  // dan bentuk datanya adalah kontrak dengan situs publik, jadi ia disalin
+  // apa adanya alih-alih diduplikasi - dua salinan akan saling menyimpang
+  // persis di tempat yang paling mahal, yaitu nama field JSON-nya.
+  "components/content/CollectionRepeater.tsx",
 ];
 
 for (const file of filesToCopy) {

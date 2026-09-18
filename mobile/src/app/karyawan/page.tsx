@@ -22,6 +22,7 @@ import { getDaftarShift } from "@/lib/gateways/shift";
 import { subscribeSyncCompleted } from "@/lib/gateways/sync-status";
 import { useDebounce } from "@/lib/hooks/useDebounce";
 import { useHydrated } from "@/lib/hooks/useHydrated";
+import { opsiFilterUnit, TANPA_UNIT } from "@/lib/validations/personnel";
 
 type FilterStatus = "" | "Aktif" | "Nonaktif";
 type FilterBackup = "" | "BACKUP" | "NORMAL";
@@ -57,6 +58,7 @@ export default function KaryawanPage() {
   const debouncedSearch = useDebounce(search, 200);
   const [filterStatus, setFilterStatus] = useState<FilterStatus>("");
   const [filterBackup, setFilterBackup] = useState<FilterBackup>("");
+  const [filterUnit, setFilterUnit] = useState<string>("");
 
   // ─── Modal State ────────────────────────────────────────────────────────────
   const [detailEmployee, setDetailEmployee] = useState<Record<
@@ -137,11 +139,31 @@ export default function KaryawanPage() {
   // Filter status_backup dilakukan di sisi klien karena tidak tersedia
   // sebagai parameter di gateway backend — aman untuk < 1000 baris.
   const filteredEmployees = useMemo(() => {
-    if (!filterBackup) return employees;
-    return employees.filter(
-      (emp) => String(emp.status_backup ?? "NORMAL") === filterBackup,
-    );
-  }, [employees, filterBackup]);
+    return employees.filter((emp) => {
+      if (
+        filterBackup &&
+        String(emp.status_backup ?? "NORMAL") !== filterBackup
+      ) {
+        return false;
+      }
+      if (filterUnit) {
+        const unitBaris = String(emp.unit || "").trim();
+        if (
+          filterUnit === TANPA_UNIT
+            ? unitBaris !== ""
+            : unitBaris !== filterUnit
+        ) {
+          return false;
+        }
+      }
+      return true;
+    });
+  }, [employees, filterBackup, filterUnit]);
+
+  const unitOptions = useMemo(
+    () => opsiFilterUnit(units, employees),
+    [units, employees],
+  );
 
   // ─── Handler: Toggle Status ─────────────────────────────────────────────────
   const handleToggleStatus = useCallback(
@@ -370,6 +392,26 @@ export default function KaryawanPage() {
             {item.label}
           </button>
         ))}
+
+        {/* Pemisah visual */}
+        <div className="shrink-0 w-px bg-white/10 self-stretch" />
+
+        {/* Filter Unit — dropdown, bukan chip: jumlah unitnya ditentukan
+            sekolah dan bisa jauh lebih banyak daripada tiga pilihan tetap. */}
+        <select
+          value={filterUnit}
+          onChange={(e) => setFilterUnit(e.target.value)}
+          aria-label="Saring berdasarkan unit"
+          className="shrink-0 rounded-full border border-white/10 bg-white/[0.04] px-3 py-1.5 text-[11px] font-bold text-slate-300 outline-none focus:border-sky-500"
+        >
+          <option value="">Semua Unit</option>
+          <option value={TANPA_UNIT}>(Tanpa unit)</option>
+          {unitOptions.map((nama) => (
+            <option key={nama} value={nama}>
+              {nama}
+            </option>
+          ))}
+        </select>
       </div>
 
       {/* ── Feedback Banners ── */}

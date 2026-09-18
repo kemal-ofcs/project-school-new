@@ -10,6 +10,12 @@ import {
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import {
+  bangunKoleksi,
+  KUNCI_KOLEKSI,
+  normalisasiStat,
+  uraiKoleksi,
+} from "@/lib/services/landing-collections";
 import type { GelombangAktif } from "@/lib/services/pmb";
 
 interface HeroSectionProps {
@@ -30,21 +36,39 @@ export function HeroSection({
   const heroBadge =
     konten["landing.hero_badge"] || "Akreditasi A Unggul (BAN-SM)";
 
-  const stat1Label = konten["landing.stat1_label"] || "Akreditasi A";
-  const stat1Value = konten["landing.stat1_value"] || "98 / 100";
-  const stat1Sub = konten["landing.stat1_sub"] || "BAN-SM Predikat Unggul";
+  // Jumlah kartu statistik ditentukan isinya, bukan kode. Ikonnya tetap di sini
+  // karena ia komponen React; paletnya diputar berdasarkan posisi supaya kartu
+  // kelima dan seterusnya tetap punya ikon.
+  const STAT_BAWAAN = [
+    { label: "Akreditasi A", value: "98 / 100", sub: "BAN-SM Predikat Unggul" },
+    {
+      label: "Lulusan PTN/LN",
+      value: "98.4%",
+      sub: "UI, ITB, UGM & Luar Negeri",
+    },
+    { label: "Prestasi 2024", value: "150+", sub: "Tingkat Nasional & Dunia" },
+    { label: "Komunitas", value: "1.250+", sub: "Siswa & Alumni Aktif" },
+  ];
+  const IKON_STAT = [Award, GraduationCap, Trophy, Users];
 
-  const stat2Label = konten["landing.stat2_label"] || "Lulusan PTN/LN";
-  const stat2Value = konten["landing.stat2_value"] || "98.4%";
-  const stat2Sub = konten["landing.stat2_sub"] || "UI, ITB, UGM & Luar Negeri";
+  const statLama = STAT_BAWAAN.map((bawaan, i) => ({
+    label: konten[`landing.stat${i + 1}_label`] || bawaan.label,
+    value: konten[`landing.stat${i + 1}_value`] || bawaan.value,
+    sub: konten[`landing.stat${i + 1}_sub`] || bawaan.sub,
+  }));
+  const adaStatLama = STAT_BAWAAN.some(
+    (_, i) =>
+      konten[`landing.stat${i + 1}_label`] ||
+      konten[`landing.stat${i + 1}_value`] ||
+      konten[`landing.stat${i + 1}_sub`],
+  );
 
-  const stat3Label = konten["landing.stat3_label"] || "Prestasi 2024";
-  const stat3Value = konten["landing.stat3_value"] || "150+";
-  const stat3Sub = konten["landing.stat3_sub"] || "Tingkat Nasional & Dunia";
-
-  const stat4Label = konten["landing.stat4_label"] || "Komunitas";
-  const stat4Value = konten["landing.stat4_value"] || "1.250+";
-  const stat4Sub = konten["landing.stat4_sub"] || "Siswa & Alumni Aktif";
+  const statsData = bangunKoleksi(
+    uraiKoleksi(konten[KUNCI_KOLEKSI.stat]),
+    adaStatLama ? statLama : [],
+    STAT_BAWAAN,
+    normalisasiStat,
+  ).map((item, i) => ({ ...item, Ikon: IKON_STAT[i % IKON_STAT.length] }));
 
   return (
     <section className="relative overflow-hidden bg-primary text-primary-foreground py-16 sm:py-24 lg:py-28">
@@ -131,57 +155,23 @@ export function HeroSection({
 
         {/* Quick Stats Strip */}
         <div className="w-full pt-8 grid grid-cols-2 md:grid-cols-4 gap-4">
-          <div className="rounded-xl bg-white/10 p-5 backdrop-blur-md border border-white/10 space-y-1">
-            <div className="flex items-center gap-1.5 text-secondary-container">
-              <Award className="h-4 w-4" />
-              <span className="font-semibold text-xs uppercase tracking-wider">
-                {stat1Label}
-              </span>
+          {statsData.map((stat) => (
+            <div
+              key={`${stat.label}-${stat.value}`}
+              className="rounded-xl bg-white/10 p-5 backdrop-blur-md border border-white/10 space-y-1"
+            >
+              <div className="flex items-center gap-1.5 text-secondary-container">
+                <stat.Ikon className="h-4 w-4" />
+                <span className="font-semibold text-xs uppercase tracking-wider">
+                  {stat.label}
+                </span>
+              </div>
+              <p className="font-extrabold text-2xl sm:text-3xl text-white">
+                {stat.value}
+              </p>
+              <p className="text-xs text-white/70">{stat.sub}</p>
             </div>
-            <p className="font-extrabold text-2xl sm:text-3xl text-white">
-              {stat1Value}
-            </p>
-            <p className="text-xs text-white/70">{stat1Sub}</p>
-          </div>
-
-          <div className="rounded-xl bg-white/10 p-5 backdrop-blur-md border border-white/10 space-y-1">
-            <div className="flex items-center gap-1.5 text-secondary-container">
-              <GraduationCap className="h-4 w-4" />
-              <span className="font-semibold text-xs uppercase tracking-wider">
-                {stat2Label}
-              </span>
-            </div>
-            <p className="font-extrabold text-2xl sm:text-3xl text-white">
-              {stat2Value}
-            </p>
-            <p className="text-xs text-white/70">{stat2Sub}</p>
-          </div>
-
-          <div className="rounded-xl bg-white/10 p-5 backdrop-blur-md border border-white/10 space-y-1">
-            <div className="flex items-center gap-1.5 text-secondary-container">
-              <Trophy className="h-4 w-4" />
-              <span className="font-semibold text-xs uppercase tracking-wider">
-                {stat3Label}
-              </span>
-            </div>
-            <p className="font-extrabold text-2xl sm:text-3xl text-white">
-              {stat3Value}
-            </p>
-            <p className="text-xs text-white/70">{stat3Sub}</p>
-          </div>
-
-          <div className="rounded-xl bg-white/10 p-5 backdrop-blur-md border border-white/10 space-y-1">
-            <div className="flex items-center gap-1.5 text-secondary-container">
-              <Users className="h-4 w-4" />
-              <span className="font-semibold text-xs uppercase tracking-wider">
-                {stat4Label}
-              </span>
-            </div>
-            <p className="font-extrabold text-2xl sm:text-3xl text-white">
-              {stat4Value}
-            </p>
-            <p className="text-xs text-white/70">{stat4Sub}</p>
-          </div>
+          ))}
         </div>
       </div>
     </section>
