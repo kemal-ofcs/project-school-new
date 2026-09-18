@@ -52,16 +52,17 @@ export default async function Beranda() {
         gelombangAktif={gelombangAktif}
         heroTitle={kontenLanding["landing.hero_title"]}
         heroSubtitle={kontenLanding["landing.hero_subtitle"]}
+        konten={kontenLanding}
       />
 
       {/* 2. 4 Pilar Keunggulan & Sambutan Pimpinan */}
-      <PillarsSection profil={profil} />
+      <PillarsSection profil={profil} konten={kontenLanding} />
 
       {/* 3. Program Keahlian / Jurusan (Dari DB) & Ekstrakurikuler */}
-      <ProgramsSection programStudi={programStudi} />
+      <ProgramsSection programStudi={programStudi} konten={kontenLanding} />
 
       {/* 4. Fasilitas Kampus Unggulan dengan Modal Preview */}
-      <FacilitiesSection />
+      <FacilitiesSection konten={kontenLanding} />
 
       {/* 5. Alur PMB 4 Tahapan & Rincian Gelombang Aktif */}
       <PmbOverviewSection gelombangAktif={gelombangAktif} />

@@ -8,6 +8,7 @@ import { Icon } from "@/components/ui/Icon";
 import { Modal } from "@/components/ui/Modal";
 import { canAccessArea, hasPermission } from "@/lib/auth/access";
 import { triggerHaptic } from "@/lib/client/haptics";
+import { LANDING_PAGE_SUBSECTIONS } from "@/lib/constants/landing-cms-fields";
 import { useAuth } from "@/lib/context/AuthContext";
 import {
   type ArticleDraft,
@@ -64,6 +65,7 @@ export default function KontenMobilePage() {
   const [halamanTab, setHalamanTab] = useState<
     "profil" | "kontak" | "program" | "landing"
   >("profil");
+  const [landingSubTab, setLandingSubTab] = useState<string>("hero_stats");
   const [contentMap, setContentMap] = useState<PageContentMap>({});
   const [loadingHalaman, setLoadingHalaman] = useState(false);
 
@@ -387,13 +389,94 @@ export default function KontenMobilePage() {
               ))}
             </div>
 
+            {/* Sub-tab khusus Landing Page di Mobile */}
+            {halamanTab === "landing" && (
+              <div className="flex overflow-x-auto gap-1.5 pb-1">
+                {LANDING_PAGE_SUBSECTIONS.map((sub) => (
+                  <button
+                    key={sub.id}
+                    type="button"
+                    onClick={() => {
+                      triggerHaptic("light");
+                      setLandingSubTab(sub.id);
+                    }}
+                    className={`whitespace-nowrap rounded-xl px-2.5 py-1 text-[11px] font-bold transition ${
+                      landingSubTab === sub.id
+                        ? "bg-sky-500 text-slate-950 shadow"
+                        : "bg-slate-800 text-slate-400 hover:text-white"
+                    }`}
+                  >
+                    {sub.title}
+                  </button>
+                ))}
+              </div>
+            )}
+
             {loadingHalaman ? (
               <p className="py-8 text-center text-xs text-slate-400">
                 Memuat data...
               </p>
             ) : (
               <div className="rounded-2xl border border-white/10 bg-slate-900 p-4 space-y-3">
-                {Object.keys(contentMap).length === 0 ? (
+                {halamanTab === "landing" ? (
+                  (() => {
+                    const currentSub =
+                      LANDING_PAGE_SUBSECTIONS.find(
+                        (s) => s.id === landingSubTab,
+                      ) ?? LANDING_PAGE_SUBSECTIONS[0];
+                    return currentSub.fields.map((field) => {
+                      const value = contentMap[field.key] ?? "";
+                      return (
+                        <div key={field.key}>
+                          <label
+                            htmlFor={`input-hal-${field.key}`}
+                            className="block text-[11px] font-bold text-slate-300 mb-1"
+                          >
+                            {field.label}
+                          </label>
+                          {field.description ? (
+                            <p className="mb-1 text-[10px] text-sky-400/90">
+                              ℹ️ {field.description}
+                            </p>
+                          ) : null}
+                          {field.type === "textarea" ? (
+                            <textarea
+                              id={`input-hal-${field.key}`}
+                              aria-label={field.label}
+                              rows={field.rows || 2}
+                              value={value}
+                              onChange={(e) =>
+                                setContentMap((prev) => ({
+                                  ...prev,
+                                  [field.key]: e.target.value,
+                                }))
+                              }
+                              placeholder={field.placeholder}
+                              disabled={!canManage}
+                              className="w-full rounded-xl border border-white/10 bg-slate-800 p-2.5 text-xs text-white focus:border-sky-400 focus:outline-none"
+                            />
+                          ) : (
+                            <input
+                              id={`input-hal-${field.key}`}
+                              aria-label={field.label}
+                              type="text"
+                              value={value}
+                              onChange={(e) =>
+                                setContentMap((prev) => ({
+                                  ...prev,
+                                  [field.key]: e.target.value,
+                                }))
+                              }
+                              placeholder={field.placeholder}
+                              disabled={!canManage}
+                              className="w-full rounded-xl border border-white/10 bg-slate-800 p-2.5 text-xs text-white focus:border-sky-400 focus:outline-none"
+                            />
+                          )}
+                        </div>
+                      );
+                    });
+                  })()
+                ) : Object.keys(contentMap).length === 0 ? (
                   <p className="text-xs text-slate-400">
                     Belum ada data khusus untuk bagian ini.
                   </p>

@@ -58,9 +58,60 @@ const EKSKUL = [
 
 interface ProgramsSectionProps {
   programStudi: ProgramStudi[];
+  konten?: Record<string, string>;
 }
 
-export function ProgramsSection({ programStudi }: ProgramsSectionProps) {
+export function ProgramsSection({
+  programStudi,
+  konten = {},
+}: ProgramsSectionProps) {
+  const eyebrow =
+    konten["landing.ekskul_eyebrow"] || "Eksplorasi Minat & Bakat";
+  const title =
+    konten["landing.ekskul_title"] || "Program Akademik & Pengembangan Diri";
+  const subtitle =
+    konten["landing.ekskul_subtitle"] ||
+    "Pilihan kurikulum terintegrasi dan wadah ekstrakurikuler komprehensif untuk mengasah potensi intelektual, artistik, dan kepemimpinan setiap siswa.";
+
+  const ekskulList = [
+    {
+      icon: EKSKUL[0].icon,
+      title: konten["landing.ekskul1_title"] || EKSKUL[0].title,
+      category: konten["landing.ekskul1_cat"] || EKSKUL[0].category,
+      desc: konten["landing.ekskul1_desc"] || EKSKUL[0].desc,
+    },
+    {
+      icon: EKSKUL[1].icon,
+      title: konten["landing.ekskul2_title"] || EKSKUL[1].title,
+      category: konten["landing.ekskul2_cat"] || EKSKUL[1].category,
+      desc: konten["landing.ekskul2_desc"] || EKSKUL[1].desc,
+    },
+    {
+      icon: EKSKUL[2].icon,
+      title: konten["landing.ekskul3_title"] || EKSKUL[2].title,
+      category: konten["landing.ekskul3_cat"] || EKSKUL[2].category,
+      desc: konten["landing.ekskul3_desc"] || EKSKUL[2].desc,
+    },
+    {
+      icon: EKSKUL[3].icon,
+      title: konten["landing.ekskul4_title"] || EKSKUL[3].title,
+      category: konten["landing.ekskul4_cat"] || EKSKUL[3].category,
+      desc: konten["landing.ekskul4_desc"] || EKSKUL[3].desc,
+    },
+    {
+      icon: EKSKUL[4].icon,
+      title: konten["landing.ekskul5_title"] || EKSKUL[4].title,
+      category: konten["landing.ekskul5_cat"] || EKSKUL[4].category,
+      desc: konten["landing.ekskul5_desc"] || EKSKUL[4].desc,
+    },
+    {
+      icon: EKSKUL[5].icon,
+      title: konten["landing.ekskul6_title"] || EKSKUL[5].title,
+      category: konten["landing.ekskul6_cat"] || EKSKUL[5].category,
+      desc: konten["landing.ekskul6_desc"] || EKSKUL[5].desc,
+    },
+  ];
+
   return (
     <section className="py-20 sm:py-28 bg-muted/40 border-y border-border">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 space-y-12">
@@ -68,15 +119,13 @@ export function ProgramsSection({ programStudi }: ProgramsSectionProps) {
         <div className="text-center max-w-2xl mx-auto space-y-3">
           <div className="inline-flex items-center gap-1.5 text-xs font-bold uppercase tracking-widest text-secondary">
             <Layers className="h-3.5 w-3.5" />
-            <span>Eksplorasi Minat & Bakat</span>
+            <span>{eyebrow}</span>
           </div>
           <h2 className="font-bold text-2xl sm:text-4xl text-foreground tracking-tight">
-            Program Akademik & Pengembangan Diri
+            {title}
           </h2>
           <p className="text-sm sm:text-base text-muted-foreground leading-relaxed">
-            Pilihan kurikulum terintegrasi dan wadah ekstrakurikuler
-            komprehensif untuk mengasah potensi intelektual, artistik, dan
-            kepemimpinan setiap siswa.
+            {subtitle}
           </p>
         </div>
 
@@ -145,7 +194,7 @@ export function ProgramsSection({ programStudi }: ProgramsSectionProps) {
           {/* Tab 2: Ekstrakurikuler */}
           <TabsContent value="ekskul">
             <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
-              {EKSKUL.map((item) => {
+              {ekskulList.map((item) => {
                 const Icon = item.icon;
                 return (
                   <Card

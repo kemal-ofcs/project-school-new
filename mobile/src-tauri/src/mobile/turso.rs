@@ -7005,7 +7005,7 @@ impl TursoClient {
             .into_iter()
             .next()
             .ok_or_else(|| CommandError::new("NOT_FOUND", "Artikel berita tidak ditemukan."))?;
-        Ok(json!(row))
+        Ok(json!({ "article": row }))
     }
 
     #[allow(dead_code)]

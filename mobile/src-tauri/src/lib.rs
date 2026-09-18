@@ -278,6 +278,7 @@ pub fn run() {
             mobile::commands::desktop_delete_article,
             mobile::commands::desktop_get_page_content,
             mobile::commands::desktop_save_page_content,
+            mobile::commands::desktop_open_external_url,
         ])
         .run(tauri::generate_context!())
         .unwrap_or_else(|error| {

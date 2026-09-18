@@ -17,6 +17,7 @@ interface HeroSectionProps {
   gelombangAktif: GelombangAktif | null;
   heroTitle?: string;
   heroSubtitle?: string;
+  konten?: Record<string, string>;
 }
 
 export function HeroSection({
@@ -24,7 +25,27 @@ export function HeroSection({
   gelombangAktif,
   heroTitle,
   heroSubtitle,
+  konten = {},
 }: HeroSectionProps) {
+  const heroBadge =
+    konten["landing.hero_badge"] || "Akreditasi A Unggul (BAN-SM)";
+
+  const stat1Label = konten["landing.stat1_label"] || "Akreditasi A";
+  const stat1Value = konten["landing.stat1_value"] || "98 / 100";
+  const stat1Sub = konten["landing.stat1_sub"] || "BAN-SM Predikat Unggul";
+
+  const stat2Label = konten["landing.stat2_label"] || "Lulusan PTN/LN";
+  const stat2Value = konten["landing.stat2_value"] || "98.4%";
+  const stat2Sub = konten["landing.stat2_sub"] || "UI, ITB, UGM & Luar Negeri";
+
+  const stat3Label = konten["landing.stat3_label"] || "Prestasi 2024";
+  const stat3Value = konten["landing.stat3_value"] || "150+";
+  const stat3Sub = konten["landing.stat3_sub"] || "Tingkat Nasional & Dunia";
+
+  const stat4Label = konten["landing.stat4_label"] || "Komunitas";
+  const stat4Value = konten["landing.stat4_value"] || "1.250+";
+  const stat4Sub = konten["landing.stat4_sub"] || "Siswa & Alumni Aktif";
+
   return (
     <section className="relative overflow-hidden bg-primary text-primary-foreground py-16 sm:py-24 lg:py-28">
       {/* Background Decorative Pattern */}
@@ -70,7 +91,9 @@ export function HeroSection({
         <div className="max-w-3xl space-y-4">
           <div className="inline-flex items-center gap-2 rounded-lg bg-accent/80 px-3 py-1 text-xs font-semibold text-white backdrop-blur-sm">
             <CheckCircle2 className="h-3.5 w-3.5" />
-            <span>Akreditasi A Unggul (BAN-SM) • {namaSekolah}</span>
+            <span>
+              {heroBadge} • {namaSekolah}
+            </span>
           </div>
 
           <h1 className="font-extrabold text-3xl tracking-tight sm:text-5xl lg:text-6xl text-white leading-tight">
@@ -112,52 +135,52 @@ export function HeroSection({
             <div className="flex items-center gap-1.5 text-secondary-container">
               <Award className="h-4 w-4" />
               <span className="font-semibold text-xs uppercase tracking-wider">
-                Akreditasi A
+                {stat1Label}
               </span>
             </div>
             <p className="font-extrabold text-2xl sm:text-3xl text-white">
-              98 / 100
+              {stat1Value}
             </p>
-            <p className="text-xs text-white/70">BAN-SM Predikat Unggul</p>
+            <p className="text-xs text-white/70">{stat1Sub}</p>
           </div>
 
           <div className="rounded-xl bg-white/10 p-5 backdrop-blur-md border border-white/10 space-y-1">
             <div className="flex items-center gap-1.5 text-secondary-container">
               <GraduationCap className="h-4 w-4" />
               <span className="font-semibold text-xs uppercase tracking-wider">
-                Lulusan PTN/LN
+                {stat2Label}
               </span>
             </div>
             <p className="font-extrabold text-2xl sm:text-3xl text-white">
-              98.4%
+              {stat2Value}
             </p>
-            <p className="text-xs text-white/70">UI, ITB, UGM & Luar Negeri</p>
+            <p className="text-xs text-white/70">{stat2Sub}</p>
           </div>
 
           <div className="rounded-xl bg-white/10 p-5 backdrop-blur-md border border-white/10 space-y-1">
             <div className="flex items-center gap-1.5 text-secondary-container">
               <Trophy className="h-4 w-4" />
               <span className="font-semibold text-xs uppercase tracking-wider">
-                Prestasi 2024
+                {stat3Label}
               </span>
             </div>
             <p className="font-extrabold text-2xl sm:text-3xl text-white">
-              150+
+              {stat3Value}
             </p>
-            <p className="text-xs text-white/70">Tingkat Nasional & Dunia</p>
+            <p className="text-xs text-white/70">{stat3Sub}</p>
           </div>
 
           <div className="rounded-xl bg-white/10 p-5 backdrop-blur-md border border-white/10 space-y-1">
             <div className="flex items-center gap-1.5 text-secondary-container">
               <Users className="h-4 w-4" />
               <span className="font-semibold text-xs uppercase tracking-wider">
-                Komunitas
+                {stat4Label}
               </span>
             </div>
             <p className="font-extrabold text-2xl sm:text-3xl text-white">
-              1.250+
+              {stat4Value}
             </p>
-            <p className="text-xs text-white/70">Siswa & Alumni Aktif</p>
+            <p className="text-xs text-white/70">{stat4Sub}</p>
           </div>
         </div>
       </div>

@@ -40,11 +40,61 @@ const PILAR = [
 
 interface PillarsSectionProps {
   profil: SchoolProfile;
+  konten?: Record<string, string>;
 }
 
-export function PillarsSection({ profil }: PillarsSectionProps) {
-  const namaPimpinan = profil.namaPimpinan ?? "Dr. H. Bambang Sudarmono, M.Pd.";
-  const jabatanPimpinan = profil.jabatanPimpinan ?? "Kepala Sekolah";
+export function PillarsSection({ profil, konten = {} }: PillarsSectionProps) {
+  const eyebrow = konten["landing.pillars_eyebrow"] || "Keunggulan Institusi";
+  const title =
+    konten["landing.pillars_title"] || "4 Pilar Pendidikan Masa Depan";
+  const subtitle =
+    konten["landing.pillars_subtitle"] ||
+    "Kami memadukan ketangguhan moral spiritual, kurikulum berstandar internasional, serta ekosistem pembelajaran modern untuk melahirkan inovator muda yang berakhlak mulia.";
+  const badgePill =
+    konten["landing.pillars_badge"] ||
+    "Green & Digital Eco-Campus Bersertifikasi";
+
+  const pillarsData = [
+    {
+      icon: PILAR[0].icon,
+      title: konten["landing.pilar1_title"] || PILAR[0].title,
+      desc: konten["landing.pilar1_desc"] || PILAR[0].desc,
+      tag: konten["landing.pilar1_tag"] || PILAR[0].tag,
+    },
+    {
+      icon: PILAR[1].icon,
+      title: konten["landing.pilar2_title"] || PILAR[1].title,
+      desc: konten["landing.pilar2_desc"] || PILAR[1].desc,
+      tag: konten["landing.pilar2_tag"] || PILAR[1].tag,
+    },
+    {
+      icon: PILAR[2].icon,
+      title: konten["landing.pilar3_title"] || PILAR[2].title,
+      desc: konten["landing.pilar3_desc"] || PILAR[2].desc,
+      tag: konten["landing.pilar3_tag"] || PILAR[2].tag,
+    },
+    {
+      icon: PILAR[3].icon,
+      title: konten["landing.pilar4_title"] || PILAR[3].title,
+      desc: konten["landing.pilar4_desc"] || PILAR[3].desc,
+      tag: konten["landing.pilar4_tag"] || PILAR[3].tag,
+    },
+  ];
+
+  const namaPimpinan =
+    konten["landing.sambutan_nama"] || profil.namaPimpinan || "Nanang Kosim";
+  const jabatanPimpinan =
+    konten["landing.sambutan_jabatan"] ||
+    profil.jabatanPimpinan ||
+    "Kepala Yayasan";
+  const badgePimpinan =
+    konten["landing.sambutan_badge"] || "Dewan Pembina Kurikulum";
+  const sambutanQuote =
+    konten["landing.sambutan_quote"] ||
+    "“Pendidikan sejati bukan sekadar mengisi wadah pengetahuan, melainkan menyalakan api keingintahuan, memperkuat kompas moral, dan membekali anak-anak kita dengan keberanian untuk menjadi pemecah masalah di panggung global.”";
+  const sambutanBody =
+    konten["landing.sambutan_body"] ||
+    "Kami menyambut hangat setiap calon siswa dan orang tua untuk bertumbuh bersama dalam keluarga besar sekolah kami. Mari persiapkan generasi emas yang mandiri, berkarakter, dan berdaya saing internasional.";
 
   return (
     <section className="py-20 sm:py-28 bg-background">
@@ -54,26 +104,24 @@ export function PillarsSection({ profil }: PillarsSectionProps) {
           <div className="max-w-2xl space-y-2">
             <div className="inline-flex items-center gap-1.5 text-xs font-bold uppercase tracking-widest text-secondary">
               <Sparkles className="h-3.5 w-3.5" />
-              <span>Keunggulan Institusi</span>
+              <span>{eyebrow}</span>
             </div>
             <h2 className="font-bold text-2xl sm:text-4xl text-foreground tracking-tight">
-              4 Pilar Pendidikan Masa Depan
+              {title}
             </h2>
             <p className="text-sm sm:text-base text-muted-foreground leading-relaxed">
-              Kami memadukan ketangguhan moral spiritual, kurikulum berstandar
-              internasional, serta ekosistem pembelajaran modern untuk
-              melahirkan inovator muda yang berakhlak mulia.
+              {subtitle}
             </p>
           </div>
           <div className="hidden lg:flex items-center gap-2 text-xs font-semibold text-accent rounded-full bg-muted px-4 py-2">
             <ShieldCheck className="h-4 w-4" />
-            <span>Green & Digital Eco-Campus Bersertifikasi</span>
+            <span>{badgePill}</span>
           </div>
         </div>
 
         {/* 4 Pillars Grid */}
         <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
-          {PILAR.map((item) => {
+          {pillarsData.map((item) => {
             const Icon = item.icon;
             return (
               <Card
@@ -105,7 +153,7 @@ export function PillarsSection({ profil }: PillarsSectionProps) {
           })}
         </div>
 
-        {/* Sambutan Kepala Sekolah */}
+        {/* Sambutan Pimpinan Sekolah / Yayasan */}
         <div className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
           <div className="grid grid-cols-1 md:grid-cols-12 items-center">
             {/* Foto / Ilustrasi Pimpinan */}
@@ -120,7 +168,7 @@ export function PillarsSection({ profil }: PillarsSectionProps) {
                 {jabatanPimpinan}
               </p>
               <Badge variant="success" className="mt-3 text-[10px]">
-                Dewan Pembina Kurikulum
+                {badgePimpinan}
               </Badge>
             </div>
 
@@ -128,16 +176,10 @@ export function PillarsSection({ profil }: PillarsSectionProps) {
             <div className="md:col-span-8 p-6 sm:p-10 space-y-4">
               <Quote className="h-8 w-8 text-primary/30" />
               <blockquote className="font-medium text-base sm:text-lg text-foreground leading-relaxed italic">
-                &ldquo;Pendidikan sejati bukan sekadar mengisi wadah
-                pengetahuan, melainkan menyalakan api keingintahuan, memperkuat
-                kompas moral, dan membekali anak-anak kita dengan keberanian
-                untuk menjadi pemecah masalah di panggung global.&rdquo;
+                {sambutanQuote}
               </blockquote>
               <p className="text-sm text-muted-foreground leading-relaxed">
-                Kami menyambut hangat setiap calon siswa dan orang tua untuk
-                bertumbuh bersama dalam keluarga besar sekolah kami. Mari
-                persiapkan generasi emas yang mandiri, berkarakter, dan berdaya
-                saing internasional.
+                {sambutanBody}
               </p>
             </div>
           </div>

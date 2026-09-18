@@ -103,9 +103,77 @@ const FASILITAS = [
   },
 ] as const;
 
-export function FacilitiesSection() {
+function parseSpecs(
+  raw: string | undefined,
+  fallback: readonly string[],
+): string[] {
+  if (!raw || !raw.trim()) return [...fallback];
+  const lines = raw
+    .split("\n")
+    .map((s) => s.trim())
+    .filter(Boolean);
+  return lines.length > 0 ? lines : [...fallback];
+}
+
+interface FacilitiesSectionProps {
+  konten?: Record<string, string>;
+}
+
+export function FacilitiesSection({ konten = {} }: FacilitiesSectionProps) {
+  const eyebrow = konten["landing.fasilitas_eyebrow"] || "Infrastruktur Kampus";
+  const title =
+    konten["landing.fasilitas_title"] || "Fasilitas Modern Penunjang Potensi";
+  const subtitle =
+    konten["landing.fasilitas_subtitle"] ||
+    "Sarana dan prasarana berstandar internasional yang dirancang untuk kenyamanan belajar, kesehatan raga, dan eksplorasi kreativitas tanpa batas.";
+
+  const facilitiesList = [
+    {
+      icon: FASILITAS[0].icon,
+      name: konten["landing.fasilitas1_name"] || FASILITAS[0].name,
+      tag: konten["landing.fasilitas1_tag"] || FASILITAS[0].tag,
+      shortDesc: konten["landing.fasilitas1_desc"] || FASILITAS[0].shortDesc,
+      specs: parseSpecs(konten["landing.fasilitas1_specs"], FASILITAS[0].specs),
+    },
+    {
+      icon: FASILITAS[1].icon,
+      name: konten["landing.fasilitas2_name"] || FASILITAS[1].name,
+      tag: konten["landing.fasilitas2_tag"] || FASILITAS[1].tag,
+      shortDesc: konten["landing.fasilitas2_desc"] || FASILITAS[1].shortDesc,
+      specs: parseSpecs(konten["landing.fasilitas2_specs"], FASILITAS[1].specs),
+    },
+    {
+      icon: FASILITAS[2].icon,
+      name: konten["landing.fasilitas3_name"] || FASILITAS[2].name,
+      tag: konten["landing.fasilitas3_tag"] || FASILITAS[2].tag,
+      shortDesc: konten["landing.fasilitas3_desc"] || FASILITAS[2].shortDesc,
+      specs: parseSpecs(konten["landing.fasilitas3_specs"], FASILITAS[2].specs),
+    },
+    {
+      icon: FASILITAS[3].icon,
+      name: konten["landing.fasilitas4_name"] || FASILITAS[3].name,
+      tag: konten["landing.fasilitas4_tag"] || FASILITAS[3].tag,
+      shortDesc: konten["landing.fasilitas4_desc"] || FASILITAS[3].shortDesc,
+      specs: parseSpecs(konten["landing.fasilitas4_specs"], FASILITAS[3].specs),
+    },
+    {
+      icon: FASILITAS[4].icon,
+      name: konten["landing.fasilitas5_name"] || FASILITAS[4].name,
+      tag: konten["landing.fasilitas5_tag"] || FASILITAS[4].tag,
+      shortDesc: konten["landing.fasilitas5_desc"] || FASILITAS[4].shortDesc,
+      specs: parseSpecs(konten["landing.fasilitas5_specs"], FASILITAS[5].specs),
+    },
+    {
+      icon: FASILITAS[5].icon,
+      name: konten["landing.fasilitas6_name"] || FASILITAS[5].name,
+      tag: konten["landing.fasilitas6_tag"] || FASILITAS[5].tag,
+      shortDesc: konten["landing.fasilitas6_desc"] || FASILITAS[5].shortDesc,
+      specs: parseSpecs(konten["landing.fasilitas6_specs"], FASILITAS[5].specs),
+    },
+  ];
+
   const [selectedFacility, setSelectedFacility] = React.useState<
-    (typeof FASILITAS)[number] | null
+    (typeof facilitiesList)[number] | null
   >(null);
 
   return (
@@ -115,21 +183,19 @@ export function FacilitiesSection() {
         <div className="text-center max-w-2xl mx-auto space-y-3">
           <div className="inline-flex items-center gap-1.5 text-xs font-bold uppercase tracking-widest text-secondary">
             <Building2 className="h-3.5 w-3.5" />
-            <span>Infrastruktur Kampus</span>
+            <span>{eyebrow}</span>
           </div>
           <h2 className="font-bold text-2xl sm:text-4xl text-foreground tracking-tight">
-            Fasilitas Modern Penunjang Potensi
+            {title}
           </h2>
           <p className="text-sm sm:text-base text-muted-foreground leading-relaxed">
-            Sarana dan prasarana berstandar internasional yang dirancang untuk
-            kenyamanan belajar, kesehatan raga, dan eksplorasi kreativitas tanpa
-            batas.
+            {subtitle}
           </p>
         </div>
 
         {/* Facilities Grid */}
         <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
-          {FASILITAS.map((item) => {
+          {facilitiesList.map((item) => {
             const Icon = item.icon;
             return (
               <Card
