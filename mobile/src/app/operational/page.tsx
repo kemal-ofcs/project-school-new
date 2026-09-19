@@ -4,8 +4,8 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { MobileAppShell } from "@/components/MobileAppShell";
+import { BackHeader } from "@/components/ui/HubRow";
 import { Icon } from "@/components/ui/Icon";
-import { QuickActionTile } from "@/components/ui/QuickActionTile";
 import { canAccessArea } from "@/lib/auth/access";
 import { triggerHaptic } from "@/lib/client/haptics";
 import { useAuth } from "@/lib/context/AuthContext";
@@ -116,13 +116,6 @@ export default function OperationalPage() {
   const [manKeterangan, setManKeterangan] = useState<string>("");
 
   const isOperational = canAccessArea(user, "operational");
-  const bolehKonten = canAccessArea(user, "konten");
-  const bolehPmb = canAccessArea(user, "pmb");
-  // Halaman ini juga jadi satu-satunya pintu masuk modul CMS dan PMB di Mobile.
-  // Paket bawaan peran `operator` memegang `content.view` TANPA `corrections.view`
-  // maupun `backups.view`, jadi menjaga seluruh halaman pada `operational` akan
-  // mengunci justru peran yang modul itu ditujukan untuknya.
-  const bolehBukaHalaman = isOperational || bolehKonten || bolehPmb;
 
   useEffect(() => {
     if (!authLoading && !isAuthenticated) {
@@ -131,10 +124,10 @@ export default function OperationalPage() {
     }
     // Otorisasi, bukan sekadar autentikasi. Mobile memakai static export dan
     // tidak punya rute `/forbidden`, jadi pengguna tanpa hak dipulangkan.
-    if (!authLoading && isAuthenticated && !bolehBukaHalaman) {
-      router.replace("/dashboard");
+    if (!authLoading && isAuthenticated && !isOperational) {
+      router.replace("/operasional-hub");
     }
-  }, [authLoading, isAuthenticated, bolehBukaHalaman, router]);
+  }, [authLoading, isAuthenticated, isOperational, router]);
 
   // Load master data once
   useEffect(() => {
@@ -224,7 +217,7 @@ export default function OperationalPage() {
   }, [date, activeTab, isAuthenticated, isOperational, loadTabRecords]);
 
   // Check RBAC Access
-  if (!authLoading && !bolehBukaHalaman) {
+  if (!authLoading && !isOperational) {
     return (
       <MobileAppShell>
         <div className="flex flex-col items-center justify-center min-h-[60vh] text-center px-4">
@@ -237,11 +230,11 @@ export default function OperationalPage() {
             (Koreksi Admin, Backup, atau Import).
           </p>
           <Link
-            href="/dashboard"
+            href="/operasional-hub"
             className="mt-5 inline-flex items-center gap-2 rounded-2xl bg-sky-500 px-5 py-2.5 text-xs font-bold text-slate-950 shadow-lg active:scale-95 transition"
           >
             <Icon name="home" className="size-4" />
-            <span>Kembali ke Beranda</span>
+            <span>Kembali ke Operasional</span>
           </Link>
         </div>
       </MobileAppShell>
@@ -558,6 +551,12 @@ export default function OperationalPage() {
   return (
     <MobileAppShell>
       <div className="flex flex-col gap-4">
+        <BackHeader
+          href="/operasional-hub"
+          label="Operasional"
+          title="Pusat Operasional"
+        />
+
         {/* Header Card */}
         <div className="rounded-3xl border border-white/15 bg-slate-900/90 p-4 shadow-xl backdrop-blur-xl">
           <div className="flex items-center justify-between gap-3 mb-3">
@@ -651,36 +650,6 @@ export default function OperationalPage() {
             </>
           )}
         </div>
-
-        {/* Sub-menu Operasional: modul yang berdiri sendiri, bukan tab entri harian. */}
-        {(bolehKonten || bolehPmb) && (
-          <section aria-labelledby="judul-submenu-operasional">
-            <h3
-              id="judul-submenu-operasional"
-              className="mb-2 px-1 text-[11px] font-black uppercase tracking-wider text-slate-400"
-            >
-              Modul Operasional
-            </h3>
-            <div className="grid grid-cols-2 gap-2.5">
-              {bolehKonten && (
-                <QuickActionTile
-                  href="/konten"
-                  icon="globe"
-                  title="Situs Publik & Berita"
-                  tone="purple"
-                />
-              )}
-              {bolehPmb && (
-                <QuickActionTile
-                  href="/pmb"
-                  icon="users"
-                  title="PMB (Pendaftaran)"
-                  tone="emerald"
-                />
-              )}
-            </div>
-          </section>
-        )}
 
         {/* Feedback Alert */}
         {feedback && (

@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 import { MobileAppShell } from "@/components/MobileAppShell";
@@ -13,6 +14,8 @@ export default function ScannerPage() {
   const { user, isAuthenticated, isLoading } = useAuth();
   const router = useRouter();
   const canUseScanner = canAccessArea(user, "scanner");
+  const canHistory = canAccessArea(user, "history");
+  const canDasborKehadiran = canAccessArea(user, "dasbor_kehadiran");
 
   useEffect(() => {
     if (!isLoading && !isAuthenticated) {
@@ -53,6 +56,33 @@ export default function ScannerPage() {
     // Pull-to-refresh dimatikan: gestur geser bentrok dengan pratinjau kamera.
     <MobileAppShell disablePullRefresh>
       <div className="flex flex-col gap-2">
+        {/* Scanner sengaja BUKAN hub — kamera adalah konten utamanya. Kedua
+            pintasan ini adalah chip, bukan layar menu, supaya alur satu-tap
+            memindai tidak terganggu. */}
+        {(canHistory || canDasborKehadiran) && (
+          <div className="flex flex-wrap items-center gap-2 px-0.5 pb-1">
+            {canHistory && (
+              <Link
+                href="/history"
+                onClick={() => triggerHaptic("light")}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-800/80 text-slate-300 border border-slate-700 text-xs font-bold"
+              >
+                <Icon name="history" className="size-3.5" />
+                <span>Riwayat</span>
+              </Link>
+            )}
+            {canDasborKehadiran && (
+              <Link
+                href="/dasbor-kehadiran"
+                onClick={() => triggerHaptic("light")}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-800/80 text-slate-300 border border-slate-700 text-xs font-bold"
+              >
+                <Icon name="dashboard" className="size-3.5" />
+                <span>Dasbor Kehadiran</span>
+              </Link>
+            )}
+          </div>
+        )}
         <ScannerView />
       </div>
     </MobileAppShell>

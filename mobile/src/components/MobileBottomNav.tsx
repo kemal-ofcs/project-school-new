@@ -12,6 +12,13 @@ interface NavItem {
   icon: IconName;
   label: string;
   isElevated?: boolean;
+  /**
+   * Rute lain yang juga harus menyalakan tab ini — layar anak dari sebuah hub
+   * hidup di path lama yang tidak diawali nama hub barunya (mis. hub
+   * `/operasional-hub` membuka anak `/operational`), jadi `startsWith(href)`
+   * saja tidak cukup untuk menandai tab aktif.
+   */
+  activePrefixes?: string[];
 }
 
 export function MobileBottomNav() {
@@ -27,24 +34,38 @@ export function MobileBottomNav() {
   if (canHome) {
     navItems.push({ href: "/dashboard", icon: "dashboard", label: "Beranda" });
   }
-  // Halaman Operasional memuat modul CMS dan PMB sebagai sub-menu, dan paket
-  // bawaan peran `operator` memegang `content.view` tanpa izin koreksi/backup.
-  // Tanpa ketiga area ini ikut dihitung, peran itu tidak punya jalan ke sana.
+  // Tab ini membuka hub /operasional-hub, yang mengelompokkan tujuan-tujuan
+  // di bawah jadi "Operasional Harian", "Laporan", dan "Administrasi &
+  // Keamanan". Tab hanya muncul kalau minimal satu baris di hub itu bisa
+  // dibuka peran ini — tab yang membuka hub kosong lebih membingungkan
+  // daripada tab yang tidak ada.
   if (
     canAccessArea(user, "operational") ||
+    canAccessArea(user, "history") ||
+    canAccessArea(user, "dasbor_kehadiran") ||
+    canAccessArea(user, "notifikasi_wa") ||
+    canAccessArea(user, "operators") ||
+    canAccessArea(user, "password_reset") ||
+    canAccessArea(user, "attendance_photo") ||
     canAccessArea(user, "konten") ||
     canAccessArea(user, "pmb")
   ) {
     navItems.push({
-      href: "/operational",
+      href: "/operasional-hub",
       icon: "tools",
       label: "Operasional",
-    });
-  } else if (canAccessArea(user, "dasbor_kehadiran")) {
-    navItems.push({
-      href: "/dasbor-kehadiran",
-      icon: "dashboard",
-      label: "Operasional",
+      activePrefixes: [
+        "/operasional-hub",
+        "/operational",
+        "/history",
+        "/dasbor-kehadiran",
+        "/notifikasi-wa",
+        "/operators",
+        "/riwayat-reset-password",
+        "/foto-absensi",
+        "/konten",
+        "/pmb",
+      ],
     });
   }
   if (canScanner) {
@@ -55,8 +76,26 @@ export function MobileBottomNav() {
       isElevated: true,
     });
   }
-  if (canKaryawan || canAccessArea(user, "siswa")) {
-    navItems.push({ href: "/karyawan", icon: "users", label: "Karyawan & PD" });
+  // Tab ini membuka hub /personil (Karyawan, Peserta Didik, Guru & PTK,
+  // Cetak ID Card).
+  if (
+    canKaryawan ||
+    canAccessArea(user, "siswa") ||
+    canAccessArea(user, "guru") ||
+    canAccessArea(user, "idcards")
+  ) {
+    navItems.push({
+      href: "/personil",
+      icon: "users",
+      label: "Karyawan & PD",
+      activePrefixes: [
+        "/personil",
+        "/karyawan",
+        "/siswa",
+        "/guru",
+        "/id-cards",
+      ],
+    });
   }
   navItems.push({ href: "/settings", icon: "settings", label: "Pengaturan" });
 
@@ -70,7 +109,9 @@ export function MobileBottomNav() {
           const isActive =
             item.href === "/dashboard"
               ? pathname === "/dashboard" || pathname === "/"
-              : pathname.startsWith(item.href);
+              : (item.activePrefixes ?? [item.href]).some((prefix) =>
+                  pathname.startsWith(prefix),
+                );
 
           if (item.isElevated) {
             return (

@@ -5,8 +5,8 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import { DashboardInsights } from "@/components/dashboard/DashboardInsights";
 import { MobileAppShell } from "@/components/MobileAppShell";
+import { HubGroupLabel, HubRow } from "@/components/ui/HubRow";
 import { Icon } from "@/components/ui/Icon";
-import { QuickActionGrid } from "@/components/ui/QuickActionGrid";
 import { StatusBadgePill } from "@/components/ui/StatusBadgePill";
 import { StatusHeroCard } from "@/components/ui/StatusHeroCard";
 import { canAccessArea, hasPermission } from "@/lib/auth/access";
@@ -26,6 +26,17 @@ export default function DashboardPage() {
   const canViewScanner = canAccessArea(user, "scanner");
   const canViewHistory = canAccessArea(user, "history");
   const canViewKaryawan = canAccessArea(user, "karyawan");
+  const canPresensiKelas = canAccessArea(user, "presensi_kelas");
+  const canAudit = canAccessArea(user, "audit");
+  const canJurnalMengajar = canAccessArea(user, "jurnal_mengajar");
+  const canLegerKehadiran = canAccessArea(user, "leger_kehadiran");
+  const canPayroll = canAccessArea(user, "payroll");
+  const hasAnyHubItem =
+    canPresensiKelas ||
+    canAudit ||
+    canJurnalMengajar ||
+    canLegerKehadiran ||
+    canPayroll;
 
   const [metrics, setMetrics] = useState<DashboardMetrics | null>(null);
   const [recentScans, setRecentScans] = useState<Record<string, unknown>[]>([]);
@@ -87,8 +98,61 @@ export default function DashboardPage() {
           />
         ) : null}
 
-        {/* 2. Quick Action Hub (Grid 4x2) */}
-        <QuickActionGrid />
+        {/* 2. Modul harian: lima tujuan yang dipakai tiap hari, bukan seluruh
+            fitur aplikasi. Cetak ID Card sengaja tidak di sini — rumahnya
+            Karyawan & PD, karena itu aksi personil, bukan pintasan harian. */}
+        {hasAnyHubItem ? (
+          <section aria-labelledby="judul-modul-harian">
+            <HubGroupLabel>Modul Harian</HubGroupLabel>
+            <div id="judul-modul-harian" className="flex flex-col gap-2">
+              {canPresensiKelas && (
+                <HubRow
+                  href="/presensi-kelas"
+                  icon="check"
+                  title="Presensi Mapel & Anomali"
+                  subtitle="Jurnal kelas, rekonsiliasi & deteksi bolos"
+                  tone="teal"
+                />
+              )}
+              {canAudit && (
+                <HubRow
+                  href="/audit-absensi"
+                  icon="alert"
+                  title="Live Audit Presensi"
+                  subtitle="Belum absen, sesi menggantung & perlu verifikasi"
+                  tone="amber"
+                />
+              )}
+              {canJurnalMengajar && (
+                <HubRow
+                  href="/jurnal-mengajar"
+                  icon="document"
+                  title="Jurnal Mengajar"
+                  subtitle="Catatan materi, kendala KBM & paraf guru"
+                  tone="sky"
+                />
+              )}
+              {canLegerKehadiran && (
+                <HubRow
+                  href="/leger-kehadiran"
+                  icon="calendar"
+                  title="Leger Kehadiran"
+                  subtitle="Rekapitulasi semester & pembekuan rapor"
+                  tone="indigo"
+                />
+              )}
+              {canPayroll && (
+                <HubRow
+                  href="/payroll"
+                  icon="document"
+                  title="Penggajian & Slip Gaji"
+                  subtitle="Kalkulasi upah harian & arsip pembayaran"
+                  tone="emerald"
+                />
+              )}
+            </div>
+          </section>
+        ) : null}
 
         {/* Akses Cepat Area Berizin */}
         {(canViewScanner || canViewHistory || canViewKaryawan) && (
