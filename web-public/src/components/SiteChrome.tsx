@@ -25,7 +25,28 @@ export const NAVIGASI = [
   { href: "/kontak", label: "Kontak" },
 ] as const;
 
-export function SiteHeader({ profil }: { profil: SchoolProfile }) {
+/**
+ * Konten situs yang dipakai header dan footer di setiap halaman: gabungan kunci
+ * halaman `profil` dan `kontak` di CMS.
+ *
+ * Dulu header dan footer membawa klaim yang ditulis di kode — "TERAKREDITASI",
+ * "Terakreditasi Unggul (A) BAN-SM", slogan, deskripsi, dan jam layanan — yang
+ * tampil di setiap halaman situs setiap sekolah. Klaim akreditasi yang belum
+ * tentu benar di header sebuah sekolah adalah hal terakhir yang boleh
+ * dikarang oleh perangkat lunaknya. Kunci yang belum diisi kini disembunyikan.
+ */
+type KontenSitus = Record<string, string>;
+
+export function SiteHeader({
+  profil,
+  konten = {},
+}: {
+  profil: SchoolProfile;
+  konten?: KontenSitus;
+}) {
+  const akreditasi = konten["profil.akreditasi"];
+  const subjudul = profil.namaCabang ?? konten["profil.tagline"];
+
   const nama = namaTampil(profil);
 
   return (
@@ -53,16 +74,20 @@ export function SiteHeader({ profil }: { profil: SchoolProfile }) {
               <span className="font-bold text-base text-foreground tracking-tight sm:text-lg">
                 {nama}
               </span>
-              <Badge
-                variant="prestige"
-                className="hidden sm:inline-flex text-[10px] px-1.5 py-0"
-              >
-                TERAKREDITASI
-              </Badge>
+              {akreditasi ? (
+                <Badge
+                  variant="prestige"
+                  className="hidden sm:inline-flex text-[10px] px-1.5 py-0"
+                >
+                  {akreditasi}
+                </Badge>
+              ) : null}
             </div>
-            <p className="hidden text-xs text-muted-foreground md:block">
-              {profil.namaCabang ?? "Portal Akademik & Penerimaan Murid Baru"}
-            </p>
+            {subjudul ? (
+              <p className="hidden text-xs text-muted-foreground md:block">
+                {subjudul}
+              </p>
+            ) : null}
           </div>
         </Link>
 
@@ -120,8 +145,21 @@ export function SiteHeader({ profil }: { profil: SchoolProfile }) {
   );
 }
 
-export function SiteFooter({ profil }: { profil: SchoolProfile }) {
+export function SiteFooter({
+  profil,
+  konten = {},
+}: {
+  profil: SchoolProfile;
+  konten?: KontenSitus;
+}) {
   const nama = namaTampil(profil);
+  const tagline = konten["profil.tagline"];
+  const deskripsi = konten["profil.deskripsi_singkat"];
+  const akreditasi = konten["profil.akreditasi"];
+  const slogan = konten["profil.slogan"];
+  // Sama dengan yang tampil di halaman Kontak — satu kunci, supaya keduanya
+  // tidak mungkin menyebut jam yang berbeda.
+  const jamLayanan = konten["kontak.jam_kerja"];
   const tahun = new Date().getFullYear();
 
   return (
@@ -136,19 +174,22 @@ export function SiteFooter({ profil }: { profil: SchoolProfile }) {
               </div>
               <div>
                 <h3 className="font-bold text-lg leading-tight">{nama}</h3>
-                <p className="text-xs text-muted-foreground">
-                  Institusi Pendidikan Unggulan
-                </p>
+                {tagline ? (
+                  <p className="text-xs text-muted-foreground">{tagline}</p>
+                ) : null}
               </div>
             </div>
-            <p className="text-sm text-muted-foreground leading-relaxed">
-              Membentuk generasi pemimpin yang cerdas, berintegritas, berwawasan
-              global, dan berakar kuat pada nilai karakter luhur.
-            </p>
-            <div className="inline-flex items-center gap-2 rounded-lg bg-muted px-3 py-1.5 text-xs font-semibold text-accent">
-              <CheckCircle2 className="h-4 w-4" />
-              <span>Terakreditasi Unggul (A) BAN-SM</span>
-            </div>
+            {deskripsi ? (
+              <p className="text-sm text-muted-foreground leading-relaxed">
+                {deskripsi}
+              </p>
+            ) : null}
+            {akreditasi ? (
+              <div className="inline-flex items-center gap-2 rounded-lg bg-muted px-3 py-1.5 text-xs font-semibold text-accent">
+                <CheckCircle2 className="h-4 w-4" />
+                <span>{akreditasi}</span>
+              </div>
+            ) : null}
           </div>
 
           {/* Kolom 2: Navigasi Cepat */}
@@ -275,14 +316,15 @@ export function SiteFooter({ profil }: { profil: SchoolProfile }) {
                   </a>
                 </p>
               ) : null}
-              <div className="rounded-lg bg-muted p-3 text-xs space-y-1 mt-2">
-                <div className="flex items-center gap-1.5 font-semibold text-foreground">
-                  <Clock className="h-3.5 w-3.5 text-secondary" />
-                  <span>Jam Layanan Sekretariat:</span>
+              {jamLayanan ? (
+                <div className="rounded-lg bg-muted p-3 text-xs space-y-1 mt-2">
+                  <div className="flex items-center gap-1.5 font-semibold text-foreground">
+                    <Clock className="h-3.5 w-3.5 text-secondary" />
+                    <span>Jam Layanan Sekretariat:</span>
+                  </div>
+                  <p className="whitespace-pre-line">{jamLayanan}</p>
                 </div>
-                <p>Senin - Jumat: 07.30 - 16.00 WIB</p>
-                <p>Sabtu: 08.00 - 13.00 WIB</p>
-              </div>
+              ) : null}
             </div>
           </div>
         </div>
@@ -292,9 +334,9 @@ export function SiteFooter({ profil }: { profil: SchoolProfile }) {
           <p>
             © {tahun} {nama}. Hak Cipta Dilindungi Undang-Undang.
           </p>
-          <p className="font-medium text-foreground">
-            Standar Pendidikan Nasional & Pengayaan Kurikulum Global
-          </p>
+          {slogan ? (
+            <p className="font-medium text-foreground">{slogan}</p>
+          ) : null}
         </div>
       </div>
     </footer>

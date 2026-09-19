@@ -10,65 +10,34 @@ import {
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import {
-  bangunKoleksi,
-  KUNCI_KOLEKSI,
-  normalisasiStat,
-  uraiKoleksi,
-} from "@/lib/services/landing-collections";
+import { koleksiStat } from "@/lib/services/landing-collections";
 import type { GelombangAktif } from "@/lib/services/pmb";
 
 interface HeroSectionProps {
   namaSekolah: string;
   gelombangAktif: GelombangAktif | null;
-  heroTitle?: string;
-  heroSubtitle?: string;
   konten?: Record<string, string>;
 }
 
 export function HeroSection({
   namaSekolah,
   gelombangAktif,
-  heroTitle,
-  heroSubtitle,
   konten = {},
 }: HeroSectionProps) {
-  const heroBadge =
-    konten["landing.hero_badge"] || "Akreditasi A Unggul (BAN-SM)";
+  // Seluruh teksnya dari CMS. Tanpa teks contoh di kode: judul yang belum
+  // diisi memakai nama sekolah (data, bukan tulisan kita), dan subjudul serta
+  // lencana yang belum diisi disembunyikan.
+  const heroTitle = konten["landing.hero_title"] || namaSekolah;
+  const heroSubtitle = konten["landing.hero_subtitle"];
+  const heroBadge = konten["landing.hero_badge"];
 
-  // Jumlah kartu statistik ditentukan isinya, bukan kode. Ikonnya tetap di sini
-  // karena ia komponen React; paletnya diputar berdasarkan posisi supaya kartu
-  // kelima dan seterusnya tetap punya ikon.
-  const STAT_BAWAAN = [
-    { label: "Akreditasi A", value: "98 / 100", sub: "BAN-SM Predikat Unggul" },
-    {
-      label: "Lulusan PTN/LN",
-      value: "98.4%",
-      sub: "UI, ITB, UGM & Luar Negeri",
-    },
-    { label: "Prestasi 2024", value: "150+", sub: "Tingkat Nasional & Dunia" },
-    { label: "Komunitas", value: "1.250+", sub: "Siswa & Alumni Aktif" },
-  ];
+  // Ikon tetap di kode karena ia komponen React; paletnya diputar berdasarkan
+  // posisi sehingga kartu ke-N tetap punya ikon.
   const IKON_STAT = [Award, GraduationCap, Trophy, Users];
-
-  const statLama = STAT_BAWAAN.map((bawaan, i) => ({
-    label: konten[`landing.stat${i + 1}_label`] || bawaan.label,
-    value: konten[`landing.stat${i + 1}_value`] || bawaan.value,
-    sub: konten[`landing.stat${i + 1}_sub`] || bawaan.sub,
+  const statsData = koleksiStat(konten).map((item, i) => ({
+    ...item,
+    Ikon: IKON_STAT[i % IKON_STAT.length],
   }));
-  const adaStatLama = STAT_BAWAAN.some(
-    (_, i) =>
-      konten[`landing.stat${i + 1}_label`] ||
-      konten[`landing.stat${i + 1}_value`] ||
-      konten[`landing.stat${i + 1}_sub`],
-  );
-
-  const statsData = bangunKoleksi(
-    uraiKoleksi(konten[KUNCI_KOLEKSI.stat]),
-    adaStatLama ? statLama : [],
-    STAT_BAWAAN,
-    normalisasiStat,
-  ).map((item, i) => ({ ...item, Ikon: IKON_STAT[i % IKON_STAT.length] }));
 
   return (
     <section className="relative overflow-hidden bg-primary text-primary-foreground py-16 sm:py-24 lg:py-28">
@@ -116,19 +85,19 @@ export function HeroSection({
           <div className="inline-flex items-center gap-2 rounded-lg bg-accent/80 px-3 py-1 text-xs font-semibold text-white backdrop-blur-sm">
             <CheckCircle2 className="h-3.5 w-3.5" />
             <span>
-              {heroBadge} • {namaSekolah}
+              {heroBadge ? `${heroBadge} • ${namaSekolah}` : namaSekolah}
             </span>
           </div>
 
           <h1 className="font-extrabold text-3xl tracking-tight sm:text-5xl lg:text-6xl text-white leading-tight">
-            {heroTitle ||
-              "Wujudkan Generasi Pemimpin Cerdas, Berkarakter & Berdaya Saing Global"}
+            {heroTitle}
           </h1>
 
-          <p className="text-base sm:text-lg text-white/85 leading-relaxed max-w-2xl font-normal">
-            {heroSubtitle ||
-              "Pendidikan holistik memadukan ketangguhan karakter moral, pengayaan kurikulum internasional, serta ekosistem pembelajaran modern berbasis riset dan teknologi masa depan."}
-          </p>
+          {heroSubtitle ? (
+            <p className="text-base sm:text-lg text-white/85 leading-relaxed max-w-2xl font-normal">
+              {heroSubtitle}
+            </p>
+          ) : null}
         </div>
 
         {/* Primary Call to Actions */}
@@ -154,25 +123,29 @@ export function HeroSection({
         </div>
 
         {/* Quick Stats Strip */}
-        <div className="w-full pt-8 grid grid-cols-2 md:grid-cols-4 gap-4">
-          {statsData.map((stat) => (
-            <div
-              key={`${stat.label}-${stat.value}`}
-              className="rounded-xl bg-white/10 p-5 backdrop-blur-md border border-white/10 space-y-1"
-            >
-              <div className="flex items-center gap-1.5 text-secondary-container">
-                <stat.Ikon className="h-4 w-4" />
-                <span className="font-semibold text-xs uppercase tracking-wider">
-                  {stat.label}
-                </span>
+        {statsData.length > 0 ? (
+          <div className="w-full pt-8 grid grid-cols-2 md:grid-cols-4 gap-4">
+            {statsData.map((stat) => (
+              <div
+                key={`${stat.label}-${stat.value}`}
+                className="rounded-xl bg-white/10 p-5 backdrop-blur-md border border-white/10 space-y-1"
+              >
+                <div className="flex items-center gap-1.5 text-secondary-container">
+                  <stat.Ikon className="h-4 w-4" />
+                  <span className="font-semibold text-xs uppercase tracking-wider">
+                    {stat.label}
+                  </span>
+                </div>
+                <p className="font-extrabold text-2xl sm:text-3xl text-white">
+                  {stat.value}
+                </p>
+                {stat.sub ? (
+                  <p className="text-xs text-white/70">{stat.sub}</p>
+                ) : null}
               </div>
-              <p className="font-extrabold text-2xl sm:text-3xl text-white">
-                {stat.value}
-              </p>
-              <p className="text-xs text-white/70">{stat.sub}</p>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        ) : null}
       </div>
     </section>
   );

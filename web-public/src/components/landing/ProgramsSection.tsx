@@ -15,52 +15,14 @@ import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import {
-  bangunKoleksi,
-  KUNCI_KOLEKSI,
-  normalisasiEkskul,
-  uraiKoleksi,
-} from "@/lib/services/landing-collections";
+import { koleksiEkskul } from "@/lib/services/landing-collections";
 import type { ProgramStudi } from "@/lib/services/school-profile";
 
-const EKSKUL = [
-  {
-    icon: Code2,
-    title: "Robotika & Coding Club",
-    category: "Sains & Teknologi",
-    desc: "Eksplorasi kecerdasan buatan, mikrokontroler IoT, kompetisi robotik nasional & internasional.",
-  },
-  {
-    icon: FlaskConical,
-    title: "Karya Ilmiah Remaja (KIR)",
-    category: "Riset Akademis",
-    desc: "Inkubasi riset sains terapan, bioteknologi, dan publikasi jurnal ilmiah tingkat SMA.",
-  },
-  {
-    icon: Mic,
-    title: "English Debate & Model UN",
-    category: "Bahasa & Diplomasi",
-    desc: "Pengasahan retorika kritis, diplomasi internasional simulasi PBB, serta sertifikasi IELTS/TOEFL.",
-  },
-  {
-    icon: Trophy,
-    title: "Sport Club (Basket & Futsal)",
-    category: "Olahraga & Fisik",
-    desc: "Pelatihan fisik intensif bersama pelatih berlisensi nasional, turnamen DBL dan liga antar-sekolah.",
-  },
-  {
-    icon: Palette,
-    title: "Desain Grafis & Sinematografi",
-    category: "Kreatif & Seni",
-    desc: "Produksi film pendek, fotografi jurnalistik, animasi 3D, serta manajemen media digital sekolah.",
-  },
-  {
-    icon: GraduationCap,
-    title: "Olimpiade Sains Nasional (OSN)",
-    category: "Intensif Prestasi",
-    desc: "Bimbingan khusus calon juara OSN di bidang Matematika, Fisika, Kimia, Astronomi, dan Informatika.",
-  },
-] as const;
+/**
+ * Ikon ekstrakurikuler diputar berdasarkan posisi. Ia komponen React sehingga
+ * tidak bisa disimpan di database, dan kegiatan ke-N tetap butuh satu.
+ */
+const IKON_EKSKUL = [Code2, FlaskConical, Mic, Trophy, Palette, GraduationCap];
 
 interface ProgramsSectionProps {
   programStudi: ProgramStudi[];
@@ -71,59 +33,45 @@ export function ProgramsSection({
   programStudi,
   konten = {},
 }: ProgramsSectionProps) {
-  const eyebrow =
-    konten["landing.ekskul_eyebrow"] || "Eksplorasi Minat & Bakat";
-  const title =
-    konten["landing.ekskul_title"] || "Program Akademik & Pengembangan Diri";
-  const subtitle =
-    konten["landing.ekskul_subtitle"] ||
-    "Pilihan kurikulum terintegrasi dan wadah ekstrakurikuler komprehensif untuk mengasah potensi intelektual, artistik, dan kepemimpinan setiap siswa.";
+  // Seluruh teksnya dari CMS; tidak ada teks contoh di kode. Bagian yang
+  // belum diisi disembunyikan.
+  const eyebrow = konten["landing.ekskul_eyebrow"];
+  const title = konten["landing.ekskul_title"];
+  const subtitle = konten["landing.ekskul_subtitle"];
 
-  // Jumlah ekstrakurikuler ditentukan isinya, bukan kode. Kunci bernomor lama
-  // tetap dibaca sebagai lapis kedua supaya konten yang sudah diisi lewat panel
-  // versi sebelumnya tidak lenyap saat aplikasi diperbarui.
-  const ekskulLama = EKSKUL.map((bawaan, i) => ({
-    title: konten[`landing.ekskul${i + 1}_title`] || bawaan.title,
-    category: konten[`landing.ekskul${i + 1}_cat`] || bawaan.category,
-    desc: konten[`landing.ekskul${i + 1}_desc`] || bawaan.desc,
-  }));
-  const adaEkskulLama = EKSKUL.some(
-    (_, i) =>
-      konten[`landing.ekskul${i + 1}_title`] ||
-      konten[`landing.ekskul${i + 1}_cat`] ||
-      konten[`landing.ekskul${i + 1}_desc`],
-  );
-
-  const ekskulFinal = bangunKoleksi(
-    uraiKoleksi(konten[KUNCI_KOLEKSI.ekskul]),
-    adaEkskulLama ? ekskulLama : [],
-    EKSKUL.map(({ title, category, desc }) => ({ title, category, desc })),
-    normalisasiEkskul,
-  );
-
-  // Ikon diputar berdasarkan posisi: ia komponen React, tidak bisa disimpan di
-  // database, dan item ke-N di luar bawaan tetap harus punya satu.
-  const ekskulList = ekskulFinal.map((item, i) => ({
+  const ekskulList = koleksiEkskul(konten).map((item, i) => ({
     ...item,
-    icon: EKSKUL[i % EKSKUL.length].icon,
+    icon: IKON_EKSKUL[i % IKON_EKSKUL.length],
   }));
+
+  // Jurusan datang dari `akademik_jurusan`, jadi section ini tetap punya isi
+  // walau CMS-nya belum diisi. Hanya bila keduanya kosong ia disembunyikan.
+  if (programStudi.length === 0 && ekskulList.length === 0) return null;
+  const adaHeader = Boolean(eyebrow || title || subtitle);
 
   return (
     <section className="py-20 sm:py-28 bg-muted/40 border-y border-border">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 space-y-12">
-        {/* Section Header */}
-        <div className="text-center max-w-2xl mx-auto space-y-3">
-          <div className="inline-flex items-center gap-1.5 text-xs font-bold uppercase tracking-widest text-secondary">
-            <Layers className="h-3.5 w-3.5" />
-            <span>{eyebrow}</span>
+        {adaHeader ? (
+          <div className="text-center max-w-2xl mx-auto space-y-3">
+            {eyebrow ? (
+              <div className="inline-flex items-center gap-1.5 text-xs font-bold uppercase tracking-widest text-secondary">
+                <Layers className="h-3.5 w-3.5" />
+                <span>{eyebrow}</span>
+              </div>
+            ) : null}
+            {title ? (
+              <h2 className="font-bold text-2xl sm:text-4xl text-foreground tracking-tight">
+                {title}
+              </h2>
+            ) : null}
+            {subtitle ? (
+              <p className="text-sm sm:text-base text-muted-foreground leading-relaxed">
+                {subtitle}
+              </p>
+            ) : null}
           </div>
-          <h2 className="font-bold text-2xl sm:text-4xl text-foreground tracking-tight">
-            {title}
-          </h2>
-          <p className="text-sm sm:text-base text-muted-foreground leading-relaxed">
-            {subtitle}
-          </p>
-        </div>
+        ) : null}
 
         {/* Interactive Tabs */}
         <Tabs defaultValue="jurusan" className="w-full">
@@ -165,10 +113,15 @@ export function ProgramsSection({
                         <h3 className="font-bold text-lg text-foreground">
                           {prodi.nama}
                         </h3>
-                        <p className="text-sm text-muted-foreground leading-relaxed">
-                          {prodi.deskripsi ??
-                            "Program kurikulum komprehensif dengan pembelajaran berbasis riset, proyek terapan, dan pengayaan sertifikasi kompetensi keahlian."}
-                        </p>
+                        {/* Deskripsi jurusan diisi di menu Akademik. Yang
+                            kosong tidak ditambal teks contoh — sebelumnya
+                            setiap jurusan tanpa deskripsi menampilkan kalimat
+                            yang sama persis. */}
+                        {prodi.deskripsi ? (
+                          <p className="text-sm text-muted-foreground leading-relaxed">
+                            {prodi.deskripsi}
+                          </p>
+                        ) : null}
                       </div>
                     </div>
 
@@ -189,35 +142,45 @@ export function ProgramsSection({
 
           {/* Tab 2: Ekstrakurikuler */}
           <TabsContent value="ekskul">
-            <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
-              {ekskulList.map((item) => {
-                const Icon = item.icon;
-                return (
-                  <Card
-                    key={item.title}
-                    className="flex flex-col justify-between p-6 transition-all duration-300 hover:shadow-md hover:border-border"
-                  >
-                    <div className="space-y-3">
-                      <div className="flex items-center justify-between">
-                        <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-secondary/15 text-secondary">
-                          <Icon className="h-5 w-5" />
+            {ekskulList.length === 0 ? (
+              <div className="rounded-xl border border-dashed border-border p-12 text-center text-sm text-muted-foreground bg-card">
+                Belum ada kegiatan ekstrakurikuler yang ditampilkan.
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
+                {ekskulList.map((item, i) => {
+                  const Icon = item.icon;
+                  return (
+                    <Card
+                      key={`${i}-${item.title}`}
+                      className="flex flex-col justify-between p-6 transition-all duration-300 hover:shadow-md hover:border-border"
+                    >
+                      <div className="space-y-3">
+                        <div className="flex items-center justify-between">
+                          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-secondary/15 text-secondary">
+                            <Icon className="h-5 w-5" />
+                          </div>
+                          {item.category ? (
+                            <Badge variant="outline" className="text-[11px]">
+                              {item.category}
+                            </Badge>
+                          ) : null}
                         </div>
-                        <Badge variant="outline" className="text-[11px]">
-                          {item.category}
-                        </Badge>
-                      </div>
 
-                      <h3 className="font-bold text-base text-foreground">
-                        {item.title}
-                      </h3>
-                      <p className="text-xs sm:text-sm text-muted-foreground leading-relaxed">
-                        {item.desc}
-                      </p>
-                    </div>
-                  </Card>
-                );
-              })}
-            </div>
+                        <h3 className="font-bold text-base text-foreground">
+                          {item.title}
+                        </h3>
+                        {item.desc ? (
+                          <p className="text-xs sm:text-sm text-muted-foreground leading-relaxed">
+                            {item.desc}
+                          </p>
+                        ) : null}
+                      </div>
+                    </Card>
+                  );
+                })}
+              </div>
+            )}
           </TabsContent>
         </Tabs>
       </div>

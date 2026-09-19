@@ -50,8 +50,6 @@ export default async function Beranda() {
       <HeroSection
         namaSekolah={nama}
         gelombangAktif={gelombangAktif}
-        heroTitle={kontenLanding["landing.hero_title"]}
-        heroSubtitle={kontenLanding["landing.hero_subtitle"]}
         konten={kontenLanding}
       />
 
@@ -65,10 +63,13 @@ export default async function Beranda() {
       <FacilitiesSection konten={kontenLanding} />
 
       {/* 5. Alur PMB 4 Tahapan & Rincian Gelombang Aktif */}
-      <PmbOverviewSection gelombangAktif={gelombangAktif} />
+      <PmbOverviewSection
+        gelombangAktif={gelombangAktif}
+        konten={kontenLanding}
+      />
 
       {/* 6. FAQ Accordion Interaktif */}
-      <FaqSection />
+      <FaqSection konten={kontenLanding} />
 
       {/* 7. Floating WhatsApp Desktop & Sticky Action Bar Mobile */}
       <StickyAction nomorTelepon={profil.telepon} />

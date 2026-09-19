@@ -2,33 +2,30 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { DashboardInsights } from "@/components/dashboard/DashboardInsights";
 import { MobileAppShell } from "@/components/MobileAppShell";
 import { Icon } from "@/components/ui/Icon";
-import { StatusBadge } from "@/components/ui/StatusBadge";
+import { QuickActionGrid } from "@/components/ui/QuickActionGrid";
+import { StatusBadgePill } from "@/components/ui/StatusBadgePill";
+import { StatusHeroCard } from "@/components/ui/StatusHeroCard";
 import { canAccessArea, hasPermission } from "@/lib/auth/access";
-import { triggerHaptic } from "@/lib/client/haptics";
 import { useAuth } from "@/lib/context/AuthContext";
 import {
   type DashboardMetrics,
   getDashboardMetrics,
   getRiwayatScan,
 } from "@/lib/gateways/report";
-import { useClock } from "@/lib/hooks/useClock";
 
 export default function DashboardPage() {
   const { user, isAuthenticated, isLoading: authLoading } = useAuth();
   const router = useRouter();
-  const clock = useClock();
 
   const canViewMetrics = hasPermission(user, "dashboard.view");
-  // Riwayat scan terbaru dijaga `home.view` di backend. Tanpa izin itu
-  // bagiannya disembunyikan, bukan dimuat lalu gagal menjadi pesan error.
-  const canViewRecentScans = canAccessArea(user, "home");
+  const canViewHome = canAccessArea(user, "home");
+  const canViewScanner = canAccessArea(user, "scanner");
   const canViewHistory = canAccessArea(user, "history");
   const canViewKaryawan = canAccessArea(user, "karyawan");
-  const canJurnalMengajar = canAccessArea(user, "jurnal_mengajar");
 
   const [metrics, setMetrics] = useState<DashboardMetrics | null>(null);
   const [recentScans, setRecentScans] = useState<Record<string, unknown>[]>([]);
@@ -41,295 +38,157 @@ export default function DashboardPage() {
     }
   }, [authLoading, isAuthenticated, router]);
 
-  useEffect(() => {
-    let cancelled = false;
-    async function loadData() {
-      try {
-        const [metricData, scansData] = await Promise.all([
-          canViewMetrics ? getDashboardMetrics() : Promise.resolve(null),
-          canViewRecentScans
-            ? getRiwayatScan({ limit: 5 })
-            : Promise.resolve([] as Record<string, unknown>[]),
-        ]);
-        if (!cancelled) {
-          setMetrics(metricData);
-          setRecentScans(scansData || []);
-          setLoadError(null);
-        }
-      } catch (err) {
-        // Diam berarti dasbor tampil kosong dan tidak bisa dibedakan dari hari
-        // yang memang belum ada aktivitasnya — pelajaran yang sama dengan
-        // dasbor kehadiran yang dulu menyamarkan kegagalan query menjadi nol.
-        if (!cancelled) {
-          setLoadError(
-            err instanceof Error
-              ? err.message
-              : "Data dasbor gagal dimuat. Tarik ke bawah untuk mencoba lagi.",
-          );
-        }
-      } finally {
-        if (!cancelled) setIsLoading(false);
-      }
+  const loadData = useCallback(async () => {
+    try {
+      const [metricData, scansData] = await Promise.all([
+        canViewMetrics ? getDashboardMetrics() : Promise.resolve(null),
+        canViewHome
+          ? getRiwayatScan({ limit: 5 })
+          : Promise.resolve([] as Record<string, unknown>[]),
+      ]);
+      setMetrics(metricData);
+      setRecentScans(scansData || []);
+      setLoadError(null);
+    } catch (err) {
+      setLoadError(
+        err instanceof Error
+          ? err.message
+          : "Data dasbor gagal dimuat. Tarik ke bawah untuk mencoba lagi.",
+      );
+    } finally {
+      setIsLoading(false);
     }
+  }, [canViewMetrics, canViewHome]);
+
+  useEffect(() => {
     if (isAuthenticated) {
       void loadData();
     }
-    return () => {
-      cancelled = true;
-    };
-  }, [isAuthenticated, canViewMetrics, canViewRecentScans]);
-
-  const formattedTime = clock
-    ? clock.toLocaleTimeString("id-ID", {
-        hour: "2-digit",
-        minute: "2-digit",
-        second: "2-digit",
-      })
-    : "--:--:--";
-
-  const formattedDate = clock
-    ? clock.toLocaleDateString("id-ID", {
-        weekday: "long",
-        day: "numeric",
-        month: "short",
-        year: "numeric",
-      })
-    : "Memuat waktu...";
+  }, [isAuthenticated, loadData]);
 
   return (
     <MobileAppShell>
-      <div className="flex flex-col gap-4">
+      <div className="flex flex-col gap-4 pb-20">
         {loadError ? (
           <div className="rounded-2xl border border-rose-400/30 bg-rose-400/10 p-3 text-xs text-rose-200">
             {loadError}
           </div>
         ) : null}
 
-        {/* Time & Shift Card */}
-        <div className="relative overflow-hidden rounded-3xl border border-white/15 bg-gradient-to-br from-slate-900 via-slate-900/90 to-sky-950/40 p-5 shadow-2xl backdrop-blur-xl">
-          <div className="flex items-center justify-between">
-            <div>
-              <span className="text-[11px] font-bold uppercase tracking-wider text-sky-400">
-                Waktu Kerja Saat Ini
-              </span>
-              <h2 className="text-2xl font-black tracking-tight text-white font-mono mt-0.5">
-                {formattedTime}
-              </h2>
-              <p className="text-xs text-slate-400 mt-0.5">{formattedDate}</p>
-            </div>
-            <div className="grid size-12 place-items-center rounded-2xl border border-sky-400/30 bg-sky-500/10 text-sky-300 shadow-inner">
-              <Icon name="clock" className="size-6 stroke-[2]" />
-            </div>
-          </div>
-        </div>
-
-        {/* Quick Launch QR Scanner Hero Button */}
-        <Link
-          href="/scanner"
-          onClick={() => triggerHaptic("success")}
-          className="theme-invariant group relative flex items-center justify-between overflow-hidden rounded-3xl border border-sky-400/40 bg-gradient-to-r from-sky-500 via-sky-600 to-blue-700 p-5 shadow-xl shadow-sky-950/60 active:scale-[0.98] transition-all"
-        >
-          <div className="flex items-center gap-3.5">
-            <div className="grid size-12 place-items-center rounded-2xl bg-white/20 text-white shadow-md">
-              <Icon name="scanner" className="size-6 stroke-[2.2]" />
-            </div>
-            <div>
-              <h3 className="text-base font-black text-white leading-tight">
-                Scan QR Absensi
-              </h3>
-              <p className="text-xs text-sky-100/80 mt-0.5">
-                Kamera aktif instan dengan auto-haptics
-              </p>
-            </div>
-          </div>
-          <Icon
-            name="chevron-right"
-            className="size-5 text-white/80 group-hover:translate-x-1 transition-transform"
-          />
-        </Link>
-
-        {/* Quick Access: Data Karyawan (hanya jika memiliki izin employees.view) */}
-        {canViewKaryawan ? (
-          <Link
-            href="/karyawan"
-            onClick={() => triggerHaptic("light")}
-            className="group flex items-center justify-between rounded-2xl border border-white/10 bg-slate-900/70 px-4 py-3.5 hover:bg-slate-900/90 active:scale-[0.98] transition-all"
-          >
-            <div className="flex items-center gap-3">
-              <div className="grid size-10 place-items-center rounded-2xl border border-white/10 bg-slate-800/60 text-slate-300">
-                <Icon name="users" className="size-5" />
-              </div>
-              <div>
-                <p className="text-sm font-bold text-white">Data Karyawan</p>
-                <p className="text-[11px] text-slate-400 mt-0.5">
-                  {isLoading
-                    ? "Memuat..."
-                    : `${metrics?.totalKaryawan ?? 0} Karyawan Terdaftar`}
-                </p>
-              </div>
-            </div>
-            <Icon
-              name="chevron-right"
-              className="size-4 text-slate-500 group-hover:translate-x-1 transition-transform"
-            />
-          </Link>
-        ) : null}
-
-        {/* Quick Access: Jurnal Mengajar (hanya jika memiliki area jurnal_mengajar) */}
-        {canJurnalMengajar ? (
-          <Link
-            href="/jurnal-mengajar"
-            onClick={() => triggerHaptic("light")}
-            className="group flex items-center justify-between rounded-2xl border border-white/10 bg-slate-900/70 px-4 py-3.5 hover:bg-slate-900/90 active:scale-[0.98] transition-all"
-          >
-            <div className="flex items-center gap-3">
-              <div className="grid size-10 place-items-center rounded-2xl border border-white/10 bg-slate-800/60 text-sky-400">
-                <Icon name="document" className="size-5" />
-              </div>
-              <div>
-                <p className="text-sm font-bold text-white">Jurnal Mengajar</p>
-                <p className="text-[11px] text-slate-400 mt-0.5">
-                  Catatan KBM &amp; Paraf Digital Guru
-                </p>
-              </div>
-            </div>
-            <Icon
-              name="chevron-right"
-              className="size-4 text-slate-500 group-hover:translate-x-1 transition-transform"
-            />
-          </Link>
-        ) : null}
-
-        {/* Statistics Grid (Hanya jika memiliki izin dashboard.view) */}
+        {/* 1. Hero Balance Card ala m-BCA */}
         {canViewMetrics ? (
-          <div className="grid grid-cols-2 gap-3">
-            <div className="rounded-2xl border border-white/10 bg-slate-900/80 p-4 backdrop-blur-md">
-              <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
-                Total Hadir
-              </span>
-              <div className="flex items-baseline gap-2 mt-1">
-                <span className="text-2xl font-black text-emerald-400">
-                  {isLoading ? "--" : (metrics?.hadirHariIni ?? 0)}
-                </span>
-                <span className="text-xs text-slate-400 font-medium">
-                  / {metrics?.totalKaryawan ?? 0}
-                </span>
-              </div>
-            </div>
-
-            <div className="rounded-2xl border border-white/10 bg-slate-900/80 p-4 backdrop-blur-md">
-              <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
-                Terlambat
-              </span>
-              <div className="flex items-baseline gap-2 mt-1">
-                <span className="text-2xl font-black text-amber-400">
-                  {isLoading ? "--" : (metrics?.terlambatHariIni ?? 0)}
-                </span>
-                <span className="text-xs text-slate-400 font-medium">
-                  orang
-                </span>
-              </div>
-            </div>
-
-            <div className="rounded-2xl border border-white/10 bg-slate-900/80 p-4 backdrop-blur-md">
-              <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
-                Izin / Sakit
-              </span>
-              <div className="flex items-baseline gap-2 mt-1">
-                <span className="text-2xl font-black text-blue-400">
-                  {isLoading ? "--" : (metrics?.sakitIzinHariIni ?? 0)}
-                </span>
-                <span className="text-xs text-slate-400 font-medium">
-                  orang
-                </span>
-              </div>
-            </div>
-
-            <div className="rounded-2xl border border-white/10 bg-slate-900/80 p-4 backdrop-blur-md">
-              <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
-                Alfa / Belum
-              </span>
-              <div className="flex items-baseline gap-2 mt-1">
-                <span className="text-2xl font-black text-rose-400">
-                  {isLoading ? "--" : (metrics?.alfaHariIni ?? 0)}
-                </span>
-                <span className="text-xs text-slate-400 font-medium">
-                  orang
-                </span>
-              </div>
-            </div>
-          </div>
+          <StatusHeroCard
+            hadir={metrics?.hadirHariIni ?? 0}
+            total={metrics?.totalKaryawan ?? 0}
+            terlambat={metrics?.terlambatHariIni ?? 0}
+            persentase={metrics?.persentaseKehadiran ?? 0}
+            isLoading={isLoading}
+            onRefresh={loadData}
+          />
         ) : null}
 
-        {/* Rekap bulanan & peringkat (izin dashboard.view, sama seperti Web) */}
-        {canViewMetrics ? <DashboardInsights /> : null}
+        {/* 2. Quick Action Hub (Grid 4x2) */}
+        <QuickActionGrid />
 
-        {/* Recent Scans Section (izin home.view) */}
-        {canViewRecentScans ? (
-          <div className="flex flex-col gap-2 mt-2">
-            <div className="flex items-center justify-between px-1">
-              <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider">
-                Aktivitas Absensi Terbaru
-              </h4>
-              {canViewHistory ? (
-                <Link
-                  href="/history"
-                  className="text-xs font-semibold text-sky-400 hover:underline"
-                >
-                  Lihat Semua →
-                </Link>
-              ) : null}
-            </div>
-
-            {isLoading ? (
-              <div className="flex flex-col gap-2">
-                {[1, 2, 3].map((i) => (
-                  <div
-                    key={i}
-                    className="h-16 rounded-2xl border border-white/5 bg-slate-900/40 animate-pulse"
-                  />
-                ))}
-              </div>
-            ) : recentScans.length === 0 ? (
-              <div className="rounded-2xl border border-white/10 bg-slate-900/40 p-6 text-center text-xs text-slate-500">
-                Belum ada aktivitas absensi hari ini.
-              </div>
-            ) : (
-              <div className="flex flex-col gap-2">
-                {recentScans.map((scan, idx) => {
-                  const nama = String(scan.nama || "Tanpa Nama");
-                  const divisi = String(scan.divisi || "-");
-                  const jam = String(scan.jam_scan || "--:--");
-                  const jenis = String(scan.jenis_scan || "Scan");
-                  const statusStr = String(scan.status_proses || "Berhasil");
-                  const idLog = String(scan.id_log || idx);
-
-                  return (
-                    <div
-                      key={idLog}
-                      className="flex items-center justify-between rounded-2xl border border-white/10 bg-slate-900/70 p-3.5 backdrop-blur-md"
-                    >
-                      <div className="flex flex-col min-w-0 pr-2">
-                        <div className="flex items-center gap-2">
-                          <span className="text-sm font-bold text-white truncate">
-                            {nama}
-                          </span>
-                          <StatusBadge status={statusStr} />
-                        </div>
-                        <span className="text-[11px] text-slate-400 mt-0.5">
-                          {divisi} • {jam} • {jenis}
-                        </span>
-                      </div>
-                      <div className="grid size-8 shrink-0 place-items-center rounded-xl bg-sky-500/10 text-sky-400 text-xs font-bold">
-                        {jenis.charAt(0)}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
+        {/* Akses Cepat Area Berizin */}
+        {(canViewScanner || canViewHistory || canViewKaryawan) && (
+          <div className="flex flex-wrap items-center gap-2 px-0.5">
+            {canViewScanner && (
+              <Link
+                href="/scanner"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-blue-600/15 text-sky-300 border border-blue-500/20 text-xs font-bold"
+              >
+                <Icon name="scanner" className="size-3.5" />
+                <span>Pindai QR</span>
+              </Link>
+            )}
+            {canViewHistory && (
+              <Link
+                href="/history"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-800/80 text-slate-300 border border-slate-700 text-xs font-bold"
+              >
+                <Icon name="clock" className="size-3.5" />
+                <span>Riwayat</span>
+              </Link>
+            )}
+            {canViewKaryawan && (
+              <Link
+                href="/karyawan"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-800/80 text-slate-300 border border-slate-700 text-xs font-bold"
+              >
+                <Icon name="users" className="size-3.5" />
+                <span>Karyawan</span>
+              </Link>
             )}
           </div>
-        ) : null}
+        )}
+
+        {/* 3. Smart Insights */}
+        {canViewMetrics && <DashboardInsights />}
+
+        {/* 4. Riwayat Scan Terkini */}
+        {canViewHome && (
+          <section className="rounded-2xl border border-white/10 bg-slate-900/80 p-4">
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-2">
+                <div className="size-6 rounded-lg bg-blue-500/20 text-sky-400 flex items-center justify-center">
+                  <Icon name="clock" className="size-3.5" />
+                </div>
+                <h3 className="text-xs font-bold text-white uppercase tracking-wider">
+                  Scan Terakhir Hari Ini
+                </h3>
+              </div>
+              <Link
+                href="/history"
+                className="text-xs font-bold text-sky-400 hover:underline inline-flex items-center gap-1"
+              >
+                <span>Semua</span>
+                <Icon name="arrow-right" className="size-3" />
+              </Link>
+            </div>
+
+            {recentScans.length === 0 ? (
+              <div className="py-4 text-center text-xs text-slate-500">
+                Belum ada aktivitas presensi hari ini.
+              </div>
+            ) : (
+              <div className="divide-y divide-slate-800/80">
+                {recentScans.map((scan, idx) => (
+                  <div
+                    key={String(scan.id_karyawan || idx)}
+                    className="py-2.5 first:pt-0 last:pb-0 flex items-center justify-between gap-2"
+                  >
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <div className="size-7 rounded-full bg-slate-800 flex items-center justify-center font-bold text-[10px] text-slate-300 shrink-0">
+                        {String(scan.nama_karyawan || "S")
+                          .slice(0, 2)
+                          .toUpperCase()}
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-xs font-bold text-white truncate">
+                          {String(scan.nama_karyawan || "Personil")}
+                        </p>
+                        <p className="text-[10px] text-slate-400 truncate">
+                          {String(scan.divisi || "Umum")}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      <span className="text-[11px] font-mono-data text-slate-400">
+                        {String(scan.waktu_scan || scan.jam || "--:--")}
+                      </span>
+                      <StatusBadgePill
+                        status={String(scan.status_kehadiran || "Hadir")}
+                        showIcon={false}
+                      />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </section>
+        )}
       </div>
     </MobileAppShell>
   );

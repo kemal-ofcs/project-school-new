@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { SiteFooter, SiteHeader } from "@/components/SiteChrome";
+import { muatKontenHalaman } from "@/lib/server/content-data";
 import { muatProfilSekolah } from "@/lib/server/school-data";
 import { namaTampil, profilKosong } from "@/lib/services/school-profile";
 import "./globals.css";
@@ -52,7 +53,18 @@ export async function generateMetadata(): Promise<Metadata> {
 export default async function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
-  const hasil = await muatProfilSekolah();
+  const [hasil, hasilProfilCms, hasilKontakCms] = await Promise.all([
+    muatProfilSekolah(),
+    muatKontenHalaman("profil"),
+    muatKontenHalaman("kontak"),
+  ]);
+  // Header dan footer tampil di setiap halaman, jadi konten CMS-nya dimuat di
+  // sini sekali. Kegagalan membacanya tidak menghentikan halaman: bagian yang
+  // butuh kunci itu saja yang tidak dirender.
+  const kontenSitus = {
+    ...(hasilKontakCms.status === "ok" ? hasilKontakCms.data : {}),
+    ...(hasilProfilCms.status === "ok" ? hasilProfilCms.data : {}),
+  };
   // Kerangka halaman tetap tampil meski profil tidak terbaca, supaya pengunjung
   // masih bisa berpindah halaman. Isinya tidak dikarang: `profilKosong()`
   // membuat setiap bagian opsional sekadar tidak dirender. Badan halaman yang
@@ -62,9 +74,9 @@ export default async function RootLayout({
   return (
     <html lang="id">
       <body className="flex min-h-dvh flex-col">
-        <SiteHeader profil={profil} />
+        <SiteHeader profil={profil} konten={kontenSitus} />
         <div className="flex-1">{children}</div>
-        <SiteFooter profil={profil} />
+        <SiteFooter profil={profil} konten={kontenSitus} />
       </body>
     </html>
   );

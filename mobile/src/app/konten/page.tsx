@@ -10,8 +10,11 @@ import { Modal } from "@/components/ui/Modal";
 import { canAccessArea, hasPermission } from "@/lib/auth/access";
 import { triggerHaptic } from "@/lib/client/haptics";
 import {
+  HALAMAN_CMS,
   KOLEKSI_LANDING,
   LANDING_PAGE_SUBSECTIONS,
+  muatKoleksiLanding,
+  siapkanSimpanLanding,
 } from "@/lib/constants/landing-cms-fields";
 import { useAuth } from "@/lib/context/AuthContext";
 import {
@@ -101,27 +104,7 @@ export default function KontenMobilePage() {
       const res = await ambilKontenHalaman(hal);
       const items = res.items || {};
       setContentMap(items);
-      // JSON rusak = koleksi kosong, bukan galat: satu baris cacat tidak boleh
-      // mengunci seluruh panel konten.
-      const terurai: Record<string, Record<string, unknown>[]> = {};
-      for (const koleksi of Object.values(KOLEKSI_LANDING)) {
-        let daftar: Record<string, unknown>[] = [];
-        try {
-          const mentah = JSON.parse(String(items[koleksi.kunci] ?? "[]"));
-          if (Array.isArray(mentah)) {
-            daftar = mentah.filter(
-              (item): item is Record<string, unknown> =>
-                typeof item === "object" &&
-                item !== null &&
-                !Array.isArray(item),
-            );
-          }
-        } catch {
-          daftar = [];
-        }
-        terurai[koleksi.kunci] = daftar;
-      }
-      setKoleksiItems(terurai);
+      setKoleksiItems(muatKoleksiLanding(items));
     } catch (err) {
       setGalat(
         err instanceof Error
@@ -229,15 +212,11 @@ export default function KontenMobilePage() {
     setGalat(null);
     startTransition(async () => {
       try {
-        // Koleksi kosong disimpan sebagai string kosong, bukan "[]": situs
-        // publik mengabaikan nilai kosong, sehingga menghapus seluruh item
-        // mengembalikan tampilan ke isi bawaannya alih-alih bagian kosong.
-        const denganKoleksi = { ...contentMap };
-        for (const koleksi of Object.values(KOLEKSI_LANDING)) {
-          const daftar = koleksiItems[koleksi.kunci] ?? [];
-          denganKoleksi[koleksi.kunci] =
-            daftar.length > 0 ? JSON.stringify(daftar) : "";
-        }
+        // Hanya tab Landing yang punya koleksi; halaman lain disimpan apa adanya.
+        const denganKoleksi =
+          halamanTab === "landing"
+            ? siapkanSimpanLanding(contentMap, koleksiItems)
+            : contentMap;
         await simpanKontenHalaman(halamanTab, denganKoleksi);
         setContentMap(denganKoleksi);
         triggerHaptic("success");
@@ -538,37 +517,58 @@ export default function KontenMobilePage() {
                   />
                 ) : null}
 
-                {halamanTab === "landing" ? null : Object.keys(contentMap)
-                    .length === 0 ? (
-                  <p className="text-xs text-slate-400">
-                    Belum ada data khusus untuk bagian ini.
-                  </p>
-                ) : (
-                  Object.entries(contentMap).map(([kunci, isi]) => (
-                    <div key={kunci}>
-                      <label
-                        htmlFor={`input-hal-${kunci}`}
-                        className="block text-[11px] font-bold text-slate-300 mb-1"
-                      >
-                        {kunci}
-                      </label>
-                      <textarea
-                        id={`input-hal-${kunci}`}
-                        aria-label={`Konten untuk ${kunci}`}
-                        rows={2}
-                        value={isi}
-                        onChange={(e) =>
-                          setContentMap((prev) => ({
-                            ...prev,
-                            [kunci]: e.target.value,
-                          }))
-                        }
-                        disabled={!canManage}
-                        className="w-full rounded-xl border border-white/10 bg-slate-800 p-2.5 text-xs text-white focus:border-sky-400 focus:outline-none"
-                      />
-                    </div>
-                  ))
-                )}
+                {/* Field halaman Profil/Kontak/Program dari konfigurasi bersama.
+                    Dulu tab ini merender kunci yang KEBETULAN sudah ada di
+                    database, sehingga pada pemasangan baru tidak ada satu
+                    field pun yang bisa diisi dari ponsel. */}
+                {halamanTab === "landing"
+                  ? null
+                  : (HALAMAN_CMS[halamanTab]?.fields ?? []).map((field) => (
+                      <div key={field.key}>
+                        <label
+                          htmlFor={`input-hal-${field.key}`}
+                          className="block text-[11px] font-bold text-slate-300 mb-1"
+                        >
+                          {field.label}
+                        </label>
+                        {field.description ? (
+                          <p className="mb-1 text-[10px] text-sky-400/90">
+                            {field.description}
+                          </p>
+                        ) : null}
+                        {field.type === "textarea" ? (
+                          <textarea
+                            id={`input-hal-${field.key}`}
+                            rows={field.rows || 3}
+                            value={contentMap[field.key] ?? ""}
+                            placeholder={field.placeholder}
+                            onChange={(e) =>
+                              setContentMap((prev) => ({
+                                ...prev,
+                                [field.key]: e.target.value,
+                              }))
+                            }
+                            disabled={!canManage}
+                            className="w-full rounded-xl border border-white/10 bg-slate-800 p-2.5 text-xs text-white focus:border-sky-400 focus:outline-none"
+                          />
+                        ) : (
+                          <input
+                            id={`input-hal-${field.key}`}
+                            type="text"
+                            value={contentMap[field.key] ?? ""}
+                            placeholder={field.placeholder}
+                            onChange={(e) =>
+                              setContentMap((prev) => ({
+                                ...prev,
+                                [field.key]: e.target.value,
+                              }))
+                            }
+                            disabled={!canManage}
+                            className="w-full rounded-xl border border-white/10 bg-slate-800 p-2.5 text-xs text-white focus:border-sky-400 focus:outline-none"
+                          />
+                        )}
+                      </div>
+                    ))}
 
                 {canManage && (
                   <button

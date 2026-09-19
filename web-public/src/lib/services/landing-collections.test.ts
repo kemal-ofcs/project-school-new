@@ -1,20 +1,32 @@
 import { describe, expect, test } from "bun:test";
 import {
-  bangunKoleksi,
+  dariKunciBernomor,
   KUNCI_KOLEKSI,
+  KUNCI_LAMA,
+  koleksiFaq,
+  koleksiFasilitas,
+  koleksiPilar,
+  koleksiStat,
+  koleksiTahapanPmb,
   MAKS_ITEM_KOLEKSI,
-  normalisasiFasilitas,
-  normalisasiPilar,
   uraiKoleksi,
   uraiSpecs,
 } from "./landing-collections";
 
-const PILAR_BAWAAN = [
-  { title: "Bawaan 1", desc: "Desk 1", tag: "Tag 1" },
-  { title: "Bawaan 2", desc: "Desk 2", tag: "Tag 2" },
-];
-
 describe("koleksi dinamis landing page", () => {
+  /**
+   * Situs publik tidak membawa isi bawaan lagi. Teks contoh yang tertanam di
+   * kode tampil di situs sekolah seolah-olah ditulis sekolah itu, dan tidak
+   * bisa disunting siapa pun lewat CMS.
+   */
+  test("tanpa isi di database, setiap koleksi kosong — tidak ada teks contoh", () => {
+    expect(koleksiStat({})).toEqual([]);
+    expect(koleksiPilar({})).toEqual([]);
+    expect(koleksiFasilitas({})).toEqual([]);
+    expect(koleksiTahapanPmb({})).toEqual([]);
+    expect(koleksiFaq({})).toEqual([]);
+  });
+
   test("JSON rusak diperlakukan sebagai belum diisi, bukan galat", () => {
     // Satu baris JSON cacat tidak boleh menjatuhkan halaman depan situs.
     expect(uraiKoleksi("{bukan json")).toEqual([]);
@@ -22,7 +34,7 @@ describe("koleksi dinamis landing page", () => {
     expect(uraiKoleksi('"teks biasa"')).toEqual([]);
     expect(uraiKoleksi("{}")).toEqual([]);
     expect(uraiKoleksi(undefined)).toEqual([]);
-    expect(uraiKoleksi("   ")).toEqual([]);
+    expect(koleksiFaq({ [KUNCI_KOLEKSI.faq]: "[{rusak" })).toEqual([]);
   });
 
   test("hanya objek yang dihitung, dan jumlahnya dibatasi", () => {
@@ -37,59 +49,63 @@ describe("koleksi dinamis landing page", () => {
     expect(uraiKoleksi(banyak)).toHaveLength(MAKS_ITEM_KOLEKSI);
   });
 
-  /**
-   * Lapis kedua ini bukan kerapian. Pemasangan yang sudah mengisi konten lewat
-   * panel versi sebelumnya menyimpannya di kunci bernomor; kalau kunci itu
-   * berhenti dibaca, seluruh isinya lenyap saat aplikasi diperbarui.
-   */
-  test("urutan sumber: koleksi → kunci bernomor lama → bawaan", () => {
-    const lama = [{ title: "Dari kunci lama", desc: "D", tag: "T" }];
-
-    // 1. Koleksi ada → menang atas keduanya.
-    expect(
-      bangunKoleksi(
-        uraiKoleksi('[{"title":"Dari koleksi","desc":"D2","tag":"T2"}]'),
-        lama,
-        PILAR_BAWAAN,
-        normalisasiPilar,
-      ),
-    ).toEqual([{ title: "Dari koleksi", desc: "D2", tag: "T2" }]);
-
-    // 2. Koleksi kosong → kunci lama.
-    expect(bangunKoleksi([], lama, PILAR_BAWAAN, normalisasiPilar)).toEqual(
-      lama,
-    );
-
-    // 3. Keduanya kosong → bawaan.
-    expect(bangunKoleksi([], [], PILAR_BAWAAN, normalisasiPilar)).toEqual(
-      PILAR_BAWAAN,
-    );
-  });
-
-  test("field kosong pada item jatuh ke bawaan di posisi yang sama", () => {
-    // Mengisi satu field saja tidak boleh mengosongkan sisanya.
-    const hasil = bangunKoleksi(
-      uraiKoleksi('[{"title":"Hanya judul"}]'),
-      [],
-      PILAR_BAWAAN,
-      normalisasiPilar,
-    );
-    expect(hasil).toEqual([
-      { title: "Hanya judul", desc: "Desk 1", tag: "Tag 1" },
+  test("baris yang ditambahkan lalu tidak diisi tidak ditampilkan", () => {
+    const konten = {
+      [KUNCI_KOLEKSI.pilar]: JSON.stringify([
+        { title: "Pilar A", desc: "", tag: "" },
+        { title: "  ", desc: "", tag: "" },
+      ]),
+    };
+    expect(koleksiPilar(konten)).toEqual([
+      { title: "Pilar A", desc: "", tag: "" },
     ]);
   });
 
-  test("item melebihi jumlah bawaan tetap sah, tanpa cadangan", () => {
-    const hasil = bangunKoleksi(
-      uraiKoleksi(
-        '[{"title":"A","desc":"a","tag":"x"},{"title":"B","desc":"b","tag":"y"},{"title":"C","desc":"c","tag":"z"}]',
+  /**
+   * Lapis kedua membaca DATABASE, bukan teks bawaan. Pemasangan yang mengisi
+   * konten lewat panel versi sebelumnya menyimpannya di kunci bernomor, dan
+   * isinya tidak boleh lenyap hanya karena aplikasinya diperbarui.
+   */
+  test("kunci bernomor lama dibaca ketika koleksinya belum ada", () => {
+    const konten = {
+      "landing.pilar1_title": "Pilar Lama",
+      "landing.pilar1_tag": "Tag Lama",
+      "landing.pilar3_desc": "Nomor boleh berlubang",
+    };
+    expect(koleksiPilar(konten)).toEqual([
+      { title: "Pilar Lama", desc: "", tag: "Tag Lama" },
+      { title: "", desc: "Nomor boleh berlubang", tag: "" },
+    ]);
+  });
+
+  test("koleksi yang ada menang atas kunci bernomor lama", () => {
+    const konten = {
+      "landing.pilar1_title": "Pilar Lama",
+      [KUNCI_KOLEKSI.pilar]: '[{"title":"Pilar Baru","desc":"D","tag":"T"}]',
+    };
+    expect(koleksiPilar(konten)).toEqual([
+      { title: "Pilar Baru", desc: "D", tag: "T" },
+    ]);
+  });
+
+  test("ekskul lama memakai akhiran `_cat`, bukan `_category`", () => {
+    // Ejaan kunci lama dan nama field koleksi memang berbeda di sini.
+    expect(
+      dariKunciBernomor(
+        { "landing.ekskul1_cat": "Olahraga" },
+        KUNCI_LAMA.ekskul.awalan,
+        KUNCI_LAMA.ekskul.peta,
       ),
-      [],
-      PILAR_BAWAAN,
-      normalisasiPilar,
-    );
-    expect(hasil).toHaveLength(3);
-    expect(hasil[2]).toEqual({ title: "C", desc: "c", tag: "z" });
+    ).toEqual([{ category: "Olahraga" }]);
+  });
+
+  test("FAQ dan tahapan PMB tidak punya lapis kunci lama", () => {
+    expect(koleksiFaq({ "landing.faq1_q": "Tidak pernah ada" })).toEqual([]);
+    expect(
+      koleksiTahapanPmb({
+        [KUNCI_KOLEKSI.pmbTahapan]: '[{"title":"Daftar","desc":"Isi form"}]',
+      }),
+    ).toEqual([{ title: "Daftar", desc: "Isi form" }]);
   });
 
   test("specs menerima array maupun teks berbaris-baris", () => {
@@ -97,17 +113,19 @@ describe("koleksi dinamis landing page", () => {
     expect(uraiSpecs("A\n\n  B  \nC")).toEqual(["A", "B", "C"]);
     expect(uraiSpecs(undefined)).toEqual([]);
     expect(
-      normalisasiFasilitas({ name: "Lab", specs: "X\nY" }, undefined).specs,
+      koleksiFasilitas({ "landing.fasilitas1_specs": "X\nY" })[0].specs,
     ).toEqual(["X", "Y"]);
   });
 
   test("nama kunci koleksi adalah kontrak dengan panel admin", () => {
     // Berubah di satu sisi saja = koleksinya terbaca kosong tanpa pesan galat.
     expect(KUNCI_KOLEKSI).toEqual({
+      stat: "landing.stat_items",
       pilar: "landing.pilar_items",
       ekskul: "landing.ekskul_items",
       fasilitas: "landing.fasilitas_items",
-      stat: "landing.stat_items",
+      pmbTahapan: "landing.pmb_tahapan_items",
+      faq: "landing.faq_items",
     });
   });
 });

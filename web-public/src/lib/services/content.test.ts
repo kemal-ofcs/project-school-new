@@ -1,7 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { createClient } from "@libsql/client";
 import {
-  DEFAULT_PAGE_CONTENT,
   readArticleBySlug,
   readArticleCoverBySlug,
   readPageContent,
@@ -80,28 +79,32 @@ describe("Tahap D: web-public Content Service & Fallback Contract", () => {
     expect(tidakAda).toBeNull();
   });
 
-  test("readPageContent memadukan data DB dengan default fallback", async () => {
+  /**
+   * Tidak ada teks bawaan yang ikut. Versi sebelumnya menambal kunci kosong
+   * dengan isi contoh dari kode, sehingga situs setiap sekolah menampilkan visi
+   * dan misi yang sama persis sampai ada yang menimpanya.
+   */
+  test("readPageContent hanya mengembalikan isi database", async () => {
     const client = dbMemori();
     await setupDatabase(client);
 
-    // Kasus 1: Tabel masih kosong -> Mengembalikan full fallback statis
-    const kontenAwal = await readPageContent(client, "profil");
-    expect(kontenAwal["profil.visi"]).toBe(
-      DEFAULT_PAGE_CONTENT.profil["profil.visi"],
-    );
+    expect(await readPageContent(client, "profil")).toEqual({});
 
-    // Kasus 2: DB diisi nilai khusus untuk visi sekolah
     await client.execute({
       sql: `INSERT INTO konten_publik (halaman, kunci, nilai) VALUES
-            ('profil', 'profil.visi', 'Visi Baru dari CMS Sekolah.');`,
+            ('profil', 'profil.visi', 'Visi Baru dari CMS Sekolah.'),
+            ('profil', 'profil.misi', '   ');`,
     });
 
-    const kontenUpdate = await readPageContent(client, "profil");
-    expect(kontenUpdate["profil.visi"]).toBe("Visi Baru dari CMS Sekolah.");
-    // Misi dan sejarah tetap memakai fallback
-    expect(kontenUpdate["profil.sejarah"]).toBe(
-      DEFAULT_PAGE_CONTENT.profil["profil.sejarah"],
-    );
+    // Nilai yang hanya berisi spasi diperlakukan sama dengan belum diisi.
+    expect(await readPageContent(client, "profil")).toEqual({
+      "profil.visi": "Visi Baru dari CMS Sekolah.",
+    });
+  });
+
+  test("readPageContent tanpa tabel mengembalikan objek kosong, bukan melempar", async () => {
+    const client = dbMemori();
+    expect(await readPageContent(client, "landing")).toEqual({});
   });
 
   /**

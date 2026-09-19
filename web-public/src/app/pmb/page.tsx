@@ -1,7 +1,9 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { StatusTidakTerbaca } from "@/components/StatusData";
+import { muatKontenHalaman } from "@/lib/server/content-data";
 import { muatGelombangAktif } from "@/lib/server/pmb-data";
+import { koleksiTahapanPmb } from "@/lib/services/landing-collections";
 
 export const metadata: Metadata = {
   title: "Pendaftaran Peserta Didik Baru",
@@ -17,15 +19,17 @@ export const metadata: Metadata = {
  */
 export const revalidate = 0;
 
-const LANGKAH = [
-  "Mengisi formulir pendaftaran secara daring.",
-  "Mengunggah berkas persyaratan.",
-  "Menunggu verifikasi berkas oleh panitia sekolah.",
-  "Memeriksa status pendaftaran menggunakan nomor pendaftaran.",
-] as const;
-
 export default async function HalamanPmb() {
-  const gelombang = await muatGelombangAktif();
+  // Alur pendaftarannya SAMA dengan tahapan di beranda, dan keduanya dibaca dari
+  // satu koleksi CMS. Dulu halaman ini punya daftar langkahnya sendiri di kode,
+  // sehingga mengubah alur PMB di CMS hanya mengubah beranda — halaman yang
+  // justru dibuka orang saat hendak mendaftar tetap menampilkan alur lama.
+  const [gelombang, hasilKonten] = await Promise.all([
+    muatGelombangAktif(),
+    muatKontenHalaman("landing"),
+  ]);
+  const tahapan =
+    hasilKonten.status === "ok" ? koleksiTahapanPmb(hasilKonten.data) : [];
 
   return (
     <main className="mx-auto max-w-3xl px-6 py-14">
@@ -76,22 +80,31 @@ export default async function HalamanPmb() {
         )}
       </div>
 
-      <section className="mt-10">
-        <h2 className="font-semibold text-xl">Alur pendaftaran</h2>
-        <ol className="mt-5 space-y-4">
-          {LANGKAH.map((langkah, urutan) => (
-            <li className="flex gap-4" key={langkah}>
-              <span
-                aria-hidden="true"
-                className="flex size-7 shrink-0 items-center justify-center rounded-full bg-aksen font-medium text-aksen-teks text-sm"
-              >
-                {urutan + 1}
-              </span>
-              <span className="pt-0.5 leading-relaxed">{langkah}</span>
-            </li>
-          ))}
-        </ol>
-      </section>
+      {tahapan.length > 0 ? (
+        <section className="mt-10">
+          <h2 className="font-semibold text-xl">Alur pendaftaran</h2>
+          <ol className="mt-5 space-y-4">
+            {tahapan.map((langkah, urutan) => (
+              <li className="flex gap-4" key={`${urutan}-${langkah.title}`}>
+                <span
+                  aria-hidden="true"
+                  className="flex size-7 shrink-0 items-center justify-center rounded-full bg-aksen font-medium text-aksen-teks text-sm"
+                >
+                  {urutan + 1}
+                </span>
+                <span className="pt-0.5 leading-relaxed">
+                  <span className="font-medium">{langkah.title}</span>
+                  {langkah.desc ? (
+                    <span className="block text-sm text-teks-lembut">
+                      {langkah.desc}
+                    </span>
+                  ) : null}
+                </span>
+              </li>
+            ))}
+          </ol>
+        </section>
+      ) : null}
 
       <section className="mt-10 rounded-lg border border-garis p-5">
         <h2 className="font-semibold text-lg">Sudah mendaftar?</h2>

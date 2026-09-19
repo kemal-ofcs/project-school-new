@@ -28,7 +28,13 @@ export function MobileBottomNav() {
   if (canHome) {
     navItems.push({ href: "/dashboard", icon: "dashboard", label: "Beranda" });
   }
-  if (canKaryawan) {
+  if (canAccessArea(user, "dasbor_kehadiran")) {
+    navItems.push({
+      href: "/dasbor-kehadiran",
+      icon: "dashboard",
+      label: "Pantau",
+    });
+  } else if (canKaryawan) {
     navItems.push({ href: "/karyawan", icon: "users", label: "Karyawan" });
   }
   if (canScanner) {
@@ -39,7 +45,9 @@ export function MobileBottomNav() {
       isElevated: true,
     });
   }
-  if (canHistory) {
+  if (canAccessArea(user, "siswa")) {
+    navItems.push({ href: "/siswa", icon: "users", label: "Siswa" });
+  } else if (canHistory) {
     navItems.push({ href: "/history", icon: "clock", label: "Riwayat" });
   }
   navItems.push({ href: "/settings", icon: "settings", label: "Pengaturan" });
@@ -66,13 +74,16 @@ export function MobileBottomNav() {
                 className="group relative -top-4 flex flex-col items-center"
               >
                 <div
-                  className={`grid size-14 place-items-center rounded-2xl shadow-xl transition-all active:scale-90 ${
+                  className={`grid size-14 place-items-center rounded-2xl shadow-floating-bca transition-all active:scale-90 ${
                     isActive
-                      ? "bg-gradient-to-tr from-sky-400 via-sky-500 to-blue-600 text-slate-950 shadow-sky-500/40 ring-4 ring-slate-950 ring-offset-2 ring-offset-sky-500/30"
-                      : "bg-gradient-to-tr from-sky-500 to-blue-700 text-on-accent shadow-sky-950/60 ring-4 ring-slate-950 hover:brightness-110"
+                      ? "bg-gradient-to-tr from-[#003399] via-blue-600 to-[#007aff] text-white ring-4 ring-slate-950 scale-105 shadow-blue-500/30"
+                      : "bg-gradient-to-tr from-[#003399] to-blue-700 text-white ring-4 ring-slate-950 hover:brightness-110"
                   }`}
                 >
-                  <Icon name="scanner" className="size-7 stroke-[2.2]" />
+                  <Icon
+                    name="scanner"
+                    className="size-7 stroke-[2.2] text-white"
+                  />
                 </div>
                 <span
                   className={`mt-1 text-[11px] font-black tracking-tight transition-colors ${

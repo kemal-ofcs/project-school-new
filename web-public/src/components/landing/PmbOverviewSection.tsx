@@ -11,59 +11,68 @@ import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { koleksiTahapanPmb } from "@/lib/services/landing-collections";
 import type { GelombangAktif } from "@/lib/services/pmb";
 
 interface PmbOverviewSectionProps {
   gelombangAktif: GelombangAktif | null;
+  konten?: Record<string, string>;
 }
 
-const TAHAPAN = [
-  {
-    step: "1",
-    icon: FileText,
-    title: "Formulir Daring",
-    desc: "Mengisi data diri calon siswa, riwayat asal sekolah, kontak wali, dan pilihan program studi secara online.",
-  },
-  {
-    step: "2",
-    icon: Upload,
-    title: "Unggah Berkas",
-    desc: "Mengunggah pasfoto terbaru, scan Kartu Keluarga, Akta Kelahiran, dan salinan rapor semester terakhir (max 500KB).",
-  },
-  {
-    step: "3",
-    icon: UserCheck,
-    title: "Verifikasi & Wawancara",
-    desc: "Pemeriksaan keabsahan dokumen oleh panitia dan sesi wawancara peminatan minat bakat bersama psikolog sekolah.",
-  },
-  {
-    step: "4",
-    icon: CheckCircle,
-    title: "Pengumuman & Daftar Ulang",
-    desc: "Mengecek nomor kelulusan di portal status, penyelesaian administrasi daftar ulang, dan pengambilan seragam.",
-  },
-] as const;
+/**
+ * Ikon tahapan diputar berdasarkan posisi. Ia komponen React sehingga tidak
+ * bisa disimpan di database, dan tahapan ke-N tetap butuh satu.
+ */
+const IKON_TAHAPAN = [FileText, Upload, UserCheck, CheckCircle];
 
+/**
+ * Ringkasan PMB di landing page.
+ *
+ * Kotak gelombang SELALU tampil karena datanya dari tabel PMB, bukan dari CMS.
+ * Judul-judul dan tahapan pendaftarannya dari CMS (`landing.pmb_*`); versi
+ * sebelumnya menulis empat tahapan di kode beserta judul "4 Langkah Mudah…",
+ * yang langsung berbohong begitu sekolah punya tiga atau lima langkah.
+ */
 export function PmbOverviewSection({
   gelombangAktif,
+  konten = {},
 }: PmbOverviewSectionProps) {
+  const eyebrow = konten["landing.pmb_eyebrow"];
+  const title = konten["landing.pmb_title"];
+  const subtitle = konten["landing.pmb_subtitle"];
+  const judulTahapan = konten["landing.pmb_tahapan_title"];
+  const tahapan = koleksiTahapanPmb(konten).map((item, i) => ({
+    ...item,
+    // Nomor langkah dihitung dari urutan, bukan disimpan: menggeser atau
+    // menghapus satu tahapan di CMS tidak boleh meninggalkan nomor yang loncat.
+    step: String(i + 1),
+    icon: IKON_TAHAPAN[i % IKON_TAHAPAN.length],
+  }));
+  const adaHeader = Boolean(eyebrow || title || subtitle);
+
   return (
     <section className="py-20 sm:py-28 bg-muted/40 border-y border-border">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 space-y-16">
-        {/* Section Header */}
-        <div className="text-center max-w-2xl mx-auto space-y-3">
-          <div className="inline-flex items-center gap-1.5 text-xs font-bold uppercase tracking-widest text-secondary">
-            <Sparkles className="h-3.5 w-3.5" />
-            <span>Penerimaan Murid Baru</span>
+        {adaHeader ? (
+          <div className="text-center max-w-2xl mx-auto space-y-3">
+            {eyebrow ? (
+              <div className="inline-flex items-center gap-1.5 text-xs font-bold uppercase tracking-widest text-secondary">
+                <Sparkles className="h-3.5 w-3.5" />
+                <span>{eyebrow}</span>
+              </div>
+            ) : null}
+            {title ? (
+              <h2 className="font-bold text-2xl sm:text-4xl text-foreground tracking-tight">
+                {title}
+              </h2>
+            ) : null}
+            {subtitle ? (
+              <p className="text-sm sm:text-base text-muted-foreground leading-relaxed">
+                {subtitle}
+              </p>
+            ) : null}
           </div>
-          <h2 className="font-bold text-2xl sm:text-4xl text-foreground tracking-tight">
-            Alur Pendaftaran & Transparansi Biaya
-          </h2>
-          <p className="text-sm sm:text-base text-muted-foreground leading-relaxed">
-            Proses seleksi penerimaan murid baru yang transparan, mudah, dan
-            terpadu dalam 4 tahapan sistematis.
-          </p>
-        </div>
+        ) : null}
 
         {/* Banner Gelombang Aktif */}
         {gelombangAktif ? (
@@ -139,44 +148,49 @@ export function PmbOverviewSection({
           </div>
         )}
 
-        {/* 4 Tahapan Berurutan */}
-        <div className="space-y-6">
-          <h3 className="font-bold text-xl text-foreground text-center">
-            4 Langkah Mudah Menjadi Bagian Sekolah Kami
-          </h3>
+        {tahapan.length > 0 ? (
+          <div className="space-y-6">
+            {judulTahapan ? (
+              <h3 className="font-bold text-xl text-foreground text-center">
+                {judulTahapan}
+              </h3>
+            ) : null}
 
-          <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
-            {TAHAPAN.map((item) => {
-              const Icon = item.icon;
-              return (
-                <Card
-                  key={item.step}
-                  className="relative flex flex-col justify-between p-6 bg-card border-border shadow-xs hover:shadow-md transition-shadow"
-                >
-                  <div className="space-y-4">
-                    <div className="flex items-center justify-between">
-                      <span className="flex h-9 w-9 items-center justify-center rounded-full bg-primary font-bold text-sm text-primary-foreground shadow-sm">
-                        {item.step}
-                      </span>
-                      <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-muted text-primary">
-                        <Icon className="h-5 w-5" />
+            <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
+              {tahapan.map((item) => {
+                const Icon = item.icon;
+                return (
+                  <Card
+                    key={item.step}
+                    className="relative flex flex-col justify-between p-6 bg-card border-border shadow-xs hover:shadow-md transition-shadow"
+                  >
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-between">
+                        <span className="flex h-9 w-9 items-center justify-center rounded-full bg-primary font-bold text-sm text-primary-foreground shadow-sm">
+                          {item.step}
+                        </span>
+                        <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-muted text-primary">
+                          <Icon className="h-5 w-5" />
+                        </div>
+                      </div>
+
+                      <div className="space-y-1.5">
+                        <h4 className="font-bold text-base text-foreground">
+                          {item.title}
+                        </h4>
+                        {item.desc ? (
+                          <p className="text-xs text-muted-foreground leading-relaxed">
+                            {item.desc}
+                          </p>
+                        ) : null}
                       </div>
                     </div>
-
-                    <div className="space-y-1.5">
-                      <h4 className="font-bold text-base text-foreground">
-                        {item.title}
-                      </h4>
-                      <p className="text-xs text-muted-foreground leading-relaxed">
-                        {item.desc}
-                      </p>
-                    </div>
-                  </div>
-                </Card>
-              );
-            })}
+                  </Card>
+                );
+              })}
+            </div>
           </div>
-        </div>
+        ) : null}
 
         {/* Informasi Bantuan & Cek Status Mandiri */}
         <div className="rounded-xl border border-border bg-card p-6 flex flex-col sm:flex-row items-center justify-between gap-4">

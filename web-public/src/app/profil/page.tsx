@@ -75,34 +75,44 @@ export default async function HalamanProfil() {
         </section>
       ) : null}
 
-      {/* Visi & Misi */}
-      <section className="grid gap-8 sm:grid-cols-2">
-        <div className="rounded-3xl border border-garis bg-kartu p-6 sm:p-8 space-y-3 shadow-sm">
-          <div className="flex items-center gap-2">
-            <span className="flex size-7 items-center justify-center rounded-xl bg-aksen/15 text-aksen font-bold text-sm">
-              V
-            </span>
-            <h2 className="font-bold text-lg text-teks-utama">Visi Sekolah</h2>
-          </div>
-          <p className="text-sm leading-relaxed text-teks-lembut whitespace-pre-line">
-            {visi ||
-              "Mewujudkan generasi unggul, berakhlak mulia, dan berdaya saing global."}
-          </p>
-        </div>
+      {/* Visi & Misi — dari CMS saja. Kartu yang belum diisi disembunyikan;
+          versi sebelumnya menambalnya dengan kalimat contoh yang tampil sama
+          persis di situs setiap sekolah. */}
+      {visi || misi ? (
+        <section className="grid gap-8 sm:grid-cols-2">
+          {visi ? (
+            <div className="rounded-3xl border border-garis bg-kartu p-6 sm:p-8 space-y-3 shadow-sm">
+              <div className="flex items-center gap-2">
+                <span className="flex size-7 items-center justify-center rounded-xl bg-aksen/15 text-aksen font-bold text-sm">
+                  V
+                </span>
+                <h2 className="font-bold text-lg text-teks-utama">
+                  Visi Sekolah
+                </h2>
+              </div>
+              <p className="text-sm leading-relaxed text-teks-lembut whitespace-pre-line">
+                {visi}
+              </p>
+            </div>
+          ) : null}
 
-        <div className="rounded-3xl border border-garis bg-kartu p-6 sm:p-8 space-y-3 shadow-sm">
-          <div className="flex items-center gap-2">
-            <span className="flex size-7 items-center justify-center rounded-xl bg-aksen/15 text-aksen font-bold text-sm">
-              M
-            </span>
-            <h2 className="font-bold text-lg text-teks-utama">Misi Sekolah</h2>
-          </div>
-          <div className="text-sm leading-relaxed text-teks-lembut whitespace-pre-line space-y-1">
-            {misi ||
-              "Menyelenggarakan pendidikan berkualitas dan berintegritas tinggi."}
-          </div>
-        </div>
-      </section>
+          {misi ? (
+            <div className="rounded-3xl border border-garis bg-kartu p-6 sm:p-8 space-y-3 shadow-sm">
+              <div className="flex items-center gap-2">
+                <span className="flex size-7 items-center justify-center rounded-xl bg-aksen/15 text-aksen font-bold text-sm">
+                  M
+                </span>
+                <h2 className="font-bold text-lg text-teks-utama">
+                  Misi Sekolah
+                </h2>
+              </div>
+              <div className="text-sm leading-relaxed text-teks-lembut whitespace-pre-line space-y-1">
+                {misi}
+              </div>
+            </div>
+          ) : null}
+        </section>
+      ) : null}
 
       {/* Sejarah Singkat */}
       {sejarah ? (
