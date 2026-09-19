@@ -91,7 +91,6 @@ const dirsToCopy = [
  */
 const MOBILE_ONLY_IN_SYNCED_DIRS = [
   "lib/client/audio.ts",
-  "lib/client/external-link.ts",
   "lib/client/haptics.ts",
   "lib/client/share.ts",
   "lib/client/wakelock.ts",

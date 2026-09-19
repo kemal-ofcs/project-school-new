@@ -19,6 +19,7 @@ import {
   type PmbRegistrantDetail,
   type PmbRegistrantItem,
   type PmbWave,
+  simpanGelombangPmb,
   ubahStatusPendaftarPmb,
 } from "@/lib/gateways/pmb";
 import { useConfirmDialog } from "@/lib/hooks/useConfirmDialog";
@@ -29,6 +30,16 @@ interface Rombel {
   id_rombel: string;
   nama_rombel: string;
 }
+
+const GELOMBANG_KOSONG = {
+  nama: "",
+  tahunAjaran: "",
+  tanggalBuka: "",
+  tanggalTutup: "",
+  kuota: 0,
+  biayaPendaftaran: 0,
+  isAktif: true,
+};
 
 /**
  * Tinjauan PMB di ponsel.
@@ -62,7 +73,10 @@ export default function PmbMobilePage() {
   const [rombel, setRombel] = useState<Rombel[]>([]);
 
   const [filterStatus, setFilterStatus] = useState("Semua");
+  const [filterGelombang, setFilterGelombang] = useState("Semua");
   const [pencarian, setPencarian] = useState("");
+  const [modalGelombang, setModalGelombang] = useState(false);
+  const [draftGelombang, setDraftGelombang] = useState(GELOMBANG_KOSONG);
 
   const [detail, setDetail] = useState<PmbRegistrantDetail | null>(null);
   const [berkasDibuka, setBerkasDibuka] = useState<PmbFileContent | null>(null);
@@ -92,6 +106,7 @@ export default function PmbMobilePage() {
     try {
       const [hasilPendaftar, hasilGelombang] = await Promise.all([
         daftarPendaftarPmb({
+          id_gelombang: filterGelombang,
           status: filterStatus,
           search: pencarian || null,
         }),
@@ -109,7 +124,7 @@ export default function PmbMobilePage() {
     } finally {
       setMemuat(false);
     }
-  }, [filterStatus, pencarian]);
+  }, [filterGelombang, filterStatus, pencarian]);
 
   useEffect(() => {
     if (!authLoading && isAuthenticated) void muatData();
@@ -227,6 +242,27 @@ export default function PmbMobilePage() {
     }
   }
 
+  async function simpanGelombang(peristiwa: React.FormEvent<HTMLFormElement>) {
+    peristiwa.preventDefault();
+    if (isSubmittingRef.current) return;
+    isSubmittingRef.current = true;
+    setGalat("");
+
+    try {
+      await simpanGelombangPmb(draftGelombang);
+      setKabar("Gelombang pendaftaran disimpan.");
+      setModalGelombang(false);
+      setDraftGelombang(GELOMBANG_KOSONG);
+      await muatData();
+    } catch (error) {
+      setGalat(
+        error instanceof Error ? error.message : "Gelombang gagal disimpan.",
+      );
+    } finally {
+      isSubmittingRef.current = false;
+    }
+  }
+
   if (authLoading || !isAuthenticated) {
     return (
       <MobileAppShell>
@@ -252,14 +288,59 @@ export default function PmbMobilePage() {
             Meninjau calon siswa yang mendaftar lewat situs sekolah. Data PMB
             berada di cloud dan memerlukan jaringan.
           </p>
-          {gelombang.length > 0 ? (
-            <p className="mt-2 text-slate-500 text-xs">
-              {gelombang.filter((g) => g.is_aktif).length > 0
-                ? `Gelombang aktif: ${gelombang.find((g) => g.is_aktif)?.nama}`
-                : "Tidak ada gelombang yang sedang dibuka."}
-            </p>
-          ) : null}
         </header>
+
+        <section className="space-y-3 rounded-2xl border border-white/10 bg-slate-900/95 p-4">
+          <div className="flex items-center justify-between gap-3">
+            <h2 className="font-semibold text-sm text-white">
+              Gelombang Pendaftaran
+            </h2>
+            {bolehKelola ? (
+              <button
+                className="rounded-xl bg-amber-500 px-3 py-1.5 font-bold text-[11px] text-slate-950 active:scale-95"
+                onClick={() => {
+                  setDraftGelombang(GELOMBANG_KOSONG);
+                  setModalGelombang(true);
+                }}
+                type="button"
+              >
+                Gelombang Baru
+              </button>
+            ) : null}
+          </div>
+          {gelombang.length === 0 ? (
+            <p className="text-slate-400 text-xs leading-relaxed">
+              Belum ada gelombang. Situs publik tidak akan menerima pendaftaran
+              sampai satu gelombang dibuat dan diaktifkan.
+            </p>
+          ) : (
+            <ul className="grid gap-2">
+              {gelombang.map((item) => (
+                <li
+                  className="rounded-xl border border-white/10 p-3"
+                  key={item.id_gelombang}
+                >
+                  <p className="font-medium text-sm text-white">
+                    {item.nama}
+                    {item.is_aktif ? (
+                      <span className="ml-2 rounded-full bg-emerald-500/20 px-2 py-0.5 text-emerald-300 text-[10px]">
+                        Aktif
+                      </span>
+                    ) : null}
+                  </p>
+                  <p className="mt-1 text-slate-400 text-[11px]">
+                    {item.tahun_ajaran} · {item.tanggal_buka} →{" "}
+                    {item.tanggal_tutup}
+                  </p>
+                  <p className="mt-1 text-slate-400 text-[11px]">
+                    Pendaftar: {item.terpakai ?? 0}
+                    {item.kuota > 0 ? ` / ${item.kuota}` : ""}
+                  </p>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
 
         {galat ? (
           <FeedbackBanner
@@ -277,6 +358,27 @@ export default function PmbMobilePage() {
         ) : null}
 
         <section className="space-y-3 rounded-2xl border border-white/10 bg-slate-900/95 p-4">
+          <div>
+            <label
+              className="block text-slate-400 text-xs"
+              htmlFor={`${id}-gelombang`}
+            >
+              Filter gelombang
+            </label>
+            <select
+              className="mt-1 w-full rounded-xl border border-white/10 bg-slate-950 px-3 py-2 text-sm text-white"
+              id={`${id}-gelombang`}
+              onChange={(e) => setFilterGelombang(e.target.value)}
+              value={filterGelombang}
+            >
+              <option value="Semua">Semua gelombang</option>
+              {gelombang.map((item) => (
+                <option key={item.id_gelombang} value={item.id_gelombang}>
+                  {item.nama}
+                </option>
+              ))}
+            </select>
+          </div>
           <div>
             <label
               className="block text-slate-400 text-xs"
@@ -532,6 +634,166 @@ export default function PmbMobilePage() {
             type="submit"
           >
             Buat data siswa
+          </button>
+        </form>
+      </Modal>
+
+      <Modal
+        isOpen={modalGelombang}
+        onClose={() => setModalGelombang(false)}
+        title="Gelombang Pendaftaran"
+      >
+        <form className="space-y-3 text-sm" onSubmit={simpanGelombang}>
+          <div>
+            <label
+              className="block text-slate-400 text-xs"
+              htmlFor={`${id}-gel-nama`}
+            >
+              Nama gelombang
+            </label>
+            <input
+              className="mt-1 w-full rounded-xl border border-white/10 bg-slate-950 px-3 py-2 text-white"
+              id={`${id}-gel-nama`}
+              onChange={(e) =>
+                setDraftGelombang((d) => ({ ...d, nama: e.target.value }))
+              }
+              required
+              type="text"
+              value={draftGelombang.nama}
+            />
+          </div>
+          <div>
+            <label
+              className="block text-slate-400 text-xs"
+              htmlFor={`${id}-gel-ta`}
+            >
+              Tahun ajaran
+            </label>
+            <input
+              className="mt-1 w-full rounded-xl border border-white/10 bg-slate-950 px-3 py-2 text-white"
+              id={`${id}-gel-ta`}
+              onChange={(e) =>
+                setDraftGelombang((d) => ({
+                  ...d,
+                  tahunAjaran: e.target.value,
+                }))
+              }
+              placeholder="2026/2027"
+              required
+              type="text"
+              value={draftGelombang.tahunAjaran}
+            />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label
+                className="block text-slate-400 text-xs"
+                htmlFor={`${id}-gel-buka`}
+              >
+                Tanggal buka
+              </label>
+              <input
+                className="mt-1 w-full rounded-xl border border-white/10 bg-slate-950 px-3 py-2 text-white"
+                id={`${id}-gel-buka`}
+                onChange={(e) =>
+                  setDraftGelombang((d) => ({
+                    ...d,
+                    tanggalBuka: e.target.value,
+                  }))
+                }
+                required
+                type="date"
+                value={draftGelombang.tanggalBuka}
+              />
+            </div>
+            <div>
+              <label
+                className="block text-slate-400 text-xs"
+                htmlFor={`${id}-gel-tutup`}
+              >
+                Tanggal tutup
+              </label>
+              <input
+                className="mt-1 w-full rounded-xl border border-white/10 bg-slate-950 px-3 py-2 text-white"
+                id={`${id}-gel-tutup`}
+                onChange={(e) =>
+                  setDraftGelombang((d) => ({
+                    ...d,
+                    tanggalTutup: e.target.value,
+                  }))
+                }
+                required
+                type="date"
+                value={draftGelombang.tanggalTutup}
+              />
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label
+                className="block text-slate-400 text-xs"
+                htmlFor={`${id}-gel-kuota`}
+              >
+                Kuota (0 = tanpa batas)
+              </label>
+              <input
+                className="mt-1 w-full rounded-xl border border-white/10 bg-slate-950 px-3 py-2 text-white"
+                id={`${id}-gel-kuota`}
+                min={0}
+                onChange={(e) =>
+                  setDraftGelombang((d) => ({
+                    ...d,
+                    kuota: Number(e.target.value),
+                  }))
+                }
+                type="number"
+                value={draftGelombang.kuota}
+              />
+            </div>
+            <div>
+              <label
+                className="block text-slate-400 text-xs"
+                htmlFor={`${id}-gel-biaya`}
+              >
+                Biaya pendaftaran
+              </label>
+              <input
+                className="mt-1 w-full rounded-xl border border-white/10 bg-slate-950 px-3 py-2 text-white"
+                id={`${id}-gel-biaya`}
+                min={0}
+                onChange={(e) =>
+                  setDraftGelombang((d) => ({
+                    ...d,
+                    biayaPendaftaran: Number(e.target.value),
+                  }))
+                }
+                type="number"
+                value={draftGelombang.biayaPendaftaran}
+              />
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <input
+              checked={draftGelombang.isAktif}
+              id={`${id}-gel-aktif`}
+              name="isAktif"
+              onChange={(e) =>
+                setDraftGelombang((d) => ({ ...d, isAktif: e.target.checked }))
+              }
+              type="checkbox"
+            />
+            <label
+              className="text-slate-300 text-xs"
+              htmlFor={`${id}-gel-aktif`}
+            >
+              Aktifkan gelombang ini (gelombang lain otomatis dinonaktifkan)
+            </label>
+          </div>
+          <button
+            className="w-full rounded-xl bg-amber-500 px-4 py-3 font-semibold text-slate-950"
+            type="submit"
+          >
+            Simpan gelombang
           </button>
         </form>
       </Modal>

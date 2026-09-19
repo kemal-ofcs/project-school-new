@@ -3805,12 +3805,44 @@ pub async fn desktop_save_page_content(
     state.get_turso_client()?.save_page_content(&halaman, &items).await
 }
 
-/// Membuka URL eksternal di browser default sistem (Chrome/Edge).
+/// Menyerahkan tautan ke aplikasi lain: WhatsApp, aplikasi telepon, atau browser.
+///
+/// Di Android ini WAJIB lewat Intent.ACTION_VIEW. WebView yang dipakai Tauri
+/// tidak meneruskan skema non-http (`tel:`, `whatsapp:`) ke sistem, dan
+/// menavigasi WebView ke `https://wa.me/...` hanya memuat WhatsApp Web di dalam
+/// aplikasi lalu gagal — persis bug yang dilaporkan pada tombol "WA",
+/// "Hubungi Wali", dan tombol telepon.
+///
+/// Versi sebelumnya hanya punya cabang Windows/macOS/Linux, dan cabang Linux-nya
+/// di-`cfg` dengan `not(target_os = "android")`. Di Android seluruh badan fungsi
+/// karena itu menguap dan command ini mengembalikan `Ok(())` tanpa melakukan
+/// apa pun — melapor sukses sambil tidak membuka apa-apa.
 #[tauri::command]
-pub fn desktop_open_external_url(url: String) -> Result<(), CommandError> {
+pub fn desktop_open_external_url(
+    #[allow(unused_variables)] app: tauri::AppHandle,
+    url: String,
+) -> Result<(), CommandError> {
     let trimmed = url.trim();
-    if !trimmed.starts_with("https://") && !trimmed.starts_with("http://") && !trimmed.starts_with("whatsapp://") {
+    // `tel:` ikut diizinkan: tombol telepon memakai skema ini, dan sebelumnya
+    // ia ditolak di sini sehingga tidak pernah bisa sampai ke aplikasi telepon.
+    let diizinkan = ["https://", "http://", "whatsapp://", "tel:"]
+        .iter()
+        .any(|awalan| trimmed.starts_with(awalan));
+    if !diizinkan {
         return Err(CommandError::new("INVALID_URL", "Skema URL tidak diizinkan."));
+    }
+
+    #[cfg(target_os = "android")]
+    {
+        use tauri_plugin_opener::OpenerExt;
+        app.opener()
+            .open_url(trimmed, None::<&str>)
+            .map_err(|e| {
+                CommandError::new(
+                    "OPEN_FAILED",
+                    format!("Tidak ada aplikasi yang bisa membuka tautan ini: {e}"),
+                )
+            })?;
     }
 
     #[cfg(target_os = "windows")]

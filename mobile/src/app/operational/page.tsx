@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { MobileAppShell } from "@/components/MobileAppShell";
 import { Icon } from "@/components/ui/Icon";
+import { QuickActionTile } from "@/components/ui/QuickActionTile";
 import { canAccessArea } from "@/lib/auth/access";
 import { triggerHaptic } from "@/lib/client/haptics";
 import { useAuth } from "@/lib/context/AuthContext";
@@ -115,6 +116,13 @@ export default function OperationalPage() {
   const [manKeterangan, setManKeterangan] = useState<string>("");
 
   const isOperational = canAccessArea(user, "operational");
+  const bolehKonten = canAccessArea(user, "konten");
+  const bolehPmb = canAccessArea(user, "pmb");
+  // Halaman ini juga jadi satu-satunya pintu masuk modul CMS dan PMB di Mobile.
+  // Paket bawaan peran `operator` memegang `content.view` TANPA `corrections.view`
+  // maupun `backups.view`, jadi menjaga seluruh halaman pada `operational` akan
+  // mengunci justru peran yang modul itu ditujukan untuknya.
+  const bolehBukaHalaman = isOperational || bolehKonten || bolehPmb;
 
   useEffect(() => {
     if (!authLoading && !isAuthenticated) {
@@ -123,10 +131,10 @@ export default function OperationalPage() {
     }
     // Otorisasi, bukan sekadar autentikasi. Mobile memakai static export dan
     // tidak punya rute `/forbidden`, jadi pengguna tanpa hak dipulangkan.
-    if (!authLoading && isAuthenticated && !isOperational) {
+    if (!authLoading && isAuthenticated && !bolehBukaHalaman) {
       router.replace("/dashboard");
     }
-  }, [authLoading, isAuthenticated, isOperational, router]);
+  }, [authLoading, isAuthenticated, bolehBukaHalaman, router]);
 
   // Load master data once
   useEffect(() => {
@@ -216,7 +224,7 @@ export default function OperationalPage() {
   }, [date, activeTab, isAuthenticated, isOperational, loadTabRecords]);
 
   // Check RBAC Access
-  if (!authLoading && !isOperational) {
+  if (!authLoading && !bolehBukaHalaman) {
     return (
       <MobileAppShell>
         <div className="flex flex-col items-center justify-center min-h-[60vh] text-center px-4">
@@ -561,82 +569,118 @@ export default function OperationalPage() {
                 Operasional Lapangan
               </h2>
             </div>
-            <button
-              type="button"
-              onClick={() => loadTabRecords(date, activeTab)}
-              aria-label="Muat ulang data"
-              className="grid size-9 place-items-center rounded-xl bg-white/10 text-slate-300 hover:bg-white/20 active:scale-95 transition"
-            >
-              <Icon
-                name="reset"
-                className={`size-4 ${loadingList ? "animate-spin" : ""}`}
-              />
-            </button>
+            {isOperational && (
+              <button
+                type="button"
+                onClick={() => loadTabRecords(date, activeTab)}
+                aria-label="Muat ulang data"
+                className="grid size-9 place-items-center rounded-xl bg-white/10 text-slate-300 hover:bg-white/20 active:scale-95 transition"
+              >
+                <Icon
+                  name="reset"
+                  className={`size-4 ${loadingList ? "animate-spin" : ""}`}
+                />
+              </button>
+            )}
           </div>
 
-          {/* Date Picker */}
-          <div className="mb-3">
-            <input
-              aria-label="Tanggal absensi"
-              type="date"
-              value={date}
-              onChange={(e) => {
-                triggerHaptic("light");
-                setDate(e.target.value);
-              }}
-              className="w-full rounded-2xl border border-white/15 bg-slate-950 px-4 py-2 text-xs font-semibold text-white focus:border-sky-400 focus:outline-none font-mono"
-            />
-          </div>
+          {isOperational && (
+            <>
+              {/* Date Picker */}
+              <div className="mb-3">
+                <input
+                  aria-label="Tanggal absensi"
+                  type="date"
+                  value={date}
+                  onChange={(e) => {
+                    triggerHaptic("light");
+                    setDate(e.target.value);
+                  }}
+                  className="w-full rounded-2xl border border-white/15 bg-slate-950 px-4 py-2 text-xs font-semibold text-white focus:border-sky-400 focus:outline-none font-mono"
+                />
+              </div>
 
-          {/* 3-Tab Segmented Control */}
-          <div className="grid grid-cols-3 gap-1 rounded-2xl bg-slate-950/80 p-1 border border-white/10">
-            <button
-              type="button"
-              onClick={() => {
-                triggerHaptic("light");
-                setActiveTab("koreksi");
-                setFeedback(null);
-              }}
-              className={`rounded-xl py-2 text-[11px] font-bold transition active:scale-95 ${
-                activeTab === "koreksi"
-                  ? "bg-sky-500 text-slate-950 shadow-md"
-                  : "text-slate-400 hover:text-white"
-              }`}
-            >
-              Koreksi Admin
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                triggerHaptic("light");
-                setActiveTab("backup");
-                setFeedback(null);
-              }}
-              className={`rounded-xl py-2 text-[11px] font-bold transition active:scale-95 ${
-                activeTab === "backup"
-                  ? "bg-sky-500 text-slate-950 shadow-md"
-                  : "text-slate-400 hover:text-white"
-              }`}
-            >
-              Backup Karyawan
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                triggerHaptic("light");
-                setActiveTab("manual");
-                setFeedback(null);
-              }}
-              className={`rounded-xl py-2 text-[11px] font-bold transition active:scale-95 ${
-                activeTab === "manual"
-                  ? "bg-sky-500 text-slate-950 shadow-md"
-                  : "text-slate-400 hover:text-white"
-              }`}
-            >
-              Entri Manual
-            </button>
-          </div>
+              {/* 3-Tab Segmented Control */}
+              <div className="grid grid-cols-3 gap-1 rounded-2xl bg-slate-950/80 p-1 border border-white/10">
+                <button
+                  type="button"
+                  onClick={() => {
+                    triggerHaptic("light");
+                    setActiveTab("koreksi");
+                    setFeedback(null);
+                  }}
+                  className={`rounded-xl py-2 text-[11px] font-bold transition active:scale-95 ${
+                    activeTab === "koreksi"
+                      ? "bg-sky-500 text-slate-950 shadow-md"
+                      : "text-slate-400 hover:text-white"
+                  }`}
+                >
+                  Koreksi Admin
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    triggerHaptic("light");
+                    setActiveTab("backup");
+                    setFeedback(null);
+                  }}
+                  className={`rounded-xl py-2 text-[11px] font-bold transition active:scale-95 ${
+                    activeTab === "backup"
+                      ? "bg-sky-500 text-slate-950 shadow-md"
+                      : "text-slate-400 hover:text-white"
+                  }`}
+                >
+                  Backup Karyawan
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    triggerHaptic("light");
+                    setActiveTab("manual");
+                    setFeedback(null);
+                  }}
+                  className={`rounded-xl py-2 text-[11px] font-bold transition active:scale-95 ${
+                    activeTab === "manual"
+                      ? "bg-sky-500 text-slate-950 shadow-md"
+                      : "text-slate-400 hover:text-white"
+                  }`}
+                >
+                  Entri Manual
+                </button>
+              </div>
+            </>
+          )}
         </div>
+
+        {/* Sub-menu Operasional: modul yang berdiri sendiri, bukan tab entri harian. */}
+        {(bolehKonten || bolehPmb) && (
+          <section aria-labelledby="judul-submenu-operasional">
+            <h3
+              id="judul-submenu-operasional"
+              className="mb-2 px-1 text-[11px] font-black uppercase tracking-wider text-slate-400"
+            >
+              Modul Operasional
+            </h3>
+            <div className="grid grid-cols-2 gap-2.5">
+              {bolehKonten && (
+                <QuickActionTile
+                  href="/konten"
+                  icon="globe"
+                  title="Situs Publik & Berita"
+                  tone="purple"
+                />
+              )}
+              {bolehPmb && (
+                <QuickActionTile
+                  href="/pmb"
+                  icon="users"
+                  title="PMB (Pendaftaran)"
+                  tone="emerald"
+                />
+              )}
+            </div>
+          </section>
+        )}
 
         {/* Feedback Alert */}
         {feedback && (
@@ -658,7 +702,7 @@ export default function OperationalPage() {
         )}
 
         {/* TAB 1: KOREKSI ADMIN */}
-        {activeTab === "koreksi" && (
+        {isOperational && activeTab === "koreksi" && (
           <div className="flex flex-col gap-4">
             <form
               onSubmit={handleSubmitKoreksi}
@@ -820,7 +864,7 @@ export default function OperationalPage() {
         )}
 
         {/* TAB 2: BACKUP KARYAWAN */}
-        {activeTab === "backup" && (
+        {isOperational && activeTab === "backup" && (
           <div className="flex flex-col gap-4">
             <form
               onSubmit={handleSubmitBackup}
@@ -993,7 +1037,7 @@ export default function OperationalPage() {
         )}
 
         {/* TAB 3: ENTRI MANUAL / DARURAT */}
-        {activeTab === "manual" && (
+        {isOperational && activeTab === "manual" && (
           <div className="flex flex-col gap-4">
             <form
               onSubmit={handleSubmitManual}

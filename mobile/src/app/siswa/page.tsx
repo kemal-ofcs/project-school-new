@@ -8,6 +8,7 @@ import { Icon } from "@/components/ui/Icon";
 import { Modal } from "@/components/ui/Modal";
 import { canAccessArea, hasPermission } from "@/lib/auth/access";
 import { triggerHaptic } from "@/lib/client/haptics";
+import { openWhatsAppChat } from "@/lib/client/open-url";
 import {
   describeImportReport,
   downloadStudentTemplate,
@@ -657,16 +658,17 @@ export default function SiswaMobilePage() {
                         Barcode
                       </button>
                       {wa ? (
-                        <a
-                          href={`https://wa.me/${wa}`}
-                          target="_blank"
-                          rel="noreferrer"
-                          onClick={() => triggerHaptic("light")}
+                        <button
+                          type="button"
+                          onClick={() => {
+                            triggerHaptic("light");
+                            void openWhatsAppChat(wa);
+                          }}
                           className="inline-flex items-center gap-1 rounded-lg border border-emerald-500/20 bg-emerald-500/10 px-2 py-0.5 text-[10px] font-bold text-emerald-300 active:scale-95"
                         >
                           <Icon name="whatsapp" className="size-3" />
                           Wali
-                        </a>
+                        </button>
                       ) : null}
                       {canResetWali ? (
                         <button

@@ -8,6 +8,7 @@ import { Icon } from "@/components/ui/Icon";
 import { formatTanggalOperasional } from "@/lib/attendance/time-policy";
 import { canAccessArea, hasPermission } from "@/lib/auth/access";
 import { triggerHaptic } from "@/lib/client/haptics";
+import { openWhatsAppChat } from "@/lib/client/open-url";
 import { useAuth } from "@/lib/context/AuthContext";
 import {
   getDaftarMapel,
@@ -566,17 +567,17 @@ export default function MobilePresensiKelasPage() {
     }
   };
 
-  const getWhatsAppLink = (item: AttendanceAnomalyItem) => {
+  // Mengembalikan bahan pesannya, bukan URL: penyerahan ke aplikasi WhatsApp
+  // ditangani `openWhatsAppChat`, karena anchor `wa.me` di WebView Android
+  // hanya membuka WhatsApp Web di dalam aplikasi lalu gagal.
+  const getWhatsAppTarget = (item: AttendanceAnomalyItem) => {
     if (!item.no_whatsapp_wali) return null;
     const normalized = normalizeOperatorPhone(item.no_whatsapp_wali);
     if (!normalized) return null;
 
-    const cleanNumber = normalized.replace("+", "");
     // Teks dibedakan per jenis anomali di satu tempat bersama; dua anomali
     // rekonsiliasi artinya berlawanan dan tidak boleh memakai kalimat sama.
-    const text = encodeURIComponent(buildParentNotificationText(item));
-
-    return `https://wa.me/${cleanNumber}?text=${text}`;
+    return { nomor: normalized, teks: buildParentNotificationText(item) };
   };
 
   useEffect(() => {
@@ -1093,7 +1094,7 @@ export default function MobilePresensiKelasPage() {
             ) : (
               <div className="space-y-2.5">
                 {anomalies.map((item, idx) => {
-                  const waLink = getWhatsAppLink(item);
+                  const waLink = getWhatsAppTarget(item);
                   return (
                     <div
                       key={`${item.id_presensi_mapel}-${item.id_siswa}-${idx}`}
@@ -1115,15 +1116,17 @@ export default function MobilePresensiKelasPage() {
                           </p>
                         </div>
                         {waLink ? (
-                          <a
-                            href={waLink}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="inline-flex items-center gap-1 rounded-xl bg-emerald-500 px-3 py-1.5 text-xs font-bold text-slate-950 shadow"
+                          <button
+                            type="button"
+                            onClick={() => {
+                              triggerHaptic("light");
+                              void openWhatsAppChat(waLink.nomor, waLink.teks);
+                            }}
+                            className="inline-flex items-center gap-1 rounded-xl bg-emerald-500 px-3 py-1.5 text-xs font-bold text-slate-950 shadow active:scale-95"
                           >
                             <Icon name="whatsapp" className="size-3.5" />
                             <span>WA</span>
-                          </a>
+                          </button>
                         ) : null}
                       </div>
 

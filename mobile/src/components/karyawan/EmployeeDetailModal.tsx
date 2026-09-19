@@ -5,8 +5,12 @@ import { DigitalIdCardPreview } from "@/components/karyawan/DigitalIdCardPreview
 import { Icon } from "@/components/ui/Icon";
 import { Modal } from "@/components/ui/Modal";
 import { StatusBadge } from "@/components/ui/StatusBadge";
-import { openExternalLink } from "@/lib/client/external-link";
 import { triggerHaptic } from "@/lib/client/haptics";
+import {
+  normalizeWhatsAppNumber,
+  openPhoneDialer,
+  openWhatsAppChat,
+} from "@/lib/client/open-url";
 
 type DetailTab = "idcard" | "info" | "aksi";
 
@@ -152,26 +156,22 @@ export function EmployeeDetailModal({
       phoneDigits.length >= 5,
   );
 
-  const telHref = isValidPhone
-    ? `tel:${rawNoHp.startsWith("+") ? `+${phoneDigits}` : phoneDigits}`
-    : null;
+  const bolehTelepon = isValidPhone;
+  const waDigits = normalizeWhatsAppNumber(rawNoHp);
+  const bolehWhatsApp = isValidPhone && waDigits.length >= 8;
 
-  let waDigits = phoneDigits;
-  if (waDigits.startsWith("0")) {
-    waDigits = `62${waDigits.slice(1)}`;
-  } else if (waDigits.startsWith("8")) {
-    waDigits = `62${waDigits}`;
-  }
-  const waHref =
-    isValidPhone && waDigits.length >= 8 ? `https://wa.me/${waDigits}` : null;
-
-  // WebView Android Intent Native untuk WA & Telp
-  const handleOpenContact = (url: string, label: string) => {
+  // Penyerahan ke aplikasi WhatsApp / telepon lewat Intent sistem. Tidak boleh
+  // memakai anchor biasa: WebView Android memuat `wa.me` sebagai WhatsApp Web
+  // di dalam aplikasi lalu gagal, dan `tel:` ditolak sebagai skema tak dikenal.
+  const handleOpenContact = async (
+    buka: () => Promise<boolean>,
+    label: string,
+  ) => {
     triggerHaptic("light");
-    const res = openExternalLink(url);
-    if (!res.sukses) {
+    const sukses = await buka();
+    if (!sukses) {
       setContactError(
-        res.error || `Tidak ada aplikasi ${label} yang bisa membuka nomor ini.`,
+        `Tidak ada aplikasi ${label} yang bisa membuka nomor ini.`,
       );
       triggerHaptic("error");
       window.setTimeout(() => setContactError(null), 4000);
@@ -431,10 +431,15 @@ export function EmployeeDetailModal({
                     {rawNoHp}
                   </span>
                   <div className="flex items-center gap-1.5 shrink-0">
-                    {waHref ? (
+                    {bolehWhatsApp ? (
                       <button
                         type="button"
-                        onClick={() => handleOpenContact(waHref, "WhatsApp")}
+                        onClick={() =>
+                          void handleOpenContact(
+                            () => openWhatsAppChat(rawNoHp),
+                            "WhatsApp",
+                          )
+                        }
                         title="Chat WhatsApp"
                         aria-label={`Chat WhatsApp ${nama}`}
                         className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-emerald-500/15 text-emerald-400 hover:bg-emerald-500/25 border border-emerald-500/30 active:scale-95 transition-all shadow-sm"
@@ -445,10 +450,15 @@ export function EmployeeDetailModal({
                         </span>
                       </button>
                     ) : null}
-                    {telHref ? (
+                    {bolehTelepon ? (
                       <button
                         type="button"
-                        onClick={() => handleOpenContact(telHref, "Telepon")}
+                        onClick={() =>
+                          void handleOpenContact(
+                            () => openPhoneDialer(rawNoHp),
+                            "Telepon",
+                          )
+                        }
                         title="Panggil Telepon"
                         aria-label={`Panggil Telepon ${nama}`}
                         className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-sky-500/15 text-sky-400 hover:bg-sky-500/25 border border-sky-500/30 active:scale-95 transition-all shadow-sm"

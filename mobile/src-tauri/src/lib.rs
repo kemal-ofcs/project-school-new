@@ -22,6 +22,15 @@ pub fn run() {
             // izin diberikan per berkas — tanpa satu pun permission manifest.
             #[cfg(target_os = "android")]
             app.handle().plugin(tauri_plugin_android_fs::init())?;
+            // Penyerahan tautan ke aplikasi lain (WhatsApp, dialer, browser).
+            //
+            // WebView Android tidak meneruskan skema non-http (`tel:`,
+            // `whatsapp:`) ke Intent sistem, dan menavigasi WebView ke
+            // `https://wa.me/...` hanya membuka WhatsApp Web di dalam aplikasi
+            // lalu gagal. Plugin ini menjalankan Intent.ACTION_VIEW, yang
+            // adalah satu-satunya jalan agar nomor benar-benar sampai ke
+            // aplikasi WhatsApp atau aplikasi telepon.
+            app.handle().plugin(tauri_plugin_opener::init())?;
             app.manage(mobile::MobileState::initialize(app.handle())?);
             Ok(())
         })

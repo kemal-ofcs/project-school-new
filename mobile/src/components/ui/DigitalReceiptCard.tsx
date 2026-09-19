@@ -6,6 +6,7 @@ import {
   type AttendanceStatusType,
   StatusBadgePill,
 } from "@/components/ui/StatusBadgePill";
+import { openWhatsAppChat } from "@/lib/client/open-url";
 
 export interface DigitalReceiptData {
   idTransaksi?: string;
@@ -106,17 +107,19 @@ export function DigitalReceiptCard({
         {/* Action Buttons */}
         <div className="flex items-center gap-2 pt-1">
           {data.noHpWali && (
-            <a
-              href={`https://wa.me/${data.noHpWali.replace(/\D/g, "")}?text=${encodeURIComponent(
-                `Informasi Presensi Sekolah:\nNama: ${data.nama}\nStatus: ${data.status}\nWaktu: ${data.waktu}\nCatatan: Presensi tercatat secara otomatis.`,
-              )}`}
-              target="_blank"
-              rel="noopener noreferrer"
+            <button
+              type="button"
+              onClick={() =>
+                void openWhatsAppChat(
+                  data.noHpWali ?? "",
+                  `Informasi Presensi Sekolah:\nNama: ${data.nama}\nStatus: ${data.status}\nWaktu: ${data.waktu}\nCatatan: Presensi tercatat secara otomatis.`,
+                )
+              }
               className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-bold text-xs transition-all shadow-sm"
             >
               <Icon name="whatsapp" className="size-3.5" />
               <span>Kirim ke WA</span>
-            </a>
+            </button>
           )}
           {onClose && (
             <button

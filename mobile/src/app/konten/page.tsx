@@ -66,6 +66,16 @@ export default function KontenMobilePage() {
   const [ringkasan, setRingkasan] = useState("");
   const [isi, setIsi] = useState("");
   const [status, setStatus] = useState<ArticleStatus>("Draft");
+  const [slug, setSlug] = useState("");
+  // Gambar sampul TIDAK disunting dari ponsel, tetapi WAJIB ikut dibawa saat
+  // menyimpan: `save_article` menulis `gambar_sampul = ?` apa adanya, sehingga
+  // draft tanpa kunci ini mengubah sampul artikel menjadi NULL — sunting judul
+  // dari ponsel dan gambar yang dipasang lewat Desktop lenyap tanpa peringatan.
+  const [gambarSampul, setGambarSampul] = useState<string | null>(null);
+  const [filterStatus, setFilterStatus] = useState<ArticleStatus | "Semua">(
+    "Semua",
+  );
+  const [pencarian, setPencarian] = useState("");
   const [isPending, startTransition] = useTransition();
 
   // State Halaman
@@ -84,7 +94,11 @@ export default function KontenMobilePage() {
     setLoadingArticles(true);
     setGalat(null);
     try {
-      const res = await daftarArtikel({ limit: 50 });
+      const res = await daftarArtikel({
+        status: filterStatus,
+        search: pencarian.trim() || undefined,
+        limit: 50,
+      });
       setArticles(res.items);
     } catch (err) {
       setGalat(
@@ -95,7 +109,7 @@ export default function KontenMobilePage() {
     } finally {
       setLoadingArticles(false);
     }
-  }, []);
+  }, [filterStatus, pencarian]);
 
   const muatHalaman = useCallback(async (hal: string) => {
     setLoadingHalaman(true);
@@ -147,8 +161,10 @@ export default function KontenMobilePage() {
         const draft: ArticleDraft = {
           idBerita: editingId || undefined,
           judul: judul.trim(),
+          slug: slug.trim() || undefined,
           ringkasan: ringkasan.trim(),
           isi: isi.trim(),
+          gambarSampul,
           status,
           penulis: user?.nama_operator || "Operator Mobile",
         };
@@ -158,8 +174,10 @@ export default function KontenMobilePage() {
         setArticleFormOpen(false);
         setEditingId(null);
         setJudul("");
+        setSlug("");
         setRingkasan("");
         setIsi("");
+        setGambarSampul(null);
         void muatBerita();
       } catch (err) {
         triggerHaptic("error");
@@ -178,8 +196,10 @@ export default function KontenMobilePage() {
       const art = res.article;
       setEditingId(art.id_berita);
       setJudul(art.judul);
+      setSlug(art.slug);
       setRingkasan(art.ringkasan);
       setIsi(art.isi);
+      setGambarSampul(art.gambar_sampul);
       setStatus(art.status);
       setArticleFormOpen(true);
     } catch (err) {
@@ -302,8 +322,10 @@ export default function KontenMobilePage() {
                     triggerHaptic("light");
                     setEditingId(null);
                     setJudul("");
+                    setSlug("");
                     setRingkasan("");
                     setIsi("");
+                    setGambarSampul(null);
                     setStatus("Draft");
                     setArticleFormOpen(true);
                   }}
@@ -313,6 +335,51 @@ export default function KontenMobilePage() {
                   <span>Tulis Berita</span>
                 </button>
               )}
+            </div>
+
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <label
+                  htmlFor="select-mob-filter-status"
+                  className="block text-[11px] font-bold text-slate-400 mb-1"
+                >
+                  Filter status
+                </label>
+                <select
+                  id="select-mob-filter-status"
+                  value={filterStatus}
+                  onChange={(e) =>
+                    setFilterStatus(e.target.value as ArticleStatus | "Semua")
+                  }
+                  className="w-full rounded-xl border border-white/10 bg-slate-800 p-2 text-xs text-white focus:border-sky-400 focus:outline-none"
+                >
+                  <option value="Semua" className="bg-slate-900 text-white">
+                    Semua status
+                  </option>
+                  <option value="Draft" className="bg-slate-900 text-white">
+                    Draft
+                  </option>
+                  <option value="Terbit" className="bg-slate-900 text-white">
+                    Terbit
+                  </option>
+                </select>
+              </div>
+              <div>
+                <label
+                  htmlFor="input-mob-cari-berita"
+                  className="block text-[11px] font-bold text-slate-400 mb-1"
+                >
+                  Cari judul
+                </label>
+                <input
+                  id="input-mob-cari-berita"
+                  type="search"
+                  value={pencarian}
+                  onChange={(e) => setPencarian(e.target.value)}
+                  placeholder="Kata kunci..."
+                  className="w-full rounded-xl border border-white/10 bg-slate-800 p-2 text-xs text-white focus:border-sky-400 focus:outline-none"
+                />
+              </div>
             </div>
 
             {loadingArticles ? (
@@ -609,6 +676,28 @@ export default function KontenMobilePage() {
                 placeholder="Judul artikel..."
                 className="w-full rounded-xl border border-white/10 bg-slate-800 p-2.5 text-white focus:border-sky-400 focus:outline-none"
               />
+            </div>
+
+            <div>
+              <label
+                htmlFor="input-mob-slug"
+                className="block font-bold text-slate-300 mb-1"
+              >
+                Slug URL
+              </label>
+              <input
+                id="input-mob-slug"
+                aria-label="Slug URL artikel"
+                type="text"
+                value={slug}
+                onChange={(e) => setSlug(e.target.value)}
+                placeholder="Dikosongkan = dibuat dari judul"
+                className="w-full rounded-xl border border-white/10 bg-slate-800 p-2.5 text-white focus:border-sky-400 focus:outline-none"
+              />
+              <p className="mt-1 text-[10px] text-slate-500">
+                Alamat artikel di situs publik. Mengubahnya akan memutus tautan
+                yang sudah tersebar.
+              </p>
             </div>
 
             <div>

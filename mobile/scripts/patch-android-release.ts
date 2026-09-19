@@ -194,6 +194,46 @@ if (izinHilang.length > 0) {
   berubah = true;
 }
 
+// ── 3b. Visibilitas paket untuk penyerahan tautan ──────────────────────────
+//
+// Sejak Android 11 sebuah aplikasi tidak lagi bisa MELIHAT aplikasi lain tanpa
+// mendeklarasikannya. Tanpa blok ini, Intent.ACTION_VIEW yang dipakai tombol
+// "WA", "Hubungi Wali", dan tombol telepon tidak menemukan penanganya, dan
+// kegagalannya senyap: pengguna menekan tombol dan tidak terjadi apa-apa.
+const blokQueries = `    <queries>
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:scheme="tel" />
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:scheme="whatsapp" />
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:scheme="https" />
+        </intent>
+        <package android:name="com.whatsapp" />
+        <package android:name="com.whatsapp.w4b" />
+    </queries>
+
+`;
+
+if (!isiManifest.includes("<queries>")) {
+  const titikSisipQueries = isiManifest.indexOf("<application");
+  if (titikSisipQueries < 0) {
+    keluarDenganPesan(
+      "Tag `<application` tidak ditemukan saat memasang blok <queries>.",
+    );
+  }
+  isiManifest =
+    isiManifest.slice(0, titikSisipQueries) +
+    blokQueries +
+    isiManifest.slice(titikSisipQueries);
+  writeFileSync(manifest, isiManifest);
+  berubah = true;
+}
+
 // ── 4. Nama aplikasi di peluncur Android ────────────────────────────────────
 //
 // `productName` di `tauri.conf.json` hanya dibaca saat `tauri android init`
@@ -290,6 +330,11 @@ for (const baris of deklarasiIzin) {
       `AndroidManifest.xml: ${namaDeklarasi(baris)} tidak dideklarasikan — kamera/lokasi ditolak tanpa dialog`,
     );
   }
+}
+if (!manifestAkhir.includes("<queries>")) {
+  gagal.push(
+    "AndroidManifest.xml: blok <queries> hilang — tombol WhatsApp/telepon tidak menemukan aplikasi tujuan",
+  );
 }
 if (!/isMinifyEnabled\s*=\s*false/.test(releaseAkhir)) {
   gagal.push("build.gradle.kts: `isMinifyEnabled = false` tidak terpasang");

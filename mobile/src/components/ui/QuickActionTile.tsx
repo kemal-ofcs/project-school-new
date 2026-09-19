@@ -2,7 +2,6 @@
 
 import Link from "next/link";
 import { Icon, type IconName } from "@/components/ui/Icon";
-import { triggerHaptic } from "@/lib/client/haptics";
 
 export interface QuickActionTileProps {
   href: string;
@@ -56,7 +55,6 @@ export function QuickActionTile({
   href,
   icon,
   title,
-  subtitle,
   badge,
   badgeColor = "rose",
   tone = "primary",
@@ -74,8 +72,7 @@ export function QuickActionTile({
   return (
     <Link
       href={href}
-      onClick={() => triggerHaptic("light")}
-      className={`group relative flex flex-col items-center justify-center text-center p-3 sm:p-4 rounded-2xl border bg-white dark:bg-slate-900/80 backdrop-blur-sm transition-all duration-150 active:scale-95 shadow-sm hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-950 ${
+      className={`group relative flex flex-col items-center justify-center text-center p-3.5 sm:p-4 rounded-2xl border bg-white dark:bg-slate-900/80 backdrop-blur-sm transition-all duration-150 active:scale-95 shadow-sm hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-950 ${
         styles.border
       } ${styles.hoverBg} ${
         isPrimaryAction
@@ -83,6 +80,7 @@ export function QuickActionTile({
           : ""
       }`}
     >
+      {/* Badge Notification */}
       {badge !== undefined && badge !== null && (
         <span
           className={`absolute -top-1.5 -right-1.5 flex min-w-5 h-5 px-1.5 items-center justify-center rounded-full text-[10px] font-bold font-mono-data shadow-sm ${badgeBg}`}
@@ -91,21 +89,17 @@ export function QuickActionTile({
         </span>
       )}
 
+      {/* Icon Tile */}
       <div
-        className={`flex size-11 sm:size-12 items-center justify-center rounded-xl transition-transform group-hover:scale-105 duration-200 ${styles.iconBg}`}
+        className={`flex size-12 sm:size-13 items-center justify-center rounded-xl transition-transform group-hover:scale-105 duration-200 ${styles.iconBg}`}
       >
-        <Icon name={icon} className="size-5.5 stroke-[2.2]" />
+        <Icon name={icon} className="size-6 stroke-[2.2]" />
       </div>
 
-      <span className="mt-2 text-xs font-bold text-slate-900 dark:text-slate-100 tracking-tight line-clamp-1">
+      {/* Title */}
+      <span className="mt-2 text-xs sm:text-sm font-bold text-slate-900 dark:text-slate-100 tracking-tight line-clamp-2 min-h-[2.25rem] flex items-center justify-center">
         {title}
       </span>
-
-      {subtitle && (
-        <span className="mt-0.5 text-[10px] font-medium text-slate-500 dark:text-slate-400 line-clamp-1">
-          {subtitle}
-        </span>
-      )}
     </Link>
   );
 }
