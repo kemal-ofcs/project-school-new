@@ -2879,36 +2879,42 @@ pub fn desktop_backfill_id_cards(state: State<'_, MobileState>) -> Result<Value,
     academic::backfill_missing_id_cards(&state)
 }
 
+/// Simpan foto profil satu personil (guru, siswa, atau karyawan).
+///
+/// Izinnya `employees.manage`, bukan `students.manage`: perintah ini menyentuh
+/// SELURUH baris `master_data` tanpa membedakan jenis personil, jadi izin
+/// domain siswa di sini akan menjadi celah eskalasi hak akses — alasan yang
+/// sama persis dengan `desktop_backfill_id_cards` di atas.
 #[tauri::command]
-pub fn desktop_save_student_photo(
+pub fn desktop_save_personnel_photo(
     state: State<'_, MobileState>,
-    id_siswa: String,
+    id_unik: String,
     foto_base64: String,
     foto_mime: Option<String>,
 ) -> Result<Value, CommandError> {
-    require_permission(&state, "students.manage")?;
-    academic::save_student_photo(&state, &id_siswa, &foto_base64, foto_mime.as_deref())
+    require_permission(&state, "employees.manage")?;
+    academic::save_personnel_photo(&state, &id_unik, &foto_base64, foto_mime.as_deref())
 }
 
-/// Foto profil siswa: salinan lokal lebih dulu, cloud sebagai cadangan.
+/// Foto profil personil: salinan lokal lebih dulu, cloud sebagai cadangan.
 ///
-/// Urutannya disengaja. `siswa_foto` tidak ikut ditarik bersama snapshot, jadi
-/// perangkat yang tidak memotret siswa itu memang tidak memilikinya secara
-/// lokal — dan tanpa cadangan cloud, kartu pelajarnya tercetak tanpa foto.
+/// Urutannya disengaja. `personil_foto` tidak ikut ditarik bersama snapshot,
+/// jadi perangkat yang tidak mengunggah foto itu memang tidak memilikinya
+/// secara lokal — dan tanpa cadangan cloud, kartunya tercetak tanpa foto.
 /// Sebaliknya, mendahulukan lokal membuat perangkat yang sudah punya salinannya
 /// tetap bisa mencetak kartu saat jaringan mati, sesuai janji offline-first.
 ///
 /// Kegagalan menjangkau cloud diperlakukan sebagai "belum ada foto", bukan
-/// error: siswa tanpa foto adalah keadaan wajar, dan kartu tetap harus bisa
+/// error: personil tanpa foto adalah keadaan wajar, dan kartu tetap harus bisa
 /// dicetak tanpa fotonya.
 #[tauri::command]
-pub async fn desktop_get_student_photo(
+pub async fn desktop_get_personnel_photo(
     state: State<'_, MobileState>,
-    id_siswa: String,
+    id_unik: String,
 ) -> Result<Value, CommandError> {
-    require_permission(&state, "students.view")?;
+    require_permission(&state, "employees.view")?;
 
-    let local = academic::get_student_photo(&state, &id_siswa)?;
+    let local = academic::get_personnel_photo(&state, &id_unik)?;
     if !local.is_null() {
         return Ok(local);
     }
@@ -2917,9 +2923,19 @@ pub async fn desktop_get_student_photo(
         return Ok(Value::Null);
     };
     Ok(client
-        .get_student_photo(&id_siswa)
+        .get_personnel_photo(&id_unik)
         .await
         .unwrap_or(Value::Null))
+}
+
+/// Hapus foto profil satu personil.
+#[tauri::command]
+pub fn desktop_delete_personnel_photo(
+    state: State<'_, MobileState>,
+    id_unik: String,
+) -> Result<Value, CommandError> {
+    require_permission(&state, "employees.manage")?;
+    academic::delete_personnel_photo(&state, &id_unik)
 }
 
 /// Mengambil metrik analitik kehadiran komprehensif untuk Dasbor Audit Kehadiran.
@@ -3805,44 +3821,17 @@ pub async fn desktop_save_page_content(
     state.get_turso_client()?.save_page_content(&halaman, &items).await
 }
 
-/// Menyerahkan tautan ke aplikasi lain: WhatsApp, aplikasi telepon, atau browser.
-///
-/// Di Android ini WAJIB lewat Intent.ACTION_VIEW. WebView yang dipakai Tauri
-/// tidak meneruskan skema non-http (`tel:`, `whatsapp:`) ke sistem, dan
-/// menavigasi WebView ke `https://wa.me/...` hanya memuat WhatsApp Web di dalam
-/// aplikasi lalu gagal — persis bug yang dilaporkan pada tombol "WA",
-/// "Hubungi Wali", dan tombol telepon.
-///
-/// Versi sebelumnya hanya punya cabang Windows/macOS/Linux, dan cabang Linux-nya
-/// di-`cfg` dengan `not(target_os = "android")`. Di Android seluruh badan fungsi
-/// karena itu menguap dan command ini mengembalikan `Ok(())` tanpa melakukan
-/// apa pun — melapor sukses sambil tidak membuka apa-apa.
+/// Membuka URL eksternal di browser default sistem (Chrome/Edge).
 #[tauri::command]
-pub fn desktop_open_external_url(
-    #[allow(unused_variables)] app: tauri::AppHandle,
-    url: String,
-) -> Result<(), CommandError> {
+pub fn desktop_open_external_url(url: String) -> Result<(), CommandError> {
     let trimmed = url.trim();
-    // `tel:` ikut diizinkan: tombol telepon memakai skema ini, dan sebelumnya
-    // ia ditolak di sini sehingga tidak pernah bisa sampai ke aplikasi telepon.
+    // `tel:` ikut diizinkan supaya tombol telepon bisa menyerahkan nomornya ke
+    // aplikasi panggilan bawaan sistem, bukan ditolak di gerbang ini.
     let diizinkan = ["https://", "http://", "whatsapp://", "tel:"]
         .iter()
         .any(|awalan| trimmed.starts_with(awalan));
     if !diizinkan {
         return Err(CommandError::new("INVALID_URL", "Skema URL tidak diizinkan."));
-    }
-
-    #[cfg(target_os = "android")]
-    {
-        use tauri_plugin_opener::OpenerExt;
-        app.opener()
-            .open_url(trimmed, None::<&str>)
-            .map_err(|e| {
-                CommandError::new(
-                    "OPEN_FAILED",
-                    format!("Tidak ada aplikasi yang bisa membuka tautan ini: {e}"),
-                )
-            })?;
     }
 
     #[cfg(target_os = "windows")]

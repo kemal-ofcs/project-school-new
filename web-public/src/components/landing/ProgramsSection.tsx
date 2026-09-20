@@ -114,7 +114,7 @@ export function ProgramsSection({
                           {prodi.nama}
                         </h3>
                         {/* Deskripsi jurusan diisi di menu Akademik. Yang
-                            kosong tidak ditambal teks contoh — sebelumnya
+                            kosong tidak ditambal teks contoh: sebelumnya
                             setiap jurusan tanpa deskripsi menampilkan kalimat
                             yang sama persis. */}
                         {prodi.deskripsi ? (

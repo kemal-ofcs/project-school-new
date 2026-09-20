@@ -1,9 +1,16 @@
 import type { Metadata } from "next";
+import { Plus_Jakarta_Sans } from "next/font/google";
 import { SiteFooter, SiteHeader } from "@/components/SiteChrome";
 import { muatKontenHalaman } from "@/lib/server/content-data";
 import { muatProfilSekolah } from "@/lib/server/school-data";
 import { namaTampil, profilKosong } from "@/lib/services/school-profile";
 import "./globals.css";
+
+const plusJakartaSans = Plus_Jakarta_Sans({
+  subsets: ["latin"],
+  variable: "--font-sans",
+  display: "swap",
+});
 
 /**
  * Layout situs publik.
@@ -73,7 +80,9 @@ export default async function RootLayout({
 
   return (
     <html lang="id">
-      <body className="flex min-h-dvh flex-col">
+      <body
+        className={`${plusJakartaSans.variable} font-sans flex min-h-dvh flex-col`}
+      >
         <SiteHeader profil={profil} konten={kontenSitus} />
         <div className="flex-1">{children}</div>
         <SiteFooter profil={profil} konten={kontenSitus} />

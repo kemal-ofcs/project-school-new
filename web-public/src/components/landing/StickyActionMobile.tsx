@@ -29,7 +29,6 @@ export function StickyAction({ nomorTelepon }: StickyActionProps) {
           aria-label="Konsultasi WhatsApp PMB"
           className="relative flex h-14 w-14 items-center justify-center rounded-full bg-accent text-accent-foreground shadow-xl transition-transform duration-200 hover:scale-105 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
         >
-          <span className="absolute inline-flex h-full w-full rounded-full bg-accent/40 opacity-75 animate-ping pointer-events-none" />
           <MessageCircle className="relative z-10 h-6 w-6" />
         </a>
       </aside>

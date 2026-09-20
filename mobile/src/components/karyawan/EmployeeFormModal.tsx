@@ -2,6 +2,7 @@
 
 import type React from "react";
 import { useEffect, useRef, useState } from "react";
+import { PersonnelPhotoField } from "@/components/PersonnelPhotoField";
 import { FeedbackBanner } from "@/components/ui/FeedbackBanner";
 import { Modal } from "@/components/ui/Modal";
 import { triggerHaptic } from "@/lib/client/haptics";
@@ -527,6 +528,14 @@ export function EmployeeFormModal({
             rows={2}
             placeholder="Catatan tambahan karyawan..."
             className="w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-2 text-xs text-white outline-none focus:border-sky-500 resize-none"
+          />
+        </div>
+
+        <div className="pt-3 border-t border-slate-800 text-xs">
+          <PersonnelPhotoField
+            idUnik={isEditing ? (formData.id_unik ?? "") : ""}
+            nama={formData.nama || "karyawan ini"}
+            disabled={isSubmitting}
           />
         </div>
 

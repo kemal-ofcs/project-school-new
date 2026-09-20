@@ -9,6 +9,7 @@ import { Icon } from "@/components/ui/Icon";
 import { Modal } from "@/components/ui/Modal";
 import { canAccessArea, hasPermission } from "@/lib/auth/access";
 import { triggerHaptic } from "@/lib/client/haptics";
+import { optimizeImageFile } from "@/lib/client/image-optimizer";
 import {
   HALAMAN_CMS,
   KOLEKSI_LANDING,
@@ -67,10 +68,10 @@ export default function KontenMobilePage() {
   const [isi, setIsi] = useState("");
   const [status, setStatus] = useState<ArticleStatus>("Draft");
   const [slug, setSlug] = useState("");
-  // Gambar sampul TIDAK disunting dari ponsel, tetapi WAJIB ikut dibawa saat
-  // menyimpan: `save_article` menulis `gambar_sampul = ?` apa adanya, sehingga
-  // draft tanpa kunci ini mengubah sampul artikel menjadi NULL — sunting judul
-  // dari ponsel dan gambar yang dipasang lewat Desktop lenyap tanpa peringatan.
+  // WAJIB ikut dibawa saat menyimpan: `save_article` menulis `gambar_sampul = ?`
+  // apa adanya, sehingga draft tanpa kunci ini mengubah sampul artikel menjadi
+  // NULL — sunting judul dari ponsel dan gambar yang dipasang lewat Desktop
+  // lenyap tanpa peringatan.
   const [gambarSampul, setGambarSampul] = useState<string | null>(null);
   const [filterStatus, setFilterStatus] = useState<ArticleStatus | "Semua">(
     "Semua",
@@ -147,6 +148,51 @@ export default function KontenMobilePage() {
     muatBerita,
     muatHalaman,
   ]);
+
+  /**
+   * Kompresi gambar sampul dilakukan lewat `optimizeImageFile`, bukan rantai
+   * FileReader→Image→canvas yang ditulis sendiri: helper itu me-`reject` kedua
+   * jalur gagalnya (berkas tidak terbaca, gambar tidak bisa didekode), sehingga
+   * kegagalan memilih gambar tidak pernah berakhir sebagai state yang diam-diam
+   * tetap null lalu tersimpan sebagai artikel tanpa sampul.
+   */
+  const handlePilihGambar = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    // Dikosongkan supaya memilih berkas yang sama dua kali tetap memicu change.
+    e.target.value = "";
+    if (!file) return;
+
+    if (!["image/jpeg", "image/png", "image/webp"].includes(file.type)) {
+      setGalat("Format gambar sampul harus JPEG, PNG, atau WebP.");
+      return;
+    }
+
+    try {
+      const { dataUrl } = await optimizeImageFile(file, {
+        maxWidth: 1200,
+        maxHeight: 800,
+        quality: 0.82,
+        mimeType: "image/jpeg",
+        fit: "contain",
+      });
+      // Batas yang sama dengan `save_article` di Rust dan `validasiGambarSampul`
+      // di TypeScript — ditolak di sini supaya pesannya bisa menyebut solusinya.
+      if (dataUrl.length > 750_000) {
+        setGalat(
+          "Gambar masih terlalu besar setelah dikompres (maksimal 500 KB). Pilih gambar dengan resolusi lebih rendah.",
+        );
+        return;
+      }
+      setGambarSampul(dataUrl);
+      setGalat(null);
+      triggerHaptic("light");
+    } catch (err) {
+      triggerHaptic("error");
+      setGalat(
+        err instanceof Error ? err.message : "Gagal memproses gambar sampul.",
+      );
+    }
+  };
 
   const handleSimpanArtikel = () => {
     if (isSubmittingRef.current) return;
@@ -734,6 +780,45 @@ export default function KontenMobilePage() {
                 placeholder="Isi lengkap artikel..."
                 className="w-full rounded-xl border border-white/10 bg-slate-800 p-2.5 text-white focus:border-sky-400 focus:outline-none font-sans"
               />
+            </div>
+
+            <div>
+              <label
+                htmlFor="input-mob-gambar"
+                className="block font-bold text-slate-300 mb-1"
+              >
+                Gambar Sampul
+              </label>
+              <input
+                id="input-mob-gambar"
+                aria-label="Pilih gambar sampul artikel"
+                type="file"
+                accept="image/jpeg,image/png,image/webp"
+                onChange={handlePilihGambar}
+                className="w-full text-[11px] text-slate-400 file:mr-3 file:rounded-xl file:border-0 file:bg-slate-800 file:px-3 file:py-2 file:text-[11px] file:font-bold file:text-sky-300"
+              />
+              {gambarSampul ? (
+                <div className="relative mt-2 h-32 w-full overflow-hidden rounded-xl border border-white/10 bg-slate-950">
+                  {/* biome-ignore lint/performance/noImgElement: preview data URI hasil kompresi canvas di sisi klien */}
+                  <img
+                    src={gambarSampul}
+                    alt="Pratinjau gambar sampul"
+                    className="h-full w-full object-cover"
+                  />
+                  <button
+                    type="button"
+                    aria-label="Hapus gambar sampul"
+                    onClick={() => setGambarSampul(null)}
+                    className="absolute right-1.5 top-1.5 rounded-full bg-black/70 px-2 py-1 text-[10px] font-bold text-rose-300"
+                  >
+                    Hapus
+                  </button>
+                </div>
+              ) : (
+                <p className="mt-1 text-[10px] text-slate-500">
+                  Opsional. Tampil sebagai sampul kartu berita di situs publik.
+                </p>
+              )}
             </div>
 
             <div>

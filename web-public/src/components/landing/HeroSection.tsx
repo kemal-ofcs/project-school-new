@@ -1,9 +1,9 @@
 import {
   Award,
   BookOpen,
+  Calendar,
   CheckCircle2,
   GraduationCap,
-  Sparkles,
   Trophy,
   Users,
 } from "lucide-react";
@@ -40,26 +40,12 @@ export function HeroSection({
   }));
 
   return (
-    <section className="relative overflow-hidden bg-primary text-primary-foreground py-16 sm:py-24 lg:py-28">
-      {/* Background Decorative Pattern */}
-      <div
-        className="absolute inset-0 z-0 opacity-15 bg-[radial-gradient(#ffffff_1px,transparent_1px)] [background-size:24px_24px]"
-        aria-hidden="true"
-      />
-      <div
-        className="absolute -top-40 -right-40 h-96 w-96 rounded-full bg-secondary-container/20 blur-3xl pointer-events-none"
-        aria-hidden="true"
-      />
-      <div
-        className="absolute -bottom-40 -left-40 h-96 w-96 rounded-full bg-accent/20 blur-3xl pointer-events-none"
-        aria-hidden="true"
-      />
-
+    <section className="relative overflow-hidden bg-primary text-primary-foreground py-14 sm:py-20 lg:py-24 border-b border-primary-container">
       <div className="relative z-10 mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 flex flex-col items-start gap-8">
         {/* Urgency / Active PMB Banner */}
         {gelombangAktif ? (
           <div className="inline-flex flex-wrap items-center gap-2.5 rounded-full bg-white/10 px-4 py-1.5 text-xs font-medium backdrop-blur-md border border-white/15 shadow-sm">
-            <span className="flex h-2 w-2 rounded-full bg-secondary-container animate-pulse" />
+            <span className="flex h-2 w-2 rounded-full bg-secondary-container" />
             <span className="font-bold text-secondary-container uppercase tracking-wider">
               PMB DIBUKA
             </span>
@@ -73,7 +59,7 @@ export function HeroSection({
           </div>
         ) : (
           <div className="inline-flex items-center gap-2 rounded-full bg-white/10 px-4 py-1.5 text-xs font-medium backdrop-blur-md border border-white/15">
-            <Sparkles className="h-3.5 w-3.5 text-secondary-container" />
+            <Calendar className="h-3.5 w-3.5 text-secondary-container" />
             <span className="text-white/90 font-semibold">
               Tahun Ajaran Baru Segera Dibuka
             </span>
@@ -101,10 +87,15 @@ export function HeroSection({
         </div>
 
         {/* Primary Call to Actions */}
-        <div className="flex flex-wrap items-center gap-4 pt-2">
-          <Button asChild variant="secondary" size="lg" className="shadow-xl">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 pt-2 w-full sm:w-auto">
+          <Button
+            asChild
+            variant="secondary"
+            size="lg"
+            className="h-12 w-full sm:w-auto font-bold shadow-md justify-center"
+          >
             <Link href="/pmb">
-              <GraduationCap className="h-5 w-5" />
+              <GraduationCap className="h-5 w-5 mr-2" />
               <span>Daftar PMB Sekarang</span>
             </Link>
           </Button>
@@ -113,10 +104,10 @@ export function HeroSection({
             asChild
             variant="outline"
             size="lg"
-            className="border-white/30 bg-white/10 text-white hover:bg-white/20 hover:text-white backdrop-blur-sm"
+            className="h-12 w-full sm:w-auto border-white/30 bg-white/10 text-white hover:bg-white/20 hover:text-white backdrop-blur-sm justify-center"
           >
             <Link href="/program">
-              <BookOpen className="h-5 w-5" />
+              <BookOpen className="h-5 w-5 mr-2" />
               <span>Jelajahi Program Studi</span>
             </Link>
           </Button>

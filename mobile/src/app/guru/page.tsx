@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { MobileAppShell } from "@/components/MobileAppShell";
+import { PersonnelPhotoField } from "@/components/PersonnelPhotoField";
 import { FeedbackBanner } from "@/components/ui/FeedbackBanner";
 import { Icon } from "@/components/ui/Icon";
 import { Modal } from "@/components/ui/Modal";
@@ -770,6 +771,13 @@ export default function GuruMobilePage() {
                     : "Scan masuk hanya diterima di sekitar jam masuk shift ini.")}
               </span>
             </label>
+            <div className="mt-1 border-t border-white/10 pt-3 text-xs">
+              <PersonnelPhotoField
+                idUnik={isEditing ? (form.id_guru ?? "") : ""}
+                nama={form.nama || "guru ini"}
+              />
+            </div>
+
             <div className="mt-1 flex gap-2">
               <button
                 type="button"

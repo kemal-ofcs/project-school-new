@@ -1,11 +1,10 @@
 import {
-  ArrowRight,
+  Award,
   Cpu,
   Globe,
   GraduationCap,
   Quote,
   ShieldCheck,
-  Sparkles,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
@@ -24,7 +23,7 @@ interface PillarsSectionProps {
 }
 
 /**
- * Pilar keunggulan dan sambutan pimpinan — seluruh teksnya dari CMS.
+ * Pilar keunggulan dan sambutan pimpinan: seluruh teksnya dari CMS.
  *
  * Tidak ada teks contoh di sini lagi. Versi sebelumnya membawa empat pilar,
  * kutipan sambutan, bahkan NAMA pimpinan yang tertanam di kode; semuanya
@@ -64,7 +63,7 @@ export function PillarsSection({ profil, konten = {} }: PillarsSectionProps) {
             <div className="max-w-2xl space-y-2">
               {eyebrow ? (
                 <div className="inline-flex items-center gap-1.5 text-xs font-bold uppercase tracking-widest text-secondary">
-                  <Sparkles className="h-3.5 w-3.5" />
+                  <Award className="h-3.5 w-3.5" />
                   <span>{eyebrow}</span>
                 </div>
               ) : null}
@@ -113,19 +112,16 @@ export function PillarsSection({ profil, konten = {} }: PillarsSectionProps) {
                     </div>
                   </div>
 
-                  <div className="pt-6 flex items-center justify-between text-xs font-semibold text-primary">
-                    {item.tag ? (
+                  {item.tag ? (
+                    <div className="pt-6">
                       <Badge
                         variant="outline"
                         className="text-[11px] font-medium"
                       >
                         {item.tag}
                       </Badge>
-                    ) : (
-                      <span />
-                    )}
-                    <ArrowRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-1" />
-                  </div>
+                    </div>
+                  ) : null}
                 </Card>
               );
             })}

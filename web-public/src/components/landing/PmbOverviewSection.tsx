@@ -1,9 +1,9 @@
 import {
   ArrowRight,
+  Calendar,
   CheckCircle,
   Clock,
   FileText,
-  Sparkles,
   Upload,
   UserCheck,
 } from "lucide-react";
@@ -57,7 +57,7 @@ export function PmbOverviewSection({
           <div className="text-center max-w-2xl mx-auto space-y-3">
             {eyebrow ? (
               <div className="inline-flex items-center gap-1.5 text-xs font-bold uppercase tracking-widest text-secondary">
-                <Sparkles className="h-3.5 w-3.5" />
+                <Calendar className="h-3.5 w-3.5" />
                 <span>{eyebrow}</span>
               </div>
             ) : null}
@@ -112,19 +112,24 @@ export function PmbOverviewSection({
                 )}
               </div>
 
-              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full sm:w-auto">
                 <Button
                   asChild
                   variant="secondary"
                   size="lg"
-                  className="shadow-md"
+                  className="h-12 w-full sm:w-auto shadow-md font-bold justify-center"
                 >
                   <Link href="/pmb/daftar">
                     <span>Isi Formulir Online</span>
                     <ArrowRight className="h-4 w-4 ml-1" />
                   </Link>
                 </Button>
-                <Button asChild variant="outline" size="lg">
+                <Button
+                  asChild
+                  variant="outline"
+                  size="lg"
+                  className="h-12 w-full sm:w-auto justify-center"
+                >
                   <Link href="/pmb/status">
                     <span>Cek Status Berkas</span>
                   </Link>

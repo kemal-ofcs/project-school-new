@@ -14,7 +14,7 @@ interface FaqSectionProps {
 }
 
 /**
- * Pertanyaan yang sering diajukan — seluruhnya dari CMS (`landing.faq_items`).
+ * Pertanyaan yang sering diajukan: seluruhnya dari CMS (`landing.faq_items`).
  *
  * Versi sebelumnya membawa lima tanya-jawab yang ditulis di kode, termasuk
  * janji yang sangat spesifik: beasiswa DPP hingga 100%, sertifikasi Cambridge
