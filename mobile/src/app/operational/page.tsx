@@ -13,6 +13,7 @@ import {
   batalkanPenugasanBackup,
   buatPenugasanBackup,
   getDaftarBackup,
+  hapusPenugasanBackup,
 } from "@/lib/gateways/backup";
 import {
   getDaftarKoreksi,
@@ -506,6 +507,51 @@ export default function OperationalPage() {
     }
   };
 
+  const handleDeleteBackup = async (idBackup: string) => {
+    if (
+      !(await konfirmasi({
+        title: "Hapus penugasan backup ini?",
+        description:
+          "Baris penugasan backup akan dihapus permanen dari riwayat dan status backup karyawan akan diselaraskan kembali.",
+        preserved:
+          "Absensi yang sudah tercatat atas penugasan ini tetap tersimpan.",
+        confirmLabel: "Ya, hapus",
+      }))
+    )
+      return;
+    if (isSubmittingRef.current) return;
+    isSubmittingRef.current = true;
+    setFeedback(null);
+    try {
+      const res = await hapusPenugasanBackup(idBackup);
+      if (res.sukses) {
+        triggerHaptic("light");
+        setFeedback({
+          type: "success",
+          message: res.pesan || "Penugasan backup berhasil dihapus.",
+        });
+        void loadTabRecords(date, "backup");
+      } else {
+        triggerHaptic("error");
+        setFeedback({
+          type: "error",
+          message: res.pesan || "Penugasan backup gagal dihapus.",
+        });
+      }
+    } catch (err: unknown) {
+      triggerHaptic("error");
+      setFeedback({
+        type: "error",
+        message:
+          err instanceof Error
+            ? err.message
+            : "Penugasan backup gagal dihapus.",
+      });
+    } finally {
+      isSubmittingRef.current = false;
+    }
+  };
+
   const handleDeleteImport = async (eventKey: string) => {
     if (
       !(await konfirmasi({
@@ -990,13 +1036,24 @@ export default function OperationalPage() {
                           {String(item.id_shift_backup)}
                         </span>
                       </div>
-                      <button
-                        type="button"
-                        onClick={() => handleCancelBackup(idBck)}
-                        className="rounded-xl border border-rose-500/30 bg-rose-500/10 px-2.5 py-1 text-[10px] font-bold text-rose-300 hover:bg-rose-500/20 active:scale-95 transition shrink-0"
-                      >
-                        Batalkan
-                      </button>
+                      <div className="flex items-center gap-1 shrink-0">
+                        {item.status_tugas === "Aktif" ? (
+                          <button
+                            type="button"
+                            onClick={() => handleCancelBackup(idBck)}
+                            className="rounded-xl border border-amber-500/30 bg-amber-500/10 px-2.5 py-1 text-[10px] font-bold text-amber-300 hover:bg-amber-500/20 active:scale-95 transition shrink-0"
+                          >
+                            Batalkan
+                          </button>
+                        ) : null}
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteBackup(idBck)}
+                          className="rounded-xl border border-rose-500/30 bg-rose-500/10 px-2.5 py-1 text-[10px] font-bold text-rose-300 hover:bg-rose-500/20 active:scale-95 transition shrink-0"
+                        >
+                          Hapus
+                        </button>
+                      </div>
                     </div>
                   );
                 })

@@ -101,6 +101,7 @@ pub fn run() {
             mobile::commands::desktop_get_backups,
             mobile::commands::desktop_create_backup,
             mobile::commands::desktop_cancel_backup,
+            mobile::commands::desktop_delete_backup,
             mobile::commands::desktop_get_imports,
             mobile::commands::desktop_import_offline,
             mobile::commands::desktop_get_dashboard_data,

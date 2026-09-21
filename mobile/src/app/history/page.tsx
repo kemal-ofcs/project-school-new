@@ -15,6 +15,7 @@ import {
   editAbsensiHarian,
   getRekapHarian,
   getRiwayatScan,
+  hapusAbsensiHarian,
   hapusLogScan,
 } from "@/lib/gateways/report";
 import { subscribeSyncCompleted } from "@/lib/gateways/sync-status";
@@ -35,13 +36,22 @@ interface EditAbsensiDraft {
   keterangan: string;
 }
 
-interface DeleteScanTarget {
-  id_log: number;
-  nama: string;
-  id_karyawan: string;
-  jenis_scan: string;
-  jam_scan: string;
-}
+type DeleteTarget =
+  | {
+      type: "scan";
+      id_log: number;
+      nama: string;
+      id_karyawan: string;
+      jenis_scan: string;
+      jam_scan: string;
+    }
+  | {
+      type: "daily";
+      id_sesi: string;
+      nama: string;
+      id_karyawan: string;
+      tanggal: string;
+    };
 
 /**
  * Backend membatasi baris per permintaan: log scan bawaan 200 (maks 500),
@@ -166,9 +176,7 @@ export default function HistoryPage() {
 
   // CRUD State
   const [editData, setEditData] = useState<EditAbsensiDraft | null>(null);
-  const [deleteTarget, setDeleteTarget] = useState<DeleteScanTarget | null>(
-    null,
-  );
+  const [deleteTarget, setDeleteTarget] = useState<DeleteTarget | null>(null);
   const [actionBusy, setActionBusy] = useState(false);
   const isSubmittingRef = useRef(false);
   const [exporting, setExporting] = useState(false);
@@ -263,10 +271,23 @@ export default function HistoryPage() {
     });
   };
 
+  const openDeleteDaily = (rec: Record<string, unknown>) => {
+    triggerHaptic("warning");
+    setSelectedDaily(null);
+    setDeleteTarget({
+      type: "daily",
+      id_sesi: String(rec.id_sesi || ""),
+      nama: String(rec.nama || "-"),
+      id_karyawan: String(rec.id_karyawan || "-"),
+      tanggal: String(rec.tanggal || tanggalMulai),
+    });
+  };
+
   const openDeleteScanLog = (log: Record<string, unknown>) => {
     triggerHaptic("warning");
     setSelectedScanLog(null);
     setDeleteTarget({
+      type: "scan",
       id_log: Number(log.id_log),
       nama: String(log.nama || "-"),
       id_karyawan: String(log.id_karyawan || "-"),
@@ -322,7 +343,10 @@ export default function HistoryPage() {
     setActionBusy(true);
     setFeedback(null);
     try {
-      const result = await hapusLogScan(deleteTarget.id_log);
+      const result =
+        deleteTarget.type === "daily"
+          ? await hapusAbsensiHarian(deleteTarget.id_sesi)
+          : await hapusLogScan(deleteTarget.id_log);
       if (result.sukses) {
         triggerHaptic("success");
         setFeedback({ type: "success", message: result.pesan });
@@ -992,16 +1016,28 @@ export default function HistoryPage() {
               </div>
             </div>
 
-            {canEditHistory ? (
-              <button
-                type="button"
-                onClick={() => openEditDaily(selectedDaily)}
-                className="flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border border-amber-500/40 bg-amber-500/15 text-xs font-black text-amber-200 transition hover:bg-amber-500/25 active:scale-95"
-              >
-                <span aria-hidden="true">✏️</span>
-                <span>Edit Data Absensi</span>
-              </button>
-            ) : null}
+            <div className="flex flex-col gap-2 pt-1">
+              {canEditHistory ? (
+                <button
+                  type="button"
+                  onClick={() => openEditDaily(selectedDaily)}
+                  className="flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border border-amber-500/40 bg-amber-500/15 text-xs font-black text-amber-200 transition hover:bg-amber-500/25 active:scale-95"
+                >
+                  <span aria-hidden="true">✏️</span>
+                  <span>Edit Data Absensi</span>
+                </button>
+              ) : null}
+              {canDeleteHistory ? (
+                <button
+                  type="button"
+                  onClick={() => openDeleteDaily(selectedDaily)}
+                  className="flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border border-rose-500/40 bg-rose-500/15 text-xs font-black text-rose-200 transition hover:bg-rose-500/25 active:scale-95"
+                >
+                  <Icon name="trash" className="size-4" />
+                  <span>Hapus Data Absensi Ini</span>
+                </button>
+              ) : null}
+            </div>
           </div>
         )}
       </Modal>
@@ -1307,13 +1343,17 @@ export default function HistoryPage() {
         ) : null}
       </Modal>
 
-      {/* Modal Konfirmasi Hapus Log Scan */}
+      {/* Modal Konfirmasi Hapus */}
       <Modal
         isOpen={Boolean(deleteTarget)}
         onClose={() => {
           if (!actionBusy) setDeleteTarget(null);
         }}
-        title="Hapus Log Scan"
+        title={
+          deleteTarget?.type === "daily"
+            ? "Hapus Absensi Harian"
+            : "Hapus Log Scan"
+        }
         titleId="history-delete-modal-title"
         maxWidth="max-w-sm"
         hideFooter
@@ -1321,13 +1361,27 @@ export default function HistoryPage() {
         {deleteTarget ? (
           <div className="flex flex-col gap-4 text-xs">
             <div className="space-y-1 rounded-2xl border border-rose-500/20 bg-rose-950/30 p-3.5">
-              <p className="text-sm font-bold text-white">
-                Hapus log scan #{deleteTarget.id_log}?
-              </p>
-              <p className="text-slate-300">
-                {deleteTarget.nama} ({deleteTarget.id_karyawan}) — Scan{" "}
-                {deleteTarget.jenis_scan} pukul {deleteTarget.jam_scan}
-              </p>
+              {deleteTarget.type === "daily" ? (
+                <>
+                  <p className="text-sm font-bold text-white">
+                    Apakah kamu ingin menghapus baris ini (
+                    {deleteTarget.tanggal}), ({deleteTarget.nama}) ?
+                  </p>
+                  <p className="text-slate-300">
+                    ID Karyawan: {deleteTarget.id_karyawan}
+                  </p>
+                </>
+              ) : (
+                <>
+                  <p className="text-sm font-bold text-white">
+                    Hapus log scan #{deleteTarget.id_log}?
+                  </p>
+                  <p className="text-slate-300">
+                    {deleteTarget.nama} ({deleteTarget.id_karyawan}) — Scan{" "}
+                    {deleteTarget.jenis_scan} pukul {deleteTarget.jam_scan}
+                  </p>
+                </>
+              )}
               <p className="pt-1 text-[11px] text-amber-300">
                 Tindakan ini permanen dan akan mencatat jejak audit operator.
               </p>
