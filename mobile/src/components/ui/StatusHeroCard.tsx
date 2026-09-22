@@ -78,7 +78,7 @@ export function StatusHeroCard({
   return (
     <section
       aria-label="Rangkuman Operasional Presensi Hari Ini"
-      className="relative overflow-hidden w-full rounded-2xl border border-blue-200/90 dark:border-blue-900/40 bg-gradient-to-br from-blue-50 via-sky-100/70 to-indigo-50/80 dark:from-[#003399] dark:via-[#002266] dark:to-[#0a183d] text-slate-900 dark:text-white p-5 md:p-6 shadow-sm dark:shadow-card-bca transition-colors duration-200"
+      className="status-hero-card relative overflow-hidden w-full rounded-2xl border border-blue-200/90 dark:border-blue-900/40 bg-gradient-to-br from-blue-50 via-sky-100/70 to-indigo-50/80 dark:from-[#003399] dark:via-[#002266] dark:to-[#0a183d] text-slate-900 dark:text-white p-5 md:p-6 shadow-sm dark:shadow-card-bca transition-colors duration-200"
     >
       {/* Decorative accent geometry */}
       <div
@@ -97,10 +97,10 @@ export function StatusHeroCard({
             <Icon name="calendar" className="size-4" />
           </div>
           <div>
-            <p className="text-xs font-bold text-blue-950 dark:text-sky-200 capitalize">
+            <p className="hero-date-title text-xs font-bold text-blue-950 dark:text-sky-200 capitalize">
               {todayDateFormatted}
             </p>
-            <p className="text-[11px] text-blue-800/80 dark:text-sky-300/70 font-medium">
+            <p className="hero-date-subtitle text-[11px] text-blue-800/80 dark:text-sky-300/70 font-medium">
               {companyName} • {shiftName}
             </p>
           </div>
@@ -109,7 +109,7 @@ export function StatusHeroCard({
         <div className="flex items-center gap-2">
           {/* Online/Offline Badge */}
           <div
-            className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold backdrop-blur-md ${
+            className={`hero-badge inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold backdrop-blur-md ${
               isOnline
                 ? "bg-emerald-100 text-emerald-800 border border-emerald-300 dark:bg-emerald-500/20 dark:text-emerald-200 dark:border-emerald-400/30"
                 : "bg-amber-100 text-amber-800 border border-amber-300 dark:bg-amber-500/20 dark:text-amber-200 dark:border-amber-400/30"
@@ -122,7 +122,7 @@ export function StatusHeroCard({
                   : "bg-amber-500 dark:bg-amber-400"
               }`}
             />
-            <span>{isOnline ? "Cloud Sinkron" : "Mode Offline"}</span>
+            <span>{isOnline ? "Cloud Sesuai" : "Mode Offline"}</span>
           </div>
 
           {/* Sync action button */}
@@ -144,14 +144,14 @@ export function StatusHeroCard({
       {/* Main KPI: The m-BCA Balance Equivalent */}
       <div className="relative z-10 mt-5 flex flex-col md:flex-row md:items-end justify-between gap-4">
         <div>
-          <span className="text-xs font-bold uppercase tracking-wider text-blue-900/70 dark:text-sky-200/80">
+          <span className="hero-kpi-label text-xs font-bold uppercase tracking-wider text-blue-900/70 dark:text-sky-200/80">
             Tingkat Kehadiran Hari Ini
           </span>
           <div className="flex items-baseline gap-2 mt-1">
-            <span className="text-4xl md:text-5xl font-extrabold tracking-tight font-mono-data text-blue-950 dark:text-white">
+            <span className="hero-kpi-value text-4xl md:text-5xl font-extrabold tracking-tight font-mono-data text-blue-950 dark:text-white">
               {persentase.toFixed(1)}%
             </span>
-            <span className="text-sm font-semibold text-blue-900/80 dark:text-sky-200">
+            <span className="hero-kpi-label text-sm font-semibold text-blue-900/80 dark:text-sky-200">
               dari target 100%
             </span>
           </div>
@@ -160,8 +160,10 @@ export function StatusHeroCard({
         {/* Progress bar and counter */}
         <div className="w-full md:w-56 space-y-1.5">
           <div className="flex justify-between text-xs font-semibold">
-            <span className="text-blue-950 dark:text-sky-200">Total Masuk</span>
-            <span className="font-mono-data text-blue-950 dark:text-white">
+            <span className="hero-kpi-label text-blue-950 dark:text-sky-200">
+              Total Masuk
+            </span>
+            <span className="hero-kpi-value font-mono-data text-blue-950 dark:text-white">
               {hadir} / {total} Orang
             </span>
           </div>
@@ -178,29 +180,29 @@ export function StatusHeroCard({
 
       {/* 3 Status Counters */}
       <div className="relative z-10 mt-5 grid grid-cols-3 gap-2.5">
-        <div className="flex flex-col rounded-xl bg-white/80 dark:bg-white/10 backdrop-blur-md p-3 border border-blue-200/70 dark:border-white/10 shadow-xs dark:shadow-none">
+        <div className="hero-status-box flex flex-col rounded-2xl bg-white/80 dark:bg-white/10 backdrop-blur-md p-3 border border-blue-200/70 dark:border-white/10 shadow-xs dark:shadow-none">
           <span className="text-[11px] font-semibold text-emerald-700 dark:text-emerald-300 flex items-center gap-1">
             <Icon name="check" className="size-3" /> Tepat Waktu
           </span>
-          <span className="text-xl md:text-2xl font-bold font-mono-data text-slate-900 dark:text-white mt-0.5">
+          <span className="hero-status-value text-xl md:text-2xl font-bold font-mono-data text-slate-900 dark:text-white mt-0.5">
             {tepatWaktu}
           </span>
         </div>
 
-        <div className="flex flex-col rounded-xl bg-white/80 dark:bg-white/10 backdrop-blur-md p-3 border border-blue-200/70 dark:border-white/10 shadow-xs dark:shadow-none">
+        <div className="hero-status-box flex flex-col rounded-2xl bg-white/80 dark:bg-white/10 backdrop-blur-md p-3 border border-blue-200/70 dark:border-white/10 shadow-xs dark:shadow-none">
           <span className="text-[11px] font-semibold text-amber-700 dark:text-amber-300 flex items-center gap-1">
             <Icon name="clock" className="size-3" /> Terlambat
           </span>
-          <span className="text-xl md:text-2xl font-bold font-mono-data text-slate-900 dark:text-white mt-0.5">
+          <span className="hero-status-value text-xl md:text-2xl font-bold font-mono-data text-slate-900 dark:text-white mt-0.5">
             {terlambat}
           </span>
         </div>
 
-        <div className="flex flex-col rounded-xl bg-white/80 dark:bg-white/10 backdrop-blur-md p-3 border border-blue-200/70 dark:border-white/10 shadow-xs dark:shadow-none">
+        <div className="hero-status-box flex flex-col rounded-2xl bg-white/80 dark:bg-white/10 backdrop-blur-md p-3 border border-blue-200/70 dark:border-white/10 shadow-xs dark:shadow-none">
           <span className="text-[11px] font-semibold text-rose-700 dark:text-rose-300 flex items-center gap-1">
             <Icon name="alert" className="size-3" /> Belum Absen
           </span>
-          <span className="text-xl md:text-2xl font-bold font-mono-data text-slate-900 dark:text-white mt-0.5">
+          <span className="hero-status-value text-xl md:text-2xl font-bold font-mono-data text-slate-900 dark:text-white mt-0.5">
             {belumAbsen}
           </span>
         </div>

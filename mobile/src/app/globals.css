@@ -1,5 +1,12 @@
 @import "tailwindcss";
 
+@custom-variant dark (&:where(
+    [data-theme="dark"],
+    [data-theme="dark"] *,
+    .dark,
+    .dark *
+  ));
+
 :root {
   color-scheme: dark;
   --app-background: #030712;
@@ -140,7 +147,9 @@ textarea {
    tetap gelap di kedua tema.
    ========================================================================== */
 
-:root[data-theme="light"] {
+:root[data-theme="light"],
+html[data-theme="light"],
+html.light {
   color-scheme: light;
 
   /* Skala slate dibalik: 950 jadi paling terang, 50 jadi paling gelap. */
@@ -180,7 +189,9 @@ textarea {
   --app-text-muted: #475569;
 }
 
-:root[data-theme="light"] body {
+:root[data-theme="light"] body,
+html[data-theme="light"] body,
+html.light body {
   background:
     radial-gradient(circle at 50% 0%, rgb(56 189 248 / 12%), transparent 28rem),
     radial-gradient(
@@ -191,7 +202,9 @@ textarea {
     linear-gradient(180deg, var(--app-background-soft), var(--app-background));
 }
 
-:root[data-theme="light"] ::selection {
+:root[data-theme="light"] ::selection,
+html[data-theme="light"] ::selection,
+html.light ::selection {
   background: rgb(2 132 199 / 22%);
   color: #0f172a;
 }
@@ -236,7 +249,9 @@ body {
  * memang harus sama di kedua tema. Utilitas beralpha (`bg-sky-500/10`) juga
  * tidak perlu diubah karena tembus pandang.
  */
-:root[data-theme="light"] {
+:root[data-theme="light"],
+html[data-theme="light"],
+html.light {
   --color-sky-950: #f0f9ff;
   --color-sky-900: #e0f2fe;
   --color-sky-400: #0284c7;
@@ -532,4 +547,59 @@ body {
   --color-purple-400: #c084fc;
   --color-purple-900: #581c87;
   --color-purple-950: #3b0764;
+}
+
+/* ==========================================================================
+   StatusHeroCard di Tema Terang (Persis Sesuai Gambar Referensi)
+   ========================================================================== */
+html[data-theme="light"] .status-hero-card,
+html.light .status-hero-card {
+  background: linear-gradient(
+    180deg,
+    #bde0fe 0%,
+    #d0e8ff 50%,
+    #e8f2ff 100%
+  ) !important;
+  border: 1px solid #93c5fd !important;
+  box-shadow: 0 8px 30px -4px rgba(186, 230, 253, 0.45) !important;
+  color: #0f172a !important;
+}
+
+html[data-theme="light"] .status-hero-card .hero-status-box,
+html.light .status-hero-card .hero-status-box {
+  background-color: #ffffff !important;
+  border: 1px solid rgba(255, 255, 255, 0.95) !important;
+  box-shadow: 0 2px 10px rgba(15, 23, 42, 0.05) !important;
+}
+
+html[data-theme="light"] .status-hero-card .hero-status-value,
+html.light .status-hero-card .hero-status-value {
+  color: #0f172a !important;
+}
+
+html[data-theme="light"] .status-hero-card .hero-kpi-value,
+html.light .status-hero-card .hero-kpi-value {
+  color: #0f172a !important;
+}
+
+html[data-theme="light"] .status-hero-card .hero-kpi-label,
+html.light .status-hero-card .hero-kpi-label {
+  color: #475569 !important;
+}
+
+html[data-theme="light"] .status-hero-card .hero-date-title,
+html.light .status-hero-card .hero-date-title {
+  color: #0f172a !important;
+}
+
+html[data-theme="light"] .status-hero-card .hero-date-subtitle,
+html.light .status-hero-card .hero-date-subtitle {
+  color: #475569 !important;
+}
+
+html[data-theme="light"] .status-hero-card .hero-badge,
+html.light .status-hero-card .hero-badge {
+  background-color: #ecfdf5 !important;
+  color: #065f46 !important;
+  border: 1px solid #a7f3d0 !important;
 }

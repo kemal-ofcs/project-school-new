@@ -1,8 +1,6 @@
 "use client";
 
 import { dataUrlToBlob, downloadDataUrl } from "@/lib/client/download";
-import { isDesktopRuntime } from "@/lib/runtime/app-runtime";
-import { invokeDesktop } from "@/lib/runtime/desktop-commands";
 
 export interface ShareResult {
   sukses: boolean;
@@ -12,8 +10,8 @@ export interface ShareResult {
 
 /**
  * Membagikan berkas gambar (ID Card / QR Code) ke aplikasi lain (WhatsApp, Telegram, Gmail, Drive, dll).
- * Mengutamakan Android Native Share Sheet (via AndroidBridge) pada Android WebView,
- * kemudian Tauri IPC `mobile_share_file`, dan fallback ke Web Share API / Unduhan.
+ * Mengutamakan Android Native Share Sheet (via AndroidBridge jika ada, atau Web Share API pada Android WebView),
+ * dan fallback ke penyimpanan berkas lokal (SAF / download).
  */
 export async function shareDataUrl(
   dataUrl: string,
@@ -27,7 +25,7 @@ export async function shareDataUrl(
       ? dataUrl.split(",")[1] || ""
       : dataUrl;
 
-  // 1. Android Native Bridge Share Sheet (Prioritas Tertinggi di Mobile WebView)
+  // 1. Android Native Bridge Share Sheet (Jika tersedia di WebView khusus)
   if (typeof window !== "undefined" && window.AndroidBridge?.shareImage) {
     try {
       const rawRes = window.AndroidBridge.shareImage(
@@ -53,29 +51,7 @@ export async function shareDataUrl(
     }
   }
 
-  // 2. Desktop Tauri Command
-  if (isDesktopRuntime()) {
-    try {
-      const res = await invokeDesktop<{
-        sukses: boolean;
-        path?: string;
-      }>("mobile_share_file", {
-        filename,
-        base64Data: cleanBase64,
-        title,
-      });
-      if (res?.sukses) {
-        return {
-          sukses: true,
-          message: "Berkas berhasil disiapkan.",
-        };
-      }
-    } catch (desktopErr) {
-      console.warn("Tauri mobile_share_file failed:", desktopErr);
-    }
-  }
-
-  // 3. Web Share API (Browser standar yang mendukung File Sharing)
+  // 2. Web Share API (Prioritas utama pada WebView Android modern & browser yang mendukung File Sharing)
   if (
     typeof navigator !== "undefined" &&
     typeof navigator.share === "function"
@@ -107,7 +83,7 @@ export async function shareDataUrl(
     }
   }
 
-  // 4. Fallback: Simpan ke media penyimpanan lokal
+  // 3. Fallback: Simpan ke media penyimpanan lokal (SAF di Android / Download di desktop)
   const downloadRes = await downloadDataUrl(dataUrl, filename);
   // Di Android ini membuka dialog "Simpan ke…"; menutupnya = pembatalan.
   if (downloadRes.cancelled) return { sukses: false, cancelled: true };

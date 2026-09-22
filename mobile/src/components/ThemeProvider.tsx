@@ -58,6 +58,13 @@ function systemTheme(): ResolvedTheme {
 function applyTheme(resolved: ResolvedTheme) {
   const root = document.documentElement;
   root.setAttribute("data-theme", resolved);
+  if (resolved === "dark") {
+    root.classList.add("dark");
+    root.classList.remove("light");
+  } else {
+    root.classList.add("light");
+    root.classList.remove("dark");
+  }
   root.style.colorScheme = resolved;
   const meta = document.querySelector('meta[name="theme-color"]');
   if (meta) {

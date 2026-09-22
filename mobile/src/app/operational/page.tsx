@@ -1019,15 +1019,17 @@ export default function OperationalPage() {
                       key={idBck}
                       className="flex items-center justify-between rounded-2xl border border-amber-400/20 bg-slate-900/80 p-3.5 backdrop-blur-md"
                     >
-                      <div className="flex flex-col min-w-0 pr-2">
-                        <div className="flex items-center gap-1 text-xs font-bold text-white">
-                          <span>
+                      <div className="flex flex-col min-w-0 pr-2 flex-1">
+                        <div className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-xs font-bold text-white">
+                          <span className="break-all">
                             {String(
                               item.nama_pengganti || item.id_karyawan_pengganti,
                             )}
                           </span>
-                          <span className="text-slate-400">menggantikan</span>
-                          <span className="text-amber-300">
+                          <span className="text-slate-400 font-normal">
+                            menggantikan
+                          </span>
+                          <span className="text-amber-300 break-all">
                             {String(item.nama_asal || item.id_karyawan_asal)}
                           </span>
                         </div>

@@ -21,6 +21,7 @@ import {
   getIdCardTemplate,
   type IdCardTemplateConfig,
 } from "@/lib/gateways/id-card-template";
+import { ambilFotoPersonil } from "@/lib/gateways/personnel-photo";
 import { subscribeSyncCompleted, syncNow } from "@/lib/gateways/sync-status";
 import { useAppLogo } from "@/lib/hooks/useAppLogo";
 import type { CardSide } from "@/types/id-card";
@@ -76,6 +77,50 @@ export function DigitalIdCardPreview({
     : "";
   // Payload yang dipakai absensi manual (sama persis dengan isi QR Code): "ID_Unik|token".
   const absensiPayload = employeeQrPayload(employee);
+
+  const idUnik = String(
+    employee.id_unik ??
+      employee.id_karyawan ??
+      employee.id_siswa ??
+      employee.id_guru ??
+      "",
+  ).trim();
+
+  // Avatar URL state untuk foto profil
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(
+    typeof employee.avatar_url === "string" ? employee.avatar_url : null,
+  );
+
+  // Muat foto personil secara on-demand bila belum tersedia di data employee
+  useEffect(() => {
+    let cancelled = false;
+    if (!idUnik) {
+      setAvatarUrl(null);
+      return;
+    }
+    if (typeof employee.avatar_url === "string" && employee.avatar_url) {
+      setAvatarUrl(employee.avatar_url);
+      return;
+    }
+
+    ambilFotoPersonil(idUnik)
+      .then((hasil) => {
+        if (!cancelled) {
+          setAvatarUrl(
+            hasil?.foto_base64
+              ? `data:${hasil.foto_mime || "image/jpeg"};base64,${hasil.foto_base64.replace(/^data:[^,]+,/, "")}`
+              : null,
+          );
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setAvatarUrl(null);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [idUnik, employee.avatar_url]);
 
   // 1. Muat Template ID Card Resmi & Profil Instansi dari SQLite lokal
   const loadTemplateAndCompany = useCallback(async () => {
@@ -187,18 +232,22 @@ export function DigitalIdCardPreview({
             }
           : null);
 
+      const effectiveEmployee = avatarUrl
+        ? { ...employee, avatar_url: avatarUrl }
+        : employee;
+
       setTemplateRendering(true);
       try {
         await preloadCardAssets({
           template: effectiveTemplate,
           company: activeCompany,
-          employee,
+          employee: effectiveEmployee,
         });
 
         const url = await renderIdCardSideToCanvas({
           template: effectiveTemplate,
           side: cardSide,
-          employee,
+          employee: effectiveEmployee,
           company: activeCompany,
           qrPngOverride: qrDataUrl || undefined,
           dpiScale: 1,
@@ -219,7 +268,7 @@ export function DigitalIdCardPreview({
                 elements: DEFAULT_ID_CARD_ELEMENTS,
               },
               side: cardSide,
-              employee,
+              employee: effectiveEmployee,
               company: activeCompany,
               qrPngOverride: qrDataUrl || undefined,
               dpiScale: 1,
@@ -238,7 +287,15 @@ export function DigitalIdCardPreview({
     return () => {
       cancelled = true;
     };
-  }, [template, companyProfile, cardSide, employee, logoDataUrl, qrDataUrl]);
+  }, [
+    template,
+    companyProfile,
+    cardSide,
+    employee,
+    logoDataUrl,
+    qrDataUrl,
+    avatarUrl,
+  ]);
 
   const getCardDataUrl = async (side: CardSide): Promise<string> => {
     if (renderedCardUrl && side === cardSide) {
@@ -274,10 +331,14 @@ export function DigitalIdCardPreview({
       isActive: true,
     };
 
+    const effectiveEmployee = avatarUrl
+      ? { ...employee, avatar_url: avatarUrl }
+      : employee;
+
     return await renderIdCardSideToCanvas({
       template: effectiveTemplate,
       side,
-      employee,
+      employee: effectiveEmployee,
       company: activeCompany,
       qrPngOverride: qrDataUrl || undefined,
       dpiScale: 1,
