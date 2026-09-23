@@ -41,10 +41,10 @@ pub const LICENSE_SETTING_KEY: &str = "app_license";
 pub const LICENSE_ISSUER: &str = "Kemal Office Studio";
 
 /// Public key produk `kos-absensi`, hasil `bun run keygen kos-absensi` di
-/// folder alat lisensi. Aman dibagikan. Selama masih berisi nol, SETIAP lisensi
-/// ditolak — gagal tertutup, bukan terbuka.
+/// folder alat lisensi (dibuat 2026-09-23). Aman dibagikan. Mengganti nilainya
+/// membuat SEMUA lisensi yang sudah diterbitkan tidak sah lagi.
 const PRODUCT_PUBLIC_KEY_HEX: &str =
-    "0000000000000000000000000000000000000000000000000000000000000000";
+    "213db2e48a0fb72b5776206f83d84b71ea005e7a1c41b6291b07ec3dcbabad97";
 
 /// Tanggal build (WIB), ditulis `build.rs`. Dibandingkan dengan
 /// `pembaruan_sampai`: versi yang dibangun setelah masa pembaruan habis tidak
