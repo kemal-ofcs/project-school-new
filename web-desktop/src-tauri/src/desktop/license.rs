@@ -26,10 +26,16 @@ use sha2::{Digest, Sha256};
 
 use super::{config::DesktopState, models::CommandError, storage, sync, time_policy};
 
-pub const LICENSE_PRODUCT: &str = "absensi-sppg";
+/// Kode produk aplikasi ini di alat lisensi. Setiap aplikasi penerbit punya
+/// kode (dan pasangan kunci) sendiri, supaya lisensi satu aplikasi tidak sah
+/// di aplikasi lain.
+pub const LICENSE_PRODUCT: &str = "kos-absensi";
 pub const LICENSE_SETTING_KEY: &str = "app_license";
+/// Penerbit lisensi yang disebut di pesan untuk klien. Padanannya di UI:
+/// `LICENSE_ISSUER` di `lib/gateways/license.ts`.
+pub const LICENSE_ISSUER: &str = "Kemal Office Studio";
 
-/// Public key produk `absensi-sppg`, hasil `bun run keygen absensi-sppg` di
+/// Public key produk `kos-absensi`, hasil `bun run keygen kos-absensi` di
 /// folder alat lisensi. Aman dibagikan. Selama masih berisi nol, SETIAP lisensi
 /// ditolak — gagal tertutup, bukan terbuka.
 const PRODUCT_PUBLIC_KEY_HEX: &str =
@@ -306,14 +312,16 @@ pub fn evaluate(
     let Some(text) = text.map(str::trim).filter(|text| !text.is_empty()) else {
         return blocked(
             LicenseState::Missing,
-            "Aplikasi ini belum memiliki lisensi. Kirim kode perangkat di bawah kepada penyedia aplikasi untuk mendapatkannya.".into(),
+            format!("Aplikasi ini belum memiliki lisensi. Kirim kode perangkat di bawah kepada {LICENSE_ISSUER} untuk mendapatkannya."),
             None,
         );
     };
     if public_key.iter().all(|byte| *byte == 0) {
         return blocked(
             LicenseState::Invalid,
-            "Build aplikasi ini belum diberi public key lisensi. Hubungi penyedia aplikasi.".into(),
+            format!(
+                "Build aplikasi ini belum diberi public key lisensi. Hubungi {LICENSE_ISSUER}."
+            ),
             None,
         );
     }
@@ -331,7 +339,7 @@ pub fn evaluate(
         && !license.devices.iter().any(|code| code == device_code)
     {
         let message = format!(
-            "Perangkat ini ({device_code}) tidak terdaftar di lisensi {}. Kirim kode perangkat ini kepada penyedia aplikasi untuk ditambahkan.",
+            "Perangkat ini ({device_code}) tidak terdaftar di lisensi {}. Kirim kode perangkat ini kepada {LICENSE_ISSUER} untuk ditambahkan.",
             license.holder
         );
         return blocked(LicenseState::DeviceNotListed, message, Some(license));
@@ -775,8 +783,8 @@ mod tests {
         "8a88e3dd7409f195fd52db2d3cba5d72ca6709bf1d94121bf3748801b40f6f5c";
 
     /// Vektor kembar dari `lisensi/test/format.test.ts` — WAJIB sama persis.
-    const VECTOR_V1: &str = "LIS1.eyJ2IjoxLCJwcm9kdWsiOiJhYnNlbnNpLXNwcGciLCJpZCI6IkxJUy0yMDI2LTAwMDEiLCJwZW1lZ2FuZyI6IlNQUEcgVWppIFZla3RvciIsImplbmlzIjoibGFuZ2dhbmFuIiwidGVyYml0IjoiMjAyNi0wOS0yMyIsInBlbWJhcnVhbl9zYW1wYWkiOiIyMDI3LTA5LTIzIiwiYmVybGFrdV9zYW1wYWkiOiIyMDI3LTA5LTIzIiwicGVyYW5na2F0IjpbIlctMUEyQi0zQzRELTVFNkYtN0E4QiJdLCJrdW5jaV9tb2JpbGUiOmZhbHNlfQ.9jFcq8cpoazsc7uSEfNNU2W8DAptL5FK7QC0kCe-sL0ugeh36kU0siPUSNAHpE_hgKjDocYfECDzq9srimDkAg";
-    const VECTOR_V2: &str = "LIS1.eyJ2IjoxLCJwcm9kdWsiOiJhYnNlbnNpLXNwcGciLCJpZCI6IkxJUy0yMDI2LTAwMDIiLCJwZW1lZ2FuZyI6IlNQUEcgTnVzYW50YXJhIOKAlCBDYWJhbmcgVGltdXIiLCJqZW5pcyI6ImJlbGlfcHV0dXMiLCJ0ZXJiaXQiOiIyMDI2LTA5LTIzIiwicGVtYmFydWFuX3NhbXBhaSI6IjIwMjctMDktMjMiLCJiZXJsYWt1X3NhbXBhaSI6bnVsbCwicGVyYW5na2F0IjpbXSwia3VuY2lfbW9iaWxlIjpmYWxzZX0.vYUREZdBaxMQbq1VbyWPIp_iPhnqg-pRWL38KNdFBLUAkGRpk5rDVh6gY9PsjHyOP-IhRcatckUjFEpxZZT4DQ";
+    const VECTOR_V1: &str = "LIS1.eyJ2IjoxLCJwcm9kdWsiOiJrb3MtYWJzZW5zaSIsImlkIjoiTElTLTIwMjYtMDAwMSIsInBlbWVnYW5nIjoiU1BQRyBVamkgVmVrdG9yIiwiamVuaXMiOiJsYW5nZ2FuYW4iLCJ0ZXJiaXQiOiIyMDI2LTA5LTIzIiwicGVtYmFydWFuX3NhbXBhaSI6IjIwMjctMDktMjMiLCJiZXJsYWt1X3NhbXBhaSI6IjIwMjctMDktMjMiLCJwZXJhbmdrYXQiOlsiVy0xQTJCLTNDNEQtNUU2Ri03QThCIl0sImt1bmNpX21vYmlsZSI6ZmFsc2V9.E7JW7dhTf5Io_uEYSP4I0N8U_jmJFLZzxWXUsHXmB8M36GI11ft6fnFfdfY5qkZKeej49YkgKeDjA1lMwD4AAQ";
+    const VECTOR_V2: &str = "LIS1.eyJ2IjoxLCJwcm9kdWsiOiJrb3MtYWJzZW5zaSIsImlkIjoiTElTLTIwMjYtMDAwMiIsInBlbWVnYW5nIjoiU1BQRyBOdXNhbnRhcmEg4oCUIENhYmFuZyBUaW11ciIsImplbmlzIjoiYmVsaV9wdXR1cyIsInRlcmJpdCI6IjIwMjYtMDktMjMiLCJwZW1iYXJ1YW5fc2FtcGFpIjoiMjAyNy0wOS0yMyIsImJlcmxha3Vfc2FtcGFpIjpudWxsLCJwZXJhbmdrYXQiOltdLCJrdW5jaV9tb2JpbGUiOmZhbHNlfQ.SJNWqONTGK2IoCbHUtvTNO3meDdRHqtjc-TJx3s1hTbVp1zTPlLQOITVKO5b20uH1o81MnTeL4KC5RLD5SjMCQ";
     const DEVICE: &str = "W-1A2B-3C4D-5E6F-7A8B";
     const OTHER_DEVICE: &str = "W-0000-1111-2222-3333";
 
@@ -796,7 +804,7 @@ mod tests {
 
     fn base_payload() -> Value {
         json!({
-            "v": 1, "produk": "absensi-sppg", "id": "LIS-UJI", "pemegang": "SPPG Uji",
+            "v": 1, "produk": "kos-absensi", "id": "LIS-UJI", "pemegang": "SPPG Uji",
             "jenis": "beli_putus", "terbit": "2026-09-23", "pembaruan_sampai": "2027-09-23",
             "berlaku_sampai": null, "perangkat": [], "kunci_mobile": false
         })

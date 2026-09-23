@@ -9,6 +9,7 @@ import {
 } from "react";
 import {
   installLicense,
+  LICENSE_ISSUER,
   LICENSE_KIND_LABEL,
   type LicenseState,
   type LicenseStatus,
@@ -139,8 +140,8 @@ export function LicenseActivationPanel({
           </button>
         </div>
         <p className="text-[11px] text-slate-500">
-          Kirim kode ini kepada penyedia aplikasi saat meminta atau
-          memperpanjang lisensi.
+          Kirim kode ini kepada {LICENSE_ISSUER} saat meminta atau memperpanjang
+          lisensi.
         </p>
       </div>
 

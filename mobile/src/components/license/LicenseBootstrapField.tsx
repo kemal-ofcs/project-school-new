@@ -1,6 +1,7 @@
 "use client";
 
 import { useId } from "react";
+import { LICENSE_ISSUER } from "@/lib/gateways/license";
 import { useLicenseStatus } from "@/lib/hooks/useLicenseStatus";
 
 type Props = {
@@ -42,7 +43,7 @@ export function LicenseBootstrapField({ value, onChange }: Props) {
         <code className="select-all font-mono font-bold text-slate-300">
           {status.deviceCode}
         </code>{" "}
-        — kirim kepada penyedia aplikasi untuk mendapatkan lisensi.
+        — kirim kepada {LICENSE_ISSUER} untuk mendapatkan lisensi.
       </p>
     </div>
   );

@@ -43,6 +43,9 @@ export type LicenseStatus = {
   buildDate: string;
 };
 
+/** Penerbit lisensi, disebut di layar aktivasi. Padanan `LICENSE_ISSUER` di `license.rs`. */
+export const LICENSE_ISSUER = "Kemal Office Studio";
+
 export const LICENSE_KIND_LABEL: Record<LicenseKind, string> = {
   beli_putus: "Beli putus",
   langganan: "Langganan",
