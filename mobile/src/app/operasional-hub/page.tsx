@@ -18,6 +18,7 @@ export default function OperasionalHubPage() {
   const canNotifikasiWa = canAccessArea(user, "notifikasi_wa");
   const canOperators = canAccessArea(user, "operators");
   const canPasswordReset = canAccessArea(user, "password_reset");
+  const canRiwayatIdentitas = canAccessArea(user, "karyawan");
   const canAttendancePhoto = canAccessArea(user, "attendance_photo");
   const canKonten = canAccessArea(user, "konten");
   const canPmb = canAccessArea(user, "pmb");
@@ -28,6 +29,7 @@ export default function OperasionalHubPage() {
     canNotifikasiWa ||
     canOperators ||
     canPasswordReset ||
+    canRiwayatIdentitas ||
     canAttendancePhoto ||
     canKonten ||
     canPmb;
@@ -129,6 +131,15 @@ export default function OperasionalHubPage() {
                   title="Riwayat Reset Password"
                   subtitle="Siapa yang mengajukan, foto wajah & hasil verifikasi"
                   tone="violet"
+                />
+              )}
+              {canRiwayatIdentitas && (
+                <HubRow
+                  href="/riwayat-identitas-karyawan"
+                  icon="history"
+                  title="Riwayat Identitas Karyawan"
+                  subtitle="ID Unik yang diganti saat konflik sinkronisasi"
+                  tone="amber"
                 />
               )}
               {canOperators && (

@@ -9,6 +9,7 @@ import {
 } from "@/lib/gateways/sync-status";
 import { AutoAlfaRunner } from "./AutoAlfaRunner";
 import { AutoSyncRunner } from "./AutoSyncRunner";
+import { AutoWaSenderRunner } from "./AutoWaSenderRunner";
 import { MobileBottomNav } from "./MobileBottomNav";
 import { MobileHeader } from "./MobileHeader";
 import { PullToRefresh } from "./PullToRefresh";
@@ -74,6 +75,7 @@ export function MobileAppShell({
     <div className="mobile-shell min-h-dvh flex flex-col bg-slate-950 text-slate-100 antialiased selection:bg-sky-500/30 selection:text-sky-200">
       <AutoAlfaRunner />
       <AutoSyncRunner />
+      <AutoWaSenderRunner />
       <MobileHeader />
       <PullToRefresh
         onRefresh={handleRefresh}

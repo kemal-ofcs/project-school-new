@@ -1,3 +1,4 @@
+import { PersonnelAvatar } from "@/components/personnel/PersonnelAvatar";
 import { Icon } from "@/components/ui/Icon";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { triggerHaptic } from "@/lib/client/haptics";
@@ -7,6 +8,8 @@ interface EmployeeCardProps {
   canManage: boolean;
   onOpenDetail: (emp: Record<string, unknown>) => void;
   onOpenIdCard?: (emp: Record<string, unknown>) => void;
+  /** Dari `useStatusFotoPersonil`: tampilkan "Lihat Foto" alih-alih inisial. */
+  punyaFoto?: boolean;
 }
 
 /**
@@ -26,7 +29,11 @@ function getAvatarHue(name: string): number {
  * Kartu ringkas karyawan untuk daftar halaman Master Karyawan.
  * Menampilkan data identitas utama, badge status, dan satu tombol aksi detail terpadu.
  */
-export function EmployeeCard({ employee, onOpenDetail }: EmployeeCardProps) {
+export function EmployeeCard({
+  employee,
+  onOpenDetail,
+  punyaFoto = false,
+}: EmployeeCardProps) {
   const nama = String(employee.nama ?? "");
   const kodeKaryawan = String(employee.kode_karyawan ?? "-");
   const idUnik = String(employee.id_unik ?? "-");
@@ -57,23 +64,27 @@ export function EmployeeCard({ employee, onOpenDetail }: EmployeeCardProps) {
     <div className="rounded-2xl border border-white/10 bg-slate-900/80 p-4 backdrop-blur-md shadow-sm transition-all">
       {/* Baris Utama: Avatar + Identitas */}
       <div className="flex items-start gap-3 min-w-0">
-        {/* Avatar Inisial */}
-        <div className="relative shrink-0">
-          <div
-            className="grid size-11 place-items-center rounded-2xl text-sm font-black text-white shadow-md"
-            style={{
-              background: `linear-gradient(135deg, hsl(${avatarHue},70%,35%) 0%, hsl(${avatarHue},50%,22%) 100%)`,
-            }}
-          >
-            {inisial || "??"}
+        {/* Foto: tombol "Lihat Foto" bila ada, avatar inisial bila tidak. */}
+        {punyaFoto ? (
+          <PersonnelAvatar idUnik={idUnik} nama={nama} punyaFoto />
+        ) : (
+          <div className="relative shrink-0">
+            <div
+              className="grid size-11 place-items-center rounded-2xl text-sm font-black text-white shadow-md"
+              style={{
+                background: `linear-gradient(135deg, hsl(${avatarHue},70%,35%) 0%, hsl(${avatarHue},50%,22%) 100%)`,
+              }}
+            >
+              {inisial || "??"}
+            </div>
+            {/* Indikator status aktif sebagai titik di sudut avatar */}
+            <span
+              className={`absolute -bottom-0.5 -right-0.5 size-3 rounded-full border-2 border-slate-900 ${
+                isAktif ? "bg-emerald-400" : "bg-slate-500"
+              }`}
+            />
           </div>
-          {/* Indikator status aktif sebagai titik di sudut avatar */}
-          <span
-            className={`absolute -bottom-0.5 -right-0.5 size-3 rounded-full border-2 border-slate-900 ${
-              isAktif ? "bg-emerald-400" : "bg-slate-500"
-            }`}
-          />
-        </div>
+        )}
 
         {/* Identitas */}
         <div className="flex flex-col min-w-0 flex-1">

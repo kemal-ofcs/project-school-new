@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { MobileAppShell } from "@/components/MobileAppShell";
 import { PersonnelPhotoField } from "@/components/PersonnelPhotoField";
+import { PersonnelAvatar } from "@/components/personnel/PersonnelAvatar";
 import { FeedbackBanner } from "@/components/ui/FeedbackBanner";
 import { Icon } from "@/components/ui/Icon";
 import { Modal } from "@/components/ui/Modal";
@@ -19,6 +20,7 @@ import {
 import { createQrPng, employeeQrPayload } from "@/lib/client/qr-code";
 import { useAuth } from "@/lib/context/AuthContext";
 import { getDaftarUnit } from "@/lib/gateways/academic";
+import { simpanFotoPersonilBaru } from "@/lib/gateways/personnel-photo";
 import { getDaftarShift } from "@/lib/gateways/shift";
 import { subscribeSyncCompleted, syncNow } from "@/lib/gateways/sync-status";
 import {
@@ -30,6 +32,7 @@ import {
 import { useConfirmDialog } from "@/lib/hooks/useConfirmDialog";
 import { useDebounce } from "@/lib/hooks/useDebounce";
 import { useHydrated } from "@/lib/hooks/useHydrated";
+import { useStatusFotoPersonil } from "@/lib/hooks/useStatusFotoPersonil";
 import {
   opsiFilterUnit,
   STATUS_KEPEGAWAIAN_GURU as STATUS_KEPEGAWAIAN,
@@ -172,6 +175,16 @@ export default function GuruMobilePage() {
     });
   }, [guru, debouncedSearch, filterStatus, filterUnit]);
 
+  // Daftar hanya butuh status "punya foto"; fotonya dimuat saat dibuka.
+  const idTampil = useMemo(
+    () => filtered.map((item) => String(item.id_guru)),
+    [filtered],
+  );
+  const { punyaFoto, muatUlang: muatUlangStatusFoto } =
+    useStatusFotoPersonil(idTampil);
+  // Foto yang dipilih saat Tambah, disimpan setelah gurunya tercipta.
+  const [fotoBaru, setFotoBaru] = useState<string | null>(null);
+
   const unitOptions = useMemo(
     () => opsiFilterUnit(unitList, guru),
     [unitList, guru],
@@ -217,11 +230,17 @@ export default function GuruMobilePage() {
     if (!canManage || isSubmittingRef.current) return;
     isSubmittingRef.current = true;
     try {
-      await simpanGuru(form);
+      const hasil = await simpanGuru(form);
+      const peringatanFoto = isEditing
+        ? null
+        : await simpanFotoPersonilBaru(hasil.id_guru, fotoBaru);
+      setFotoBaru(null);
       setSuccessMsg("Data guru berhasil disimpan.");
+      if (peringatanFoto) setErrorMsg(peringatanFoto);
       triggerHaptic("success");
       setFormOpen(false);
       await loadData(true);
+      void muatUlangStatusFoto();
     } catch (err: unknown) {
       setErrorMsg(
         err instanceof Error ? err.message : "Gagal menyimpan data guru.",
@@ -230,7 +249,7 @@ export default function GuruMobilePage() {
     } finally {
       isSubmittingRef.current = false;
     }
-  }, [canManage, form, loadData]);
+  }, [canManage, form, loadData, isEditing, fotoBaru, muatUlangStatusFoto]);
 
   const handleDelete = useCallback(
     async (id: string) => {
@@ -401,6 +420,7 @@ export default function GuruMobilePage() {
                   emptyForm(shifts[0] ? Number(shifts[0].id_shift) : undefined),
                 );
                 setIsEditing(false);
+                setFotoBaru(null);
                 setFormOpen(true);
                 triggerHaptic("light");
               }}
@@ -501,11 +521,11 @@ export default function GuruMobilePage() {
                 className="rounded-2xl border border-white/10 bg-slate-900/60 p-3.5"
               >
                 <div className="flex items-start gap-3">
-                  <div className="grid size-10 shrink-0 place-items-center rounded-xl border border-indigo-500/20 bg-indigo-500/10 text-sm font-black text-indigo-300">
-                    {String(item.nama ?? "?")
-                      .charAt(0)
-                      .toUpperCase()}
-                  </div>
+                  <PersonnelAvatar
+                    idUnik={id}
+                    nama={String(item.nama ?? "")}
+                    punyaFoto={punyaFoto.has(id)}
+                  />
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-sm font-bold text-white">
                       {String(item.nama)}
@@ -775,6 +795,8 @@ export default function GuruMobilePage() {
               <PersonnelPhotoField
                 idUnik={isEditing ? (form.id_guru ?? "") : ""}
                 nama={form.nama || "guru ini"}
+                onChanged={() => void muatUlangStatusFoto()}
+                onPendingChange={isEditing ? undefined : setFotoBaru}
               />
             </div>
 

@@ -1,6 +1,5 @@
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use zeroize::Zeroizing;
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -59,7 +58,6 @@ pub struct OfflineCredential {
 #[derive(Debug)]
 pub struct MobileSession {
     pub operator: OperatorUser,
-    pub token: Option<Zeroizing<String>>,
     pub mode: SessionMode,
 }
 
@@ -158,15 +156,3 @@ impl std::fmt::Display for CommandError {
 
 impl std::error::Error for CommandError {}
 
-#[derive(Debug, Deserialize)]
-pub struct LoginApiResponse {
-    pub sukses: bool,
-    pub pesan: Option<String>,
-    pub operator: Option<OperatorUser>,
-}
-
-pub struct RemoteLogin {
-    pub operator: OperatorUser,
-    pub token: Zeroizing<String>,
-    pub message: String,
-}

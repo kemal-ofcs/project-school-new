@@ -12,7 +12,6 @@ import {
 import { BootstrapPanel } from "@/components/BootstrapPanel";
 import { BrandLogo } from "@/components/ui/BrandLogo";
 import { FeedbackBanner } from "@/components/ui/FeedbackBanner";
-import { Modal } from "@/components/ui/Modal";
 import { triggerHaptic } from "@/lib/client/haptics";
 import { BRANDING } from "@/lib/constants/branding";
 import { useAuth } from "@/lib/context/AuthContext";
@@ -20,7 +19,6 @@ import {
   type BootstrapStatus,
   getBootstrapStatus,
 } from "@/lib/gateways/bootstrap";
-import { getServerUrl, setServerUrl } from "@/lib/gateways/server-config";
 import { useAppName } from "@/lib/hooks/useAppName";
 import { useCompanyName } from "@/lib/hooks/useCompanyName";
 import { useOnlineStatus } from "@/lib/hooks/useOnlineStatus";
@@ -100,29 +98,11 @@ export default function LoginPage() {
     return () => clearInterval(timer);
   }, [cooldownSeconds]);
 
-  // Server Endpoint Settings state
-  const [serverUrl, setServerUrlState] = useState(
-    "https://absensi-sppg-seven.vercel.app",
-  );
-  const [isServerModalOpen, setIsServerModalOpen] = useState(false);
-  const [customServerUrl, setCustomServerUrl] = useState("");
-  const [serverSaveMessage, setServerSaveMessage] = useState("");
-  const [isSavingServer, setIsSavingServer] = useState(false);
-
   useEffect(() => {
     if (!authLoading && isAuthenticated) {
       router.replace("/dashboard");
     }
   }, [authLoading, isAuthenticated, router]);
-
-  useEffect(() => {
-    void getServerUrl().then((url) => {
-      if (url) {
-        setServerUrlState(url);
-        setCustomServerUrl(url);
-      }
-    });
-  }, []);
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -168,31 +148,6 @@ export default function LoginPage() {
     } finally {
       setIsSubmitting(false);
       isSubmittingRef.current = false;
-    }
-  };
-
-  const handleSaveServerUrl = async (urlToSave: string) => {
-    const target = urlToSave.trim();
-    if (!target) return;
-    setIsSavingServer(true);
-    setServerSaveMessage("");
-    try {
-      const savedOrigin = await setServerUrl(target);
-      setServerUrlState(savedOrigin);
-      setCustomServerUrl(savedOrigin);
-      setServerSaveMessage(`Server berhasil disetel ke: ${savedOrigin}`);
-      triggerHaptic("success");
-      setTimeout(() => {
-        setIsServerModalOpen(false);
-        setServerSaveMessage("");
-      }, 1200);
-    } catch (err: unknown) {
-      triggerHaptic("error");
-      setServerSaveMessage(
-        err instanceof Error ? err.message : "Gagal menyimpan URL server.",
-      );
-    } finally {
-      setIsSavingServer(false);
     }
   };
 
@@ -255,16 +210,16 @@ export default function LoginPage() {
               </span>
             </div>
 
+            {/* Perangkat login langsung ke database (Turso, server sendiri,
+                atau lokal). Jalur "URL Server Origin" ke server web sudah
+                dipensiunkan: dispatcher sinkronisasinya tidak mengenal data
+                akademik, sehingga antrean perangkat macet permanen. */}
             <button
               type="button"
-              onClick={() => {
-                setCustomServerUrl(serverUrl);
-                setServerSaveMessage("");
-                setIsServerModalOpen(true);
-              }}
+              onClick={() => setShowDatabaseSetup(true)}
               className="inline-flex items-center gap-1.5 rounded-full border border-sky-500/30 bg-sky-500/10 px-3 py-1 text-xs font-semibold text-sky-300 hover:bg-sky-500/20 active:scale-95 transition"
             >
-              <span>⚙️ Server</span>
+              <span>Koneksi Database</span>
             </button>
           </div>
         </div>
@@ -423,114 +378,12 @@ export default function LoginPage() {
             </div>
           </form>
         </div>
-
-        {/* Server Endpoint Active Info */}
-        <div className="mt-4 text-center">
-          <p className="text-[11px] text-slate-400 truncate max-w-xs">
-            Endpoint:{" "}
-            <span className="font-mono text-sky-300">{serverUrl}</span>
-          </p>
-        </div>
       </div>
 
       {/* Footer Info */}
       <footer className="text-center text-[11px] text-slate-500">
         {appName} Mobile v0.1 • 100% Offline-First
       </footer>
-
-      {/* Server Config Modal */}
-      {isServerModalOpen && (
-        <Modal
-          isOpen
-          onClose={() => setIsServerModalOpen(false)}
-          title="Pengaturan Server API"
-          maxWidth="max-w-sm"
-          footer={
-            <div className="flex w-full gap-2">
-              <button
-                type="button"
-                onClick={() => setIsServerModalOpen(false)}
-                className="flex-1 min-h-10 rounded-xl border border-white/10 bg-slate-800 text-xs font-bold text-slate-300 hover:bg-slate-700 transition"
-              >
-                Batal
-              </button>
-              <button
-                type="button"
-                disabled={isSavingServer || !customServerUrl.trim()}
-                onClick={() => handleSaveServerUrl(customServerUrl)}
-                className="flex-1 min-h-10 rounded-xl bg-sky-500 font-bold text-xs text-slate-950 hover:bg-sky-400 disabled:opacity-50 transition"
-              >
-                {isSavingServer ? "Menyimpan..." : "Simpan & Terapkan"}
-              </button>
-            </div>
-          }
-        >
-          <div>
-            <p className="text-xs text-slate-300 mb-4 leading-relaxed">
-              Tentukan alamat server backend yang dituju untuk autentikasi dan
-              sinkronisasi data.
-            </p>
-
-            <div className="mb-4">
-              <label
-                htmlFor="serverUrlInput"
-                className="block text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1.5"
-              >
-                URL Server Origin
-              </label>
-              <input
-                id="serverUrlInput"
-                type="text"
-                value={customServerUrl}
-                onChange={(e) => setCustomServerUrl(e.target.value)}
-                placeholder="https://absensi-sppg-seven.vercel.app"
-                className="w-full min-h-11 rounded-xl border border-white/15 bg-slate-950 px-3 text-xs font-mono text-white placeholder-slate-600 focus:border-sky-400 focus:outline-none"
-              />
-            </div>
-
-            {/* Quick presets */}
-            <div className="mb-5 flex flex-col gap-2">
-              <span className="text-[11px] font-semibold text-slate-400">
-                Pilihan Cepat:
-              </span>
-              <div className="flex flex-col gap-1.5">
-                <button
-                  type="button"
-                  onClick={() =>
-                    setCustomServerUrl("https://absensi-sppg-seven.vercel.app")
-                  }
-                  className="w-full text-left px-3 py-2 rounded-xl border border-sky-500/20 bg-sky-500/5 hover:bg-sky-500/10 text-xs text-sky-200 transition"
-                >
-                  <span className="font-bold text-sky-400">
-                    ☁️ Cloud Vercel:
-                  </span>
-                  <div className="font-mono text-[10px] text-slate-300">
-                    https://absensi-sppg-seven.vercel.app
-                  </div>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setCustomServerUrl("http://127.0.0.1:3000")}
-                  className="w-full text-left px-3 py-2 rounded-xl border border-emerald-500/20 bg-emerald-500/5 hover:bg-emerald-500/10 text-xs text-emerald-200 transition"
-                >
-                  <span className="font-bold text-emerald-400">
-                    💻 USB Reverse / Lokal PC:
-                  </span>
-                  <div className="font-mono text-[10px] text-slate-300">
-                    http://127.0.0.1:3000
-                  </div>
-                </button>
-              </div>
-            </div>
-
-            {serverSaveMessage && (
-              <div className="mb-4 p-2.5 rounded-xl bg-slate-800 border border-white/10 text-xs text-center text-sky-300 font-medium">
-                {serverSaveMessage}
-              </div>
-            )}
-          </div>
-        </Modal>
-      )}
     </div>
   );
 }

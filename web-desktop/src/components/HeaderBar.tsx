@@ -142,6 +142,12 @@ const NAVIGATION: NavigationItem[] = [
     label: "Riwayat Reset",
   },
   {
+    area: "karyawan",
+    href: "/riwayat-identitas-karyawan",
+    icon: "history",
+    label: "Riwayat Identitas",
+  },
+  {
     area: "attendance_photo",
     href: "/foto-absensi",
     icon: "eye",

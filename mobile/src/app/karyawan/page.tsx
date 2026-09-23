@@ -22,6 +22,7 @@ import { getDaftarShift } from "@/lib/gateways/shift";
 import { subscribeSyncCompleted } from "@/lib/gateways/sync-status";
 import { useDebounce } from "@/lib/hooks/useDebounce";
 import { useHydrated } from "@/lib/hooks/useHydrated";
+import { useStatusFotoPersonil } from "@/lib/hooks/useStatusFotoPersonil";
 import { opsiFilterUnit, TANPA_UNIT } from "@/lib/validations/personnel";
 
 type FilterStatus = "" | "Aktif" | "Nonaktif";
@@ -160,6 +161,14 @@ export default function KaryawanPage() {
     });
   }, [employees, filterBackup, filterUnit]);
 
+  // Kartu hanya butuh status "punya foto"; fotonya dimuat saat dibuka.
+  const idKaryawanTampil = useMemo(
+    () => filteredEmployees.map((emp) => String(emp.id_unik ?? "")),
+    [filteredEmployees],
+  );
+  const { punyaFoto, muatUlang: muatUlangStatusFoto } =
+    useStatusFotoPersonil(idKaryawanTampil);
+
   const unitOptions = useMemo(
     () => opsiFilterUnit(units, employees),
     [units, employees],
@@ -246,8 +255,9 @@ export default function KaryawanPage() {
     (message: string) => {
       setSuccessMsg(message);
       void loadData(true);
+      void muatUlangStatusFoto();
     },
-    [loadData],
+    [loadData, muatUlangStatusFoto],
   );
 
   // ─── Render ─────────────────────────────────────────────────────────────────
@@ -486,6 +496,7 @@ export default function KaryawanPage() {
               employee={emp}
               canManage={canManage}
               onOpenDetail={handleOpenDetail}
+              punyaFoto={punyaFoto.has(String(emp.id_unik ?? ""))}
             />
           ))}
         </div>
@@ -500,6 +511,7 @@ export default function KaryawanPage() {
         onClose={() => setDetailOpen(false)}
         onEditRequest={handleEditRequest}
         onToggleStatus={handleToggleStatus}
+        onPhotoChanged={() => void muatUlangStatusFoto()}
       />
 
       {/* ── Modal Form Tambah / Edit (hanya render jika canManage) ── */}
@@ -512,6 +524,7 @@ export default function KaryawanPage() {
           units={units}
           onClose={() => setFormOpen(false)}
           onSuccess={handleFormSuccess}
+          onWarning={setErrorMsg}
         />
       ) : null}
     </MobileAppShell>

@@ -6,7 +6,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { MobileAppShell } from "@/components/MobileAppShell";
 import { BackHeader } from "@/components/ui/HubRow";
 import { Icon } from "@/components/ui/Icon";
-import { canAccessArea } from "@/lib/auth/access";
+import { formatTanggalOperasional } from "@/lib/attendance/time-policy";
+import { canAccessArea, hasPermission } from "@/lib/auth/access";
 import { triggerHaptic } from "@/lib/client/haptics";
 import { useAuth } from "@/lib/context/AuthContext";
 import {
@@ -59,8 +60,8 @@ export default function OperationalPage() {
   const router = useRouter();
 
   const [activeTab, setActiveTab] = useState<OperationalTab>("koreksi");
-  const [date, setDate] = useState<string>(
-    () => new Date().toISOString().split("T")[0],
+  const [date, setDate] = useState<string>(() =>
+    formatTanggalOperasional(Date.now()),
   );
 
   // Data Masters
@@ -514,7 +515,7 @@ export default function OperationalPage() {
         description:
           "Baris penugasan backup akan dihapus permanen dari riwayat dan status backup karyawan akan diselaraskan kembali.",
         preserved:
-          "Absensi yang sudah tercatat atas penugasan ini tetap tersimpan.",
+          "Penugasan yang sudah dipakai absensi tidak bisa dihapus; batalkan saja.",
         confirmLabel: "Ya, hapus",
       }))
     )
@@ -1048,13 +1049,15 @@ export default function OperationalPage() {
                             Batalkan
                           </button>
                         ) : null}
-                        <button
-                          type="button"
-                          onClick={() => handleDeleteBackup(idBck)}
-                          className="rounded-xl border border-rose-500/30 bg-rose-500/10 px-2.5 py-1 text-[10px] font-bold text-rose-300 hover:bg-rose-500/20 active:scale-95 transition shrink-0"
-                        >
-                          Hapus
-                        </button>
+                        {hasPermission(user, "operational.delete") ? (
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteBackup(idBck)}
+                            className="rounded-xl border border-rose-500/30 bg-rose-500/10 px-2.5 py-1 text-[10px] font-bold text-rose-300 hover:bg-rose-500/20 active:scale-95 transition shrink-0"
+                          >
+                            Hapus
+                          </button>
+                        ) : null}
                       </div>
                     </div>
                   );

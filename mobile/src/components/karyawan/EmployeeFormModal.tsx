@@ -11,6 +11,7 @@ import {
   tambahKaryawan,
   updateKaryawan,
 } from "@/lib/gateways/employee";
+import { simpanFotoPersonilBaru } from "@/lib/gateways/personnel-photo";
 import {
   createEmployeeIdentifiers,
   firstValidationMessage,
@@ -57,6 +58,8 @@ interface EmployeeFormModalProps {
   onClose: () => void;
   /** Callback sukses menyimpan — menerima pesan konfirmasi. */
   onSuccess: (message: string) => void;
+  /** Data tersimpan tetapi fotonya gagal diunggah. */
+  onWarning?: (message: string) => void;
 }
 
 /**
@@ -71,6 +74,7 @@ export function EmployeeFormModal({
   units,
   onClose,
   onSuccess,
+  onWarning,
 }: EmployeeFormModalProps) {
   const isSubmittingRef = useRef(false);
   const [formData, setFormData] = useState<KaryawanInput>(DEFAULT_FORM);
@@ -78,6 +82,8 @@ export function EmployeeFormModal({
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const isEditing = mode === "edit";
+  // Foto yang dipilih saat Tambah, disimpan setelah karyawannya tercipta.
+  const [fotoBaru, setFotoBaru] = useState<string | null>(null);
   const prevOpenRef = useRef(false);
 
   // Inisialisasi form HANYA saat modal pertama kali dibuka (rising edge)
@@ -85,6 +91,7 @@ export function EmployeeFormModal({
     if (!prevOpenRef.current && isOpen) {
       setFormErrors({});
       setErrorMsg(null);
+      setFotoBaru(null);
       isSubmittingRef.current = false;
 
       if (mode === "edit" && initialData) {
@@ -135,7 +142,12 @@ export function EmployeeFormModal({
         onSuccess(`Data karyawan ${formData.nama} berhasil diperbarui.`);
       } else {
         await tambahKaryawan(formData);
+        const peringatanFoto = await simpanFotoPersonilBaru(
+          formData.id_unik,
+          fotoBaru,
+        );
         onSuccess(`Karyawan baru ${formData.nama} berhasil ditambahkan.`);
+        if (peringatanFoto) onWarning?.(peringatanFoto);
       }
       triggerHaptic("success");
       onClose();
@@ -536,6 +548,7 @@ export function EmployeeFormModal({
             idUnik={isEditing ? (formData.id_unik ?? "") : ""}
             nama={formData.nama || "karyawan ini"}
             disabled={isSubmitting}
+            onPendingChange={isEditing ? undefined : setFotoBaru}
           />
         </div>
 

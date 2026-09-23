@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { MobileAppShell } from "@/components/MobileAppShell";
 import { PersonnelPhotoField } from "@/components/PersonnelPhotoField";
+import { PersonnelAvatar } from "@/components/personnel/PersonnelAvatar";
 import { FeedbackBanner } from "@/components/ui/FeedbackBanner";
 import { Icon } from "@/components/ui/Icon";
 import { Modal } from "@/components/ui/Modal";
@@ -20,6 +21,7 @@ import {
 import { createQrPng, employeeQrPayload } from "@/lib/client/qr-code";
 import { useAuth } from "@/lib/context/AuthContext";
 import { getDaftarRombel, getDaftarUnit } from "@/lib/gateways/academic";
+import { simpanFotoPersonilBaru } from "@/lib/gateways/personnel-photo";
 import { getDaftarShift } from "@/lib/gateways/shift";
 import {
   getDaftarSiswa,
@@ -36,6 +38,7 @@ import {
 import { useConfirmDialog } from "@/lib/hooks/useConfirmDialog";
 import { useDebounce } from "@/lib/hooks/useDebounce";
 import { useHydrated } from "@/lib/hooks/useHydrated";
+import { useStatusFotoPersonil } from "@/lib/hooks/useStatusFotoPersonil";
 import { normalizeOperatorPhone } from "@/lib/operators/contact";
 import {
   opsiFilterUnit,
@@ -196,6 +199,16 @@ export default function SiswaMobilePage() {
     });
   }, [siswa, debouncedSearch, filterStatus, filterUnit]);
 
+  // Daftar hanya butuh status "punya foto"; fotonya dimuat saat dibuka.
+  const idTampil = useMemo(
+    () => filtered.map((item) => String(item.id_siswa)),
+    [filtered],
+  );
+  const { punyaFoto, muatUlang: muatUlangStatusFoto } =
+    useStatusFotoPersonil(idTampil);
+  // Foto yang dipilih saat Tambah, disimpan setelah siswanya tercipta.
+  const [fotoBaru, setFotoBaru] = useState<string | null>(null);
+
   const unitOptions = useMemo(
     () => opsiFilterUnit(unitList, siswa),
     [unitList, siswa],
@@ -242,11 +255,17 @@ export default function SiswaMobilePage() {
     if (!canManage || isSubmittingRef.current) return;
     isSubmittingRef.current = true;
     try {
-      await simpanSiswa(form);
+      const hasil = await simpanSiswa(form);
+      const peringatanFoto = isEditing
+        ? null
+        : await simpanFotoPersonilBaru(hasil.id_siswa, fotoBaru);
+      setFotoBaru(null);
       setSuccessMsg("Data siswa berhasil disimpan.");
+      if (peringatanFoto) setErrorMsg(peringatanFoto);
       triggerHaptic("success");
       setFormOpen(false);
       await loadData(true);
+      void muatUlangStatusFoto();
     } catch (err: unknown) {
       setErrorMsg(
         err instanceof Error ? err.message : "Gagal menyimpan data siswa.",
@@ -255,7 +274,7 @@ export default function SiswaMobilePage() {
     } finally {
       isSubmittingRef.current = false;
     }
-  }, [canManage, form, loadData]);
+  }, [canManage, form, loadData, isEditing, fotoBaru, muatUlangStatusFoto]);
 
   const handleDelete = useCallback(
     async (id: string) => {
@@ -504,6 +523,7 @@ export default function SiswaMobilePage() {
                   ),
                 );
                 setIsEditing(false);
+                setFotoBaru(null);
                 setFormOpen(true);
                 triggerHaptic("light");
               }}
@@ -623,11 +643,11 @@ export default function SiswaMobilePage() {
                 className="rounded-2xl border border-white/10 bg-slate-900/60 p-3.5"
               >
                 <div className="flex items-start gap-3">
-                  <div className="grid size-10 shrink-0 place-items-center rounded-xl border border-sky-500/20 bg-sky-500/10 text-sm font-black text-sky-300">
-                    {String(item.nama_lengkap ?? "?")
-                      .charAt(0)
-                      .toUpperCase()}
-                  </div>
+                  <PersonnelAvatar
+                    idUnik={id}
+                    nama={String(item.nama_lengkap ?? "")}
+                    punyaFoto={punyaFoto.has(id)}
+                  />
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-sm font-bold text-white">
                       {String(item.nama_lengkap)}
@@ -939,6 +959,8 @@ export default function SiswaMobilePage() {
               <PersonnelPhotoField
                 idUnik={isEditing ? (form.id_siswa ?? "") : ""}
                 nama={form.nama_lengkap || "siswa ini"}
+                onChanged={() => void muatUlangStatusFoto()}
+                onPendingChange={isEditing ? undefined : setFotoBaru}
               />
             </div>
 

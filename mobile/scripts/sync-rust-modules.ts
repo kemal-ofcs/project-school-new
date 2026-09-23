@@ -16,6 +16,8 @@ const filesToSync = [
   "attendance_ledger.rs",
   "attendance_dashboard.rs",
   "wa_notification.rs",
+  // Pengirim antrean WhatsApp; aturannya wajib identik dengan Desktop.
+  "wa_sender.rs",
   "commands.rs",
   // Tarif default payroll: satu sumber untuk SQLite lokal dan Turso cloud, di
   // kedua workspace. Perbedaan sekecil apa pun di sini membuat baris seed lokal

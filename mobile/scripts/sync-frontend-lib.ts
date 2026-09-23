@@ -33,6 +33,7 @@ const filesToCopy = [
   "lib/db-schema.ts",
   "lib/db-migrations.ts",
   "components/AutoAlfaRunner.tsx",
+  "components/AutoWaSenderRunner.tsx",
   "components/AutoSyncRunner.tsx",
   "components/LivenessCapture.tsx",
   // Editor koleksi berulang CMS landing. Tidak punya perilaku khusus platform
@@ -40,6 +41,13 @@ const filesToCopy = [
   // apa adanya alih-alih diduplikasi - dua salinan akan saling menyimpang
   // persis di tempat yang paling mahal, yaitu nama field JSON-nya.
   "components/content/CollectionRepeater.tsx",
+  // Foto personil di daftar dan Detail. Hanya bergantung pada kontrak `Modal`
+  // yang sama di kedua workspace (`isOpen`/`onClose`/`title`/`titleId`) dan
+  // pada gateway foto yang ikut tersinkron, jadi tidak ada perilaku khusus
+  // platform yang bisa patah.
+  "components/personnel/PersonnelAvatar.tsx",
+  "components/personnel/PersonnelPhotoDialog.tsx",
+  "components/personnel/PersonnelPortrait.tsx",
 ];
 
 for (const file of filesToCopy) {

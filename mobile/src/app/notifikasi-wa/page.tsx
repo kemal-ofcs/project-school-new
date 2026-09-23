@@ -195,7 +195,7 @@ export default function NotifikasiWaMobilePage() {
   /**
    * Kuras antrean sekarang, tanpa menunggu penjadwal.
    *
-   * Pengirimannya berjalan di server aplikasi — lihat `drainWaQueueGateway`.
+   * Jalur pengirimannya per build — lihat `drainWaQueueGateway`.
    * Hasilnya dilaporkan apa adanya termasuk saat nol pesan terkirim: sebuah
    * tombol yang selalu menjawab "berhasil" tidak membedakan antrean kosong dari
    * gateway yang menolak.
@@ -541,6 +541,29 @@ export default function NotifikasiWaMobilePage() {
                 Aktifkan pengiriman WhatsApp
               </label>
             </div>
+            <div className="flex items-center gap-2">
+              <input
+                checked={config.autoSendEnabled}
+                id="wa-cfg-otomatis"
+                onChange={(e) =>
+                  setConfig((c) =>
+                    c ? { ...c, autoSendEnabled: e.target.checked } : c,
+                  )
+                }
+                type="checkbox"
+              />
+              <label
+                className="text-slate-300 text-xs"
+                htmlFor="wa-cfg-otomatis"
+              >
+                Kirim otomatis tanpa menekan tombol
+              </label>
+            </div>
+            <p className="text-[11px] text-slate-500 leading-relaxed">
+              Antrean dikuras sendiri setiap menit selama aplikasi terbuka oleh
+              operator yang berizin mengirim notifikasi. Di Android, aplikasi
+              yang di-minimize berhenti mengirim.
+            </p>
             <p className="text-[11px] text-slate-500 leading-relaxed">
               Sakelar jenis notifikasi (scan masuk, pulang, bolos, ambang alfa)
               ikut sinkronisasi dan diatur di halaman Pengaturan — sakelar itu

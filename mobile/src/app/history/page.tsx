@@ -7,6 +7,7 @@ import { FeedbackBanner } from "@/components/ui/FeedbackBanner";
 import { Icon } from "@/components/ui/Icon";
 import { Modal } from "@/components/ui/Modal";
 import { StatusBadge } from "@/components/ui/StatusBadge";
+import { formatTanggalOperasional } from "@/lib/attendance/time-policy";
 import { canAccessArea, hasPermission } from "@/lib/auth/access";
 import { exportToCsv, exportToExcel } from "@/lib/client/excel-export";
 import { triggerHaptic } from "@/lib/client/haptics";
@@ -150,11 +151,11 @@ export default function HistoryPage() {
   const canDeleteHistory = hasPermission(user, "history.delete");
 
   const [activeTab, setActiveTab] = useState<HistoryTab>("daily");
-  const [tanggalMulai, setTanggalMulai] = useState<string>(
-    () => new Date().toISOString().split("T")[0],
+  const [tanggalMulai, setTanggalMulai] = useState<string>(() =>
+    formatTanggalOperasional(Date.now()),
   );
-  const [tanggalSelesai, setTanggalSelesai] = useState<string>(
-    () => new Date().toISOString().split("T")[0],
+  const [tanggalSelesai, setTanggalSelesai] = useState<string>(() =>
+    formatTanggalOperasional(Date.now()),
   );
   const [dailyRecords, setDailyRecords] = useState<Record<string, unknown>[]>(
     [],

@@ -30,6 +30,13 @@ interface Props {
   nama: string;
   disabled?: boolean;
   onChanged?: () => void;
+  /**
+   * Mode "Tambah": personil belum punya ID, jadi foto yang dipilih DITAHAN di
+   * form dan diserahkan ke pemanggil (base64 tanpa awalan `data:`, atau `null`
+   * bila dibatalkan). Pemanggil menyimpannya lewat `simpanFotoPersonilBaru`
+   * setelah personil berhasil dibuat.
+   */
+  onPendingChange?: (fotoBase64: string | null) => void;
 }
 
 export function PersonnelPhotoField({
@@ -37,6 +44,7 @@ export function PersonnelPhotoField({
   nama,
   disabled = false,
   onChanged,
+  onPendingChange,
 }: Props) {
   const [foto, setFoto] = useState<string | null>(null);
   const [memuat, setMemuat] = useState(false);
@@ -45,6 +53,9 @@ export function PersonnelPhotoField({
 
   const onChangedRef = useRef(onChanged);
   onChangedRef.current = onChanged;
+  const onPendingChangeRef = useRef(onPendingChange);
+  onPendingChangeRef.current = onPendingChange;
+  const modeTambah = !idUnik && Boolean(onPendingChange);
 
   const muat = useCallback(async () => {
     if (!idUnik) {
@@ -102,6 +113,12 @@ export function PersonnelPhotoField({
         );
         return;
       }
+      if (!idUnik) {
+        setFoto(dataUrl);
+        onPendingChangeRef.current?.(base64);
+        triggerHaptic("success");
+        return;
+      }
       await simpanFotoPersonil(idUnik, base64, "image/jpeg");
       setFoto(dataUrl);
       triggerHaptic("success");
@@ -116,6 +133,11 @@ export function PersonnelPhotoField({
 
   const handleHapus = async () => {
     if (isSubmittingRef.current) return;
+    if (!idUnik) {
+      setFoto(null);
+      onPendingChangeRef.current?.(null);
+      return;
+    }
     isSubmittingRef.current = true;
     setGalat(null);
     try {
@@ -133,7 +155,7 @@ export function PersonnelPhotoField({
 
   const inputId = `input-foto-personil-${idUnik || "baru"}`;
 
-  if (!idUnik) {
+  if (!idUnik && !modeTambah) {
     return (
       <p className="text-[10px] text-slate-500">
         Simpan data terlebih dahulu, lalu foto bisa diunggah lewat tombol Ubah.
@@ -183,11 +205,13 @@ export function PersonnelPhotoField({
               onClick={handleHapus}
               className="rounded-lg bg-rose-500/15 px-3 py-2 text-[10px] font-semibold text-rose-300"
             >
-              Hapus foto
+              {modeTambah ? "Batalkan foto" : "Hapus foto"}
             </button>
           ) : null}
           <p className="text-[10px] text-slate-500">
-            Maksimal 500 KB. Dipakai juga pada kartu identitas.
+            {modeTambah
+              ? "Foto disimpan setelah data berhasil ditambahkan."
+              : "Maksimal 500 KB. Dipakai juga pada kartu identitas."}
           </p>
         </div>
       </div>

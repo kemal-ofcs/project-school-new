@@ -2,15 +2,23 @@
 
 import { useState } from "react";
 import { DigitalIdCardPreview } from "@/components/karyawan/DigitalIdCardPreview";
+import { PersonnelPhotoField } from "@/components/PersonnelPhotoField";
+import { PersonnelPortrait } from "@/components/personnel/PersonnelPortrait";
 import { Icon } from "@/components/ui/Icon";
 import { Modal } from "@/components/ui/Modal";
 import { StatusBadge } from "@/components/ui/StatusBadge";
+import { hasPermission } from "@/lib/auth/access";
 import { triggerHaptic } from "@/lib/client/haptics";
 import {
   normalizeWhatsAppNumber,
   openPhoneDialer,
   openWhatsAppChat,
 } from "@/lib/client/open-url";
+import { useAuth } from "@/lib/context/AuthContext";
+import {
+  izinKelolaFoto,
+  jenisDariLabel,
+} from "@/lib/validations/personnel-photo";
 
 type DetailTab = "idcard" | "info" | "aksi";
 
@@ -29,18 +37,8 @@ interface EmployeeDetailModalProps {
   onEditRequest: (emp: Record<string, unknown>) => void;
   /** Callback untuk toggle status Aktif/Nonaktif. */
   onToggleStatus: (idUnik: string, currentStatus: string) => Promise<void>;
-}
-
-/**
- * Menghasilkan warna HSL yang konsisten dari nama karyawan.
- */
-function getAvatarHue(name: string): number {
-  let hash = 0;
-  for (let i = 0; i < name.length; i++) {
-    hash = name.charCodeAt(i) + ((hash << 5) - hash);
-    hash |= 0;
-  }
-  return Math.abs(hash) % 360;
+  /** Dipanggil setelah foto disimpan atau dihapus, untuk menyegarkan daftar. */
+  onPhotoChanged?: () => void;
 }
 
 /**
@@ -106,7 +104,11 @@ export function EmployeeDetailModal({
   onClose,
   onEditRequest,
   onToggleStatus,
+  onPhotoChanged,
 }: EmployeeDetailModalProps) {
+  const { user } = useAuth();
+  // Dinaikkan setelah foto berubah supaya foto di header dimuat ulang.
+  const [versiFoto, setVersiFoto] = useState(0);
   const [activeTab, setActiveTab] = useState<DetailTab>("idcard");
   const [busyToggle, setBusyToggle] = useState(false);
   const [confirmToggleOpen, setConfirmToggleOpen] = useState(false);
@@ -132,14 +134,12 @@ export function EmployeeDetailModal({
   const selesaiAktif = fmtDate(employee.tanggal_selesai_aktif);
   const statusQr = String(employee.status_qr ?? "Belum");
   const statusBackup = String(employee.status_backup ?? "NORMAL");
-
-  const avatarHue = getAvatarHue(nama);
-  const inisial = nama
-    .split(" ")
-    .map((n) => n.charAt(0))
-    .slice(0, 2)
-    .join("")
-    .toUpperCase();
+  // Izin foto mengikuti jenis personil (karyawan/guru/siswa), sama dengan
+  // penjaga di backend.
+  const bolehKelolaFoto = hasPermission(
+    user,
+    izinKelolaFoto(jenisDariLabel(employee.jenis_personil)),
+  );
 
   const isAktif = statusAktif === "Aktif";
   const isBackup = statusBackup === "BACKUP";
@@ -242,16 +242,14 @@ export function EmployeeDetailModal({
       {/* Hero Profile Header */}
       <div className="mb-4 rounded-2xl border border-white/10 bg-gradient-to-b from-slate-800/80 to-slate-900/80 p-3.5 shadow-lg backdrop-blur-md">
         <div className="flex items-center gap-3">
-          {/* Avatar Inisial */}
+          {/* Foto (inisial bila belum ada) */}
           <div className="relative shrink-0">
-            <div
-              className="grid size-12 place-items-center rounded-2xl text-base font-black text-white shadow-md border border-white/20"
-              style={{
-                background: `linear-gradient(135deg, hsl(${avatarHue},70%,35%) 0%, hsl(${avatarHue},50%,22%) 100%)`,
-              }}
-            >
-              {inisial || "??"}
-            </div>
+            <PersonnelPortrait
+              key={`${idUnik}-${versiFoto}`}
+              idUnik={idUnik}
+              nama={nama}
+              className="size-12 rounded-2xl shadow-md"
+            />
             {/* Status Dot */}
             <span
               className={`absolute -bottom-0.5 -right-0.5 size-3.5 rounded-full border-2 border-slate-900 ${
@@ -328,6 +326,32 @@ export function EmployeeDetailModal({
       {/* Tab 2: Informasi Lengkap (16 Kolom) */}
       {activeTab === "info" ? (
         <div className="flex flex-col gap-3">
+          {/* Grup 0: Foto — sebelum Identitas */}
+          <div className="rounded-2xl border border-white/10 bg-slate-800/40 p-3.5 shadow-sm">
+            {bolehKelolaFoto ? (
+              <PersonnelPhotoField
+                idUnik={idUnik}
+                nama={nama}
+                onChanged={() => {
+                  setVersiFoto((versi) => versi + 1);
+                  onPhotoChanged?.();
+                }}
+              />
+            ) : (
+              <div className="flex items-center gap-3">
+                <PersonnelPortrait
+                  key={`${idUnik}-${versiFoto}`}
+                  idUnik={idUnik}
+                  nama={nama}
+                  className="h-28 w-24 rounded-xl"
+                />
+                <p className="text-[10px] text-slate-500">
+                  Foto hanya bisa diubah pemegang izin kelola data ini.
+                </p>
+              </div>
+            )}
+          </div>
+
           {/* Grup 1: Identitas Pegawai */}
           <div className="rounded-2xl border border-white/10 bg-slate-800/40 p-3.5 shadow-sm">
             <div className="flex items-center gap-1.5 mb-2">

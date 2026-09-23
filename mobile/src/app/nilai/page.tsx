@@ -5,6 +5,7 @@ import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { MobileAppShell } from "@/components/MobileAppShell";
 import { FeedbackBanner } from "@/components/ui/FeedbackBanner";
 import { Modal } from "@/components/ui/Modal";
+import { formatTanggalOperasional } from "@/lib/attendance/time-policy";
 import { canAccessArea, hasPermission } from "@/lib/auth/access";
 import { useAuth } from "@/lib/context/AuthContext";
 import {
@@ -33,7 +34,7 @@ interface Opsi {
 const DRAFT_KOSONG = {
   jenis: "Ulangan Harian" as (typeof JENIS_PENILAIAN)[number],
   nama_penilaian: "",
-  tanggal: new Date().toISOString().slice(0, 10),
+  tanggal: formatTanggalOperasional(Date.now()),
   bobot: 1,
   nilai_maks: 100,
 };

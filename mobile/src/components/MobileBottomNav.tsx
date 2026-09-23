@@ -62,6 +62,7 @@ export function MobileBottomNav() {
         "/notifikasi-wa",
         "/operators",
         "/riwayat-reset-password",
+        "/riwayat-identitas-karyawan",
         "/foto-absensi",
         "/konten",
         "/pmb",
