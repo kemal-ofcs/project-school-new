@@ -14,11 +14,24 @@ type Props = {
  * Database baru tidak bisa diprovisioning tanpa lisensi, jadi kode perangkat
  * ditampilkan di sini juga — lisensi yang dikunci ke perangkat harus diminta
  * sebelum formulir ini bisa diselesaikan. Tidak merender apa pun di Web.
+ *
+ * Pemasangan baru biasanya sudah mengaktifkan lisensi di layar pertama
+ * (sebelum provisioning); bootstrap memakai lisensi itu bila kolom ini kosong,
+ * jadi yang ditampilkan cukup konfirmasinya.
  */
 export function LicenseBootstrapField({ value, onChange }: Props) {
   const { status } = useLicenseStatus();
   const textId = useId();
   if (!status) return null;
+  if (status.state === "active" && status.license) {
+    return (
+      <p className="rounded-xl border border-white/10 bg-slate-950/60 p-3 text-xs text-slate-300">
+        Lisensi aktif untuk{" "}
+        <span className="font-bold text-white">{status.license.holder}</span>{" "}
+        sudah terpasang di perangkat ini.
+      </p>
+    );
+  }
 
   return (
     <div className="space-y-1.5">

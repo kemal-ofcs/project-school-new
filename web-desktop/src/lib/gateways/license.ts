@@ -20,7 +20,7 @@ export type LicenseState =
 
 export type LicenseReadOnlyReason = "expired" | "version_not_covered";
 
-export type LicenseKind = "beli_putus" | "langganan" | "uji_coba";
+export type LicenseKind = "beli_putus" | "sewa";
 
 export type LicensePayload = {
   id: string;
@@ -38,6 +38,8 @@ export type LicenseStatus = {
   readOnlyReason: LicenseReadOnlyReason | null;
   message: string | null;
   license: LicensePayload | null;
+  /** Sisa hari sewa, hari ini ikut dihitung (hari terakhir = 1). `null` untuk beli putus. */
+  daysLeft: number | null;
   deviceCode: string;
   deviceBound: boolean;
   buildDate: string;
@@ -48,8 +50,7 @@ export const LICENSE_ISSUER = "Kemal Office Studio";
 
 export const LICENSE_KIND_LABEL: Record<LicenseKind, string> = {
   beli_putus: "Beli putus",
-  langganan: "Langganan",
-  uji_coba: "Uji coba",
+  sewa: "Sewa",
 };
 
 /** Status yang tidak mengizinkan login sama sekali. */

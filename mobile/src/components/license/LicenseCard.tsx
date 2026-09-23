@@ -6,6 +6,12 @@ import { LICENSE_KIND_LABEL } from "@/lib/gateways/license";
 import { useLicenseStatus } from "@/lib/hooks/useLicenseStatus";
 import { LicenseActivationPanel } from "./LicenseActivationPanel";
 
+function describeDaysLeft(days: number) {
+  if (days <= 0) return "Sewa sudah berakhir";
+  if (days === 1) return "Hari terakhir sewa";
+  return `${days} hari`;
+}
+
 const STATE_LABEL = {
   active: "Aktif",
   read_only: "Mode baca-saja",
@@ -15,18 +21,18 @@ const STATE_LABEL = {
 } as const;
 
 /**
- * Kartu Lisensi di Pengaturan (Desktop dan Mobile). Semua pengguna yang login
- * boleh melihatnya; mengganti lisensi yang masih aktif hanya untuk Superadmin,
- * sama dengan aturan `desktop_install_license`. Tidak merender apa pun di Web.
+ * Kartu Lisensi di Pengaturan (Desktop dan Mobile), KHUSUS Superadmin: sisa
+ * sewa dan daftar perangkat adalah urusan pemilik lembaga, bukan operator.
+ * Operator tetap melihat dialog "Aktifkan lisensi" saat sewa habis
+ * (`LicenseNotice`). Tidak merender apa pun di Web.
  */
 export function LicenseCard() {
   const { user } = useAuth();
   const { status, setStatus } = useLicenseStatus();
   const [replacing, setReplacing] = useState(false);
-  if (!status) return null;
+  if (!status || !user?.isSuperadmin) return null;
 
   const license = status.license;
-  const canReplace = status.state !== "active" || Boolean(user?.isSuperadmin);
   const rows: [string, string][] = license
     ? [
         ["Pemegang", license.holder],
@@ -35,6 +41,12 @@ export function LicenseCard() {
         ["Terbit", license.issued],
         ["Pembaruan sampai", license.updatesUntil],
         ["Berlaku sampai", license.validUntil ?? "Selamanya"],
+        ...(status.daysLeft === null
+          ? []
+          : ([["Sisa sewa", describeDaysLeft(status.daysLeft)]] as [
+              string,
+              string,
+            ][])),
         [
           "Perangkat",
           license.devices.length
@@ -53,7 +65,7 @@ export function LicenseCard() {
             Status: {STATE_LABEL[status.state]}
           </p>
         </div>
-        {canReplace && !replacing ? (
+        {!replacing ? (
           <button
             type="button"
             onClick={() => setReplacing(true)}

@@ -202,7 +202,7 @@ pub async fn desktop_bootstrap_superadmin(
     // Lisensi diverifikasi SEBELUM Superadmin dibuat: lisensi yang ditolak
     // setelahnya meninggalkan database yang tidak bisa dipakai login sekaligus
     // tidak bisa diprovisioning ulang.
-    let license_text = license.unwrap_or_default();
+    let license_text = license::bootstrap_license_text(&state, license)?;
     let device_code = license::current_device_code(&state)?;
 
     // Kredensial dari form SELALU menang atas kredensial yang sudah tersimpan.
@@ -398,6 +398,11 @@ pub async fn desktop_link_bootstrap_database(
             "TURSO_SUPERADMIN_MISSING",
             "Database ini belum memiliki Superadmin aktif. Lanjutkan provisioning untuk membuat akun pertama.",
         ));
+    }
+    // SEBELUM pull: pull menimpa setting lokal dengan isi database, termasuk
+    // lisensi yang dipasang di layar aktivasi sebelum provisioning.
+    if let Err(error) = license::publish_local_if_cloud_missing(&state, &client).await {
+        eprintln!("[link-database] Lisensi lokal gagal dibawa ke database: {}", error.code);
     }
     state.set_database_config(&config)?;
     let _ = sync::pull_snapshot(&state).await;

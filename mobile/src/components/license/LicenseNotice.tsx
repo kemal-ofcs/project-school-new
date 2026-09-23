@@ -27,7 +27,7 @@ function rememberDismissed() {
 /**
  * Pemberitahuan mode baca-saja untuk shell aplikasi (Desktop dan Mobile).
  *
- * Saat langganan/uji coba habis atau versi aplikasi tidak tercakup masa
+ * Saat masa sewa habis atau versi aplikasi tidak tercakup masa
  * pembaruan, dialog "Aktifkan lisensi" langsung muncul setelah login, dan pita
  * di atas halaman tetap menyediakannya selama mode baca-saja berlaku. Tidak
  * merender apa pun di Web maupun saat lisensinya aktif.

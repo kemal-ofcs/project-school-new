@@ -55,7 +55,7 @@ const LICENSE_PREFIX: &str = "LIS1";
 const MAX_LICENSE_TEXT: usize = 16_384;
 const MAX_DEVICES: usize = 200;
 const MAX_HOLDER_CHARS: usize = 120;
-const LICENSE_KINDS: [&str; 3] = ["beli_putus", "langganan", "uji_coba"];
+const LICENSE_KINDS: [&str; 2] = ["beli_putus", "sewa"];
 const LICENSE_KEYS: [&str; 10] = [
     "v",
     "produk",
@@ -115,7 +115,7 @@ pub struct Evaluation {
 
 /// Hak yang dibawa sesi login. `read_only` dihitung saat login; `valid_until`
 /// dibandingkan ulang di setiap gerbang izin karena terminal pemindai bisa
-/// tetap login berbulan-bulan melewati tanggal berakhirnya langganan.
+/// tetap login berbulan-bulan melewati tanggal berakhirnya sewa.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct LicenseGrant {
     pub read_only: Option<ReadOnlyReason>,
@@ -130,6 +130,8 @@ pub struct LicenseStatus {
     pub read_only_reason: Option<ReadOnlyReason>,
     pub message: Option<String>,
     pub license: Option<LicensePayload>,
+    /// Sisa hari sewa (hari ini ikut dihitung); `None` untuk beli putus.
+    pub days_left: Option<i64>,
     pub device_code: String,
     pub device_bound: bool,
     pub build_date: String,
@@ -218,7 +220,7 @@ fn validate_payload(value: &Value) -> Result<(String, LicensePayload), String> {
     } else {
         let until = string_field(object, "berlaku_sampai")
             .filter(|value| time_policy::is_calendar_date(value))
-            .ok_or_else(|| "Lisensi langganan/uji_coba wajib punya berlaku_sampai.".to_owned())?;
+            .ok_or_else(|| "Lisensi sewa wajib punya berlaku_sampai.".to_owned())?;
         if until < issued {
             return Err("berlaku_sampai tidak boleh sebelum tanggal terbit.".into());
         }
@@ -261,11 +263,24 @@ fn validate_payload(value: &Value) -> Result<(String, LicensePayload), String> {
     ))
 }
 
+/// Buang SEMUA spasi, tab, dan baris baru. Teks yang disalin dari terminal atau
+/// WhatsApp sering terpotong di tengah; base64url tidak pernah memuat spasi,
+/// jadi membuangnya tidak mungkin mengubah lisensi yang sah.
+/// Cermin `rapikanTeks` di `lisensi/src/format.ts`.
+pub fn compact_license_text(text: &str) -> String {
+    text.chars()
+        .filter(|character| !character.is_whitespace())
+        .collect()
+}
+
 /// Verifikasi tanda tangan lalu validasi isi. Tanda tangan dihitung atas byte
 /// `LIS1.<payload>` persis seperti tertulis, jadi JSON-nya tidak pernah disusun
 /// ulang dan urutan kunci tidak memengaruhi keabsahan.
 pub fn parse_license(text: &str, public_key: &[u8]) -> Result<LicensePayload, String> {
-    let text = text.trim();
+    if text.len() > MAX_LICENSE_TEXT * 4 {
+        return Err("Teks lisensi terlalu panjang.".into());
+    }
+    let text = compact_license_text(text);
     if text.len() > MAX_LICENSE_TEXT {
         return Err("Teks lisensi terlalu panjang.".into());
     }
@@ -578,16 +593,31 @@ pub async fn resolve(state: &MobileState) -> Result<(Evaluation, String), Comman
     ))
 }
 
+/// Sisa hari sewa dengan hari ini ikut dihitung: hari terakhir sewa = 1, sewa
+/// yang sudah lewat = 0. Sama dengan cara alat penerbit menghitung `--hari`,
+/// sehingga sewa 30 hari menampilkan "30 hari" pada hari terbitnya.
+pub fn rental_days_left(valid_until: &str, today: &str) -> Option<i64> {
+    time_policy::days_between(today, valid_until)
+        .ok()
+        .map(|days| (days + 1).max(0))
+}
+
 fn to_status(evaluation: Evaluation, device_code: String) -> LicenseStatus {
     let device_bound = evaluation
         .payload
         .as_ref()
         .is_some_and(|license| device_must_be_listed(license, IS_MOBILE));
+    let days_left = evaluation
+        .payload
+        .as_ref()
+        .and_then(|license| license.valid_until.as_deref())
+        .and_then(|until| rental_days_left(until, &today_wib()));
     LicenseStatus {
         state: evaluation.state,
         read_only_reason: evaluation.read_only_reason,
         message: evaluation.message,
         license: evaluation.payload,
+        days_left,
         device_code,
         device_bound,
         build_date: BUILD_DATE.to_owned(),
@@ -674,7 +704,7 @@ fn store_local_and_enqueue(state: &MobileState, text: &str) -> Result<(), Comman
 /// `setting/update`. Juga ditulis langsung ke cloud bila terjangkau, supaya
 /// perangkat lain menerimanya tanpa menunggu siapa pun login di sini.
 pub async fn install(state: &MobileState, text: &str) -> Result<LicenseStatus, CommandError> {
-    let text = text.trim().to_owned();
+    let text = compact_license_text(text);
     let code = current_device_code(state)?;
     let license = check_installable(&text, &code)?;
     let (current, _) = resolve(state).await?;
@@ -695,7 +725,14 @@ pub async fn install(state: &MobileState, text: &str) -> Result<LicenseStatus, C
         ));
     }
 
-    store_local_and_enqueue(state, &text)?;
+    // Pemasangan baru memasang lisensi SEBELUM database diatur. Belum ada
+    // tujuan sync, jadi lisensi cukup disimpan lokal; bootstrap Superadmin atau
+    // "gabung ke database yang sudah ada" yang kemudian membawanya ke cloud.
+    if state.turso_config().is_none() {
+        storage::set_system_setting(&state.data_dir, LICENSE_SETTING_KEY, &text)?;
+    } else {
+        store_local_and_enqueue(state, &text)?;
+    }
 
     if let Ok(client) = state.get_turso_client() {
         let _ = client
@@ -726,6 +763,21 @@ pub async fn install(state: &MobileState, text: &str) -> Result<LicenseStatus, C
     Ok(to_status(evaluation, code))
 }
 
+/// Teks lisensi untuk bootstrap Superadmin: yang diketik di formulir bila ada,
+/// selain itu lisensi yang sudah dipasang di layar aktivasi sebelum provisioning.
+pub fn bootstrap_license_text(
+    state: &MobileState,
+    provided: Option<String>,
+) -> Result<String, CommandError> {
+    let provided = provided
+        .map(|text| compact_license_text(&text))
+        .unwrap_or_default();
+    if !provided.is_empty() {
+        return Ok(provided);
+    }
+    Ok(stored_license(state)?.unwrap_or_default())
+}
+
 /// Tulis lisensi yang sudah terverifikasi ke database cloud yang baru saja
 /// diprovisioning. Dipanggil dari bootstrap Superadmin, sebelum pull pertama.
 pub async fn store_bootstrap_license(
@@ -736,10 +788,35 @@ pub async fn store_bootstrap_license(
     client
         .query_one(
             "INSERT INTO setting_gex_system (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value;",
-            vec![json!(LICENSE_SETTING_KEY), json!(text.trim())],
+            vec![json!(LICENSE_SETTING_KEY), json!(text)],
         )
         .await?;
-    storage::set_system_setting(&state.data_dir, LICENSE_SETTING_KEY, text.trim())
+    storage::set_system_setting(&state.data_dir, LICENSE_SETTING_KEY, text)
+}
+
+/// Perangkat yang memasang lisensi sebelum provisioning lalu bergabung ke
+/// database yang SUDAH ADA: bila database itu belum berlisensi (misalnya dibuat
+/// lewat Web), lisensi perangkat ini dibawa ke sana. Tanpa ini, pull pertama
+/// menimpa salinan lokalnya dan perangkat terkunci di login berikutnya.
+/// Lisensi yang sudah ada di database tidak pernah ditimpa.
+pub async fn publish_local_if_cloud_missing(
+    state: &MobileState,
+    client: &super::turso::TursoClient,
+) -> Result<(), CommandError> {
+    let Some(local) = stored_license(state)? else {
+        return Ok(());
+    };
+    let code = current_device_code(state)?;
+    if grant_from(&evaluate_text(Some(&local), &code)).is_none() {
+        return Ok(());
+    }
+    client
+        .query_one(
+            "INSERT INTO setting_gex_system (key, value) VALUES (?, ?) ON CONFLICT(key) DO NOTHING;",
+            vec![json!(LICENSE_SETTING_KEY), json!(local)],
+        )
+        .await?;
+    Ok(())
 }
 
 /// Gerbang mode baca-saja untuk satu izin. Perpanjangan bisa tiba lewat sync
@@ -788,7 +865,7 @@ mod tests {
         "8a88e3dd7409f195fd52db2d3cba5d72ca6709bf1d94121bf3748801b40f6f5c";
 
     /// Vektor kembar dari `lisensi/test/format.test.ts` — WAJIB sama persis.
-    const VECTOR_V1: &str = "LIS1.eyJ2IjoxLCJwcm9kdWsiOiJrb3MtYWJzZW5zaSIsImlkIjoiTElTLTIwMjYtMDAwMSIsInBlbWVnYW5nIjoiU1BQRyBVamkgVmVrdG9yIiwiamVuaXMiOiJsYW5nZ2FuYW4iLCJ0ZXJiaXQiOiIyMDI2LTA5LTIzIiwicGVtYmFydWFuX3NhbXBhaSI6IjIwMjctMDktMjMiLCJiZXJsYWt1X3NhbXBhaSI6IjIwMjctMDktMjMiLCJwZXJhbmdrYXQiOlsiVy0xQTJCLTNDNEQtNUU2Ri03QThCIl0sImt1bmNpX21vYmlsZSI6ZmFsc2V9.E7JW7dhTf5Io_uEYSP4I0N8U_jmJFLZzxWXUsHXmB8M36GI11ft6fnFfdfY5qkZKeej49YkgKeDjA1lMwD4AAQ";
+    const VECTOR_V1: &str = "LIS1.eyJ2IjoxLCJwcm9kdWsiOiJrb3MtYWJzZW5zaSIsImlkIjoiTElTLTIwMjYtMDAwMSIsInBlbWVnYW5nIjoiU1BQRyBVamkgVmVrdG9yIiwiamVuaXMiOiJzZXdhIiwidGVyYml0IjoiMjAyNi0wOS0yMyIsInBlbWJhcnVhbl9zYW1wYWkiOiIyMDI3LTA5LTIzIiwiYmVybGFrdV9zYW1wYWkiOiIyMDI3LTA5LTIzIiwicGVyYW5na2F0IjpbIlctMUEyQi0zQzRELTVFNkYtN0E4QiJdLCJrdW5jaV9tb2JpbGUiOmZhbHNlfQ.mZd_W7LOv0CTY3GS9PjkRpLObWV7znUwvhBkYBorZJttYTlSAxSdiIjGsNkgmlinP8iXiTVXJ0G81WSqS_WCAQ";
     const VECTOR_V2: &str = "LIS1.eyJ2IjoxLCJwcm9kdWsiOiJrb3MtYWJzZW5zaSIsImlkIjoiTElTLTIwMjYtMDAwMiIsInBlbWVnYW5nIjoiU1BQRyBOdXNhbnRhcmEg4oCUIENhYmFuZyBUaW11ciIsImplbmlzIjoiYmVsaV9wdXR1cyIsInRlcmJpdCI6IjIwMjYtMDktMjMiLCJwZW1iYXJ1YW5fc2FtcGFpIjoiMjAyNy0wOS0yMyIsImJlcmxha3Vfc2FtcGFpIjpudWxsLCJwZXJhbmdrYXQiOltdLCJrdW5jaV9tb2JpbGUiOmZhbHNlfQ.SJNWqONTGK2IoCbHUtvTNO3meDdRHqtjc-TJx3s1hTbVp1zTPlLQOITVKO5b20uH1o81MnTeL4KC5RLD5SjMCQ";
     const DEVICE: &str = "W-1A2B-3C4D-5E6F-7A8B";
     const OTHER_DEVICE: &str = "W-0000-1111-2222-3333";
@@ -843,7 +920,7 @@ mod tests {
             LicensePayload {
                 id: "LIS-2026-0001".into(),
                 holder: "SPPG Uji Vektor".into(),
-                kind: "langganan".into(),
+                kind: "sewa".into(),
                 issued: "2026-09-23".into(),
                 updates_until: "2027-09-23".into(),
                 valid_until: Some("2027-09-23".into()),
@@ -927,8 +1004,8 @@ mod tests {
             "Lisensi beli_putus tidak punya berlaku_sampai."
         );
         assert_eq!(
-            reject(json!({ "jenis": "langganan" })),
-            "Lisensi langganan/uji_coba wajib punya berlaku_sampai."
+            reject(json!({ "jenis": "sewa" })),
+            "Lisensi sewa wajib punya berlaku_sampai."
         );
         assert_eq!(
             reject(json!({ "perangkat": ["w-1a2b-3c4d-5e6f-7a8b"] })),
@@ -962,7 +1039,7 @@ mod tests {
             LicenseState::Active
         );
 
-        let expired = with(json!({ "jenis": "uji_coba", "berlaku_sampai": "2026-09-30" }));
+        let expired = with(json!({ "jenis": "sewa", "berlaku_sampai": "2026-09-30" }));
         let evaluation = eval(&expired, DEVICE, false, build, today);
         assert_eq!(evaluation.state, LicenseState::ReadOnly);
         assert_eq!(evaluation.read_only_reason, Some(ReadOnlyReason::Expired));
@@ -1097,6 +1174,38 @@ mod tests {
     #[test]
     fn build_date_is_a_calendar_date() {
         assert!(time_policy::is_calendar_date(BUILD_DATE), "{BUILD_DATE}");
+    }
+
+    #[test]
+    fn whitespace_inside_license_is_ignored() {
+        // Cermin tes "spasi dan baris baru di tengah teks dibuang" di
+        // `lisensi/test/format.test.ts`: salinan dari terminal/WhatsApp.
+        let broken = format!(
+            "  {}\r\n{} \t{}\n",
+            &VECTOR_V1[..120],
+            &VECTOR_V1[120..200],
+            &VECTOR_V1[200..]
+        );
+        assert_eq!(
+            parse_license(&broken, &public_key()),
+            parse_license(VECTOR_V1, &public_key())
+        );
+        assert_eq!(compact_license_text(&broken), VECTOR_V1);
+    }
+
+    #[test]
+    fn rental_days_left_counts_today() {
+        // Sewa 30 hari terbit 24 Sep berakhir 23 Okt (lihat `akhirSewa` di alat
+        // penerbit): hari pertama = 30, hari terakhir = 1, sesudahnya = 0.
+        assert_eq!(rental_days_left("2026-10-23", "2026-09-24"), Some(30));
+        assert_eq!(rental_days_left("2026-10-23", "2026-10-23"), Some(1));
+        assert_eq!(rental_days_left("2026-10-23", "2026-10-24"), Some(0));
+        assert_eq!(rental_days_left("2026-10-23", "2027-01-01"), Some(0));
+        assert_eq!(rental_days_left("bukan-tanggal", "2026-10-01"), None);
+        assert_eq!(
+            time_policy::days_between("2028-02-28", "2028-03-01"),
+            Ok(2)
+        );
     }
 
     #[test]

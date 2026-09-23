@@ -92,9 +92,15 @@ export default function LoginPage() {
     status: licenseStatus,
     refresh: refreshLicense,
     setStatus: setLicenseStatus,
-  } = useLicenseStatus(
-    Boolean(bootstrapStatus?.configured && !bootstrapStatus.required),
-  );
+  } = useLicenseStatus(false);
+  // Dibaca ulang setiap status database berubah: perangkat yang baru
+  // bergabung ke database berlisensi menemukan lisensinya di sana.
+  useEffect(() => {
+    if (bootstrapStatus) void refreshLicense();
+  }, [bootstrapStatus, refreshLicense]);
+  // Pemasangan baru meminta lisensi SEBELUM provisioning; perangkat lain
+  // milik lembaga yang sama melewatinya karena lisensinya sudah di database.
+  const [joiningLicensedDatabase, setJoiningLicensedDatabase] = useState(false);
 
   // Live countdown ticker
   useEffect(() => {
@@ -176,6 +182,36 @@ export default function LoginPage() {
           <span className="text-xs font-semibold text-slate-400">
             Memeriksa konfigurasi database...
           </span>
+        </div>
+      </div>
+    );
+  }
+
+  if (
+    !isAuthenticated &&
+    bootstrapStatus?.required &&
+    !joiningLicensedDatabase &&
+    licenseStatus &&
+    isLicenseBlocking(licenseStatus)
+  ) {
+    return (
+      <div className="min-h-dvh flex items-center bg-slate-950 p-4 pt-[calc(1.5rem+env(safe-area-inset-top))] pb-[calc(1.5rem+env(safe-area-inset-bottom))]">
+        <div className="w-full max-w-sm mx-auto rounded-3xl border border-white/15 bg-slate-900/90 p-6 shadow-2xl">
+          <p className="mb-3 text-[11px] font-bold uppercase tracking-wider text-slate-500">
+            Langkah 1 dari 2 · setelah lisensi aktif, lanjut ke pengaturan
+            database
+          </p>
+          <LicenseActivationPanel
+            status={licenseStatus}
+            onInstalled={setLicenseStatus}
+          />
+          <button
+            type="button"
+            onClick={() => setJoiningLicensedDatabase(true)}
+            className="mt-3 min-h-10 w-full rounded-xl border border-sky-500/30 bg-sky-500/10 px-3 text-xs font-semibold text-sky-300 active:scale-[0.98] transition"
+          >
+            Perangkat ini bergabung ke database lembaga yang sudah berlisensi
+          </button>
         </div>
       </div>
     );
