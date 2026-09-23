@@ -162,6 +162,15 @@ export default function LoginPage() {
               setErrorMsg(null);
             }}
           />
+          {/* Perangkat yang menunjuk database salah tidak pernah menemukan
+              lisensinya; tanpa pintu ini ia terjebak di layar aktivasi. */}
+          <button
+            type="button"
+            onClick={() => setShowDatabaseSetup(true)}
+            className="mt-3 w-full min-h-10 rounded-xl border border-slate-700 bg-slate-800/80 px-3 text-xs font-bold text-slate-300 transition hover:bg-slate-700"
+          >
+            Konfigurasi ulang database
+          </button>
         </div>
       </main>
     );
