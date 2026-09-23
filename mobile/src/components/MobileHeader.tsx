@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { LicenseHolderLabel } from "@/components/license/LicenseNotice";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { BrandLogo } from "@/components/ui/BrandLogo";
 import { useAuth } from "@/lib/context/AuthContext";
@@ -31,6 +32,10 @@ export function MobileHeader() {
             <span className="text-[10px] font-semibold text-sky-300 truncate max-w-[120px] leading-none">
               {companyName}
             </span>
+            <LicenseHolderLabel
+              unlessEqualTo={companyName}
+              className="text-[10px] font-medium text-slate-400 truncate max-w-[120px] leading-none"
+            />
             <div className="flex items-center gap-1.5 text-[10px] font-medium text-slate-400">
               <span
                 className={`size-2 rounded-full ${

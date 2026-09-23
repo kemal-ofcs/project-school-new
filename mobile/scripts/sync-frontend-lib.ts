@@ -48,6 +48,13 @@ const filesToCopy = [
   "components/personnel/PersonnelAvatar.tsx",
   "components/personnel/PersonnelPhotoDialog.tsx",
   "components/personnel/PersonnelPortrait.tsx",
+  // UI lisensi. Satu gateway, satu aturan: layar aktivasi yang berbeda antara
+  // Desktop dan Mobile hanya akan menerima teks lisensi dengan cara berbeda.
+  // Hanya bergantung pada kontrak `Modal` yang sama dan `AuthContext` tersinkron.
+  "components/license/LicenseActivationPanel.tsx",
+  "components/license/LicenseBootstrapField.tsx",
+  "components/license/LicenseCard.tsx",
+  "components/license/LicenseNotice.tsx",
 ];
 
 for (const file of filesToCopy) {

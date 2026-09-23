@@ -44,6 +44,9 @@ const filesToSync = [
   // yang menjaganya tetap sama — persis kelas drift yang membuat aturan shift
   // berbeda antar platform.
   "time_policy.rs",
+  // Pemeriksa lisensi offline. Wajib identik: satu lisensi yang sama dipasang
+  // sekali per lembaga dan dibaca Desktop maupun Mobile dari database bersama.
+  "license.rs",
 ];
 
 /**

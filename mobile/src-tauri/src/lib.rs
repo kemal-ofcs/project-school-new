@@ -37,6 +37,8 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             mobile::commands::desktop_get_session,
             mobile::commands::desktop_get_runtime_status,
+            mobile::commands::desktop_get_license_status,
+            mobile::commands::desktop_install_license,
             mobile::commands::desktop_get_bootstrap_status,
             mobile::commands::desktop_bootstrap_superadmin,
             mobile::commands::desktop_check_bootstrap_database,

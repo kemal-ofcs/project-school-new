@@ -43,6 +43,15 @@ pbkdf2 = { version = "0.12", default-features = false, features = ["hmac"] }
 hmac = "0.12"
 rust_decimal = { version = "1.36", features = ["serde-with-str", "maths"] }
 tauri-plugin-opener = "2.5"
+# Verifikasi tanda tangan lisensi Ed25519 (`license.rs`). Sudah ada di biner
+# lewat rustls, jadi tidak menambah crate baru.
+ring = "0.17"
+
+# `license.rs` tersalin identik dari Desktop dan membaca MachineGuid di Windows.
+# Hanya terpakai saat crate ini dikompilasi di Windows (tes di mesin
+# pengembang); APK Android dan build iOS tidak pernah menariknya.
+[target.'cfg(windows)'.dependencies]
+windows-registry = "0.6"
 
 [dev-dependencies]
 # Hanya untuk tes: `ensure_schema` bersifat async, dan menguji provisioning

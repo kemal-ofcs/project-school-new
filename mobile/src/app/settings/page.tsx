@@ -100,7 +100,7 @@ export default function SettingsPage() {
             href="/settings/akun"
             icon="lock"
             title="Akun & Keamanan Pribadi"
-            subtitle="Tema tampilan, verifikasi 2 langkah, kode pemulihan"
+            subtitle="Tema tampilan, verifikasi 2 langkah, kode pemulihan, lisensi"
             tone="emerald"
           />
           {canStrukturJadwal && (

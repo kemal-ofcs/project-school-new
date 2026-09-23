@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
+import { LicenseCard } from "@/components/license/LicenseCard";
 import { MobileAppShell } from "@/components/MobileAppShell";
 import { PasswordRecoveryCard } from "@/components/PasswordRecoveryCard";
 import { ThemeSettingsCard } from "@/components/ThemeSettingsCard";
@@ -33,6 +34,7 @@ export default function AkunKeamananPage() {
         <ThemeSettingsCard />
         <TwoFactorCard />
         <PasswordRecoveryCard />
+        <LicenseCard />
       </div>
     </MobileAppShell>
   );

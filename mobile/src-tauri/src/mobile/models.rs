@@ -59,6 +59,8 @@ pub struct OfflineCredential {
 pub struct MobileSession {
     pub operator: OperatorUser,
     pub mode: SessionMode,
+    /// Hak lisensi yang berlaku untuk sesi ini (lihat `license.rs`).
+    pub license: super::license::LicenseGrant,
 }
 
 #[derive(Clone, Copy, Debug, Serialize)]

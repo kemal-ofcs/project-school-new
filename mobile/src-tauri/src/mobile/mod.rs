@@ -17,6 +17,8 @@ pub mod attendance_dashboard;
 pub mod attendance_ledger;
 pub mod class_attendance;
 pub mod grades;
+// Lisensi offline Ed25519: SALINAN `desktop/license.rs` oleh sync-rust-modules.ts.
+pub mod license;
 pub mod payroll;
 // Administrasi payroll: SALINAN `desktop/payroll/*` oleh sync-rust-modules.ts.
 pub mod payroll_admin;

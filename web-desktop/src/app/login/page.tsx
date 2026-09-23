@@ -5,6 +5,7 @@ import { redirect, useRouter } from "next/navigation";
 import type React from "react";
 import { useCallback, useEffect, useState } from "react";
 import { BootstrapPanel } from "@/components/BootstrapPanel";
+import { LicenseActivationPanel } from "@/components/license/LicenseActivationPanel";
 import { LoginSceneGate } from "@/components/visual/LoginSceneGate";
 import { VisualProvider } from "@/components/visual/VisualProvider";
 import { BRANDING } from "@/lib/constants/branding";
@@ -14,9 +15,11 @@ import {
   getBootstrapStatus,
   getWebProvisioningHint,
 } from "@/lib/gateways/bootstrap";
+import { isLicenseBlocking } from "@/lib/gateways/license";
 import { useAppName } from "@/lib/hooks/useAppName";
 import { useCompanyName } from "@/lib/hooks/useCompanyName";
 import { useHydrated } from "@/lib/hooks/useHydrated";
+import { useLicenseStatus } from "@/lib/hooks/useLicenseStatus";
 import { useOnlineStatus } from "@/lib/hooks/useOnlineStatus";
 
 export default function LoginPage() {
@@ -58,6 +61,16 @@ export default function LoginPage() {
     refreshBootstrapStatus();
   }, [refreshBootstrapStatus]);
 
+  // Desktop/Mobile saja (Web selalu `null`). Dibaca setelah database siap:
+  // database yang belum diprovisioning meminta lisensinya di BootstrapPanel.
+  const {
+    status: licenseStatus,
+    refresh: refreshLicense,
+    setStatus: setLicenseStatus,
+  } = useLicenseStatus(
+    Boolean(bootstrapStatus?.configured && !bootstrapStatus.required),
+  );
+
   // Khusus Web: `false` berarti database belum punya satu akun pun. Tanpa
   // petunjuk ini, database yang baru dibuat membuat halaman ini jalan buntu —
   // form login tampil, tidak ada akun untuk dipakai, dan tidak ada tanda harus
@@ -90,6 +103,7 @@ export default function LoginPage() {
       } else {
         if (res.requiresTotp) setNeedsTotp(true);
         setErrorMsg(res.pesan);
+        void refreshLicense();
       }
     } catch (err: unknown) {
       const msg =
@@ -97,6 +111,10 @@ export default function LoginPage() {
           ? err.message
           : "Gagal melakukan verifikasi login.";
       setErrorMsg(msg);
+      // Login bisa ditolak karena lisensinya (diganti dari perangkat lain, atau
+      // perangkat ini dikeluarkan dari daftar); membaca ulang status memunculkan
+      // layar aktivasi alih-alih membiarkan form login buntu.
+      void refreshLicense();
     } finally {
       setIsSubmitting(false);
     }
@@ -131,6 +149,21 @@ export default function LoginPage() {
         onCompleted={refreshBootstrapStatus}
         onCancel={() => setShowDatabaseSetup(false)}
       />
+    );
+  }
+  if (licenseStatus && isLicenseBlocking(licenseStatus)) {
+    return (
+      <main className="min-h-screen bg-slate-950 text-slate-100 flex items-center justify-center p-4 sm:p-6 font-sans">
+        <div className="w-full max-w-md bg-slate-900/80 border border-slate-800 rounded-3xl p-6 sm:p-8 shadow-2xl">
+          <LicenseActivationPanel
+            status={licenseStatus}
+            onInstalled={(next) => {
+              setLicenseStatus(next);
+              setErrorMsg(null);
+            }}
+          />
+        </div>
+      </main>
     );
   }
 
@@ -339,8 +372,11 @@ export default function LoginPage() {
         </form>
 
         {/* Footer info */}
-        <div className="text-center text-[10px] text-slate-600 font-mono">
-          {appName} v0.1.0 • KOS
+        <div className="text-center text-[10px] text-slate-600 font-mono space-y-0.5">
+          {licenseStatus?.license ? (
+            <p>Berlisensi untuk {licenseStatus.license.holder}</p>
+          ) : null}
+          <p>{appName} v0.1.0 • KOS</p>
         </div>
       </div>
     </main>

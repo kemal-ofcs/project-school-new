@@ -10,6 +10,7 @@ import {
 import { AutoAlfaRunner } from "./AutoAlfaRunner";
 import { AutoSyncRunner } from "./AutoSyncRunner";
 import { AutoWaSenderRunner } from "./AutoWaSenderRunner";
+import { LicenseNotice } from "./license/LicenseNotice";
 import { MobileBottomNav } from "./MobileBottomNav";
 import { MobileHeader } from "./MobileHeader";
 import { PullToRefresh } from "./PullToRefresh";
@@ -77,6 +78,7 @@ export function MobileAppShell({
       <AutoSyncRunner />
       <AutoWaSenderRunner />
       <MobileHeader />
+      <LicenseNotice />
       <PullToRefresh
         onRefresh={handleRefresh}
         disabled={disablePullRefresh}
