@@ -8,6 +8,7 @@ import { FeedbackBanner } from "@/components/ui/FeedbackBanner";
 import { Modal } from "@/components/ui/Modal";
 import { canAccessArea, hasPermission } from "@/lib/auth/access";
 import { triggerHaptic } from "@/lib/client/haptics";
+import { openWhatsAppChat } from "@/lib/client/open-url";
 import { useAuth } from "@/lib/context/AuthContext";
 import {
   cancelWaNotificationGateway,
@@ -227,6 +228,16 @@ export default function NotifikasiWaMobilePage() {
     }
   }
 
+  async function bukaWhatsApp(item: WaNotificationItem) {
+    setError(null);
+    const terbuka = await openWhatsAppChat(item.tujuan_nomor, item.isi_pesan);
+    if (!terbuka) {
+      setError(
+        "WhatsApp tidak bisa dibuka. Periksa nomor wali atau pasang aplikasi WhatsApp.",
+      );
+    }
+  }
+
   async function bukaPengaturan() {
     setError(null);
     try {
@@ -440,18 +451,36 @@ export default function NotifikasiWaMobilePage() {
                     pesan yang sudah terkirim tidak bisa ditarik kembali, dan
                     menawarkan tombolnya hanya menjanjikan yang tidak bisa
                     ditepati. */}
-                {bolehBatalkan && item.status === "Menunggu" ? (
-                  <button
-                    className="mt-3 rounded-xl border border-amber-400/40 px-3 py-1.5 font-bold text-[11px] text-amber-200"
-                    onClick={() => {
-                      triggerHaptic("light");
-                      void batalkan(item);
-                    }}
-                    type="button"
-                  >
-                    Batalkan pesan
-                  </button>
-                ) : null}
+                <div className="mt-3 flex flex-wrap items-center gap-2">
+                  {/* Kirim manual lewat aplikasi WhatsApp di ponsel ini. Status
+                      sengaja tidak diubah: aplikasi tidak bisa tahu apakah
+                      tombol kirim di WhatsApp benar-benar ditekan. */}
+                  {bolehKirim &&
+                  (item.status === "Menunggu" || item.status === "Gagal") ? (
+                    <button
+                      className="min-h-11 rounded-xl bg-emerald-600 px-3 font-bold text-[11px] text-white"
+                      onClick={() => {
+                        triggerHaptic("light");
+                        void bukaWhatsApp(item);
+                      }}
+                      type="button"
+                    >
+                      Buka di WhatsApp
+                    </button>
+                  ) : null}
+                  {bolehBatalkan && item.status === "Menunggu" ? (
+                    <button
+                      className="rounded-xl border border-amber-400/40 px-3 py-1.5 font-bold text-[11px] text-amber-200"
+                      onClick={() => {
+                        triggerHaptic("light");
+                        void batalkan(item);
+                      }}
+                      type="button"
+                    >
+                      Batalkan pesan
+                    </button>
+                  ) : null}
+                </div>
               </li>
             ))}
           </ul>

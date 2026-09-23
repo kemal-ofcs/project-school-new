@@ -203,3 +203,15 @@ Jam kerja pada tanggal libur dipisahkan sebagai **Jam Kerja Hari Libur** dan dih
 - `.agents/penting.md` — architecture/security/payroll principles in Indonesian.
 
 Local dev database: root `absensi-sppg.db` is the reference SQLite DB used by `bun run audit:schema` — that file name is historical and deliberately unchanged, like the `LEGACY_*` storage keys and `migrate-old-db.ts`'s `sourceDbPath`: it names something that already exists on disk, so renaming it would only make the tooling stop finding it. The Desktop app's real local DB lives at `%LOCALAPPDATA%\id.sekolah.manajemen\desktop-security.db`, where the folder is the `identifier` from `tauri.conf.json` — **changing that identifier moves the entire local database**, so an existing installation looks empty afterwards even though nothing was lost. Anything deriving that path (notably `migrate-old-db.ts`'s `targetDbPath`) must be updated in the same change, or the migration reports success while writing where the app never reads. `bun run migrate-old-db` (in `web-desktop/`) copies operational data from the legacy root DB into it without touching the RBAC/security schema.
+
+<!-- antislop:start -->
+## antislop
+For UI, copy, people, mobile layout, or code comments work, load the `antislop` skill (core, installed as a plugin) and then the skill for the task:
+- UI / visual: `antislop-ui`
+- Copy & text: `antislop-copywriting`
+- People: `antislop-human`
+- Mobile / responsive: `antislop-layoutmobile`
+- Code comments: `antislop-code`
+Root `DESIGN.md` is the brief for `web-public` (PMB portal) only. `web-desktop` and `mobile` have no DESIGN.md; their direction is the theme and 3D rules in this file.
+Before starting, ask the user when antislop applies: during the work, or after it is done.
+<!-- antislop:end -->
