@@ -1,7 +1,7 @@
 ---
 name: audit-lalu-perbaiki
 description: >-
-  Audit berbasis bukti atas satu area Absensi SPPG (keamanan pre-launch, atau satu fitur seperti
+  Audit berbasis bukti atas satu area Manajemen Sekolah (keamanan pre-launch, atau satu fitur seperti
   export/import/template, notifikasi WA, lisensi, ID card) di Web, Desktop, dan Mobile: petakan
   kodenya dari UI sampai Rust, laporkan temuan bernomor dengan severity + file:baris + dampak nyata +
   fix yang pasti, minta keputusan per huruf, BERHENTI, lalu setelah disetujui kerjakan HANYA yang
@@ -22,7 +22,7 @@ description: >-
 
 ## Latar singkat (anggap Anda belum tahu apa pun soal proyek ini)
 
-Absensi SPPG adalah aplikasi absensi + payroll sekolah yang offline-first, dengan tiga build dari
+Manajemen Sekolah adalah aplikasi absensi + payroll sekolah yang offline-first, dengan tiga build dari
 dua workspace, plus satu situs publik:
 
 | Build | Folder | Logika | Akses data |

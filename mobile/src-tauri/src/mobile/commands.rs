@@ -3026,6 +3026,24 @@ pub async fn desktop_drain_wa_queue(
     super::wa_sender::drain(&turso, &state.http, &client_id, otomatis.unwrap_or(false)).await
 }
 
+/// Template teks pesan WhatsApp per jenis; string kosong berarti teks bawaan.
+#[tauri::command]
+pub fn desktop_get_wa_templates(state: State<'_, MobileState>) -> Result<Value, CommandError> {
+    require_permission(&state, "notification.view")?;
+    super::wa_notification::get_wa_templates(&state)
+}
+
+/// Simpan template teks pesan WhatsApp. Ditulis lokal lalu didorong lewat
+/// `setting/update`, sehingga terminal offline memakainya saat mengantre.
+#[tauri::command]
+pub fn desktop_save_wa_templates(
+    state: State<'_, MobileState>,
+    templates: Value,
+) -> Result<Value, CommandError> {
+    require_permission(&state, "notification.template")?;
+    super::wa_notification::save_wa_templates(&state, &templates)
+}
+
 /// Membaca konfigurasi gateway WhatsApp (Cloud-Only via Turso).
 #[tauri::command]
 pub async fn desktop_get_wa_config(state: State<'_, MobileState>) -> Result<Value, CommandError> {

@@ -1410,7 +1410,7 @@ pub fn initialize(path: &Path) -> Result<(), String> {
                 r#"
             CREATE TABLE IF NOT EXISTS company_profile (
                 id TEXT PRIMARY KEY DEFAULT 'default_company',
-                company_name TEXT NOT NULL DEFAULT 'SPPG',
+                company_name TEXT NOT NULL DEFAULT 'Nama Instansi',
                 branch_name TEXT,
                 logo_url TEXT,
                 signature_url TEXT,
@@ -1444,7 +1444,7 @@ pub fn initialize(path: &Path) -> Result<(), String> {
                 r#"
             CREATE TABLE IF NOT EXISTS id_card_template (
                 id TEXT PRIMARY KEY DEFAULT 'default_template',
-                name TEXT NOT NULL DEFAULT 'Template Default SPPG',
+                name TEXT NOT NULL DEFAULT 'Template Standar ID Card',
                 orientation TEXT NOT NULL DEFAULT 'landscape',
                 front_bg_url TEXT,
                 back_bg_url TEXT,

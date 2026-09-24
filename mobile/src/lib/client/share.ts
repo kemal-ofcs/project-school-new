@@ -16,8 +16,8 @@ export interface ShareResult {
 export async function shareDataUrl(
   dataUrl: string,
   filename: string,
-  title = "ID Card SPPG",
-  text = "ID Card Digital SPPG",
+  title = "ID Card",
+  text = "ID Card Digital",
 ): Promise<ShareResult> {
   const cleanBase64 = dataUrl.includes(";base64,")
     ? dataUrl.split(";base64,")[1] || ""
@@ -100,7 +100,7 @@ export async function shareDataUrl(
  */
 export async function shareText(
   text: string,
-  title = "Slip Gaji SPPG",
+  title = "Slip Gaji",
 ): Promise<ShareResult> {
   if (
     typeof navigator !== "undefined" &&

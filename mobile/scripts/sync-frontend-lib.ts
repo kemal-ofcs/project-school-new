@@ -55,6 +55,10 @@ const filesToCopy = [
   "components/license/LicenseBootstrapField.tsx",
   "components/license/LicenseCard.tsx",
   "components/license/LicenseNotice.tsx",
+  // Penyunting teks pesan WhatsApp. Aturan isian dan teks bawaannya hidup di
+  // `lib/validations` yang tersinkron; dialog yang berbeda antar build akan
+  // menampilkan pratinjau yang tidak sama dengan pesan yang benar terkirim.
+  "components/notifikasi-wa/WaTemplateDialog.tsx",
 ];
 
 for (const file of filesToCopy) {

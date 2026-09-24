@@ -103,7 +103,7 @@ pub fn share_desktop_file(
         "sukses": true,
         "path": target_path.to_string_lossy().to_string(),
         "filename": sanitized_filename,
-        "title": title.unwrap_or("ID Card SPPG")
+        "title": title.unwrap_or("ID Card")
     }))
 }
 
@@ -342,6 +342,6 @@ mod tests {
         let hasil = share_desktop_file("../../etc/passwd", "aGFsbw==", None)
             .expect("penulisan file share gagal");
         assert_eq!(hasil["filename"], ".._.._etc_passwd");
-        assert_eq!(hasil["title"], "ID Card SPPG");
+        assert_eq!(hasil["title"], "ID Card");
     }
 }

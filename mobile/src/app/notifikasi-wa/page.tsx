@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { MobileAppShell } from "@/components/MobileAppShell";
 import { WaQueueEmptyDiagnostic } from "@/components/notifikasi-wa/WaQueueEmptyDiagnostic";
+import { WaTemplateDialog } from "@/components/notifikasi-wa/WaTemplateDialog";
 import { FeedbackBanner } from "@/components/ui/FeedbackBanner";
 import { Modal } from "@/components/ui/Modal";
 import { canAccessArea, hasPermission } from "@/lib/auth/access";
@@ -99,6 +100,7 @@ export default function NotifikasiWaMobilePage() {
   const [error, setError] = useState<string | null>(null);
   const [kabar, setKabar] = useState("");
   const [modalConfig, setModalConfig] = useState(false);
+  const [modalTemplate, setModalTemplate] = useState(false);
   const [config, setConfig] = useState<WaConfig | null>(null);
   const { konfirmasi, dialogKonfirmasi } = useConfirmDialog();
 
@@ -160,6 +162,7 @@ export default function NotifikasiWaMobilePage() {
   const bolehBatalkan = hasPermission(user, "notification.delete");
   const bolehKelola = hasPermission(user, "notification.manage");
   const bolehKirim = hasPermission(user, "notification.send");
+  const bolehUbahTeks = hasPermission(user, "notification.template");
   const totalMenunggu = items.filter((i) => i.status === "Menunggu").length;
 
   async function batalkan(item: WaNotificationItem) {
@@ -276,7 +279,7 @@ export default function NotifikasiWaMobilePage() {
   return (
     <MobileAppShell>
       <div className="flex flex-col gap-4 text-slate-100">
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
           <button
             type="button"
             onClick={() => {
@@ -300,7 +303,7 @@ export default function NotifikasiWaMobilePage() {
               <path d="m15 18-6-6 6-6" />
             </svg>
           </button>
-          <div className="min-w-0 flex-1">
+          <div className="min-w-[10rem] flex-1">
             <h1 className="font-black text-lg text-white">Antrean WhatsApp</h1>
             <p className="text-[11px] text-slate-400">
               Dibaca dari cloud · membutuhkan koneksi
@@ -329,6 +332,18 @@ export default function NotifikasiWaMobilePage() {
               type="button"
             >
               Gateway
+            </button>
+          ) : null}
+          {bolehUbahTeks ? (
+            <button
+              className="shrink-0 rounded-xl border border-white/15 px-3 py-2 font-bold text-[11px] text-white"
+              onClick={() => {
+                triggerHaptic("light");
+                setModalTemplate(true);
+              }}
+              type="button"
+            >
+              Teks Pesan
             </button>
           ) : null}
         </div>
@@ -490,6 +505,11 @@ export default function NotifikasiWaMobilePage() {
         )}
       </div>
 
+      <WaTemplateDialog
+        isOpen={modalTemplate}
+        onClose={() => setModalTemplate(false)}
+        onSaved={setKabar}
+      />
       <Modal
         isOpen={modalConfig}
         onClose={() => setModalConfig(false)}

@@ -138,6 +138,8 @@ const MOBILE_COMMANDS: &[&str] = &[
     "mobile_list_wa_notifications",
     "mobile_cancel_wa_notification",
     "mobile_queue_wa_notification",
+    "desktop_get_wa_templates",
+    "desktop_save_wa_templates",
     "desktop_get_wa_config",
     "desktop_save_wa_config",
     "desktop_drain_wa_queue",

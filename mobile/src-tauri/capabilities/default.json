@@ -145,6 +145,8 @@
     "allow-mobile-list-wa-notifications",
     "allow-mobile-cancel-wa-notification",
     "allow-mobile-queue-wa-notification",
+    "allow-desktop-get-wa-templates",
+    "allow-desktop-save-wa-templates",
     "allow-desktop-get-wa-config",
     "allow-desktop-save-wa-config",
     "allow-desktop-drain-wa-queue",

@@ -113,7 +113,7 @@ impl MobileState {
             .use_preconfigured_tls(tls_config)
             .connect_timeout(std::time::Duration::from_secs(15))
             .timeout(std::time::Duration::from_secs(MOBILE_HTTP_TIMEOUT_SECONDS))
-            .user_agent("Absensi-SPPG-Mobile/0.1")
+            .user_agent("Manajemen-Sekolah-Mobile/0.1")
             .build()
             .map_err(|_| "HTTP client Mobile tidak dapat dibuat.")?;
 

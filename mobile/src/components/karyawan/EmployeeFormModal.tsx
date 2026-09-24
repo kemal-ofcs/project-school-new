@@ -29,7 +29,7 @@ const DEFAULT_FORM: KaryawanInput = {
   id_unik: "",
   kode_karyawan: "",
   nama: "",
-  divisi: "SPPG Operational",
+  divisi: "",
   jabatan_status: "Staff",
   no_hp: "",
   lp: "L",

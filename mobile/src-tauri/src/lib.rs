@@ -189,6 +189,8 @@ pub fn run() {
             mobile::wa_review::mobile_list_wa_notifications,
             mobile::wa_review::mobile_cancel_wa_notification,
             mobile::wa_review::mobile_queue_wa_notification,
+            mobile::commands::desktop_get_wa_templates,
+            mobile::commands::desktop_save_wa_templates,
             mobile::commands::desktop_get_wa_config,
             mobile::commands::desktop_save_wa_config,
             mobile::commands::desktop_drain_wa_queue,

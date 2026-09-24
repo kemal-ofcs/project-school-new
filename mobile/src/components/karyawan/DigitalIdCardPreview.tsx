@@ -71,7 +71,7 @@ export function DigitalIdCardPreview({
   const [qrFullscreen, setQrFullscreen] = useState(false);
   const [copied, setCopied] = useState(false);
 
-  const nama = String(employee.nama ?? "Karyawan SPPG");
+  const nama = String(employee.nama ?? "Karyawan");
   const tokenAbsensi = employee.token_absensi
     ? String(employee.token_absensi)
     : "";
@@ -204,7 +204,7 @@ export function DigitalIdCardPreview({
     async function renderTemplateCanvas() {
       const effectiveTemplate: IdCardTemplateConfig = template || {
         id: "default_template",
-        name: "Template Standar SPPG",
+        name: "Template Standar",
         orientation: "landscape",
         elements: DEFAULT_ID_CARD_ELEMENTS,
         isActive: true,
@@ -215,7 +215,7 @@ export function DigitalIdCardPreview({
         (logoDataUrl
           ? {
               id: "default",
-              company_name: "SPPG",
+              company_name: BRANDING.defaultCompanyName,
               branch_name: null,
               logo_url: logoDataUrl,
               signature_url: null,
@@ -306,7 +306,7 @@ export function DigitalIdCardPreview({
       (logoDataUrl
         ? {
             id: "default",
-            company_name: "SPPG",
+            company_name: BRANDING.defaultCompanyName,
             branch_name: null,
             logo_url: logoDataUrl,
             signature_url: null,
@@ -325,7 +325,7 @@ export function DigitalIdCardPreview({
 
     const effectiveTemplate: IdCardTemplateConfig = template || {
       id: "default_template",
-      name: "Template Standar SPPG",
+      name: "Template Standar",
       orientation: "landscape",
       elements: DEFAULT_ID_CARD_ELEMENTS,
       isActive: true,
@@ -411,8 +411,8 @@ export function DigitalIdCardPreview({
     setFeedback(null);
     const sideLabel = cardSide === "front" ? "Depan" : "Belakang";
     const filename = `ID-Card-${sideLabel}-${nama.replace(/[^a-zA-Z0-9_-]/g, "_")}.png`;
-    const title = `ID Card SPPG (${sideLabel}) - ${nama}`;
-    const text = `ID Card Digital SPPG (${sideLabel}) untuk ${nama}`;
+    const title = `ID Card (${sideLabel}) - ${nama}`;
+    const text = `ID Card Digital (${sideLabel}) untuk ${nama}`;
     try {
       const dataUrl = await getCardDataUrl(cardSide);
       const res = await shareDataUrl(dataUrl, filename, title, text);
