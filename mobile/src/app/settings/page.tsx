@@ -9,6 +9,7 @@ import { canAccessArea, hasPermission } from "@/lib/auth/access";
 import { triggerHaptic } from "@/lib/client/haptics";
 import { useAuth } from "@/lib/context/AuthContext";
 import { useConfirmDialog } from "@/lib/hooks/useConfirmDialog";
+import { useLicenseStatus } from "@/lib/hooks/useLicenseStatus";
 import { useOnlineStatus } from "@/lib/hooks/useOnlineStatus";
 
 export default function SettingsPage() {
@@ -16,6 +17,7 @@ export default function SettingsPage() {
   const { user, isAuthenticated, isLoading: authLoading, logout } = useAuth();
   const router = useRouter();
   const isOnline = useOnlineStatus();
+  const pemegangLisensi = useLicenseStatus().status?.license?.holder;
 
   const canStrukturJadwal =
     canAccessArea(user, "akademik") ||
@@ -86,6 +88,16 @@ export default function SettingsPage() {
                 {isOnline ? "Terhubung Online" : "Mode Offline"}
               </span>
             </div>
+            {pemegangLisensi ? (
+              <div className="flex justify-between gap-3">
+                <span className="shrink-0 text-slate-500">
+                  Berlisensi untuk:
+                </span>
+                <span className="truncate text-right font-semibold text-white">
+                  {pemegangLisensi}
+                </span>
+              </div>
+            ) : null}
             <div className="flex justify-between">
               <span className="text-slate-500">Revisi Izin:</span>
               <span className="font-semibold text-white">

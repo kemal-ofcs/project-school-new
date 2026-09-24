@@ -13,8 +13,18 @@ import { useId, useRef, useState } from "react";
  * sesi yang masih hidup. Karena `passwordLama` tidak lagi ada di memori, ia
  * diminta ulang — dan `POST /api/wali/ganti-password` memang menuntutnya,
  * sehingga sesi yang dicuri pun tidak bisa mengunci akun dengan password baru.
+ *
+ * Satu pengecualian: wali yang baru masuk lewat kode WhatsApp
+ * (`tanpaPasswordLama`) sudah membuktikan penguasaan nomor wali, dan justru
+ * sedang lupa password-nya. Server memeriksa ulang syarat itu sendiri.
  */
-export function FormGantiPassword() {
+export function FormGantiPassword({
+  wajib,
+  tanpaPasswordLama,
+}: {
+  wajib: boolean;
+  tanpaPasswordLama: boolean;
+}) {
   const router = useRouter();
   const id = useId();
   const isSubmittingRef = useRef(false);
@@ -41,8 +51,8 @@ export function FormGantiPassword() {
       isSubmittingRef.current = false;
       return;
     }
-    if (passwordBaru === passwordLama) {
-      setGalat("Kata sandi baru tidak boleh sama dengan kata sandi bawaan.");
+    if (passwordLama && passwordBaru === passwordLama) {
+      setGalat("Kata sandi baru tidak boleh sama dengan kata sandi saat ini.");
       isSubmittingRef.current = false;
       return;
     }
@@ -72,30 +82,45 @@ export function FormGantiPassword() {
 
   return (
     <form className="space-y-4" onSubmit={simpan}>
-      <div className="rounded-lg border border-garis bg-latar-lembut p-4 text-sm leading-relaxed">
-        <p className="font-medium text-teks">Kata sandi Anda masih bawaan</p>
-        <p className="mt-1 text-teks-lembut text-xs">
-          Kata sandi yang diterbitkan sekolah dapat ditebak dari dokumen anak
-          Anda. Buat kata sandi baru dulu sebelum melihat data anak.
-        </p>
-      </div>
+      {wajib ? (
+        <div className="rounded-lg border border-garis bg-latar-lembut p-4 text-sm leading-relaxed">
+          <p className="font-medium text-teks">
+            Kata sandi Anda masih kata sandi sementara dari sekolah
+          </p>
+          <p className="mt-1 text-teks-lembut text-xs">
+            Kata sandi itu pernah tercetak di slip dan dilihat petugas sekolah.
+            Buat kata sandi Anda sendiri sebelum melihat data anak.
+          </p>
+        </div>
+      ) : null}
 
-      <div>
-        <label
-          className="block text-sm text-teks-lembut"
-          htmlFor={`${id}-password-lama`}
-        >
-          Kata Sandi Saat Ini
-        </label>
-        <input
-          autoComplete="current-password"
-          className="mt-1 w-full rounded-md border border-garis bg-latar px-3 py-2 text-teks"
-          id={`${id}-password-lama`}
-          name="passwordLama"
-          required
-          type="password"
-        />
-      </div>
+      {tanpaPasswordLama ? (
+        <p className="rounded-lg border border-garis bg-latar-lembut p-4 text-sm text-teks-lembut leading-relaxed">
+          Anda baru masuk dengan kode WhatsApp, jadi kata sandi lama tidak
+          diperlukan.
+        </p>
+      ) : (
+        <div>
+          <label
+            className="block text-sm text-teks-lembut"
+            htmlFor={`${id}-password-lama`}
+          >
+            Kata Sandi Saat Ini
+          </label>
+          <input
+            autoComplete="current-password"
+            className="mt-1 w-full rounded-md border border-garis bg-latar px-3 py-2 text-teks"
+            id={`${id}-password-lama`}
+            name="passwordLama"
+            required
+            type="password"
+          />
+          <p className="mt-1 text-teks-lembut text-xs">
+            Lupa? Keluar, lalu masuk dengan kode WhatsApp dan buka halaman ini
+            lagi dalam 15 menit.
+          </p>
+        </div>
+      )}
 
       <div>
         <label

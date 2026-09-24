@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { getReadyPublicDatabase } from "@/lib/server/db";
 import { wajibSesiWaliSiap } from "@/lib/server/wali-session";
 import { bacaProfilAnak } from "@/lib/services/wali-data";
@@ -39,6 +40,12 @@ export default async function HalamanProfil() {
         Perubahan data anak dilakukan oleh sekolah. Bila ada yang tidak sesuai,
         silakan hubungi wali kelas.
       </p>
+      <Link
+        className="mt-4 inline-flex min-h-11 items-center font-medium text-aksen underline underline-offset-4"
+        href="/wali/ganti-password"
+      >
+        Ganti kata sandi
+      </Link>
     </main>
   );
 }

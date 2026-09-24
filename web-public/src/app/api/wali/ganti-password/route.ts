@@ -1,6 +1,7 @@
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { getReadyPublicDatabase } from "@/lib/server/db";
+import { bacaJsonBerbatas } from "@/lib/server/http/json-body";
 import {
   assertSameOriginMutation,
   getClientAddress,
@@ -63,18 +64,20 @@ export async function POST(request: Request) {
     }
     await catatPercobaan(client, kunci, KEBIJAKAN_CEK_STATUS);
 
-    const body = (await request.json().catch(() => ({}))) as {
+    const body = (await bacaJsonBerbatas(request, 16_384)) as {
       passwordLama?: string;
       passwordBaru?: string;
     };
     const passwordLama = String(body.passwordLama ?? "");
     const passwordBaru = String(body.passwordBaru ?? "");
 
-    if (!passwordLama || !passwordBaru) {
+    // Kata sandi saat ini boleh kosong: wali yang baru masuk lewat kode
+    // WhatsApp tidak memerlukannya. `gantiPasswordWali` yang memutuskan.
+    if (!passwordBaru) {
       return NextResponse.json(
         {
           error: "VALIDATION_ERROR",
-          message: "Kata sandi saat ini dan kata sandi baru wajib diisi.",
+          message: "Kata sandi baru wajib diisi.",
         },
         { status: 400 },
       );

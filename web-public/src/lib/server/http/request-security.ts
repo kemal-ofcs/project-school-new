@@ -48,11 +48,21 @@ export function assertSameOriginMutation(request: Request) {
  * oleh klien bukan bukti apa pun. Nilainya dipakai sebagai kunci rate limit,
  * jadi klien yang bisa memilih alamatnya sendiri berarti rate limit yang bisa
  * dilewati dengan mengubah satu field.
+ *
+ * Yang dibaca adalah entri PALING KANAN `X-Forwarded-For`, dikurangi jumlah
+ * proxy tepercaya (`SPPG_TRUSTED_PROXY_HOPS`, bawaan 1). Entri paling kiri
+ * adalah isian klien: di belakang nginx/Caddy yang MENAMBAHKAN alamat, klien
+ * bebas menulisnya sendiri. Di Vercel header ini ditimpa platform (satu
+ * alamat), jadi hasilnya sama. Cerminan fungsi yang sama di `web-desktop`.
  */
 export function getClientAddress(request: Request) {
-  const forwarded = request.headers
-    .get("x-forwarded-for")
-    ?.split(",")[0]
-    ?.trim();
-  return forwarded || request.headers.get("x-real-ip")?.trim() || "unknown";
+  const hops = Math.max(1, Number(process.env.SPPG_TRUSTED_PROXY_HOPS) || 1);
+  const rantai = (request.headers.get("x-forwarded-for") ?? "")
+    .split(",")
+    .map((alamat) => alamat.trim())
+    .filter(Boolean);
+  return (
+    rantai[rantai.length - hops] ??
+    (request.headers.get("x-real-ip")?.trim() || "unknown")
+  );
 }

@@ -56,7 +56,7 @@ export default function PersonilPage() {
               href="/siswa"
               icon="users"
               title="Peserta Didik"
-              subtitle="Direktori siswa, wali murid & barcode"
+              subtitle="Direktori peserta didik, wali murid & barcode"
               tone="teal"
             />
           )}

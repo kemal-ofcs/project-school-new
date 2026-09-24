@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getReadyPublicDatabase } from "@/lib/server/db";
+import { bacaJsonBerbatas } from "@/lib/server/http/json-body";
 import {
   assertSameOriginMutation,
   getClientAddress,
@@ -30,7 +31,7 @@ export async function POST(request: Request) {
     assertSameOriginMutation(request);
 
     const client = await getReadyPublicDatabase();
-    const body = (await request.json().catch(() => ({}))) as {
+    const body = (await bacaJsonBerbatas(request, 16_384)) as {
       metode?: "password" | "otp";
       nomorInduk?: string;
       password?: string;

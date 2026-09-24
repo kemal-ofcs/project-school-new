@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getReadyPublicDatabase } from "@/lib/server/db";
+import { bacaJsonBerbatas } from "@/lib/server/http/json-body";
 import {
   assertSameOriginMutation,
   getClientAddress,
@@ -59,7 +60,9 @@ export async function POST(request: Request) {
     // semuanya sah secara format — tidak pernah tersentuh rate limit.
     await catatPercobaan(client, kunci, KEBIJAKAN_DAFTAR_PMB);
 
-    const parsed = pendaftaranSchema.safeParse(await request.json());
+    const parsed = pendaftaranSchema.safeParse(
+      await bacaJsonBerbatas(request, 5_242_880),
+    );
     if (!parsed.success) {
       return NextResponse.json(
         {

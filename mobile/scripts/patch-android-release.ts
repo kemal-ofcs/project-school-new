@@ -234,6 +234,18 @@ if (!isiManifest.includes("<queries>")) {
   berubah = true;
 }
 
+// Template Tauri tidak menyebut `allowBackup`, dan bawaan Android adalah
+// `true`: folder data aplikasi (vault token database dan `device_id` yang
+// menjadi kuncinya) ikut ke backup Google dan ke HP baru lewat transfer data.
+if (!/android:allowBackup="false"/.test(isiManifest)) {
+  isiManifest = isiManifest.replace(
+    /<application(?![^>]*android:allowBackup)/,
+    '<application\n        android:allowBackup="false"',
+  );
+  writeFileSync(manifest, isiManifest);
+  berubah = true;
+}
+
 // ── 4. Nama aplikasi di peluncur Android ────────────────────────────────────
 //
 // `productName` di `tauri.conf.json` hanya dibaca saat `tauri android init`
@@ -334,6 +346,11 @@ for (const baris of deklarasiIzin) {
 if (!manifestAkhir.includes("<queries>")) {
   gagal.push(
     "AndroidManifest.xml: blok <queries> hilang — tombol WhatsApp/telepon tidak menemukan aplikasi tujuan",
+  );
+}
+if (!/android:allowBackup="false"/.test(manifestAkhir)) {
+  gagal.push(
+    'AndroidManifest.xml: `android:allowBackup="false"` tidak terpasang — vault token database ikut backup cloud',
   );
 }
 if (!/isMinifyEnabled\s*=\s*false/.test(releaseAkhir)) {

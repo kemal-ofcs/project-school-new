@@ -99,6 +99,7 @@ export default function KaryawanPage() {
           getDaftarKaryawan({
             search: debouncedSearch || undefined,
             status_aktif: filterStatus || undefined,
+            hanya_pegawai: true,
           }),
           getDaftarShift(),
           getDaftarUnit(),
@@ -321,6 +322,7 @@ export default function KaryawanPage() {
       {canManage ? (
         <EmployeeBulkActions
           exportRows={filteredEmployees}
+          shifts={shifts}
           onCompleted={(message) => {
             setErrorMsg(null);
             setSuccessMsg(message);

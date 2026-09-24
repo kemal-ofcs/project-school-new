@@ -218,9 +218,12 @@ export default function NotifikasiWaMobilePage() {
     setError(null);
     try {
       const hasil = await drainWaQueueGateway();
+      // Muat ulang DULU: `muat()` mengosongkan `error` saat berhasil, jadi
+      // pesan pengirim yang ditulis sebelumnya ("Gateway belum diaktifkan")
+      // terhapus seketika dan tombolnya tampak hanya me-refresh halaman.
+      await muat();
       if (hasil.sukses) setKabar(hasil.message);
       else setError(hasil.message);
-      await muat();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Antrean gagal dikuras.");
     } finally {

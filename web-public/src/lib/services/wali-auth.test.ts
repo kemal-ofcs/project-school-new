@@ -7,8 +7,10 @@ import {
   cabutSesiWali,
   cariSiswaUntukOtp,
   gantiPasswordWali,
+  hashPasswordWali,
   hitungPasswordDefaultWali,
   OTP_MAKS_PERCOBAAN,
+  OtpTerlaluSeringError,
   samarkanNomor,
   terbitkanOtp,
   terbitkanSesiWali,
@@ -235,6 +237,10 @@ describe("terbitkanOtp dan verifikasiOtp", () => {
   test("menerbitkan kode baru membatalkan kode lama", async () => {
     const client = await siapkanDatabase();
     const pertama = await terbitkanOtp(client, "wali", "sis-1", "+62812");
+    // Lewati jeda antarkode; jedanya diuji tersendiri di bawah.
+    await client.execute(
+      "UPDATE wali_otp SET created_at = datetime('now', '-2 minutes');",
+    );
     const kedua = await terbitkanOtp(client, "wali", "sis-1", "+62812");
 
     // Yang diuji adalah PROPERTINYA, bukan label kegagalannya: hanya boleh ada
@@ -262,6 +268,32 @@ describe("terbitkanOtp dan verifikasiOtp", () => {
     expect(
       (await verifikasiOtp(client, "wali", "sis-1", kedua.kode)).hasil,
     ).toBe("cocok");
+  });
+
+  test("kode tidak bisa diminta beruntun untuk siswa yang sama", async () => {
+    const client = await siapkanDatabase();
+    await terbitkanOtp(client, "wali", "sis-1", "+62812");
+    // Alamat IP berganti tidak menolong: batasnya per siswa.
+    await expect(
+      terbitkanOtp(client, "wali", "sis-1", "+62812"),
+    ).rejects.toBeInstanceOf(OtpTerlaluSeringError);
+
+    // Lewat jeda pun, paling banyak tiga kode per jam.
+    for (let i = 0; i < 2; i += 1) {
+      await client.execute(
+        "UPDATE wali_otp SET created_at = datetime(created_at, '-2 minutes');",
+      );
+      await terbitkanOtp(client, "wali", "sis-1", "+62812");
+    }
+    await client.execute(
+      "UPDATE wali_otp SET created_at = datetime(created_at, '-2 minutes');",
+    );
+    await expect(
+      terbitkanOtp(client, "wali", "sis-1", "+62812"),
+    ).rejects.toBeInstanceOf(OtpTerlaluSeringError);
+
+    // Siswa lain tidak terdampak.
+    await terbitkanOtp(client, "wali", "sis-2", "+62813");
   });
 
   test("kode kedaluwarsa ditolak", async () => {
@@ -402,31 +434,44 @@ describe("kredensial kata sandi portal wali", () => {
     );
   });
 
-  test("autentikasi login pertama dengan password default sukses dan menandai perlu ganti", async () => {
-    const client = await siapkanDatabase();
-    await tambahSiswa(client, {
-      id: "sis-1",
-      nis: "1001",
-      nisn: "0091001",
-      unit: "SMP",
+  /** Password sementara seperti yang diterbitkan halaman Siswa. */
+  async function terbitkan(client: Klien, password: string) {
+    await client.execute({
+      sql: `INSERT INTO wali_kredensial (id_siswa, password_hash, changed_at, created_at, updated_at)
+            VALUES ('sis-1', ?, NULL, datetime('now'), datetime('now'));`,
+      args: [await hashPasswordWali(password)],
     });
+  }
 
-    // Login pertama menggunakan password bawaan: 0091001SMP
+  test("formula NISN + unit tidak lagi bisa dipakai masuk", async () => {
+    const client = await siapkanDatabase();
+    await tambahSiswa(client);
+
+    // Tanpa kredensial: jalur password tertutup sama sekali.
+    expect(
+      (await autentikasiPasswordWali(client, "0091001", "0091001SMP")).sukses,
+    ).toBe(false);
+
+    // Hash formula dari penerbitan lama tetap ditolak.
+    await terbitkan(client, "0091001SMP");
+    expect(
+      (await autentikasiPasswordWali(client, "0091001", "0091001SMP")).sukses,
+    ).toBe(false);
+  });
+
+  test("password sementara terbitan sekolah bisa dipakai dan wajib diganti", async () => {
+    const client = await siapkanDatabase();
+    await tambahSiswa(client);
+    await terbitkan(client, "K7PQ2MXH9A");
+
     const login = await autentikasiPasswordWali(
       client,
       "0091001",
-      "0091001SMP",
+      "K7PQ2MXH9A",
     );
     expect(login.sukses).toBe(true);
     expect(login.idSiswa).toBe("sis-1");
     expect(login.perluGantiPassword).toBe(true);
-
-    // Verifikasi row wali_kredensial tercipta di database dengan changed_at NULL
-    const check = await client.execute(
-      "SELECT id_siswa, changed_at FROM wali_kredensial WHERE id_siswa = 'sis-1';",
-    );
-    expect(check.rows.length).toBe(1);
-    expect(check.rows[0]?.changed_at).toBeNull();
   });
 
   test("autentikasi dengan password salah ditolak", async () => {
@@ -455,14 +500,12 @@ describe("kredensial kata sandi portal wali", () => {
       unit: "SMP",
     });
 
-    // Initial default auth
-    await autentikasiPasswordWali(client, "0091001", "0091001SMP");
+    await terbitkan(client, "K7PQ2MXH9A");
 
-    // Ganti password ke yang baru
     const ubah = await gantiPasswordWali(
       client,
       "sis-1",
-      "0091001SMP",
+      "K7PQ2MXH9A",
       "KataSandiBaru#2026",
     );
     expect(ubah.sukses).toBe(true);
@@ -476,12 +519,61 @@ describe("kredensial kata sandi portal wali", () => {
     expect(loginBaru.sukses).toBe(true);
     expect(loginBaru.perluGantiPassword).toBe(false);
 
-    // Login dengan password lama sekarang ditolak
+    // Password sementara mati begitu wali mengganti password.
     const loginLama = await autentikasiPasswordWali(
       client,
       "0091001",
-      "0091001SMP",
+      "K7PQ2MXH9A",
     );
     expect(loginLama.sukses).toBe(false);
+  });
+
+  test("password baru tidak boleh berupa formula lama", async () => {
+    const client = await siapkanDatabase();
+    await tambahSiswa(client);
+    await terbitkan(client, "K7PQ2MXH9A");
+
+    const ubah = await gantiPasswordWali(
+      client,
+      "sis-1",
+      "K7PQ2MXH9A",
+      "0091001SMP",
+    );
+    expect(ubah.sukses).toBe(false);
+  });
+
+  test("setelah masuk lewat kode WhatsApp, password lama tidak diperlukan", async () => {
+    const client = await siapkanDatabase();
+    await tambahSiswa(client);
+    await terbitkan(client, "K7PQ2MXH9A");
+
+    // Tanpa OTP, password lama kosong ditolak.
+    expect(
+      (await gantiPasswordWali(client, "sis-1", "", "KataSandiBaru#2026"))
+        .sukses,
+    ).toBe(false);
+
+    const { kode } = await terbitkanOtp(
+      client,
+      "wali",
+      "sis-1",
+      "+6281200000000",
+    );
+    expect((await verifikasiOtp(client, "wali", "sis-1", kode)).hasil).toBe(
+      "cocok",
+    );
+    expect(
+      (await gantiPasswordWali(client, "sis-1", "", "KataSandiBaru#2026"))
+        .sukses,
+    ).toBe(true);
+
+    // Lewat 15 menit, keringanannya berakhir.
+    await client.execute(
+      "UPDATE wali_otp SET used_at = datetime('now', '-16 minutes');",
+    );
+    expect(
+      (await gantiPasswordWali(client, "sis-1", "", "KataSandiLain#2026"))
+        .sukses,
+    ).toBe(false);
   });
 });

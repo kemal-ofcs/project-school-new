@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getReadyPublicDatabase } from "@/lib/server/db";
+import { bacaJsonBerbatas } from "@/lib/server/http/json-body";
 import {
   assertSameOriginMutation,
   getClientAddress,
@@ -17,6 +18,7 @@ import {
 import { readFullWaConfig, sendViaProvider } from "@/lib/services/wa-provider";
 import {
   OTP_UMUR_MENIT,
+  OtpTerlaluSeringError,
   samarkanNomor,
   tandaiPengirimanOtp,
   terbitkanOtp,
@@ -68,7 +70,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const body = (await request.json().catch(() => ({}))) as {
+    const body = (await bacaJsonBerbatas(request, 16_384)) as {
       nomorPendaftaran?: string;
     };
     const nomor = String(body.nomorPendaftaran ?? "").trim();
@@ -145,6 +147,12 @@ export async function POST(request: Request) {
       umurMenit: OTP_UMUR_MENIT,
     });
   } catch (error) {
+    if (error instanceof OtpTerlaluSeringError) {
+      return NextResponse.json(
+        { error: "TERLALU_BANYAK_PERMINTAAN", message: error.message },
+        { status: 429 },
+      );
+    }
     if (error instanceof OriginTidakDiizinkanError) {
       return NextResponse.json(
         { error: "FORBIDDEN", message: error.message },

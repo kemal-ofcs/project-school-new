@@ -19,6 +19,12 @@ import type { Client } from "@libsql/client";
 /** Umur satu kode OTP. Cukup untuk membaca pesan, terlalu pendek untuk ditebak. */
 export const OTP_UMUR_MENIT = 10;
 
+/**
+ * Selama ini setelah kode WhatsApp dipakai, wali boleh membuat password baru
+ * tanpa password lama (alur "lupa password" tanpa admin).
+ */
+export const OTP_GANTI_PASSWORD_MENIT = 15;
+
 /** Percobaan salah sebelum kode dibatalkan dan wali harus meminta yang baru. */
 export const OTP_MAKS_PERCOBAAN = 5;
 
@@ -132,12 +138,43 @@ export interface OtpTerbit {
  * tiga kali akan punya tiga kode sah sekaligus, dan jendela tebakan penyerang
  * ikut melebar tiga kali lipat. Hanya kode TERAKHIR yang berlaku.
  */
+/** Jeda minimum antarkode untuk satu subjek, dan batas kode per jam. */
+export const OTP_JEDA_DETIK = 60;
+export const OTP_MAKS_PER_JAM = 3;
+
+export class OtpTerlaluSeringError extends Error {
+  constructor() {
+    super("Kode baru saja dikirim. Tunggu sebentar sebelum meminta kode lagi.");
+    this.name = "OtpTerlaluSeringError";
+  }
+}
+
 export async function terbitkanOtp(
   client: Client,
   subjek: "wali" | "pmb",
   subjekId: string,
   nomorTujuan: string,
 ): Promise<OtpTerbit> {
+  // Rate limit route hanya per IP. Tanpa batas per subjek, alamat yang
+  // berganti-ganti bisa membanjiri WhatsApp seorang wali (dan kuota gateway
+  // sekolah), dan setiap kode baru membatalkan kode lama sehingga wali aslinya
+  // tidak pernah bisa masuk.
+  const riwayat = await client.execute({
+    sql: `SELECT COUNT(*) AS jumlah,
+                 COALESCE(MAX(created_at) > datetime('now', ?), 0) AS terlalu_cepat
+            FROM wali_otp
+           WHERE subjek = ? AND subjek_id = ?
+             AND created_at > datetime('now', '-1 hour');`,
+    args: [`-${OTP_JEDA_DETIK} seconds`, subjek, subjekId],
+  });
+  const baris = riwayat.rows[0];
+  if (
+    Number(baris?.jumlah ?? 0) >= OTP_MAKS_PER_JAM ||
+    Number(baris?.terlalu_cepat ?? 0) === 1
+  ) {
+    throw new OtpTerlaluSeringError();
+  }
+
   const kode = buatKodeOtp();
   const idOtp = buatId("otp");
 
@@ -448,7 +485,11 @@ function constantTimeEqualBytes(left: Uint8Array, right: Uint8Array): boolean {
 }
 
 /**
- * Hitung password default wali sesuai formula: `${nisn || nis}${unit}` (uppercase).
+ * Formula password LAMA wali: `${nisn || nis}${unit}` (uppercase).
+ *
+ * Tidak lagi dipakai untuk menerbitkan apa pun. Nilainya hanya dihitung untuk
+ * DITOLAK: saat masuk (hash lama hasil formula mungkin masih tersimpan) dan
+ * saat memilih password baru.
  */
 export function hitungPasswordDefaultWali(
   nis?: string | null,
@@ -551,32 +592,17 @@ export async function autentikasiPasswordWali(
   const passwordHash = baris.password_hash ? String(baris.password_hash) : null;
   const changedAt = baris.changed_at ? String(baris.changed_at) : null;
 
-  if (!passwordHash) {
-    // Kredensial belum pernah digenerate di tabel wali_kredensial.
-    // Periksa kecocokan dengan formula default.
-    const passwordDefault = hitungPasswordDefaultWali(nis, nisn, unit);
-    if (password !== passwordDefault) {
-      return {
-        sukses: false,
-        pesanError: "Nomor induk atau kata sandi tidak cocok.",
-      };
-    }
-
-    // Cocok dengan default! Lazy insert baris kredensial awal (changed_at NULL).
-    const newHash = await hashPasswordWali(passwordDefault);
-    await client.execute({
-      sql: `INSERT INTO wali_kredensial (id_siswa, password_hash, changed_at, created_at, updated_at)
-            VALUES (?, ?, NULL, datetime('now'), datetime('now'))
-            ON CONFLICT(id_siswa) DO NOTHING;`,
-      args: [idSiswa, newHash],
-    });
-
+  // Tanpa kredensial terbitan sekolah, jalur password tertutup: wali masuk
+  // lewat kode WhatsApp atau meminta slip password ke sekolah. Formula lama
+  // `NISN + UNIT` ditolak meski masih tersimpan sebagai hash dari penerbitan
+  // lama, karena siapa pun yang memegang kartu pelajar anak bisa menghitungnya.
+  if (
+    !passwordHash ||
+    password === hitungPasswordDefaultWali(nis, nisn, unit)
+  ) {
     return {
-      sukses: true,
-      idSiswa,
-      namaSiswa,
-      nomorWali,
-      perluGantiPassword: true,
+      sukses: false,
+      pesanError: "Nomor induk atau kata sandi tidak cocok.",
     };
   }
 
@@ -597,6 +623,26 @@ export async function autentikasiPasswordWali(
   };
 }
 
+/**
+ * Apakah kode WhatsApp untuk siswa ini dipakai dalam
+ * `OTP_GANTI_PASSWORD_MENIT` terakhir. Dipakai layar ganti password untuk
+ * menyembunyikan kolom kata sandi saat ini, dan oleh `gantiPasswordWali`
+ * sebagai pengganti bukti password lama.
+ */
+export async function baruMasukLewatOtp(
+  client: Client,
+  idSiswa: string,
+): Promise<boolean> {
+  const hasil = await client.execute({
+    sql: `SELECT 1 FROM wali_otp
+           WHERE subjek = 'wali' AND subjek_id = ? AND status = 'Terpakai'
+             AND used_at > datetime('now', ?)
+           LIMIT 1;`,
+    args: [idSiswa, `-${OTP_GANTI_PASSWORD_MENIT} minutes`],
+  });
+  return Boolean(hasil.rows[0]);
+}
+
 export async function gantiPasswordWali(
   client: Client,
   idSiswa: string,
@@ -606,7 +652,7 @@ export async function gantiPasswordWali(
   if (!passwordBaru || passwordBaru.length < 8) {
     return { sukses: false, pesanError: "Kata sandi baru minimal 8 karakter." };
   }
-  if (passwordLama === passwordBaru) {
+  if (passwordLama && passwordLama === passwordBaru) {
     return {
       sukses: false,
       pesanError: "Kata sandi baru tidak boleh sama dengan kata sandi lama.",
@@ -631,19 +677,30 @@ export async function gantiPasswordWali(
     };
   }
 
-  const passwordHash = baris.password_hash ? String(baris.password_hash) : null;
-  if (!passwordHash) {
-    const passwordDefault = hitungPasswordDefaultWali(
-      baris.nis ? String(baris.nis) : null,
-      baris.nisn ? String(baris.nisn) : null,
-      baris.unit ? String(baris.unit) : null,
-    );
-    if (passwordLama !== passwordDefault) {
-      return { sukses: false, pesanError: "Kata sandi lama tidak cocok." };
-    }
-  } else {
-    const cocok = await verifyPasswordWali(passwordLama, passwordHash);
-    if (!cocok) {
+  const formulaLama = hitungPasswordDefaultWali(
+    baris.nis ? String(baris.nis) : null,
+    baris.nisn ? String(baris.nisn) : null,
+    baris.unit ? String(baris.unit) : null,
+  );
+  if (passwordBaru === formulaLama) {
+    return {
+      sukses: false,
+      pesanError:
+        "Kata sandi baru tidak boleh berupa nomor induk digabung unit sekolah.",
+    };
+  }
+
+  // Wali yang baru saja masuk lewat kode WhatsApp sudah membuktikan
+  // penguasaan nomor wali, jadi boleh membuat password baru tanpa password
+  // lama. Tanpa jalur ini "lupa password" hanya bisa diselesaikan admin.
+  if (!(await baruMasukLewatOtp(client, idSiswa))) {
+    const passwordHash = baris.password_hash
+      ? String(baris.password_hash)
+      : null;
+    if (
+      !passwordHash ||
+      !(await verifyPasswordWali(passwordLama, passwordHash))
+    ) {
       return { sukses: false, pesanError: "Kata sandi lama tidak cocok." };
     }
   }

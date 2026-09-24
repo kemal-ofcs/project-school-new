@@ -10,6 +10,7 @@ import {
   readEmployeeWorkbook,
 } from "@/lib/client/employee-workbook";
 import { triggerHaptic } from "@/lib/client/haptics";
+import { describeImportReport } from "@/lib/client/personnel-workbook";
 import {
   generateTokenMassal,
   importKaryawanMassal,
@@ -39,12 +40,14 @@ const REQUIRED_COLUMNS = [
   "kode_karyawan",
   "nama",
   "divisi",
-  "id_shift",
+  "kode_shift",
 ];
 
 interface Props {
   /** Baris karyawan yang sedang tampil — isi berkas Ekspor Excel. */
   exportRows: Record<string, unknown>[];
+  /** Daftar shift perangkat ini: `kode_shift` di berkas diterjemahkan lewat sini. */
+  shifts: Record<string, unknown>[];
   /** Dipanggil setelah data berubah — pesan sukses untuk banner halaman. */
   onCompleted: (message: string) => void;
   /** Pesan untuk banner halaman yang tidak mengubah data (ekspor/template). */
@@ -55,6 +58,7 @@ interface Props {
 
 export function EmployeeBulkActions({
   exportRows,
+  shifts,
   onCompleted,
   onInfo,
   onError,
@@ -66,6 +70,8 @@ export function EmployeeBulkActions({
   const [importPreview, setImportPreview] = useState<{
     fileName: string;
     drafts: KaryawanInput[];
+    /** Nomor baris Excel tiap draft, untuk laporan baris yang gagal. */
+    barisExcel: number[];
   } | null>(null);
   const [confirmGenerate, setConfirmGenerate] = useState(false);
   const [showHint, setShowHint] = useState(false);
@@ -78,9 +84,13 @@ export function EmployeeBulkActions({
     try {
       // Validasi penuh (kolom wajib, format tiap baris, duplikat di dalam
       // berkas, batas 500) terjadi di sini, SEBELUM apa pun ditulis.
-      const drafts = await readEmployeeWorkbook(file);
+      const baris = await readEmployeeWorkbook(file, shifts);
       triggerHaptic("light");
-      setImportPreview({ fileName: file.name, drafts });
+      setImportPreview({
+        fileName: file.name,
+        drafts: baris.map((b) => b.draft),
+        barisExcel: baris.map((b) => b.baris),
+      });
     } catch (err) {
       triggerHaptic("error");
       onError(
@@ -97,11 +107,22 @@ export function EmployeeBulkActions({
     setBusy(true);
     try {
       const result = await importKaryawanMassal(importPreview.drafts);
-      triggerHaptic("success");
-      setImportPreview(null);
-      onCompleted(
-        `Import selesai: ${result.berhasil} berhasil, ${result.dilewati} dilewati karena sudah ada/gagal.`,
+      const laporan = describeImportReport(
+        {
+          berhasil: result.berhasil,
+          gagal: result.gagal.map((g) => ({
+            baris: importPreview.barisExcel[g.index] ?? 0,
+            pesan: g.pesan,
+          })),
+        },
+        "karyawan",
       );
+      setImportPreview(null);
+      triggerHaptic(result.gagal.length > 0 ? "error" : "success");
+      // `onCompleted` memuat ulang daftar untuk baris yang tersimpan; bila ada
+      // yang gagal, laporannya dipasang ulang sebagai galat supaya tetap tampil.
+      if (result.berhasil > 0) onCompleted(laporan);
+      if (result.gagal.length > 0) onError(laporan);
     } catch (err) {
       triggerHaptic("error");
       setImportPreview(null);
@@ -121,8 +142,8 @@ export function EmployeeBulkActions({
     try {
       const res =
         kind === "template"
-          ? await downloadEmployeeTemplate()
-          : await exportEmployees(exportRows);
+          ? await downloadEmployeeTemplate(shifts)
+          : await exportEmployees(exportRows, shifts);
       if (res.cancelled) return;
       triggerHaptic("success");
       onInfo(

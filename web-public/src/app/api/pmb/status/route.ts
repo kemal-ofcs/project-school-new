@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getReadyPublicDatabase } from "@/lib/server/db";
+import { bacaJsonBerbatas } from "@/lib/server/http/json-body";
 import {
   assertSameOriginMutation,
   getClientAddress,
@@ -62,7 +63,7 @@ export async function POST(request: Request) {
     }
     await catatPercobaan(client, kunci, KEBIJAKAN_CEK_STATUS);
 
-    const body = (await request.json().catch(() => ({}))) as {
+    const body = (await bacaJsonBerbatas(request, 16_384)) as {
       nomorPendaftaran?: string;
       tanggalLahir?: string;
       kode?: string;

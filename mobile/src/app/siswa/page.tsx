@@ -113,6 +113,8 @@ export default function SiswaMobilePage() {
     statusInfo: WaliCredentialStatus | null;
     loading: boolean;
     resetting: boolean;
+    /** Password sementara hasil reset; hanya ada sampai modal ditutup. */
+    passwordBaru: string | null;
   } | null>(null);
 
   const isSubmittingRef = useRef(false);
@@ -144,7 +146,9 @@ export default function SiswaMobilePage() {
       } catch (err: unknown) {
         if (!silent) {
           setErrorMsg(
-            err instanceof Error ? err.message : "Data siswa gagal dimuat.",
+            err instanceof Error
+              ? err.message
+              : "Data peserta didik gagal dimuat.",
           );
         }
       } finally {
@@ -226,7 +230,7 @@ export default function SiswaMobilePage() {
       setQrPng(png);
     } catch {
       setErrorMsg(
-        "Barcode belum tersedia. Simpan ulang data siswa untuk menerbitkan token absensinya.",
+        "Barcode belum tersedia. Simpan ulang data peserta didik untuk menerbitkan token absensinya.",
       );
     }
   }, []);
@@ -260,7 +264,7 @@ export default function SiswaMobilePage() {
         ? null
         : await simpanFotoPersonilBaru(hasil.id_siswa, fotoBaru);
       setFotoBaru(null);
-      setSuccessMsg("Data siswa berhasil disimpan.");
+      setSuccessMsg("Data peserta didik berhasil disimpan.");
       if (peringatanFoto) setErrorMsg(peringatanFoto);
       triggerHaptic("success");
       setFormOpen(false);
@@ -268,7 +272,9 @@ export default function SiswaMobilePage() {
       void muatUlangStatusFoto();
     } catch (err: unknown) {
       setErrorMsg(
-        err instanceof Error ? err.message : "Gagal menyimpan data siswa.",
+        err instanceof Error
+          ? err.message
+          : "Gagal menyimpan data peserta didik.",
       );
       triggerHaptic("error");
     } finally {
@@ -280,9 +286,9 @@ export default function SiswaMobilePage() {
     async (id: string) => {
       if (!canManage || isSubmittingRef.current) return;
       const setuju = await konfirmasi({
-        title: "Hapus profil siswa ini?",
+        title: "Hapus profil peserta didik ini?",
         description:
-          "Profil siswa dinonaktifkan dan hilang dari daftar rombel. Penghapusannya ikut tersinkronisasi ke seluruh perangkat.",
+          "Profil peserta didik dinonaktifkan dan hilang dari daftar rombel. Penghapusannya ikut tersinkronisasi ke seluruh perangkat.",
         preserved:
           "Riwayat absensi gerbang, presensi kelas, dan leger kehadirannya tetap tersimpan.",
         confirmLabel: "Ya, hapus",
@@ -291,13 +297,13 @@ export default function SiswaMobilePage() {
       isSubmittingRef.current = true;
       try {
         await hapusSiswa(id);
-        setSuccessMsg("Profil siswa berhasil dihapus.");
+        setSuccessMsg("Profil peserta didik berhasil dihapus.");
         triggerHaptic("success");
         setDetail(null);
         await loadData(true);
       } catch (err: unknown) {
         setErrorMsg(
-          err instanceof Error ? err.message : "Gagal menghapus siswa.",
+          err instanceof Error ? err.message : "Gagal menghapus peserta didik.",
         );
         triggerHaptic("error");
       } finally {
@@ -314,6 +320,7 @@ export default function SiswaMobilePage() {
       statusInfo: null,
       loading: true,
       resetting: false,
+      passwordBaru: null,
     });
     try {
       const status = await getWaliCredentialStatus(idSiswa);
@@ -339,7 +346,7 @@ export default function SiswaMobilePage() {
     const setuju = await konfirmasi({
       title: `Reset sandi wali ${nama}?`,
       description:
-        "Sandi akan kembali ke bawaan (NISN/NIS + Unit) dan sesi login wali yang aktif akan dicabut.",
+        "Sistem membuat kata sandi sementara yang acak dan mencabut sesi login wali yang aktif. Kata sandi itu hanya tampil sekali di jendela ini.",
       confirmLabel: "Ya, reset",
     });
     if (!setuju) return;
@@ -350,14 +357,19 @@ export default function SiswaMobilePage() {
 
     try {
       const res = await resetWaliPassword(idSiswa);
-      setSuccessMsg(
-        `Sandi akun wali ${nama} direset ke: ${res.defaultPassword}`,
-      );
+      // Password-nya TIDAK ditaruh di pesan sukses: pesan itu hilang sendiri
+      // dalam beberapa detik, sementara password ini tidak bisa dibaca ulang.
+      setSuccessMsg(`Kata sandi sementara untuk wali ${nama} sudah dibuat.`);
       triggerHaptic("success");
       const updatedStatus = await getWaliCredentialStatus(idSiswa);
       setWaliModal((prev) =>
         prev && String(prev.student.id_siswa) === idSiswa
-          ? { ...prev, statusInfo: updatedStatus, resetting: false }
+          ? {
+              ...prev,
+              statusInfo: updatedStatus,
+              resetting: false,
+              passwordBaru: res.password,
+            }
           : prev,
       );
     } catch (err) {
@@ -469,7 +481,7 @@ export default function SiswaMobilePage() {
           <p className="mt-0.5 text-[11px] text-slate-400">
             {loading
               ? "Memuat data..."
-              : `${filtered.length} dari ${siswa.length} siswa`}
+              : `${filtered.length} dari ${siswa.length} peserta didik`}
           </p>
         </div>
         {canManage ? (
@@ -527,7 +539,7 @@ export default function SiswaMobilePage() {
                 setFormOpen(true);
                 triggerHaptic("light");
               }}
-              aria-label="Tambah siswa baru"
+              aria-label="Tambah peserta didik baru"
               className="grid size-10 place-items-center rounded-2xl bg-gradient-to-tr from-indigo-500 to-violet-600 text-on-accent shadow-lg shadow-indigo-500/30 transition-all hover:brightness-110 active:scale-90 disabled:opacity-50"
             >
               <Icon
@@ -562,7 +574,7 @@ export default function SiswaMobilePage() {
           className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400"
         />
         <input
-          aria-label="Cari siswa"
+          aria-label="Cari peserta didik"
           type="search"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
@@ -731,7 +743,7 @@ export default function SiswaMobilePage() {
         <Modal
           isOpen
           onClose={() => setDetail(null)}
-          title="Barcode Absensi Siswa"
+          title="Barcode Absensi Peserta Didik"
           subtitle={String(detail.nama_lengkap ?? "")}
         >
           <div className="flex flex-col items-center gap-3 py-2">
@@ -758,7 +770,7 @@ export default function SiswaMobilePage() {
         <Modal
           isOpen
           onClose={() => setFormOpen(false)}
-          title={isEditing ? "Ubah Data Siswa" : "Tambah Siswa"}
+          title={isEditing ? "Ubah Data Peserta Didik" : "Tambah Peserta Didik"}
         >
           <form
             onSubmit={(e) => {
@@ -951,7 +963,7 @@ export default function SiswaMobilePage() {
               <span className="mt-1 block text-[10px] font-normal text-slate-400">
                 {shiftError ??
                   (shifts.length === 0
-                    ? "Belum ada shift. Buat shift khusus siswa di menu Shift."
+                    ? "Belum ada shift. Buat shift khusus peserta didik di menu Shift."
                     : "Scan masuk hanya diterima di sekitar jam masuk shift ini.")}
               </span>
             </label>
@@ -1005,23 +1017,56 @@ export default function SiswaMobilePage() {
                       <span className="text-emerald-400">
                         Sandi Sudah Diubah Wali
                       </span>
+                    ) : waliModal.statusInfo.status === "bawaan" ? (
+                      <span className="text-amber-400">
+                        Masih Kata Sandi Sementara
+                      </span>
                     ) : (
-                      <span className="text-amber-400">Masih Sandi Bawaan</span>
+                      <span className="text-sky-400">Belum Diterbitkan</span>
                     )}
                   </div>
                 </div>
 
-                <div className="rounded-xl border border-white/10 bg-slate-900/60 p-3">
-                  <div className="text-[11px] text-slate-400">
-                    Kata Sandi Bawaan
+                {waliModal.passwordBaru ? (
+                  <div className="rounded-xl border border-white/10 bg-slate-900/60 p-3">
+                    <div className="text-[11px] text-slate-400">
+                      Kata Sandi Sementara
+                    </div>
+                    <div className="mt-1 font-mono text-sm font-bold text-sky-300 select-all">
+                      {waliModal.passwordBaru}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        triggerHaptic("light");
+                        const siswa = waliModal.student;
+                        void openWhatsAppChat(
+                          String(siswa.no_whatsapp_wali ?? ""),
+                          `Kata sandi sementara portal wali untuk ${String(siswa.nama_lengkap ?? "ananda")}: ${waliModal.passwordBaru}\n\nMasuk dengan NIS/NISN anak dan kata sandi ini, lalu buat kata sandi Anda sendiri.`,
+                        ).then((terbuka) => {
+                          if (!terbuka) {
+                            setErrorMsg(
+                              "WhatsApp tidak bisa dibuka. Periksa nomor WhatsApp wali di data peserta didik.",
+                            );
+                          }
+                        });
+                      }}
+                      className="mt-2 min-h-11 w-full rounded-xl bg-emerald-600 px-3 text-xs font-bold text-white"
+                    >
+                      Kirim ke WhatsApp wali
+                    </button>
+                    <p className="mt-1 text-[10px] text-slate-400">
+                      Hanya tampil sampai jendela ditutup. Wali wajib
+                      menggantinya saat pertama kali masuk portal.
+                    </p>
                   </div>
-                  <div className="mt-1 font-mono text-sm font-bold text-sky-300 select-all">
-                    {waliModal.statusInfo.defaultPassword}
-                  </div>
-                  <p className="mt-1 text-[10px] text-slate-500">
-                    Formula: NISN/NIS + UNIT (huruf besar)
+                ) : (
+                  <p className="rounded-xl border border-white/10 bg-slate-900/60 p-3 text-[11px] text-slate-400">
+                    Kata sandi wali tidak bisa dilihat. Bila wali lupa dan tidak
+                    bisa masuk dengan kode WhatsApp, tekan Reset Sandi untuk
+                    membuat kata sandi sementara.
                   </p>
-                </div>
+                )}
 
                 <div className="mt-2 flex gap-2">
                   <button

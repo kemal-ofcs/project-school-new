@@ -410,9 +410,9 @@ export function FormMasuk() {
               type={lihatPassword ? "text" : "password"}
             />
             <p className="mt-1.5 text-teks-lembut text-xs leading-relaxed">
-              Kata sandi awal adalah NISN/NIS digabung Unit (contoh:{" "}
-              <code className="font-mono font-semibold">0012345678SMP</code>).
-              Jika lupa, hubungi pihak tata usaha sekolah.
+              Kata sandi awal tercetak di slip akun wali dari sekolah. Lupa kata
+              sandi? Masuk dengan kode WhatsApp, lalu buat kata sandi baru di
+              halaman Profil. Tanpa WhatsApp, hubungi tata usaha sekolah.
             </p>
           </div>
 

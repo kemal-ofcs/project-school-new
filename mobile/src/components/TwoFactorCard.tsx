@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useId, useState } from "react";
 import { Icon } from "@/components/ui/Icon";
 import { triggerHaptic } from "@/lib/client/haptics";
 import {
@@ -31,6 +31,10 @@ export function TwoFactorCard() {
   const [setup, setSetup] = useState<TwoFactorSetup | null>(null);
   const [recoveryCodes, setRecoveryCodes] = useState<string[]>([]);
   const [code, setCode] = useState("");
+  // Bukti pemilik akun sebelum mendaftarkan autentikator; lihat
+  // `beginTwoFactorSetup`.
+  const [password, setPassword] = useState("");
+  const passwordId = useId();
   const [busy, setBusy] = useState(false);
   const [feedback, setFeedback] = useState<{
     tone: "success" | "error";
@@ -60,8 +64,9 @@ export function TwoFactorCard() {
     setFeedback(null);
     triggerHaptic("light");
     try {
-      setSetup(await beginTwoFactorSetup());
+      setSetup(await beginTwoFactorSetup(password));
       setCode("");
+      setPassword("");
       setMode("setup");
     } catch (error) {
       fail(error, "Pendaftaran 2FA tidak dapat dimulai.");
@@ -177,15 +182,33 @@ export function TwoFactorCard() {
               </button>
             </>
           ) : (
-            <button
-              type="button"
-              onClick={() => void startSetup()}
-              disabled={busy}
-              className="flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-violet-500 px-4 text-xs font-black text-white shadow-md transition active:scale-95 disabled:opacity-50"
-            >
-              <Icon name="lock" className="size-4" />
-              {busy ? "Menyiapkan..." : "Aktifkan 2FA"}
-            </button>
+            <>
+              <div>
+                <label
+                  htmlFor={passwordId}
+                  className="text-[11px] font-bold text-slate-400"
+                >
+                  Password akun Anda
+                </label>
+                <input
+                  id={passwordId}
+                  type="password"
+                  autoComplete="current-password"
+                  value={password}
+                  onChange={(event) => setPassword(event.target.value)}
+                  className="mt-1 min-h-11 w-full rounded-xl border border-white/15 bg-slate-950/60 px-3 text-sm text-white"
+                />
+              </div>
+              <button
+                type="button"
+                onClick={() => void startSetup()}
+                disabled={busy || password.length === 0}
+                className="flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-violet-500 px-4 text-xs font-black text-white shadow-md transition active:scale-95 disabled:opacity-50"
+              >
+                <Icon name="lock" className="size-4" />
+                {busy ? "Menyiapkan..." : "Aktifkan 2FA"}
+              </button>
+            </>
           )}
         </div>
       ) : null}
