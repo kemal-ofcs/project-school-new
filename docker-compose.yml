@@ -1,0 +1,74 @@
+# ==============================================================================
+# Absensi SPPG / Manajemen Sekolah — Docker Compose Self-Hosted
+# Arsitektur: 2-Tier Offline-First (LibSQL Server + Next.js Web Server)
+# ==============================================================================
+
+services:
+  # ----------------------------------------------------------------------------
+  # 1. Database Server: LibSQL (sqld)
+  # Endpoint HTTP Pipeline Hrana (/v2/pipeline) untuk Web, Desktop, dan Android
+  # ----------------------------------------------------------------------------
+  sqld:
+    image: ghcr.io/tursodatabase/libsql-server:latest
+    container_name: sppg-sqld-database
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./data/sqld:/var/lib/sqld
+    # Opsional: Jika ingin mengaktifkan autentikasi Auth Token untuk akses publik:
+    # environment:
+    #   - SQLD_AUTH_JWT_KEY=...
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8080/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  # ----------------------------------------------------------------------------
+  # 2. Web Application Server: Next.js (web-desktop web mode)
+  # Melayani UI browser dan API route handler server-side
+  # ----------------------------------------------------------------------------
+  web-app:
+    build:
+      context: ./web-desktop
+      dockerfile: Dockerfile
+    container_name: sppg-web-server
+    restart: unless-stopped
+    depends_on:
+      sqld:
+        condition: service_healthy
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+      - SPPG_BUILD_TARGET=web
+      - NEXT_PUBLIC_SPPG_RUNTIME=web
+      - SPPG_DATABASE_PROVIDER=self_hosted
+      - TURSO_DATABASE_URL=http://sqld:8080
+      # Biarkan kosong jika sqld berjalan tanpa auth di jaringan internal:
+      - TURSO_AUTH_TOKEN=
+      - SPPG_ALLOW_INSECURE_DATABASE=0
+      - SPPG_TRUSTED_PROXY_HOPS=1
+    volumes:
+      - web-public-storage:/app/storage
+
+  # ----------------------------------------------------------------------------
+  # 3. Cloudflare Tunnel (Opsional - Sangat Direkomendasikan untuk Akses Global Gratis)
+  # Memberikan akses global HTTPS resmi dari internet tanpa perlu IP Publik Statis
+  # dan tanpa perlu buka port forwarding di router sekolah/kantor.
+  # ----------------------------------------------------------------------------
+  # tunnel:
+  #   image: cloudflare/cloudflared:latest
+  #   container_name: sppg-cloudflare-tunnel
+  #   restart: unless-stopped
+  #   command: tunnel run
+  #   environment:
+  #     - TUNNEL_TOKEN=isi_dengan_token_tunnel_cloudflare_anda
+  #   depends_on:
+  #     - web-app
+  #     - sqld
+
+volumes:
+  web-public-storage:
