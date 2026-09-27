@@ -22,6 +22,11 @@ import { Icon } from "@/components/ui/Icon";
 import { Modal } from "@/components/ui/Modal";
 import { canAccessArea, hasPermission } from "@/lib/auth/access";
 import { triggerHaptic } from "@/lib/client/haptics";
+import {
+  formatTingkatDisplay,
+  parseUnitKeterangan,
+  resolveTingkatOptions,
+} from "@/lib/constants/academic-levels";
 import { useAuth } from "@/lib/context/AuthContext";
 import {
   aktifkanTahunAjaran,
@@ -259,7 +264,7 @@ export default function AkademikMobilePage() {
       rombel: {
         kind: "rombel",
         id_tahun_ajaran: selectedTa,
-        tingkat: "10",
+        tingkat: String(resolveTingkatOptions(unit)[0]?.tingkat ?? 10),
         id_jurusan: "",
         nama_rombel: "",
         id_wali_kelas: "",
@@ -762,9 +767,12 @@ export default function AkademikMobilePage() {
                   <RowCard
                     key={id}
                     title={String(item.nama_rombel)}
-                    subtitle={`Tingkat ${String(item.tingkat)} · ${String(
-                      item.nama_jurusan || "Umum",
-                    )} · Wali: ${String(item.nama_wali_kelas || "belum ditunjuk")}`}
+                    subtitle={`${formatTingkatDisplay(
+                      item.tingkat as number,
+                      unit,
+                    )} · ${String(item.nama_jurusan || "Umum")} · Wali: ${String(
+                      item.nama_wali_kelas || "belum ditunjuk",
+                    )}`}
                     badge={
                       <span className="shrink-0 rounded-lg border border-white/10 bg-slate-800 px-2 py-1 text-[10px] font-bold text-slate-300">
                         {String(item.jumlah_siswa ?? 0)}/
@@ -831,11 +839,17 @@ export default function AkademikMobilePage() {
                   <RowCard
                     key={id}
                     title={String(item.nama_unit)}
-                    subtitle={
-                      item.keterangan
-                        ? String(item.keterangan)
-                        : "Tanpa keterangan"
-                    }
+                    subtitle={(() => {
+                      const parsed = parseUnitKeterangan(item.keterangan);
+                      const tLabels = parsed.daftar_tingkat
+                        .map((t) => t.nama)
+                        .join(", ");
+                      if (tLabels && parsed.deskripsi)
+                        return `${parsed.deskripsi} · ${tLabels}`;
+                      if (tLabels) return tLabels;
+                      if (parsed.deskripsi) return parsed.deskripsi;
+                      return "Tanpa keterangan";
+                    })()}
                     badge={
                       <span className="shrink-0 rounded-lg border border-white/10 bg-slate-800 px-2 py-1 text-[10px] font-bold text-slate-300">
                         #{String(item.urutan ?? 0)}
@@ -980,7 +994,7 @@ export default function AkademikMobilePage() {
             ) : null}
             <AkademikFormFields
               draft={draft}
-              options={{ tahunAjaran, jurusan, rombel, mapel, guru }}
+              options={{ tahunAjaran, jurusan, rombel, mapel, guru, unit }}
               onChange={setDraft}
             />
           </form>

@@ -1,5 +1,11 @@
 "use client";
 
+import {
+  PRESET_TINGKAT_TEMPLATES,
+  parseUnitKeterangan,
+  resolveTingkatOptions,
+  serializeUnitKeterangan,
+} from "@/lib/constants/academic-levels";
 import type {
   GuruMapelInput,
   JurusanInput,
@@ -246,6 +252,7 @@ export interface AcademicFormOptions {
   rombel: Rows;
   mapel: Rows;
   guru: Rows;
+  unit?: Rows;
 }
 
 function ActiveToggle({
@@ -375,7 +382,8 @@ export function AkademikFormFields({
           )}
         </>
       );
-    case "unit":
+    case "unit": {
+      const parsedUnit = parseUnitKeterangan(draft.keterangan);
       return (
         <>
           <div>
@@ -388,7 +396,7 @@ export function AkademikFormFields({
               onChange={(e) =>
                 onChange({ ...draft, nama_unit: e.target.value })
               }
-              placeholder="TK / SD / SMP"
+              placeholder="TK / SD / SMP / SMK / Kuliah"
               required
               className={INPUT}
             />
@@ -397,34 +405,136 @@ export function AkademikFormFields({
               memindahkan semua personil yang memakai unit ini.
             </p>
           </div>
-          <div className="grid grid-cols-3 gap-2">
-            <div className="col-span-2">
-              <label htmlFor="ak-unit-ket" className={LABEL}>
-                Keterangan (opsional)
-              </label>
-              <input
-                id="ak-unit-ket"
-                value={draft.keterangan}
-                onChange={(e) =>
-                  onChange({ ...draft, keterangan: e.target.value })
-                }
-                className={INPUT}
-              />
+
+          <div>
+            <label htmlFor="ak-unit-ket" className={LABEL}>
+              Deskripsi / Catatan Unit (opsional)
+            </label>
+            <input
+              id="ak-unit-ket"
+              value={parsedUnit.deskripsi}
+              onChange={(e) =>
+                onChange({
+                  ...draft,
+                  keterangan: serializeUnitKeterangan(
+                    e.target.value,
+                    parsedUnit.daftar_tingkat,
+                  ),
+                })
+              }
+              placeholder="cth: Satuan Pendidikan Kejuruan"
+              className={INPUT}
+            />
+          </div>
+
+          {/* Sub-panel Tingkat Kelas */}
+          <div className="flex flex-col gap-2 rounded-xl border border-white/10 bg-slate-900/60 p-3">
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-semibold text-sky-400">
+                Tingkat / Kelas di Unit Ini
+              </span>
+              <span className="font-mono text-[10px] text-slate-400">
+                {parsedUnit.daftar_tingkat.length} Tingkat
+              </span>
             </div>
-            <div>
-              <label htmlFor="ak-unit-urut" className={LABEL}>
-                Urutan
-              </label>
-              <input
-                id="ak-unit-urut"
-                type="number"
-                min={0}
-                value={draft.urutan}
-                onChange={(e) => onChange({ ...draft, urutan: e.target.value })}
-                className={INPUT}
-              />
+
+            {parsedUnit.daftar_tingkat.length === 0 ? (
+              <p className="text-[11px] italic text-slate-500">
+                Belum ada tingkat. Pilih template cepat di bawah untuk mengisi.
+              </p>
+            ) : (
+              <div className="flex flex-wrap gap-1.5">
+                {parsedUnit.daftar_tingkat.map((t) => (
+                  <span
+                    key={t.tingkat}
+                    className="inline-flex items-center gap-1.5 rounded-lg border border-sky-500/20 bg-sky-500/10 px-2 py-1 text-[11px] text-sky-300"
+                  >
+                    <span>{t.nama}</span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const next = parsedUnit.daftar_tingkat.filter(
+                          (item) => item.tingkat !== t.tingkat,
+                        );
+                        onChange({
+                          ...draft,
+                          keterangan: serializeUnitKeterangan(
+                            parsedUnit.deskripsi,
+                            next,
+                          ),
+                        });
+                      }}
+                      className="text-rose-400 active:scale-90"
+                    >
+                      ×
+                    </button>
+                  </span>
+                ))}
+              </div>
+            )}
+
+            {/* Template Cepat */}
+            <div className="flex flex-col gap-1 border-t border-white/5 pt-2">
+              <span className="text-[10px] text-slate-400">
+                Bantu isi cepat:
+              </span>
+              <div className="flex flex-wrap gap-1">
+                {(
+                  [
+                    ["tk", "TK"],
+                    ["sd", "SD"],
+                    ["smp", "SMP"],
+                    ["smk_sma", "SMA/SMK"],
+                    ["kuliah", "Kuliah"],
+                  ] as const
+                ).map(([key, lbl]) => (
+                  <button
+                    key={key}
+                    type="button"
+                    onClick={() => {
+                      const tpl = PRESET_TINGKAT_TEMPLATES[key];
+                      if (!tpl) return;
+                      const map = new Map<number, string>();
+                      for (const item of parsedUnit.daftar_tingkat)
+                        map.set(item.tingkat, item.nama);
+                      for (const item of tpl.tingkat) {
+                        if (!map.has(item.tingkat))
+                          map.set(item.tingkat, item.nama);
+                      }
+                      const next = Array.from(map.entries())
+                        .map(([tingkat, nama]) => ({ tingkat, nama }))
+                        .sort((a, b) => a.tingkat - b.tingkat);
+                      onChange({
+                        ...draft,
+                        keterangan: serializeUnitKeterangan(
+                          parsedUnit.deskripsi,
+                          next,
+                        ),
+                      });
+                    }}
+                    className="rounded border border-white/10 bg-white/5 px-1.5 py-0.5 text-[10px] text-slate-300 active:bg-white/10"
+                  >
+                    +{lbl}
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
+
+          <div>
+            <label htmlFor="ak-unit-urut" className={LABEL}>
+              Urutan
+            </label>
+            <input
+              id="ak-unit-urut"
+              type="number"
+              min={0}
+              value={draft.urutan}
+              onChange={(e) => onChange({ ...draft, urutan: e.target.value })}
+              className={INPUT}
+            />
+          </div>
+
           {draft.id ? (
             <ActiveToggle
               id="ak-unit-aktif"
@@ -438,6 +548,7 @@ export function AkademikFormFields({
           ) : null}
         </>
       );
+    }
     case "jurusan":
       return (
         <>
@@ -539,9 +650,18 @@ export function AkademikFormFields({
                 }
                 className={INPUT}
               >
-                <option value="10">Kelas 10</option>
-                <option value="11">Kelas 11</option>
-                <option value="12">Kelas 12</option>
+                {resolveTingkatOptions(
+                  options.unit || [],
+                  undefined,
+                  draft.tingkat,
+                ).map((opt) => (
+                  <option
+                    key={`${opt.tingkat}-${opt.label}-${opt.unitNama || ""}`}
+                    value={String(opt.tingkat)}
+                  >
+                    {opt.label} {opt.unitNama ? `(${opt.unitNama})` : ""}
+                  </option>
+                ))}
               </select>
             </div>
           </div>
