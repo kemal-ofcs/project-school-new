@@ -3,6 +3,7 @@
 import { MessageCircle, UserCheck } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
+import { ScrollToTop } from "@/components/visual/ScrollToTop";
 
 interface StickyActionProps {
   nomorTelepon?: string | null;
@@ -17,6 +18,9 @@ export function StickyAction({ nomorTelepon }: StickyActionProps) {
 
   return (
     <>
+      {/* 0. Scroll To Top Button with Circular Progress */}
+      <ScrollToTop />
+
       {/* 1. Desktop Floating WhatsApp Button */}
       <aside className="fixed bottom-6 right-6 z-40 hidden md:flex items-center group">
         <div className="mr-3 px-3 py-1.5 rounded-lg bg-foreground text-background text-xs font-semibold shadow-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap">
@@ -29,6 +33,8 @@ export function StickyAction({ nomorTelepon }: StickyActionProps) {
           aria-label="Konsultasi WhatsApp PMB"
           className="relative flex h-14 w-14 items-center justify-center rounded-full bg-accent text-accent-foreground shadow-xl transition-transform duration-200 hover:scale-105 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
         >
+          {/* Subtle live indicator ping */}
+          <span className="absolute inline-flex h-full w-full rounded-full bg-accent opacity-30 animate-ping" />
           <MessageCircle className="relative z-10 h-6 w-6" />
         </a>
       </aside>
@@ -36,14 +42,18 @@ export function StickyAction({ nomorTelepon }: StickyActionProps) {
       {/* 2. Mobile Sticky Bottom Action Bar (Thumb-Zone) */}
       <div className="fixed bottom-0 left-0 right-0 z-40 md:hidden border-t border-border bg-background/95 backdrop-blur-xl p-3 pb-safe shadow-2xl transition-colors">
         <div className="flex items-center gap-2.5 max-w-md mx-auto">
-          {/* Tombol WhatsApp Icon-Only */}
+          {/* Tombol WhatsApp Icon-Only dengan status dot */}
           <a
             href={waUrl}
             target="_blank"
             rel="noopener noreferrer"
             aria-label="Chat WhatsApp Panitia PMB"
-            className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-accent text-accent-foreground shadow-md transition-transform active:scale-95"
+            className="relative flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-accent text-accent-foreground shadow-md transition-transform active:scale-95"
           >
+            <span className="absolute -top-1 -right-1 flex h-3 w-3">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-secondary opacity-75" />
+              <span className="relative inline-flex rounded-full h-3 w-3 bg-secondary" />
+            </span>
             <MessageCircle className="h-6 w-6" />
           </a>
 

@@ -17,6 +17,7 @@ import {
   simpanKontenHalaman,
 } from "@/lib/gateways/content";
 import { CollectionRepeater } from "./CollectionRepeater";
+import { HeroImageUploader } from "./HeroImageUploader";
 
 export function PageContentManager() {
   const { user } = useAuth();
@@ -207,7 +208,13 @@ export function PageContentManager() {
                       ℹ️ {field.description}
                     </p>
                   ) : null}
-                  {field.type === "textarea" ? (
+                  {field.type === "image" ? (
+                    <HeroImageUploader
+                      value={value}
+                      onChange={(val) => handleFieldChange(field.key, val)}
+                      disabled={!canManage}
+                    />
+                  ) : field.type === "textarea" ? (
                     <textarea
                       id={`input-${field.key}`}
                       rows={field.rows || 3}

@@ -8,6 +8,7 @@ import {
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
+import { SpotlightCard } from "@/components/visual/SpotlightCard";
 import { koleksiPilar } from "@/lib/services/landing-collections";
 import type { SchoolProfile } from "@/lib/services/school-profile";
 
@@ -92,37 +93,40 @@ export function PillarsSection({ profil, konten = {} }: PillarsSectionProps) {
             {pillarsData.map((item, i) => {
               const Icon = item.icon;
               return (
-                <Card
+                <SpotlightCard
                   key={`${i}-${item.title}`}
-                  className="group relative flex flex-col justify-between p-6 transition-all duration-300 hover:shadow-lg hover:-translate-y-1 border-border bg-card"
+                  className="rounded-2xl"
+                  glowColor="rgba(0, 35, 111, 0.14)"
                 >
-                  <div className="space-y-4">
-                    <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10 text-primary group-hover:bg-primary group-hover:text-primary-foreground transition-colors duration-200">
-                      <Icon className="h-6 w-6" />
+                  <Card className="h-full flex flex-col justify-between p-6 transition-all duration-300 hover:shadow-xl hover:-translate-y-1 border-border/80 bg-card/90 backdrop-blur-xs">
+                    <div className="space-y-4">
+                      <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10 text-primary group-hover:bg-primary group-hover:text-primary-foreground transition-all duration-300 shadow-xs">
+                        <Icon className="h-6 w-6" />
+                      </div>
+                      <div className="space-y-2">
+                        <h3 className="font-bold text-lg text-foreground leading-snug group-hover:text-primary transition-colors">
+                          {item.title}
+                        </h3>
+                        {item.desc ? (
+                          <p className="text-sm text-muted-foreground leading-relaxed">
+                            {item.desc}
+                          </p>
+                        ) : null}
+                      </div>
                     </div>
-                    <div className="space-y-2">
-                      <h3 className="font-semibold text-lg text-foreground leading-snug">
-                        {item.title}
-                      </h3>
-                      {item.desc ? (
-                        <p className="text-sm text-muted-foreground leading-relaxed">
-                          {item.desc}
-                        </p>
-                      ) : null}
-                    </div>
-                  </div>
 
-                  {item.tag ? (
-                    <div className="pt-6">
-                      <Badge
-                        variant="outline"
-                        className="text-[11px] font-medium"
-                      >
-                        {item.tag}
-                      </Badge>
-                    </div>
-                  ) : null}
-                </Card>
+                    {item.tag ? (
+                      <div className="pt-6">
+                        <Badge
+                          variant="outline"
+                          className="text-[11px] font-semibold border-secondary/30 text-secondary bg-secondary/5"
+                        >
+                          {item.tag}
+                        </Badge>
+                      </div>
+                    ) : null}
+                  </Card>
+                </SpotlightCard>
               );
             })}
           </div>

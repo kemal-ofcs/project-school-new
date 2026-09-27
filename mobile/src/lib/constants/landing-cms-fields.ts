@@ -10,7 +10,7 @@
 export interface CmsFieldConfig {
   key: string;
   label: string;
-  type: "text" | "textarea";
+  type: "text" | "textarea" | "image";
   placeholder: string;
   rows?: number;
   description?: string;
@@ -193,6 +193,14 @@ export const LANDING_PAGE_SUBSECTIONS: CmsSubSectionConfig[] = [
         rows: 3,
         placeholder:
           "Pendidikan holistik memadukan ketangguhan karakter moral, pengayaan kurikulum internasional, serta ekosistem pembelajaran modern berbasis riset dan teknologi masa depan.",
+      },
+      {
+        key: "landing.hero_image",
+        label: "Foto Latar Belakang Hero",
+        type: "image",
+        placeholder: "Pilih foto kampus atau gedung sekolah",
+        description:
+          "Foto gedung atau kampus sekolah (rasio landscape 16:9). Bila dikosongkan, halaman menggunakan animasi gradien sekolah.",
       },
     ],
   },

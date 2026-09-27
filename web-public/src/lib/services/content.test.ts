@@ -102,6 +102,32 @@ describe("Tahap D: web-public Content Service & Fallback Contract", () => {
     });
   });
 
+  test("readPageContent mengambil landing.hero_image base64 secara utuh dan membuang spasi kosong", async () => {
+    const client = dbMemori();
+    await setupDatabase(client);
+
+    const base64Contoh =
+      "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEASABIAAD/2wBDAP//////////////////////////////////////////////////////////////////////////////////////wgALCAABAAEBAREA/8QAFBABAAAAAAAAAAAAAAAAAAAAAP/aAAgBAQABPxA=";
+
+    await client.execute({
+      sql: `INSERT INTO konten_publik (halaman, kunci, nilai) VALUES
+            ('landing', 'landing.hero_image', ?),
+            ('landing', 'landing.title', 'SMK Unggulan');`,
+      args: [base64Contoh],
+    });
+
+    const hasil = await readPageContent(client, "landing");
+    expect(hasil["landing.hero_image"]).toBe(base64Contoh);
+    expect(hasil["landing.title"]).toBe("SMK Unggulan");
+
+    // Jika nilainya hanya spasi kosong, diperlakukan sebagai belum diisi
+    await client.execute({
+      sql: `UPDATE konten_publik SET nilai = '   ' WHERE halaman = 'landing' AND kunci = 'landing.hero_image';`,
+    });
+    const hasilKosong = await readPageContent(client, "landing");
+    expect(hasilKosong["landing.hero_image"]).toBeUndefined();
+  });
+
   test("readPageContent tanpa tabel mengembalikan objek kosong, bukan melempar", async () => {
     const client = dbMemori();
     expect(await readPageContent(client, "landing")).toEqual({});

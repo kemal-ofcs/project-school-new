@@ -11,6 +11,7 @@ import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { SpotlightCard } from "@/components/visual/SpotlightCard";
 import { koleksiTahapanPmb } from "@/lib/services/landing-collections";
 import type { GelombangAktif } from "@/lib/services/pmb";
 
@@ -161,36 +162,42 @@ export function PmbOverviewSection({
               </h3>
             ) : null}
 
-            <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
-              {tahapan.map((item) => {
+            <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4 relative">
+              {tahapan.map((item, idx) => {
                 const Icon = item.icon;
                 return (
-                  <Card
-                    key={item.step}
-                    className="relative flex flex-col justify-between p-6 bg-card border-border shadow-xs hover:shadow-md transition-shadow"
-                  >
-                    <div className="space-y-4">
-                      <div className="flex items-center justify-between">
-                        <span className="flex h-9 w-9 items-center justify-center rounded-full bg-primary font-bold text-sm text-primary-foreground shadow-sm">
-                          {item.step}
-                        </span>
-                        <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-muted text-primary">
-                          <Icon className="h-5 w-5" />
+                  <SpotlightCard key={item.step} className="h-full">
+                    <Card className="relative flex flex-col justify-between h-full p-6 bg-card border-border shadow-xs hover:shadow-md transition-shadow">
+                      <div className="space-y-4">
+                        <div className="flex items-center justify-between">
+                          <span className="flex h-9 w-9 items-center justify-center rounded-full bg-primary font-bold text-sm text-primary-foreground shadow-sm ring-4 ring-primary/10">
+                            {item.step}
+                          </span>
+                          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-muted text-primary">
+                            <Icon className="h-5 w-5" />
+                          </div>
+                        </div>
+
+                        <div className="space-y-1.5">
+                          <h4 className="font-bold text-base text-foreground">
+                            {item.title}
+                          </h4>
+                          {item.desc ? (
+                            <p className="text-xs text-muted-foreground leading-relaxed">
+                              {item.desc}
+                            </p>
+                          ) : null}
                         </div>
                       </div>
 
-                      <div className="space-y-1.5">
-                        <h4 className="font-bold text-base text-foreground">
-                          {item.title}
-                        </h4>
-                        {item.desc ? (
-                          <p className="text-xs text-muted-foreground leading-relaxed">
-                            {item.desc}
-                          </p>
-                        ) : null}
-                      </div>
-                    </div>
-                  </Card>
+                      {/* Indikator Langkah Berikutnya (Desktop) */}
+                      {idx < tahapan.length - 1 ? (
+                        <div className="hidden lg:block absolute -right-3 top-1/2 -translate-y-1/2 z-10 p-1 rounded-full bg-muted border border-border text-muted-foreground shadow-xs">
+                          <ArrowRight className="h-3 w-3" />
+                        </div>
+                      ) : null}
+                    </Card>
+                  </SpotlightCard>
                 );
               })}
             </div>

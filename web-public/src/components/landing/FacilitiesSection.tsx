@@ -21,6 +21,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { SpotlightCard } from "@/components/visual/SpotlightCard";
 import { koleksiFasilitas } from "@/lib/services/landing-collections";
 
 /**
@@ -87,51 +88,71 @@ export function FacilitiesSection({ konten = {} }: FacilitiesSectionProps) {
           {facilitiesList.map((item, i) => {
             const Icon = item.icon;
             return (
-              <Card
-                key={`${i}-${item.name}`}
-                className="group flex flex-col justify-between p-6 transition-all duration-300 hover:shadow-lg hover:-translate-y-1 bg-card border-border"
-              >
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10 text-primary group-hover:bg-primary group-hover:text-primary-foreground transition-colors">
-                      <Icon className="h-6 w-6" />
+              <SpotlightCard key={`${i}-${item.name}`} className="h-full">
+                <Card className="group flex flex-col justify-between h-full p-6 transition-all duration-300 hover:shadow-lg bg-card border-border">
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10 text-primary group-hover:bg-primary group-hover:text-primary-foreground transition-colors">
+                        <Icon className="h-6 w-6" />
+                      </div>
+                      {item.tag ? (
+                        <Badge variant="outline" className="text-[11px]">
+                          {item.tag}
+                        </Badge>
+                      ) : null}
                     </div>
-                    {item.tag ? (
-                      <Badge variant="outline" className="text-[11px]">
-                        {item.tag}
-                      </Badge>
+
+                    <div className="space-y-2">
+                      <h3 className="font-bold text-lg text-foreground group-hover:text-primary transition-colors">
+                        {item.name}
+                      </h3>
+                      {item.shortDesc ? (
+                        <p className="text-sm text-muted-foreground leading-relaxed line-clamp-3">
+                          {item.shortDesc}
+                        </p>
+                      ) : null}
+                    </div>
+
+                    {/* Preview Spesifikasi Singkat di Kartu */}
+                    {item.specs.length > 0 ? (
+                      <div className="flex flex-wrap gap-1.5 pt-2">
+                        {item.specs.slice(0, 2).map((spec) => (
+                          <span
+                            key={spec}
+                            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[11px] font-medium bg-muted text-muted-foreground"
+                          >
+                            <CheckCircle2 className="h-3 w-3 text-secondary shrink-0" />
+                            <span className="truncate max-w-[160px]">
+                              {spec}
+                            </span>
+                          </span>
+                        ))}
+                        {item.specs.length > 2 ? (
+                          <span className="inline-flex items-center px-2 py-1 rounded-md text-[11px] font-medium text-muted-foreground">
+                            +{item.specs.length - 2} lainnya
+                          </span>
+                        ) : null}
+                      </div>
                     ) : null}
                   </div>
 
-                  <div className="space-y-2">
-                    <h3 className="font-bold text-lg text-foreground group-hover:text-primary transition-colors">
-                      {item.name}
-                    </h3>
-                    {item.shortDesc ? (
-                      <p className="text-sm text-muted-foreground leading-relaxed">
-                        {item.shortDesc}
-                      </p>
-                    ) : null}
-                  </div>
-                </div>
-
-                {/* Tombol spesifikasi hanya bila ada spesifikasinya: dialog
-                    yang terbuka kosong adalah tombol yang tidak melakukan apa-apa. */}
-                {item.specs.length > 0 ? (
-                  <div className="pt-6 border-t border-border/60">
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="default"
-                      className="w-full justify-between h-11 text-sm font-semibold text-primary hover:bg-primary/10"
-                      onClick={() => setSelectedFacility(item)}
-                    >
-                      <span>Lihat Spesifikasi Fasilitas</span>
-                      <Eye className="h-4 w-4" />
-                    </Button>
-                  </div>
-                ) : null}
-              </Card>
+                  {/* Tombol spesifikasi lengkap */}
+                  {item.specs.length > 0 ? (
+                    <div className="pt-5 mt-4 border-t border-border/60">
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="default"
+                        className="w-full justify-between h-11 text-sm font-semibold text-primary hover:bg-primary/10"
+                        onClick={() => setSelectedFacility(item)}
+                      >
+                        <span>Lihat Spesifikasi Lengkap</span>
+                        <Eye className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  ) : null}
+                </Card>
+              </SpotlightCard>
             );
           })}
         </div>

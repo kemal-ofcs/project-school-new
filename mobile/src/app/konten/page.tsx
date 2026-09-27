@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState, useTransition } from "react";
 import { CollectionRepeater } from "@/components/content/CollectionRepeater";
+import { HeroImageUploader } from "@/components/content/HeroImageUploader";
 import { MobileAppShell } from "@/components/MobileAppShell";
 import { FeedbackBanner } from "@/components/ui/FeedbackBanner";
 import { Icon } from "@/components/ui/Icon";
@@ -571,7 +572,18 @@ export default function KontenMobilePage() {
                                 ℹ️ {field.description}
                               </p>
                             ) : null}
-                            {field.type === "textarea" ? (
+                            {field.type === "image" ? (
+                              <HeroImageUploader
+                                value={value}
+                                onChange={(val) =>
+                                  setContentMap((prev) => ({
+                                    ...prev,
+                                    [field.key]: val,
+                                  }))
+                                }
+                                disabled={!canManage}
+                              />
+                            ) : field.type === "textarea" ? (
                               <textarea
                                 id={`input-hal-${field.key}`}
                                 aria-label={field.label}

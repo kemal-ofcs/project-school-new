@@ -187,3 +187,71 @@ body {
     color 0.3s ease;
   overflow-x: hidden;
 }
+
+/* Keyframes Animasi Visual & Efek Latar Hero */
+@keyframes ken-burns {
+  0% {
+    transform: scale(1) translate3d(0, 0, 0);
+  }
+  50% {
+    transform: scale(1.06) translate3d(-1%, -1%, 0);
+  }
+  100% {
+    transform: scale(1) translate3d(0, 0, 0);
+  }
+}
+
+@keyframes aurora-slow {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+  50% {
+    transform: translate3d(8%, 10%, 0) scale(1.08);
+  }
+}
+
+@keyframes aurora-reverse {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0) scale(1.05);
+  }
+  50% {
+    transform: translate3d(-10%, -6%, 0) scale(0.95);
+  }
+}
+
+@keyframes aurora-float {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0);
+  }
+  50% {
+    transform: translate3d(6%, -8%, 0);
+  }
+}
+
+.animate-ken-burns {
+  animation: ken-burns 24s ease-in-out infinite alternate;
+}
+
+.animate-aurora-slow {
+  animation: aurora-slow 18s ease-in-out infinite alternate;
+}
+
+.animate-aurora-reverse {
+  animation: aurora-reverse 15s ease-in-out infinite alternate;
+}
+
+.animate-aurora-float {
+  animation: aurora-float 20s ease-in-out infinite alternate;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-ken-burns,
+  .animate-aurora-slow,
+  .animate-aurora-reverse,
+  .animate-aurora-float {
+    animation: none !important;
+  }
+}
