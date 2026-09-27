@@ -440,3 +440,38 @@ bun run sync:mobile
 - **DILARANG MENGGUNAKAN SIMBOL/EMOJI/IKON DEKORATIF** dalam respon chat kepada pengguna (misalnya: tidak boleh menggunakan emoji atau ikon seperti lambang api, checklist warna-warni, lampu, kunci pas, otak, kaca pembesar, dll.).
 - **Tampilan Bersih & Rapi:** Gunakan format teks standar markdown yang bersih (heading `#`, `##`, `###`, poin tanda hubung `-`, penomoran `1.`, teks tebal `**`, dan blok kode fenced).
 - **Hanya gunakan ikon jika pengguna secara eksplisit meminta**.
+
+---
+
+<!-- antislop:start -->
+## antislop
+Untuk pengerjaan UI, teks/copy, aksesibilitas, layout mobile, atau komentar kode, baca `.agents/antislop.md` (core) dan skill yang sesuai:
+- UI / visual: `.agents/skills/antislop-ui/SKILL.md`
+- Copy & text: `.agents/skills/antislop-copywriting/SKILL.md`
+- People / accessibility: `.agents/skills/antislop-human/SKILL.md`
+- Mobile / responsive: `.agents/skills/antislop-layoutmobile/SKILL.md`
+- Code comments: `.agents/skills/antislop-code/SKILL.md`
+Sebelum memulai pengerjaan UI, tanyakan kepada pengguna kapan antislop diterapkan: selama pengerjaan (during) atau setelah selesai (after).
+<!-- antislop:end -->
+
+---
+
+<!-- ponytail:start -->
+## ponytail
+Mode developer senior minimalis (lazy senior dev): tulis hanya kode yang benar-benar dibutuhkan. Tangga pertimbangan (ladder):
+1. Apakah fitur ini memang perlu dibangun? (YAGNI)
+2. Apakah sudah ada di basis kode ini? Gunakan kembali fungsi, utilitas, atau gateway yang sudah ada.
+3. Apakah standard library sudah menyediakannya? Gunakan.
+4. Apakah fitur bawaan platform (browser/OS/DB) sudah menyediakannya? Gunakan.
+5. Apakah dependensi yang sudah terpasang sudah menyelesaikannya? Gunakan, jangan pasang dependensi baru tanpa alasan kuat.
+6. Apakah bisa satu baris? Buat satu baris.
+7. Hanya jika rute di atas tidak terpenuhi: tulis kode minimal yang berfungsi.
+Baca detail di `.agents/rules/ponytail.md` dan modul skill di `.agents/skills/ponytail*/`.
+<!-- ponytail:end -->
+
+---
+
+<!-- context7:start -->
+## context7
+Untuk dokumentasi library, framework, atau API eksternal terkini (React, Next.js, Tauri, Zod, Three.js, dll.), gunakan Context7 MCP server. Baca `.agents/rules/context7.md` dan `.agents/skills/context7-mcp/SKILL.md`.
+<!-- context7:end -->

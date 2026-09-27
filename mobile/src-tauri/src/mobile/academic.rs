@@ -2244,7 +2244,7 @@ fn daftar_wali_kredensial(
 ) -> Result<Vec<Value>, CommandError> {
     let dasar = r#"SELECT s.id_siswa, COALESCE(s.nis, ''), COALESCE(s.nisn, ''),
                           s.nama_lengkap, r.nama_rombel, COALESCE(m.unit, ''),
-                          k.password_hash, k.changed_at
+                          k.password_hash, k.changed_at, COALESCE(r.tingkat, '')
                      FROM siswa_data s
                      JOIN akademik_rombel r ON r.id_rombel = s.id_rombel
                      LEFT JOIN master_data m ON m.id_unik = s.id_siswa
@@ -2280,12 +2280,24 @@ fn daftar_wali_kredensial(
             let unit: String = row.get(5)?;
             let hash: Option<String> = row.get(6)?;
             let changed_at: Option<String> = row.get(7)?;
+            let nama_rombel: String = row.get(4)?;
+            let tingkat_val: Option<rusqlite::types::Value> = row.get(8)?;
+            let tingkat = match tingkat_val {
+                Some(rusqlite::types::Value::Integer(n)) => n.to_string(),
+                Some(rusqlite::types::Value::Text(s)) => s,
+                _ => String::new(),
+            };
+            let rombel = if tingkat.trim().is_empty() {
+                nama_rombel
+            } else {
+                format!("Kelas {} - {}", tingkat.trim(), nama_rombel.trim())
+            };
             Ok(json!({
                 "idSiswa": row.get::<_, String>(0)?,
                 "namaSiswa": row.get::<_, String>(3)?,
                 "nis": if nis.is_empty() { Value::Null } else { json!(nis) },
                 "nisn": if nisn.is_empty() { Value::Null } else { json!(nisn) },
-                "rombel": row.get::<_, String>(4)?,
+                "rombel": rombel,
                 "unit": if unit.trim().is_empty() {
                     Value::Null
                 } else {

@@ -48,3 +48,7 @@ yarn-error.log*
 next-env.d.ts
 
 graphify-out/
+
+# local MCP keys
+.vscode/mcp.json
+.agents/mcp_config.json

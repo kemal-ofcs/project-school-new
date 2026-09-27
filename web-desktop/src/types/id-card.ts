@@ -23,6 +23,10 @@ export interface IdCardElement {
     | "company.logo"
     | "company.terms"
     | "company.signature"
+    | "teacher.nip"
+    | "teacher.nuptk"
+    | "student.nisn"
+    | "employee.unit"
     | "static_text";
   staticValue?: string;
   label: string;

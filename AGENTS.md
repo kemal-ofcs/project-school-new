@@ -414,3 +414,32 @@ tabel empat lapisan di atas, lalu sesuaikan `src/lib/rbac/catalog.ts`,
 `src/lib/auth/access.ts`, gateway, dan pendaftaran perintah di kedua `lib.rs`.
 
 Detail lengkap ada di `README.md`.
+
+<!-- antislop:start -->
+## antislop
+For UI, copy, people, mobile layout, or code comments work, read `.agents/antislop.md` (core) and then the skill for the task:
+- UI / visual: `.agents/skills/antislop-ui/SKILL.md`
+- Copy & text: `.agents/skills/antislop-copywriting/SKILL.md`
+- People: `.agents/skills/antislop-human/SKILL.md`
+- Mobile / responsive: `.agents/skills/antislop-layoutmobile/SKILL.md`
+- Code comments: `.agents/skills/antislop-code/SKILL.md`
+Before starting, ask the user when antislop applies: during the work, or after it is done.
+<!-- antislop:end -->
+
+<!-- ponytail:start -->
+## ponytail
+Lazy senior developer mode: write only what the task needs. Ladder:
+1. Does this need to exist? (YAGNI)
+2. Already in this codebase? Reuse existing helpers/gateways.
+3. Stdlib does it? Use it.
+4. Native platform feature? Use it.
+5. Installed dependency? Use it.
+6. One line? Make it one line.
+7. Only then: minimum working code.
+Read `.agents/rules/ponytail.md` and skills in `.agents/skills/ponytail*/`.
+<!-- ponytail:end -->
+
+<!-- context7:start -->
+## context7
+Untuk dokumentasi library, framework, atau API eksternal terkini (React, Next.js, Tauri, Zod, Three.js, dll.), gunakan Context7 MCP server. Baca `.agents/rules/context7.md` dan `.agents/skills/context7-mcp/SKILL.md`.
+<!-- context7:end -->

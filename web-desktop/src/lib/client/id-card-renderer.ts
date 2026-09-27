@@ -688,6 +688,18 @@ async function renderSingleElement(
       case "company.terms":
         val = String(company?.card_terms || BRANDING.defaultCardTerms);
         break;
+      case "teacher.nip":
+        val = String(employee.nip || "198701012010011001");
+        break;
+      case "teacher.nuptk":
+        val = String(employee.nuptk || "1234567890123456");
+        break;
+      case "student.nisn":
+        val = String(employee.nisn || "0012345678");
+        break;
+      case "employee.unit":
+        val = String(employee.unit || "UNIT SEKOLAH");
+        break;
       case "static_text":
         val = el.staticValue || el.label || "";
         break;

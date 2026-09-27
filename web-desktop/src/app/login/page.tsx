@@ -238,8 +238,8 @@ export default function LoginPage() {
           </div>
 
           <div className="pt-2">
-            <div className="w-12 h-12 bg-gradient-to-tr from-emerald-600 to-sky-500 rounded-2xl mx-auto flex items-center justify-center shadow-lg shadow-emerald-950/60 font-bold text-white text-xl">
-              🔑
+            <div className="w-12 h-12 bg-gradient-to-tr from-emerald-600 to-sky-500 rounded-2xl mx-auto flex items-center justify-center shadow-lg shadow-emerald-950/60 font-bold text-white text-sm tracking-wider">
+              AUTH
             </div>
             <h1 className="text-xl sm:text-2xl font-extrabold text-white tracking-tight mt-3">
               {companyName && companyName !== BRANDING.defaultCompanyName
@@ -311,7 +311,6 @@ export default function LoginPage() {
         {/* Error Alert Message */}
         {errorMsg && (
           <div className="p-3.5 bg-rose-950/60 border border-rose-800/80 rounded-2xl text-rose-300 text-xs flex items-start gap-2.5 animate-fadeIn">
-            <span className="text-base leading-none">⚠️</span>
             <div className="flex-1 font-medium">{errorMsg}</div>
           </div>
         )}
@@ -360,7 +359,7 @@ export default function LoginPage() {
                 onClick={() => setShowPassword(!showPassword)}
                 className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-200 text-xs px-2 py-1 rounded transition"
               >
-                {showPassword ? "🙈 Sembunyi" : "👁️ Lihat"}
+                {showPassword ? "Sembunyikan" : "Lihat"}
               </button>
             </div>
           </div>
@@ -376,7 +375,7 @@ export default function LoginPage() {
                 <span>Memverifikasi Login...</span>
               </>
             ) : (
-              <span>Masuk Aplikasi →</span>
+              <span>Masuk Aplikasi</span>
             )}
           </button>
 
