@@ -174,6 +174,14 @@ export const LANDING_PAGE_SUBSECTIONS: CmsSubSectionConfig[] = [
       "Headline, subheadline, lencana, dan kartu statistik di bagian paling atas halaman. Judul yang dikosongkan memakai nama sekolah.",
     fields: [
       {
+        key: "landing.hero_image",
+        label: "Foto Latar Belakang Hero (Background Utama)",
+        type: "image",
+        placeholder: "Pilih foto kampus atau gedung sekolah",
+        description:
+          "Foto gedung atau kampus sekolah (rasio landscape 16:9). Bila dikosongkan, halaman menggunakan animasi gradien sekolah.",
+      },
+      {
         key: "landing.hero_badge",
         label: "Badge Pill Atas (Akreditasi & Nama Sekolah)",
         type: "text",
@@ -193,14 +201,6 @@ export const LANDING_PAGE_SUBSECTIONS: CmsSubSectionConfig[] = [
         rows: 3,
         placeholder:
           "Pendidikan holistik memadukan ketangguhan karakter moral, pengayaan kurikulum internasional, serta ekosistem pembelajaran modern berbasis riset dan teknologi masa depan.",
-      },
-      {
-        key: "landing.hero_image",
-        label: "Foto Latar Belakang Hero",
-        type: "image",
-        placeholder: "Pilih foto kampus atau gedung sekolah",
-        description:
-          "Foto gedung atau kampus sekolah (rasio landscape 16:9). Bila dikosongkan, halaman menggunakan animasi gradien sekolah.",
       },
     ],
   },
