@@ -1179,6 +1179,7 @@ export default function IdCardsPage() {
       color: type === "qr_code" ? "#000000" : "#ffffff",
       textAlign: "left",
       isUppercase: false,
+      isItalic: false,
       visible: true,
     };
     setTemplate({

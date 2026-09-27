@@ -50,6 +50,7 @@ import {
 function emptyForm(idRombel = "", idShift?: number): SiswaInput {
   return {
     id_siswa: "",
+    kode_karyawan: "",
     nama_lengkap: "",
     nis: "",
     nisn: "",
@@ -238,6 +239,7 @@ export default function SiswaMobilePage() {
   const handleEdit = useCallback((item: Record<string, unknown>) => {
     setForm({
       id_siswa: String(item.id_siswa ?? ""),
+      kode_karyawan: item.kode_karyawan ? String(item.kode_karyawan) : "",
       nama_lengkap: String(item.nama_lengkap ?? ""),
       nis: String(item.nis ?? ""),
       nisn: String(item.nisn ?? ""),
@@ -259,7 +261,7 @@ export default function SiswaMobilePage() {
     if (!canManage || isSubmittingRef.current) return;
     isSubmittingRef.current = true;
     try {
-      const hasil = await simpanSiswa(form);
+      const hasil = await simpanSiswa({ ...form, is_edit: isEditing });
       const peringatanFoto = isEditing
         ? null
         : await simpanFotoPersonilBaru(hasil.id_siswa, fotoBaru);
@@ -759,6 +761,15 @@ export default function SiswaMobilePage() {
                 Menyiapkan barcode...
               </div>
             )}
+            <div className="space-y-0.5 text-center font-mono text-xs">
+              <p className="text-sky-400">
+                ID Unik: {String(detail.id_siswa ?? "-")}
+              </p>
+              <p className="text-slate-400">
+                Kode Personil:{" "}
+                {String(detail.kode_karyawan ?? detail.nis ?? "-")}
+              </p>
+            </div>
             <p className="text-center text-[11px] text-slate-400">
               Pindai barcode ini di scanner gerbang saat masuk dan pulang.
             </p>
@@ -779,24 +790,40 @@ export default function SiswaMobilePage() {
             }}
             className="flex flex-col gap-3 py-1"
           >
-            <label className="text-[11px] font-semibold text-slate-300">
-              ID Unik
-              <input
-                value={form.id_siswa ?? ""}
-                readOnly={isEditing}
-                disabled={isEditing}
-                placeholder="Kosongkan untuk dibuatkan otomatis"
-                onChange={(e) =>
-                  setForm((p) => ({ ...p, id_siswa: e.target.value }))
-                }
-                className="mt-1 w-full rounded-xl border border-white/10 bg-slate-800/60 px-3 py-2 font-mono text-sm text-white outline-none focus:border-sky-500 disabled:cursor-not-allowed disabled:text-slate-400"
-              />
-              <span className="mt-1 block text-[10px] font-normal text-slate-500">
-                {isEditing
-                  ? "ID tidak dapat diubah; ia kunci absensi, kartu, nilai, dan QR yang sudah tercetak."
-                  : "Boleh diisi sendiri. Dikosongkan berarti dibuatkan sistem."}
-              </span>
-            </label>
+            <div className="grid grid-cols-2 gap-3">
+              <label className="text-[11px] font-semibold text-slate-300">
+                ID Unik
+                <input
+                  value={form.id_siswa ?? ""}
+                  readOnly={isEditing}
+                  disabled={isEditing}
+                  placeholder="Kosongkan untuk otomatis"
+                  onChange={(e) =>
+                    setForm((p) => ({ ...p, id_siswa: e.target.value }))
+                  }
+                  className="mt-1 w-full rounded-xl border border-white/10 bg-slate-800/60 px-3 py-2 font-mono text-sm text-white outline-none focus:border-sky-500 disabled:cursor-not-allowed disabled:text-slate-400"
+                />
+                <span className="mt-1 block text-[10px] font-normal text-slate-500">
+                  {isEditing
+                    ? "ID tidak dapat diubah; kunci absensi & QR."
+                    : "Boleh diisi sendiri. Kosongkan untuk otomatis."}
+                </span>
+              </label>
+              <label className="text-[11px] font-semibold text-slate-300">
+                Kode Personil
+                <input
+                  value={form.kode_karyawan ?? ""}
+                  placeholder="Kosongkan untuk otomatis (NIS/ID)"
+                  onChange={(e) =>
+                    setForm((p) => ({ ...p, kode_karyawan: e.target.value }))
+                  }
+                  className="mt-1 w-full rounded-xl border border-white/10 bg-slate-800/60 px-3 py-2 font-mono text-sm text-white outline-none focus:border-sky-500"
+                />
+                <span className="mt-1 block text-[10px] font-normal text-slate-500">
+                  Kode personil di data induk & kartu.
+                </span>
+              </label>
+            </div>
             <label className="text-[11px] font-semibold text-slate-300">
               Unit
               <select

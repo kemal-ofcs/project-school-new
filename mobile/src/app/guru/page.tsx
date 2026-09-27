@@ -230,7 +230,10 @@ export default function GuruMobilePage() {
     if (!canManage || isSubmittingRef.current) return;
     isSubmittingRef.current = true;
     try {
-      const hasil = await simpanGuru(form);
+      const hasil = await simpanGuru({
+        ...form,
+        is_edit: isEditing,
+      });
       const peringatanFoto = isEditing
         ? null
         : await simpanFotoPersonilBaru(hasil.id_guru, fotoBaru);
@@ -598,6 +601,15 @@ export default function GuruMobilePage() {
                 Menyiapkan barcode...
               </div>
             )}
+            <div className="text-center font-mono text-xs space-y-0.5">
+              <p className="text-sky-400">
+                ID Unik: {String(detail.id_guru ?? "-")}
+              </p>
+              <p className="text-slate-400">
+                Kode Karyawan:{" "}
+                {String(detail.kode_karyawan ?? detail.nip ?? "-")}
+              </p>
+            </div>
             <p className="text-center text-[11px] text-slate-400">
               Arahkan barcode ini ke kamera terminal pemindai saat tiba dan
               pulang.
@@ -619,24 +631,40 @@ export default function GuruMobilePage() {
             }}
             className="flex flex-col gap-3 py-1"
           >
-            <label className="text-[11px] font-semibold text-slate-300">
-              ID Unik
-              <input
-                value={form.id_guru ?? ""}
-                readOnly={isEditing}
-                disabled={isEditing}
-                placeholder="Kosongkan untuk dibuatkan otomatis"
-                onChange={(e) =>
-                  setForm((p) => ({ ...p, id_guru: e.target.value }))
-                }
-                className="mt-1 w-full rounded-xl border border-white/10 bg-slate-800/60 px-3 py-2 font-mono text-sm text-white outline-none focus:border-indigo-500 disabled:cursor-not-allowed disabled:text-slate-400"
-              />
-              <span className="mt-1 block text-[10px] font-normal text-slate-500">
-                {isEditing
-                  ? "ID tidak dapat diubah; ia kunci absensi, kartu, dan QR yang sudah tercetak."
-                  : "Boleh diisi sendiri. Dikosongkan berarti dibuatkan sistem."}
-              </span>
-            </label>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              <label className="text-[11px] font-semibold text-slate-300">
+                ID Unik
+                <input
+                  value={form.id_guru ?? ""}
+                  readOnly={isEditing}
+                  disabled={isEditing}
+                  placeholder="Kosongkan untuk dibuatkan otomatis"
+                  onChange={(e) =>
+                    setForm((p) => ({ ...p, id_guru: e.target.value }))
+                  }
+                  className="mt-1 w-full rounded-xl border border-white/10 bg-slate-800/60 px-3 py-2 font-mono text-sm text-white outline-none focus:border-indigo-500 disabled:cursor-not-allowed disabled:text-slate-400"
+                />
+                <span className="mt-1 block text-[10px] font-normal text-slate-500">
+                  {isEditing
+                    ? "ID tidak dapat diubah; kunci absensi & QR."
+                    : "Boleh diisi sendiri. Kosongkan untuk otomatis."}
+                </span>
+              </label>
+              <label className="text-[11px] font-semibold text-slate-300">
+                Kode Karyawan / PTK
+                <input
+                  value={form.kode_karyawan ?? ""}
+                  placeholder="Kosongkan untuk otomatis (NIP/ID)"
+                  onChange={(e) =>
+                    setForm((p) => ({ ...p, kode_karyawan: e.target.value }))
+                  }
+                  className="mt-1 w-full rounded-xl border border-white/10 bg-slate-800/60 px-3 py-2 font-mono text-sm text-white outline-none focus:border-indigo-500"
+                />
+                <span className="mt-1 block text-[10px] font-normal text-slate-500">
+                  Kode personil di data induk & kartu.
+                </span>
+              </label>
+            </div>
             <label className="text-[11px] font-semibold text-slate-300">
               Unit
               <select

@@ -39,6 +39,7 @@ export interface IdCardElement {
   color: string; // Hex color
   textAlign?: "left" | "center" | "right";
   isUppercase?: boolean;
+  isItalic?: boolean;
   visible?: boolean; // Default true, jika false maka elemen tidak dirender di kartu
 }
 

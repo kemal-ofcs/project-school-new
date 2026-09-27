@@ -606,6 +606,7 @@ async function renderSingleElement(
       : el.fontWeight === "600"
         ? "600"
         : "normal";
+  const fontStyle = el.isItalic ? "italic" : "normal";
 
   ctx.save();
 
@@ -713,7 +714,7 @@ async function renderSingleElement(
     }
 
     const font = (px: number) =>
-      `${fontWeight} ${px}px Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif`;
+      `${fontStyle} ${fontWeight} ${px}px Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif`;
     ctx.fillStyle = el.color || "#ffffff";
     ctx.font = font(fontSizePx);
     ctx.textAlign = el.textAlign || "left";
