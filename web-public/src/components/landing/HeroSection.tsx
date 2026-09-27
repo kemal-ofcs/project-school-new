@@ -58,10 +58,9 @@ export function HeroSection({
             alt=""
             className="h-full w-full object-cover object-center animate-ken-burns scale-105"
           />
-          {/* Lapisan Gradien Terkalibrasi untuk Menjamin Kontras Teks WCAG AA */}
-          <div className="absolute inset-0 bg-gradient-to-r from-primary/95 via-primary/85 to-primary/45" />
-          <div className="absolute inset-0 bg-gradient-to-t from-primary via-transparent to-primary/40" />
-          <div className="absolute inset-0 bg-radial from-transparent via-primary/40 to-primary/90" />
+          {/* Lapisan Gradien Elegan: Foto sekolah tetap jelas dan hidup, teks tetap kontras tajam */}
+          <div className="absolute inset-0 bg-gradient-to-r from-slate-950/75 via-slate-950/40 to-slate-950/15" />
+          <div className="absolute inset-0 bg-gradient-to-t from-primary/85 via-primary/20 to-transparent" />
         </div>
       ) : (
         <AuroraBackground />

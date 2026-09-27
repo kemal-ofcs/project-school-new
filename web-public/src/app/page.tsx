@@ -12,6 +12,13 @@ import { muatGelombangAktif } from "@/lib/server/pmb-data";
 import { muatProfilSekolah, muatProgramStudi } from "@/lib/server/school-data";
 import { namaTampil } from "@/lib/services/school-profile";
 
+/**
+ * Halaman utama beranda selalu dinamis agar perubahan konten dan foto latar
+ * yang diunggah dari CMS admin langsung tampil seketika tanpa tertahan cache.
+ */
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 export default async function Beranda() {
   // Pemuatan data paralel dari database Turso
   const [hasilProfil, hasilProgram, hasilGelombang, hasilKonten] =

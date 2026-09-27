@@ -47,7 +47,7 @@ export function HeroImageUploader({
         fit: "contain",
       });
 
-      if (dataUrl.length > 650_000) {
+      if (dataUrl.length > 2_000_000) {
         setError(
           "Gambar masih terlalu besar setelah dikompres. Silakan pilih foto dengan resolusi lebih rendah.",
         );
@@ -100,23 +100,33 @@ export function HeroImageUploader({
 
       {/* Pratinjau Gambar atau Banner Status Kosong */}
       {hasImage ? (
-        <div className="relative aspect-video w-full max-w-md overflow-hidden rounded-xl border border-white/15 shadow-md">
-          {/* biome-ignore lint/performance/noImgElement: user uploaded data url preview */}
-          <img
-            src={value || ""}
-            alt="Pratinjau Foto Latar Hero"
-            className="h-full w-full object-cover"
-          />
-          {/* Gradien Pelindung Kontras Simulasi Hero */}
-          <div className="absolute inset-0 bg-gradient-to-r from-slate-950/85 via-slate-950/50 to-transparent flex items-end p-3">
-            <div className="space-y-0.5">
-              <span className="inline-block rounded-md bg-sky-500/80 px-1.5 py-0.5 text-[9px] font-bold text-slate-950">
-                Pratinjau Hero
-              </span>
-              <p className="text-xs font-bold text-white drop-shadow-sm">
-                Efek gradien melindungi kontras teks
-              </p>
+        <div className="space-y-2">
+          <div className="relative aspect-video w-full max-w-md overflow-hidden rounded-xl border border-white/15 shadow-md">
+            {/* biome-ignore lint/performance/noImgElement: user uploaded data url preview */}
+            <img
+              src={value || ""}
+              alt="Pratinjau Foto Latar Hero"
+              className="h-full w-full object-cover"
+            />
+            {/* Gradien Pelindung Kontras Simulasi Hero */}
+            <div className="absolute inset-0 bg-gradient-to-r from-slate-950/75 via-slate-950/40 to-transparent flex items-end p-3">
+              <div className="space-y-0.5">
+                <span className="inline-block rounded-md bg-sky-500/80 px-1.5 py-0.5 text-[9px] font-bold text-slate-950">
+                  Pratinjau Hero
+                </span>
+                <p className="text-xs font-bold text-white drop-shadow-sm">
+                  Gradien transparan melindungi kontras teks
+                </p>
+              </div>
             </div>
+          </div>
+          <div className="flex items-center gap-2 rounded-xl bg-sky-500/10 p-2.5 text-xs text-sky-300 border border-sky-500/20 max-w-md">
+            <Icon name="check" className="size-4 shrink-0 text-sky-400" />
+            <span>
+              Foto siap disimpan. Jangan lupa klik tombol{" "}
+              <strong>&quot;Simpan Perubahan Bagian Ini&quot;</strong> di bawah
+              form!
+            </span>
           </div>
         </div>
       ) : (
