@@ -409,13 +409,19 @@ html.light .bg-white\/\[0\.05\] {
   border-color: #e2e8f0 !important;
 }
 
-/* 4. Segmented Tab Switchers (Dashboard, Scanner, Riwayat) */
+/* 4. Segmented Tab Switchers (Dashboard, Scanner, Riwayat, CMS Sub-tabs) */
 html[data-theme="light"] .bg-slate-900\/60,
 html[data-theme="light"] .bg-slate-950\/60,
+html[data-theme="light"] .bg-slate-800\/60,
 html[data-theme="light"] div.bg-slate-950.p-1\.5.rounded-2xl,
+html[data-theme="light"] div.rounded-2xl.bg-slate-900\/60,
+html[data-theme="light"] div.rounded-2xl.bg-slate-800\/60,
 html.light .bg-slate-900\/60,
 html.light .bg-slate-950\/60,
-html.light div.bg-slate-950.p-1\.5.rounded-2xl {
+html.light .bg-slate-800\/60,
+html.light div.bg-slate-950.p-1\.5.rounded-2xl,
+html.light div.rounded-2xl.bg-slate-900\/60,
+html.light div.rounded-2xl.bg-slate-800\/60 {
   background-color: #f1f5f9 !important;
   border-color: #e2e8f0 !important;
 }
@@ -424,9 +430,11 @@ html.light div.bg-slate-950.p-1\.5.rounded-2xl {
 html[data-theme="light"] button.bg-gradient-to-r.from-sky-600,
 html[data-theme="light"] div.bg-slate-950 button.bg-sky-500,
 html[data-theme="light"] div.bg-slate-900\/60 button.bg-sky-500,
+html[data-theme="light"] div.bg-slate-800\/60 button.bg-sky-500,
 html.light button.bg-gradient-to-r.from-sky-600,
 html.light div.bg-slate-950 button.bg-sky-500,
-html.light div.bg-slate-900\/60 button.bg-sky-500 {
+html.light div.bg-slate-900\/60 button.bg-sky-500,
+html.light div.bg-slate-800\/60 button.bg-sky-500 {
   background: linear-gradient(to right, #0284c7, #0ea5e9) !important;
   color: #ffffff !important;
   box-shadow: 0 2px 8px rgba(2, 132, 199, 0.25) !important;
@@ -435,9 +443,11 @@ html.light div.bg-slate-900\/60 button.bg-sky-500 {
 html[data-theme="light"] button.bg-gradient-to-r.from-sky-600 *,
 html[data-theme="light"] div.bg-slate-950 button.bg-sky-500 *,
 html[data-theme="light"] div.bg-slate-900\/60 button.bg-sky-500 *,
+html[data-theme="light"] div.bg-slate-800\/60 button.bg-sky-500 *,
 html.light button.bg-gradient-to-r.from-sky-600 *,
 html.light div.bg-slate-950 button.bg-sky-500 *,
-html.light div.bg-slate-900\/60 button.bg-sky-500 * {
+html.light div.bg-slate-900\/60 button.bg-sky-500 *,
+html.light div.bg-slate-800\/60 button.bg-sky-500 * {
   color: #ffffff !important;
 }
 
@@ -445,26 +455,38 @@ html.light div.bg-slate-900\/60 button.bg-sky-500 * {
 html[data-theme="light"] .bg-slate-900\/60
   button:not(.bg-gradient-to-r):not(.bg-sky-500),
 html[data-theme="light"]
+  .bg-slate-800\/60
+  button:not(.bg-gradient-to-r):not(.bg-sky-500),
+html[data-theme="light"]
   div.bg-slate-950
   button:not(.bg-gradient-to-r):not(.bg-sky-500),
 html.light .bg-slate-900\/60 button:not(.bg-gradient-to-r):not(.bg-sky-500),
+html.light .bg-slate-800\/60 button:not(.bg-gradient-to-r):not(.bg-sky-500),
 html.light div.bg-slate-950 button:not(.bg-gradient-to-r):not(.bg-sky-500) {
   color: #475569 !important;
+  background-color: transparent !important;
 }
 html[data-theme="light"]
   .bg-slate-900\/60
   button:not(.bg-gradient-to-r):not(.bg-sky-500):hover,
 html[data-theme="light"]
+  .bg-slate-800\/60
+  button:not(.bg-gradient-to-r):not(.bg-sky-500):hover,
+html[data-theme="light"]
   div.bg-slate-950
   button:not(.bg-gradient-to-r):not(.bg-sky-500):hover,
 html.light
   .bg-slate-900\/60
   button:not(.bg-gradient-to-r):not(.bg-sky-500):hover,
 html.light
+  .bg-slate-800\/60
+  button:not(.bg-gradient-to-r):not(.bg-sky-500):hover,
+html.light
   div.bg-slate-950
   button:not(.bg-gradient-to-r):not(.bg-sky-500):hover {
   color: #0f172a !important;
-  background-color: #e2e8f0 !important;
+  background-color: #ffffff !important;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.08) !important;
 }
 
 /* 5. General Hover & Active States (No dark gray/black hovers) */
@@ -1016,15 +1038,32 @@ html.light .text-rose-400 {
 /* 10. Borders & Dividers */
 html[data-theme="light"] .border-slate-800,
 html[data-theme="light"] .border-slate-700,
+html[data-theme="light"] .border-white\/5,
 html[data-theme="light"] .border-white\/10,
 html[data-theme="light"] .border-white\/15,
 html[data-theme="light"] .border-white\/20,
 html.light .border-slate-800,
 html.light .border-slate-700,
+html.light .border-white\/5,
 html.light .border-white\/10,
 html.light .border-white\/15,
 html.light .border-white\/20 {
   border-color: #e2e8f0 !important;
+}
+
+/* Horizontal Underline Tabs (.border-b-2) */
+html[data-theme="light"] button.border-sky-400,
+html.light button.border-sky-400 {
+  border-color: #0284c7 !important;
+  color: #0284c7 !important;
+}
+html[data-theme="light"] button.border-transparent.text-slate-400,
+html.light button.border-transparent.text-slate-400 {
+  color: #64748b !important;
+}
+html[data-theme="light"] button.border-transparent.text-slate-400:hover,
+html.light button.border-transparent.text-slate-400:hover {
+  color: #0f172a !important;
 }
 
 html[data-theme="light"] .divide-slate-800\/60,

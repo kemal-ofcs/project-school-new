@@ -149,7 +149,7 @@ export function PageContentManager() {
 
       {/* Sub-tab Switcher Khusus Landing Page */}
       {activeTab === "landing" && (
-        <div className="flex flex-wrap gap-2 p-1.5 rounded-2xl bg-slate-800/60 border border-white/5">
+        <div className="flex flex-wrap gap-2 p-1.5 rounded-2xl bg-slate-900/60 border border-white/10">
           {LANDING_PAGE_SUBSECTIONS.map((sub) => (
             <button
               key={sub.id}
@@ -239,9 +239,6 @@ export function PageContentManager() {
                       className="w-full rounded-xl border border-white/10 bg-slate-800/90 px-4 py-2.5 text-sm text-white focus:border-sky-400 focus:outline-none disabled:opacity-60"
                     />
                   )}
-                  <p className="mt-1 text-[11px] font-mono text-slate-500">
-                    Kunci database: {field.key}
-                  </p>
                 </div>
               );
             })}
