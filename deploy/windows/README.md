@@ -12,12 +12,13 @@ yang sama dengan server.
 1. Ekstrak folder ini ke lokasi tetap, misalnya `C:\ManajemenSekolah`. Jangan
    menjalankannya dari dalam berkas zip.
 2. Salin `.env.example` menjadi `.env`, lalu isi `KOS_SITE_ADDRESS`,
-   `KOS_PUBLIC_ADDRESS`, dan `KOS_SETUP_TOKEN`.
+   `KOS_PUBLIC_ADDRESS`, dan `KOS_SETUP_TOKEN`. Lisensi tidak diisi di sini.
 3. Klik dua kali `Mulai.cmd`. Bila Windows Firewall bertanya, izinkan akses
    untuk jaringan privat.
 4. Buka `https://<KOS_SITE_ADDRESS>/setup` di browser. Halaman itu menampilkan
    kode server, berawalan `S-`. Kirim kode itu kepada Kemal Office Studio untuk
-   mendapatkan lisensi.
+   mendapatkan lisensi. Alamat yang diketik dengan `http://` dialihkan sendiri
+   ke `https://`.
 5. Setelah lisensi diterima, kembali ke `/setup`: isi token, data akun
    Superadmin, dan tempel teks lisensinya.
 6. Cetak atau salin delapan kode pemulihan yang tampil. Kode itu hanya tampil
@@ -46,7 +47,8 @@ server database (libSQL di komputer lain dalam jaringan, atau Turso).
 ## Peringatan sertifikat
 
 Server membuat sertifikat HTTPS-nya sendiri, sehingga browser menampilkan
-peringatan pada kunjungan pertama. Ada dua cara menanganinya:
+peringatan pada kunjungan pertama di setiap komputer dan HP. Ada dua cara
+menanganinya:
 
 - Lanjutkan lewat peringatan itu di setiap perangkat.
 - Pasang sertifikat akar server di setiap perangkat supaya peringatannya
@@ -88,8 +90,15 @@ tempat lain, lalu jalankan `Mulai.cmd` lagi.
   yang kurang.
 - Halaman tidak terbuka: lihat berkas di folder `log`. `proxy.log` untuk
   HTTPS, `admin.log` untuk aplikasi admin, `situs.log` untuk situs publik.
-- Port 443 sudah dipakai program lain: beri `KOS_SITE_ADDRESS` port sendiri,
-  misalnya `192.168.1.10:9443`.
-- Port 80 sudah dipakai program lain (misalnya IIS): `proxy.log` menyebut
-  port itu. Hentikan program tersebut, karena proxy memakai port 80 untuk
-  mengalihkan alamat `http://` ke `https://`.
+- `Mulai.cmd` melapor "Port 443 sudah dipakai program lain": di komputer
+  operator sekolah, port itu sering sudah dipakai Aplikasi Dapodik. Beri
+  `KOS_SITE_ADDRESS` port sendiri, misalnya `192.168.1.10:9443`, lalu buka
+  aplikasi di `https://192.168.1.10:9443`.
+- Alamat admin menampilkan halaman program lain (misalnya "Forbidden" dari
+  Apache): penyebabnya sama, port 443 dipakai program itu. Jalan keluarnya
+  sama dengan butir di atas.
+- `Mulai.cmd` melapor port 80 sudah dipakai: aplikasi tetap menyala, tetapi
+  alamat yang tidak memakai port harus diketik lengkap dengan `https://`.
+- Terbuka di server tetapi tidak di komputer atau HP lain: pastikan perangkat
+  itu di jaringan yang sama, lalu izinkan `runtime\caddy.exe` di Windows
+  Firewall untuk jaringan privat.

@@ -20,6 +20,7 @@ import {
   rmSync,
   writeFileSync,
 } from "node:fs";
+import net from "node:net";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { parseEnv } from "node:util";
@@ -30,6 +31,11 @@ const exe = process.platform === "win32" ? ".exe" : "";
 /** Alamat tanpa port, untuk sertifikat: `192.168.1.10:8443` menjadi `192.168.1.10`. */
 function tanpaPort(alamat) {
   return alamat.replace(/:\d+$/, "");
+}
+
+/** Port HTTPS sebuah alamat; tanpa port berarti 443. */
+function portDari(alamat) {
+  return Number(alamat.match(/:(\d+)$/)?.[1] ?? 443);
 }
 
 /**
@@ -85,6 +91,25 @@ export function susunLingkungan(isian, akar) {
     alamatAdmin,
     alamatSitus,
     databaseUrl,
+    // Port yang harus kosong sebelum menyala, beserta jalan keluarnya.
+    portWajib: [
+      {
+        port: portDari(alamatAdmin),
+        saran: `Beri KOS_SITE_ADDRESS port sendiri, misalnya ${tanpaPort(alamatAdmin)}:9443.`,
+      },
+      {
+        port: portDari(alamatSitus),
+        saran: `Beri KOS_PUBLIC_ADDRESS port lain, misalnya ${tanpaPort(alamatSitus)}:9444.`,
+      },
+      {
+        port: Number(portAdmin),
+        saran: "Ganti KOS_PORT_ADMIN dengan port lain.",
+      },
+      {
+        port: Number(portSitus),
+        saran: "Ganti KOS_PORT_SITUS dengan port lain.",
+      },
+    ],
     memakaiBerkas: databaseUrl.startsWith("file:"),
     admin: { ...dasar, PORT: portAdmin },
     situs: {
@@ -111,13 +136,39 @@ function prosesHidup(pid) {
   try {
     process.kill(pid, 0);
     return true;
-  } catch {
-    // Sinyal 0 hanya menanyakan keberadaan proses; galat berarti tidak ada.
-    return false;
+  } catch (galat) {
+    // Sinyal 0 hanya menanyakan keberadaan proses. EPERM berarti prosesnya ADA
+    // tetapi milik akun lain: peluncur yang dijalankan otomatis oleh Windows
+    // berjalan sebagai SYSTEM, dan tanpa cabang ini klik pada Mulai.cmd
+    // menyalakan peluncur kedua di atasnya.
+    return galat.code === "EPERM";
   }
 }
 
-function utama() {
+/**
+ * Adakah program yang sudah menjawab di port ini?
+ *
+ * Diperiksa dengan MENYAMBUNG, bukan dengan mencoba mendengarkan. Di Windows,
+ * program kedua bisa berhasil mendengarkan di port yang sudah dipakai (Apache
+ * mengizinkannya), tanpa galat apa pun, sementara semua sambungan tetap jatuh
+ * ke program pertama. Caddy mengalaminya persis begitu: log-nya bersih dan
+ * alamat admin menampilkan halaman milik program lain.
+ */
+function portTerpakai(port) {
+  return new Promise((selesai) => {
+    const soket = net.connect({ port, host: "127.0.0.1" });
+    const jawab = (terpakai) => {
+      soket.destroy();
+      selesai(terpakai);
+    };
+    soket.setTimeout(1000);
+    soket.once("connect", () => jawab(true));
+    soket.once("error", () => jawab(false));
+    soket.once("timeout", () => jawab(false));
+  });
+}
+
+async function utama() {
   const berkasEnv = path.join(root, ".env");
   if (!existsSync(berkasEnv)) {
     console.error(
@@ -141,14 +192,9 @@ function utama() {
   console.log(
     `  Database       : ${susunan.memakaiBerkas ? "berkas di folder data (Web saja)" : "server database dari .env"}`,
   );
-  if (process.argv.includes("--periksa")) {
-    console.log("\nBerkas .env sah. Tidak ada yang dijalankan (--periksa).");
-    return;
-  }
 
-  mkdirSync(path.join(root, "data"), { recursive: true });
-  mkdirSync(path.join(root, "log"), { recursive: true });
-
+  // Diperiksa lebih dulu: bila aplikasi ini sendiri sedang berjalan, port-nya
+  // memang terpakai dan itu bukan bentrokan.
   const berkasPid = path.join(root, "data", "mulai.pid");
   if (existsSync(berkasPid)) {
     const lama = Number(readFileSync(berkasPid, "utf8").trim());
@@ -159,6 +205,41 @@ function utama() {
       process.exit(1);
     }
   }
+
+  const bentrok = new Map();
+  for (const { port, saran } of susunan.portWajib) {
+    if (!bentrok.has(port) && (await portTerpakai(port))) {
+      bentrok.set(port, saran);
+    }
+  }
+  if (bentrok.size > 0) {
+    console.error("\nPort berikut sudah dipakai program lain di komputer ini:");
+    for (const [port, saran] of bentrok) {
+      console.error(`  - Port ${port}. ${saran}`);
+    }
+    console.error(
+      "Port 443 sering sudah dipakai Aplikasi Dapodik. Ubah berkas .env, lalu jalankan lagi.",
+    );
+    process.exit(1);
+  }
+  // Port 80 hanya dipakai untuk mengalihkan `http://` ke `https://`. Bila sudah
+  // dipakai program lain, pengalihan itu dimatikan dan aplikasi tetap menyala.
+  if (await portTerpakai(80)) {
+    susunan.proxy.KOS_AUTO_HTTPS = "auto_https disable_redirects";
+    console.log(
+      "\nPort 80 sudah dipakai program lain. Alamat yang tidak memakai port wajib diketik dengan https://.",
+    );
+  }
+
+  if (process.argv.includes("--periksa")) {
+    console.log(
+      "\nBerkas .env sah dan port-nya kosong. Tidak ada yang dijalankan (--periksa).",
+    );
+    return;
+  }
+
+  mkdirSync(path.join(root, "data"), { recursive: true });
+  mkdirSync(path.join(root, "log"), { recursive: true });
   writeFileSync(berkasPid, String(process.pid), "utf8");
 
   const node = path.join(root, "runtime", `node${exe}`);
@@ -248,5 +329,5 @@ if (
   process.argv[1] &&
   path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)
 ) {
-  utama();
+  await utama();
 }
