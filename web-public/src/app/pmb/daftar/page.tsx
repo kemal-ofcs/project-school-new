@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
+import { headers } from "next/headers";
 import Link from "next/link";
 import { StatusTidakTerbaca } from "@/components/StatusData";
+import { HEADER_LISENSI } from "@/lib/server/license-gate";
 import { muatGelombangAktif } from "@/lib/server/pmb-data";
 import { muatProgramStudi } from "@/lib/server/school-data";
 import { FormPendaftaran } from "./FormPendaftaran";
@@ -21,6 +23,35 @@ export const metadata: Metadata = {
 export const revalidate = 0;
 
 export default async function HalamanDaftar() {
+  // Diperiksa SEBELUM formulir dirender, dengan alasan yang sama seperti
+  // `revalidate = 0` di atas: orang yang mengisi seluruh formulir dan
+  // mengunggah berkasnya tidak boleh baru tahu di akhir bahwa pendaftarannya
+  // tidak diterima. Pesannya tidak menyebut alasan; lihat `license-gate.ts`.
+  if ((await headers()).get(HEADER_LISENSI) === "baca-saja") {
+    return (
+      <main className="mx-auto max-w-3xl px-6 py-14">
+        <h1 className="font-semibold text-3xl">Formulir Pendaftaran</h1>
+        <div className="mt-6 rounded-lg border border-garis bg-latar-lembut p-5">
+          <p className="font-medium">
+            Pendaftaran online sedang ditutup sementara.
+          </p>
+          <p className="mt-2 text-sm text-teks-lembut leading-relaxed">
+            Silakan hubungi sekolah untuk mendaftar. Informasi jalur dan jadwal
+            tetap bisa dibaca di halaman{" "}
+            <Link className="text-aksen hover:underline" href="/pmb">
+              Pendaftaran
+            </Link>
+            , dan alamat serta nomor sekolah ada di halaman{" "}
+            <Link className="text-aksen hover:underline" href="/kontak">
+              Kontak
+            </Link>
+            .
+          </p>
+        </div>
+      </main>
+    );
+  }
+
   const [gelombang, program] = await Promise.all([
     muatGelombangAktif(),
     muatProgramStudi(),

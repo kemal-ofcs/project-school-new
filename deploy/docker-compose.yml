@@ -1,0 +1,96 @@
+# ==============================================================================
+# Manajemen Sekolah, pemasangan di server sendiri.
+#
+# Empat layanan: database (libSQL), aplikasi admin, situs publik sekolah, dan
+# proxy HTTPS.
+# Isi berkas `.env` di folder ini lebih dulu (salin dari `.env.example`),
+# lalu jalankan:  docker compose up -d
+# ==============================================================================
+
+services:
+  # Database. Datanya tersimpan di ./data/database, dan folder itulah yang
+  # perlu dicadangkan.
+  database:
+    image: ghcr.io/tursodatabase/libsql-server:latest
+    container_name: sekolah-database
+    restart: unless-stopped
+    volumes:
+      - ./data/database:/var/lib/sqld
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8080/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    # Port database SENGAJA tidak dibuka. Tanpa autentikasi, siapa pun di
+    # jaringan yang sama bisa membaca dan mengubah seluruh data langsung dari
+    # database, melewati login dan hak akses aplikasi.
+    #
+    # Buka hanya bila aplikasi Desktop atau Mobile ikut memakai database ini,
+    # dan pasang autentikasinya lebih dulu:
+    # environment:
+    #   - SQLD_AUTH_JWT_KEY=<kunci publik Ed25519>
+    # ports:
+    #   - "8080:8080"
+
+  # Aplikasi admin. Tidak membuka port sendiri: semua akses lewat proxy di bawah.
+  web:
+    image: ${KOS_WEB_IMAGE:?Isi KOS_WEB_IMAGE di berkas .env}
+    container_name: sekolah-web
+    restart: unless-stopped
+    depends_on:
+      database:
+        condition: service_healthy
+    environment:
+      - KOS_DATABASE_PROVIDER=self_hosted
+      - KOS_DATABASE_URL=http://database:8080
+      - KOS_DATABASE_AUTH_TOKEN=${KOS_DATABASE_AUTH_TOKEN:-}
+      # Aplikasi menolak HTTP polos ke alamat yang bukan jaringan privat, dan
+      # nama layanan Docker tidak ia kenali sebagai privat. Izin ini aman di
+      # sini karena lalu lintasnya tidak pernah keluar dari jaringan internal
+      # Docker di mesin yang sama.
+      - KOS_ALLOW_INSECURE_DATABASE=1
+      # Satu proxy (Caddy) di depan aplikasi.
+      - KOS_TRUSTED_PROXY_HOPS=1
+      - KOS_SETUP_TOKEN=${KOS_SETUP_TOKEN:-}
+
+  # Situs publik sekolah: halaman profil, berita, pendaftaran, dan portal wali.
+  # Membaca database yang sama dengan aplikasi admin dan tidak pernah membuat
+  # tabel sendiri, jadi aplikasi admin harus sudah dibuka sekali lebih dulu.
+  public:
+    image: ${KOS_PUBLIC_IMAGE:?Isi KOS_PUBLIC_IMAGE di berkas .env}
+    container_name: sekolah-situs
+    restart: unless-stopped
+    depends_on:
+      database:
+        condition: service_healthy
+    environment:
+      - KOS_DATABASE_PROVIDER=self_hosted
+      - KOS_DATABASE_URL=http://database:8080
+      - KOS_DATABASE_AUTH_TOKEN=${KOS_DATABASE_AUTH_TOKEN:-}
+      - KOS_ALLOW_INSECURE_DATABASE=1
+      - KOS_TRUSTED_PROXY_HOPS=1
+      # Alamat resmi situs, dipakai sitemap dan robots.
+      - KOS_SITE_URL=https://${KOS_PUBLIC_ADDRESS:?Isi KOS_PUBLIC_ADDRESS di berkas .env}
+
+  # Proxy HTTPS. Browser hanya mengizinkan kamera (pemindai QR, foto bukti) dan
+  # cookie login yang aman lewat HTTPS, jadi aplikasi tidak dibuka lewat HTTP.
+  proxy:
+    image: caddy:2-alpine
+    container_name: sekolah-proxy
+    restart: unless-stopped
+    depends_on:
+      - web
+      - public
+    ports:
+      - "80:80"
+      - "443:443"
+      # Dipakai situs publik pada pemasangan jaringan lokal, saat aplikasi admin
+      # dan situs berbagi satu alamat IP (lihat KOS_PUBLIC_ADDRESS di .env).
+      - "8443:8443"
+    environment:
+      - KOS_SITE_ADDRESS=${KOS_SITE_ADDRESS:?Isi KOS_SITE_ADDRESS di berkas .env}
+      - KOS_PUBLIC_ADDRESS=${KOS_PUBLIC_ADDRESS:?Isi KOS_PUBLIC_ADDRESS di berkas .env}
+      - KOS_TLS=${KOS_TLS:-internal}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./data/caddy:/data

@@ -1,6 +1,10 @@
 import type { MetadataRoute } from "next";
 import { resolveSiteUrl } from "@/lib/server/site-url";
 
+// Disusun per permintaan. Bila dibekukan saat build, alamatnya ikut membeku
+// pada nilai di mesin build, dan image yang sama dipakai banyak sekolah.
+export const dynamic = "force-dynamic";
+
 /**
  * `/wali` dan `/pmb/status` dilarang di-crawl sejak sekarang, sebelum keduanya
  * ada.

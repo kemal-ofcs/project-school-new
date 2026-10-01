@@ -1971,14 +1971,21 @@ html.light .bootstrap-input-readonly {
 }
 
 /* Submit & Cancel Buttons */
+/* `button.` wajib ikut: aturan umum `button.bg-sky-400` lebih spesifik daripada
+   kelas saja, sehingga tanpa itu tombol ini tetap #0284c7 (putih di atasnya
+   4,10:1, di bawah 4,5:1). Putih di atas #0369a1 = 5,93:1. */
 html[data-theme="light"] .bootstrap-btn-submit,
-html.light .bootstrap-btn-submit {
-  background-color: #0284c7 !important;
+html.light .bootstrap-btn-submit,
+html[data-theme="light"] button.bootstrap-btn-submit,
+html.light button.bootstrap-btn-submit {
+  background-color: #0369a1 !important;
   color: #ffffff !important;
 }
 html[data-theme="light"] .bootstrap-btn-submit:hover:not(:disabled),
-html.light .bootstrap-btn-submit:hover:not(:disabled) {
-  background-color: #0369a1 !important;
+html.light .bootstrap-btn-submit:hover:not(:disabled),
+html[data-theme="light"] button.bootstrap-btn-submit:hover:not(:disabled),
+html.light button.bootstrap-btn-submit:hover:not(:disabled) {
+  background-color: #075985 !important;
 }
 html[data-theme="light"] .bootstrap-btn-cancel,
 html.light .bootstrap-btn-cancel {

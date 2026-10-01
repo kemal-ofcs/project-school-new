@@ -129,11 +129,18 @@ docker run -p 8080:8080 -v $PWD/data:/var/lib/sqld ghcr.io/tursodatabase/libsql-
 Untuk build **Web**, database ditentukan lewat environment server:
 
 ```bash
-TURSO_DATABASE_URL=libsql://nama-db.turso.io
-TURSO_AUTH_TOKEN=...
-SPPG_DATABASE_PROVIDER=turso          # atau self_hosted
-SPPG_ALLOW_INSECURE_DATABASE=0        # 1 hanya bila Anda menerima risikonya
+KOS_DATABASE_URL=libsql://nama-db.turso.io
+KOS_DATABASE_AUTH_TOKEN=...
+KOS_DATABASE_PROVIDER=turso          # atau self_hosted
+KOS_ALLOW_INSECURE_DATABASE=0        # 1 hanya bila Anda menerima risikonya
 ```
+
+Nama lama (`TURSO_DATABASE_URL`, `TURSO_AUTH_TOKEN`, `SPPG_DATABASE_*`) masih
+dibaca; bila keduanya diisi, nama `KOS_` yang dipakai.
+
+Untuk memasang Web di server sendiri tanpa source code, lihat
+[deploy/README.md](deploy/README.md). Image-nya dibangun dari
+`web-desktop/Dockerfile`.
 
 ---
 

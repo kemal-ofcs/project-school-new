@@ -5,14 +5,22 @@ import {
 } from "@/lib/validations/database-endpoint";
 
 export interface ServerDatabaseEnvironment {
+  /**
+   * Nama yang dipakai pemasangan baru. Bila diisi, ia MENANG atas dua nama
+   * lama di bawah, yang tetap dibaca supaya `.env` yang sudah beredar tidak
+   * perlu disunting.
+   */
+  KOS_DATABASE_URL?: string;
+  KOS_DATABASE_AUTH_TOKEN?: string;
+  /** `turso` (default) atau `self_hosted` untuk server libSQL sendiri. */
+  KOS_DATABASE_PROVIDER?: string;
+  /** Izin eksplisit memakai HTTP polos ke alamat publik. */
+  KOS_ALLOW_INSECURE_DATABASE?: string;
   TURSO_DATABASE_URL?: string;
   TURSO_AUTH_TOKEN?: string;
-  /** Alias yang lebih netral, dipakai turunan template non-Turso. */
   SPPG_DATABASE_URL?: string;
   SPPG_DATABASE_AUTH_TOKEN?: string;
-  /** `turso` (default) atau `self_hosted` untuk server libSQL sendiri. */
   SPPG_DATABASE_PROVIDER?: string;
-  /** Izin eksplisit memakai HTTP polos ke alamat publik. */
   SPPG_ALLOW_INSECURE_DATABASE?: string;
   NODE_ENV?: string;
 }
@@ -42,13 +50,19 @@ export function resolveServerDatabaseConfig(
   environment: ServerDatabaseEnvironment,
 ): ServerDatabaseConfig {
   const url = (
-    environment.TURSO_DATABASE_URL ?? environment.SPPG_DATABASE_URL
+    environment.KOS_DATABASE_URL ??
+    environment.TURSO_DATABASE_URL ??
+    environment.SPPG_DATABASE_URL
   )?.trim();
   const authToken = (
-    environment.TURSO_AUTH_TOKEN ?? environment.SPPG_DATABASE_AUTH_TOKEN
+    environment.KOS_DATABASE_AUTH_TOKEN ??
+    environment.TURSO_AUTH_TOKEN ??
+    environment.SPPG_DATABASE_AUTH_TOKEN
   )?.trim();
   const provider = normalizeProvider(
-    environment.SPPG_DATABASE_PROVIDER?.trim(),
+    (
+      environment.KOS_DATABASE_PROVIDER ?? environment.SPPG_DATABASE_PROVIDER
+    )?.trim(),
   );
 
   // Sisi Web SELALU memakai database remote — Turso Cloud atau libSQL
@@ -59,10 +73,13 @@ export function resolveServerDatabaseConfig(
   // aturan keamanan alamat.
   if (provider === "local_file") {
     throw new Error(
-      "SPPG_DATABASE_PROVIDER=local_file hanya berlaku untuk aplikasi Desktop/Mobile. Sisi Web memerlukan database remote (Turso atau libSQL self-hosted).",
+      "KOS_DATABASE_PROVIDER=local_file hanya berlaku untuk aplikasi Desktop/Mobile. Sisi Web memerlukan database remote (Turso atau libSQL self-hosted).",
     );
   }
-  const allowInsecure = isTruthyFlag(environment.SPPG_ALLOW_INSECURE_DATABASE);
+  const allowInsecure = isTruthyFlag(
+    environment.KOS_ALLOW_INSECURE_DATABASE ??
+      environment.SPPG_ALLOW_INSECURE_DATABASE,
+  );
   const isProduction = environment.NODE_ENV === "production";
 
   if (url) {
@@ -72,7 +89,7 @@ export function resolveServerDatabaseConfig(
       const endpoint = reviewDatabaseEndpoint(url, provider, allowInsecure);
       if (!endpoint.valid) {
         throw new Error(
-          `TURSO_DATABASE_URL tidak dapat dipakai: ${endpoint.issue?.message ?? "alamat tidak valid."}`,
+          `Alamat database tidak dapat dipakai: ${endpoint.issue?.message ?? "alamat tidak valid."}`,
         );
       }
       // Turso terkelola selalu wajib token. Server sendiri hanya wajib bila
@@ -80,7 +97,7 @@ export function resolveServerDatabaseConfig(
       // jaringan privat lazim berjalan tanpa autentikasi sama sekali.
       if (isProduction && endpoint.tokenRequired && !authToken) {
         throw new Error(
-          "TURSO_AUTH_TOKEN wajib tersedia untuk database remote production.",
+          "KOS_DATABASE_AUTH_TOKEN atau TURSO_AUTH_TOKEN wajib tersedia untuk database remote production.",
         );
       }
     }
@@ -95,7 +112,7 @@ export function resolveServerDatabaseConfig(
 
   if (isProduction) {
     throw new Error(
-      "TURSO_DATABASE_URL wajib tersedia pada environment server production.",
+      "KOS_DATABASE_URL atau TURSO_DATABASE_URL wajib tersedia pada environment server production.",
     );
   }
 

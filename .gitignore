@@ -51,4 +51,4 @@ graphify-out/
 
 # local MCP keys
 .vscode/mcp.json
-.agents/mcp_config.json
+.agents/mcp_config.json

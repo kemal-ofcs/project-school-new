@@ -13,7 +13,8 @@ import { useAuth } from "@/lib/context/AuthContext";
 import {
   type BootstrapStatus,
   getBootstrapStatus,
-  getWebProvisioningHint,
+  getWebProvisioningStatus,
+  type WebProvisioningStatus,
 } from "@/lib/gateways/bootstrap";
 import { isLicenseBlocking } from "@/lib/gateways/license";
 import { useAppName } from "@/lib/hooks/useAppName";
@@ -21,6 +22,7 @@ import { useCompanyName } from "@/lib/hooks/useCompanyName";
 import { useHydrated } from "@/lib/hooks/useHydrated";
 import { useLicenseStatus } from "@/lib/hooks/useLicenseStatus";
 import { useOnlineStatus } from "@/lib/hooks/useOnlineStatus";
+import { isDesktopRuntime } from "@/lib/runtime/app-runtime";
 
 export default function LoginPage() {
   const isHydrated = useHydrated();
@@ -61,7 +63,7 @@ export default function LoginPage() {
     refreshBootstrapStatus();
   }, [refreshBootstrapStatus]);
 
-  // Desktop/Mobile saja (Web selalu `null`). Dibaca setelah database siap:
+  // `null` pada build Web yang tidak menegakkan lisensi. Dibaca setelah database siap:
   // database yang belum diprovisioning meminta lisensinya di BootstrapPanel.
   const {
     status: licenseStatus,
@@ -70,23 +72,25 @@ export default function LoginPage() {
   } = useLicenseStatus(false);
   // Dibaca ulang setiap status database berubah: perangkat yang baru
   // bergabung ke database berlisensi menemukan lisensinya di sana.
+  // Di Web `bootstrapStatus` selalu `null` (database ditentukan `.env`
+  // server), jadi lisensinya dibaca langsung; tanpa itu layar aktivasi tidak
+  // pernah muncul dan form login hanya menolak dengan pesan lisensi.
   useEffect(() => {
-    if (bootstrapStatus) void refreshLicense();
+    if (bootstrapStatus || !isDesktopRuntime()) void refreshLicense();
   }, [bootstrapStatus, refreshLicense]);
   // Pemasangan baru meminta lisensi SEBELUM provisioning. Perangkat kedua dan
   // seterusnya milik lembaga yang sama melewatinya: lisensi lembaga sudah ada
   // di database yang akan mereka sambungkan.
   const [joiningLicensedDatabase, setJoiningLicensedDatabase] = useState(false);
 
-  // Khusus Web: `false` berarti database belum punya satu akun pun. Tanpa
-  // petunjuk ini, database yang baru dibuat membuat halaman ini jalan buntu —
-  // form login tampil, tidak ada akun untuk dipakai, dan tidak ada tanda harus
-  // berbuat apa. `null` (tidak diketahui, atau bukan Web) sengaja diam.
-  const [webProvisioningHint, setWebProvisioningHint] = useState<
-    boolean | null
-  >(null);
+  // Khusus Web. `hasOperator: false` berarti database belum punya satu akun
+  // pun: tanpa petunjuk ini halaman login menjadi jalan buntu, karena form
+  // tampil sementara tidak ada akun untuk dipakai. `null` (bukan Web, atau
+  // status tidak terbaca) sengaja diam.
+  const [webProvisioning, setWebProvisioning] =
+    useState<WebProvisioningStatus | null>(null);
   useEffect(() => {
-    void getWebProvisioningHint().then(setWebProvisioningHint);
+    void getWebProvisioningStatus().then(setWebProvisioning);
   }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -198,14 +202,18 @@ export default function LoginPage() {
             }}
           />
           {/* Perangkat yang menunjuk database salah tidak pernah menemukan
-              lisensinya; tanpa pintu ini ia terjebak di layar aktivasi. */}
-          <button
-            type="button"
-            onClick={() => setShowDatabaseSetup(true)}
-            className="mt-3 w-full min-h-10 rounded-xl border border-slate-700 bg-slate-800/80 px-3 text-xs font-bold text-slate-300 transition hover:bg-slate-700"
-          >
-            Konfigurasi ulang database
-          </button>
+              lisensinya; tanpa pintu ini ia terjebak di layar aktivasi. Di Web
+              database ditentukan `.env` server, jadi tombolnya tidak ada:
+              `bootstrapStatus` di sana selalu `null`. */}
+          {bootstrapStatus ? (
+            <button
+              type="button"
+              onClick={() => setShowDatabaseSetup(true)}
+              className="mt-3 w-full min-h-10 rounded-xl border border-slate-700 bg-slate-800/80 px-3 text-xs font-bold text-slate-300 transition hover:bg-slate-700"
+            >
+              Konfigurasi ulang database
+            </button>
+          ) : null}
         </div>
       </main>
     );
@@ -278,33 +286,56 @@ export default function LoginPage() {
           </div>
         ) : null}
 
-        {/* Database Web yang belum punya akun sama sekali. Hanya MENUNJUK ke
-            jalan provisioning — tidak ada cara membuat akun dari browser, dan
-            tidak boleh ada: aplikasi Web terbuka ke internet, jadi layar
-            "buat Superadmin pertama" di sini berarti siapa pun yang pertama
-            membuka URL-nya bisa mengklaim seluruh sistem.
+        {/* Database Web yang belum punya akun. Halaman ini hanya MENUNJUK ke
+            jalan provisioning; pembuatan akunnya ada di `/setup`, yang dijaga
+            token pemasangan dari `.env` server. Tanpa token itu, pengunjung
+            pertama yang membuka URL ini bisa mengklaim seluruh sistem.
 
             Kelasnya sengaja hanya yang sudah punya pasangan mode terang di
             globals.css (`bg-amber-950/50`, `text-amber-100`, `text-amber-300`);
             varian ber-opasitas seperti `text-amber-200/90` belum punya, dan
             akan menjadi teks terang di atas latar terang. */}
-        {webProvisioningHint === false ? (
+        {webProvisioning?.hasOperator === false ? (
           <div className="p-3.5 bg-amber-950/50 border border-white/10 rounded-2xl text-amber-100 text-xs space-y-1.5">
             <p className="font-bold text-amber-300">
               Database ini belum punya akun
             </p>
-            <p>
-              Belum ada satu pun akun untuk login. Buat Superadmin pertama lewat
-              aplikasi Desktop — layar provisioning akan muncul dengan
-              sendirinya — lalu akun yang sama langsung bisa dipakai di sini.
-            </p>
-            <p>
-              Untuk server tanpa Desktop, jalankan{" "}
-              <code className="font-mono font-bold text-amber-300">
-                bun run bootstrap:superadmin
-              </code>{" "}
-              di server.
-            </p>
+            {webProvisioning.setupEnabled ? (
+              <>
+                <p>
+                  Belum ada akun untuk masuk. Buat Superadmin pertama dengan
+                  token pemasangan dari berkas .env server.
+                </p>
+                <Link
+                  href="/setup"
+                  className="flex min-h-11 w-full items-center justify-center rounded-xl bg-amber-400 px-3 text-xs font-black text-slate-950 transition hover:bg-amber-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-300"
+                >
+                  Buat Superadmin pertama
+                </Link>
+              </>
+            ) : (
+              <>
+                <p>
+                  Belum ada akun untuk masuk. Sambungkan aplikasi Desktop ke
+                  database yang sama: layar provisioning muncul sendiri di sana,
+                  dan akun yang dibuat langsung bisa dipakai di sini.
+                </p>
+                <p>
+                  Tanpa Desktop, isi{" "}
+                  <code className="font-mono font-bold text-amber-300">
+                    KOS_SETUP_TOKEN
+                  </code>{" "}
+                  di berkas .env server, lalu ikuti{" "}
+                  <Link
+                    href="/setup"
+                    className="font-bold text-amber-300 underline underline-offset-2"
+                  >
+                    langkah di halaman provisioning
+                  </Link>
+                  .
+                </p>
+              </>
+            )}
           </div>
         ) : null}
 

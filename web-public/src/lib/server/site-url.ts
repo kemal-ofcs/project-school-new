@@ -11,6 +11,14 @@
  * pencari meng-index salinan sementara sebagai situs resmi sekolah.
  */
 export interface SiteUrlEnvironment {
+  /**
+   * Alamat situs untuk pemasangan di server sendiri. Dibaca saat server
+   * BERJALAN, tidak seperti `NEXT_PUBLIC_SITE_URL` yang ditanam Next.js ke
+   * dalam hasil build: satu image dipakai banyak sekolah, dan nilai yang
+   * ditanam saat image dibangun akan membuat sitemap setiap sekolah menunjuk
+   * ke alamat yang sama.
+   */
+  KOS_SITE_URL?: string;
   NEXT_PUBLIC_SITE_URL?: string;
   VERCEL_PROJECT_PRODUCTION_URL?: string;
   /**
@@ -29,7 +37,9 @@ export function resolveSiteUrl(
   // mengarang seluruh environment hanya untuk memeriksa satu variabel.
   environment: SiteUrlEnvironment = process.env as SiteUrlEnvironment,
 ): string {
-  const eksplisit = environment.NEXT_PUBLIC_SITE_URL?.trim();
+  const eksplisit = (
+    environment.KOS_SITE_URL ?? environment.NEXT_PUBLIC_SITE_URL
+  )?.trim();
   if (eksplisit) return normalkan(eksplisit);
 
   const vercel = environment.VERCEL_PROJECT_PRODUCTION_URL?.trim();

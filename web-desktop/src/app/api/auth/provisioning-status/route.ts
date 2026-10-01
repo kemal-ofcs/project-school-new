@@ -1,4 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server";
+import { resolveSetupToken } from "@/lib/server/auth/setup-token";
 import { getServerDatabase } from "@/lib/server/db";
 import { isSameOriginMutation } from "@/lib/server/http/request-security";
 
@@ -29,12 +30,13 @@ function noStoreJson(body: unknown, status = 200) {
  *    tidak menulis apa pun. Tabel yang belum ada berarti "belum ada akun",
  *    bukan alasan untuk menyiapkan skema dari permintaan tanpa sesi.
  *
- * 3. TIDAK ADA JALAN MEMBUAT AKUN DARI SINI, dan tidak boleh pernah ditambahkan.
- *    Aplikasi Web ter-deploy ke internet: layar "buat Superadmin pertama" tanpa
- *    login berarti siapa pun yang pertama membuka URL-nya bisa mengklaim seluruh
- *    sistem. Karena itu provisioning hanya ada di Desktop/Mobile, tempat yang
- *    menjalankannya adalah orang yang duduk di depan mesinnya sendiri. Endpoint
- *    ini hanya boleh MENUNJUK ke sana.
+ * 3. ENDPOINT INI SENDIRI TIDAK PERNAH MEMBUAT AKUN. Aplikasi Web terbuka ke
+ *    jaringan: layar "buat Superadmin pertama" tanpa bukti apa pun berarti
+ *    pengunjung pertama mengambil alih seluruh sistem. Pembuatan akun hanya
+ *    ada di `POST /api/auth/bootstrap`, yang menuntut token pemasangan dari
+ *    `.env` server. `setupEnabled` di bawah hanya memberi tahu halaman login
+ *    apakah pintu itu dibuka di server ini, supaya ia menunjuk ke `/setup`
+ *    dan bukan ke jalan yang tidak tersedia.
  */
 export async function POST(request: NextRequest) {
   if (!isSameOriginMutation(request)) {
@@ -44,12 +46,13 @@ export async function POST(request: NextRequest) {
     );
   }
 
+  const setupEnabled = resolveSetupToken(process.env).state === "ready";
   try {
     const result = await getServerDatabase().execute(
       "SELECT EXISTS(SELECT 1 FROM master_operator) AS ada;",
     );
     const ada = Number(result.rows[0]?.ada ?? 0) === 1;
-    return noStoreJson({ sukses: true, hasOperator: ada });
+    return noStoreJson({ sukses: true, hasOperator: ada, setupEnabled });
   } catch (error) {
     // Dua kegagalan yang WAJIB dibedakan, karena jawabannya berlawanan:
     //
@@ -66,6 +69,7 @@ export async function POST(request: NextRequest) {
     return noStoreJson({
       sukses: true,
       hasOperator: tabelBelumAda ? false : null,
+      setupEnabled,
     });
   }
 }

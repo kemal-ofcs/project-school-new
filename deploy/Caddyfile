@@ -1,0 +1,24 @@
+# Alamat dan cara sertifikatnya dibaca dari berkas .env:
+#   KOS_SITE_ADDRESS    alamat aplikasi admin
+#   KOS_PUBLIC_ADDRESS  alamat situs publik sekolah
+#   KOS_TLS             `internal` (sertifikat buatan server ini, untuk LAN)
+#                     atau alamat email (sertifikat Let's Encrypt, untuk domain
+#                     yang bisa dijangkau dari internet)
+# Browser yang membuka alamat IP tidak mengirim nama server saat jabat tangan
+# TLS. Di dalam Docker, Caddy lalu mencari sertifikat untuk IP kontainernya
+# sendiri dan tidak menemukannya; baris ini menunjuk ke sertifikat yang benar.
+{
+	default_sni {$KOS_SITE_ADDRESS}
+}
+
+{$KOS_SITE_ADDRESS} {
+	tls {$KOS_TLS}
+	encode gzip
+	reverse_proxy web:3000
+}
+
+{$KOS_PUBLIC_ADDRESS} {
+	tls {$KOS_TLS}
+	encode gzip
+	reverse_proxy public:3000
+}

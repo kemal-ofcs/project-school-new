@@ -72,6 +72,12 @@ const filesToCopy = [
   "lib/operators/contact.ts",
   "lib/operators/contact.test.ts",
   "lib/services/wa-provider.ts",
+  // Pemeriksa lisensi. Situs publik melayani database yang sama dengan
+  // aplikasi admin, jadi ia wajib menilai lisensi yang sama dengan aturan yang
+  // sama persis. Tesnya TIDAK ikut disalin: ia membangun skema lewat
+  // `initDatabaseSchema`, yang sengaja tidak ada di workspace ini.
+  "lib/license/types.ts",
+  "lib/server/license.ts",
 ];
 
 const desktopSrc = join(import.meta.dir, "../../web-desktop/src");

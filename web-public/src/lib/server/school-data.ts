@@ -1,5 +1,6 @@
 import "server-only";
 
+import { connection } from "next/server";
 import { cache } from "react";
 import {
   alamatDatabaseTersetel,
@@ -61,12 +62,25 @@ export type HasilMuat<T> =
  * skemanya belum lengkap atau sedang tidak terjangkau. Dua yang terakhir adalah
  * keadaan operasional yang memang harus dilayani halaman dengan anggun.
  */
-function tolakBuildTanpaKonfigurasi(): void {
+async function tolakBuildTanpaKonfigurasi(): Promise<void> {
+  // Image untuk server sendiri dibangun SEKALI tanpa database siapa pun, lalu
+  // dipakai banyak sekolah. Tidak ada isi yang boleh dibekukan saat build:
+  // `connection()` menghentikan prerender di sini, sehingga setiap halaman
+  // dirender saat diminta, dari database sekolah yang menjalankannya. Harganya
+  // cache lima menit tidak berlaku, dan itu murah di sana karena databasenya
+  // ada di mesin yang sama. Nilai ini ditanam saat build (`next.config.ts`).
+  // ponytail: tanpa cache, ±2 detik per halaman bila databasenya Turso cloud;
+  // bungkus pembacaan dengan `unstable_cache` bila pembeli memakai database jauh.
+  if (process.env.KOS_SELF_HOSTED === "1") {
+    await connection();
+    return;
+  }
+
   if (process.env.NEXT_PHASE !== "phase-production-build") return;
   if (alamatDatabaseTersetel()) return;
 
   throw new Error(
-    "TURSO_DATABASE_URL (atau SPPG_DATABASE_URL) belum disetel saat build. " +
+    "KOS_DATABASE_URL (atau TURSO_DATABASE_URL) belum disetel saat build. " +
       "Seluruh isi situs publik berasal dari database sekolah, sehingga build " +
       "tanpa alamat database hanya akan membekukan halaman kegagalan selama " +
       "masa ISR. Setel variabelnya di environment build, lalu ulangi.",
@@ -99,7 +113,7 @@ export const getProgramStudi = cache(async (): Promise<ProgramStudi[]> => {
 });
 
 export async function muatProfilSekolah(): Promise<HasilMuat<SchoolProfile>> {
-  tolakBuildTanpaKonfigurasi();
+  await tolakBuildTanpaKonfigurasi();
   try {
     return { status: "ok", data: await getSchoolProfile() };
   } catch (error) {
@@ -113,7 +127,7 @@ export async function muatProfilSekolah(): Promise<HasilMuat<SchoolProfile>> {
 }
 
 export async function muatProgramStudi(): Promise<HasilMuat<ProgramStudi[]>> {
-  tolakBuildTanpaKonfigurasi();
+  await tolakBuildTanpaKonfigurasi();
   try {
     return { status: "ok", data: await getProgramStudi() };
   } catch (error) {

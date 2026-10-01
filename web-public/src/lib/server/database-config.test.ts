@@ -165,6 +165,44 @@ describe("nilai bawaan dan alias", () => {
     expect(config.authToken).toBe("token");
   });
 
+  /**
+   * Pemasangan baru memakai nama `KOS_*`. Nama itu harus MENANG, bukan sekadar
+   * dibaca: `.env` yang masih menyimpan nama lama di samping nama baru tidak
+   * boleh diam-diam menunjuk ke database yang lama.
+   */
+  test("KOS_* menang atas TURSO_* dan SPPG_*", () => {
+    const config = resolveServerDatabaseConfig(
+      env({
+        KOS_DATABASE_URL: "http://192.168.1.10:8080",
+        KOS_DATABASE_AUTH_TOKEN: "token-baru",
+        KOS_DATABASE_PROVIDER: "self_hosted",
+        TURSO_DATABASE_URL: "libsql://lama.turso.io",
+        TURSO_AUTH_TOKEN: "token-lama",
+        SPPG_DATABASE_URL: "libsql://lebih-lama.turso.io",
+        SPPG_DATABASE_PROVIDER: "turso",
+      }),
+    );
+    expect(config.url).toBe("http://192.168.1.10:8080");
+    expect(config.authToken).toBe("token-baru");
+    expect(config.provider).toBe("self_hosted");
+  });
+
+  test("KOS_ALLOW_INSECURE_DATABASE dibaca seperti nama lamanya", () => {
+    const publik = {
+      KOS_DATABASE_URL: "http://203.0.113.10:8080",
+      KOS_DATABASE_PROVIDER: "self_hosted",
+      KOS_DATABASE_AUTH_TOKEN: "token",
+    };
+    expect(() => resolveServerDatabaseConfig(env(publik))).toThrow(
+      "Alamat database tidak dapat dipakai",
+    );
+    expect(
+      resolveServerDatabaseConfig(
+        env({ ...publik, KOS_ALLOW_INSECURE_DATABASE: "1" }),
+      ).url,
+    ).toBe("http://203.0.113.10:8080");
+  });
+
   test("URL kosong ditolak di production", () => {
     expect(() => resolveServerDatabaseConfig(env({}))).toThrow(
       /wajib tersedia/,

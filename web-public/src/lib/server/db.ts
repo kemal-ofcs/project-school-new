@@ -38,6 +38,7 @@ const state = globalDatabase.__sppgPublicDatabase;
  * menjalankan build ini sudah menyetelnya?".
  */
 export interface AlamatDatabaseEnvironment {
+  KOS_DATABASE_URL?: string;
   TURSO_DATABASE_URL?: string;
   SPPG_DATABASE_URL?: string;
 }
@@ -49,7 +50,8 @@ export function alamatDatabaseTersetel(
   environment: AlamatDatabaseEnvironment = process.env as AlamatDatabaseEnvironment,
 ): boolean {
   return Boolean(
-    environment.TURSO_DATABASE_URL?.trim() ||
+    environment.KOS_DATABASE_URL?.trim() ||
+      environment.TURSO_DATABASE_URL?.trim() ||
       environment.SPPG_DATABASE_URL?.trim(),
   );
 }

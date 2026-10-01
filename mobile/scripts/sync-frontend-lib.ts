@@ -80,6 +80,8 @@ const dirsToCopy = [
   "lib/contracts",
   "lib/gateways",
   "lib/hooks",
+  // Bentuk data lisensi: tipe murni, dipakai gateway di kedua workspace.
+  "lib/license",
   // Konfigurasi pengirim email sistem dan mesin liveness "Lupa Password":
   // keduanya murni logika lintas platform dan WAJIB identik di kedua workspace
   // karena Web menghitung ulang vonis liveness dengan modul yang sama.

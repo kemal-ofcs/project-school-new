@@ -12,7 +12,26 @@ import type { NextConfig } from "next";
  * Halaman publik menuntut ketiganya. Landing page tanpa metadata dinamis tidak
  * bisa di-index dengan benar, dan PMB tanpa server tidak bisa menerima berkas.
  */
+/**
+ * Build untuk image Docker pemasangan self-hosted, dan sakelar lisensinya.
+ * Aturannya sama dengan `web-desktop/next.config.ts`, beserta alasannya:
+ * keluaran standalone hanya diminta `Dockerfile`, dan sakelar lisensi DITANAM
+ * ke hasil build supaya tidak bisa dimatikan lewat `.env` di server pembeli.
+ */
+const isStandaloneBuild = process.env.KOS_BUILD_STANDALONE === "1";
+const licenseEnforced = process.env.KOS_LICENSE_ENFORCED === "1" ? "1" : "0";
+const buildDateWib = new Intl.DateTimeFormat("en-CA", {
+  timeZone: "Asia/Jakarta",
+}).format(new Date());
+
 const nextConfig: NextConfig = {
+  ...(isStandaloneBuild ? { output: "standalone" as const } : {}),
+  env: {
+    KOS_LICENSE_ENFORCED: licenseEnforced,
+    KOS_BUILD_DATE: buildDateWib,
+    // Dibaca `school-data.ts`: build image tidak mem-prerender isi sekolah.
+    KOS_SELF_HOSTED: isStandaloneBuild ? "1" : "0",
+  },
   devIndicators: false,
   // Header keamanan situs publik. Minimal (tanpa `script-src`) supaya script
   // inline Next.js tidak ikut terblokir.
