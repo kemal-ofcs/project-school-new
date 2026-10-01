@@ -52,3 +52,6 @@ graphify-out/
 # local MCP keys
 .vscode/mcp.json
 .agents/mcp_config.json
+
+# hasil `bun run image:build`: arsip image untuk pembeli
+/rilis/

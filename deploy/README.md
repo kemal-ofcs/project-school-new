@@ -2,25 +2,32 @@
 
 Panduan ini untuk teknisi yang memasang aplikasi admin dan situs publik
 sekolah di server milik sekolah.
-Server tidak perlu internet untuk berjalan sehari-hari. Internet hanya dipakai
-saat mengunduh image.
+Server tidak perlu internet untuk berjalan sehari-hari. Bila image diterima
+sebagai berkas `.tar`, pemasangannya pun tidak butuh internet: berkas itu
+memuat keempat image yang dipakai, termasuk database dan proxy. Yang harus
+sudah terpasang di server hanya Docker.
+
+Untuk server Windows tanpa Docker ada paket terpisah dengan panduannya sendiri
+(`manajemen-sekolah-<versi>-windows.zip`).
 
 ## Yang dibutuhkan
 
 - Komputer atau server dengan Docker dan Docker Compose.
-- Alamat dua image (aplikasi admin dan situs publik) serta akses registry dari
-  Kemal Office Studio.
+- Image aplikasi dari Kemal Office Studio: sebagai satu berkas `.tar`, atau
+  sebagai alamat registry beserta aksesnya.
 - Alamat IP tetap untuk server di jaringan sekolah, atau dua nama domain: satu
   untuk aplikasi admin, satu untuk situs publik.
 
 ## Langkah pemasangan
 
 1. Salin folder ini ke server.
-2. Masuk ke registry dengan akses yang Anda terima:
-   `docker login <alamat-registry>`
-3. Salin `.env.example` menjadi `.env`, lalu isi `KOS_WEB_IMAGE`,
-   `KOS_PUBLIC_IMAGE`, `KOS_SITE_ADDRESS`, `KOS_PUBLIC_ADDRESS`, dan
-   `KOS_SETUP_TOKEN`.
+2. Siapkan image-nya dengan salah satu cara:
+   - Berkas `.tar`: `docker load -i manajemen-sekolah-<versi>.tar`
+   - Registry: `docker login <alamat-registry>`
+3. Salin `.env.example` menjadi `.env`, lalu isi `KOS_SITE_ADDRESS`,
+   `KOS_PUBLIC_ADDRESS`, dan `KOS_SETUP_TOKEN`. Pada paket berkas `.tar`,
+   `KOS_WEB_IMAGE` dan `KOS_PUBLIC_IMAGE` sudah terisi. Pada jalur registry,
+   isi keduanya dengan alamat yang Anda terima.
    Token bisa dibuat dengan `openssl rand -base64 32`.
 4. Jalankan `docker compose up -d`.
 5. Buka `https://<KOS_SITE_ADDRESS>/setup` di browser. Halaman itu menampilkan
@@ -84,12 +91,13 @@ Seluruh data ada di folder `data/database`. Hentikan layanan dengan
 
 ## Memperbarui aplikasi
 
-Ganti versi pada `KOS_WEB_IMAGE` di `.env`, lalu jalankan:
+Ganti versi pada `KOS_WEB_IMAGE` dan `KOS_PUBLIC_IMAGE` di `.env`, lalu:
 
-```
-docker compose pull
-docker compose up -d
-```
+- Berkas `.tar`: muat berkas versi baru dengan `docker load -i <berkas>`, lalu
+  jalankan `docker compose up -d`.
+- Registry: jalankan `docker compose pull`, lalu `docker compose up -d`.
+
+Data tidak tersentuh: ia ada di folder `data/`, di luar image.
 
 ## Aplikasi Desktop dan Mobile
 

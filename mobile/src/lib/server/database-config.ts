@@ -65,12 +65,16 @@ export function resolveServerDatabaseConfig(
     )?.trim(),
   );
 
-  // Sisi Web SELALU memakai database remote — Turso Cloud atau libSQL
-  // self-hosted. Kebutuhan offline tanpa internet dilayani aplikasi Desktop
-  // dan Mobile, yang memang menyimpan berkasnya sendiri. Menolaknya di sini
-  // penting karena `local_file` melewati pemeriksaan transport: membiarkannya
+  // Provider `local_file` milik Desktop/Mobile: di sana ia berarti berkas hub
+  // per perangkat, lengkap dengan mesin sinkronisasinya. Menolaknya di sini
+  // penting karena provider itu melewati pemeriksaan transport: membiarkannya
   // lolos berarti satu variabel lingkungan yang salah bisa mematikan seluruh
   // aturan keamanan alamat.
+  //
+  // Web tetap BOLEH memakai berkas SQLite, tetapi lewat alamatnya
+  // (`KOS_DATABASE_URL=file:...`), bukan lewat provider. Itu jalur pemasangan
+  // Web-saja di satu server tanpa internet dan tanpa server database terpisah:
+  // aplikasi Desktop dan Mobile tidak bisa ikut terhubung ke berkas itu.
   if (provider === "local_file") {
     throw new Error(
       "KOS_DATABASE_PROVIDER=local_file hanya berlaku untuk aplikasi Desktop/Mobile. Sisi Web memerlukan database remote (Turso atau libSQL self-hosted).",
@@ -121,6 +125,24 @@ export function resolveServerDatabaseConfig(
     isRemote: false,
     provider,
   };
+}
+
+/**
+ * Waktu tunggu saat berkas SQLite sedang dikunci proses lain.
+ *
+ * Bawaan klien libSQL adalah 0: tulisan kedua langsung gagal dengan
+ * "database is locked". Pada pemasangan berkas, aplikasi admin dan situs
+ * publik adalah DUA proses yang menulis ke berkas yang sama (login, antrean
+ * WhatsApp, pendaftaran PMB), jadi tabrakan itu pasti terjadi. Lima detik
+ * jauh di atas lama satu transaksi, dan masih di bawah batas sabar pengguna.
+ */
+export const FILE_DATABASE_BUSY_TIMEOUT_MS = 5_000;
+
+/** Opsi `createClient` tambahan untuk berkas SQLite; kosong untuk database remote. */
+export function fileDatabaseOptions(config: ServerDatabaseConfig): {
+  timeout?: number;
+} {
+  return config.isRemote ? {} : { timeout: FILE_DATABASE_BUSY_TIMEOUT_MS };
 }
 
 /**

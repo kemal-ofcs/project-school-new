@@ -139,8 +139,42 @@ Nama lama (`TURSO_DATABASE_URL`, `TURSO_AUTH_TOKEN`, `SPPG_DATABASE_*`) masih
 dibaca; bila keduanya diisi, nama `KOS_` yang dipakai.
 
 Untuk memasang Web di server sendiri tanpa source code, lihat
-[deploy/README.md](deploy/README.md). Image-nya dibangun dari
-`web-desktop/Dockerfile`.
+[deploy/README.md](deploy/README.md).
+
+### Menyerahkan versi Web ke pembeli
+
+Padanan `tauri:build` untuk Web, dijalankan dari root repo di mesin yang punya
+Docker:
+
+```bash
+bun run image:build --versi 1.0.0
+```
+
+Hasilnya folder `rilis/manajemen-sekolah-1.0.0/` berisi arsip kedua image
+(aplikasi admin dan situs publik) beserta berkas pemasangannya. Folder itulah
+yang diserahkan, bukan repo ini. Lisensinya diterbitkan terpisah setelah pembeli
+mengirim kode server dari halaman `/setup`.
+
+Untuk pembeli yang servernya Windows dan tidak memakai Docker, dijalankan dari
+root repo di Windows 64-bit:
+
+```bash
+bun run paket:build --versi 1.0.0
+```
+
+Hasilnya `rilis/manajemen-sekolah-1.0.0-windows.zip`: kedua aplikasi yang sudah
+dikompilasi, Node.js, proxy HTTPS (Caddy), dan berkas `Mulai.cmd`. Pembeli tidak
+perlu memasang apa pun. Panduan pemasangannya ada di
+[deploy/windows/README.md](deploy/windows/README.md).
+
+| | `image:build` | `paket:build` |
+|---|---|---|
+| Server pembeli | Linux, VPS, atau Windows dengan Docker | Windows tanpa Docker |
+| Database bawaan | Server libSQL di dalam paket | Berkas SQLite di folder `data` |
+| Desktop dan Mobile ikut terhubung | Ya | Hanya bila `KOS_DATABASE_URL` diisi alamat server database |
+
+Paket Windows memakai berkas SQLite karena server libSQL tidak punya versi
+Windows. Berkas itu hanya bisa dibuka kedua aplikasi Web di komputer yang sama.
 
 ### Urutan deploy ke Vercel
 

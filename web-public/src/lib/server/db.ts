@@ -1,7 +1,10 @@
 import "server-only";
 
 import { type Client, createClient } from "@libsql/client";
-import { resolveServerDatabaseConfig } from "@/lib/server/database-config";
+import {
+  fileDatabaseOptions,
+  resolveServerDatabaseConfig,
+} from "@/lib/server/database-config";
 import { assertSchemaReady } from "@/lib/server/schema-readiness";
 
 interface PublicDatabaseState {
@@ -62,6 +65,9 @@ export function getPublicDatabase(): Client {
     state.client = createClient({
       url: config.url,
       authToken: config.authToken,
+      // Berkas SQLite dibagi dengan aplikasi admin; tanpa waktu tunggu,
+      // pendaftaran PMB yang bertabrakan dengan tulisan admin langsung gagal.
+      ...fileDatabaseOptions(config),
     });
   }
 

@@ -5,8 +5,11 @@
 # `node_modules` lengkap, tanpa source map. Itulah yang diserahkan ke pembeli,
 # bukan repo ini.
 #
-# Menerbitkan (dijalankan pemilik aplikasi, dari folder `web-desktop/`):
-#   docker build -t <registry>/<nama-image>:<versi> .
+# Menerbitkan (dijalankan pemilik aplikasi, dari root repo):
+#   bun run image:build --versi <versi>
+# Perintah itu membangun image ini bersama pasangannya dan menyusun folder
+# `rilis/` yang siap diserahkan. Untuk jalur registry, beri tag lalu dorong:
+#   docker tag <nama-image>:<versi> <registry>/<nama-image>:<versi>
 #   docker push <registry>/<nama-image>:<versi>
 # Pembeli memakainya lewat `deploy/docker-compose.yml`.
 # ==============================================================================

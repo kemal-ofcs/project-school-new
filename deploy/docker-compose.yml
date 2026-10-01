@@ -90,6 +90,8 @@ services:
     environment:
       - KOS_SITE_ADDRESS=${KOS_SITE_ADDRESS:?Isi KOS_SITE_ADDRESS di berkas .env}
       - KOS_PUBLIC_ADDRESS=${KOS_PUBLIC_ADDRESS:?Isi KOS_PUBLIC_ADDRESS di berkas .env}
+      # Alamat admin di paket ini tidak memakai port, jadi sama dengan namanya.
+      - KOS_SITE_HOST=${KOS_SITE_ADDRESS}
       - KOS_TLS=${KOS_TLS:-internal}
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
