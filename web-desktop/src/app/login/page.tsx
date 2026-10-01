@@ -5,6 +5,11 @@ import { redirect, useRouter } from "next/navigation";
 import type React from "react";
 import { useCallback, useEffect, useState } from "react";
 import { BootstrapPanel } from "@/components/BootstrapPanel";
+import {
+  DATABASE_NOT_CONFIGURED_DESCRIPTION,
+  DATABASE_NOT_CONFIGURED_TITLE,
+  DatabaseNotConfiguredNotice,
+} from "@/components/DatabaseNotConfiguredNotice";
 import { LicenseActivationPanel } from "@/components/license/LicenseActivationPanel";
 import { LoginSceneGate } from "@/components/visual/LoginSceneGate";
 import { VisualProvider } from "@/components/visual/VisualProvider";
@@ -89,9 +94,18 @@ export default function LoginPage() {
   // status tidak terbaca) sengaja diam.
   const [webProvisioning, setWebProvisioning] =
     useState<WebProvisioningStatus | null>(null);
-  useEffect(() => {
-    void getWebProvisioningStatus().then(setWebProvisioning);
+  const [checkingProvisioning, setCheckingProvisioning] = useState(false);
+  const refreshWebProvisioning = useCallback(async () => {
+    setCheckingProvisioning(true);
+    try {
+      setWebProvisioning(await getWebProvisioningStatus());
+    } finally {
+      setCheckingProvisioning(false);
+    }
   }, []);
+  useEffect(() => {
+    void refreshWebProvisioning();
+  }, [refreshWebProvisioning]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -145,6 +159,27 @@ export default function LoginPage() {
   }
 
   if (isAuthenticated && user) redirect("/");
+  // Form login tidak ditampilkan sama sekali: tanpa database ia tidak bisa
+  // dipakai, dan menampilkannya membuat aplikasi tampak rusak.
+  if (webProvisioning?.databaseConfigured === false) {
+    return (
+      <main className="min-h-screen bg-slate-950 text-slate-100 flex items-center justify-center p-4 sm:p-6 font-sans">
+        <div className="w-full max-w-md bg-slate-900/80 border border-slate-800 rounded-3xl p-6 sm:p-8 shadow-2xl">
+          <h1 className="text-base font-bold text-white">
+            {DATABASE_NOT_CONFIGURED_TITLE}
+          </h1>
+          <p className="mt-1 mb-4 text-xs leading-5 text-slate-400">
+            {DATABASE_NOT_CONFIGURED_DESCRIPTION}
+          </p>
+          <DatabaseNotConfiguredNotice
+            issue={webProvisioning.databaseIssue}
+            onRetry={() => void refreshWebProvisioning()}
+            checking={checkingProvisioning}
+          />
+        </div>
+      </main>
+    );
+  }
   if (
     bootstrapStatus?.required &&
     !joiningLicensedDatabase &&

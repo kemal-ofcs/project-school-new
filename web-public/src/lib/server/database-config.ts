@@ -122,3 +122,30 @@ export function resolveServerDatabaseConfig(
     provider,
   };
 }
+
+/**
+ * Alasan konfigurasi database tidak bisa dipakai, atau `null` bila sah.
+ *
+ * Bukan aturan baru: ini `resolveServerDatabaseConfig` yang ditanya tanpa
+ * melempar. Dipakai untuk memisahkan dua kegagalan yang jawabannya berlawanan.
+ * Database yang TIDAK TERJANGKAU bersifat sementara, dan layar sengaja diam.
+ * Database yang BELUM DIKONFIGURASI tidak akan pulih sendiri, jadi pemasangnya
+ * harus diberi tahu apa yang kurang, bukan disuguhi form login yang buntu.
+ *
+ * Pesannya hanya menyebut nama variabel, tidak pernah nilai alamat atau token,
+ * sehingga aman ditampilkan sebelum login.
+ */
+export function databaseConfigIssue(
+  environment: ServerDatabaseEnvironment,
+): string | null {
+  try {
+    resolveServerDatabaseConfig(environment);
+    return null;
+  } catch (error) {
+    return error instanceof Error ? error.message : String(error);
+  }
+}
+
+/** Jawaban route saat database belum dikonfigurasi. */
+export const DATABASE_NOT_CONFIGURED_MESSAGE =
+  "Server belum terhubung ke database. Isi KOS_DATABASE_URL dan KOS_DATABASE_AUTH_TOKEN di environment server, lalu deploy ulang.";

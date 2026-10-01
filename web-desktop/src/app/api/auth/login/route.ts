@@ -13,6 +13,10 @@ import { assertWebLicense } from "@/lib/server/auth/authorize";
 import { createWebSession } from "@/lib/server/auth/session";
 import { evaluateTwoFactorGate } from "@/lib/server/auth/two-factor";
 import {
+  DATABASE_NOT_CONFIGURED_MESSAGE,
+  databaseConfigIssue,
+} from "@/lib/server/database-config";
+import {
   ensureServerDatabaseInitialized,
   getServerDatabase,
 } from "@/lib/server/db";
@@ -67,6 +71,12 @@ export async function POST(request: NextRequest) {
     const password = typeof body.password === "string" ? body.password : "";
     if (username.length < 3 || username.length > 64 || password.length > 256) {
       return errorResponse("Username atau password tidak sesuai.", 401);
+    }
+
+    // Tanpa ini, server yang belum diberi alamat database menjawab 500 umum
+    // dan pemasangnya tidak tahu bahwa yang kurang hanya satu variabel.
+    if (databaseConfigIssue(process.env) !== null) {
+      return errorResponse(DATABASE_NOT_CONFIGURED_MESSAGE, 503);
     }
 
     await ensureServerDatabaseInitialized();

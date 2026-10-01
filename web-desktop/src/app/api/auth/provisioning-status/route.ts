@@ -1,5 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { resolveSetupToken } from "@/lib/server/auth/setup-token";
+import { databaseConfigIssue } from "@/lib/server/database-config";
 import { getServerDatabase } from "@/lib/server/db";
 import { isSameOriginMutation } from "@/lib/server/http/request-security";
 
@@ -47,12 +48,33 @@ export async function POST(request: NextRequest) {
   }
 
   const setupEnabled = resolveSetupToken(process.env).state === "ready";
+
+  // Diperiksa SEBELUM database disentuh. "Belum dikonfigurasi" tidak akan pulih
+  // sendiri, jadi ia dilaporkan sebagai keadaannya sendiri, terpisah dari
+  // `hasOperator: null` di bawah yang berarti "tidak terjangkau saat ini".
+  const databaseIssue = databaseConfigIssue(process.env);
+  if (databaseIssue !== null) {
+    return noStoreJson({
+      sukses: true,
+      hasOperator: null,
+      setupEnabled,
+      databaseConfigured: false,
+      databaseIssue,
+    });
+  }
+
   try {
     const result = await getServerDatabase().execute(
       "SELECT EXISTS(SELECT 1 FROM master_operator) AS ada;",
     );
     const ada = Number(result.rows[0]?.ada ?? 0) === 1;
-    return noStoreJson({ sukses: true, hasOperator: ada, setupEnabled });
+    return noStoreJson({
+      sukses: true,
+      hasOperator: ada,
+      setupEnabled,
+      databaseConfigured: true,
+      databaseIssue: null,
+    });
   } catch (error) {
     // Dua kegagalan yang WAJIB dibedakan, karena jawabannya berlawanan:
     //
@@ -70,6 +92,8 @@ export async function POST(request: NextRequest) {
       sukses: true,
       hasOperator: tabelBelumAda ? false : null,
       setupEnabled,
+      databaseConfigured: true,
+      databaseIssue: null,
     });
   }
 }

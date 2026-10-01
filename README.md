@@ -142,6 +142,27 @@ Untuk memasang Web di server sendiri tanpa source code, lihat
 [deploy/README.md](deploy/README.md). Image-nya dibangun dari
 `web-desktop/Dockerfile`.
 
+### Urutan deploy ke Vercel
+
+Web tidak bisa mengatur database dari browser: alamatnya ditentukan environment
+server. Karena itu urutannya tidak bisa dibalik.
+
+1. Buat database (Turso, atau server libSQL sendiri).
+2. Deploy `web-desktop` dengan `KOS_DATABASE_URL`, `KOS_DATABASE_AUTH_TOKEN`,
+   dan `KOS_SETUP_TOKEN` (minimal 32 karakter).
+3. Buka `/login`, ikuti tombol ke `/setup`, lalu buat Superadmin. Skema
+   database dibuat pada langkah ini.
+4. Hapus `KOS_SETUP_TOKEN`, lalu deploy ulang.
+5. Deploy `web-public` dengan `KOS_DATABASE_URL` dan `KOS_DATABASE_AUTH_TOKEN`
+   yang sama.
+
+Bila langkah 2 terlewat, halaman login dan `/setup` menampilkan "Server belum
+terhubung ke database" beserta variabel yang kurang. `web-public` lebih keras:
+build-nya gagal tanpa alamat database, karena ia membekukan isi sekolah ke
+dalam halaman saat build, dan tanpa database yang dibekukan adalah halaman
+kegagalan. Ia juga tidak pernah membuat tabel, jadi baru bisa di-deploy setelah
+langkah 3.
+
 ---
 
 ## 4. Mengganti domain contoh

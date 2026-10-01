@@ -50,6 +50,14 @@ export type WebProvisioningStatus = {
   hasOperator: boolean | null;
   /** Server ini memasang `KOS_SETUP_TOKEN`, jadi `/setup` bisa dipakai. */
   setupEnabled: boolean;
+  /**
+   * `false` = alamat database belum diisi atau tidak sah di environment
+   * server. Berbeda dari `hasOperator: null`: keadaan ini tidak pulih sendiri,
+   * jadi layar WAJIB mengatakannya alih-alih diam.
+   */
+  databaseConfigured: boolean;
+  /** Alasan dari server saat `databaseConfigured` bernilai `false`. */
+  databaseIssue: string | null;
 };
 
 /**
@@ -63,10 +71,17 @@ export async function getWebProvisioningStatus(): Promise<WebProvisioningStatus 
     const response = await requestWebApi<{
       hasOperator: boolean | null;
       setupEnabled?: boolean;
+      databaseConfigured?: boolean;
+      databaseIssue?: string | null;
     }>("/api/auth/provisioning-status", "POST");
     return {
       hasOperator: response.hasOperator,
       setupEnabled: response.setupEnabled === true,
+      databaseConfigured: response.databaseConfigured !== false,
+      databaseIssue:
+        typeof response.databaseIssue === "string"
+          ? response.databaseIssue
+          : null,
     };
   } catch {
     // Petunjuk ini pelengkap, bukan syarat untuk login. Endpoint yang gagal

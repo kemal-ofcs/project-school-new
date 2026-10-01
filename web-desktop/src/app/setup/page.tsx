@@ -9,6 +9,11 @@ import {
   useRef,
   useState,
 } from "react";
+import {
+  DATABASE_NOT_CONFIGURED_DESCRIPTION,
+  DATABASE_NOT_CONFIGURED_TITLE,
+  DatabaseNotConfiguredNotice,
+} from "@/components/DatabaseNotConfiguredNotice";
 import { LicenseBootstrapField } from "@/components/license/LicenseBootstrapField";
 import {
   createWebSuperadmin,
@@ -30,6 +35,8 @@ type View =
   | { kind: "loading" }
   /** Aplikasi Desktop/Mobile: provisioning-nya ada di layar masuk. */
   | { kind: "not-web" }
+  /** Alamat database belum diisi di environment server. Tidak pulih sendiri. */
+  | { kind: "not-configured"; issue: string | null }
   /** Endpoint status atau database tidak menjawab. */
   | { kind: "unreachable" }
   | { kind: "ready"; status: WebProvisioningStatus };
@@ -92,6 +99,10 @@ export default function SetupPage() {
     }
     setView({ kind: "loading" });
     const status = await getWebProvisioningStatus();
+    if (status && !status.databaseConfigured) {
+      setView({ kind: "not-configured", issue: status.databaseIssue });
+      return;
+    }
     setView(
       status === null || status.hasOperator === null
         ? { kind: "unreachable" }
@@ -220,6 +231,23 @@ export default function SetupPage() {
         <Link href="/login" className={`${SECONDARY_BUTTON_CLASS} mt-5 w-full`}>
           Buka halaman masuk
         </Link>
+      </Shell>
+    );
+  }
+
+  if (view.kind === "not-configured") {
+    return (
+      <Shell
+        title={DATABASE_NOT_CONFIGURED_TITLE}
+        description={DATABASE_NOT_CONFIGURED_DESCRIPTION}
+      >
+        <div className="mt-5">
+          <DatabaseNotConfiguredNotice
+            issue={view.issue}
+            onRetry={() => void loadStatus()}
+            checking={false}
+          />
+        </div>
       </Shell>
     );
   }

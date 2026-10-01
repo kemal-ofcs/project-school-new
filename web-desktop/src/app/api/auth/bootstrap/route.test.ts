@@ -1,5 +1,6 @@
 import {
   afterAll,
+  afterEach,
   beforeAll,
   beforeEach,
   describe,
@@ -156,6 +157,47 @@ describe("POST /api/auth/bootstrap", () => {
     const response = await kirim({ ...DRAFT, setupToken: "x".repeat(40) });
     expect(response.status).toBe(403);
     expect((await response.json()).pesan).toBe("Token pemasangan tidak cocok.");
+  });
+
+  describe("database belum dikonfigurasi", () => {
+    const environment = process.env as Record<string, string | undefined>;
+    const kunci = [
+      "KOS_DATABASE_URL",
+      "TURSO_DATABASE_URL",
+      "SPPG_DATABASE_URL",
+      "NODE_ENV",
+    ];
+    let tersimpan: Record<string, string | undefined> = {};
+
+    beforeEach(() => {
+      tersimpan = Object.fromEntries(kunci.map((k) => [k, environment[k]]));
+      for (const k of kunci) delete environment[k];
+      environment.NODE_ENV = "production";
+    });
+
+    afterEach(() => {
+      for (const k of kunci) {
+        if (tersimpan[k] === undefined) delete environment[k];
+        else environment[k] = tersimpan[k];
+      }
+    });
+
+    test("pemegang token diberi tahu apa yang kurang", async () => {
+      const response = await kirim(DRAFT);
+      expect(response.status).toBe(503);
+      expect((await response.json()).pesan).toContain(
+        "Server belum terhubung ke database",
+      );
+      expect(await jumlahOperator()).toBe(0);
+    });
+
+    test("tanpa token yang benar, jawabannya tetap soal token", async () => {
+      const response = await kirim({ ...DRAFT, setupToken: "x".repeat(40) });
+      expect(response.status).toBe(403);
+      expect((await response.json()).pesan).toBe(
+        "Token pemasangan tidak cocok.",
+      );
+    });
   });
 
   test("penebak token dikunci, dan token benar pun menunggu", async () => {

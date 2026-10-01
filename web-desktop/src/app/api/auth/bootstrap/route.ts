@@ -10,6 +10,10 @@ import {
   resolveSetupToken,
 } from "@/lib/server/auth/setup-token";
 import {
+  DATABASE_NOT_CONFIGURED_MESSAGE,
+  databaseConfigIssue,
+} from "@/lib/server/database-config";
+import {
   ensureServerDatabaseInitialized,
   getServerDatabase,
 } from "@/lib/server/db";
@@ -92,6 +96,22 @@ export async function POST(request: NextRequest) {
       return noStoreJson(
         { sukses: false, pesan: "Isian provisioning tidak valid." },
         400,
+      );
+    }
+
+    // Tanpa database tidak ada tabel pembatas percobaan untuk dipakai. Token
+    // tetap dibandingkan lebih dulu, supaya jawaban "belum terhubung" hanya
+    // sampai ke pemegang token, sama seperti pesan validasi di bawah.
+    if (databaseConfigIssue(process.env) !== null) {
+      if (!matchesSetupToken(setup.token, parsed.data.setupToken)) {
+        return noStoreJson(
+          { sukses: false, pesan: "Token pemasangan tidak cocok." },
+          403,
+        );
+      }
+      return noStoreJson(
+        { sukses: false, pesan: DATABASE_NOT_CONFIGURED_MESSAGE },
+        503,
       );
     }
 

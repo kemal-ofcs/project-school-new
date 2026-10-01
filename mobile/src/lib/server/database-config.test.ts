@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 
 import {
+  databaseConfigIssue,
   resolveServerDatabaseConfig,
   type ServerDatabaseEnvironment,
 } from "@/lib/server/database-config";
@@ -218,5 +219,54 @@ describe("nilai bawaan dan alias", () => {
     const config = resolveServerDatabaseConfig({ NODE_ENV: "development" });
     expect(config.url.startsWith("file:")).toBe(true);
     expect(config.isRemote).toBe(false);
+  });
+});
+
+/**
+ * `databaseConfigIssue` adalah `resolveServerDatabaseConfig` yang ditanya tanpa
+ * melempar. Pesannya tampil di halaman login dan `/setup` SEBELUM siapa pun
+ * login, jadi ia tidak boleh memuat nilai alamat atau token.
+ */
+describe("databaseConfigIssue", () => {
+  test("konfigurasi yang sah tidak punya masalah", () => {
+    expect(
+      databaseConfigIssue(
+        env({
+          KOS_DATABASE_URL: "libsql://db.turso.io",
+          KOS_DATABASE_AUTH_TOKEN: "token",
+        }),
+      ),
+    ).toBeNull();
+    // Pengembangan tanpa URL jatuh ke berkas lokal, bukan salah konfigurasi.
+    expect(databaseConfigIssue({ NODE_ENV: "development" })).toBeNull();
+  });
+
+  test("production tanpa alamat menyebut variabel yang kurang", () => {
+    expect(databaseConfigIssue(env({}))).toContain("KOS_DATABASE_URL");
+  });
+
+  test("pesan tidak pernah memuat nilai alamat atau token", () => {
+    const alamat = "http://203.0.113.10:8080";
+    const token = "token-sangat-rahasia";
+    const kasus = [
+      env({ KOS_DATABASE_URL: "libsql://db-rahasia.turso.io" }),
+      env({
+        KOS_DATABASE_URL: alamat,
+        KOS_DATABASE_PROVIDER: "self_hosted",
+        KOS_DATABASE_AUTH_TOKEN: token,
+      }),
+      env({
+        KOS_DATABASE_URL: "libsql://db-rahasia.turso.io",
+        KOS_DATABASE_AUTH_TOKEN: token,
+        KOS_DATABASE_PROVIDER: "local_file",
+      }),
+    ];
+    for (const lingkungan of kasus) {
+      const masalah = databaseConfigIssue(lingkungan);
+      expect(masalah).not.toBeNull();
+      expect(masalah).not.toContain("db-rahasia");
+      expect(masalah).not.toContain("203.0.113.10");
+      expect(masalah).not.toContain(token);
+    }
   });
 });
