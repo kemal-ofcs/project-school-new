@@ -220,62 +220,31 @@ html.light .page-header-description {
   color: #475569 !important;
 }
 
-/* Inactive navigation links & buttons in light mode */
-html[data-theme="light"] header
-  nav
-  a:not(.bg-sky-600):not(.bg-sky-500):not(.bg-sky-400),
-html[data-theme="light"]
-  header
-  nav
-  button:not(.bg-sky-600):not(.bg-sky-500):not(.bg-sky-400),
-html.light header nav a:not(.bg-sky-600):not(.bg-sky-500):not(.bg-sky-400),
-html.light
-  header
-  nav
-  button:not(.bg-sky-600):not(.bg-sky-500):not(.bg-sky-400) {
-  color: #334155 !important;
+/* Sidebar: kolom tetap (aside) dan laci layar sempit (dialog) memakai kelas
+   yang sama. Laci yang terbuka mengunci gulir halaman di belakangnya. */
+html:has(dialog.app-sidebar[open]) {
+  overflow: hidden;
 }
-html[data-theme="light"]
-  header
-  nav
-  a:not(.bg-sky-600):not(.bg-sky-500):not(.bg-sky-400):hover,
-html[data-theme="light"]
-  header
-  nav
-  button:not(.bg-sky-600):not(.bg-sky-500):not(.bg-sky-400):hover,
-html.light
-  header
-  nav
-  a:not(.bg-sky-600):not(.bg-sky-500):not(.bg-sky-400):hover,
-html.light
-  header
-  nav
-  button:not(.bg-sky-600):not(.bg-sky-500):not(.bg-sky-400):hover {
+html[data-theme="light"] .app-sidebar,
+html.light .app-sidebar {
+  background-color: #ffffff !important;
+  border-color: #e2e8f0 !important;
+}
+html[data-theme="light"] .app-sidebar nav a:not([aria-current="page"]):hover,
+html[data-theme="light"] .app-sidebar button:hover,
+html.light .app-sidebar nav a:not([aria-current="page"]):hover,
+html.light .app-sidebar button:hover {
   background-color: #f1f5f9 !important;
   color: #0f172a !important;
 }
-
-/* Header main nav container pill in light mode */
-html[data-theme="light"] header nav[aria-label="Navigasi utama"],
-html.light header nav[aria-label="Navigasi utama"] {
-  background-color: #f8fafc !important;
-  border-color: #e2e8f0 !important;
+html[data-theme="light"] .app-sidebar nav a[aria-current="page"],
+html.light .app-sidebar nav a[aria-current="page"] {
+  background-color: #e0f2fe !important;
+  color: #075985 !important;
 }
-
-/* Desktop management popup in light mode */
-html[data-theme="light"] #desktop-management-menu,
-html.light #desktop-management-menu {
-  background-color: #ffffff !important;
-  border-color: #e2e8f0 !important;
-  box-shadow: 0 20px 45px -12px rgba(15, 23, 42, 0.15) !important;
-}
-html[data-theme="light"] #desktop-management-menu p,
-html.light #desktop-management-menu p {
-  color: #64748b !important;
-}
-html[data-theme="light"] #desktop-management-menu > div > div,
-html.light #desktop-management-menu > div > div {
-  border-color: #f1f5f9 !important;
+html[data-theme="light"] .app-sidebar summary:hover,
+html.light .app-sidebar summary:hover {
+  color: #0f172a !important;
 }
 
 /* Inversion for cyan action button (e.g. Uji Koneksi Database) in light mode */
