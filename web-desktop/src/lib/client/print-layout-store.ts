@@ -133,6 +133,32 @@ export function getGridOriginMm(
   };
 }
 
+/**
+ * Margin yang menaruh grid kartu persis di tengah kertas. Grid yang lebih
+ * besar dari kertas mendapat margin 0; peringatan meluapnya tampil di panel.
+ */
+export function getCenteredMarginsMm(
+  layout: IdCardPrintLayoutConfig,
+  orientation: CardOrientation,
+): Pick<
+  IdCardPrintLayoutConfig,
+  "marginTopMm" | "marginBottomMm" | "marginLeftMm" | "marginRightMm"
+> {
+  const { width, height } = getCardTrimSizeMm(orientation);
+  const cols = Math.max(1, layout.gridCols);
+  const rows = Math.max(1, layout.gridRows);
+  const gridWidth = cols * width + (cols - 1) * layout.gapColMm;
+  const gridHeight = rows * height + (rows - 1) * layout.gapRowMm;
+  const x = Math.max(0, roundMm((layout.paperWidthMm - gridWidth) / 2));
+  const y = Math.max(0, roundMm((layout.paperHeightMm - gridHeight) / 2));
+  return {
+    marginTopMm: y,
+    marginBottomMm: y,
+    marginLeftMm: x,
+    marginRightMm: x,
+  };
+}
+
 /** Posisi kiri-atas garis potong kartu di sebuah slot, terhadap sudut kertas. */
 export function getSlotPositionMm(
   layout: IdCardPrintLayoutConfig,
@@ -142,13 +168,29 @@ export function getSlotPositionMm(
 ): { x: number; y: number } {
   const { width, height } = getCardTrimSizeMm(orientation);
   const cols = Math.max(1, layout.gridCols);
+  const rows = Math.max(1, layout.gridRows);
+  const row = Math.floor(slotIndex / cols);
   const origin = getGridOriginMm(layout, pageSide, orientation);
-  return {
-    x: roundMm(origin.x + (slotIndex % cols) * (width + layout.gapColMm)),
-    y: roundMm(
-      origin.y + Math.floor(slotIndex / cols) * (height + layout.gapRowMm),
-    ),
-  };
+  let x = origin.x + (slotIndex % cols) * (width + layout.gapColMm);
+  let y = origin.y + row * (height + layout.gapRowMm);
+
+  if (pageSide === "back") {
+    // Kalibrasi sisi belakang diukur dari sisi depan, jadi dihitung menurut
+    // baris FISIK kartu: balik sisi pendek menukar atas dan bawah.
+    const longEdge = layout.flipAxis === "long_edge";
+    const physicalRow = longEdge ? row : rows - 1 - row;
+    const t = rows > 1 ? Math.min(1, Math.max(0, physicalRow / (rows - 1))) : 0;
+    const topX = layout.backDriftTopXMm ?? 0;
+    const topY = layout.backDriftTopYMm ?? 0;
+    const driftX = topX + t * ((layout.backDriftBottomXMm ?? 0) - topX);
+    const driftY = topY + t * ((layout.backDriftBottomYMm ?? 0) - topY);
+    // Gambar belakang digeser BERLAWANAN dengan selisih yang terukur. Sumbu
+    // yang dicerminkan pembalikan kertas berbalik tanda di koordinat halaman
+    // belakang: "ke kiri" dilihat dari depan adalah "ke kanan" di sana.
+    x += longEdge ? driftX : -driftX;
+    y += longEdge ? -driftY : driftY;
+  }
+  return { x: roundMm(x), y: roundMm(y) };
 }
 
 /**
