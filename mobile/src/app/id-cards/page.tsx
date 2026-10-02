@@ -15,6 +15,12 @@ import { getDaftarIdCard, updateStatusIdCard } from "@/lib/gateways/id-card";
 import { backfillKartuPelajar } from "@/lib/gateways/student";
 import { subscribeSyncCompleted } from "@/lib/gateways/sync-status";
 import { useDebounce } from "@/lib/hooks/useDebounce";
+import {
+  cocokFilterUnit,
+  opsiFilterKelas,
+  opsiFilterUnit,
+  TANPA_UNIT,
+} from "@/lib/validations/personnel";
 
 /*
  * Daftar ID Card untuk Mobile — padanan tab "Daftar & Cetak Kartu" di
@@ -71,6 +77,8 @@ export default function MobileIdCardsPage() {
   const [search, setSearch] = useState("");
   const debouncedSearch = useDebounce(search, 250);
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
+  const [unitFilter, setUnitFilter] = useState("");
+  const [kelasFilter, setKelasFilter] = useState("");
   const [visible, setVisible] = useState(PAGE_SIZE);
   const [selectMode, setSelectMode] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -128,18 +136,39 @@ export default function MobileIdCardsPage() {
     });
   }, [load]);
 
+  // Pilihan filter diturunkan dari baris yang dimuat, jadi tidak pernah
+  // menawarkan unit atau kelas yang hasilnya kosong.
+  const unitOptions = useMemo(() => opsiFilterUnit([], rows), [rows]);
+  const unitAktif =
+    unitFilter === TANPA_UNIT || unitOptions.includes(unitFilter)
+      ? unitFilter
+      : "";
+  const kelasOptions = useMemo(
+    () => opsiFilterKelas(rows, unitAktif),
+    [rows, unitAktif],
+  );
+  // Pilihan yang sudah tidak ada di daftar (data dimuat ulang, unit diganti)
+  // diperlakukan sebagai "semua", bukan menyaring ke hasil kosong.
+  const kelasAktif = kelasOptions.some((kelas) => kelas.id === kelasFilter)
+    ? kelasFilter
+    : "";
+
   const filtered = useMemo(() => {
     const term = debouncedSearch.trim().toLowerCase();
     return rows.filter((row) => {
       const status = statusOf(row);
       if (statusFilter !== "all" && status !== statusFilter) return false;
+      if (!cocokFilterUnit(row, unitAktif)) return false;
+      if (kelasAktif && String(row.id_rombel ?? "") !== kelasAktif) {
+        return false;
+      }
       if (!term) return true;
       return [row.nama, row.kode_karyawan, row.id_unik, row.divisi]
         .join(" ")
         .toLowerCase()
         .includes(term);
     });
-  }, [rows, debouncedSearch, statusFilter]);
+  }, [rows, debouncedSearch, statusFilter, unitAktif, kelasAktif]);
 
   const printedCount = rows.filter(
     (row) => statusOf(row) === "Berhasil",
@@ -307,6 +336,42 @@ export default function MobileIdCardsPage() {
               </button>
             ))}
           </div>
+          <div className="grid grid-cols-2 gap-2">
+            <select
+              aria-label="Filter unit"
+              value={unitAktif}
+              onChange={(event) => {
+                setUnitFilter(event.target.value);
+                setKelasFilter("");
+                setVisible(PAGE_SIZE);
+              }}
+              className="min-h-11 w-full min-w-0 rounded-xl border border-white/10 bg-slate-950/80 px-3 text-xs text-white outline-none focus:border-sky-400"
+            >
+              <option value="">Semua Unit</option>
+              <option value={TANPA_UNIT}>(Tanpa unit)</option>
+              {unitOptions.map((nama) => (
+                <option key={nama} value={nama}>
+                  {nama}
+                </option>
+              ))}
+            </select>
+            <select
+              aria-label="Filter kelas"
+              value={kelasAktif}
+              onChange={(event) => {
+                setKelasFilter(event.target.value);
+                setVisible(PAGE_SIZE);
+              }}
+              className="min-h-11 w-full min-w-0 rounded-xl border border-white/10 bg-slate-950/80 px-3 text-xs text-white outline-none focus:border-sky-400"
+            >
+              <option value="">Semua Kelas</option>
+              {kelasOptions.map((kelas) => (
+                <option key={kelas.id} value={kelas.id}>
+                  {kelas.label}
+                </option>
+              ))}
+            </select>
+          </div>
 
           {selectMode ? (
             <div className="grid grid-cols-2 gap-2">
@@ -451,8 +516,15 @@ export default function MobileIdCardsPage() {
 
                   <div className="flex items-center justify-between gap-2 rounded-xl border border-white/5 bg-slate-950/60 px-3 py-2 text-[11px]">
                     <span className="truncate text-slate-400">
-                      {String(row.jabatan_status || "-")} ·{" "}
-                      {String(row.divisi || "-")}
+                      {[
+                        row.jabatan_status,
+                        row.divisi,
+                        row.unit,
+                        row.nama_rombel,
+                      ]
+                        .map((nilai) => String(nilai ?? "").trim())
+                        .filter(Boolean)
+                        .join(" · ") || "-"}
                     </span>
                     <span
                       className={`shrink-0 font-mono font-bold ${
