@@ -1,6 +1,6 @@
 # MASTER DESIGN BRIEF: LANDING PAGE & PORTAL PUBLIK (MOBILE-FIRST ERGONOMICS)
 **Produk:** Portal Publik & Sistem Penerimaan Murid Baru (PMB) SPPG  
-**Repositori Target:** `E:\Freelance\Project Meksa\web-public`  
+**Repositori Target:** `web-public/` (di repo ini)  
 **Role:** Senior Product Designer & Mobile UX Architect  
 **Status:** Canonical Mobile Design Specification (Ready for Frontend Implementation)
 
@@ -276,7 +276,7 @@ Mematuhi pedoman **W3C Mobile Accessibility Guidelines** dan standar **Apple iOS
 
 # MASTER DESIGN BRIEF: LANDING PAGE & PORTAL PUBLIK (DESKTOP & UNIVERSAL SYSTEM)
 **Produk:** Portal Publik & Sistem Penerimaan Murid Baru (PMB) SPPG  
-**Repositori Target:** `E:\Freelance\Project Meksa\web-public`  
+**Repositori Target:** `web-public/` (di repo ini)  
 **Role:** Senior Product Designer & Design System Architect  
 **Status:** Canonical Design Specification (Ready for Frontend Implementation)
 
