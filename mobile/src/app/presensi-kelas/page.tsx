@@ -3,9 +3,13 @@
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { MobileAppShell } from "@/components/MobileAppShell";
+import { WaTemplateDialog } from "@/components/notifikasi-wa/WaTemplateDialog";
 import { FeedbackBanner } from "@/components/ui/FeedbackBanner";
 import { Icon } from "@/components/ui/Icon";
-import { formatTanggalOperasional } from "@/lib/attendance/time-policy";
+import {
+  formatJamOperasional,
+  formatTanggalOperasional,
+} from "@/lib/attendance/time-policy";
 import { canAccessArea, hasPermission } from "@/lib/auth/access";
 import { triggerHaptic } from "@/lib/client/haptics";
 import { openWhatsAppChat } from "@/lib/client/open-url";
@@ -38,15 +42,17 @@ import { useConfirmDialog } from "@/lib/hooks/useConfirmDialog";
 import { useHydrated } from "@/lib/hooks/useHydrated";
 import { normalizeOperatorPhone } from "@/lib/operators/contact";
 import {
-  buildParentNotificationText,
   buildPresentWithoutGateScanWarning,
   DEFAULT_JP_DURATION_MINUTES,
   DEFAULT_JP_MAX_PER_DAY,
   hasUnsavedAttendanceMarks,
   hitungJp,
   MAX_JAM_KE,
+  pukulJamKe,
+  REKONSILIASI_TEMPLATE_KINDS,
   rentangJamKe,
   susunJamKe,
+  usulkanSesiSekarang,
 } from "@/lib/validations/class-attendance";
 
 type TabKey = "input" | "reconciliation" | "history";
@@ -57,8 +63,10 @@ export default function MobilePresensiKelasPage() {
   const router = useRouter();
   const canManage = hasPermission(user, "class_attendance.manage");
   const canDelete = hasPermission(user, "class_attendance.delete");
+  const canEditTemplate = hasPermission(user, "notification.template");
 
   const [activeTab, setActiveTab] = useState<TabKey>("input");
+  const [templateDialogOpen, setTemplateDialogOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [feedback, setFeedback] = useState<{
     tone: "success" | "error" | "warning";
@@ -105,16 +113,15 @@ export default function MobilePresensiKelasPage() {
   // Jadwal bel hanya KETERANGAN: kalau sekolah belum mengisinya, layar ini
   // tetap berjalan dan pukulnya saja yang tidak muncul.
   const [lessonPeriods, setLessonPeriods] = useState<LessonPeriodRow[]>([]);
-  const pukulBel = (() => {
-    const awal = lessonPeriods.find(
-      (row) => row.jam_ke === jamKeDari && row.is_aktif === 1,
-    );
-    const akhir = lessonPeriods.find(
-      (row) => row.jam_ke === jamKeSampai && row.is_aktif === 1,
-    );
-    if (!awal || !akhir) return null;
-    return `${awal.jam_mulai}–${akhir.jam_selesai}`;
-  })();
+  const pukulBel =
+    selectedJamKe === null ? null : pukulJamKe(lessonPeriods, selectedJamKe);
+
+  // Sesi yang sedang berjalan menurut jadwal guru yang login, hanya sebagai
+  // USULAN: guru tetap menekan "Pakai sesi ini" lalu menyimpan sendiri. Jam
+  // sekarang dibaca dari perangkat dalam zona WIB, sama seperti tanggal bawaan
+  // layar ini; tidak ada yang disimpan dari nilai itu.
+  const [guruSaya, setGuruSaya] = useState("");
+  const [usulan, setUsulan] = useState<TeachingScheduleRow | null>(null);
   const [materiPokok, setMateriPokok] = useState<string>("");
   // Catatan umum sesi WAJIB ikut dimuat dan dikirim ulang saat menyunting:
   // penyimpanan menulis `catatan` apa adanya, jadi form tanpa kolom ini akan
@@ -200,7 +207,15 @@ export default function MobilePresensiKelasPage() {
         setSelectedRombel(String(rombelData[0]?.id_rombel));
       if (mapelData.length > 0 && !selectedMapelRef.current)
         setSelectedMapel(String(mapelData[0]?.id_mapel));
-      if (guruData.length > 0 && !selectedGuruRef.current)
+      // Aturan pencocokan guru sama dengan halaman Web.
+      const guruLogin = guruData.find(
+        (g) => g.id_guru === user?.id || g.id_guru === user?.kode_operator,
+      );
+      if (guruLogin) {
+        setGuruSaya(String(guruLogin.id_guru));
+        if (!selectedGuruRef.current)
+          setSelectedGuru(String(guruLogin.id_guru));
+      } else if (guruData.length > 0 && !selectedGuruRef.current)
         setSelectedGuru(String(guruData[0]?.id_guru));
     } catch {
       setFeedback({
@@ -208,7 +223,31 @@ export default function MobilePresensiKelasPage() {
         message: "Gagal memuat data master akademik.",
       });
     }
-  }, []);
+  }, [user]);
+
+  useEffect(() => {
+    if (!guruSaya || lessonPeriods.length === 0) return;
+    let batal = false;
+    const sekarang = new Date();
+    getJadwalMengajar({
+      id_guru: guruSaya,
+      tanggal: formatTanggalOperasional(sekarang),
+    })
+      .then((rows) => {
+        if (batal) return;
+        setUsulan(
+          usulkanSesiSekarang(
+            rows.filter((row) => row.is_aktif === 1),
+            lessonPeriods,
+            formatJamOperasional(sekarang).slice(0, 5),
+          ),
+        );
+      })
+      .catch(() => undefined);
+    return () => {
+      batal = true;
+    };
+  }, [guruSaya, lessonPeriods]);
 
   useEffect(() => {
     if (!isAuthenticated) return;
@@ -287,12 +326,14 @@ export default function MobilePresensiKelasPage() {
         id_rombel: reconRombel || undefined,
       });
       setAnomalies(res.anomalies);
+      return true;
     } catch (err: unknown) {
       setFeedback({
         tone: "error",
         message:
           err instanceof Error ? err.message : "Gagal memuat rekonsiliasi.",
       });
+      return false;
     } finally {
       setLoadingRecon(false);
     }
@@ -575,9 +616,9 @@ export default function MobilePresensiKelasPage() {
     const normalized = normalizeOperatorPhone(item.no_whatsapp_wali);
     if (!normalized) return null;
 
-    // Teks dibedakan per jenis anomali di satu tempat bersama; dua anomali
+    // Teks disusun backend dari template per jenis anomali; dua anomali
     // rekonsiliasi artinya berlawanan dan tidak boleh memakai kalimat sama.
-    return { nomor: normalized, teks: buildParentNotificationText(item) };
+    return { nomor: normalized, teks: item.pesan_wali };
   };
 
   useEffect(() => {
@@ -685,6 +726,36 @@ export default function MobilePresensiKelasPage() {
         {/* TAB 1: INPUT PRESENSI KBM */}
         {activeTab === "input" ? (
           <div className="space-y-4">
+            {usulan && !editingSession ? (
+              <div className="rounded-2xl border border-sky-500/30 bg-sky-500/10 p-3.5">
+                <p className="text-xs leading-5 text-sky-100">
+                  <span className="font-bold">Sesi sekarang:</span> Jam{" "}
+                  {usulan.jam_ke}
+                  {pukulJamKe(lessonPeriods, usulan.jam_ke)
+                    ? ` (${pukulJamKe(lessonPeriods, usulan.jam_ke)})`
+                    : ""}{" "}
+                  · {usulan.nama_mapel || usulan.id_mapel} ·{" "}
+                  {usulan.nama_rombel || usulan.id_rombel}
+                </p>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const rentang = rentangJamKe(usulan.jam_ke);
+                    setSelectedRombel(usulan.id_rombel);
+                    setSelectedMapel(usulan.id_mapel);
+                    setSelectedGuru(usulan.id_guru);
+                    setSelectedDate(formatTanggalOperasional(new Date()));
+                    if (rentang) {
+                      setJamKeDari(rentang.awal);
+                      setJamKeSampai(rentang.akhir);
+                    }
+                  }}
+                  className="mt-2 min-h-11 w-full rounded-xl bg-sky-500 px-4 text-xs font-bold text-slate-950"
+                >
+                  Pakai sesi ini
+                </button>
+              </div>
+            ) : null}
             {editingSession ? (
               <div className="flex items-start justify-between gap-3 rounded-2xl border border-amber-500/30 bg-amber-500/10 p-3.5">
                 <div className="min-w-0">
@@ -1051,13 +1122,13 @@ export default function MobilePresensiKelasPage() {
                 type="date"
                 value={reconDate}
                 onChange={(e) => setReconDate(e.target.value)}
-                className="rounded-xl border border-white/10 bg-slate-950 px-3 py-1.5 text-xs font-semibold text-white outline-none"
+                className="min-h-11 rounded-xl border border-white/10 bg-slate-950 px-3 text-xs font-semibold text-white outline-none"
               />
               <select
                 aria-label="Rombongan belajar rekonsiliasi"
                 value={reconRombel}
                 onChange={(e) => setReconRombel(e.target.value)}
-                className="rounded-xl border border-white/10 bg-slate-950 px-2.5 py-1.5 text-xs font-semibold text-white outline-none"
+                className="min-h-11 rounded-xl border border-white/10 bg-slate-950 px-2.5 text-xs font-semibold text-white outline-none"
               >
                 <option value="">Semua Rombel</option>
                 {rombelList.map((r) => (
@@ -1074,10 +1145,19 @@ export default function MobilePresensiKelasPage() {
                 type="button"
                 onClick={handleLoadReconciliation}
                 disabled={loadingRecon}
-                className="rounded-xl bg-rose-500 px-3 py-1.5 text-xs font-bold text-white shadow"
+                className="min-h-11 rounded-xl bg-rose-500 px-4 text-xs font-bold text-white shadow"
               >
                 {loadingRecon ? "..." : "Analisis"}
               </button>
+              {canEditTemplate ? (
+                <button
+                  type="button"
+                  onClick={() => setTemplateDialogOpen(true)}
+                  className="min-h-11 rounded-xl border border-white/10 bg-slate-800 px-4 text-xs font-bold text-slate-200"
+                >
+                  Ubah Teks Pesan
+                </button>
+              ) : null}
             </div>
 
             {anomalies.length === 0 ? (
@@ -1227,6 +1307,18 @@ export default function MobilePresensiKelasPage() {
           </div>
         ) : null}
       </div>
+      <WaTemplateDialog
+        isOpen={templateDialogOpen}
+        onClose={() => setTemplateDialogOpen(false)}
+        kinds={REKONSILIASI_TEMPLATE_KINDS}
+        onSaved={async (message) => {
+          // Pesan disusun backend; muat ulang supaya tombol memakai teks baru.
+          // Pemuatan ulang mengosongkan banner, jadi pesan sukses menyusul.
+          if (anomalies.length === 0 || (await handleLoadReconciliation())) {
+            setFeedback({ tone: "success", message });
+          }
+        }}
+      />
       {dialogKonfirmasi}
     </MobileAppShell>
   );

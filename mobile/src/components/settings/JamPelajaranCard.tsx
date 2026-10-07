@@ -15,6 +15,7 @@ import {
   DEFAULT_JP_DURATION_MINUTES,
   DEFAULT_JP_MAX_PER_DAY,
   MAX_JAM_KE,
+  nomorJamKbmKosong,
 } from "@/lib/validations/class-attendance";
 
 /*
@@ -41,6 +42,7 @@ export function JamPelajaranCard() {
   } | null>(null);
 
   const [periods, setPeriods] = useState<LessonPeriodRow[]>([]);
+  const nomorKosong = nomorJamKbmKosong(periods);
 
   const muat = useCallback(async () => {
     try {
@@ -192,8 +194,9 @@ export function JamPelajaranCard() {
         <p className="text-xs font-bold text-slate-200">Jadwal bel</p>
         {periods.length === 0 ? (
           <p className="mt-1 text-[11px] leading-4 text-slate-500">
-            Belum diisi. Presensi tetap berjalan tanpa ini — pukulnya saja yang
-            belum muncul. Susun jadwalnya lewat Pengaturan di layar besar.
+            Belum diisi. Presensi tetap berjalan tanpa ini, hanya pukulnya yang
+            belum muncul. Susun jadwalnya di menu Akademik, tab Jam Pelajaran,
+            lewat layar besar.
           </p>
         ) : (
           <ul className="mt-2 flex flex-col gap-1">
@@ -203,8 +206,7 @@ export function JamPelajaranCard() {
                 className="flex items-center justify-between gap-2 text-[11px]"
               >
                 <span className="text-slate-400">
-                  Jam ke-{row.jam_ke}
-                  {row.jenis === "KBM" ? "" : ` · ${row.jenis}`}
+                  {row.jenis === "KBM" ? `Jam ke-${row.jam_ke}` : row.jenis}
                   {row.is_aktif === 1 ? "" : " · nonaktif"}
                 </span>
                 <span className="font-mono text-slate-300">
@@ -214,6 +216,12 @@ export function JamPelajaranCard() {
             ))}
           </ul>
         )}
+        {nomorKosong.length > 0 ? (
+          <p className="mt-2 text-[11px] leading-4 text-amber-100">
+            Nomor jam ke-{nomorKosong.join(", ")} belum terisi. Rapikan
+            penomorannya di menu Akademik lewat layar besar.
+          </p>
+        ) : null}
       </div>
     </form>
   );
