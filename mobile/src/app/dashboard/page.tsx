@@ -31,12 +31,16 @@ export default function DashboardPage() {
   const canJurnalMengajar = canAccessArea(user, "jurnal_mengajar");
   const canLegerKehadiran = canAccessArea(user, "leger_kehadiran");
   const canPayroll = canAccessArea(user, "payroll");
+  const canInventaris = canAccessArea(user, "inventaris");
+  const canUks = canAccessArea(user, "uks");
   const hasAnyHubItem =
     canPresensiKelas ||
     canAudit ||
     canJurnalMengajar ||
     canLegerKehadiran ||
-    canPayroll;
+    canPayroll ||
+    canInventaris ||
+    canUks;
 
   const [metrics, setMetrics] = useState<DashboardMetrics | null>(null);
   const [recentScans, setRecentScans] = useState<Record<string, unknown>[]>([]);
@@ -139,6 +143,24 @@ export default function DashboardPage() {
                   title="Leger Kehadiran"
                   subtitle="Rekapitulasi semester & pembekuan rapor"
                   tone="indigo"
+                />
+              )}
+              {canInventaris && (
+                <HubRow
+                  href="/inventaris"
+                  icon="box"
+                  title="Inventaris"
+                  subtitle="Stok barang, obat UKS & kartu stok"
+                  tone="sky"
+                />
+              )}
+              {canUks && (
+                <HubRow
+                  href="/uks"
+                  icon="document"
+                  title="Kunjungan UKS"
+                  subtitle="Catat siswa sakit, obat, dan tindak lanjut"
+                  tone="sky"
                 />
               )}
               {canPayroll && (

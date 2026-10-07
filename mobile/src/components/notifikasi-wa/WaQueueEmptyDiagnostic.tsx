@@ -25,7 +25,8 @@ export function WaQueueEmptyDiagnostic({
     !config.bolosEnabled &&
     !config.ambangAlfaEnabled &&
     !config.koreksiAdminEnabled &&
-    !config.importManualEnabled;
+    !config.importManualEnabled &&
+    !config.uksEnabled;
 
   return (
     <div className="rounded-3xl border border-white/10 bg-slate-900/80 p-4">

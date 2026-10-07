@@ -63,6 +63,7 @@ const JENIS_LABEL: Record<string, string> = {
   ambang_alfa: "Ambang Alfa",
   koreksi_admin: "Koreksi Admin",
   import_manual: "Import Manual",
+  uks: "Kunjungan UKS",
 };
 
 function warnaStatus(status: string) {

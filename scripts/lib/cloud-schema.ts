@@ -18,9 +18,15 @@ import Database from "bun:sqlite";
 
 export type TableSchema = Map<string, Set<string>>;
 
-/** Statement DDL yang layak dijalankan ulang di SQLite lokal. */
+/**
+ * Statement DDL yang layak dijalankan ulang di SQLite lokal.
+ *
+ * `CREATE VIEW` ikut sejak v35: stok inventaris dihitung lewat view
+ * `inventory_saldo`, dan query aplikasi membacanya. Tanpa view ini `audit:sql`
+ * tidak bisa mem-`prepare` query stok sama sekali.
+ */
 const DDL_PREFIX =
-	/^\s*(CREATE\s+TABLE|CREATE\s+INDEX|CREATE\s+UNIQUE\s+INDEX|ALTER\s+TABLE)\b/i;
+	/^\s*(CREATE\s+TABLE|CREATE\s+INDEX|CREATE\s+UNIQUE\s+INDEX|CREATE\s+VIEW|ALTER\s+TABLE)\b/i;
 
 /** Batch yang memuat DDL di tengahnya, misalnya diawali `PRAGMA`. */
 const DDL_ANYWHERE = /\b(CREATE\s+TABLE|ALTER\s+TABLE)\b/i;

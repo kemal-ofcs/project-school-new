@@ -13,6 +13,10 @@ const filesToSync = [
   "class_attendance.rs",
   "grades.rs",
   "teaching_journal.rs",
+  // Inventaris: aturan stok dan validasi mutasi wajib identik dengan Desktop.
+  "inventory.rs",
+  // Buku Kunjungan UKS: aturan dan alur salinan wajib identik dengan Desktop.
+  "uks.rs",
   "attendance_ledger.rs",
   "attendance_dashboard.rs",
   "wa_notification.rs",

@@ -36,6 +36,19 @@ const filesToCopy = [
   "components/AutoWaSenderRunner.tsx",
   "components/AutoSyncRunner.tsx",
   "components/LivenessCapture.tsx",
+  // UI inventaris: satu komponen untuk ketiga build. Hanya bergantung pada
+  // kontrak `Modal` yang sama dan gateway tersinkron; pesan sukses/galat ditulis
+  // di dalamnya karena `FeedbackBanner` kedua workspace berbeda props.
+  "components/inventory/InventarisWorkspace.tsx",
+  "components/inventory/PanelPemantauan.tsx",
+  "components/inventory/gaya.ts",
+  "components/inventory/beritaAcara.ts",
+  "components/inventory/ekspor.ts",
+  // Pemindai label (kamera + pemindai USB) dan dialog cetak label QR.
+  "components/inventory/LabelQr.tsx",
+  // UI Buku Kunjungan UKS, termasuk pemberitahuan offline dan "sinkronisasi
+  // terakhir"; bergantung pada `Modal` dan gaya inventaris yang ikut tersalin.
+  "components/uks/UksWorkspace.tsx",
   // Editor koleksi berulang CMS landing. Tidak punya perilaku khusus platform
   // dan bentuk datanya adalah kontrak dengan situs publik, jadi ia disalin
   // apa adanya alih-alih diduplikasi - dua salinan akan saling menyimpang

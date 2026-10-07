@@ -66,6 +66,8 @@ const TABEL_TUMBUH: Record<string, string> = {
 	jurnal_mengajar: "satu baris per sesi mengajar",
 	payroll_items: "satu baris per personil per periode gaji",
 	leger_kehadiran: "satu baris per siswa per periode rapor",
+	inventory_mutasi: "satu baris per barang yang masuk, keluar, atau berpindah",
+	uks_kunjungan: "satu baris per kunjungan ke UKS",
 };
 
 const SUMBER: Array<{ dir: string; ext: ".ts" | ".rs" }> = [
