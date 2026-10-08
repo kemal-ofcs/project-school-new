@@ -246,6 +246,8 @@ const MOBILE_COMMANDS: &[&str] = &[
     "desktop_inventory_record_opname",
     "desktop_inventory_cancel_mutation",
     "desktop_inventory_stock_card",
+    "desktop_inventory_register_units",
+    "desktop_inventory_save_unit",
     "desktop_get_ledger_preview",
     "desktop_freeze_attendance_ledger",
     "desktop_get_frozen_ledger",

@@ -297,6 +297,8 @@ pub fn run() {
             mobile::commands::desktop_inventory_record_opname,
             mobile::commands::desktop_inventory_cancel_mutation,
             mobile::commands::desktop_inventory_stock_card,
+            mobile::commands::desktop_inventory_register_units,
+            mobile::commands::desktop_inventory_save_unit,
             mobile::commands::desktop_get_ledger_preview,
             mobile::commands::desktop_freeze_attendance_ledger,
             mobile::commands::desktop_get_frozen_ledger,

@@ -2,7 +2,7 @@
 
 **Produk:** Manajemen Sekolah (Web, Desktop Tauri v2, Mobile Android Tauri v2)
 **Versi dokumen:** 2.2 (final, revisi dari draf 1.0 tanggal 7 Oktober 2026; menambah Buku Kunjungan UKS sebagai Fase 4)
-**Status:** Semua keputusan di §11 sudah diambil. Fase 1, 2, 3, 4a, 4b, dan fase label QR + opname pindai sudah diimplementasikan (7 Oktober 2026).
+**Status:** Semua keputusan di §11 sudah diambil. Fase 1, 2, 3, 4a, 4b, fase label QR + opname pindai (7 Oktober 2026), dan registri aset per unit (8 Oktober 2026) sudah diimplementasikan.
 **Tanggal:** 7 Oktober 2026
 
 ---
@@ -53,7 +53,7 @@ Petugas TU/Sarpras biasanya bekerja di laptop kantor. Kepala sekolah membuka lap
 
 ### Di luar cakupan v1
 
-- **Registri aset per unit** (nomor seri, label per laptop). V1 mencatat aset sebagai jumlah per tempat dan kondisi. Ditunda (§11 no. 4).
+- ~~**Registri aset per unit**~~ Dikerjakan 8 Oktober 2026 (schema v37, `inventory_unit`). Keputusan rencananya: pilihan per barang Aset lewat "Daftarkan unit" atau kotak "Catat per unit" saat barang masuk; unit = batch berjumlah 1 (`id_unit` = id mutasi Masuk pembukanya); stok lama didaftarkan lewat Keluar + Masuk beralasan `Distribusi` (tanpa alasan baru, supaya CHECK perangkat lama tidak menolak) dan tidak bisa dibatalkan; kode unit `<kode barang>-NN`; isian hanya nomor seri dan catatan; unit yang tidak dipindai saat opname tetap dianggap ada sampai petugas menekan "Catat yang belum dipindai sebagai tidak ditemukan".
 - **Pencatatan resmi BMD/KIB dan SPJ BOS (ARKAS).** Export Excel dari modul ini membantu menyusunnya, tetapi bukan format resmi dan tidak menggantikan aplikasi pemerintah.
 - **Penilaian persediaan** (FIFO/rata-rata) dan nilai buku aset. Laporan hanya menjumlahkan nilai **pengadaan** dari harga yang diisi saat barang masuk.
 - **Konversi satuan** (1 rim = 500 lembar). Satu barang punya satu satuan. Pilih satuan sesuai cara barang itu dikeluarkan.

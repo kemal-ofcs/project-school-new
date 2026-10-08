@@ -46,6 +46,8 @@ const filesToCopy = [
   "components/inventory/ekspor.ts",
   // Pemindai label (kamera + pemindai USB) dan dialog cetak label QR.
   "components/inventory/LabelQr.tsx",
+  // Registri aset per unit: daftarkan unit dan ubah nomor seri.
+  "components/inventory/UnitAset.tsx",
   // UI Buku Kunjungan UKS, termasuk pemberitahuan offline dan "sinkronisasi
   // terakhir"; bergantung pada `Modal` dan gaya inventaris yang ikut tersalin.
   "components/uks/UksWorkspace.tsx",
