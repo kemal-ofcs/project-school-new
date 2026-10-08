@@ -254,7 +254,9 @@ html[data-theme="light"],
 html.light {
   --color-sky-950: #f0f9ff;
   --color-sky-900: #e0f2fe;
-  --color-sky-400: #0284c7;
+  /* #0284c7 hanya 4.10:1 di atas putih, baik sebagai teks maupun sebagai
+     latar tombol berteks putih; ambang teks normal 4.5:1. */
+  --color-sky-400: #0369a1;
   --color-sky-300: #0369a1;
   --color-sky-200: #075985;
 
