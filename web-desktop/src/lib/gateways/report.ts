@@ -3,9 +3,18 @@
 import { requestWebApi } from "@/lib/client/api-client";
 import { isDesktopRuntime } from "@/lib/runtime/app-runtime";
 import { invokeDesktop, kickDesktopSync } from "@/lib/runtime/desktop-commands";
-import type { DashboardMetrics, RekapBulananItem } from "@/lib/services/report";
+import type {
+  DashboardMetrics,
+  RekapBulananItem,
+  TrenMingguan,
+} from "@/lib/services/report";
 
-export type { DashboardMetrics, RekapBulananItem } from "@/lib/services/report";
+export type {
+  DashboardMetrics,
+  RekapBulananItem,
+  RekapTanggal,
+  TrenMingguan,
+} from "@/lib/services/report";
 
 async function query<T>(kind: string, filter: Record<string, unknown> = {}) {
   if (isDesktopRuntime())
@@ -19,6 +28,8 @@ async function query<T>(kind: string, filter: Record<string, unknown> = {}) {
 }
 
 export const getDashboardMetrics = () => query<DashboardMetrics>("metrics");
+/** Senin-Minggu pekan berjalan, tidak mengikuti filter tanggal tabel. */
+export const getTrenMingguan = () => query<TrenMingguan>("weekly-trend");
 export const getRekapHarian = (
   filter: {
     tanggal?: string;

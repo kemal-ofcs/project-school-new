@@ -1071,17 +1071,19 @@ export default function MobilePresensiKelasPage() {
                               }
                               disabled={Boolean(editingSession) && !canManage}
                               aria-pressed={isActive}
+                              // Warna tetap: `slate-950` dan `black` ikut dibalik
+                              // tema terang sehingga teksnya pudar di atas -500.
                               className={`py-1.5 rounded-lg text-xs font-black transition ${
                                 isActive
                                   ? opt.tone === "emerald"
-                                    ? "bg-emerald-500 text-slate-950"
+                                    ? "bg-emerald-500 text-[#020617]"
                                     : opt.tone === "sky"
-                                      ? "bg-sky-500 text-slate-950"
+                                      ? "bg-sky-500 text-[#020617]"
                                       : opt.tone === "amber"
-                                        ? "bg-amber-500 text-slate-950"
+                                        ? "bg-amber-500 text-[#020617]"
                                         : opt.tone === "rose"
-                                          ? "bg-rose-500 text-white"
-                                          : "bg-purple-500 text-white"
+                                          ? "bg-rose-500 text-[#020617]"
+                                          : "bg-purple-500 text-[#020617]"
                                   : "bg-slate-950 text-slate-400 border border-white/5"
                               }`}
                             >

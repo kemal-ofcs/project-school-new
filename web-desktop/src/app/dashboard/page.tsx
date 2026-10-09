@@ -18,10 +18,10 @@ import { useAuth } from "@/lib/context/AuthContext";
 import {
   type DashboardMetrics,
   getDashboardMetrics,
-  getRekapBulanan,
   getRekapHarian,
   getTopKaryawanTerajin,
-  type RekapBulananItem,
+  getTrenMingguan,
+  type TrenMingguan,
 } from "@/lib/gateways/report";
 import { subscribeSyncCompleted } from "@/lib/gateways/sync-status";
 import { useCompanyName } from "@/lib/hooks/useCompanyName";
@@ -33,9 +33,9 @@ export default function DashboardPage() {
   const companyName = useCompanyName();
 
   const [metrics, setMetrics] = useState<DashboardMetrics | null>(null);
-  const [activeTab, setActiveTab] = useState<
-    "harian" | "bulanan" | "leaderboard"
-  >("harian");
+  const [activeTab, setActiveTab] = useState<"harian" | "leaderboard">(
+    "harian",
+  );
   const [filterMode, setFilterMode] = useState<"single" | "range">("single");
   const [startDate, setStartDate] = useState<string>(
     new Date().toLocaleDateString("en-CA"),
@@ -46,12 +46,10 @@ export default function DashboardPage() {
   const [rekapHarianList, setRekapHarianList] = useState<
     Record<string, unknown>[]
   >([]);
-  const [rekapBulananList, setRekapBulananList] = useState<RekapBulananItem[]>(
-    [],
-  );
   const [topKaryawanList, setTopKaryawanList] = useState<
     Record<string, unknown>[]
   >([]);
+  const [trenMingguan, setTrenMingguan] = useState<TrenMingguan | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [exportMessage, setExportMessage] = useState<string | null>(null);
@@ -65,7 +63,7 @@ export default function DashboardPage() {
   const [currentPage, setCurrentPage] = useState<number>(1);
   const [rowsPerPage, setRowsPerPage] = useState<number>(15);
 
-  // ── Overview data: metrics, bulanan, leaderboard ─────────────────────────
+  // ── Overview data: metrics, leaderboard ──────────────────────────────────
   useEffect(() => {
     if (!isHydrated || !isAuthenticated) return;
 
@@ -75,15 +73,15 @@ export default function DashboardPage() {
 
     async function loadOverviewData() {
       try {
-        const [metricsData, bulananData, topData] = await Promise.all([
+        const [metricsData, topData, trenData] = await Promise.all([
           getDashboardMetrics(),
-          getRekapBulanan(),
           getTopKaryawanTerajin(10),
+          getTrenMingguan(),
         ]);
         if (isCancelled) return;
         setMetrics(metricsData);
-        setRekapBulananList(bulananData);
         setTopKaryawanList(topData);
+        setTrenMingguan(trenData);
       } catch (error: unknown) {
         if (isCancelled) return;
         setLoadError(
@@ -132,18 +130,18 @@ export default function DashboardPage() {
     return subscribeSyncCompleted(() => {
       Promise.all([
         getDashboardMetrics(),
-        getRekapBulanan(),
         getTopKaryawanTerajin(10),
+        getTrenMingguan(),
         getRekapHarian(
           filterMode === "range"
             ? { tanggal_mulai: startDate, tanggal_selesai: endDate }
             : { tanggal: startDate },
         ),
       ])
-        .then(([metricsData, bulananData, topData, harianData]) => {
+        .then(([metricsData, topData, trenData, harianData]) => {
           setMetrics(metricsData);
-          setRekapBulananList(bulananData);
           setTopKaryawanList(topData);
+          setTrenMingguan(trenData);
           setRekapHarianList(harianData);
         })
         .catch(() => undefined);
@@ -165,12 +163,8 @@ export default function DashboardPage() {
       const div = String(row.kelas_divisi || row.divisi || "").trim();
       if (div && div !== "-") set.add(div);
     }
-    for (const row of rekapBulananList) {
-      const div = String(row.divisi || "").trim();
-      if (div && div !== "-") set.add(div);
-    }
     return Array.from(set).sort();
-  }, [rekapHarianList, rekapBulananList]);
+  }, [rekapHarianList]);
 
   // ── Filtered & Sorted Daily List ─────────────────────────────────────────
   const filteredDailyList = useMemo(() => {
@@ -242,61 +236,8 @@ export default function DashboardPage() {
     sortOrder,
   ]);
 
-  // ── Filtered & Sorted Monthly List ───────────────────────────────────────
-  const filteredMonthlyList = useMemo(() => {
-    let list = [...rekapBulananList];
-
-    if (searchQuery.trim()) {
-      const q = searchQuery.toLowerCase().trim();
-      list = list.filter(
-        (row) =>
-          row.nama.toLowerCase().includes(q) ||
-          row.idKaryawan.toLowerCase().includes(q) ||
-          row.divisi.toLowerCase().includes(q),
-      );
-    }
-
-    if (divisionFilter !== "all") {
-      list = list.filter((row) => row.divisi.trim() === divisionFilter);
-    }
-
-    list.sort((a, b) => {
-      let valA: string | number = "";
-      let valB: string | number = "";
-
-      if (sortField === "nama") {
-        valA = a.nama.toLowerCase();
-        valB = b.nama.toLowerCase();
-      } else if (sortField === "divisi") {
-        valA = a.divisi.toLowerCase();
-        valB = b.divisi.toLowerCase();
-      } else if (sortField === "totalHadir") {
-        valA = a.totalHadir;
-        valB = b.totalHadir;
-      } else if (sortField === "totalTerlambat") {
-        valA = a.totalTerlambat;
-        valB = b.totalTerlambat;
-      } else if (sortField === "totalJamKerja") {
-        valA = a.totalJamKerja;
-        valB = b.totalJamKerja;
-      } else {
-        valA = a.idKaryawan;
-        valB = b.idKaryawan;
-      }
-
-      if (valA < valB) return sortOrder === "asc" ? -1 : 1;
-      if (valA > valB) return sortOrder === "asc" ? 1 : -1;
-      return 0;
-    });
-
-    return list;
-  }, [rekapBulananList, searchQuery, divisionFilter, sortField, sortOrder]);
-
   // ── Pagination Calculation ───────────────────────────────────────────────
-  const totalItems =
-    activeTab === "harian"
-      ? filteredDailyList.length
-      : filteredMonthlyList.length;
+  const totalItems = filteredDailyList.length;
   const effectiveRowsPerPage = rowsPerPage > 0 ? rowsPerPage : totalItems || 1;
   const totalPages = Math.max(1, Math.ceil(totalItems / effectiveRowsPerPage));
 
@@ -305,12 +246,6 @@ export default function DashboardPage() {
     const start = (currentPage - 1) * rowsPerPage;
     return filteredDailyList.slice(start, start + rowsPerPage);
   }, [filteredDailyList, currentPage, rowsPerPage]);
-
-  const paginatedMonthlyList = useMemo(() => {
-    if (rowsPerPage <= 0) return filteredMonthlyList;
-    const start = (currentPage - 1) * rowsPerPage;
-    return filteredMonthlyList.slice(start, start + rowsPerPage);
-  }, [filteredMonthlyList, currentPage, rowsPerPage]);
 
   const handleSort = (field: string) => {
     if (sortField === field) {
@@ -329,8 +264,8 @@ export default function DashboardPage() {
       if (activeTab === "harian") {
         const filename =
           filterMode === "range" && startDate !== endDate
-            ? `Rekap_Harian_${startDate}_sd_${endDate}.csv`
-            : `Rekap_Harian_${startDate}.csv`;
+            ? `Rekap_Kehadiran_${startDate}_sd_${endDate}.csv`
+            : `Rekap_Kehadiran_${startDate}.csv`;
         const headers = [
           "ID / NIK",
           "Nama Karyawan",
@@ -352,40 +287,6 @@ export default function DashboardPage() {
           String(row.status_kehadiran ?? ""),
           Number(row.menit_terlambat ?? 0),
           String(row.keterangan ?? "-"),
-        ]);
-        const res = await exportToCsv(filename, headers, rows);
-        if (res.sukses) {
-          setExportMessage(
-            `Berkas CSV berhasil disimpan: ${res.filename || filename}`,
-          );
-        }
-      } else if (activeTab === "bulanan") {
-        const filename = `Rekap_Bulanan_Absensi_${new Date().toLocaleDateString("en-CA")}.csv`;
-        const headers = [
-          "ID Karyawan",
-          "Nama",
-          "Divisi",
-          "Total Hadir",
-          "Total Telat (Menit)",
-          "Frekuensi Telat",
-          "Total Sakit",
-          "Total Izin",
-          "Total Alfa",
-          "Total Jam Kerja",
-          "Total Lembur",
-        ];
-        const rows = filteredMonthlyList.map((row) => [
-          row.idKaryawan,
-          row.nama,
-          row.divisi,
-          row.totalHadir,
-          row.totalTerlambat,
-          row.frekuensiTelat,
-          row.totalSakit,
-          row.totalIzin,
-          row.totalAlfa,
-          row.totalJamKerja,
-          row.totalLembur,
         ]);
         const res = await exportToCsv(filename, headers, rows);
         if (res.sukses) {
@@ -408,8 +309,8 @@ export default function DashboardPage() {
       if (activeTab === "harian") {
         const filename =
           filterMode === "range" && startDate !== endDate
-            ? `Rekap_Harian_${startDate}_sd_${endDate}.xlsx`
-            : `Rekap_Harian_${startDate}.xlsx`;
+            ? `Rekap_Kehadiran_${startDate}_sd_${endDate}.xlsx`
+            : `Rekap_Kehadiran_${startDate}.xlsx`;
         const headers = [
           "ID / NIK",
           "Nama Karyawan",
@@ -434,46 +335,7 @@ export default function DashboardPage() {
         ]);
         const res = await exportToExcel(
           filename,
-          "Rekap Harian",
-          headers,
-          rows,
-        );
-        if (res.sukses) {
-          setExportMessage(
-            `Berkas Excel berhasil disimpan: ${res.filename || filename}`,
-          );
-        }
-      } else if (activeTab === "bulanan") {
-        const filename = `Rekap_Bulanan_Absensi_${new Date().toLocaleDateString("en-CA")}.xlsx`;
-        const headers = [
-          "ID Karyawan",
-          "Nama",
-          "Divisi",
-          "Total Hadir",
-          "Total Telat (Menit)",
-          "Frekuensi Telat",
-          "Total Sakit",
-          "Total Izin",
-          "Total Alfa",
-          "Total Jam Kerja",
-          "Total Lembur",
-        ];
-        const rows = filteredMonthlyList.map((row) => [
-          row.idKaryawan,
-          row.nama,
-          row.divisi,
-          row.totalHadir,
-          row.totalTerlambat,
-          row.frekuensiTelat,
-          row.totalSakit,
-          row.totalIzin,
-          row.totalAlfa,
-          row.totalJamKerja,
-          row.totalLembur,
-        ]);
-        const res = await exportToExcel(
-          filename,
-          "Rekap Bulanan",
+          "Rekap Kehadiran",
           headers,
           rows,
         );
@@ -519,8 +381,8 @@ export default function DashboardPage() {
               Rekap & Laporan Kehadiran {companyName}
             </h1>
             <p className="text-sm text-slate-400 mt-1">
-              Laporan agregasi absensi harian/bulanan, peringkat terajin, dan
-              ekspor data Excel.
+              Rekap kehadiran per tanggal atau rentang tanggal, peringkat
+              terajin, dan ekspor data Excel.
             </p>
           </div>
 
@@ -532,9 +394,8 @@ export default function DashboardPage() {
                   onClick={handleExportCSV}
                   disabled={
                     isLoading ||
-                    (activeTab === "harian"
-                      ? filteredDailyList.length === 0
-                      : filteredMonthlyList.length === 0)
+                    activeTab !== "harian" ||
+                    filteredDailyList.length === 0
                   }
                   className="flex items-center justify-center gap-1.5 rounded-xl border border-slate-700 bg-slate-800 px-3.5 py-2 text-xs font-bold text-sky-200 shadow-md transition hover:bg-slate-700 disabled:opacity-50"
                 >
@@ -546,9 +407,8 @@ export default function DashboardPage() {
                   onClick={handleExportExcel}
                   disabled={
                     isLoading ||
-                    (activeTab === "harian"
-                      ? filteredDailyList.length === 0
-                      : filteredMonthlyList.length === 0)
+                    activeTab !== "harian" ||
+                    filteredDailyList.length === 0
                   }
                   className="flex items-center justify-center gap-1.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 px-3.5 py-2 text-xs font-bold text-white shadow-lg shadow-emerald-950/60 transition hover:from-emerald-500 hover:to-teal-500 disabled:opacity-50"
                 >
@@ -748,7 +608,7 @@ export default function DashboardPage() {
           {/* Right: Weekly Trend Bars */}
           <div className="lg:col-span-8">
             <AttendanceWeeklyTrend
-              rekapHarian={rekapHarianList}
+              tren={trenMingguan}
               totalKaryawan={metrics?.totalKaryawan ?? 1}
             />
           </div>
@@ -770,22 +630,8 @@ export default function DashboardPage() {
               }`}
             >
               {filterMode === "single" || startDate === endDate
-                ? `Rekap Harian (${startDate})`
-                : `Rekap (${startDate} s/d ${endDate})`}
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setActiveTab("bulanan");
-                setCurrentPage(1);
-              }}
-              className={`px-4 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition ${
-                activeTab === "bulanan"
-                  ? "bg-gradient-to-r from-sky-800 to-sky-700 text-white shadow-md shadow-sky-950"
-                  : "text-slate-400 hover:text-white"
-              }`}
-            >
-              Rekap Bulanan
+                ? `Rekap Kehadiran (${startDate})`
+                : `Rekap Kehadiran (${startDate} s/d ${endDate})`}
             </button>
             <button
               type="button"
@@ -1149,133 +995,6 @@ export default function DashboardPage() {
                         </td>
                         <td className="p-4 text-slate-400">
                           {String(row.keterangan || "-")}
-                        </td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            </div>
-          ) : activeTab === "bulanan" ? (
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs border-collapse">
-                <thead>
-                  <tr className="bg-slate-950 text-slate-400 border-b border-slate-800 font-mono select-none">
-                    <th
-                      className="p-4 cursor-pointer hover:text-white transition"
-                      onClick={() => handleSort("id")}
-                    >
-                      <div className="flex items-center gap-1">
-                        <span>ID</span>
-                        {sortField === "id" && (
-                          <span>{sortOrder === "asc" ? "▲" : "▼"}</span>
-                        )}
-                      </div>
-                    </th>
-                    <th
-                      className="p-4 cursor-pointer hover:text-white transition"
-                      onClick={() => handleSort("nama")}
-                    >
-                      <div className="flex items-center gap-1">
-                        <span>Nama</span>
-                        {sortField === "nama" && (
-                          <span>{sortOrder === "asc" ? "▲" : "▼"}</span>
-                        )}
-                      </div>
-                    </th>
-                    <th
-                      className="p-4 cursor-pointer hover:text-white transition"
-                      onClick={() => handleSort("divisi")}
-                    >
-                      <div className="flex items-center gap-1">
-                        <span>Divisi</span>
-                        {sortField === "divisi" && (
-                          <span>{sortOrder === "asc" ? "▲" : "▼"}</span>
-                        )}
-                      </div>
-                    </th>
-                    <th
-                      className="p-4 cursor-pointer hover:text-white transition"
-                      onClick={() => handleSort("totalHadir")}
-                    >
-                      <div className="flex items-center gap-1">
-                        <span>Hadir</span>
-                        {sortField === "totalHadir" && (
-                          <span>{sortOrder === "asc" ? "▲" : "▼"}</span>
-                        )}
-                      </div>
-                    </th>
-                    <th
-                      className="p-4 cursor-pointer hover:text-white transition"
-                      onClick={() => handleSort("totalTerlambat")}
-                    >
-                      <div className="flex items-center gap-1">
-                        <span>Total Telat</span>
-                        {sortField === "totalTerlambat" && (
-                          <span>{sortOrder === "asc" ? "▲" : "▼"}</span>
-                        )}
-                      </div>
-                    </th>
-                    <th className="p-4">Frekuensi Telat</th>
-                    <th className="p-4">Sakit</th>
-                    <th className="p-4">Izin</th>
-                    <th className="p-4">Alfa</th>
-                    <th
-                      className="p-4 cursor-pointer hover:text-white transition"
-                      onClick={() => handleSort("totalJamKerja")}
-                    >
-                      <div className="flex items-center gap-1">
-                        <span>Jam Kerja</span>
-                        {sortField === "totalJamKerja" && (
-                          <span>{sortOrder === "asc" ? "▲" : "▼"}</span>
-                        )}
-                      </div>
-                    </th>
-                    <th className="p-4">Lembur</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-800/60 font-mono">
-                  {paginatedMonthlyList.length === 0 ? (
-                    <tr>
-                      <td
-                        colSpan={11}
-                        className="p-12 text-center text-slate-400 font-sans"
-                      >
-                        Tidak ada data akumulasi bulanan yang sesuai filter.
-                      </td>
-                    </tr>
-                  ) : (
-                    paginatedMonthlyList.map((row) => (
-                      <tr
-                        key={row.idKaryawan}
-                        className="hover:bg-slate-800/40 transition"
-                      >
-                        <td className="p-4 text-sky-400 font-bold">
-                          {row.idKaryawan}
-                        </td>
-                        <td className="p-4 text-white font-semibold">
-                          {row.nama}
-                        </td>
-                        <td className="p-4 text-slate-300">{row.divisi}</td>
-                        <td className="p-4 text-sky-300 font-bold">
-                          {row.totalHadir} Hari
-                        </td>
-                        <td className="p-4 text-amber-300 font-bold">
-                          {row.totalTerlambat} Mnt
-                        </td>
-                        <td className="p-4 text-slate-300">
-                          {row.frekuensiTelat}x
-                        </td>
-                        <td className="p-4 text-sky-300">{row.totalSakit}</td>
-                        <td className="p-4 text-purple-300">{row.totalIzin}</td>
-                        <td className="p-4 text-rose-400 font-bold">
-                          {row.totalAlfa}
-                        </td>
-                        <td className="p-4 text-slate-300">
-                          {row.totalJamKerja} Jam
-                        </td>
-                        <td className="p-4 text-amber-400 font-bold">
-                          {row.totalLembur} Jam
                         </td>
                       </tr>
                     ))

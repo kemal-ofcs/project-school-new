@@ -27,6 +27,91 @@ export interface RekapBulananItem {
   totalLembur: number; // Jam
 }
 
+/** Hitungan kehadiran satu tanggal; kategorinya saling lepas per orang. */
+export interface RekapTanggal {
+  tanggal: string;
+  tepat_waktu: number;
+  terlambat: number;
+  sakit_izin: number;
+  alfa: number;
+}
+
+export interface TrenMingguan {
+  /** Senin pekan berjalan (WIB), dihitung SQLite, bukan jam perangkat. */
+  mulai: string;
+  hari_ini: string;
+  /** Hanya tanggal yang punya data; tanggal lain berarti nol. */
+  hari: RekapTanggal[];
+}
+
+/**
+ * Satu orang dihitung SEKALI per tanggal walau punya beberapa sesi
+ * (`izinkan_multi_sesi`); menghitung baris mentah menggandakannya. Hadir
+ * mengikuti leger (`attendance-ledger.ts`): scan gerbang yang bukan Alfa ATAU
+ * status Hadir/Terlambat. Terlambat bila SALAH SATU sesi terlambat. Hadir
+ * menang atas Sakit/Izin, yang menang atas Alfa. Cermin persis
+ * `REKAP_PER_TANGGAL_SQL` di `administration.rs`; keduanya diuji dengan fixture
+ * yang sama (`report.test.ts` ↔ `rekap_per_tanggal_*`).
+ */
+const REKAP_PER_TANGGAL_SQL = `
+  SELECT tanggal,
+    SUM(CASE WHEN hadir = 1 AND telat = 0 THEN 1 ELSE 0 END) AS tepat_waktu,
+    SUM(CASE WHEN hadir = 1 AND telat > 0 THEN 1 ELSE 0 END) AS terlambat,
+    SUM(CASE WHEN hadir = 0 AND sakit_izin = 1 THEN 1 ELSE 0 END) AS sakit_izin,
+    SUM(CASE WHEN hadir = 0 AND sakit_izin = 0 AND alfa = 1 THEN 1 ELSE 0 END) AS alfa
+  FROM (
+    SELECT id_karyawan, tanggal,
+      MAX(CASE
+        WHEN (COALESCE(TRIM(jam_masuk), '') <> ''
+              AND COALESCE(status_kehadiran, '') <> 'Alfa')
+          OR status_kehadiran IN ('Hadir', 'Terlambat')
+        THEN 1 ELSE 0 END) AS hadir,
+      MAX(COALESCE(menit_terlambat, 0)) AS telat,
+      MAX(CASE WHEN status_kehadiran IN ('Sakit', 'Izin', 'Dispen', 'Dispensasi')
+        THEN 1 ELSE 0 END) AS sakit_izin,
+      MAX(CASE WHEN status_kehadiran = 'Alfa' THEN 1 ELSE 0 END) AS alfa
+    FROM absensi_harian
+    WHERE tanggal BETWEEN ? AND ?
+    GROUP BY id_karyawan, tanggal
+  )
+  GROUP BY tanggal
+  ORDER BY tanggal;
+`;
+
+export async function rekapPerTanggal(
+  mulai: string,
+  selesai: string,
+): Promise<RekapTanggal[]> {
+  const result = await db.execute({
+    sql: REKAP_PER_TANGGAL_SQL,
+    args: [mulai, selesai],
+  });
+  return result.rows.map((row) => ({
+    tanggal: String(row.tanggal),
+    tepat_waktu: Number(row.tepat_waktu || 0),
+    terlambat: Number(row.terlambat || 0),
+    sakit_izin: Number(row.sakit_izin || 0),
+    alfa: Number(row.alfa || 0),
+  }));
+}
+
+export async function getTrenMingguan(): Promise<TrenMingguan> {
+  await ensureDbInitialized();
+  // `weekday 0` maju ke Minggu terdekat (hari ini bila sudah Minggu), lalu
+  // mundur 6 hari ke Senin pekan yang sama.
+  const pekan = await db.execute(`
+    SELECT date('now', '+7 hours', 'weekday 0', '-6 days') AS mulai,
+      date('now', '+7 hours', 'weekday 0') AS selesai,
+      date('now', '+7 hours') AS hari_ini;
+  `);
+  const { mulai, selesai, hari_ini } = pekan.rows[0] as Record<string, unknown>;
+  return {
+    mulai: String(mulai),
+    hari_ini: String(hari_ini),
+    hari: await rekapPerTanggal(String(mulai), String(selesai)),
+  };
+}
+
 export async function getDashboardMetrics(): Promise<DashboardMetrics> {
   await ensureDbInitialized();
 
@@ -38,25 +123,13 @@ export async function getDashboardMetrics(): Promise<DashboardMetrics> {
   );
   const totalKaryawan = Number(empRes.rows[0]?.count || 0);
 
-  // 2. Statistics Absensi Hari Ini
-  const statsRes = await db.execute({
-    sql: `
-      SELECT 
-        SUM(CASE WHEN status_kehadiran = 'Hadir' THEN 1 ELSE 0 END) as hadir,
-        SUM(CASE WHEN menit_terlambat > 0 THEN 1 ELSE 0 END) as terlambat,
-        SUM(CASE WHEN status_kehadiran IN ('Sakit', 'Izin', 'Dispen') THEN 1 ELSE 0 END) as sakit_izin,
-        SUM(CASE WHEN status_kehadiran = 'Alfa' THEN 1 ELSE 0 END) as alfa
-      FROM absensi_harian
-      WHERE tanggal = ?;
-    `,
-    args: [todayStr],
-  });
-
-  const row = statsRes.rows[0] as Record<string, unknown>;
-  const hadirHariIni = Number(row?.hadir || 0);
-  const terlambatHariIni = Number(row?.terlambat || 0);
-  const sakitIzinHariIni = Number(row?.sakit_izin || 0);
-  const alfaHariIni = Number(row?.alfa || 0);
+  // 2. Statistik hari ini: rumus yang sama dengan tren mingguan, sehingga
+  //    kartu KPI, donat, dan batang hari ini tidak pernah berselisih.
+  const [hariIni] = await rekapPerTanggal(todayStr, todayStr);
+  const terlambatHariIni = hariIni?.terlambat ?? 0;
+  const hadirHariIni = (hariIni?.tepat_waktu ?? 0) + terlambatHariIni;
+  const sakitIzinHariIni = hariIni?.sakit_izin ?? 0;
+  const alfaHariIni = hariIni?.alfa ?? 0;
 
   const persentaseKehadiran =
     totalKaryawan > 0 ? Math.round((hadirHariIni / totalKaryawan) * 100) : 0;

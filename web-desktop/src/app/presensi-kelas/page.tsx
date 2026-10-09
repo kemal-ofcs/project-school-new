@@ -1102,7 +1102,14 @@ export default function PresensiKelasPage() {
                             )}
                           </td>
                           <td className="px-4 py-2.5 text-center">
-                            <div className="inline-flex rounded-xl border border-white/10 bg-slate-950 p-0.5">
+                            {/* Aturan tab di globals.css menganggap tombol di
+                                dalam `div.bg-slate-950` sebagai tab nonaktif dan
+                                membuang latarnya di tema terang; tombol status
+                                dikecualikan lewat `status-kehadiran-pilihan`. */}
+                            <fieldset
+                              aria-label={`Status kehadiran ${item.nama_lengkap}`}
+                              className="inline-flex rounded-xl border border-white/10 bg-slate-950 p-0.5"
+                            >
                               {(
                                 [
                                   { key: "Hadir", label: "H", tone: "emerald" },
@@ -1127,7 +1134,12 @@ export default function PresensiKelasPage() {
                                         opt.key,
                                       )
                                     }
-                                    className={`size-7 rounded-lg text-xs font-black transition ${
+                                    aria-pressed={isActive}
+                                    aria-label={opt.key}
+                                    title={opt.key}
+                                    // Teks gelap di kelima warna: putih di atas
+                                    // rose/purple-500 hanya 3.7-4.0:1.
+                                    className={`status-kehadiran-pilihan size-7 rounded-lg text-xs font-black transition ${
                                       isActive
                                         ? opt.tone === "emerald"
                                           ? "bg-emerald-500 text-slate-950 shadow"
@@ -1136,8 +1148,8 @@ export default function PresensiKelasPage() {
                                             : opt.tone === "amber"
                                               ? "bg-amber-500 text-slate-950 shadow"
                                               : opt.tone === "rose"
-                                                ? "bg-rose-500 text-white shadow"
-                                                : "bg-purple-500 text-white shadow"
+                                                ? "bg-rose-500 text-slate-950 shadow"
+                                                : "bg-purple-500 text-slate-950 shadow"
                                         : "text-slate-400 hover:text-white"
                                     }`}
                                   >
@@ -1145,7 +1157,7 @@ export default function PresensiKelasPage() {
                                   </button>
                                 );
                               })}
-                            </div>
+                            </fieldset>
                           </td>
                           <td className="px-4 py-2.5">
                             <input

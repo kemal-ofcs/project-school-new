@@ -2077,6 +2077,112 @@ pub fn import_offline(
     }))
 }
 
+/// Cermin persis `REKAP_PER_TANGGAL_SQL` di `src/lib/services/report.ts`: satu
+/// orang dihitung SEKALI per tanggal walau multi-sesi, hadir = scan gerbang yang
+/// bukan Alfa ATAU status Hadir/Terlambat, terlambat bila salah satu sesi
+/// terlambat, dan Hadir > Sakit/Izin > Alfa. Fixture tesnya sama dengan
+/// `report.test.ts`; mengubah satu sisi tanpa sisi lain membuat Web dan Desktop
+/// menampilkan angka berbeda untuk hari yang sama.
+const REKAP_PER_TANGGAL_SQL: &str = r#"
+  SELECT tanggal,
+    SUM(CASE WHEN hadir = 1 AND telat = 0 THEN 1 ELSE 0 END) AS tepat_waktu,
+    SUM(CASE WHEN hadir = 1 AND telat > 0 THEN 1 ELSE 0 END) AS terlambat,
+    SUM(CASE WHEN hadir = 0 AND sakit_izin = 1 THEN 1 ELSE 0 END) AS sakit_izin,
+    SUM(CASE WHEN hadir = 0 AND sakit_izin = 0 AND alfa = 1 THEN 1 ELSE 0 END) AS alfa
+  FROM (
+    SELECT id_karyawan, tanggal,
+      MAX(CASE
+        WHEN (COALESCE(TRIM(jam_masuk), '') <> ''
+              AND COALESCE(status_kehadiran, '') <> 'Alfa')
+          OR status_kehadiran IN ('Hadir', 'Terlambat')
+        THEN 1 ELSE 0 END) AS hadir,
+      MAX(COALESCE(menit_terlambat, 0)) AS telat,
+      MAX(CASE WHEN status_kehadiran IN ('Sakit', 'Izin', 'Dispen', 'Dispensasi')
+        THEN 1 ELSE 0 END) AS sakit_izin,
+      MAX(CASE WHEN status_kehadiran = 'Alfa' THEN 1 ELSE 0 END) AS alfa
+    FROM absensi_harian
+    WHERE tanggal BETWEEN ? AND ?
+    GROUP BY id_karyawan, tanggal
+  )
+  GROUP BY tanggal
+  ORDER BY tanggal;
+"#;
+
+fn rekap_per_tanggal(
+    connection: &rusqlite::Connection,
+    mulai: &str,
+    selesai: &str,
+) -> Result<Vec<Value>, CommandError> {
+    let mut statement = connection
+        .prepare(REKAP_PER_TANGGAL_SQL)
+        .map_err(|_| CommandError::internal())?;
+    let rows = statement
+        .query_map(params![mulai, selesai], |row| {
+            Ok(json!({
+                "tanggal": row.get::<_, String>(0)?,
+                "tepat_waktu": row.get::<_, i64>(1)?,
+                "terlambat": row.get::<_, i64>(2)?,
+                "sakit_izin": row.get::<_, i64>(3)?,
+                "alfa": row.get::<_, i64>(4)?,
+            }))
+        })
+        .map_err(|_| CommandError::internal())?;
+    rows.collect::<Result<Vec<_>, _>>()
+        .map_err(|_| CommandError::internal())
+}
+
+/// Senin-Minggu pekan berjalan (WIB). `weekday 0` maju ke Minggu terdekat (hari
+/// ini bila sudah Minggu), lalu mundur 6 hari ke Senin. Cermin `getTrenMingguan`.
+fn tren_mingguan(connection: &rusqlite::Connection) -> Result<Value, CommandError> {
+    let (mulai, selesai, hari_ini): (String, String, String) = connection
+        .query_row(
+            "SELECT date('now', '+7 hours', 'weekday 0', '-6 days'), date('now', '+7 hours', 'weekday 0'), date('now', '+7 hours');",
+            [],
+            |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
+        )
+        .map_err(|_| CommandError::internal())?;
+    Ok(json!({
+        "mulai": mulai,
+        "hari_ini": hari_ini,
+        "hari": rekap_per_tanggal(connection, &mulai, &selesai)?,
+    }))
+}
+
+/// Kartu KPI dasbor. Hitungannya memakai `rekap_per_tanggal` yang sama dengan
+/// tren mingguan, sehingga kartu, donat, dan batang hari ini tidak berselisih.
+fn dashboard_metrics(connection: &rusqlite::Connection) -> Result<Value, CommandError> {
+    let (total, hari_ini): (i64, String) = connection
+        .query_row(
+            "SELECT (SELECT COUNT(*) FROM master_data WHERE status_aktif = 'Aktif'), date('now', '+7 hours');",
+            [],
+            |row| Ok((row.get(0)?, row.get(1)?)),
+        )
+        .map_err(|_| CommandError::internal())?;
+    let rekap = rekap_per_tanggal(connection, &hari_ini, &hari_ini)?;
+    let angka = |key: &str| {
+        rekap
+            .first()
+            .and_then(|row| row.get(key))
+            .and_then(Value::as_i64)
+            .unwrap_or(0)
+    };
+    let terlambat = angka("terlambat");
+    let hadir = angka("tepat_waktu") + terlambat;
+    let persentase = if total > 0 {
+        ((hadir as f64) * 100.0 / (total as f64)).round() as i64
+    } else {
+        0
+    };
+    Ok(json!({
+        "totalKaryawan": total,
+        "hadirHariIni": hadir,
+        "terlambatHariIni": terlambat,
+        "sakitIzinHariIni": angka("sakit_izin"),
+        "alfaHariIni": angka("alfa"),
+        "persentaseKehadiran": persentase,
+    }))
+}
+
 pub fn dashboard_data(
     state: &MobileState,
     kind: &str,
@@ -2084,22 +2190,10 @@ pub fn dashboard_data(
 ) -> Result<Value, CommandError> {
     let connection = storage::database(&state.data_dir)?;
     if kind == "metrics" {
-        let value: String = connection.query_row(
-            r#"
-      SELECT json_object(
-        'totalKaryawan', (SELECT COUNT(*) FROM master_data WHERE status_aktif = 'Aktif'),
-        'hadirHariIni', COALESCE(SUM(CASE WHEN status_kehadiran = 'Hadir' THEN 1 ELSE 0 END), 0),
-        'terlambatHariIni', COALESCE(SUM(CASE WHEN menit_terlambat > 0 THEN 1 ELSE 0 END), 0),
-        'sakitIzinHariIni', COALESCE(SUM(CASE WHEN status_kehadiran IN ('Sakit','Izin','Dispen') THEN 1 ELSE 0 END), 0),
-        'alfaHariIni', COALESCE(SUM(CASE WHEN status_kehadiran = 'Alfa' THEN 1 ELSE 0 END), 0),
-        'persentaseKehadiran', CASE WHEN (SELECT COUNT(*) FROM master_data WHERE status_aktif = 'Aktif') > 0
-          THEN ROUND(100.0 * SUM(CASE WHEN status_kehadiran = 'Hadir' THEN 1 ELSE 0 END) /
-            (SELECT COUNT(*) FROM master_data WHERE status_aktif = 'Aktif')) ELSE 0 END
-      ) FROM absensi_harian WHERE tanggal = date('now','+7 hours');
-      "#,
-            [], |row| row.get(0),
-        ).map_err(|_| CommandError::internal())?;
-        return serde_json::from_str(&value).map_err(|_| CommandError::internal());
+        return dashboard_metrics(&connection);
+    }
+    if kind == "weekly-trend" {
+        return tren_mingguan(&connection);
     }
     let division = text(filter, "divisi").replace("'", "''");
     if kind == "scan-history" {
@@ -2921,8 +3015,78 @@ mod tests {
 
     use super::{
         create_backup, create_correction, dashboard_data, delete_backup, delete_log_scan,
-        import_offline, storage, MobileState,
+        import_offline, rekap_per_tanggal, storage, MobileState,
     };
+
+    /// IDENTIK dengan `FIXTURE_REKAP_PER_TANGGAL` di
+    /// `src/lib/services/report.test.ts`, begitu juga angka yang diharapkan.
+    /// Senin: A dua sesi tepat waktu (sekali), B terlambat, C Sakit,
+    /// D Dispensasi, E Alfa. Selasa: A sesi kedua terlambat, F Dispen, G Alfa
+    /// sistem + scan Hadir, H Koreksi Admin "Hadir" tanpa jam. Minggu 4 Oktober
+    /// di luar rentang.
+    const FIXTURE_REKAP_PER_TANGGAL: &str = r#"
+INSERT INTO absensi_harian (
+  tanggal, id_karyawan, nama, kelas_divisi, jam_masuk, jam_pulang,
+  status_kehadiran, status_absen, sumber, update_terakhir,
+  menit_terlambat, id_shift, bulan, tahun, id_sesi
+) VALUES
+  ('2026-10-04', 'A', 'A', 'X', '07:00', '', 'Hadir', 'Masuk', 'Scanner', '2026-10-04 07:00:00', 0, 1, 'Oktober', 2026, 'a-04'),
+  ('2026-10-05', 'A', 'A', 'X', '07:00', '', 'Hadir', 'Masuk', 'Scanner', '2026-10-05 07:00:00', 0, 1, 'Oktober', 2026, 'a-05-1'),
+  ('2026-10-05', 'A', 'A', 'X', '', '15:00', 'Hadir', 'Pulang', 'Scanner', '2026-10-05 15:00:00', 0, 1, 'Oktober', 2026, 'a-05-2'),
+  ('2026-10-05', 'B', 'B', 'X', '07:20', '', 'Hadir', 'Masuk', 'Scanner', '2026-10-05 07:20:00', 20, 1, 'Oktober', 2026, 'b-05'),
+  ('2026-10-05', 'C', 'C', 'X', '', '', 'Sakit', 'Izin', 'Koreksi Admin', '2026-10-05 08:00:00', 0, 1, 'Oktober', 2026, 'c-05'),
+  ('2026-10-05', 'D', 'D', 'X', '', '', 'Dispensasi', 'Izin', 'Koreksi Admin', '2026-10-05 08:00:00', 0, 1, 'Oktober', 2026, 'd-05'),
+  ('2026-10-05', 'E', 'E', 'X', '', '', 'Alfa', 'Alfa', 'Generate Sistem', '2026-10-05 23:00:00', 0, 1, 'Oktober', 2026, 'e-05'),
+  ('2026-10-06', 'A', 'A', 'X', '07:00', '', 'Hadir', 'Masuk', 'Scanner', '2026-10-06 07:00:00', 0, 1, 'Oktober', 2026, 'a-06-1'),
+  ('2026-10-06', 'A', 'A', 'X', '13:10', '', 'Hadir', 'Masuk', 'Scanner', '2026-10-06 13:10:00', 10, 1, 'Oktober', 2026, 'a-06-2'),
+  ('2026-10-06', 'F', 'F', 'X', '', '', 'Dispen', 'Izin', 'Koreksi Admin', '2026-10-06 08:00:00', 0, 1, 'Oktober', 2026, 'f-06'),
+  ('2026-10-06', 'G', 'G', 'X', '', '', 'Alfa', 'Alfa', 'Generate Sistem', '2026-10-06 23:00:00', 0, 1, 'Oktober', 2026, 'g-06-1'),
+  ('2026-10-06', 'G', 'G', 'X', '06:55', '', 'Hadir', 'Masuk', 'Scanner', '2026-10-06 06:55:00', 0, 1, 'Oktober', 2026, 'g-06-2'),
+  ('2026-10-06', 'H', 'H', 'X', '', '', 'Hadir', 'Masuk', 'Koreksi Admin', '2026-10-06 09:00:00', 0, 1, 'Oktober', 2026, 'h-06');
+"#;
+
+    #[test]
+    fn rekap_per_tanggal_menghitung_satu_orang_sekali_per_hari() {
+        let directory = tempdir().expect("temporary directory");
+        storage::initialize(directory.path()).expect("local schema");
+        let connection = storage::database(directory.path()).expect("local database");
+        connection
+            .execute_batch(FIXTURE_REKAP_PER_TANGGAL)
+            .expect("fixture rekap");
+
+        let hasil = rekap_per_tanggal(&connection, "2026-10-05", "2026-10-11")
+            .expect("rekap per tanggal");
+        assert_eq!(
+            hasil,
+            vec![
+                json!({"tanggal": "2026-10-05", "tepat_waktu": 1, "terlambat": 1, "sakit_izin": 2, "alfa": 1}),
+                json!({"tanggal": "2026-10-06", "tepat_waktu": 2, "terlambat": 1, "sakit_izin": 1, "alfa": 0}),
+            ]
+        );
+    }
+
+    /// Ekspresi Senin pekan berjalan yang dipakai `tren_mingguan` dan
+    /// `getTrenMingguan`: hari Senin dan Minggu adalah tepi yang paling mudah
+    /// meleset satu pekan.
+    #[test]
+    fn senin_pekan_berjalan_dari_hari_apa_pun() {
+        let connection = rusqlite::Connection::open_in_memory().expect("memory db");
+        for (hari, senin) in [
+            ("2026-10-05", "2026-10-05"),
+            ("2026-10-09", "2026-10-05"),
+            ("2026-10-11", "2026-10-05"),
+            ("2026-10-12", "2026-10-12"),
+        ] {
+            let dihitung: String = connection
+                .query_row(
+                    "SELECT date(?, 'weekday 0', '-6 days');",
+                    [hari],
+                    |row| row.get(0),
+                )
+                .expect("tanggal");
+            assert_eq!(dihitung, senin, "Senin untuk {hari}");
+        }
+    }
 
     fn fixture() -> (tempfile::TempDir, MobileState) {
         let directory = tempdir().expect("temporary directory");

@@ -451,17 +451,25 @@ html.light div.rounded-2xl.bg-slate-800\/60 {
 /* Active Segmented Tab with Gradient or Sky-500 */
 html[data-theme="light"]
 button.bg-gradient-to-r:is(.from-sky-600, .from-sky-800),
-html[data-theme="light"] div.bg-slate-950 button:is(.bg-sky-500, .bg-sky-700),
+html[data-theme="light"]
+  div.bg-slate-950
+  button:is(.bg-sky-500, .bg-sky-700):not(.status-kehadiran-pilihan),
 html[data-theme="light"]
   div.bg-slate-900\/60
-  button:is(.bg-sky-500, .bg-sky-700),
+  button:is(.bg-sky-500, .bg-sky-700):not(.status-kehadiran-pilihan),
 html[data-theme="light"]
   div.bg-slate-800\/60
-  button:is(.bg-sky-500, .bg-sky-700),
+  button:is(.bg-sky-500, .bg-sky-700):not(.status-kehadiran-pilihan),
 html.light button.bg-gradient-to-r:is(.from-sky-600, .from-sky-800),
-html.light div.bg-slate-950 button:is(.bg-sky-500, .bg-sky-700),
-html.light div.bg-slate-900\/60 button:is(.bg-sky-500, .bg-sky-700),
-html.light div.bg-slate-800\/60 button:is(.bg-sky-500, .bg-sky-700) {
+html.light
+  div.bg-slate-950
+  button:is(.bg-sky-500, .bg-sky-700):not(.status-kehadiran-pilihan),
+html.light
+  div.bg-slate-900\/60
+  button:is(.bg-sky-500, .bg-sky-700):not(.status-kehadiran-pilihan),
+html.light
+  div.bg-slate-800\/60
+  button:is(.bg-sky-500, .bg-sky-700):not(.status-kehadiran-pilihan) {
   background: linear-gradient(to right, #075985, #0369a1) !important;
   color: #ffffff !important;
   box-shadow: 0 2px 8px rgba(2, 132, 199, 0.25) !important;
@@ -470,61 +478,121 @@ html.light div.bg-slate-800\/60 button:is(.bg-sky-500, .bg-sky-700) {
 html[data-theme="light"]
   button.bg-gradient-to-r:is(.from-sky-600, .from-sky-800)
   *,
-html[data-theme="light"] div.bg-slate-950 button:is(.bg-sky-500, .bg-sky-700) *,
+html[data-theme="light"]
+  div.bg-slate-950
+  button:is(.bg-sky-500, .bg-sky-700):not(.status-kehadiran-pilihan)
+  *,
 html[data-theme="light"]
   div.bg-slate-900\/60
-  button:is(.bg-sky-500, .bg-sky-700)
+  button:is(.bg-sky-500, .bg-sky-700):not(.status-kehadiran-pilihan)
   *,
 html[data-theme="light"]
   div.bg-slate-800\/60
-  button:is(.bg-sky-500, .bg-sky-700)
+  button:is(.bg-sky-500, .bg-sky-700):not(.status-kehadiran-pilihan)
   *,
 html.light button.bg-gradient-to-r:is(.from-sky-600, .from-sky-800) *,
-html.light div.bg-slate-950 button:is(.bg-sky-500, .bg-sky-700) *,
-html.light div.bg-slate-900\/60 button:is(.bg-sky-500, .bg-sky-700) *,
-html.light div.bg-slate-800\/60 button:is(.bg-sky-500, .bg-sky-700) * {
+html.light
+  div.bg-slate-950
+  button:is(.bg-sky-500, .bg-sky-700):not(.status-kehadiran-pilihan)
+  *,
+html.light
+  div.bg-slate-900\/60
+  button:is(.bg-sky-500, .bg-sky-700):not(.status-kehadiran-pilihan)
+  *,
+html.light
+  div.bg-slate-800\/60
+  button:is(.bg-sky-500, .bg-sky-700):not(.status-kehadiran-pilihan)
+  * {
   color: #ffffff !important;
 }
 
 /* Inactive Segmented Tab Buttons */
 html[data-theme="light"] .bg-slate-900\/60
-  button:not(.bg-gradient-to-r):not(.bg-sky-500, .bg-sky-700),
+  button:not(.bg-gradient-to-r):not(
+    .bg-sky-500,
+    .bg-sky-700,
+    .status-kehadiran-pilihan
+  ),
 html[data-theme="light"]
   .bg-slate-800\/60
-  button:not(.bg-gradient-to-r):not(.bg-sky-500, .bg-sky-700),
+  button:not(.bg-gradient-to-r):not(
+    .bg-sky-500,
+    .bg-sky-700,
+    .status-kehadiran-pilihan
+  ),
 html[data-theme="light"]
   div.bg-slate-950
-  button:not(.bg-gradient-to-r):not(.bg-sky-500, .bg-sky-700),
+  button:not(.bg-gradient-to-r):not(
+    .bg-sky-500,
+    .bg-sky-700,
+    .status-kehadiran-pilihan
+  ),
 html.light
   .bg-slate-900\/60
-  button:not(.bg-gradient-to-r):not(.bg-sky-500, .bg-sky-700),
+  button:not(.bg-gradient-to-r):not(
+    .bg-sky-500,
+    .bg-sky-700,
+    .status-kehadiran-pilihan
+  ),
 html.light
   .bg-slate-800\/60
-  button:not(.bg-gradient-to-r):not(.bg-sky-500, .bg-sky-700),
+  button:not(.bg-gradient-to-r):not(
+    .bg-sky-500,
+    .bg-sky-700,
+    .status-kehadiran-pilihan
+  ),
 html.light
   div.bg-slate-950
-  button:not(.bg-gradient-to-r):not(.bg-sky-500, .bg-sky-700) {
+  button:not(.bg-gradient-to-r):not(
+    .bg-sky-500,
+    .bg-sky-700,
+    .status-kehadiran-pilihan
+  ) {
   color: #475569 !important;
   background-color: transparent !important;
 }
 html[data-theme="light"]
   .bg-slate-900\/60
-  button:not(.bg-gradient-to-r):not(.bg-sky-500, .bg-sky-700):hover,
+  button:not(.bg-gradient-to-r):not(
+    .bg-sky-500,
+    .bg-sky-700,
+    .status-kehadiran-pilihan
+  ):hover,
 html[data-theme="light"]
   .bg-slate-800\/60
-  button:not(.bg-gradient-to-r):not(.bg-sky-500, .bg-sky-700):hover,
+  button:not(.bg-gradient-to-r):not(
+    .bg-sky-500,
+    .bg-sky-700,
+    .status-kehadiran-pilihan
+  ):hover,
 html[data-theme="light"]
   div.bg-slate-950
-  button:not(.bg-gradient-to-r):not(.bg-sky-500, .bg-sky-700):hover,
+  button:not(.bg-gradient-to-r):not(
+    .bg-sky-500,
+    .bg-sky-700,
+    .status-kehadiran-pilihan
+  ):hover,
 html.light
   .bg-slate-900\/60
-  button:not(.bg-gradient-to-r):not(.bg-sky-500, .bg-sky-700):hover,
+  button:not(.bg-gradient-to-r):not(
+    .bg-sky-500,
+    .bg-sky-700,
+    .status-kehadiran-pilihan
+  ):hover,
 html.light
   .bg-slate-800\/60
-  button:not(.bg-gradient-to-r):not(.bg-sky-500, .bg-sky-700):hover,
+  button:not(.bg-gradient-to-r):not(
+    .bg-sky-500,
+    .bg-sky-700,
+    .status-kehadiran-pilihan
+  ):hover,
 html.light
   div.bg-slate-950
-  button:not(.bg-gradient-to-r):not(.bg-sky-500, .bg-sky-700):hover {
+  button:not(.bg-gradient-to-r):not(
+    .bg-sky-500,
+    .bg-sky-700,
+    .status-kehadiran-pilihan
+  ):hover {
   color: #0f172a !important;
   background-color: #ffffff !important;
   box-shadow: 0 1px 3px rgba(15, 23, 42, 0.08) !important;
@@ -933,19 +1001,29 @@ html.light .bg-slate-950\/60.border-white\/10 {
   background-color: #ffffff !important;
   border-color: #cbd5e1 !important;
 }
-html[data-theme="light"] .bg-slate-950\/60 button:is(.bg-sky-500, .bg-sky-700),
-html.light .bg-slate-950\/60 button:is(.bg-sky-500, .bg-sky-700) {
+html[data-theme="light"]
+  .bg-slate-950\/60
+  button:is(.bg-sky-500, .bg-sky-700):not(.status-kehadiran-pilihan),
+html.light
+  .bg-slate-950\/60
+  button:is(.bg-sky-500, .bg-sky-700):not(.status-kehadiran-pilihan) {
   background-color: #0369a1 !important;
   color: #ffffff !important;
 }
-html[data-theme="light"] .bg-slate-950\/60 button:not(.bg-sky-500, .bg-sky-700),
-html.light .bg-slate-950\/60 button:not(.bg-sky-500, .bg-sky-700) {
+html[data-theme="light"]
+  .bg-slate-950\/60
+  button:not(.bg-sky-500, .bg-sky-700, .status-kehadiran-pilihan),
+html.light
+  .bg-slate-950\/60
+  button:not(.bg-sky-500, .bg-sky-700, .status-kehadiran-pilihan) {
   color: #475569 !important;
 }
 html[data-theme="light"]
   .bg-slate-950\/60
-  button:not(.bg-sky-500, .bg-sky-700):hover,
-html.light .bg-slate-950\/60 button:not(.bg-sky-500, .bg-sky-700):hover {
+  button:not(.bg-sky-500, .bg-sky-700, .status-kehadiran-pilihan):hover,
+html.light
+  .bg-slate-950\/60
+  button:not(.bg-sky-500, .bg-sky-700, .status-kehadiran-pilihan):hover {
   color: #0f172a !important;
 }
 
@@ -1050,6 +1128,13 @@ html.light .bg-rose-600 *,
 html.light .bg-rose-500 *,
 html.light .bg-amber-600 * {
   color: #ffffff !important;
+}
+
+/* Pilihan H/I/S/A/D Presensi KBM: latarnya warna -500 yang terang, sehingga
+   aturan "teks putih" di atas membuatnya 2.5-3.7:1. Teks gelap 5.1-9.4:1. */
+html[data-theme="light"] .status-kehadiran-pilihan[aria-pressed="true"],
+html.light .status-kehadiran-pilihan[aria-pressed="true"] {
+  color: #020617 !important;
 }
 
 /* Status Text Accents in Light Mode */

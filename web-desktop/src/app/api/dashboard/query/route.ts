@@ -14,6 +14,7 @@ import {
   getRekapHarian,
   getRiwayatScan,
   getTopKaryawanTerajin,
+  getTrenMingguan,
 } from "@/lib/services/report";
 
 export const runtime = "nodejs";
@@ -26,6 +27,8 @@ export async function POST(request: NextRequest) {
     await ensureServerDatabaseInitialized();
     if (body.kind === "metrics")
       return noStoreJson({ data: await getDashboardMetrics() });
+    if (body.kind === "weekly-trend")
+      return noStoreJson({ data: await getTrenMingguan() });
     if (body.kind === "daily")
       return noStoreJson({
         data: await getRekapHarian({
