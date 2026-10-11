@@ -38,6 +38,26 @@ export function validateOperatorDraft(draft: OperatorDraft) {
   }
 }
 
+/**
+ * Nomor HP akun operator tidak boleh kembar; nomor HP personil (karyawan,
+ * guru, siswa) boleh. Dicek di aplikasi, bukan index unik: database lama bisa
+ * sudah memuat nomor kembar, dan index yang gagal dibuat menggagalkan seluruh
+ * migrasi. Cermin `assert_operator_phone_unique` di `turso.rs`.
+ */
+export async function assertOperatorPhoneUnique(
+  client: Client,
+  noHp: string,
+  excludeId = 0,
+) {
+  const result = await client.execute({
+    sql: "SELECT 1 FROM master_operator WHERE no_hp = ? AND id <> ? LIMIT 1;",
+    args: [normalizeOperatorPhone(noHp), excludeId],
+  });
+  if (result.rows.length > 0) {
+    throw new Error("Nomor HP itu sudah dipakai akun operator lain.");
+  }
+}
+
 function toOperatorRecord(row: Record<string, unknown>): OperatorRecord {
   return {
     id: Number(row.id),
@@ -104,6 +124,7 @@ export async function insertOperator(
   if (!allowSuperadmin && Number(roleCheck.rows[0]?.is_superadmin) === 1) {
     throw new Error("Role Superadmin tidak dapat ditambahkan secara manual.");
   }
+  await assertOperatorPhoneUnique(client, draft.noHp);
 
   const result = await client.execute({
     sql: `
@@ -309,6 +330,7 @@ export async function editOperator(
   ) {
     throw new Error("Operator tidak dapat dinaikkan menjadi Superadmin.");
   }
+  await assertOperatorPhoneUnique(client, draft.noHp, operatorId);
 
   const updates = [
     "kode_operator = ?",

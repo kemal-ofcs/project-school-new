@@ -46,7 +46,7 @@ async function seedOperator(
     name: nama,
     username,
     email,
-    noHp: "081200000001",
+    noHp: `0812${kode.replace(/\D/g, "").padStart(8, "0")}`,
     password: "PasswordLamaKuat1",
     roleId: Number(roles.rows[0]?.id),
     status: "Aktif",

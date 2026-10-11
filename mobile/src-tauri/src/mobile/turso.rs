@@ -5429,6 +5429,31 @@ impl TursoClient {
         Ok(json!({ "operators": rows }))
     }
 
+    /// Nomor HP akun operator tidak boleh kembar; nomor HP personil boleh.
+    /// Cermin `assertOperatorPhoneUnique` di `operator-admin.ts`. Bukan index
+    /// unik karena database lama bisa sudah memuat nomor kembar.
+    async fn assert_operator_phone_unique(
+        &self,
+        no_hp: &str,
+        exclude_id: i64,
+    ) -> Result<(), CommandError> {
+        let taken = !self
+            .query_one(
+                "SELECT 1 FROM master_operator WHERE no_hp = ? AND id <> ? LIMIT 1;",
+                vec![json!(no_hp), json!(exclude_id)],
+            )
+            .await?
+            .to_objects()
+            .is_empty();
+        if taken {
+            return Err(CommandError::new(
+                "VALIDATION_ERROR",
+                "Nomor HP itu sudah dipakai akun operator lain.",
+            ));
+        }
+        Ok(())
+    }
+
     pub async fn create_operator(&self, draft: &Value) -> Result<Value, CommandError> {
         let kode_operator = draft
             .get("kode_operator")
@@ -5504,6 +5529,7 @@ impl TursoClient {
                 ));
             }
         }
+        self.assert_operator_phone_unique(&no_hp, 0).await?;
 
         let password_hash = hash_password_pbkdf2(password);
 
@@ -5671,6 +5697,9 @@ impl TursoClient {
                     .to_string()
             });
             validate_operator_contact(&email, &phone)?;
+            if next_phone.is_some() {
+                self.assert_operator_phone_unique(&phone, id).await?;
+            }
             if let Some(email) = next_email {
                 updates.push("email = ?");
                 args.push(json!(email));

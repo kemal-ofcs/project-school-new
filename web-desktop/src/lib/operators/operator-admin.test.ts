@@ -12,6 +12,8 @@ import { initDatabaseSchema } from "@/lib/db-schema";
 import {
   type BootstrapSuperadminDraft,
   bootstrapSuperadmin,
+  editOperator,
+  insertOperator,
   validateBootstrapDraft,
 } from "@/lib/operators/operator-admin";
 import { normalizeRecoveryCode } from "@/lib/security/totp";
@@ -161,5 +163,44 @@ describe("superadmin bootstrap", () => {
       "SELECT COUNT(*) AS total FROM master_operator;",
     );
     expect(Number(total.rows[0]?.total)).toBe(0);
+  });
+});
+
+describe("nomor HP akun operator tidak boleh kembar", () => {
+  test("tambah dan sunting menolak nomor milik akun lain", async () => {
+    const role = await client.execute(
+      "SELECT id FROM app_role WHERE is_superadmin = 0 AND status = 'Aktif' LIMIT 1;",
+    );
+    const roleId = Number(role.rows[0]?.id);
+    const draft = (kode: string, noHp: string) => ({
+      kodeOperator: kode,
+      name: `Operator ${kode}`,
+      username: kode.toLowerCase(),
+      email: `${kode.toLowerCase()}@sekolah.id`,
+      noHp,
+      password: "Rahasia-2026!",
+      roleId,
+      status: "Aktif" as const,
+    });
+
+    const pertama = await insertOperator(client, draft("OPA", "081234567890"));
+    // Ejaan berbeda, nomor kanonik sama.
+    await expect(
+      insertOperator(client, draft("OPB", "+62 812-3456-7890")),
+    ).rejects.toThrow("sudah dipakai akun operator lain");
+
+    const kedua = await insertOperator(client, draft("OPB", "081299990000"));
+    await expect(
+      editOperator(client, pertama.id, kedua.id, draft("OPB", "081234567890")),
+    ).rejects.toThrow("sudah dipakai akun operator lain");
+    // Menyimpan ulang nomornya sendiri tetap boleh.
+    await expect(
+      editOperator(
+        client,
+        pertama.id,
+        pertama.id,
+        draft("OPA", "081234567890"),
+      ),
+    ).resolves.toEqual({ success: true });
   });
 });
