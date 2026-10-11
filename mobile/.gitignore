@@ -28,3 +28,8 @@ next-env.d.ts
 
 # Claude Code local settings
 .claude/settings.local.json
+
+# Kunci tanda tangan Android: kata sandi & keystore TIDAK PERNAH di-commit
+src-tauri/keystore.properties
+*.jks
+*.keystore

@@ -65,6 +65,7 @@ const manifest = join(
   "src-tauri/gen/android/app/src/main/AndroidManifest.xml",
 );
 const tauriConf = join(akarMobile, "src-tauri/tauri.conf.json");
+const keystoreProperties = join(akarMobile, "src-tauri/keystore.properties");
 
 function keluarDenganPesan(pesan: string): never {
   console.error(`\n❌ ${pesan}\n`);
@@ -130,10 +131,23 @@ if (!/isShrinkResources\s*=/.test(badan)) {
   berubah = true;
 }
 // Tanpa signingConfig, APK release keluar TANPA tanda tangan dan Android
-// menolaknya ("paket tidak valid"). Hanya dipasang bila belum ada sama sekali,
-// supaya keystore rilis yang kelak dipasang tidak tertimpa.
+// menolaknya ("paket tidak valid").
+//
+// Kunci rilis dipakai bila `src-tauri/keystore.properties` ada. Berkas itu
+// SENGAJA di luar `gen/android` (yang dilahirkan ulang setiap
+// `tauri android init`) dan di-gitignore: isinya kata sandi keystore. Gradle
+// membacanya saat build, jadi kata sandinya tidak pernah tertulis ke
+// build.gradle.kts. Tanpa berkas itu, jatuh ke kunci DEBUG seperti semula.
+// `signingConfig` lain yang dipasang manual tidak pernah ditimpa.
+const SIGNING_DEBUG = 'signingConfig = signingConfigs.getByName("debug")';
+const SIGNING_RELEASE = 'signingConfig = signingConfigs.getByName("release")';
+const pakaiKunciRilis = existsSync(keystoreProperties);
+if (pakaiKunciRilis && badan.includes(SIGNING_DEBUG)) {
+  badan = badan.replace(SIGNING_DEBUG, SIGNING_RELEASE);
+  berubah = true;
+}
 if (!/signingConfig\s*=/.test(badan)) {
-  badan = `\n            signingConfig = signingConfigs.getByName("debug")${badan}`;
+  badan = `\n            ${pakaiKunciRilis ? SIGNING_RELEASE : SIGNING_DEBUG}${badan}`;
   berubah = true;
 }
 if (berubah) {
@@ -142,6 +156,38 @@ if (berubah) {
     (_penuh, awal: string, _lama: string, akhir: string) =>
       `${awal}${badan}${akhir}`,
   );
+}
+if (pakaiKunciRilis && !isiGradle.includes('create("release")')) {
+  const blokSigning = `    signingConfigs {
+        // Dipasang oleh patch-android-release.ts. Kata sandi dibaca dari
+        // src-tauri/keystore.properties (di-gitignore), bukan ditulis di sini.
+        create("release") {
+            val keystoreProperties = Properties().apply {
+                rootProject.file("../../keystore.properties").inputStream().use { load(it) }
+            }
+            storeFile = file(keystoreProperties.getProperty("storeFile"))
+            storePassword = keystoreProperties.getProperty("storePassword")
+            keyAlias = keystoreProperties.getProperty("keyAlias")
+            keyPassword = keystoreProperties.getProperty("keyPassword")
+        }
+    }
+`;
+  if (!/\n {4}buildTypes \{/.test(isiGradle)) {
+    keluarDenganPesan(
+      "Blok `buildTypes {` tidak ditemukan di build.gradle.kts — bentuk\n" +
+        "   template Tauri berubah, periksa berkasnya sebelum menambal.",
+    );
+  }
+  if (!isiGradle.includes("import java.util.Properties")) {
+    isiGradle = `import java.util.Properties\n${isiGradle}`;
+  }
+  isiGradle = isiGradle.replace(
+    /\n {4}buildTypes \{/,
+    `\n${blokSigning}    buildTypes {`,
+  );
+  berubah = true;
+}
+if (berubah) {
   writeFileSync(gradle, isiGradle);
 }
 
@@ -364,6 +410,30 @@ if (!/signingConfig\s*=/.test(releaseAkhir)) {
     "build.gradle.kts: build release tanpa `signingConfig` — APK tidak akan bisa dipasang",
   );
 }
+if (pakaiKunciRilis) {
+  // Kunci rilis diminta: APK bertanda tangan debug di sini berarti update ke
+  // instalasi lama ditolak HP pengguna, jadi build dihentikan, bukan diteruskan.
+  if (releaseAkhir.includes(SIGNING_DEBUG)) {
+    gagal.push(
+      "build.gradle.kts: keystore.properties ada, tetapi release masih memakai kunci debug",
+    );
+  }
+  const isiKeystore = readFileSync(keystoreProperties, "utf8");
+  const nilai = (kunci: string) =>
+    new RegExp(`^\\s*${kunci}\\s*=\\s*(.+?)\\s*$`, "m").exec(isiKeystore)?.[1];
+  for (const kunci of [
+    "storeFile",
+    "storePassword",
+    "keyAlias",
+    "keyPassword",
+  ]) {
+    if (!nilai(kunci)) gagal.push(`keystore.properties: \`${kunci}\` kosong`);
+  }
+  const berkasKunci = nilai("storeFile");
+  if (berkasKunci && !existsSync(berkasKunci)) {
+    gagal.push(`keystore.properties: berkas kunci tidak ada di ${berkasKunci}`);
+  }
+}
 for (const baris of aturan) {
   if (!proguardAkhir.includes(baris)) {
     gagal.push(`proguard-rules.pro: aturan hilang — ${baris}`);
@@ -397,4 +467,9 @@ console.log(
   berubah
     ? `✅ Setelan rilis Android dipasang ulang (paket ${identifier}).`
     : `✅ Setelan rilis Android sudah benar (paket ${identifier}).`,
+);
+console.log(
+  pakaiKunciRilis
+    ? "   Tanda tangan: kunci RILIS (src-tauri/keystore.properties)."
+    : "   Tanda tangan: kunci DEBUG — buat src-tauri/keystore.properties untuk kunci rilis.",
 );
