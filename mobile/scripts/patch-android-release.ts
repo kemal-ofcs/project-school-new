@@ -72,6 +72,21 @@ function keluarDenganPesan(pesan: string): never {
   process.exit(1);
 }
 
+// Berkas di lokasi yang salah tidak menghasilkan galat apa pun: skrip tidak
+// menemukannya, diam-diam memakai kunci debug, dan Play Protect menandai APK-nya.
+// Pernah terjadi, dan kata sandinya ikut ter-commit karena .gitignore hanya
+// mengecualikan lokasi yang benar.
+for (const salah of [
+  "keystore.properties",
+  "src-tauri/gen/keystore.properties",
+]) {
+  if (existsSync(join(akarMobile, salah))) {
+    keluarDenganPesan(
+      `mobile/${salah} ada di lokasi yang salah. Pindahkan ke mobile/src-tauri/keystore.properties — tanpa itu APK ditandatangani kunci debug.`,
+    );
+  }
+}
+
 if (!existsSync(gradle)) {
   keluarDenganPesan(
     "Proyek Android belum dibuat (src-tauri/gen/android tidak ada).\n" +
@@ -468,8 +483,11 @@ console.log(
     ? `✅ Setelan rilis Android dipasang ulang (paket ${identifier}).`
     : `✅ Setelan rilis Android sudah benar (paket ${identifier}).`,
 );
-console.log(
-  pakaiKunciRilis
-    ? "   Tanda tangan: kunci RILIS (src-tauri/keystore.properties)."
-    : "   Tanda tangan: kunci DEBUG — buat src-tauri/keystore.properties untuk kunci rilis.",
-);
+if (pakaiKunciRilis) {
+  console.log("   Tanda tangan: kunci RILIS (src-tauri/keystore.properties).");
+} else {
+  console.warn(
+    "⚠️  Tanda tangan: kunci DEBUG — Play Protect akan menandai APK ini.\n" +
+      "   Buat mobile/src-tauri/keystore.properties untuk kunci rilis.",
+  );
+}
