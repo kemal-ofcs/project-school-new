@@ -22,6 +22,7 @@ export type AppArea =
   | "operators"
   | "password_reset"
   | "attendance_photo"
+  | "face_template"
   | "diagnostics"
   | "sync"
   | "dasbor_kehadiran"
@@ -70,6 +71,7 @@ const AREA_PERMISSION: Record<
   operators: "operators.view",
   password_reset: "password_reset.view",
   attendance_photo: "attendance_photo.view",
+  face_template: "face_template.view",
   diagnostics: "diagnostics.view",
   // Halaman status sinkronisasi menampilkan konflik, yang memuat payload lintas
   // domain. `sync.view` sudah ada di paket bawaan peran operator DAN scanner,

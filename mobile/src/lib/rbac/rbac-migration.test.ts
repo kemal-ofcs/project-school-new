@@ -127,6 +127,8 @@ describe("dynamic RBAC migration", () => {
       36,
       // v37 — registri aset per unit (`inventory_unit`).
       37,
+      // v38 — verifikasi wajah: `personil_wajah`, vonis di `absensi_foto`.
+      38,
     ]);
 
     const sessionColumns = await client.execute(

@@ -16,6 +16,7 @@ pub mod academic;
 pub mod attendance_dashboard;
 pub mod attendance_ledger;
 pub mod class_attendance;
+pub mod face_match;
 pub mod grades;
 pub mod inventory;
 pub mod license;

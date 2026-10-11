@@ -99,6 +99,10 @@ import {
   providerNeedsEndpoint,
   reviewDatabaseEndpoint,
 } from "@/lib/validations/database-endpoint";
+import {
+  FACE_THRESHOLD_DEFAULT,
+  type FaceMode,
+} from "@/lib/validations/face-match";
 import { validateGeofenceSettings } from "@/lib/validations/geofence";
 import { validateIpAllowlistEntries } from "@/lib/validations/ip-allowlist";
 import { validateScannerSafetySettings } from "@/lib/validations/scanner-settings";
@@ -183,6 +187,9 @@ export default function SettingsPage() {
   // Sakelar induk tingkat perusahaan. Sakelar per role di Master Operator hanya
   // berlaku ketika fiturnya dihidupkan di sini.
   const [scanPhotoEnabled, setScanPhotoEnabled] = useState(false);
+  const [faceVerifyEnabled, setFaceVerifyEnabled] = useState(false);
+  const [faceMode, setFaceMode] = useState<FaceMode>("pantau");
+  const [faceThreshold, setFaceThreshold] = useState(FACE_THRESHOLD_DEFAULT);
   const [scanIpEnabled, setScanIpEnabled] = useState(false);
   const [currentDeviceCoords, setCurrentDeviceCoords] = useState<{
     lat: number;
@@ -331,6 +338,9 @@ export default function SettingsPage() {
         if (cancelled) return;
         setScanPhotoEnabled(settings.photoEnabled);
         setScanIpEnabled(settings.ipRestrictionEnabled);
+        setFaceVerifyEnabled(settings.faceVerifyEnabled);
+        setFaceMode(settings.faceMode);
+        setFaceThreshold(settings.faceThreshold);
         setIpAllowlist(settings.entries);
         setIpAllowlistDraft(settings.entries.join("\n"));
         setIpDeviceAddresses(settings.deviceAddresses);
@@ -1048,9 +1058,15 @@ export default function SettingsPage() {
         photoEnabled: scanPhotoEnabled,
         ipRestrictionEnabled: scanIpEnabled,
         entries,
+        faceVerifyEnabled,
+        faceMode,
+        faceThreshold,
       });
       setScanPhotoEnabled(saved.photoEnabled);
       setScanIpEnabled(saved.ipRestrictionEnabled);
+      setFaceVerifyEnabled(saved.faceVerifyEnabled);
+      setFaceMode(saved.faceMode);
+      setFaceThreshold(saved.faceThreshold);
       setIpAllowlist(saved.entries);
       setIpAllowlistDraft(saved.entries.join("\n"));
       setIpDeviceAddresses(saved.deviceAddresses);
@@ -1289,6 +1305,12 @@ export default function SettingsPage() {
           setScanPhotoEnabled={setScanPhotoEnabled}
           scanIpEnabled={scanIpEnabled}
           setScanIpEnabled={setScanIpEnabled}
+          faceVerifyEnabled={faceVerifyEnabled}
+          setFaceVerifyEnabled={setFaceVerifyEnabled}
+          faceMode={faceMode}
+          setFaceMode={setFaceMode}
+          faceThreshold={faceThreshold}
+          setFaceThreshold={setFaceThreshold}
           ipAllowlist={ipAllowlist}
           ipAllowlistDraft={ipAllowlistDraft}
           setIpAllowlistDraft={setIpAllowlistDraft}

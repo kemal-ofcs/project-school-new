@@ -20,6 +20,7 @@ export default function OperasionalHubPage() {
   const canPasswordReset = canAccessArea(user, "password_reset");
   const canRiwayatIdentitas = canAccessArea(user, "karyawan");
   const canAttendancePhoto = canAccessArea(user, "attendance_photo");
+  const canFaceTemplate = canAccessArea(user, "face_template");
   const canKonten = canAccessArea(user, "konten");
   const canPmb = canAccessArea(user, "pmb");
 
@@ -31,6 +32,7 @@ export default function OperasionalHubPage() {
     canPasswordReset ||
     canRiwayatIdentitas ||
     canAttendancePhoto ||
+    canFaceTemplate ||
     canKonten ||
     canPmb;
   const bolehBukaHalaman = canHarian || canLaporan || canAdmin;
@@ -121,6 +123,15 @@ export default function OperasionalHubPage() {
                   icon="scanner"
                   title="Foto Bukti Absensi"
                   subtitle="Foto saat scan, alamat IP perangkat & operatornya"
+                  tone="sky"
+                />
+              )}
+              {canFaceTemplate && (
+                <HubRow
+                  href="/wajah"
+                  icon="user"
+                  title="Pendaftaran Wajah"
+                  subtitle="Wajah yang dicocokkan dengan pemilik kartu saat scan"
                   tone="sky"
                 />
               )}

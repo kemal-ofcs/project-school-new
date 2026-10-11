@@ -71,6 +71,9 @@ describe("tabel absensi_foto", () => {
       "foto_mime",
       "foto_base64",
       "created_at",
+      // v38 — vonis verifikasi wajah.
+      "wajah_vonis",
+      "wajah_skor",
     ]);
   });
 

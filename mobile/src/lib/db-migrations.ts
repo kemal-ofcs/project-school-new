@@ -42,6 +42,7 @@ const WA_SEND_CLAIM_MIGRATION_VERSION = 34;
 const INVENTORY_MIGRATION_VERSION = 35;
 const UKS_MIGRATION_VERSION = 36;
 const INVENTORY_UNIT_MIGRATION_VERSION = 37;
+const FACE_VERIFICATION_MIGRATION_VERSION = 38;
 
 /**
  * v21 — aturan jam scan baru: Jam Kerja Normal = (Jam Pulang − Jam Masuk) −
@@ -510,6 +511,18 @@ export async function runDatabaseMigrations(client: Client) {
       "app_wa_config",
       "uks_enabled",
       "ALTER TABLE app_wa_config ADD COLUMN uks_enabled INTEGER NOT NULL DEFAULT 0;",
+    ],
+    // Vonis verifikasi wajah pada foto bukti (v38). Cerminan `ensure_column`
+    // di `turso.rs` dan `storage.rs`.
+    [
+      "absensi_foto",
+      "wajah_vonis",
+      "ALTER TABLE absensi_foto ADD COLUMN wajah_vonis TEXT;",
+    ],
+    [
+      "absensi_foto",
+      "wajah_skor",
+      "ALTER TABLE absensi_foto ADD COLUMN wajah_skor REAL;",
     ],
   ] as const) {
     if (
@@ -1052,7 +1065,9 @@ export async function runDatabaseMigrations(client: Client) {
       client_id TEXT,
       foto_mime TEXT NOT NULL DEFAULT 'image/jpeg',
       foto_base64 TEXT NOT NULL,
-      created_at TEXT NOT NULL
+      created_at TEXT NOT NULL,
+      wajah_vonis TEXT,
+      wajah_skor REAL
     );
   `);
 
@@ -1574,6 +1589,26 @@ export async function runDatabaseMigrations(client: Client) {
     sql: `INSERT OR IGNORE INTO schema_migration (version, name, applied_at)
           VALUES (?, 'inventory-unit', ?);`,
     args: [INVENTORY_UNIT_MIGRATION_VERSION, now],
+  });
+
+  // v38 — vektor wajah terdaftar untuk verifikasi 1:1 saat scan. Ikut snapshot
+  // supaya terminal offline bisa memeriksa; isinya int8 base64, bukan foto.
+  // DDL WAJIB identik dengan `storage.rs` dan `turso.rs`.
+  await client.execute(`
+    CREATE TABLE IF NOT EXISTS personil_wajah (
+      id_unik TEXT PRIMARY KEY,
+      model TEXT NOT NULL,
+      vektor TEXT NOT NULL,
+      jumlah_sampel INTEGER NOT NULL DEFAULT 1,
+      sumber TEXT NOT NULL CHECK (sumber IN ('kamera', 'foto_profil')),
+      dibuat_oleh TEXT,
+      updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+  `);
+  await client.execute({
+    sql: `INSERT OR IGNORE INTO schema_migration (version, name, applied_at)
+          VALUES (?, 'face-verification', ?);`,
+    args: [FACE_VERIFICATION_MIGRATION_VERSION, now],
   });
 
   await client.execute(

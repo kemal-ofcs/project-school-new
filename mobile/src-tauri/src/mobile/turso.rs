@@ -25,6 +25,8 @@ use super::{
     inventory,
     // Bentuk payload kunjungan UKS dicek dengan aturan yang sama dengan lokal.
     uks,
+    // Template wajah yang tidak sah tidak boleh sampai ke CHECK cloud.
+    face_match,
     // Normalisasi cakupan whitelist hari libur hidup di `scanner` bersama
     // penilaiannya, supaya jalur cloud dan jalur scan tidak pernah bisa drift.
     scanner,
@@ -645,6 +647,7 @@ pub const ADMIN_DEFAULT_EXCLUDED_PERMISSIONS: &[&str] = &[
     "password_reset.delete",
     "two_factor.reset",
     "attendance_photo.delete",
+    "face_template.manage",
     "database_backup.restore",
     "password_reset.approve",
     "class_attendance.delete",
@@ -1042,6 +1045,12 @@ const SNAPSHOT_SOURCES: &[SnapshotSource] = &[
         payload_key: "inventoryUnits",
         table: "inventory_unit",
         sql: "SELECT * FROM inventory_unit ORDER BY id_unit;",
+    },
+    // ── v38: Vektor wajah terdaftar ──
+    SnapshotSource {
+        payload_key: "faceTemplates",
+        table: "personil_wajah",
+        sql: "SELECT * FROM personil_wajah ORDER BY id_unik\n-- batas: satu baris per personil, dibatasi jumlah personil lembaga\n;",
     },
 ];
 
@@ -1963,7 +1972,9 @@ impl TursoClient {
                     client_id TEXT,
                     foto_mime TEXT NOT NULL DEFAULT 'image/jpeg',
                     foto_base64 TEXT NOT NULL,
-                    created_at TEXT NOT NULL
+                    created_at TEXT NOT NULL,
+                    wajah_vonis TEXT,
+                    wajah_skor REAL
                 );"#,
                 vec![],
             ),
@@ -2141,6 +2152,20 @@ impl TursoClient {
             ),
             Statement::new(
                 "CREATE INDEX IF NOT EXISTS idx_inventory_unit_barang ON inventory_unit(id_barang);",
+                vec![],
+            ),
+            // Vektor wajah terdaftar (v38). WAJIB identik dengan `storage.rs`
+            // dan `db-migrations.ts`.
+            Statement::new(
+                r#"CREATE TABLE IF NOT EXISTS personil_wajah (
+                    id_unik TEXT PRIMARY KEY,
+                    model TEXT NOT NULL,
+                    vektor TEXT NOT NULL,
+                    jumlah_sampel INTEGER NOT NULL DEFAULT 1,
+                    sumber TEXT NOT NULL CHECK (sumber IN ('kamera', 'foto_profil')),
+                    dibuat_oleh TEXT,
+                    updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+                );"#,
                 vec![],
             ),
             // Buku Kunjungan UKS (v36). Di luar SNAPSHOT_SOURCES: barisnya
@@ -2443,7 +2468,9 @@ impl TursoClient {
                 ('inventory.adjust', 'Koreksi & Batalkan Mutasi Inventaris', 'Sarpras', 'Membatalkan mutasi, stock opname, dan menghapus stok rusak, hilang, atau kedaluwarsa.', 1, 1003),
                 ('uks.view', 'Lihat Buku Kunjungan UKS', 'UKS', 'Melihat riwayat dan rekap kunjungan UKS, termasuk keluhan siswa.', 1, 1100),
                 ('uks.record', 'Catat Kunjungan UKS & Obat', 'UKS', 'Mencatat dan menutup kunjungan UKS serta mengeluarkan obat untuknya.', 1, 1101),
-                ('uks.delete', 'Hapus Kunjungan UKS', 'UKS', 'Menghapus catatan kunjungan UKS.', 1, 1102);"#,
+                ('uks.delete', 'Hapus Kunjungan UKS', 'UKS', 'Menghapus catatan kunjungan UKS.', 1, 1102),
+                ('face_template.view', 'Lihat Pendaftaran Wajah', 'Sistem', 'Melihat siapa saja yang wajahnya sudah terdaftar untuk verifikasi scan.', 1, 1200),
+                ('face_template.manage', 'Kelola Pendaftaran Wajah', 'Sistem', 'Mendaftarkan, mengganti, dan menghapus wajah personil untuk verifikasi scan.', 1, 1201);"#,
                 vec![],
             ),
             // Seed Default Role Permissions untuk Role Superadmin (Role 1)
@@ -3276,7 +3303,8 @@ impl TursoClient {
                 (34, 'wa-send-claim', datetime('now')),
                 (35, 'inventory-foundation', datetime('now')),
                 (36, 'uks-visit-book', datetime('now')),
-                (37, 'inventory-unit', datetime('now'));"#,
+                (37, 'inventory-unit', datetime('now')),
+                (38, 'face-verification', datetime('now'));"#,
                 vec![],
             ),
         ];
@@ -3411,6 +3439,9 @@ impl TursoClient {
             ("app_wa_config", "koreksi_admin_enabled", "ALTER TABLE app_wa_config ADD COLUMN koreksi_admin_enabled INTEGER NOT NULL DEFAULT 0;"),
             ("app_wa_config", "import_manual_enabled", "ALTER TABLE app_wa_config ADD COLUMN import_manual_enabled INTEGER NOT NULL DEFAULT 0;"),
             ("app_wa_config", "uks_enabled", "ALTER TABLE app_wa_config ADD COLUMN uks_enabled INTEGER NOT NULL DEFAULT 0;"),
+            // Vonis verifikasi wajah pada foto bukti (v38).
+            ("absensi_foto", "wajah_vonis", "ALTER TABLE absensi_foto ADD COLUMN wajah_vonis TEXT;"),
+            ("absensi_foto", "wajah_skor", "ALTER TABLE absensi_foto ADD COLUMN wajah_skor REAL;"),
         ] {
             self.ensure_column(table, column, sql).await?;
         }
@@ -3622,6 +3653,11 @@ impl TursoClient {
         // skema dan membuat outbox macet.
         self.query_one(
             "INSERT OR IGNORE INTO schema_migration (version, name, applied_at) VALUES (-2018, 'inventory-unit-v1', datetime('now'));",
+            vec![],
+        )
+        .await?;
+        self.query_one(
+            "INSERT OR IGNORE INTO schema_migration (version, name, applied_at) VALUES (-2019, 'face-verification-v1', datetime('now'));",
             vec![],
         )
         .await?;
@@ -3895,7 +3931,7 @@ impl TursoClient {
                 // Sentinel WAJIB dinaikkan setiap kali ensure_schema menambah
                 // tabel atau kolom — nilainya di sini dan pada INSERT di atas
                 // harus selalu sama.
-                "SELECT COUNT(*) AS total FROM schema_migration WHERE version = -2018;",
+                "SELECT COUNT(*) AS total FROM schema_migration WHERE version = -2019;",
                 vec![],
             )
             .await
@@ -8055,6 +8091,8 @@ fn canonical_sync_route(domain: &str, operation: &str) -> Option<(&'static str, 
         ("inventory-item", "save") => ("inventory-item", "save"),
         ("inventory-mutation", "create") => ("inventory-mutation", "create"),
         ("inventory-unit", "save") => ("inventory-unit", "save"),
+        ("face-template", "save") => ("face-template", "save"),
+        ("face-template", "delete") => ("face-template", "delete"),
         ("uks-visit", "save") => ("uks-visit", "save"),
         ("uks-visit", "delete") => ("uks-visit", "delete"),
         ("attendance", "scan") => ("attendance", "scan"),
@@ -8978,6 +9016,28 @@ async fn apply_event_to_turso(
                     .await?;
             }
         }
+        ("face-template", "save") => {
+            if let Some(values) = face_match::cloud_template_values(payload, entity_key) {
+                turso
+                    .query_one(face_match::CLOUD_UPSERT_TEMPLATE_SQL, values)
+                    .await?;
+            }
+        }
+        ("face-template", "delete") => {
+            let id = payload
+                .get("id_unik")
+                .and_then(Value::as_str)
+                .filter(|value| !value.trim().is_empty())
+                .unwrap_or(entity_key);
+            if !id.trim().is_empty() {
+                turso
+                    .query_one(
+                        "DELETE FROM personil_wajah WHERE id_unik = ?;",
+                        vec![json!(id)],
+                    )
+                    .await?;
+            }
+        }
         ("uks-visit", "save") => {
             if let Some(values) = uks::cloud_visit_values(payload, entity_key) {
                 turso.query_one(uks::CLOUD_UPSERT_VISIT_SQL, values).await?;
@@ -9042,8 +9102,9 @@ async fn apply_event_to_turso(
                             r#"INSERT INTO absensi_foto (
                                 id_foto, id_sesi, tanggal_kerja, id_karyawan, nama, divisi,
                                 jenis_scan, timestamp_scan, sumber_data, kode_operator,
-                                ip_perangkat, client_id, foto_mime, foto_base64, created_at
-                            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                                ip_perangkat, client_id, foto_mime, foto_base64, created_at,
+                                wajah_vonis, wajah_skor
+                            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                             ON CONFLICT(id_foto) DO NOTHING;"#,
                             vec![
                                 json!(id_foto),
@@ -9067,6 +9128,8 @@ async fn apply_event_to_turso(
                                     .unwrap_or("image/jpeg")),
                                 json!(foto_base64),
                                 text("created_at"),
+                                json!(photo.get("wajah_vonis").and_then(Value::as_str)),
+                                json!(photo.get("wajah_skor").and_then(Value::as_f64)),
                             ],
                         )
                         .await?;
@@ -11824,12 +11887,18 @@ impl TursoClient {
         start_date: &str,
         end_date: &str,
         search: &str,
+        wajah_vonis: &str,
         limit: i64,
     ) -> Result<Value, CommandError> {
         self.ensure_schema_current().await?;
         let mut conditions: Vec<String> = Vec::new();
         let mut args: Vec<Value> = Vec::new();
 
+        let wajah_vonis = wajah_vonis.trim();
+        if !wajah_vonis.is_empty() {
+            conditions.push("wajah_vonis = ?".to_string());
+            args.push(json!(wajah_vonis));
+        }
         let start = start_date.trim();
         if !start.is_empty() {
             conditions.push("tanggal_kerja >= ?".to_string());
@@ -11870,7 +11939,7 @@ impl TursoClient {
                 COALESCE(client_id, '') AS client_id,
                 COALESCE(foto_mime, 'image/jpeg') AS foto_mime,
                 LENGTH(COALESCE(foto_base64, '')) AS ukuran_base64,
-                created_at
+                created_at, wajah_vonis, wajah_skor
                FROM absensi_foto
                {where_clause}
                ORDER BY timestamp_scan DESC
@@ -11906,6 +11975,8 @@ impl TursoClient {
                         .and_then(Value::as_i64)
                         .unwrap_or(0),
                     "createdAt": text("created_at"),
+                    "wajahVonis": row.get("wajah_vonis").and_then(Value::as_str),
+                    "wajahSkor": row.get("wajah_skor").and_then(Value::as_f64),
                 })
             })
             .collect();
@@ -14905,7 +14976,7 @@ mod tests {
             connection
                 .execute_batch(
                     "DROP TABLE riwayat_identitas_karyawan;
-                     DELETE FROM schema_migration WHERE version IN (-2017, -2018);",
+                     DELETE FROM schema_migration WHERE version IN (-2017, -2018, -2019);",
                 )
                 .expect("siapkan database lama");
 
@@ -14941,7 +15012,7 @@ mod tests {
             connection
                 .execute_batch(
                     "DROP TABLE inventory_unit;
-                     DELETE FROM schema_migration WHERE version = -2018;",
+                     DELETE FROM schema_migration WHERE version IN (-2018, -2019);",
                 )
                 .expect("siapkan database lama");
 
@@ -14954,6 +15025,44 @@ mod tests {
                 )
                 .expect("cek tabel");
             assert_eq!(ada, 1, "database bersentinel -2017 tidak diperbarui");
+        });
+    }
+
+    /// Database bersentinel `-2018` (v37) menerima `personil_wajah` dan kolom
+    /// vonis wajah `absensi_foto` lewat `ensure_schema_current`.
+    #[test]
+    fn sentinel_2018_memicu_skema_verifikasi_wajah() {
+        let runtime = tokio::runtime::Builder::new_current_thread()
+            .build()
+            .expect("runtime uji");
+        runtime.block_on(async {
+            let dir = tempfile::tempdir().expect("direktori sementara");
+            let hub = dir.path().join("sppg-hub.db");
+            let client = TursoClient::local_file(
+                Url::parse("https://sentinel-2018.sppg.invalid").expect("origin uji"),
+                &hub,
+                Client::new(),
+            );
+            client.ensure_schema().await.expect("provisioning lokal");
+            let connection = rusqlite::Connection::open(&hub).expect("buka hub");
+            connection
+                .execute_batch(
+                    "DROP TABLE personil_wajah;
+                     ALTER TABLE absensi_foto DROP COLUMN wajah_vonis;
+                     DELETE FROM schema_migration WHERE version = -2019;",
+                )
+                .expect("siapkan database lama");
+
+            client.ensure_schema_current().await.expect("skema mutakhir");
+            let (tabel, kolom): (i64, i64) = connection
+                .query_row(
+                    "SELECT (SELECT COUNT(*) FROM sqlite_master WHERE name = 'personil_wajah'),
+                            (SELECT COUNT(*) FROM pragma_table_info('absensi_foto') WHERE name = 'wajah_vonis');",
+                    [],
+                    |row| Ok((row.get(0)?, row.get(1)?)),
+                )
+                .expect("cek skema");
+            assert_eq!((tabel, kolom), (1, 1), "database bersentinel -2018 tidak diperbarui");
         });
     }
 

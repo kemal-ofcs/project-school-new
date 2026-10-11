@@ -66,7 +66,7 @@ Tiga jebakan default paket yang **WAJIB** ditutup secara eksplisit:
 ### 3.2 Prasyarat CSP Tauri (wajib dikonfirmasi USER sebelum diubah)
 CSP saat ini memblokir dua hal yang dibutuhkan stack ini. Perubahan berikut adalah **prasyarat implementasi**, dan karena menyentuh konfigurasi keamanan **WAJIB minta persetujuan eksplisit USER** (Pilar 2.2) sebelum diterapkan:
 
-- `web-desktop/src-tauri/tauri.conf.json` — `connect-src` saat ini hanya `"ipc: http://ipc.localhost"`. Loader GLTF/Rive/Spline/detect-gpu memuat aset via `fetch`/XHR, sehingga fetch same-origin ke `public/` pun ditolak. Wajib ditambah `'self' asset: http://asset.localhost`.
+- `web-desktop/src-tauri/tauri.conf.json` — `connect-src` sejak v38 `"'self' ipc: http://ipc.localhost"` (disetujui untuk model verifikasi wajah). Loader GLTF/Rive/Spline/detect-gpu memuat aset via `fetch`/XHR; fetch same-origin ke `public/` kini diizinkan, sedangkan `asset: http://asset.localhost` masih harus ditambah (dengan persetujuan User) bila aset 3D dibaca lewat protokol asset.
 - Kedua workspace — WebAssembly (Rive, Draco) membutuhkan `script-src` eksplisit yang memuat `'wasm-unsafe-eval'`. Saat ini `script-src` tidak dideklarasikan sehingga jatuh ke `default-src 'self'` dan instansiasi WASM akan gagal.
 - Bila memakai Web Worker (decoder Draco/KTX2 paralel), tambahkan `worker-src 'self' blob:`.
 - **DILARANG** menambahkan host eksternal apapun ke `connect-src`/`img-src`/`font-src`, dan DILARANG memakai `'unsafe-eval'`.

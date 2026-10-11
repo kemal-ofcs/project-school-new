@@ -33,3 +33,6 @@ next-env.d.ts
 src-tauri/keystore.properties
 *.jks
 *.keystore
+
+# Model wajah disalin dari node_modules saat postinstall (scripts/copy-face-models.ts).
+/public/models/wajah/

@@ -14,6 +14,22 @@ import {
   getAttendancePhotos,
   purgeAttendancePhotoEntries,
 } from "@/lib/gateways/attendance-photo";
+import { ambilFotoPersonil } from "@/lib/gateways/personnel-photo";
+import { FACE_VERDICTS, type FaceVerdict } from "@/lib/validations/face-match";
+
+const VERDICT_STYLE: Record<FaceVerdict, string> = {
+  Cocok: "border-emerald-400/25 bg-emerald-400/10 text-emerald-200",
+  "Tidak Cocok": "border-rose-400/25 bg-rose-400/10 text-rose-200",
+  "Belum Terdaftar": "border-amber-400/25 bg-amber-400/10 text-amber-200",
+  "Tidak Diperiksa": "border-white/10 bg-slate-950 text-slate-300",
+};
+
+function faceLabel(entry: AttendancePhotoEntry) {
+  if (!entry.wajahVonis) return null;
+  return entry.wajahSkor === null
+    ? entry.wajahVonis
+    : `${entry.wajahVonis} · ${Math.round(entry.wajahSkor * 100)}%`;
+}
 
 /** Batas umur foto yang dibersihkan — sama dengan halaman Web/Desktop. */
 const PURGE_DAYS = 90;
@@ -69,6 +85,7 @@ export default function FotoAbsensiMobilePage() {
 
   const [entries, setEntries] = useState<AttendancePhotoEntry[]>([]);
   const [rangeDays, setRangeDays] = useState<number>(6);
+  const [wajahVonis, setWajahVonis] = useState<FaceVerdict | "">("");
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<{
@@ -78,6 +95,8 @@ export default function FotoAbsensiMobilePage() {
   const [preview, setPreview] = useState<{
     entry: AttendancePhotoEntry;
     src: string;
+    /** Foto profil pemilik kartu, pembanding untuk vonis wajah. */
+    profileSrc: string | null;
   } | null>(null);
   const [confirmDelete, setConfirmDelete] =
     useState<AttendancePhotoEntry | null>(null);
@@ -105,6 +124,7 @@ export default function FotoAbsensiMobilePage() {
         await getAttendancePhotos({
           tanggalMulai: isoDaysAgo(rangeDays),
           tanggalSelesai: isoDaysAgo(0),
+          wajahVonis,
         }),
       );
     } catch (error) {
@@ -118,7 +138,7 @@ export default function FotoAbsensiMobilePage() {
     } finally {
       setLoading(false);
     }
-  }, [rangeDays]);
+  }, [rangeDays, wajahVonis]);
 
   useEffect(() => {
     if (authLoading || !isAuthenticated || !canView) return;
@@ -130,9 +150,17 @@ export default function FotoAbsensiMobilePage() {
     triggerHaptic("light");
     try {
       const result = await getAttendancePhotoImage(entry.idFoto);
+      // Foto profil hanya pembanding; tanpa hak melihat personil, foto scannya
+      // tetap bisa ditinjau.
+      const profile = entry.wajahVonis
+        ? await ambilFotoPersonil(entry.idKaryawan).catch(() => null)
+        : null;
       setPreview({
         entry,
         src: `data:${result.mime};base64,${result.base64}`,
+        profileSrc: profile
+          ? `data:${profile.foto_mime};base64,${profile.foto_base64}`
+          : null,
       });
     } catch (error) {
       setMessage({
@@ -275,6 +303,22 @@ export default function FotoAbsensiMobilePage() {
               ))}
             </div>
 
+            <select
+              aria-label="Filter vonis wajah"
+              value={wajahVonis}
+              onChange={(event) =>
+                setWajahVonis(event.target.value as FaceVerdict | "")
+              }
+              className="min-h-11 w-full rounded-xl border border-white/10 bg-slate-900 px-3 text-xs font-semibold text-slate-200"
+            >
+              <option value="">Semua vonis wajah</option>
+              {FACE_VERDICTS.map((vonis) => (
+                <option key={vonis} value={vonis}>
+                  {vonis}
+                </option>
+              ))}
+            </select>
+
             {canDelete ? (
               <button
                 type="button"
@@ -316,9 +360,18 @@ export default function FotoAbsensiMobilePage() {
                           {entry.divisi ? ` · ${entry.divisi}` : ""}
                         </p>
                       </div>
-                      <span className="shrink-0 rounded-full border border-white/10 bg-slate-950 px-2.5 py-1 text-[10px] font-bold text-slate-300">
-                        {entry.jenisScan || "Scan"}
-                      </span>
+                      <div className="flex shrink-0 flex-col items-end gap-1">
+                        <span className="rounded-full border border-white/10 bg-slate-950 px-2.5 py-1 text-[10px] font-bold text-slate-300">
+                          {entry.jenisScan || "Scan"}
+                        </span>
+                        {entry.wajahVonis ? (
+                          <span
+                            className={`rounded-full border px-2.5 py-1 text-[10px] font-bold ${VERDICT_STYLE[entry.wajahVonis]}`}
+                          >
+                            {faceLabel(entry)}
+                          </span>
+                        ) : null}
+                      </div>
                     </div>
                     <dl className="mt-3 grid grid-cols-2 gap-2 text-[11px]">
                       <div className="min-w-0">
@@ -397,6 +450,25 @@ export default function FotoAbsensiMobilePage() {
               alt={`Bukti absensi ${preview.entry.nama}`}
               className="w-full rounded-2xl border border-white/10"
             />
+            {preview.entry.wajahVonis ? (
+              <div className="mt-3 space-y-1.5">
+                <p className="text-[11px] font-bold text-slate-300">
+                  {faceLabel(preview.entry)} · dibandingkan dengan foto profil:
+                </p>
+                {preview.profileSrc ? (
+                  // biome-ignore lint/performance/noImgElement: data URI dari database
+                  <img
+                    src={preview.profileSrc}
+                    alt={`Foto profil ${preview.entry.nama}`}
+                    className="w-1/2 rounded-2xl border border-white/10"
+                  />
+                ) : (
+                  <p className="text-[11px] text-slate-400">
+                    Foto profil tidak tersedia.
+                  </p>
+                )}
+              </div>
+            ) : null}
             <dl className="mt-3 grid gap-2 rounded-2xl border border-white/10 bg-slate-950/60 p-3 text-[11px]">
               <div>
                 <dt className="text-[10px] font-bold uppercase tracking-wider text-slate-500">

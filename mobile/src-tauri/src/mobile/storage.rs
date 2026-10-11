@@ -740,6 +740,19 @@ pub fn initialize(path: &Path) -> Result<(), String> {
         updated_at TEXT NOT NULL DEFAULT (datetime('now'))
       );
       CREATE INDEX IF NOT EXISTS idx_inventory_unit_barang ON inventory_unit(id_barang);
+      -- Vektor wajah terdaftar untuk verifikasi 1:1 saat scan (v38). Ikut
+      -- SNAPSHOT_TABLES supaya terminal offline tetap bisa memeriksa; isinya
+      -- int8 base64 (±1,4 KB per orang), bukan foto. DDL WAJIB identik dengan
+      -- `turso.rs` dan `db-migrations.ts`.
+      CREATE TABLE IF NOT EXISTS personil_wajah (
+        id_unik TEXT PRIMARY KEY,
+        model TEXT NOT NULL,
+        vektor TEXT NOT NULL,
+        jumlah_sampel INTEGER NOT NULL DEFAULT 1,
+        sumber TEXT NOT NULL CHECK (sumber IN ('kamera', 'foto_profil')),
+        dibuat_oleh TEXT,
+        updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+      );
       -- Buku Kunjungan UKS (v36). SENGAJA di luar SNAPSHOT_TABLES, pola
       -- `absensi_foto`: ditulis lokal, didorong ke cloud lewat outbox, tidak
       -- pernah ditarik ke perangkat lain. Isinya data kesehatan anak, jadi
@@ -808,7 +821,9 @@ pub fn initialize(path: &Path) -> Result<(), String> {
         client_id TEXT,
         foto_mime TEXT NOT NULL DEFAULT 'image/jpeg',
         foto_base64 TEXT NOT NULL,
-        created_at TEXT NOT NULL
+        created_at TEXT NOT NULL,
+        wajah_vonis TEXT,
+        wajah_skor REAL
       );
       CREATE INDEX IF NOT EXISTS idx_local_absensi_foto_tanggal
         ON absensi_foto(tanggal_kerja, timestamp_scan DESC);
@@ -1486,6 +1501,15 @@ pub fn initialize(path: &Path) -> Result<(), String> {
         ensure_column(&connection, table, column, sql)?;
     }
 
+    // Vonis verifikasi wajah pada foto bukti (v38). NULL = scan itu tidak
+    // diperiksa wajahnya (fitur mati, atau foto lama).
+    for (column, sql) in [
+        ("wajah_vonis", "ALTER TABLE absensi_foto ADD COLUMN wajah_vonis TEXT;"),
+        ("wajah_skor", "ALTER TABLE absensi_foto ADD COLUMN wajah_skor REAL;"),
+    ] {
+        ensure_column(&connection, "absensi_foto", column, sql)?;
+    }
+
     // Shift tujuan sesi lanjutan. 0 = belum ditentukan, sehingga pemasangan
     // lama yang hanya menyalakan izinkan_multi_sesi tetap memakai pencocokan
     // jendela otomatis seperti perilaku lama.
@@ -1667,6 +1691,7 @@ pub(crate) const CLOUD_MIRRORED_TABLES: &[&str] = &[
     "inventory_barang",
     "inventory_mutasi",
     "inventory_unit",
+    "personil_wajah",
     // Di luar snapshot, tetapi milik database asalnya seperti `absensi_foto`.
     "uks_kunjungan",
     "company_profile",

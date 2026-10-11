@@ -22,6 +22,12 @@ import {
   saveScanSecurity,
 } from "@/lib/gateways/scan-security";
 import { subscribeSyncCompleted } from "@/lib/gateways/sync-status";
+import {
+  FACE_THRESHOLD_DEFAULT,
+  FACE_THRESHOLD_MAX,
+  FACE_THRESHOLD_MIN,
+  type FaceMode,
+} from "@/lib/validations/face-match";
 import { validateGeofenceSettings } from "@/lib/validations/geofence";
 import { validateIpAllowlistEntries } from "@/lib/validations/ip-allowlist";
 
@@ -65,6 +71,9 @@ export default function KeamananAbsensiPage() {
   const [ipAllowlistBusy, setIpAllowlistBusy] = useState(false);
   const [ipAllowlistMessage, setIpAllowlistMessage] = useState("");
   const [scanPhotoEnabled, setScanPhotoEnabled] = useState(false);
+  const [faceVerifyEnabled, setFaceVerifyEnabled] = useState(false);
+  const [faceMode, setFaceMode] = useState<FaceMode>("pantau");
+  const [faceThreshold, setFaceThreshold] = useState(FACE_THRESHOLD_DEFAULT);
   const [scanIpEnabled, setScanIpEnabled] = useState(false);
   const [saveMessage, setSaveMessage] = useState("");
   const [currentDeviceCoords, setCurrentDeviceCoords] = useState<{
@@ -82,6 +91,9 @@ export default function KeamananAbsensiPage() {
         if (cancelled) return;
         setScanPhotoEnabled(settings.photoEnabled);
         setScanIpEnabled(settings.ipRestrictionEnabled);
+        setFaceVerifyEnabled(settings.faceVerifyEnabled);
+        setFaceMode(settings.faceMode);
+        setFaceThreshold(settings.faceThreshold);
         setIpAllowlist(settings.entries);
         setIpAllowlistDraft(settings.entries.join("\n"));
         setIpDeviceAddresses(settings.deviceAddresses);
@@ -198,9 +210,15 @@ export default function KeamananAbsensiPage() {
         photoEnabled: scanPhotoEnabled,
         ipRestrictionEnabled: scanIpEnabled,
         entries,
+        faceVerifyEnabled,
+        faceMode,
+        faceThreshold,
       });
       setScanPhotoEnabled(saved.photoEnabled);
       setScanIpEnabled(saved.ipRestrictionEnabled);
+      setFaceVerifyEnabled(saved.faceVerifyEnabled);
+      setFaceMode(saved.faceMode);
+      setFaceThreshold(saved.faceThreshold);
       setIpAllowlist(saved.entries);
       setIpAllowlistDraft(saved.entries.join("\n"));
       setIpDeviceAddresses(saved.deviceAddresses);
@@ -295,6 +313,73 @@ export default function KeamananAbsensiPage() {
                 serta latar orang yang absen.
               </span>
             </label>
+
+            {scanPhotoEnabled ? (
+              <div className="mt-2 space-y-3 rounded-2xl border border-white/10 bg-slate-950/40 p-3">
+                <label className="flex items-start gap-3">
+                  <input
+                    type="checkbox"
+                    checked={faceVerifyEnabled}
+                    onChange={(event) =>
+                      setFaceVerifyEnabled(event.target.checked)
+                    }
+                    className="mt-0.5 size-4 shrink-0"
+                  />
+                  <span className="text-[11px] leading-5 text-slate-300">
+                    <strong className="text-white">
+                      Cocokkan wajah dengan pemilik kartu
+                    </strong>
+                    <br />
+                    Personil yang belum didaftarkan wajahnya tetap bisa absen.
+                  </span>
+                </label>
+                {faceVerifyEnabled ? (
+                  <>
+                    <div>
+                      <label
+                        htmlFor="face-mode"
+                        className="text-[11px] font-bold uppercase tracking-wider text-slate-400"
+                      >
+                        Bila wajah tidak cocok
+                      </label>
+                      <select
+                        id="face-mode"
+                        value={faceMode}
+                        onChange={(event) =>
+                          setFaceMode(event.target.value as FaceMode)
+                        }
+                        className="mt-1 min-h-11 w-full rounded-xl border border-white/10 bg-slate-950 px-3 text-sm text-white"
+                      >
+                        <option value="pantau">
+                          Tetap terima, tandai untuk ditinjau
+                        </option>
+                        <option value="tolak">Tolak scan</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label
+                        htmlFor="face-threshold"
+                        className="text-[11px] font-bold uppercase tracking-wider text-slate-400"
+                      >
+                        Ambang kemiripan ({faceThreshold.toFixed(2)})
+                      </label>
+                      <input
+                        id="face-threshold"
+                        type="range"
+                        min={FACE_THRESHOLD_MIN}
+                        max={FACE_THRESHOLD_MAX}
+                        step={0.01}
+                        value={faceThreshold}
+                        onChange={(event) =>
+                          setFaceThreshold(Number(event.target.value))
+                        }
+                        className="mt-1 min-h-11 w-full cursor-pointer"
+                      />
+                    </div>
+                  </>
+                ) : null}
+              </div>
+            ) : null}
 
             <label className="mt-2 flex items-start gap-3 rounded-2xl border border-white/10 bg-slate-950/50 p-3">
               <input

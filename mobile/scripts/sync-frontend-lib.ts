@@ -51,6 +51,9 @@ const filesToCopy = [
   // UI Buku Kunjungan UKS, termasuk pemberitahuan offline dan "sinkronisasi
   // terakhir"; bergantung pada `Modal` dan gaya inventaris yang ikut tersalin.
   "components/uks/UksWorkspace.tsx",
+  // Pendaftaran wajah (verifikasi 1:1): bergantung pada `Modal`, gaya
+  // inventaris, dan gateway tersinkron saja.
+  "components/wajah/WajahWorkspace.tsx",
   // Editor koleksi berulang CMS landing. Tidak punya perilaku khusus platform
   // dan bentuk datanya adalah kontrak dengan situs publik, jadi ia disalin
   // apa adanya alih-alih diduplikasi - dua salinan akan saling menyimpang

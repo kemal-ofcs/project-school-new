@@ -17,6 +17,8 @@ const filesToSync = [
   "inventory.rs",
   // Buku Kunjungan UKS: aturan dan alur salinan wajib identik dengan Desktop.
   "uks.rs",
+  // Verifikasi wajah 1:1: aturan vonis wajib identik dengan Desktop dan TS.
+  "face_match.rs",
   "attendance_ledger.rs",
   "attendance_dashboard.rs",
   "wa_notification.rs",

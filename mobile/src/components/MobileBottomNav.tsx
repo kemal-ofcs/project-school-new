@@ -47,6 +47,7 @@ export function MobileBottomNav() {
     canAccessArea(user, "operators") ||
     canAccessArea(user, "password_reset") ||
     canAccessArea(user, "attendance_photo") ||
+    canAccessArea(user, "face_template") ||
     canAccessArea(user, "konten") ||
     canAccessArea(user, "pmb")
   ) {

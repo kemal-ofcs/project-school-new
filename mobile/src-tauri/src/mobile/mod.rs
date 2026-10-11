@@ -16,6 +16,7 @@ pub mod academic;
 pub mod attendance_dashboard;
 pub mod attendance_ledger;
 pub mod class_attendance;
+pub mod face_match;
 pub mod grades;
 // Inventaris: SALINAN `desktop/inventory.rs` oleh sync-rust-modules.ts.
 pub mod inventory;
