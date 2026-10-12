@@ -4,6 +4,8 @@ import {
   DEFAULT_ROLE_PERMISSIONS,
   PERMISSION_CATALOG,
 } from "@/lib/rbac/catalog";
+import { AKUN_BAWAAN, SEED_AKUN_SQL } from "@/lib/validations/accounting";
+import TARIF_PAYROLL_BAWAAN from "@/lib/validations/tarif-payroll-bawaan.json";
 
 const RBAC_MIGRATION_VERSION = 1;
 const WEB_SESSION_MIGRATION_VERSION = 2;
@@ -43,6 +45,9 @@ const INVENTORY_MIGRATION_VERSION = 35;
 const UKS_MIGRATION_VERSION = 36;
 const INVENTORY_UNIT_MIGRATION_VERSION = 37;
 const FACE_VERIFICATION_MIGRATION_VERSION = 38;
+const ACCOUNTING_MIGRATION_VERSION = 39;
+const EMPLOYEE_LOAN_MIGRATION_VERSION = 40;
+const STUDENT_BILLING_MIGRATION_VERSION = 41;
 
 /**
  * v21 — aturan jam scan baru: Jam Kerja Normal = (Jam Pulang − Jam Masuk) −
@@ -983,41 +988,33 @@ export async function runDatabaseMigrations(client: Client) {
     );
   `);
 
-  // Default Overtime Tiers (PP 35/2021)
-  await client.execute(`
-    INSERT OR IGNORE INTO overtime_tier_rules (id, rule_type, tier_order, hour_start, hour_end, multiplier, is_active)
-    VALUES
-      ('ot-work-1', 'HARI_KERJA', 1, 0.0, 1.0, 1.5, 1),
-      ('ot-work-2', 'HARI_KERJA', 2, 1.0, NULL, 2.0, 1),
-      ('ot-holiday-1', 'HARI_LIBUR', 1, 0.0, 8.0, 2.0, 1),
-      ('ot-holiday-2', 'HARI_LIBUR', 2, 8.0, 9.0, 3.0, 1),
-      ('ot-holiday-3', 'HARI_LIBUR', 3, 9.0, NULL, 4.0, 1);
-  `);
-
-  // Default BPJS Rules
-  await client.execute(`
-    INSERT OR IGNORE INTO bpjs_rules (id, component_code, component_name, rate_percentage, wage_cap, effective_date)
-    VALUES
-      ('bpjs-jht-emp', 'JHT_EMP', 'JHT Karyawan', 2.0, NULL, '2024-01-01'),
-      ('bpjs-jht-co', 'JHT_CO', 'JHT Perusahaan', 3.7, NULL, '2024-01-01'),
-      ('bpjs-jp-emp', 'JP_EMP', 'Jaminan Pensiun Karyawan', 1.0, 10042300, '2024-01-01'),
-      ('bpjs-jp-co', 'JP_CO', 'Jaminan Pensiun Perusahaan', 2.0, 10042300, '2024-01-01'),
-      ('bpjs-jkk', 'JKK', 'Jaminan Kecelakaan Kerja', 0.24, NULL, '2024-01-01'),
-      ('bpjs-jkm', 'JKM', 'Jaminan Kematian', 0.30, NULL, '2024-01-01'),
-      ('bpjs-kes-emp', 'KES_EMP', 'BPJS Kesehatan Karyawan', 1.0, 12000000, '2024-01-01'),
-      ('bpjs-kes-co', 'KES_CO', 'BPJS Kesehatan Perusahaan', 4.0, 12000000, '2024-01-01');
-  `);
-
-  // Default Tax Rules (Pasal 17 UU HPP)
-  await client.execute(`
-    INSERT OR IGNORE INTO tax_rules (id, category, bracket_min, bracket_max, rate_percentage, effective_date)
-    VALUES
-      ('tax-p17-1', 'PASAL_17', 0, 60000000, 5.0, '2024-01-01'),
-      ('tax-p17-2', 'PASAL_17', 60000000, 250000000, 15.0, '2024-01-01'),
-      ('tax-p17-3', 'PASAL_17', 250000000, 500000000, 25.0, '2024-01-01'),
-      ('tax-p17-4', 'PASAL_17', 500000000, 5000000000, 30.0, '2024-01-01'),
-      ('tax-p17-5', 'PASAL_17', 5000000000, NULL, 35.0, '2024-01-01');
-  `);
+  // Tarif default payroll dari `tarif-payroll-bawaan.json`, berkas yang SAMA
+  // dengan seed Rust (`payroll_seed.rs`). Versi sebelumnya menulis tarif 2024
+  // dengan id lama dan tanpa TER, sehingga PPh 21 di slip Web selalu nol dan
+  // Rust terus menghapus baris yang terus ditanam ulang di sini.
+  const idLama = TARIF_PAYROLL_BAWAAN.id_lama;
+  const tandaIdLama = idLama.map(() => "?").join(", ");
+  await client.batch(
+    [
+      ...["tax_rules", "bpjs_rules", "overtime_tier_rules"].map((tabel) => ({
+        sql: `DELETE FROM ${tabel} WHERE id IN (${tandaIdLama});`,
+        args: idLama,
+      })),
+      // Cermin `purge_legacy_rate_rows`: event lama ikut dibuang supaya
+      // perangkat yang masih mengantrenya tidak menghidupkannya kembali.
+      {
+        sql: `DELETE FROM sync_changelog WHERE domain = 'payroll' AND entity_key IN (${tandaIdLama});`,
+        args: idLama,
+      },
+      ...TARIF_PAYROLL_BAWAAN.tabel.flatMap((tabel) =>
+        tabel.baris.map((baris) => ({
+          sql: `INSERT OR IGNORE INTO ${tabel.nama} (${tabel.kolom.join(", ")}) VALUES (${tabel.kolom.map(() => "?").join(", ")});`,
+          args: baris,
+        })),
+      ),
+    ],
+    "write",
+  );
 
   await client.execute({
     sql: `INSERT OR IGNORE INTO schema_migration (version, name, applied_at)
@@ -1609,6 +1606,223 @@ export async function runDatabaseMigrations(client: Client) {
     sql: `INSERT OR IGNORE INTO schema_migration (version, name, applied_at)
           VALUES (?, 'face-verification', ?);`,
     args: [FACE_VERIFICATION_MIGRATION_VERSION, now],
+  });
+
+  // v39 — akuntansi berpasangan. Saldo TIDAK pernah disimpan: dihitung dari
+  // baris jurnal. Jurnal append-only; koreksi = jurnal pembalik `batal-<id>`.
+  // DDL WAJIB identik dengan `storage.rs` dan `turso.rs`.
+  await client.execute(`
+    CREATE TABLE IF NOT EXISTS keu_akun (
+      id_akun TEXT PRIMARY KEY,
+      kode TEXT NOT NULL,
+      nama TEXT NOT NULL,
+      kelompok TEXT NOT NULL CHECK (kelompok IN ('Aset', 'Kewajiban', 'Aset Neto', 'Pendapatan', 'Beban')),
+      saldo_normal TEXT NOT NULL CHECK (saldo_normal IN ('Debit', 'Kredit')),
+      is_aktif INTEGER NOT NULL DEFAULT 1 CHECK (is_aktif IN (0, 1)),
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+  `);
+  await client.execute(`
+    CREATE TABLE IF NOT EXISTS keu_jurnal (
+      id_jurnal TEXT PRIMARY KEY,
+      tanggal TEXT NOT NULL,
+      seri TEXT NOT NULL,
+      nomor_urut INTEGER NOT NULL CHECK (nomor_urut > 0),
+      nomor TEXT NOT NULL,
+      keterangan TEXT NOT NULL,
+      sumber TEXT NOT NULL CHECK (sumber IN ('Manual', 'Kasbon', 'Payroll', 'Pembayaran', 'Tagihan', 'Pembatalan')),
+      id_sumber TEXT,
+      id_jurnal_batal TEXT,
+      dibuat_oleh TEXT NOT NULL,
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+  `);
+  await client.execute(
+    "CREATE INDEX IF NOT EXISTS idx_keu_jurnal_tanggal ON keu_jurnal(tanggal);",
+  );
+  await client.execute(
+    "CREATE INDEX IF NOT EXISTS idx_keu_jurnal_seri ON keu_jurnal(seri, nomor_urut);",
+  );
+  await client.execute(`
+    CREATE TABLE IF NOT EXISTS keu_jurnal_baris (
+      id_baris TEXT PRIMARY KEY,
+      id_jurnal TEXT NOT NULL,
+      id_akun TEXT NOT NULL,
+      debit INTEGER NOT NULL DEFAULT 0 CHECK (debit >= 0),
+      kredit INTEGER NOT NULL DEFAULT 0 CHECK (kredit >= 0),
+      keterangan TEXT,
+      urutan INTEGER NOT NULL DEFAULT 0,
+      CHECK ((debit > 0 AND kredit = 0) OR (debit = 0 AND kredit > 0))
+    );
+  `);
+  await client.execute(
+    "CREATE INDEX IF NOT EXISTS idx_keu_jurnal_baris_jurnal ON keu_jurnal_baris(id_jurnal);",
+  );
+  await client.execute(
+    "CREATE INDEX IF NOT EXISTS idx_keu_jurnal_baris_akun ON keu_jurnal_baris(id_akun);",
+  );
+  // Bagan akun bawaan dari berkas JSON yang sama dengan seed Rust.
+  await client.batch(
+    AKUN_BAWAAN.map((akun) => ({
+      sql: SEED_AKUN_SQL,
+      args: [
+        akun.id_akun,
+        akun.kode,
+        akun.nama,
+        akun.kelompok,
+        akun.saldo_normal,
+      ],
+    })),
+    "write",
+  );
+  await client.execute({
+    sql: `INSERT OR IGNORE INTO schema_migration (version, name, applied_at)
+          VALUES (?, 'accounting-foundation', ?);`,
+    args: [ACCOUNTING_MIGRATION_VERSION, now],
+  });
+
+  // v40 — kasbon karyawan. Sisa TIDAK disimpan: pokok dikurangi angsuran gaji
+  // dan pelunasan tunai. DDL WAJIB identik dengan `storage.rs` dan `turso.rs`.
+  await client.execute(`
+    CREATE TABLE IF NOT EXISTS keu_pinjaman (
+      id_pinjaman TEXT PRIMARY KEY,
+      id_karyawan TEXT NOT NULL,
+      nama_karyawan TEXT NOT NULL,
+      pokok INTEGER NOT NULL CHECK (pokok > 0),
+      cicilan INTEGER NOT NULL CHECK (cicilan > 0),
+      mulai_potong TEXT NOT NULL,
+      keterangan TEXT,
+      status TEXT NOT NULL DEFAULT 'Diajukan' CHECK (status IN ('Diajukan', 'Disetujui', 'Ditolak', 'Dibatalkan')),
+      tanggal_pengajuan TEXT NOT NULL,
+      diajukan_oleh TEXT NOT NULL,
+      diputuskan_oleh TEXT,
+      tanggal_cair TEXT,
+      id_akun_kas TEXT,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+  `);
+  await client.execute(`
+    CREATE TABLE IF NOT EXISTS keu_pinjaman_mutasi (
+      id_mutasi TEXT PRIMARY KEY,
+      id_pinjaman TEXT NOT NULL,
+      jenis TEXT NOT NULL CHECK (jenis IN ('Pencairan', 'Angsuran Gaji', 'Pelunasan Tunai', 'Pembatalan')),
+      jumlah INTEGER NOT NULL CHECK (jumlah > 0),
+      tanggal TEXT NOT NULL,
+      id_ref TEXT,
+      id_jurnal TEXT,
+      dicatat_oleh TEXT NOT NULL,
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+  `);
+  await client.execute(`
+    CREATE TABLE IF NOT EXISTS keu_pinjaman_tunda (
+      id_tunda TEXT PRIMARY KEY,
+      id_pinjaman TEXT NOT NULL,
+      periode TEXT NOT NULL,
+      alasan TEXT,
+      dibuat_oleh TEXT NOT NULL,
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+  `);
+  await client.execute(
+    "CREATE INDEX IF NOT EXISTS idx_keu_pinjaman_karyawan ON keu_pinjaman(id_karyawan, status);",
+  );
+  await client.execute(
+    "CREATE INDEX IF NOT EXISTS idx_keu_pinjaman_mutasi_pinjaman ON keu_pinjaman_mutasi(id_pinjaman);",
+  );
+  await client.execute(
+    "CREATE INDEX IF NOT EXISTS idx_keu_pinjaman_tunda_pinjaman ON keu_pinjaman_tunda(id_pinjaman, periode);",
+  );
+  await client.execute({
+    sql: `INSERT OR IGNORE INTO schema_migration (version, name, applied_at)
+          VALUES (?, 'employee-loan', ?);`,
+    args: [EMPLOYEE_LOAN_MIGRATION_VERSION, now],
+  });
+
+  // v41 — tagihan siswa. `keu_tagihan` dan `keu_tagihan_batal` append-only;
+  // status "Dibatalkan" diturunkan dari baris pembatalan. DDL WAJIB identik
+  // dengan `storage.rs` dan `turso.rs`.
+  await client.execute(`
+    CREATE TABLE IF NOT EXISTS keu_jenis_tagihan (
+      id_jenis_tagihan TEXT PRIMARY KEY,
+      nama TEXT NOT NULL,
+      periodik TEXT NOT NULL CHECK (periodik IN ('Bulanan', 'Tahunan', 'Sekali')),
+      nominal_bawaan INTEGER NOT NULL DEFAULT 0 CHECK (nominal_bawaan >= 0),
+      id_akun_pendapatan TEXT NOT NULL,
+      is_aktif INTEGER NOT NULL DEFAULT 1 CHECK (is_aktif IN (0, 1)),
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+  `);
+  await client.execute(`
+    CREATE TABLE IF NOT EXISTS keu_tarif_tagihan (
+      id_tarif TEXT PRIMARY KEY,
+      id_jenis_tagihan TEXT NOT NULL,
+      nama_unit TEXT NOT NULL DEFAULT '',
+      tingkat INTEGER,
+      nominal INTEGER NOT NULL CHECK (nominal >= 0),
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+  `);
+  await client.execute(`
+    CREATE TABLE IF NOT EXISTS keu_keringanan (
+      id_keringanan TEXT PRIMARY KEY,
+      id_siswa TEXT NOT NULL,
+      id_jenis_tagihan TEXT NOT NULL,
+      jenis TEXT NOT NULL CHECK (jenis IN ('Persen', 'Nominal')),
+      nilai INTEGER NOT NULL CHECK (nilai > 0),
+      periode_mulai TEXT,
+      periode_selesai TEXT,
+      alasan TEXT,
+      is_aktif INTEGER NOT NULL DEFAULT 1 CHECK (is_aktif IN (0, 1)),
+      dibuat_oleh TEXT NOT NULL,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+  `);
+  await client.execute(`
+    CREATE TABLE IF NOT EXISTS keu_tagihan (
+      id_tagihan TEXT PRIMARY KEY,
+      id_siswa TEXT NOT NULL,
+      nama_siswa TEXT NOT NULL,
+      id_jenis_tagihan TEXT NOT NULL,
+      nama_tagihan TEXT NOT NULL,
+      periode TEXT NOT NULL,
+      nominal INTEGER NOT NULL CHECK (nominal >= 0),
+      potongan INTEGER NOT NULL DEFAULT 0 CHECK (potongan >= 0),
+      jatuh_tempo TEXT NOT NULL,
+      dibuat_oleh TEXT NOT NULL,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      CHECK (potongan <= nominal)
+    );
+  `);
+  await client.execute(`
+    CREATE TABLE IF NOT EXISTS keu_tagihan_batal (
+      id_tagihan TEXT PRIMARY KEY,
+      alasan TEXT NOT NULL,
+      dibatalkan_oleh TEXT NOT NULL,
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+  `);
+  await client.execute(
+    "CREATE INDEX IF NOT EXISTS idx_keu_tarif_jenis ON keu_tarif_tagihan(id_jenis_tagihan);",
+  );
+  await client.execute(
+    "CREATE INDEX IF NOT EXISTS idx_keu_keringanan_jenis ON keu_keringanan(id_jenis_tagihan, id_siswa);",
+  );
+  await client.execute(
+    "CREATE INDEX IF NOT EXISTS idx_keu_tagihan_jenis_periode ON keu_tagihan(id_jenis_tagihan, periode);",
+  );
+  await client.execute(
+    "CREATE INDEX IF NOT EXISTS idx_keu_tagihan_siswa ON keu_tagihan(id_siswa);",
+  );
+  await client.execute({
+    sql: `INSERT OR IGNORE INTO schema_migration (version, name, applied_at)
+          VALUES (?, 'student-billing', ?);`,
+    args: [STUDENT_BILLING_MIGRATION_VERSION, now],
   });
 
   await client.execute(

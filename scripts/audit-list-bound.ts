@@ -68,6 +68,10 @@ const TABEL_TUMBUH: Record<string, string> = {
 	leger_kehadiran: "satu baris per siswa per periode rapor",
 	inventory_mutasi: "satu baris per barang yang masuk, keluar, atau berpindah",
 	uks_kunjungan: "satu baris per kunjungan ke UKS",
+	keu_jurnal: "satu baris per transaksi keuangan",
+	keu_jurnal_baris: "dua baris atau lebih per transaksi keuangan",
+	keu_pinjaman_mutasi: "satu baris per cicilan kasbon yang dipotong atau dilunasi",
+	keu_tagihan: "satu baris per siswa per jenis tagihan per periode",
 };
 
 const SUMBER: Array<{ dir: string; ext: ".ts" | ".rs" }> = [

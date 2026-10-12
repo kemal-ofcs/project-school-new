@@ -33,6 +33,9 @@ export default function DashboardPage() {
   const canPayroll = canAccessArea(user, "payroll");
   const canInventaris = canAccessArea(user, "inventaris");
   const canUks = canAccessArea(user, "uks");
+  const canKeuangan = canAccessArea(user, "keuangan");
+  const canKasbon = canAccessArea(user, "kasbon");
+  const canTagihan = canAccessArea(user, "tagihan");
   const hasAnyHubItem =
     canPresensiKelas ||
     canAudit ||
@@ -40,7 +43,10 @@ export default function DashboardPage() {
     canLegerKehadiran ||
     canPayroll ||
     canInventaris ||
-    canUks;
+    canUks ||
+    canKeuangan ||
+    canKasbon ||
+    canTagihan;
 
   const [metrics, setMetrics] = useState<DashboardMetrics | null>(null);
   const [recentScans, setRecentScans] = useState<Record<string, unknown>[]>([]);
@@ -161,6 +167,33 @@ export default function DashboardPage() {
                   title="Kunjungan UKS"
                   subtitle="Catat siswa sakit, obat, dan tindak lanjut"
                   tone="sky"
+                />
+              )}
+              {canKeuangan && (
+                <HubRow
+                  href="/keuangan"
+                  icon="document"
+                  title="Pembukuan"
+                  subtitle="Jurnal, buku besar & neraca saldo"
+                  tone="emerald"
+                />
+              )}
+              {canTagihan && (
+                <HubRow
+                  href="/tagihan"
+                  icon="document"
+                  title="Tagihan Siswa"
+                  subtitle="SPP, keringanan & tunggakan"
+                  tone="emerald"
+                />
+              )}
+              {canKasbon && (
+                <HubRow
+                  href="/kasbon"
+                  icon="document"
+                  title="Kasbon Karyawan"
+                  subtitle="Pinjaman yang dicicil lewat potong gaji"
+                  tone="emerald"
                 />
               )}
               {canPayroll && (

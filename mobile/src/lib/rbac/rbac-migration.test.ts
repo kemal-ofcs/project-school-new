@@ -129,6 +129,12 @@ describe("dynamic RBAC migration", () => {
       37,
       // v38 — verifikasi wajah: `personil_wajah`, vonis di `absensi_foto`.
       38,
+      // v39 — akuntansi: `keu_akun`, `keu_jurnal`, `keu_jurnal_baris`.
+      39,
+      // v40 — kasbon karyawan: `keu_pinjaman`, mutasi, dan penundaannya.
+      40,
+      // v41 — tagihan siswa: jenis, tarif, keringanan, tagihan, pembatalan.
+      41,
     ]);
 
     const sessionColumns = await client.execute(

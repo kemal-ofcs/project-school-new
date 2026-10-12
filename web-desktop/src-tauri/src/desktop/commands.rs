@@ -4,9 +4,9 @@ use tauri::State;
 use zeroize::Zeroizing;
 
 use super::{
-    academic, administration, attendance_dashboard, attendance_ledger, class_attendance,
+    academic, accounting, administration, billing, attendance_dashboard, attendance_ledger, class_attendance,
     config::DesktopState,
-    face_match, inventory, license,
+    face_match, inventory, license, loan,
     models::{
         CommandError, DesktopLoginResult, DesktopRuntimeStatus, DesktopSession, DesktopSyncStatus,
         OperatorUser, SessionMode,
@@ -2701,6 +2701,308 @@ pub fn desktop_delete_teaching_journal(
 ) -> Result<Value, CommandError> {
     require_permission(&state, "teaching_journal.delete")?;
     teaching_journal::delete_teaching_journal(&state, &id_jurnal)
+}
+
+/// Bagan akun beserta penanda akun sistem dan akun yang sudah dipakai jurnal.
+#[tauri::command]
+pub fn desktop_accounting_accounts(state: State<'_, DesktopState>) -> Result<Value, CommandError> {
+    require_permission(&state, "accounting.view")?;
+    accounting::list_accounts(&state)
+}
+
+#[tauri::command]
+pub fn desktop_accounting_save_account(
+    state: State<'_, DesktopState>,
+    draft: Value,
+) -> Result<Value, CommandError> {
+    require_permission(&state, "accounting.manage")?;
+    accounting::save_account(&state, draft)
+}
+
+#[tauri::command]
+pub fn desktop_accounting_journals(
+    state: State<'_, DesktopState>,
+    dari: String,
+    sampai: String,
+    sumber: Option<String>,
+) -> Result<Value, CommandError> {
+    require_permission(&state, "accounting.view")?;
+    accounting::list_journals(&state, &dari, &sampai, sumber.as_deref())
+}
+
+#[tauri::command]
+pub fn desktop_accounting_journal(
+    state: State<'_, DesktopState>,
+    id_jurnal: String,
+) -> Result<Value, CommandError> {
+    require_permission(&state, "accounting.view")?;
+    accounting::get_journal(&state, &id_jurnal)
+}
+
+/// Jurnal umum manual. Header dan seluruh barisnya ditulis dalam satu
+/// transaksi lokal dan satu event outbox.
+#[tauri::command]
+pub fn desktop_accounting_post_journal(
+    state: State<'_, DesktopState>,
+    draft: Value,
+) -> Result<Value, CommandError> {
+    let operator = require_permission(&state, "accounting.manage")?;
+    accounting::post_journal(&state, &operator.username, draft)
+}
+
+/// Pembatalan menuntut izin sensitif tersendiri: jurnal pembalik mengubah
+/// saldo setiap akun yang disentuh jurnal asalnya.
+#[tauri::command]
+pub fn desktop_accounting_reverse_journal(
+    state: State<'_, DesktopState>,
+    id_jurnal: String,
+    alasan: String,
+) -> Result<Value, CommandError> {
+    let operator = require_permission(&state, "accounting.reverse")?;
+    accounting::reverse_journal(&state, &operator.username, &id_jurnal, &alasan)
+}
+
+#[tauri::command]
+pub fn desktop_accounting_ledger(
+    state: State<'_, DesktopState>,
+    id_akun: String,
+    dari: String,
+    sampai: String,
+) -> Result<Value, CommandError> {
+    require_permission(&state, "accounting.view")?;
+    accounting::ledger(&state, &id_akun, &dari, &sampai)
+}
+
+#[tauri::command]
+pub fn desktop_accounting_trial_balance(
+    state: State<'_, DesktopState>,
+    sampai: String,
+) -> Result<Value, CommandError> {
+    require_permission(&state, "accounting.view")?;
+    accounting::trial_balance(&state, &sampai)
+}
+
+/// Daftar kasbon beserta sisa yang dihitung dari mutasinya.
+#[tauri::command]
+pub fn desktop_loan_list(state: State<'_, DesktopState>) -> Result<Value, CommandError> {
+    require_permission(&state, "loan.view")?;
+    loan::list_loans(&state)
+}
+
+#[tauri::command]
+pub fn desktop_loan_detail(
+    state: State<'_, DesktopState>,
+    id_pinjaman: String,
+) -> Result<Value, CommandError> {
+    require_permission(&state, "loan.view")?;
+    loan::loan_detail(&state, &id_pinjaman)
+}
+
+/// Personil aktif untuk dipilih sebagai peminjam, dengan izin kasbon (bukan
+/// `employees.view`): bendahara tidak perlu melihat seluruh data kepegawaian.
+#[tauri::command]
+pub fn desktop_loan_people(state: State<'_, DesktopState>) -> Result<Value, CommandError> {
+    require_permission(&state, "loan.manage")?;
+    loan::loan_people(&state)
+}
+
+#[tauri::command]
+pub fn desktop_loan_save(
+    state: State<'_, DesktopState>,
+    draft: Value,
+) -> Result<Value, CommandError> {
+    let operator = require_permission(&state, "loan.manage")?;
+    loan::save_loan(&state, &operator.username, draft)
+}
+
+/// Menyetujui (sekaligus mencairkan), menolak, atau membatalkan kasbon. Izin
+/// sensitif: uang sekolah berpindah atau piutangnya dihapus dari pembukuan.
+#[tauri::command]
+pub fn desktop_loan_decide(
+    state: State<'_, DesktopState>,
+    id_pinjaman: String,
+    aksi: String,
+    id_akun_kas: Option<String>,
+) -> Result<Value, CommandError> {
+    let operator = require_permission(&state, "loan.approve")?;
+    loan::decide_loan(
+        &state,
+        &operator.username,
+        &id_pinjaman,
+        &aksi,
+        id_akun_kas.as_deref(),
+    )
+}
+
+#[tauri::command]
+pub fn desktop_loan_pay_off(
+    state: State<'_, DesktopState>,
+    id_pinjaman: String,
+    jumlah: i64,
+    id_akun_kas: Option<String>,
+) -> Result<Value, CommandError> {
+    let operator = require_permission(&state, "loan.manage")?;
+    loan::pay_off_loan(
+        &state,
+        &operator.username,
+        &id_pinjaman,
+        jumlah,
+        id_akun_kas.as_deref(),
+    )
+}
+
+#[tauri::command]
+pub fn desktop_loan_defer(
+    state: State<'_, DesktopState>,
+    id_pinjaman: String,
+    periode: String,
+    alasan: Option<String>,
+) -> Result<Value, CommandError> {
+    let operator = require_permission(&state, "loan.manage")?;
+    loan::defer_loan(
+        &state,
+        &operator.username,
+        &id_pinjaman,
+        &periode,
+        alasan.as_deref(),
+    )
+}
+
+#[tauri::command]
+pub fn desktop_loan_undefer(
+    state: State<'_, DesktopState>,
+    id_tunda: String,
+) -> Result<Value, CommandError> {
+    require_permission(&state, "loan.manage")?;
+    loan::undefer_loan(&state, &id_tunda)
+}
+
+/// Jenis tagihan, tarif, serta pilihan unit/rombel/tahun ajaran untuk
+/// menerbitkan, dengan izin tagihan (bukan `academic.view`).
+#[tauri::command]
+pub fn desktop_billing_master(state: State<'_, DesktopState>) -> Result<Value, CommandError> {
+    require_permission(&state, "billing.view")?;
+    billing::master(&state)
+}
+
+#[tauri::command]
+pub fn desktop_billing_save_type(
+    state: State<'_, DesktopState>,
+    draft: Value,
+) -> Result<Value, CommandError> {
+    require_permission(&state, "billing.manage")?;
+    billing::save_jenis(&state, draft)
+}
+
+#[tauri::command]
+pub fn desktop_billing_save_rate(
+    state: State<'_, DesktopState>,
+    draft: Value,
+) -> Result<Value, CommandError> {
+    require_permission(&state, "billing.manage")?;
+    billing::save_tarif(&state, draft)
+}
+
+#[tauri::command]
+pub fn desktop_billing_delete_rate(
+    state: State<'_, DesktopState>,
+    id_tarif: String,
+) -> Result<Value, CommandError> {
+    require_permission(&state, "billing.manage")?;
+    billing::delete_tarif(&state, &id_tarif)
+}
+
+#[tauri::command]
+pub fn desktop_billing_discounts(state: State<'_, DesktopState>) -> Result<Value, CommandError> {
+    require_permission(&state, "billing.view")?;
+    billing::discounts(&state)
+}
+
+#[tauri::command]
+pub fn desktop_billing_save_discount(
+    state: State<'_, DesktopState>,
+    draft: Value,
+) -> Result<Value, CommandError> {
+    let operator = require_permission(&state, "billing.manage")?;
+    billing::save_keringanan(&state, &operator.username, draft)
+}
+
+/// Siswa aktif untuk dipilih pada keringanan, dengan izin tagihan.
+#[tauri::command]
+pub fn desktop_billing_students(state: State<'_, DesktopState>) -> Result<Value, CommandError> {
+    require_permission(&state, "billing.manage")?;
+    billing::students(&state)
+}
+
+#[tauri::command]
+pub fn desktop_billing_preview(
+    state: State<'_, DesktopState>,
+    id_jenis_tagihan: String,
+    periode: String,
+    unit: Option<String>,
+    id_rombel: Option<String>,
+) -> Result<Value, CommandError> {
+    require_permission(&state, "billing.manage")?;
+    billing::preview(
+        &state,
+        &id_jenis_tagihan,
+        &periode,
+        unit.as_deref(),
+        id_rombel.as_deref(),
+    )
+}
+
+/// Menerbitkan tagihan massal. Siswa yang sudah punya tagihan periode itu
+/// dilewati; setiap tagihan bernilai bersih punya jurnalnya sendiri.
+#[tauri::command]
+pub fn desktop_billing_issue(
+    state: State<'_, DesktopState>,
+    id_jenis_tagihan: String,
+    periode: String,
+    jatuh_tempo: String,
+    unit: Option<String>,
+    id_rombel: Option<String>,
+) -> Result<Value, CommandError> {
+    let operator = require_permission(&state, "billing.manage")?;
+    billing::issue(
+        &state,
+        &operator.username,
+        &id_jenis_tagihan,
+        &periode,
+        &jatuh_tempo,
+        unit.as_deref(),
+        id_rombel.as_deref(),
+    )
+}
+
+#[tauri::command]
+pub fn desktop_billing_list(
+    state: State<'_, DesktopState>,
+    periode: Option<String>,
+    id_jenis_tagihan: Option<String>,
+    id_rombel: Option<String>,
+    status: Option<String>,
+) -> Result<Value, CommandError> {
+    require_permission(&state, "billing.view")?;
+    billing::list(
+        &state,
+        periode.as_deref(),
+        id_jenis_tagihan.as_deref(),
+        id_rombel.as_deref(),
+        status.as_deref(),
+    )
+}
+
+/// Pembatalan tagihan: izin sensitif, karena menghapus piutang siswa dari
+/// pembukuan (lewat jurnal pembalik).
+#[tauri::command]
+pub fn desktop_billing_cancel(
+    state: State<'_, DesktopState>,
+    id_tagihan: String,
+    alasan: String,
+) -> Result<Value, CommandError> {
+    let operator = require_permission(&state, "billing.cancel")?;
+    billing::cancel(&state, &operator.username, &id_tagihan, &alasan)
 }
 
 #[tauri::command]

@@ -13,13 +13,16 @@ mod time_policy;
 pub mod turso;
 
 pub mod academic;
+pub mod accounting;
 pub mod attendance_dashboard;
 pub mod attendance_ledger;
+pub mod billing;
 pub mod class_attendance;
 pub mod face_match;
 pub mod grades;
 pub mod inventory;
 pub mod license;
+pub mod loan;
 pub mod payroll;
 pub mod portability;
 pub mod teaching_journal;

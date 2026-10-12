@@ -48,6 +48,14 @@ const filesToCopy = [
   "components/inventory/LabelQr.tsx",
   // Registri aset per unit: daftarkan unit dan ubah nomor seri.
   "components/inventory/UnitAset.tsx",
+  // Pembukuan (K1): satu UI untuk kedua build, bergantung pada `Modal` dan
+  // gaya `components/inventory/gaya.ts` yang juga disalin.
+  "components/keuangan/KeuanganWorkspace.tsx",
+  // Kasbon (K2) dan pemilih akun kas/bank yang dipakai juga halaman payroll.
+  "components/keuangan/KasbonWorkspace.tsx",
+  "components/keuangan/PilihAkunBayar.tsx",
+  // Tagihan siswa (K3a).
+  "components/keuangan/TagihanWorkspace.tsx",
   // UI Buku Kunjungan UKS, termasuk pemberitahuan offline dan "sinkronisasi
   // terakhir"; bergantung pada `Modal` dan gaya inventaris yang ikut tersalin.
   "components/uks/UksWorkspace.tsx",

@@ -42,8 +42,12 @@ const rootDir = path.resolve(import.meta.dir, "..");
  * isinya ditulis trigger `AFTER DELETE`, bukan aplikasi, sehingga penghapusan
  * yang dilakukan jalur Web ikut tercatat tanpa satu baris kode pun di sisi Web.
  * Sebuah tabel yang harus DITULIS aplikasi tidak boleh masuk daftar ini.
+ *
+ * `sync_append_log` juga dipasang bersama `sync_pulse`, diisi trigger
+ * `AFTER INSERT` pada tabel append-only untuk tarik inkremental. Alasannya
+ * sama: tidak pernah ditulis aplikasi.
  */
-const CLOUD_ONLY_IN_RUST = new Set(["sync_pulse", "sync_tombstone"]);
+const CLOUD_ONLY_IN_RUST = new Set(["sync_pulse", "sync_tombstone", "sync_append_log"]);
 
 let failures = 0;
 let warnings = 0;

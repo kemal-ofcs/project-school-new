@@ -257,6 +257,9 @@ pub struct PayrollRecapRow {
     pub est_bpjs_employee: i64,
     pub est_pph21: i64,
     pub est_net_salary: i64,
+    /// Cicilan kasbon yang ikut dipotong; sudah termasuk di
+    /// `est_total_deduction` dan mengurangi `est_net_salary`.
+    pub est_kasbon: i64,
 }
 
 /// Satu orang, dilihat dari sudut pandang penyaringan komponen payroll.

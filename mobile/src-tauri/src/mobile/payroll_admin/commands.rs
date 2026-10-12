@@ -17,6 +17,7 @@ use super::models::{
     PayrollItem, PayrollRecapRow, PayrollRun, PayrollStatus, SalaryConfig, TaughtSession, TaxRule,
 };
 use crate::mobile::config::MobileState;
+use crate::mobile::loan;
 use crate::mobile::models::CommandError;
 use crate::mobile::storage;
 use crate::mobile::sync;
@@ -1488,6 +1489,10 @@ pub async fn desktop_get_payroll_recap(
     let teacher_overtime = teacher_overtime_enabled(&conn)?;
     let taught_sessions = load_taught_sessions(&conn, &period_start, &period_end)?;
     let jp_rates = load_jp_rates(&conn)?;
+    // Kasbon dipotong per proses gaji; penundaan dan bulan mulai potong
+    // dinilai terhadap bulan awal periode.
+    let kasbon_aktif =
+        loan::pinjaman_aktif(&conn, &period_start.chars().take(7).collect::<String>())?;
 
     let mut stmt = conn
         .prepare(
@@ -1651,6 +1656,18 @@ pub async fn desktop_get_payroll_recap(
                 PayrollCalculator::calculate_pph21_ter(gross, &agg.ptkp_status, &tax_rules);
 
             let net = (gross - deduction - bpjs_emp - pph21).max(Decimal::ZERO);
+            // Kasbon dipotong TERAKHIR dari gaji bersih yang tersisa, dengan
+            // aturan yang sama persis dengan pembekuan di bawah dan dengan
+            // `potongKasbon` di Web.
+            let (kasbon, _) = loan::potong_kasbon(
+                net.to_i64().unwrap_or(0),
+                kasbon_aktif
+                    .get(&agg.id_unik)
+                    .map(Vec::as_slice)
+                    .unwrap_or(&[]),
+            );
+            let net = net - Decimal::from(kasbon);
+            let deduction = deduction + Decimal::from(kasbon);
 
             result.push(PayrollRecapRow {
                 id_karyawan: agg.id_unik,
@@ -1689,6 +1706,7 @@ pub async fn desktop_get_payroll_recap(
                 est_bpjs_employee: bpjs_emp.to_i64().unwrap_or(0),
                 est_pph21: pph21.to_i64().unwrap_or(0),
                 est_net_salary: net.to_i64().unwrap_or(0),
+                est_kasbon: kasbon,
             });
         }
     }
@@ -1748,6 +1766,8 @@ pub async fn desktop_create_payroll_run(
     let components = load_payroll_components(&conn)?;
     let tax_rules = load_tax_rules(&conn, &period_end)?;
     let bpjs_rules = load_bpjs_rules(&conn, &period_end)?;
+    let kasbon_aktif =
+        loan::pinjaman_aktif(&conn, &period_start.chars().take(7).collect::<String>())?;
 
     let tx = conn.transaction().map_err(|_| CommandError::internal())?;
 
@@ -1802,7 +1822,7 @@ pub async fn desktop_create_payroll_run(
             total_teaching_jp: row.total_teaching_jp,
             total_hadir: row.total_hadir,
         };
-        let (allowance, deduction, comp_breakdown) =
+        let (allowance, deduction, mut comp_breakdown) =
             PayrollCalculator::calculate_components(basic_salary, &components, &subject);
 
         let gross = basic_salary + overtime_salary + teaching_salary + allowance;
@@ -1812,6 +1832,19 @@ pub async fn desktop_create_payroll_run(
             PayrollCalculator::calculate_pph21_ter(gross, &row.ptkp_status, &tax_rules);
 
         let net = (gross - deduction - bpjs_emp - pph21).max(Decimal::ZERO);
+        // Kasbon TERAKHIR, sama dengan pratinjau. `breakdown.kasbon` adalah
+        // yang dibaca saat proses gaji ditandai PAID untuk mencatat angsuran;
+        // entri komponennya membuat slip yang ada langsung menampilkannya.
+        let (kasbon, rincian_kasbon) = loan::potong_kasbon(
+            net.to_i64().unwrap_or(0),
+            kasbon_aktif
+                .get(&row.id_karyawan)
+                .map(Vec::as_slice)
+                .unwrap_or(&[]),
+        );
+        let net = net - Decimal::from(kasbon);
+        let deduction = deduction + Decimal::from(kasbon);
+        comp_breakdown.extend(loan::komponen_kasbon(&rincian_kasbon));
 
         let snapshot = json!({
             "rate_per_hour": row.rate_per_hour,
@@ -1827,6 +1860,7 @@ pub async fn desktop_create_payroll_run(
             "components": comp_breakdown,
             "bpjs": bpjs_breakdown,
             "tax": tax_breakdown,
+            "kasbon": loan::rincian_kasbon_json(&rincian_kasbon),
             "calculated_at": now.clone()
         });
 
@@ -2221,6 +2255,7 @@ pub async fn desktop_transition_payroll_status(
     run_id: String,
     target_status: String,
     notes: Option<String>,
+    id_akun_bayar: Option<String>,
 ) -> Result<PayrollRun, CommandError> {
     let target = PayrollStatus::from_str(&target_status)
         .ok_or_else(|| CommandError::new("INVALID_STATUS", "Status target tidak valid."))?;
@@ -2299,6 +2334,14 @@ pub async fn desktop_transition_payroll_status(
         ));
     }
 
+    // Akun pembayaran diperiksa SEBELUM status berubah: proses gaji yang
+    // tercatat PAID tanpa jurnal tidak bisa diulang, karena PAID adalah status
+    // akhir.
+    let akun_bayar = id_akun_bayar.as_deref().unwrap_or(loan::AKUN_KAS);
+    if target == PayrollStatus::Paid {
+        crate::mobile::accounting::assert_akun_bayar(&conn, akun_bayar)?;
+    }
+
     let tx = conn.transaction().map_err(|_| CommandError::internal())?;
     let now = iso_now_tx(&tx);
 
@@ -2352,6 +2395,19 @@ pub async fn desktop_transition_payroll_status(
         }),
         None,
     )?;
+    if target == PayrollStatus::Paid {
+        // Angsuran kasbon dan jurnal payroll di transaksi yang SAMA dengan
+        // perubahan status: proses gaji tidak pernah tercatat dibayar tanpa
+        // pembukuannya, dan sebaliknya.
+        loan::catat_pembayaran_payroll_tx(
+            &tx,
+            &state,
+            &client_id,
+            &run_id,
+            akun_bayar,
+            &operator.username,
+        )?;
+    }
 
     tx.commit().map_err(|_| CommandError::internal())?;
 

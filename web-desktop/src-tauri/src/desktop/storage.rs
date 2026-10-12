@@ -391,7 +391,7 @@ fn ensure_attendance_source_check(connection: &Connection) -> Result<(), String>
 /// gagal karena `component_code` UNIQUE sudah dipakai baris cloud ber-id lain.
 /// Sekarang keduanya membaca `payroll_seed`, dan baris lama dihapus sekali.
 fn seed_payroll_rate_tables(connection: &Connection) -> Result<(), String> {
-    let legacy_ids = payroll_seed::LEGACY_RATE_IDS
+    let legacy_ids = payroll_seed::legacy_rate_ids()
         .iter()
         .map(|id| format!("'{id}'"))
         .collect::<Vec<_>>()
@@ -410,13 +410,12 @@ fn seed_payroll_rate_tables(connection: &Connection) -> Result<(), String> {
         ))
         .map_err(|_| "Seed tarif payroll lama tidak dapat dibersihkan.".to_owned())?;
 
-    for statement in [
-        payroll_seed::OVERTIME_TIER_RULES_SEED_SQL,
-        payroll_seed::TAX_RULES_SEED_SQL,
-        payroll_seed::BPJS_RULES_SEED_SQL,
-    ] {
+    for (sql, baris) in payroll_seed::seed_statements() {
         connection
-            .execute_batch(statement)
+            .execute(
+                &sql,
+                rusqlite::params_from_iter(payroll_seed::sql_values(&baris)),
+            )
             .map_err(|_| "Tarif default payroll tidak dapat disiapkan.".to_owned())?;
     }
     Ok(())
@@ -754,6 +753,152 @@ pub fn initialize(path: &Path) -> Result<(), String> {
         dibuat_oleh TEXT,
         updated_at TEXT NOT NULL DEFAULT (datetime('now'))
       );
+      -- Akuntansi berpasangan (v39). Saldo TIDAK pernah disimpan: dihitung dari
+      -- baris jurnal, karena kolom saldo yang ikut sync ditimpa siapa terakhir
+      -- menang. Jurnal append-only; koreksi = jurnal pembalik `batal-<id>`.
+      -- Tanpa UNIQUE selain PK dan tanpa FK. DDL WAJIB identik dengan
+      -- `turso.rs` dan `db-migrations.ts`.
+      CREATE TABLE IF NOT EXISTS keu_akun (
+        id_akun TEXT PRIMARY KEY,
+        kode TEXT NOT NULL,
+        nama TEXT NOT NULL,
+        kelompok TEXT NOT NULL CHECK (kelompok IN ('Aset', 'Kewajiban', 'Aset Neto', 'Pendapatan', 'Beban')),
+        saldo_normal TEXT NOT NULL CHECK (saldo_normal IN ('Debit', 'Kredit')),
+        is_aktif INTEGER NOT NULL DEFAULT 1 CHECK (is_aktif IN (0, 1)),
+        created_at TEXT NOT NULL DEFAULT (datetime('now')),
+        updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+      );
+      CREATE TABLE IF NOT EXISTS keu_jurnal (
+        id_jurnal TEXT PRIMARY KEY,
+        tanggal TEXT NOT NULL,
+        seri TEXT NOT NULL,
+        nomor_urut INTEGER NOT NULL CHECK (nomor_urut > 0),
+        nomor TEXT NOT NULL,
+        keterangan TEXT NOT NULL,
+        sumber TEXT NOT NULL CHECK (sumber IN ('Manual', 'Kasbon', 'Payroll', 'Pembayaran', 'Tagihan', 'Pembatalan')),
+        id_sumber TEXT,
+        id_jurnal_batal TEXT,
+        dibuat_oleh TEXT NOT NULL,
+        created_at TEXT NOT NULL DEFAULT (datetime('now'))
+      );
+      CREATE INDEX IF NOT EXISTS idx_keu_jurnal_tanggal ON keu_jurnal(tanggal);
+      CREATE INDEX IF NOT EXISTS idx_keu_jurnal_seri ON keu_jurnal(seri, nomor_urut);
+      CREATE TABLE IF NOT EXISTS keu_jurnal_baris (
+        id_baris TEXT PRIMARY KEY,
+        id_jurnal TEXT NOT NULL,
+        id_akun TEXT NOT NULL,
+        debit INTEGER NOT NULL DEFAULT 0 CHECK (debit >= 0),
+        kredit INTEGER NOT NULL DEFAULT 0 CHECK (kredit >= 0),
+        keterangan TEXT,
+        urutan INTEGER NOT NULL DEFAULT 0,
+        CHECK ((debit > 0 AND kredit = 0) OR (debit = 0 AND kredit > 0))
+      );
+      CREATE INDEX IF NOT EXISTS idx_keu_jurnal_baris_jurnal ON keu_jurnal_baris(id_jurnal);
+      CREATE INDEX IF NOT EXISTS idx_keu_jurnal_baris_akun ON keu_jurnal_baris(id_akun);
+      -- Kasbon karyawan (v40). Sisa TIDAK disimpan: pokok dikurangi angsuran
+      -- gaji dan pelunasan tunai. Mutasi append-only, id deterministik untuk
+      -- yang bisa dicatat dua perangkat (cair-, batal-, ang-). Tanpa UNIQUE
+      -- selain PK. DDL WAJIB identik dengan `turso.rs` dan `db-migrations.ts`.
+      CREATE TABLE IF NOT EXISTS keu_pinjaman (
+        id_pinjaman TEXT PRIMARY KEY,
+        id_karyawan TEXT NOT NULL,
+        nama_karyawan TEXT NOT NULL,
+        pokok INTEGER NOT NULL CHECK (pokok > 0),
+        cicilan INTEGER NOT NULL CHECK (cicilan > 0),
+        mulai_potong TEXT NOT NULL,
+        keterangan TEXT,
+        status TEXT NOT NULL DEFAULT 'Diajukan' CHECK (status IN ('Diajukan', 'Disetujui', 'Ditolak', 'Dibatalkan')),
+        tanggal_pengajuan TEXT NOT NULL,
+        diajukan_oleh TEXT NOT NULL,
+        diputuskan_oleh TEXT,
+        tanggal_cair TEXT,
+        id_akun_kas TEXT,
+        created_at TEXT NOT NULL DEFAULT (datetime('now')),
+        updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+      );
+      CREATE TABLE IF NOT EXISTS keu_pinjaman_mutasi (
+        id_mutasi TEXT PRIMARY KEY,
+        id_pinjaman TEXT NOT NULL,
+        jenis TEXT NOT NULL CHECK (jenis IN ('Pencairan', 'Angsuran Gaji', 'Pelunasan Tunai', 'Pembatalan')),
+        jumlah INTEGER NOT NULL CHECK (jumlah > 0),
+        tanggal TEXT NOT NULL,
+        id_ref TEXT,
+        id_jurnal TEXT,
+        dicatat_oleh TEXT NOT NULL,
+        created_at TEXT NOT NULL DEFAULT (datetime('now'))
+      );
+      CREATE TABLE IF NOT EXISTS keu_pinjaman_tunda (
+        id_tunda TEXT PRIMARY KEY,
+        id_pinjaman TEXT NOT NULL,
+        periode TEXT NOT NULL,
+        alasan TEXT,
+        dibuat_oleh TEXT NOT NULL,
+        created_at TEXT NOT NULL DEFAULT (datetime('now'))
+      );
+      CREATE INDEX IF NOT EXISTS idx_keu_pinjaman_karyawan ON keu_pinjaman(id_karyawan, status);
+      CREATE INDEX IF NOT EXISTS idx_keu_pinjaman_mutasi_pinjaman ON keu_pinjaman_mutasi(id_pinjaman);
+      CREATE INDEX IF NOT EXISTS idx_keu_pinjaman_tunda_pinjaman ON keu_pinjaman_tunda(id_pinjaman, periode);
+      -- Tagihan siswa (v41). `keu_tagihan` dan `keu_tagihan_batal` append-only:
+      -- pembatalan adalah baris baru, status diturunkan darinya. Id tagihan
+      -- deterministik. Tanpa UNIQUE selain PK. DDL WAJIB identik dengan
+      -- `turso.rs` dan `db-migrations.ts`.
+      CREATE TABLE IF NOT EXISTS keu_jenis_tagihan (
+        id_jenis_tagihan TEXT PRIMARY KEY,
+        nama TEXT NOT NULL,
+        periodik TEXT NOT NULL CHECK (periodik IN ('Bulanan', 'Tahunan', 'Sekali')),
+        nominal_bawaan INTEGER NOT NULL DEFAULT 0 CHECK (nominal_bawaan >= 0),
+        id_akun_pendapatan TEXT NOT NULL,
+        is_aktif INTEGER NOT NULL DEFAULT 1 CHECK (is_aktif IN (0, 1)),
+        created_at TEXT NOT NULL DEFAULT (datetime('now')),
+        updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+      );
+      CREATE TABLE IF NOT EXISTS keu_tarif_tagihan (
+        id_tarif TEXT PRIMARY KEY,
+        id_jenis_tagihan TEXT NOT NULL,
+        nama_unit TEXT NOT NULL DEFAULT '',
+        tingkat INTEGER,
+        nominal INTEGER NOT NULL CHECK (nominal >= 0),
+        created_at TEXT NOT NULL DEFAULT (datetime('now')),
+        updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+      );
+      CREATE TABLE IF NOT EXISTS keu_keringanan (
+        id_keringanan TEXT PRIMARY KEY,
+        id_siswa TEXT NOT NULL,
+        id_jenis_tagihan TEXT NOT NULL,
+        jenis TEXT NOT NULL CHECK (jenis IN ('Persen', 'Nominal')),
+        nilai INTEGER NOT NULL CHECK (nilai > 0),
+        periode_mulai TEXT,
+        periode_selesai TEXT,
+        alasan TEXT,
+        is_aktif INTEGER NOT NULL DEFAULT 1 CHECK (is_aktif IN (0, 1)),
+        dibuat_oleh TEXT NOT NULL,
+        created_at TEXT NOT NULL DEFAULT (datetime('now')),
+        updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+      );
+      CREATE TABLE IF NOT EXISTS keu_tagihan (
+        id_tagihan TEXT PRIMARY KEY,
+        id_siswa TEXT NOT NULL,
+        nama_siswa TEXT NOT NULL,
+        id_jenis_tagihan TEXT NOT NULL,
+        nama_tagihan TEXT NOT NULL,
+        periode TEXT NOT NULL,
+        nominal INTEGER NOT NULL CHECK (nominal >= 0),
+        potongan INTEGER NOT NULL DEFAULT 0 CHECK (potongan >= 0),
+        jatuh_tempo TEXT NOT NULL,
+        dibuat_oleh TEXT NOT NULL,
+        created_at TEXT NOT NULL DEFAULT (datetime('now')),
+        CHECK (potongan <= nominal)
+      );
+      CREATE TABLE IF NOT EXISTS keu_tagihan_batal (
+        id_tagihan TEXT PRIMARY KEY,
+        alasan TEXT NOT NULL,
+        dibatalkan_oleh TEXT NOT NULL,
+        created_at TEXT NOT NULL DEFAULT (datetime('now'))
+      );
+      CREATE INDEX IF NOT EXISTS idx_keu_tarif_jenis ON keu_tarif_tagihan(id_jenis_tagihan);
+      CREATE INDEX IF NOT EXISTS idx_keu_keringanan_jenis ON keu_keringanan(id_jenis_tagihan, id_siswa);
+      CREATE INDEX IF NOT EXISTS idx_keu_tagihan_jenis_periode ON keu_tagihan(id_jenis_tagihan, periode);
+      CREATE INDEX IF NOT EXISTS idx_keu_tagihan_siswa ON keu_tagihan(id_siswa);
       -- Buku Kunjungan UKS (v36). SENGAJA di luar SNAPSHOT_TABLES, pola
       -- `absensi_foto`: ditulis lokal, didorong ke cloud lewat outbox, tidak
       -- pernah ditarik ke perangkat lain. Isinya data kesehatan anak, jadi
@@ -1401,6 +1546,8 @@ pub fn initialize(path: &Path) -> Result<(), String> {
         .map_err(|_| "Schema keamanan Desktop tidak dapat diinisialisasi.".to_owned())?;
 
     seed_payroll_rate_tables(&connection)?;
+    super::accounting::seed_akun_bawaan(&connection)
+        .map_err(|_| "Bagan akun bawaan tidak dapat disiapkan.".to_owned())?;
 
     ensure_attendance_source_check(&connection)?;
 
@@ -1755,6 +1902,21 @@ pub(crate) const CLOUD_MIRRORED_TABLES: &[&str] = &[
     "inventory_mutasi",
     "inventory_unit",
     "personil_wajah",
+    // v39 — akuntansi. Ikut dibuang saat pindah database: pembukuan milik
+    // lembaga database asalnya.
+    "keu_akun",
+    "keu_jurnal",
+    "keu_jurnal_baris",
+    // v40 — kasbon karyawan, milik lembaga database asalnya.
+    "keu_pinjaman",
+    "keu_pinjaman_mutasi",
+    "keu_pinjaman_tunda",
+    // v41 — tagihan siswa, milik lembaga database asalnya.
+    "keu_jenis_tagihan",
+    "keu_tarif_tagihan",
+    "keu_keringanan",
+    "keu_tagihan",
+    "keu_tagihan_batal",
     // Di luar snapshot, tetapi milik database asalnya seperti `absensi_foto`.
     "uks_kunjungan",
     "company_profile",
@@ -1897,6 +2059,13 @@ pub fn reset_cloud_linked_data(
     // Tabelnya baru saja dikosongkan, jadi tanam ulang di transaksi yang sama.
     seed_payroll_rate_tables(&transaction)
         .map_err(|message| CommandError::new("LOCAL_RESET_FAILED", message))?;
+    // Bagan akun bawaan sama halnya: seed aplikasi, bukan data database lama.
+    super::accounting::seed_akun_bawaan(&transaction).map_err(|_| {
+        CommandError::new(
+            "LOCAL_RESET_FAILED",
+            "Bagan akun bawaan tidak dapat disiapkan.",
+        )
+    })?;
 
     transaction.commit().map_err(|_| CommandError::internal())?;
 
@@ -2400,11 +2569,11 @@ mod tests {
             assert!(!ids.is_empty(), "{table} harus punya tarif default");
             for id in &ids {
                 assert!(
-                    payroll_seed::DEFAULT_RATE_IDS.contains(&id.as_str()),
+                    payroll_seed::default_rate_ids().contains(&id.as_str()),
                     "{table} memuat id tak terdaftar di payroll_seed: {id}"
                 );
                 assert!(
-                    !payroll_seed::LEGACY_RATE_IDS.contains(&id.as_str()),
+                    !payroll_seed::legacy_rate_ids().contains(id),
                     "{table} masih memuat id seed lama: {id}"
                 );
             }

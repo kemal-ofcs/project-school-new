@@ -52,6 +52,24 @@ export const NAVIGATION: readonly NavigationItem[] = [
     label: "Penggajian",
   },
   {
+    area: "keuangan",
+    href: "/keuangan",
+    icon: "document",
+    label: "Pembukuan",
+  },
+  {
+    area: "kasbon",
+    href: "/kasbon",
+    icon: "document",
+    label: "Kasbon Karyawan",
+  },
+  {
+    area: "tagihan",
+    href: "/tagihan",
+    icon: "document",
+    label: "Tagihan Siswa",
+  },
+  {
     area: "akademik",
     href: "/akademik",
     icon: "calendar",
@@ -220,6 +238,7 @@ export const NAVIGATION_GROUPS: readonly NavigationGroupSpec[] = [
     ],
   },
   { label: "Sarpras", hrefs: ["/inventaris", "/uks"] },
+  { label: "Keuangan", hrefs: ["/keuangan", "/tagihan", "/kasbon"] },
   {
     label: "Penggajian & Aturan Kerja",
     hrefs: ["/payroll", "/shift", "/holidays"],

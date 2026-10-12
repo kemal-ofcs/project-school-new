@@ -1,6 +1,7 @@
 import "server-only";
 
 import type { Client } from "@libsql/client";
+import { pinjamanAktif } from "@/lib/services/loan";
 import {
   applyOvertimePolicy,
   type BpjsRule,
@@ -17,6 +18,7 @@ import {
   type TaxRule,
 } from "@/lib/services/payroll-calculator";
 import { rentangJamKe } from "@/lib/validations/class-attendance";
+import { komponenKasbon, potongKasbon } from "@/lib/validations/loan";
 import {
   type ComponentSubject,
   isTeacherPersonnel,
@@ -70,6 +72,8 @@ export interface PayrollRecapRow {
   est_bpjs_employee: number;
   est_pph21: number;
   est_net_salary: number;
+  /** Cicilan kasbon yang ikut dipotong; sudah termasuk di `est_total_deduction`. */
+  est_kasbon: number;
   // Extra fields (not part of the Rust PayrollRecapRow response shape, but
   // needed by run creation to build payroll_items without recomputing).
   breakdown_snapshot: string;
@@ -275,6 +279,7 @@ export async function computePayrollRecap(
     taughtSessions,
     jpRates,
     aggResult,
+    kasbonAktif,
   ] = await Promise.all([
     loadOvertimeTiers(client, "HARI_KERJA"),
     // Jenjang lembur hari libur dikonfigurasi terpisah oleh user di menu
@@ -345,6 +350,9 @@ export async function computePayrollRecap(
         `,
       args: [periodEnd, periodStart, periodEnd],
     }),
+    // Kasbon dipotong per proses gaji; penundaan dan bulan mulai potong dinilai
+    // terhadap bulan awal periode. Cerminan `loan::pinjaman_aktif`.
+    pinjamanAktif(client, periodStart.slice(0, 7)),
   ]);
 
   const teacherOvertime = parseTeacherOvertimeSetting(
@@ -444,7 +452,18 @@ export async function computePayrollRecap(
       taxRules,
     );
 
-    const net = Math.max(0, gross - deduction - bpjsEmployee - pph21Amount);
+    const netSebelumKasbon = Math.max(
+      0,
+      gross - deduction - bpjsEmployee - pph21Amount,
+    );
+    // Kasbon dipotong TERAKHIR dari gaji bersih yang tersisa, aturan yang sama
+    // persis dengan `loan::potong_kasbon` di pratinjau dan pembekuan Rust.
+    const kasbon = potongKasbon(
+      netSebelumKasbon,
+      kasbonAktif.get(idKaryawan) ?? [],
+    );
+    const net = netSebelumKasbon - kasbon.total;
+    const totalDeduction = deduction + kasbon.total;
 
     const breakdownSnapshot = JSON.stringify({
       rate_per_hour: ratePerHour,
@@ -457,9 +476,10 @@ export async function computePayrollRecap(
       overtime_salary: overtimeSalary,
       teaching_jp: teaching.total_jp,
       teaching_salary: teaching.honor,
-      components: compBreakdown,
+      components: [...compBreakdown, ...komponenKasbon(kasbon.rincian)],
       bpjs: bpjsBreakdown,
       tax: taxBreakdown,
+      kasbon: kasbon.rincian,
       calculated_at: new Date().toISOString(),
     });
 
@@ -485,10 +505,11 @@ export async function computePayrollRecap(
       est_overtime_salary: overtimeSalary,
       est_gross_salary: gross,
       est_total_allowance: allowance,
-      est_total_deduction: deduction,
+      est_total_deduction: totalDeduction,
       est_bpjs_employee: bpjsEmployee,
       est_pph21: pph21Amount,
       est_net_salary: net,
+      est_kasbon: kasbon.total,
       breakdown_snapshot: breakdownSnapshot,
       bpjs_company_total: bpjsCompany,
     };

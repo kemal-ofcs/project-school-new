@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-desktop-billing-delete-rate"
+description = "Enables the desktop_billing_delete_rate command without any pre-configured scope."
+commands.allow = ["desktop_billing_delete_rate"]
+
+[[permission]]
+identifier = "deny-desktop-billing-delete-rate"
+description = "Denies the desktop_billing_delete_rate command without any pre-configured scope."
+commands.deny = ["desktop_billing_delete_rate"]

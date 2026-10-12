@@ -626,10 +626,15 @@ export async function getPayrollRunDetail(
   return response;
 }
 
+/**
+ * `idAkunBayar` hanya dibaca saat `targetStatus` = PAID: akun kas/bank yang
+ * dikreditkan jurnal payroll. Kosong = Kas.
+ */
 export async function transitionPayrollStatus(
   runId: string,
   targetStatus: string,
   notes?: string,
+  idAkunBayar?: string | null,
 ): Promise<PayrollRunRow> {
   if (isDesktopRuntime()) {
     const result = await invokeDesktop<PayrollRunRow>(
@@ -638,6 +643,7 @@ export async function transitionPayrollStatus(
         runId,
         targetStatus,
         notes,
+        idAkunBayar: idAkunBayar || null,
       },
     );
     kickDesktopSync();
@@ -650,6 +656,7 @@ export async function transitionPayrollStatus(
       runId,
       targetStatus,
       notes,
+      idAkunBayar: idAkunBayar || null,
     },
   );
   return response.data;

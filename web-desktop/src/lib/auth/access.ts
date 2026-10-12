@@ -32,7 +32,10 @@ export type AppArea =
   | "nilai"
   | "konten"
   | "inventaris"
-  | "uks";
+  | "uks"
+  | "keuangan"
+  | "kasbon"
+  | "tagihan";
 
 export interface AccessSubject {
   isSuperadmin: boolean;
@@ -61,6 +64,9 @@ const AREA_PERMISSION: Record<
   konten: "content.view",
   inventaris: "inventory.view",
   uks: "uks.view",
+  keuangan: "accounting.view",
+  kasbon: "loan.view",
+  tagihan: "billing.view",
   karyawan: "employees.view",
   idcards: "employees.manage",
   shift: "shifts.view",

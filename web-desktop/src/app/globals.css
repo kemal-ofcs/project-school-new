@@ -1170,6 +1170,23 @@ html.light .text-rose-200,
 html.light .text-rose-400 {
   color: #be123c !important;
 }
+/* Nada `-100` (dan varian beropasitasnya) dibalik simetris ke nada paling
+   gelap. Tanpa blok ini, `text-rose-100` pada elemen ANAK mengalahkan warna
+   gelap yang diwariskan latar berwarnanya, dan teks hampir putih tertinggal
+   di atas latar merah muda pucat (1.12:1). Kelas beropasitas baru di JSX
+   wajib ditambahkan di sini. */
+html[data-theme="light"] .text-rose-100,
+html[data-theme="light"] .text-rose-100\/90,
+html[data-theme="light"] .text-rose-100\/80,
+html.light .text-rose-100,
+html.light .text-rose-100\/90,
+html.light .text-rose-100\/80 {
+  color: #9f1239 !important;
+}
+html[data-theme="light"] .text-emerald-100,
+html.light .text-emerald-100 {
+  color: #065f46 !important;
+}
 
 /* 10. Borders & Dividers
    Varian beropasitas (`border-slate-800/60`) adalah kelas yang BERBEDA dari

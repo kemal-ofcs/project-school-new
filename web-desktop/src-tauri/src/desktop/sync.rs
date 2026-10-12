@@ -19,7 +19,7 @@ use super::{
 /// `CURRENT_SCHEMA_VERSION` di `web-desktop/src/lib/db-schema.ts` setiap kali
 /// migrasi baru ditambahkan, karena keduanya membaca tabel `schema_migration`
 /// yang sama di Turso.
-pub const CLIENT_SCHEMA_VERSION: i64 = 38;
+pub const CLIENT_SCHEMA_VERSION: i64 = 41;
 
 /// Hanya `cloud > client` yang berbahaya; `cloud <= client` adalah kondisi normal.
 fn is_client_schema_outdated(cloud_version: i64) -> bool {
@@ -998,6 +998,232 @@ const SNAPSHOT_TABLES: &[SnapshotTable] = &[
         entity_column: "id_unik",
         delete_missing: true,
     },
+    // ── v39: Akuntansi ──
+    //
+    // Ketiganya `delete_missing: false`: akun hanya dinonaktifkan dan jurnal
+    // append-only (koreksi = jurnal pembalik), jadi ketiadaan baris di
+    // snapshot tidak pernah berarti "dihapus".
+    SnapshotTable {
+        payload_key: "accountingAccounts",
+        domain: "accounting-account",
+        table: "keu_akun",
+        columns: &[
+            "id_akun",
+            "kode",
+            "nama",
+            "kelompok",
+            "saldo_normal",
+            "is_aktif",
+            "created_at",
+            "updated_at",
+        ],
+        conflict_column: "id_akun",
+        entity_column: "id_akun",
+        delete_missing: false,
+    },
+    SnapshotTable {
+        payload_key: "accountingJournals",
+        domain: "accounting-journal",
+        table: "keu_jurnal",
+        columns: &[
+            "id_jurnal",
+            "tanggal",
+            "seri",
+            "nomor_urut",
+            "nomor",
+            "keterangan",
+            "sumber",
+            "id_sumber",
+            "id_jurnal_batal",
+            "dibuat_oleh",
+            "created_at",
+        ],
+        conflict_column: "id_jurnal",
+        entity_column: "id_jurnal",
+        delete_missing: false,
+    },
+    SnapshotTable {
+        payload_key: "accountingJournalLines",
+        // Domain sendiri, pola `class-attendance-detail`: cache hash dan
+        // revisi disimpan per (domain, kunci), jadi baris yang memakai domain
+        // dan kunci headernya akan saling menimpa.
+        domain: "accounting-journal-line",
+        table: "keu_jurnal_baris",
+        columns: &[
+            "id_baris",
+            "id_jurnal",
+            "id_akun",
+            "debit",
+            "kredit",
+            "keterangan",
+            "urutan",
+        ],
+        conflict_column: "id_baris",
+        entity_column: "id_baris",
+        delete_missing: false,
+    },
+    // ── v40: Kasbon karyawan ──
+    //
+    // Pinjaman dan mutasinya `delete_missing: false` (tidak pernah dihapus).
+    // Penundaan bisa dicabut, jadi `delete_missing: true`: cabutan di perangkat
+    // lain wajib ikut hilang di sini, kalau tidak gaji tetap tidak dipotong.
+    SnapshotTable {
+        payload_key: "employeeLoans",
+        domain: "loan",
+        table: "keu_pinjaman",
+        columns: &[
+            "id_pinjaman",
+            "id_karyawan",
+            "nama_karyawan",
+            "pokok",
+            "cicilan",
+            "mulai_potong",
+            "keterangan",
+            "status",
+            "tanggal_pengajuan",
+            "diajukan_oleh",
+            "diputuskan_oleh",
+            "tanggal_cair",
+            "id_akun_kas",
+            "created_at",
+            "updated_at",
+        ],
+        conflict_column: "id_pinjaman",
+        entity_column: "id_pinjaman",
+        delete_missing: false,
+    },
+    SnapshotTable {
+        payload_key: "employeeLoanMutations",
+        domain: "loan-mutation",
+        table: "keu_pinjaman_mutasi",
+        columns: &[
+            "id_mutasi",
+            "id_pinjaman",
+            "jenis",
+            "jumlah",
+            "tanggal",
+            "id_ref",
+            "id_jurnal",
+            "dicatat_oleh",
+            "created_at",
+        ],
+        conflict_column: "id_mutasi",
+        entity_column: "id_mutasi",
+        delete_missing: false,
+    },
+    SnapshotTable {
+        payload_key: "employeeLoanDeferrals",
+        domain: "loan-deferral",
+        table: "keu_pinjaman_tunda",
+        columns: &[
+            "id_tunda",
+            "id_pinjaman",
+            "periode",
+            "alasan",
+            "dibuat_oleh",
+            "created_at",
+        ],
+        conflict_column: "id_tunda",
+        entity_column: "id_tunda",
+        delete_missing: true,
+    },
+    // ── v41: Tagihan siswa ──
+    //
+    // Tagihan dan pembatalannya append-only (`delete_missing: false`, ditarik
+    // inkremental). Tarif bisa dihapus, jadi `delete_missing: true`; jenis dan
+    // keringanan hanya dinonaktifkan.
+    SnapshotTable {
+        payload_key: "billingTypes",
+        domain: "billing-type",
+        table: "keu_jenis_tagihan",
+        columns: &[
+            "id_jenis_tagihan",
+            "nama",
+            "periodik",
+            "nominal_bawaan",
+            "id_akun_pendapatan",
+            "is_aktif",
+            "created_at",
+            "updated_at",
+        ],
+        conflict_column: "id_jenis_tagihan",
+        entity_column: "id_jenis_tagihan",
+        delete_missing: false,
+    },
+    SnapshotTable {
+        payload_key: "billingRates",
+        domain: "billing-rate",
+        table: "keu_tarif_tagihan",
+        columns: &[
+            "id_tarif",
+            "id_jenis_tagihan",
+            "nama_unit",
+            "tingkat",
+            "nominal",
+            "created_at",
+            "updated_at",
+        ],
+        conflict_column: "id_tarif",
+        entity_column: "id_tarif",
+        delete_missing: true,
+    },
+    SnapshotTable {
+        payload_key: "billingDiscounts",
+        domain: "billing-discount",
+        table: "keu_keringanan",
+        columns: &[
+            "id_keringanan",
+            "id_siswa",
+            "id_jenis_tagihan",
+            "jenis",
+            "nilai",
+            "periode_mulai",
+            "periode_selesai",
+            "alasan",
+            "is_aktif",
+            "dibuat_oleh",
+            "created_at",
+            "updated_at",
+        ],
+        conflict_column: "id_keringanan",
+        entity_column: "id_keringanan",
+        delete_missing: false,
+    },
+    SnapshotTable {
+        payload_key: "studentBills",
+        domain: "billing",
+        table: "keu_tagihan",
+        columns: &[
+            "id_tagihan",
+            "id_siswa",
+            "nama_siswa",
+            "id_jenis_tagihan",
+            "nama_tagihan",
+            "periode",
+            "nominal",
+            "potongan",
+            "jatuh_tempo",
+            "dibuat_oleh",
+            "created_at",
+        ],
+        conflict_column: "id_tagihan",
+        entity_column: "id_tagihan",
+        delete_missing: false,
+    },
+    SnapshotTable {
+        payload_key: "studentBillCancellations",
+        domain: "billing-cancel",
+        table: "keu_tagihan_batal",
+        columns: &[
+            "id_tagihan",
+            "alasan",
+            "dibatalkan_oleh",
+            "created_at",
+        ],
+        conflict_column: "id_tagihan",
+        entity_column: "id_tagihan",
+        delete_missing: false,
+    },
 ];
 
 const CANONICAL_SYNC_ROUTES: &[(&str, &str)] = &[
@@ -1058,6 +1284,18 @@ const CANONICAL_SYNC_ROUTES: &[(&str, &str)] = &[
     ("inventory-item", "save"),
     ("inventory-mutation", "create"),
     ("inventory-unit", "save"),
+    ("accounting-account", "save"),
+    ("accounting-journal", "post"),
+    ("loan", "save"),
+    ("loan-deferral", "delete"),
+    ("loan-deferral", "save"),
+    ("loan-mutation", "create"),
+    ("billing", "create"),
+    ("billing-cancel", "create"),
+    ("billing-discount", "save"),
+    ("billing-rate", "delete"),
+    ("billing-rate", "save"),
+    ("billing-type", "save"),
     ("face-template", "delete"),
     ("face-template", "save"),
     ("uks-visit", "delete"),
@@ -1106,6 +1344,63 @@ pub(super) fn is_canonical_sync_route(domain: &str, operation: &str) -> bool {
     CANONICAL_SYNC_ROUTES
         .iter()
         .any(|route| *route == (domain, operation))
+}
+
+/// Tabel APPEND-ONLY yang ditarik inkremental, bukan utuh.
+///
+/// Pull biasa menarik SELURUH tabel setiap kali penghitung `sync_pulse`-nya
+/// bergerak. Untuk jurnal dan mutasi, yang bertambah setiap hari operasional
+/// dan tidak pernah diubah, itu berarti setiap perangkat mengunduh ulang
+/// belasan ribu baris setelah satu pembayaran. Tabel di sini ditarik lewat
+/// `sync_append_log` (id AUTOINCREMENT yang diisi trigger `AFTER INSERT` di
+/// cloud), sehingga yang turun hanya baris yang lahir sejak tarikan terakhir.
+///
+/// Syarat masuk daftar ini MUTLAK: barisnya tidak pernah di-UPDATE oleh
+/// aplikasi mana pun (koreksi = baris baru). Pembaruan baris tidak menambah
+/// log, sehingga tidak akan pernah sampai ke perangkat yang sudah berkursor.
+/// Penghapusan tetap menyebar lewat `sync_tombstone`.
+pub const APPEND_ONLY_TABLES: &[&str] = &[
+    "inventory_mutasi",
+    "keu_jurnal",
+    "keu_jurnal_baris",
+    "keu_pinjaman_mutasi",
+    "keu_tagihan",
+    "keu_tagihan_batal",
+];
+
+/// Batas baris per tabel per siklus pada tarikan inkremental. Bila tercapai,
+/// pulse tabel itu tidak ditandai mutakhir supaya siklus berikutnya
+/// melanjutkan dari kursor yang sudah maju.
+pub const APPEND_PULL_LIMIT: usize = 5000;
+
+/// Kursor `sync_append_log` per tabel append-only yang sudah diterapkan.
+///
+/// Kursor DIABAIKAN bila tabel lokalnya kosong: tabel yang dikosongkan di luar
+/// aplikasi tidak boleh berhenti menerima baris lama hanya karena kursornya
+/// masih menunjuk ke depan. Tanpa kursor, tarikan berikutnya kembali utuh.
+fn load_append_cursors(state: &DesktopState) -> Result<HashMap<String, i64>, CommandError> {
+    let connection = storage::database(&state.data_dir)?;
+    let mut cursors = HashMap::new();
+    for table in APPEND_ONLY_TABLES {
+        let kosong: bool = connection
+            .query_row(&format!("SELECT NOT EXISTS(SELECT 1 FROM {table} LIMIT 1);"), [], |row| {
+                row.get(0)
+            })
+            .unwrap_or(true);
+        if kosong {
+            continue;
+        }
+        if let Ok(cursor) = connection.query_row(
+            "SELECT last_revision FROM desktop_sync_cursor WHERE domain = ?;",
+            params![format!("append:{table}")],
+            |row| row.get::<_, i64>(0),
+        ) {
+            if cursor > 0 {
+                cursors.insert((*table).to_owned(), cursor);
+            }
+        }
+    }
+    Ok(cursors)
 }
 
 /// Kunci `setting_gex_system` yang HANYA berlaku untuk perangkat ini.
@@ -2072,6 +2367,32 @@ pub fn apply_snapshot_with_pulse(
     // Kalau ia disimpan terpisah dan transaksinya gagal, perangkat akan
     // menganggap penghapusan sudah diterapkan padahal barisnya masih ada — dan
     // tidak akan pernah menariknya lagi.
+    // Kursor append disimpan di transaksi yang SAMA dengan barisnya, dengan
+    // alasan yang sama seperti kursor tombstone di bawah: kursor yang maju
+    // tanpa barisnya membuat baris itu tidak pernah ditarik lagi.
+    if let Some(cursors) = snapshot.get("appendCursors").and_then(Value::as_object) {
+        for (table, cursor) in cursors {
+            let Some(cursor) = cursor.as_i64().filter(|cursor| *cursor > 0) else {
+                continue;
+            };
+            if !APPEND_ONLY_TABLES.contains(&table.as_str()) {
+                continue;
+            }
+            transaction
+                .execute(
+                    r#"
+      INSERT INTO desktop_sync_cursor (domain, last_revision, updated_at)
+      VALUES (?, ?, ?)
+      ON CONFLICT(domain) DO UPDATE SET
+        last_revision = MAX(desktop_sync_cursor.last_revision, excluded.last_revision),
+        updated_at = excluded.updated_at;
+      "#,
+                    params![format!("append:{table}"), cursor, storage::now_epoch_seconds()],
+                )
+                .map_err(|_| CommandError::internal())?;
+        }
+    }
+
     if let Some(cursor) = snapshot.get("tombstoneCursor").and_then(Value::as_i64) {
         transaction
             .execute(
@@ -2219,12 +2540,22 @@ pub async fn pull_snapshot(state: &DesktopState) -> Result<DesktopSyncStatus, Co
     };
 
     let tombstone_cursor = load_tombstone_cursor(state)?;
+    let append_cursors = load_append_cursors(state)?;
     let payload = turso
-        .pull_snapshot_tables(last_rev, wanted.as_ref(), tombstone_cursor)
+        .pull_snapshot_tables(last_rev, wanted.as_ref(), tombstone_cursor, &append_cursors)
         .await?;
+    // Tabel append yang tarikannya terpotong `APPEND_PULL_LIMIT` TIDAK
+    // ditandai mutakhir, supaya siklus berikutnya melanjutkan sisanya.
+    let terpotong: HashSet<String> = payload
+        .get("snapshot")
+        .and_then(|snapshot| snapshot.get("appendTruncated"))
+        .and_then(Value::as_array)
+        .map(|tables| tables.iter().filter_map(Value::as_str).map(str::to_owned).collect())
+        .unwrap_or_default();
     let applied_pulse = pulse.as_ref().map(|pulse| {
         pulse
             .iter()
+            .filter(|(table, _)| !terpotong.contains(table.as_str()))
             .filter(|(table, _)| match wanted.as_ref() {
                 None => true,
                 Some(stale) => stale.contains(table.as_str()),
@@ -2794,7 +3125,7 @@ fn ensure_unsynced_payroll_data_enqueued(state: &DesktopState) -> Result<(), Com
     // Baris tarif default sudah disediakan seed di sisi lokal MAUPUN cloud, jadi
     // tidak boleh ikut didorong backfill. Kalau ikut, instalasi baru akan
     // menimpa tarif yang sudah disesuaikan admin dengan nilai bawaan.
-    let default_rate_ids = payroll_seed::DEFAULT_RATE_IDS
+    let default_rate_ids = payroll_seed::default_rate_ids()
         .iter()
         .map(|id| format!("'{id}'"))
         .collect::<Vec<_>>()

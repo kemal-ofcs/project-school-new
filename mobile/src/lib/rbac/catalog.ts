@@ -364,6 +364,51 @@ export const PERMISSION_CATALOG = [
     name: "Hapus Kunjungan UKS",
     group: "UKS",
   },
+  {
+    key: "accounting.view",
+    name: "Lihat Pembukuan",
+    group: "Keuangan",
+  },
+  {
+    key: "accounting.manage",
+    name: "Kelola Akun & Catat Jurnal",
+    group: "Keuangan",
+  },
+  {
+    key: "accounting.reverse",
+    name: "Batalkan Jurnal",
+    group: "Keuangan",
+  },
+  {
+    key: "loan.view",
+    name: "Lihat Kasbon Karyawan",
+    group: "Keuangan",
+  },
+  {
+    key: "loan.manage",
+    name: "Ajukan & Kelola Kasbon",
+    group: "Keuangan",
+  },
+  {
+    key: "loan.approve",
+    name: "Setujui & Batalkan Kasbon",
+    group: "Keuangan",
+  },
+  {
+    key: "billing.view",
+    name: "Lihat Tagihan Siswa",
+    group: "Keuangan",
+  },
+  {
+    key: "billing.manage",
+    name: "Kelola & Terbitkan Tagihan",
+    group: "Keuangan",
+  },
+  {
+    key: "billing.cancel",
+    name: "Batalkan Tagihan",
+    group: "Keuangan",
+  },
 ] as const;
 
 export type PermissionKey = (typeof PERMISSION_CATALOG)[number]["key"];
@@ -441,6 +486,15 @@ export const SENSITIVE_MUTATION_PERMISSIONS = new Set<PermissionKey>([
   // Menghapus kunjungan UKS menghilangkan satu-satunya catatan siapa yang
   // ditangani, kapan, dan obat apa yang diberikan untuknya.
   "uks.delete",
+  // Membatalkan jurnal mengubah saldo setiap akun yang disentuhnya. Jejaknya
+  // tetap ada (jurnal pembalik), tetapi pembatalan yang tidak semestinya
+  // adalah cara paling halus menghapus transaksi dari laporan.
+  "accounting.reverse",
+  // Menyetujui kasbon mencairkan uang sekolah ke tangan seseorang, dan
+  // membatalkannya menghapus piutangnya dari pembukuan.
+  "loan.approve",
+  // Membatalkan tagihan menghapus piutang seorang siswa dari pembukuan.
+  "billing.cancel",
 ]);
 
 export const SYSTEM_ROLE_KEYS = [

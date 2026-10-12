@@ -46,6 +46,12 @@ const RUST_ONLY_CLOUD_TABLES = [
 	// trigger-nya terpasang pada `ensure_schema` sebelum pull inkremental
 	// pertama berjalan.
 	"sync_tombstone",
+	// Jejak baris yang LAHIR di tabel append-only (`sync::APPEND_ONLY_TABLES`),
+	// dipasang bersama `sync_pulse` dan diisi trigger `AFTER INSERT`. Alasannya
+	// sama dengan `sync_tombstone`: tidak pernah ditulis aplikasi, sehingga
+	// tulisan jalur Web ikut tercatat tanpa satu baris kode Web. Database yang
+	// belum punya tabelnya membuat pull kembali utuh, bukan melewatkan baris.
+	"sync_append_log",
 ];
 
 const WEB_ONLY_CLOUD_TABLES: string[] = [];

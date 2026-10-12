@@ -4,6 +4,8 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import { AppShell } from "@/components/AppShell";
+import { INPUT, LABEL } from "@/components/inventory/gaya";
+import { PilihAkunBayar } from "@/components/keuangan/PilihAkunBayar";
 import { AuditTrailTimeline } from "@/components/payroll/AuditTrailTimeline";
 import { RunStatusBadge } from "@/components/payroll/RunStatusBadge";
 import { SlipGajiPrintView } from "@/components/payroll/SlipGajiPrintView";
@@ -42,6 +44,7 @@ export default function RunDetailClient() {
   const [transitionModalOpen, setTransitionModalOpen] = useState(false);
   const [targetStatus, setTargetStatus] = useState<string>("");
   const [statusNotes, setStatusNotes] = useState<string>("");
+  const [akunBayar, setAkunBayar] = useState("akun-kas");
   const [transitioning, setTransitioning] = useState(false);
 
   const [feedback, setFeedback] = useState<{
@@ -96,7 +99,12 @@ export default function RunDetailClient() {
     setTransitioning(true);
     setFeedback(null);
     try {
-      await transitionPayrollStatus(runId, targetStatus, statusNotes);
+      await transitionPayrollStatus(
+        runId,
+        targetStatus,
+        statusNotes,
+        akunBayar,
+      );
       setTransitionModalOpen(false);
       setFeedback({
         type: "success",
@@ -407,17 +415,32 @@ export default function RunDetailClient() {
                 <strong>{runId}</strong> ke status{" "}
                 <strong className="text-sky-400">{targetStatus}</strong>?
               </p>
-              <div>
-                <label className="block text-xs font-semibold text-slate-400 uppercase mb-1">
-                  <span>Catatan / Justifikasi (Opsional):</span>
-                  <textarea
-                    value={statusNotes}
-                    onChange={(e) => setStatusNotes(e.target.value)}
-                    placeholder="Tambahkan catatan persetujuan atau alasan penolakan..."
-                    rows={3}
-                    className="w-full mt-1 px-3 py-2 text-sm bg-slate-800 border border-slate-700 rounded-lg text-slate-200 focus:outline-none focus:border-sky-500 font-normal"
+              {targetStatus === "PAID" ? (
+                <div className="space-y-2">
+                  <PilihAkunBayar
+                    id="run-akun-bayar"
+                    label="Gaji dibayar dari akun"
+                    value={akunBayar}
+                    onChange={setAkunBayar}
                   />
+                  <p className="text-xs text-slate-400">
+                    Saat dibayar, cicilan kasbon di slip tercatat sebagai
+                    angsuran dan satu jurnal payroll dicatat di pembukuan.
+                  </p>
+                </div>
+              ) : null}
+              <div>
+                <label className={LABEL} htmlFor="run-status-notes">
+                  Catatan atau justifikasi (opsional)
                 </label>
+                <textarea
+                  id="run-status-notes"
+                  value={statusNotes}
+                  onChange={(e) => setStatusNotes(e.target.value)}
+                  placeholder="Tambahkan catatan persetujuan atau alasan penolakan..."
+                  rows={3}
+                  className={INPUT}
+                />
               </div>
               <div className="flex justify-end gap-3 pt-4 border-t border-slate-700">
                 <button
