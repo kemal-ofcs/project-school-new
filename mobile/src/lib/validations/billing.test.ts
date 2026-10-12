@@ -1,5 +1,8 @@
 import { describe, expect, test } from "bun:test";
 import {
+  alokasiPembayaran,
+  barisJurnalPembayaran,
+  formatNomorKuitansi,
   hitungPotongan,
   idTagihan,
   type JenisTagihanDraft,
@@ -7,12 +10,16 @@ import {
   type KeringananDraft,
   keringananBerlaku,
   keringananDraftSchema,
+  type PembayaranDraft,
+  pembayaranDraftSchema,
   pilihTarif,
   type TarifDraft,
   tarifDraftSchema,
   validateJenisTagihan,
   validateKeringanan,
+  validatePembayaran,
   validatePeriodeTagihan,
+  validateSeri,
   validateTarif,
 } from "./billing";
 
@@ -194,5 +201,120 @@ describe("keringanan", () => {
       350_000,
     );
     expect(hitungPotongan(350_000, [])).toBe(0);
+  });
+});
+
+describe("pembayaran", () => {
+  test("nomor kuitansi dan seri", () => {
+    expect(formatNomorKuitansi("2026", "TU1", 7)).toBe("KWT/2026/TU1/0007");
+    expect(formatNomorKuitansi("2026", "WEB", 12345)).toBe(
+      "KWT/2026/WEB/12345",
+    );
+    expect(hasil(validateSeri(" tu1 "))).toBe("TU1");
+    expect(hasil(validateSeri("A"))).toBe(
+      "Seri harus 2 sampai 8 huruf atau angka.",
+    );
+    expect(hasil(validateSeri("TU-1"))).toBe(
+      "Seri harus 2 sampai 8 huruf atau angka.",
+    );
+    expect(hasil(validateSeri("ABCDEFGHI"))).toBe(
+      "Seri harus 2 sampai 8 huruf atau angka.",
+    );
+    expect(hasil(validateSeri("web"))).toBe("Seri WEB dipakai aplikasi Web.");
+  });
+
+  const sah: PembayaranDraft = {
+    id_siswa: " S-01 ",
+    tanggal: "2026-07-15",
+    metode: "Tunai",
+    total: 500_000,
+    id_akun_kas: "akun-kas",
+    keterangan: " Titip kakak ",
+    id_tagihan: ["t2", " t1 ", "t2", ""],
+  };
+  const galat = (ubah: Partial<PembayaranDraft>) =>
+    hasil(validatePembayaran(pembayaranDraftSchema.parse({ ...sah, ...ubah })));
+
+  test("validatePembayaran", () => {
+    expect(galat({})).toEqual({
+      id_siswa: "S-01",
+      tanggal: "2026-07-15",
+      metode: "Tunai",
+      total: 500_000,
+      id_akun_kas: "akun-kas",
+      keterangan: "Titip kakak",
+      id_tagihan: ["t2", "t1"],
+    });
+    expect(galat({ id_siswa: " " })).toBe("Siswa wajib dipilih.");
+    expect(galat({ tanggal: "2026-02-30" })).toBe(
+      "Tanggal pembayaran tidak valid.",
+    );
+    expect(galat({ metode: "QRIS" })).toBe("Metode pembayaran tidak dikenal.");
+    expect(galat({ total: 0 })).toBe(
+      "Jumlah bayar harus rupiah bulat lebih dari nol.",
+    );
+    expect(galat({ total: 1.5 })).toBe(
+      "Jumlah bayar harus rupiah bulat lebih dari nol.",
+    );
+    expect(galat({ total: 100_000_001 })).toBe(
+      "Jumlah bayar maksimal Rp100.000.000.",
+    );
+    expect(galat({ id_akun_kas: " " })).toBe("Akun penerima wajib dipilih.");
+    expect(galat({ keterangan: "a".repeat(151) })).toBe(
+      "Keterangan maksimal 150 karakter.",
+    );
+    expect(
+      galat({ id_tagihan: Array.from({ length: 101 }, (_, i) => `t${i}`) }),
+    ).toBe("Satu kuitansi paling banyak 100 tagihan.");
+    expect(galat({ metode: "Titipan", id_tagihan: [] })).toBe(
+      "Pilih tagihan yang dibayar dari titipan.",
+    );
+    expect(galat({ metode: "Titipan", id_akun_kas: "akun-kas" })).toEqual({
+      id_siswa: "S-01",
+      tanggal: "2026-07-15",
+      metode: "Titipan",
+      total: 500_000,
+      id_akun_kas: null,
+      keterangan: "Titip kakak",
+      id_tagihan: ["t2", "t1"],
+    });
+  });
+
+  test("alokasiPembayaran: jatuh tempo terlama dulu, kelebihan ke titipan", () => {
+    const tagihan = [
+      { id_tagihan: "b", jatuh_tempo: "2026-08-10", periode: "2026-08", sisa: 300_000 },
+      { id_tagihan: "a", jatuh_tempo: "2026-07-10", periode: "2026-07", sisa: 150_000 },
+      { id_tagihan: "c", jatuh_tempo: "2026-07-10", periode: "2026-07", sisa: 0 },
+      { id_tagihan: "d", jatuh_tempo: "2026-07-10", periode: "2026-06", sisa: 100_000 },
+    ];
+    expect(alokasiPembayaran(tagihan, 400_000)).toEqual({
+      alokasi: [
+        { id_tagihan: "d", nominal: 100_000 },
+        { id_tagihan: "a", nominal: 150_000 },
+        { id_tagihan: "b", nominal: 150_000 },
+      ],
+      titipan: 0,
+    });
+    expect(alokasiPembayaran(tagihan, 600_000).titipan).toBe(50_000);
+    expect(alokasiPembayaran([], 75_000)).toEqual({
+      alokasi: [],
+      titipan: 75_000,
+    });
+  });
+
+  test("barisJurnalPembayaran", () => {
+    expect(barisJurnalPembayaran("Tunai", "akun-kas", 550_000, 50_000)).toEqual([
+      { id_akun: "akun-kas", debit: 600_000, kredit: 0 },
+      { id_akun: "akun-piutang-siswa", debit: 0, kredit: 550_000 },
+      { id_akun: "akun-titipan-wali", debit: 0, kredit: 50_000 },
+    ]);
+    expect(barisJurnalPembayaran("Transfer", "akun-bank", 0, 75_000)).toEqual([
+      { id_akun: "akun-bank", debit: 75_000, kredit: 0 },
+      { id_akun: "akun-titipan-wali", debit: 0, kredit: 75_000 },
+    ]);
+    expect(barisJurnalPembayaran("Titipan", null, 40_000, 0)).toEqual([
+      { id_akun: "akun-titipan-wali", debit: 40_000, kredit: 0 },
+      { id_akun: "akun-piutang-siswa", debit: 0, kredit: 40_000 },
+    ]);
   });
 });

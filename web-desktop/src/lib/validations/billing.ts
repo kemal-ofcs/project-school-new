@@ -7,7 +7,7 @@
  */
 
 import { z } from "zod";
-import { formatRupiah, type Hasil } from "./accounting";
+import { formatRupiah, type Hasil, isValidDate } from "./accounting";
 import { isValidPeriode } from "./loan";
 
 /** WAJIB sama dengan CHECK `keu_jenis_tagihan.periodik` di ketiga DDL. */
@@ -19,7 +19,7 @@ export const JENIS_KERINGANAN = ["Persen", "Nominal"] as const;
  * pembatalannya adalah baris `keu_tagihan_batal`. Dengan begitu kedua tabel
  * append-only dan ditarik inkremental (`sync::APPEND_ONLY_TABLES`).
  */
-export const STATUS_TAGIHAN = ["Aktif", "Dibatalkan"] as const;
+export const STATUS_TAGIHAN = ["Aktif", "Lunas", "Dibatalkan"] as const;
 
 /** Periode tetap jenis `Sekali`: id deterministiknya membuat tagihan itu hanya bisa terbit sekali per siswa. */
 export const PERIODE_SEKALI = "SEKALI";
@@ -33,10 +33,23 @@ export const BATAS_DAFTAR_TAGIHAN = 1000;
 
 export const AKUN_PIUTANG_SISWA = "akun-piutang-siswa";
 export const AKUN_PENDAPATAN_SPP = "akun-pendapatan-spp";
+export const AKUN_TITIPAN_WALI = "akun-titipan-wali";
+export const AKUN_BANK = "akun-bank";
+
+/** WAJIB sama dengan CHECK `keu_pembayaran.metode` di ketiga DDL. */
+export const METODE_BAYAR = ["Tunai", "Transfer", "Titipan"] as const;
+export const MAKS_KETERANGAN_BAYAR = 150;
+export const MAKS_TAGIHAN_PER_KUITANSI = 100;
+export const MAKS_NAMA_PERANGKAT = 60;
+/** Seri kuitansi milik aplikasi Web; tidak boleh didaftarkan untuk perangkat. */
+export const SERI_KUITANSI_WEB = "WEB";
+/** Cermin `LIMIT 1000` daftar kuitansi di `billing.rs` dan `services/billing.ts`. */
+export const BATAS_DAFTAR_KUITANSI = 1000;
 
 export type Periodik = (typeof PERIODIK)[number];
 export type JenisKeringanan = (typeof JENIS_KERINGANAN)[number];
 export type StatusTagihan = (typeof STATUS_TAGIHAN)[number];
+export type MetodeBayar = (typeof METODE_BAYAR)[number];
 
 function panjang(value: string): number {
   return Array.from(value).length;
@@ -380,4 +393,196 @@ export function hitungPotongan(
         : item.nilai;
   }
   return Math.min(total, nominal);
+}
+
+// ── Pembayaran (K3b) ────────────────────────────────────────────────────────
+
+export const idJurnalPembayaran = (id: string) => `jrn-${id}`;
+export const idAlokasi = (idPembayaran: string, urutan: number) =>
+  `${idPembayaran}-${urutan}`;
+
+/** Cermin `format_nomor_kuitansi`. */
+export function formatNomorKuitansi(
+  tahun: string,
+  seri: string,
+  nomorUrut: number,
+): string {
+  return `KWT/${tahun}/${seri}/${String(nomorUrut).padStart(4, "0")}`;
+}
+
+/** Akun penerima bawaan per metode; hanya untuk pilihan awal di layar. */
+export function akunBawaanMetode(metode: string): string | null {
+  if (metode === "Tunai") return "akun-kas";
+  if (metode === "Transfer") return AKUN_BANK;
+  return null;
+}
+
+/**
+ * Cermin `validate_seri`. Huruf diperiksa SEBELUM dijadikan kapital, karena
+ * `toUpperCase` JS mengubah sebagian huruf non-ASCII menjadi dua huruf ASCII
+ * sedangkan Rust tidak.
+ */
+export function validateSeri(seri: string): Hasil<string> {
+  const bersih = seri.trim();
+  if (!/^[A-Za-z0-9]{2,8}$/.test(bersih)) {
+    return { ok: false, error: "Seri harus 2 sampai 8 huruf atau angka." };
+  }
+  const kapital = bersih.toUpperCase();
+  if (kapital === SERI_KUITANSI_WEB) {
+    return { ok: false, error: "Seri WEB dipakai aplikasi Web." };
+  }
+  return { ok: true, value: kapital };
+}
+
+export const pembayaranDraftSchema = z
+  .object({
+    id_siswa: z.string().default(""),
+    tanggal: z.string().default(""),
+    metode: z.string().default(""),
+    total: z.number().default(0),
+    id_akun_kas: z.string().nullish(),
+    keterangan: z.string().nullish(),
+    id_tagihan: z.array(z.string()).default([]),
+  })
+  .strict();
+
+export type PembayaranDraft = z.input<typeof pembayaranDraftSchema>;
+type PembayaranParsed = z.output<typeof pembayaranDraftSchema>;
+
+export interface PembayaranValid {
+  id_siswa: string;
+  tanggal: string;
+  metode: MetodeBayar;
+  total: number;
+  id_akun_kas: string | null;
+  keterangan: string | null;
+  id_tagihan: string[];
+}
+
+/** Cermin `validate_pembayaran`. Tanggal masa depan diperiksa di backend. */
+export function validatePembayaran(
+  draft: PembayaranParsed,
+): Hasil<PembayaranValid> {
+  const id_siswa = draft.id_siswa.trim();
+  if (!id_siswa) return { ok: false, error: "Siswa wajib dipilih." };
+  if (!isValidDate(draft.tanggal)) {
+    return { ok: false, error: "Tanggal pembayaran tidak valid." };
+  }
+  if (!(METODE_BAYAR as readonly string[]).includes(draft.metode)) {
+    return { ok: false, error: "Metode pembayaran tidak dikenal." };
+  }
+  if (!Number.isInteger(draft.total) || draft.total <= 0) {
+    return {
+      ok: false,
+      error: "Jumlah bayar harus rupiah bulat lebih dari nol.",
+    };
+  }
+  if (draft.total > MAKS_NOMINAL_TAGIHAN) {
+    return {
+      ok: false,
+      error: `Jumlah bayar maksimal ${formatRupiah(MAKS_NOMINAL_TAGIHAN)}.`,
+    };
+  }
+  const titipan = draft.metode === "Titipan";
+  const id_akun_kas = titipan ? null : draft.id_akun_kas?.trim() || null;
+  if (!titipan && !id_akun_kas) {
+    return { ok: false, error: "Akun penerima wajib dipilih." };
+  }
+  const keterangan = draft.keterangan?.trim() || null;
+  if (keterangan && panjang(keterangan) > MAKS_KETERANGAN_BAYAR) {
+    return { ok: false, error: "Keterangan maksimal 150 karakter." };
+  }
+  const id_tagihan: string[] = [];
+  for (const id of draft.id_tagihan) {
+    const bersih = id.trim();
+    if (bersih && !id_tagihan.includes(bersih)) id_tagihan.push(bersih);
+  }
+  if (id_tagihan.length > MAKS_TAGIHAN_PER_KUITANSI) {
+    return { ok: false, error: "Satu kuitansi paling banyak 100 tagihan." };
+  }
+  if (titipan && id_tagihan.length === 0) {
+    return { ok: false, error: "Pilih tagihan yang dibayar dari titipan." };
+  }
+  return {
+    ok: true,
+    value: {
+      id_siswa,
+      tanggal: draft.tanggal,
+      metode: draft.metode as MetodeBayar,
+      total: draft.total,
+      id_akun_kas,
+      keterangan,
+      id_tagihan,
+    },
+  };
+}
+
+export interface TagihanTerbuka {
+  id_tagihan: string;
+  jatuh_tempo: string;
+  periode: string;
+  sisa: number;
+}
+
+/**
+ * Cermin `alokasi_pembayaran`: tagihan dengan jatuh tempo terlama dilunasi
+ * lebih dulu, kelebihannya menjadi Titipan Wali. Urutan dibandingkan per
+ * byte (bukan `localeCompare`) supaya sama dengan Rust.
+ */
+export function alokasiPembayaran(
+  tagihan: readonly TagihanTerbuka[],
+  total: number,
+): { alokasi: Array<{ id_tagihan: string; nominal: number }>; titipan: number } {
+  const banding = (a: string, b: string) => (a < b ? -1 : a > b ? 1 : 0);
+  const urut = [...tagihan].sort(
+    (a, b) =>
+      banding(a.jatuh_tempo, b.jatuh_tempo) ||
+      banding(a.periode, b.periode) ||
+      banding(a.id_tagihan, b.id_tagihan),
+  );
+  let sisa = total;
+  const alokasi: Array<{ id_tagihan: string; nominal: number }> = [];
+  for (const item of urut) {
+    if (sisa <= 0) break;
+    if (item.sisa <= 0) continue;
+    const nominal = Math.min(item.sisa, sisa);
+    alokasi.push({ id_tagihan: item.id_tagihan, nominal });
+    sisa -= nominal;
+  }
+  return { alokasi, titipan: sisa };
+}
+
+export interface BarisJurnalBayar {
+  id_akun: string;
+  debit: number;
+  kredit: number;
+}
+
+/**
+ * Cermin `baris_jurnal_pembayaran`. Uang tunai/transfer: Kas atau Bank (D) /
+ * Piutang Siswa (K) + Titipan Wali (K) untuk kelebihannya. Dari titipan:
+ * Titipan Wali (D) / Piutang Siswa (K). Seimbang karena konstruksinya.
+ */
+export function barisJurnalPembayaran(
+  metode: string,
+  idAkunKas: string | null,
+  keTagihan: number,
+  keTitipan: number,
+): BarisJurnalBayar[] {
+  if (metode === "Titipan") {
+    return [
+      { id_akun: AKUN_TITIPAN_WALI, debit: keTagihan, kredit: 0 },
+      { id_akun: AKUN_PIUTANG_SISWA, debit: 0, kredit: keTagihan },
+    ];
+  }
+  const baris: BarisJurnalBayar[] = [
+    { id_akun: idAkunKas ?? "", debit: keTagihan + keTitipan, kredit: 0 },
+  ];
+  if (keTagihan > 0) {
+    baris.push({ id_akun: AKUN_PIUTANG_SISWA, debit: 0, kredit: keTagihan });
+  }
+  if (keTitipan > 0) {
+    baris.push({ id_akun: AKUN_TITIPAN_WALI, debit: 0, kredit: keTitipan });
+  }
+  return baris;
 }

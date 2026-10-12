@@ -54,7 +54,8 @@ describe("Schema Consistency & Zero-Drift Guard", () => {
         'keu_akun', 'keu_jurnal', 'keu_jurnal_baris',
         'keu_pinjaman', 'keu_pinjaman_mutasi', 'keu_pinjaman_tunda',
         'keu_jenis_tagihan', 'keu_tarif_tagihan', 'keu_keringanan',
-        'keu_tagihan', 'keu_tagihan_batal'
+        'keu_tagihan', 'keu_tagihan_batal',
+        'keu_seri_perangkat', 'keu_pembayaran', 'keu_pembayaran_alokasi', 'keu_pembayaran_batal'
       );
     `);
     const tableCount = Number(tablesRes.rows[0]?.count ?? 0);

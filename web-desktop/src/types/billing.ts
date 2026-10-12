@@ -4,8 +4,10 @@
  * mengembalikan kunci yang sama.
  */
 
+import type { KopSekolah } from "@/lib/validations/inventory";
 import type {
   JenisKeringanan,
+  MetodeBayar,
   Periodik,
   StatusTagihan,
 } from "@/lib/validations/billing";
@@ -84,7 +86,147 @@ export interface TagihanItem {
   potongan: number;
   jatuh_tempo: string;
   alasan_batal: string | null;
+  /** Jumlah alokasi kuitansi yang tidak dibatalkan. */
+  dibayar: number;
   status: StatusTagihan;
   sisa: number;
   terlambat: boolean;
+}
+
+// ── Pembayaran (K3b) ────────────────────────────────────────────────────────
+
+export type StatusKuitansi = "Sah" | "Dibatalkan";
+
+export interface TagihanTerbukaItem {
+  id_tagihan: string;
+  nama_tagihan: string;
+  periode: string;
+  jatuh_tempo: string;
+  bersih: number;
+  dibayar: number;
+  sisa: number;
+}
+
+export interface RiwayatKuitansi {
+  id_pembayaran: string;
+  nomor: string;
+  tanggal: string;
+  metode: MetodeBayar;
+  total: number;
+  status: StatusKuitansi;
+  rincian: string;
+}
+
+export interface AkunSiswaTagihan {
+  siswa: {
+    id_siswa: string;
+    nama_lengkap: string;
+    kelas: string;
+    nama_wali: string;
+    no_wali: string;
+  };
+  tagihan: TagihanTerbukaItem[];
+  titipan: number;
+  riwayat: RiwayatKuitansi[];
+}
+
+export interface HasilBayar {
+  sukses: boolean;
+  id_pembayaran: string;
+  nomor: string;
+  ke_titipan: number;
+}
+
+export interface KuitansiItem {
+  id_pembayaran: string;
+  nomor: string;
+  seri: string;
+  tanggal: string;
+  id_siswa: string;
+  nama_siswa: string;
+  kelas: string;
+  metode: MetodeBayar;
+  total: number;
+  dibuat_oleh: string;
+  alasan_batal: string | null;
+  status: StatusKuitansi;
+  nomor_ganda: boolean;
+}
+
+export interface DetailKuitansi {
+  pembayaran: {
+    id_pembayaran: string;
+    id_siswa: string;
+    nama_siswa: string;
+    tanggal: string;
+    seri: string;
+    nomor: string;
+    metode: MetodeBayar;
+    id_akun_kas: string | null;
+    nama_akun: string;
+    total: number;
+    keterangan: string | null;
+    dibuat_oleh: string;
+    created_at: string;
+    kelas: string;
+    nama_wali: string;
+    no_wali: string;
+    alasan_batal: string | null;
+    status: StatusKuitansi;
+  };
+  alokasi: Array<{
+    id_alokasi: string;
+    /** `null` = masuk Titipan Wali. */
+    id_tagihan: string | null;
+    nama_tagihan: string | null;
+    periode: string | null;
+    nominal: number;
+  }>;
+  saldo_titipan: number;
+  kop: KopSekolah;
+}
+
+export interface TinjauanPembayaran {
+  lebih_bayar: Array<{
+    id_tagihan: string;
+    id_siswa: string;
+    nama_siswa: string;
+    nama_tagihan: string;
+    periode: string;
+    bersih: number;
+    dibayar: number;
+    dibatalkan: number;
+    kuitansi: Array<{
+      id_pembayaran: string;
+      nomor: string;
+      tanggal: string;
+      metode: MetodeBayar;
+      seri: string;
+      nominal: number;
+    }>;
+  }>;
+  kemungkinan_ganda: Array<{
+    id_pembayaran: string;
+    nomor: string;
+    seri: string;
+    tanggal: string;
+    id_siswa: string;
+    nama_siswa: string;
+    total: number;
+    metode: MetodeBayar;
+  }>;
+  titipan_minus: Array<{ id_siswa: string; nama_siswa: string; saldo: number }>;
+}
+
+export interface SeriKuitansi {
+  /** Kode perangkat ini; `null` di Web. */
+  device_code: string | null;
+  seri_aktif: string;
+  terdaftar: boolean;
+  items: Array<{
+    device_code: string;
+    seri: string;
+    nama_perangkat: string;
+    updated_at: string;
+  }>;
 }

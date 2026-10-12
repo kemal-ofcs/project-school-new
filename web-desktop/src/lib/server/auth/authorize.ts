@@ -9,7 +9,7 @@ import { WEB_SESSION_COOKIE } from "@/lib/auth/web-session";
 import type { PermissionKey } from "@/lib/rbac/catalog";
 import { readWebSession } from "@/lib/server/auth/session";
 import { getServerDatabase } from "@/lib/server/db";
-import { licenseRejection } from "@/lib/server/license";
+import { licenseRejection, readOnlyAllows } from "@/lib/server/license";
 
 /**
  * Gerbang lisensi untuk satu permintaan: melempar 403 dengan pesan lisensinya
@@ -63,4 +63,36 @@ export async function requireWebPermission(
   // lisensi, pemanggilan ini tidak menyentuh database.
   await assertWebLicense(request, permission);
   return actor;
+}
+
+/**
+ * Cermin `require_any_permission`: cukup SALAH SATU izin. Seperti
+ * `license::enforce_any`, mode baca-saja meloloskan permintaan bila salah satu
+ * izin yang DIMINTA boleh dipakai saat baca-saja.
+ */
+export async function requireAnyWebPermission(
+  request: NextRequest,
+  permissions: readonly PermissionKey[],
+) {
+  const token = request.cookies.get(WEB_SESSION_COOKIE)?.value ?? "";
+  const actor = await readWebSession(token);
+  const dipegang = permissions.find((permission) => {
+    try {
+      assertActorPermission(actor, permission);
+      return true;
+    } catch {
+      return false;
+    }
+  });
+  if (!dipegang) {
+    // Melempar galat yang sama dengan gerbang satu izin (401 atau 403).
+    assertActorPermission(actor, permissions[0] as PermissionKey);
+  }
+  await assertWebLicense(
+    request,
+    permissions.find((permission) => readOnlyAllows(permission)) ??
+      permissions[0] ??
+      null,
+  );
+  return actor as NonNullable<typeof actor>;
 }

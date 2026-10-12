@@ -2377,7 +2377,7 @@ pub fn record_opname(
 pub const MAKS_BARIS_DOKUMEN: usize = 500;
 pub const MAKS_BARIS_PENGADAAN: usize = 5000;
 
-fn kop_sekolah(connection: &Connection) -> Result<Value, CommandError> {
+pub(crate) fn kop_sekolah(connection: &Connection) -> Result<Value, CommandError> {
     let kop = connection
         .query_row(
             "SELECT company_name, branch_name, logo_url, address, phone, email, website,

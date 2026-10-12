@@ -135,6 +135,8 @@ describe("dynamic RBAC migration", () => {
       40,
       // v41 — tagihan siswa: jenis, tarif, keringanan, tagihan, pembatalan.
       41,
+      // v42 — pembayaran tagihan, kuitansi, alokasi, dan seri perangkat.
+      42,
     ]);
 
     const sessionColumns = await client.execute(

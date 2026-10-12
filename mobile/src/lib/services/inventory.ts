@@ -1139,7 +1139,7 @@ export async function recordOpname(
 }
 
 /** Cermin `kop_sekolah`: hanya kolom tampilan, dengan izin inventaris. */
-async function kopSekolah(client: Client): Promise<KopSekolah> {
+export async function kopSekolah(client: Client): Promise<KopSekolah> {
   const result = await client.execute(
     `SELECT company_name, branch_name, logo_url, address, phone, email, website,
             leader_name, leader_title, leader_nip

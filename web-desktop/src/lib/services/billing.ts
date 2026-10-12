@@ -3,14 +3,22 @@ import "server-only";
 import { randomBytes } from "node:crypto";
 import type { Client, InStatement, Transaction } from "@libsql/client";
 import {
+  assertAkunBayar,
   balikJurnalTx,
   nomorUrutBerikutnya,
   statementJurnal,
+  tulisJurnalTx,
 } from "@/lib/services/accounting";
-import { isValidDate } from "@/lib/validations/accounting";
+import { kopSekolah } from "@/lib/services/inventory";
+import { formatRupiah, isValidDate } from "@/lib/validations/accounting";
 import {
   AKUN_PIUTANG_SISWA,
+  alokasiPembayaran,
+  barisJurnalPembayaran,
+  formatNomorKuitansi,
   hitungPotongan,
+  idAlokasi,
+  idJurnalPembayaran,
   idJurnalTagihan,
   idTagihan,
   jenisTagihanDraftSchema,
@@ -19,20 +27,33 @@ import {
   keringananDraftSchema,
   kunciUnit,
   MAKS_ALASAN_BATAL_TAGIHAN,
+  MAKS_NAMA_PERANGKAT,
+  type PembayaranValid,
+  pembayaranDraftSchema,
   pilihTarif,
+  SERI_KUITANSI_WEB,
+  type TagihanTerbuka,
   type TarifBerlaku,
   tarifDraftSchema,
   validateJenisTagihan,
   validateKeringanan,
+  validatePembayaran,
   validatePeriodeTagihan,
+  validateSeri,
   validateTarif,
 } from "@/lib/validations/billing";
 import type {
+  AkunSiswaTagihan,
+  DetailKuitansi,
+  HasilBayar,
   KeringananItem,
+  KuitansiItem,
   MasterTagihan,
   PratinjauTagihan,
+  SeriKuitansi,
   SiswaTagihan,
   TagihanItem,
+  TinjauanPembayaran,
 } from "@/types/billing";
 
 /**
@@ -71,6 +92,28 @@ async function hariIni(tx: Executor): Promise<string> {
   const result = await tx.execute("SELECT date('now', '+7 hours') AS hari;");
   return String(result.rows[0]?.hari ?? "");
 }
+
+/** Cermin `DIBAYAR_SQL`: alokasi kuitansi yang tidak dibatalkan per tagihan. */
+const DIBAYAR_SQL = `SELECT a.id_tagihan, SUM(a.nominal) AS dibayar
+     FROM keu_pembayaran_alokasi a
+     JOIN keu_pembayaran p ON p.id_pembayaran = a.id_pembayaran
+     LEFT JOIN keu_pembayaran_batal pb ON pb.id_pembayaran = p.id_pembayaran
+     WHERE a.id_tagihan IS NOT NULL AND pb.id_pembayaran IS NULL
+     GROUP BY a.id_tagihan
+     -- batas: subquery yang di-JOIN ke tagihan, dibatasi kueri luarnya
+     `;
+
+/** Cermin `SALDO_TITIPAN_SQL`. */
+const SALDO_TITIPAN_SQL = `SELECT COALESCE(SUM(CASE
+            WHEN p.metode = 'Titipan' THEN -a.nominal
+            WHEN a.id_tagihan IS NULL THEN a.nominal
+            ELSE 0 END), 0) AS saldo
+     FROM keu_pembayaran p
+     JOIN keu_pembayaran_alokasi a ON a.id_pembayaran = p.id_pembayaran
+     LEFT JOIN keu_pembayaran_batal pb ON pb.id_pembayaran = p.id_pembayaran
+     WHERE p.id_siswa = ? AND pb.id_pembayaran IS NULL
+     -- batas: agregat, selalu satu baris
+     ;`;
 
 // ── Master ──────────────────────────────────────────────────────────────────
 
@@ -590,6 +633,15 @@ export async function cancel(
     });
     const row = tagihan.rows[0];
     if (!row) throw new Error("Tagihan tidak ditemukan.");
+    const bayar = await tx.execute({
+      sql: `SELECT COALESCE(SUM(dibayar), 0) AS n FROM (${DIBAYAR_SQL}) WHERE id_tagihan = ?;`,
+      args: [id],
+    });
+    if (Number(bayar.rows[0]?.n) > 0) {
+      throw new Error(
+        "Tagihan ini sudah dibayar. Batalkan kuitansinya atau pindahkan ke titipan lebih dulu.",
+      );
+    }
     const ditulis = await tx.execute({
       sql: `INSERT OR IGNORE INTO keu_tagihan_batal (id_tagihan, alasan, dibatalkan_oleh, created_at)
             VALUES (?, ?, ?, datetime('now'));`,
@@ -621,15 +673,18 @@ export async function list(
   const idJenis = isi(filter.id_jenis_tagihan);
   const idRombel = isi(filter.id_rombel);
   const status = isi(filter.status);
-  if (status && status !== "Aktif" && status !== "Dibatalkan") {
+  if (status && !["Aktif", "Lunas", "Dibatalkan"].includes(status)) {
     throw new Error("Status tagihan tidak dikenal.");
   }
   let query = `SELECT t.id_tagihan, t.id_siswa, t.nama_siswa, COALESCE(r.nama_rombel, '') AS kelas,
             t.id_jenis_tagihan, t.nama_tagihan, t.periode, t.nominal, t.potongan, t.jatuh_tempo,
-            b.alasan AS alasan_batal,
-            CASE WHEN b.id_tagihan IS NULL THEN 'Aktif' ELSE 'Dibatalkan' END AS status
+            b.alasan AS alasan_batal, COALESCE(d.dibayar, 0) AS dibayar,
+            CASE WHEN b.id_tagihan IS NOT NULL THEN 'Dibatalkan'
+                 WHEN t.nominal - t.potongan <= COALESCE(d.dibayar, 0) THEN 'Lunas'
+                 ELSE 'Aktif' END AS status
      FROM keu_tagihan t
      LEFT JOIN keu_tagihan_batal b ON b.id_tagihan = t.id_tagihan
+     LEFT JOIN (${DIBAYAR_SQL}) d ON d.id_tagihan = t.id_tagihan
      LEFT JOIN siswa_data s ON s.id_siswa = t.id_siswa
      LEFT JOIN akademik_rombel r ON r.id_rombel = s.id_rombel
      WHERE 1 = 1`;
@@ -646,11 +701,14 @@ export async function list(
     query += " AND s.id_rombel = ?";
     args.push(idRombel);
   }
-  if (status) {
+  if (status === "Aktif") {
     query +=
-      status === "Aktif"
-        ? " AND b.id_tagihan IS NULL"
-        : " AND b.id_tagihan IS NOT NULL";
+      " AND b.id_tagihan IS NULL AND t.nominal - t.potongan > COALESCE(d.dibayar, 0)";
+  } else if (status === "Lunas") {
+    query +=
+      " AND b.id_tagihan IS NULL AND t.nominal - t.potongan <= COALESCE(d.dibayar, 0)";
+  } else if (status) {
+    query += " AND b.id_tagihan IS NOT NULL";
   }
   // `LIMIT 1000` = `BATAS_DAFTAR_TAGIHAN`.
   query +=
@@ -661,7 +719,9 @@ export async function list(
   ]);
   const items = result.rows.map((row) => {
     const aktif = String(row.status) === "Aktif";
-    const sisa = aktif ? Number(row.nominal) - Number(row.potongan) : 0;
+    const sisa = aktif
+      ? Number(row.nominal) - Number(row.potongan) - Number(row.dibayar)
+      : 0;
     return {
       id_tagihan: String(row.id_tagihan),
       id_siswa: String(row.id_siswa),
@@ -674,7 +734,8 @@ export async function list(
       potongan: Number(row.potongan),
       jatuh_tempo: String(row.jatuh_tempo),
       alasan_batal: text(row.alasan_batal),
-      status: (aktif ? "Aktif" : "Dibatalkan") as TagihanItem["status"],
+      dibayar: Number(row.dibayar),
+      status: String(row.status) as TagihanItem["status"],
       sisa,
       terlambat: sisa > 0 && String(row.jatuh_tempo) < hari,
     };
@@ -683,4 +744,575 @@ export async function list(
     items,
     total_sisa: items.reduce((sum, item) => sum + item.sisa, 0),
   };
+}
+
+// ── Pembayaran dan kuitansi (K3b) ───────────────────────────────────────────
+
+const PEMBAYARAN_SQL = `SELECT id_pembayaran, id_siswa, nama_siswa, tanggal, seri, nomor_urut,
+        nomor, metode, id_akun_kas, total, keterangan, dibuat_oleh, created_at
+        FROM keu_pembayaran WHERE id_pembayaran = ?;`;
+
+async function saldoTitipan(tx: Executor, idSiswa: string): Promise<number> {
+  const result = await tx.execute({ sql: SALDO_TITIPAN_SQL, args: [idSiswa] });
+  return Number(result.rows[0]?.saldo ?? 0);
+}
+
+/** Cermin `tagihan_terbuka`. */
+async function tagihanTerbuka(tx: Executor, idSiswa: string) {
+  const result = await tx.execute({
+    sql: `SELECT t.id_tagihan, t.nama_tagihan, t.periode, t.jatuh_tempo,
+                 t.nominal - t.potongan AS bersih, COALESCE(d.dibayar, 0) AS dibayar
+          FROM keu_tagihan t
+          LEFT JOIN keu_tagihan_batal b ON b.id_tagihan = t.id_tagihan
+          LEFT JOIN (${DIBAYAR_SQL}) d ON d.id_tagihan = t.id_tagihan
+          WHERE t.id_siswa = ? AND b.id_tagihan IS NULL
+            AND t.nominal - t.potongan > COALESCE(d.dibayar, 0)
+          ORDER BY t.jatuh_tempo, t.periode, t.id_tagihan
+          LIMIT 500;`,
+    args: [idSiswa],
+  });
+  return result.rows.map((row) => ({
+    id_tagihan: String(row.id_tagihan),
+    nama_tagihan: String(row.nama_tagihan),
+    periode: String(row.periode),
+    jatuh_tempo: String(row.jatuh_tempo),
+    bersih: Number(row.bersih),
+    dibayar: Number(row.dibayar),
+    sisa: Number(row.bersih) - Number(row.dibayar),
+  }));
+}
+
+/** Cermin `account`. */
+export async function account(
+  client: Client,
+  idSiswa: string,
+): Promise<AkunSiswaTagihan> {
+  const siswa = await client.execute({
+    sql: `SELECT s.id_siswa, s.nama_lengkap, COALESCE(r.nama_rombel, '') AS kelas,
+                 COALESCE(s.nama_wali, '') AS nama_wali, COALESCE(s.no_whatsapp_wali, '') AS no_wali
+          FROM siswa_data s
+          LEFT JOIN akademik_rombel r ON r.id_rombel = s.id_rombel
+          WHERE s.id_siswa = ?;`,
+    args: [idSiswa],
+  });
+  const row = siswa.rows[0];
+  if (!row) throw new Error("Siswa tidak ditemukan.");
+  const riwayat = await client.execute({
+    sql: `SELECT p.id_pembayaran, p.nomor, p.tanggal, p.metode, p.total,
+                 CASE WHEN pb.id_pembayaran IS NULL THEN 'Sah' ELSE 'Dibatalkan' END AS status,
+                 (SELECT GROUP_CONCAT(COALESCE(t.nama_tagihan || ' ' || t.periode, 'Titipan'), ', ')
+                  FROM keu_pembayaran_alokasi a
+                  LEFT JOIN keu_tagihan t ON t.id_tagihan = a.id_tagihan
+                  WHERE a.id_pembayaran = p.id_pembayaran) AS rincian
+          FROM keu_pembayaran p
+          LEFT JOIN keu_pembayaran_batal pb ON pb.id_pembayaran = p.id_pembayaran
+          WHERE p.id_siswa = ?
+          ORDER BY p.tanggal DESC, p.created_at DESC, p.id_pembayaran
+          LIMIT 10;`,
+    args: [idSiswa],
+  });
+  return {
+    siswa: {
+      id_siswa: String(row.id_siswa),
+      nama_lengkap: String(row.nama_lengkap),
+      kelas: String(row.kelas),
+      nama_wali: String(row.nama_wali),
+      no_wali: String(row.no_wali),
+    },
+    tagihan: await tagihanTerbuka(client, idSiswa),
+    titipan: await saldoTitipan(client, idSiswa),
+    riwayat: riwayat.rows.map((item) => ({
+      id_pembayaran: String(item.id_pembayaran),
+      nomor: String(item.nomor),
+      tanggal: String(item.tanggal),
+      metode: String(item.metode) as KuitansiItem["metode"],
+      total: Number(item.total),
+      status: String(item.status) as KuitansiItem["status"],
+      rincian: String(item.rincian ?? ""),
+    })),
+  };
+}
+
+/** Cermin `catat_pembayaran_tx`. Seri kuitansi Web selalu `WEB`. */
+async function catatPembayaranTx(
+  tx: Transaction,
+  operator: string,
+  valid: PembayaranValid,
+): Promise<HasilBayar> {
+  if (valid.tanggal > (await hariIni(tx))) {
+    throw new Error("Tanggal pembayaran tidak boleh melewati hari ini.");
+  }
+  const siswa = await tx.execute({
+    sql: "SELECT nama_lengkap FROM siswa_data WHERE id_siswa = ?;",
+    args: [valid.id_siswa],
+  });
+  if (!siswa.rows[0]) throw new Error("Siswa tidak ditemukan.");
+  const namaSiswa = String(siswa.rows[0].nama_lengkap);
+  if (valid.id_akun_kas) await assertAkunBayar(tx, valid.id_akun_kas);
+  const terbuka: TagihanTerbuka[] = (await tagihanTerbuka(tx, valid.id_siswa))
+    .filter((item) => valid.id_tagihan.includes(item.id_tagihan))
+    .map((item) => ({
+      id_tagihan: item.id_tagihan,
+      jatuh_tempo: item.jatuh_tempo,
+      periode: item.periode,
+      sisa: item.sisa,
+    }));
+  const { alokasi, titipan: keTitipan } = alokasiPembayaran(
+    terbuka,
+    valid.total,
+  );
+  if (valid.metode === "Titipan") {
+    if (keTitipan > 0) {
+      throw new Error(
+        "Pembayaran dari titipan tidak boleh melebihi sisa tagihan yang dipilih.",
+      );
+    }
+    const saldo = await saldoTitipan(tx, valid.id_siswa);
+    if (valid.total > saldo) {
+      throw new Error(
+        `Saldo titipan tidak cukup. Tersedia ${formatRupiah(Math.max(saldo, 0))}.`,
+      );
+    }
+  }
+
+  const seri = SERI_KUITANSI_WEB;
+  const tahun = valid.tanggal.slice(0, 4);
+  const urut = await tx.execute({
+    sql: `SELECT COALESCE(MAX(nomor_urut), 0) + 1 AS n FROM keu_pembayaran
+          WHERE seri = ? AND substr(tanggal, 1, 4) = ?
+          -- batas: agregat, selalu satu baris
+          ;`,
+    args: [seri, tahun],
+  });
+  const nomorUrut = Number(urut.rows[0]?.n ?? 1);
+  const nomor = formatNomorKuitansi(tahun, seri, nomorUrut);
+  const id = newId("kwt-");
+  await tx.execute({
+    sql: `INSERT INTO keu_pembayaran (
+            id_pembayaran, id_siswa, nama_siswa, tanggal, seri, nomor_urut, nomor, metode,
+            id_akun_kas, total, keterangan, dibuat_oleh, created_at
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'));`,
+    args: [
+      id,
+      valid.id_siswa,
+      namaSiswa,
+      valid.tanggal,
+      seri,
+      nomorUrut,
+      nomor,
+      valid.metode,
+      valid.id_akun_kas,
+      valid.total,
+      valid.keterangan,
+      operator,
+    ],
+  });
+  const barisAlokasi: Array<[string | null, number]> = alokasi.map((item) => [
+    item.id_tagihan,
+    item.nominal,
+  ]);
+  if (keTitipan > 0) barisAlokasi.push([null, keTitipan]);
+  for (const [indeks, [idTagihanAlokasi, nominal]] of barisAlokasi.entries()) {
+    await tx.execute({
+      sql: `INSERT INTO keu_pembayaran_alokasi (id_alokasi, id_pembayaran, id_tagihan, nominal)
+            VALUES (?, ?, ?, ?);`,
+      args: [idAlokasi(id, indeks + 1), id, idTagihanAlokasi, nominal],
+    });
+  }
+
+  const keTagihan = alokasi.reduce((sum, item) => sum + item.nominal, 0);
+  const idJurnal = idJurnalPembayaran(id);
+  await tulisJurnalTx(
+    tx,
+    {
+      id_jurnal: idJurnal,
+      tanggal: valid.tanggal,
+      keterangan: `Kuitansi ${nomor} ${namaSiswa}`,
+      sumber: "Pembayaran",
+      id_sumber: id,
+      id_jurnal_batal: null,
+      dibuat_oleh: operator,
+    },
+    barisJurnalPembayaran(
+      valid.metode,
+      valid.id_akun_kas,
+      keTagihan,
+      keTitipan,
+    ).map((item, indeks) => ({
+      id_baris: `${idJurnal}-${indeks + 1}`,
+      id_akun: item.id_akun,
+      debit: item.debit,
+      kredit: item.kredit,
+      keterangan: null,
+      urutan: indeks + 1,
+    })),
+  );
+  return {
+    sukses: true,
+    id_pembayaran: id,
+    nomor,
+    ke_titipan: keTitipan,
+  };
+}
+
+export async function pay(
+  client: Client,
+  operator: string,
+  rawDraft: unknown,
+): Promise<HasilBayar> {
+  const parsed = pembayaranDraftSchema.safeParse(rawDraft);
+  if (!parsed.success) throw new Error("Data pembayaran tidak valid.");
+  const hasil = validatePembayaran(parsed.data);
+  if (!hasil.ok) throw new Error(hasil.error);
+  const valid = hasil.value;
+  return withTransaction(client, (tx) => catatPembayaranTx(tx, operator, valid));
+}
+
+function validasiAlasanBatal(alasanMentah: string): string {
+  const alasan = alasanMentah.trim();
+  if (!alasan) throw new Error("Alasan pembatalan wajib diisi.");
+  if (Array.from(alasan).length > MAKS_ALASAN_BATAL_TAGIHAN) {
+    throw new Error("Alasan pembatalan maksimal 150 karakter.");
+  }
+  return alasan;
+}
+
+/** Cermin `batal_pembayaran_tx`. */
+async function batalPembayaranTx(
+  tx: Transaction,
+  operator: string,
+  id: string,
+  alasan: string,
+) {
+  const asal = await tx.execute({ sql: PEMBAYARAN_SQL, args: [id] });
+  const row = asal.rows[0];
+  if (!row) throw new Error("Kuitansi tidak ditemukan.");
+  const ditulis = await tx.execute({
+    sql: `INSERT OR IGNORE INTO keu_pembayaran_batal (id_pembayaran, alasan, dibatalkan_oleh, created_at)
+          VALUES (?, ?, ?, datetime('now'));`,
+    args: [id, alasan, operator],
+  });
+  if (ditulis.rowsAffected === 0) {
+    throw new Error("Kuitansi ini sudah dibatalkan.");
+  }
+  await balikJurnalTx(
+    tx,
+    idJurnalPembayaran(id),
+    `Pembatalan ${String(row.nomor)} ${String(row.nama_siswa)}: ${alasan}`,
+    operator,
+  );
+  return row;
+}
+
+export async function cancelPayment(
+  client: Client,
+  operator: string,
+  id: string,
+  alasanMentah: string,
+): Promise<{ sukses: true }> {
+  const alasan = validasiAlasanBatal(alasanMentah);
+  await withTransaction(client, (tx) =>
+    batalPembayaranTx(tx, operator, id, alasan),
+  );
+  return { sukses: true as const };
+}
+
+/** Cermin `move_to_deposit`. */
+export async function moveToDeposit(
+  client: Client,
+  operator: string,
+  id: string,
+  alasanMentah: string,
+): Promise<HasilBayar> {
+  const alasan = validasiAlasanBatal(alasanMentah);
+  return withTransaction(client, async (tx) => {
+    const metode = await tx.execute({
+      sql: "SELECT metode FROM keu_pembayaran WHERE id_pembayaran = ?;",
+      args: [id],
+    });
+    if (text(metode.rows[0]?.metode) === "Titipan") {
+      throw new Error(
+        "Kuitansi dari titipan cukup dibatalkan; saldonya kembali dengan sendirinya.",
+      );
+    }
+    const asal = await batalPembayaranTx(tx, operator, id, alasan);
+    return catatPembayaranTx(tx, operator, {
+      id_siswa: String(asal.id_siswa),
+      tanggal: String(asal.tanggal),
+      metode: String(asal.metode) as PembayaranValid["metode"],
+      total: Number(asal.total),
+      id_akun_kas: text(asal.id_akun_kas),
+      keterangan: `Pengganti ${String(asal.nomor)}`,
+      id_tagihan: [],
+    });
+  });
+}
+
+/** Cermin `payments`. */
+export async function payments(
+  client: Client,
+  dari: string,
+  sampai: string,
+  seri: string | null,
+): Promise<{ items: KuitansiItem[]; total_sah: number }> {
+  if (!isValidDate(dari) || !isValidDate(sampai) || dari > sampai) {
+    throw new Error("Rentang tanggal tidak valid.");
+  }
+  let query = `SELECT p.id_pembayaran, p.nomor, p.seri, p.tanggal, p.id_siswa, p.nama_siswa,
+            COALESCE(r.nama_rombel, '') AS kelas, p.metode, p.total, p.dibuat_oleh,
+            pb.alasan AS alasan_batal,
+            CASE WHEN pb.id_pembayaran IS NULL THEN 'Sah' ELSE 'Dibatalkan' END AS status
+     FROM keu_pembayaran p
+     LEFT JOIN keu_pembayaran_batal pb ON pb.id_pembayaran = p.id_pembayaran
+     LEFT JOIN siswa_data s ON s.id_siswa = p.id_siswa
+     LEFT JOIN akademik_rombel r ON r.id_rombel = s.id_rombel
+     WHERE p.tanggal >= ? AND p.tanggal <= ?`;
+  const args = [dari, sampai];
+  const seriBersih = seri?.trim();
+  if (seriBersih) {
+    query += " AND p.seri = ?";
+    args.push(seriBersih);
+  }
+  // `LIMIT 1000` = `BATAS_DAFTAR_KUITANSI`.
+  query += " ORDER BY p.tanggal DESC, p.nomor DESC, p.id_pembayaran LIMIT 1000;";
+  const result = await client.execute({ sql: query, args });
+  const jumlah = new Map<string, number>();
+  for (const row of result.rows) {
+    const nomor = String(row.nomor);
+    jumlah.set(nomor, (jumlah.get(nomor) ?? 0) + 1);
+  }
+  const items: KuitansiItem[] = result.rows.map((row) => ({
+    id_pembayaran: String(row.id_pembayaran),
+    nomor: String(row.nomor),
+    seri: String(row.seri),
+    tanggal: String(row.tanggal),
+    id_siswa: String(row.id_siswa),
+    nama_siswa: String(row.nama_siswa),
+    kelas: String(row.kelas),
+    metode: String(row.metode) as KuitansiItem["metode"],
+    total: Number(row.total),
+    dibuat_oleh: String(row.dibuat_oleh),
+    alasan_batal: text(row.alasan_batal),
+    status: String(row.status) as KuitansiItem["status"],
+    nomor_ganda: (jumlah.get(String(row.nomor)) ?? 0) > 1,
+  }));
+  return {
+    items,
+    total_sah: items
+      .filter((item) => item.status === "Sah")
+      .reduce((sum, item) => sum + item.total, 0),
+  };
+}
+
+/** Cermin `payment_detail`. */
+export async function paymentDetail(
+  client: Client,
+  id: string,
+): Promise<DetailKuitansi> {
+  const result = await client.execute({
+    sql: `SELECT p.id_pembayaran, p.id_siswa, p.nama_siswa, p.tanggal, p.seri, p.nomor, p.metode,
+                 p.id_akun_kas, COALESCE(k.nama, '') AS nama_akun, p.total, p.keterangan,
+                 p.dibuat_oleh, p.created_at, COALESCE(r.nama_rombel, '') AS kelas,
+                 COALESCE(s.nama_wali, '') AS nama_wali, COALESCE(s.no_whatsapp_wali, '') AS no_wali,
+                 pb.alasan AS alasan_batal,
+                 CASE WHEN pb.id_pembayaran IS NULL THEN 'Sah' ELSE 'Dibatalkan' END AS status
+          FROM keu_pembayaran p
+          LEFT JOIN keu_pembayaran_batal pb ON pb.id_pembayaran = p.id_pembayaran
+          LEFT JOIN keu_akun k ON k.id_akun = p.id_akun_kas
+          LEFT JOIN siswa_data s ON s.id_siswa = p.id_siswa
+          LEFT JOIN akademik_rombel r ON r.id_rombel = s.id_rombel
+          WHERE p.id_pembayaran = ?;`,
+    args: [id],
+  });
+  const row = result.rows[0];
+  if (!row) throw new Error("Kuitansi tidak ditemukan.");
+  const alokasi = await client.execute({
+    sql: `SELECT a.id_alokasi, a.id_tagihan, t.nama_tagihan, t.periode, a.nominal
+          FROM keu_pembayaran_alokasi a
+          LEFT JOIN keu_tagihan t ON t.id_tagihan = a.id_tagihan
+          WHERE a.id_pembayaran = ?
+          ORDER BY a.id_alokasi
+          LIMIT 200;`,
+    args: [id],
+  });
+  return {
+    pembayaran: {
+      id_pembayaran: String(row.id_pembayaran),
+      id_siswa: String(row.id_siswa),
+      nama_siswa: String(row.nama_siswa),
+      tanggal: String(row.tanggal),
+      seri: String(row.seri),
+      nomor: String(row.nomor),
+      metode: String(row.metode) as KuitansiItem["metode"],
+      id_akun_kas: text(row.id_akun_kas),
+      nama_akun: String(row.nama_akun),
+      total: Number(row.total),
+      keterangan: text(row.keterangan),
+      dibuat_oleh: String(row.dibuat_oleh),
+      created_at: String(row.created_at),
+      kelas: String(row.kelas),
+      nama_wali: String(row.nama_wali),
+      no_wali: String(row.no_wali),
+      alasan_batal: text(row.alasan_batal),
+      status: String(row.status) as KuitansiItem["status"],
+    },
+    alokasi: alokasi.rows.map((item) => ({
+      id_alokasi: String(item.id_alokasi),
+      id_tagihan: text(item.id_tagihan),
+      nama_tagihan: text(item.nama_tagihan),
+      periode: text(item.periode),
+      nominal: Number(item.nominal),
+    })),
+    saldo_titipan: await saldoTitipan(client, String(row.id_siswa)),
+    kop: await kopSekolah(client),
+  };
+}
+
+/** Cermin `review`. */
+export async function review(client: Client): Promise<TinjauanPembayaran> {
+  const lebih = await client.execute(
+    `SELECT t.id_tagihan, t.id_siswa, t.nama_siswa, t.nama_tagihan, t.periode,
+            CASE WHEN b.id_tagihan IS NULL THEN t.nominal - t.potongan ELSE 0 END AS bersih,
+            d.dibayar, CASE WHEN b.id_tagihan IS NULL THEN 0 ELSE 1 END AS dibatalkan
+     FROM (${DIBAYAR_SQL}) d
+     JOIN keu_tagihan t ON t.id_tagihan = d.id_tagihan
+     LEFT JOIN keu_tagihan_batal b ON b.id_tagihan = t.id_tagihan
+     WHERE d.dibayar > CASE WHEN b.id_tagihan IS NULL THEN t.nominal - t.potongan ELSE 0 END
+     ORDER BY t.nama_siswa, t.periode, t.id_tagihan
+     LIMIT 500;`,
+  );
+  const lebih_bayar: TinjauanPembayaran["lebih_bayar"] = [];
+  for (const row of lebih.rows) {
+    const kuitansi = await client.execute({
+      sql: `SELECT p.id_pembayaran, p.nomor, p.tanggal, p.metode, p.seri, a.nominal
+            FROM keu_pembayaran_alokasi a
+            JOIN keu_pembayaran p ON p.id_pembayaran = a.id_pembayaran
+            LEFT JOIN keu_pembayaran_batal pb ON pb.id_pembayaran = p.id_pembayaran
+            WHERE a.id_tagihan = ? AND pb.id_pembayaran IS NULL
+            ORDER BY p.tanggal, p.nomor
+            LIMIT 20;`,
+      args: [String(row.id_tagihan)],
+    });
+    lebih_bayar.push({
+      id_tagihan: String(row.id_tagihan),
+      id_siswa: String(row.id_siswa),
+      nama_siswa: String(row.nama_siswa),
+      nama_tagihan: String(row.nama_tagihan),
+      periode: String(row.periode),
+      bersih: Number(row.bersih),
+      dibayar: Number(row.dibayar),
+      dibatalkan: Number(row.dibatalkan),
+      kuitansi: kuitansi.rows.map((item) => ({
+        id_pembayaran: String(item.id_pembayaran),
+        nomor: String(item.nomor),
+        tanggal: String(item.tanggal),
+        metode: String(item.metode) as KuitansiItem["metode"],
+        seri: String(item.seri),
+        nominal: Number(item.nominal),
+      })),
+    });
+  }
+  const ganda = await client.execute(
+    `SELECT p.id_pembayaran, p.nomor, p.seri, p.tanggal, p.id_siswa, p.nama_siswa, p.total, p.metode
+     FROM keu_pembayaran p
+     LEFT JOIN keu_pembayaran_batal pb ON pb.id_pembayaran = p.id_pembayaran
+     WHERE pb.id_pembayaran IS NULL
+       AND EXISTS (
+         SELECT 1 FROM keu_pembayaran q
+         LEFT JOIN keu_pembayaran_batal qb ON qb.id_pembayaran = q.id_pembayaran
+         WHERE qb.id_pembayaran IS NULL AND q.id_pembayaran <> p.id_pembayaran
+           AND q.id_siswa = p.id_siswa AND q.tanggal = p.tanggal
+           AND q.total = p.total AND q.seri <> p.seri
+       )
+     ORDER BY p.nama_siswa, p.tanggal, p.total, p.nomor
+     LIMIT 500;`,
+  );
+  const minus = await client.execute(
+    `SELECT p.id_siswa, MAX(p.nama_siswa) AS nama_siswa,
+            SUM(CASE WHEN p.metode = 'Titipan' THEN -a.nominal
+                     WHEN a.id_tagihan IS NULL THEN a.nominal ELSE 0 END) AS saldo
+     FROM keu_pembayaran p
+     JOIN keu_pembayaran_alokasi a ON a.id_pembayaran = p.id_pembayaran
+     LEFT JOIN keu_pembayaran_batal pb ON pb.id_pembayaran = p.id_pembayaran
+     WHERE pb.id_pembayaran IS NULL
+     GROUP BY p.id_siswa
+     HAVING saldo < 0
+     ORDER BY nama_siswa, p.id_siswa
+     LIMIT 500;`,
+  );
+  return {
+    lebih_bayar,
+    kemungkinan_ganda: ganda.rows.map((row) => ({
+      id_pembayaran: String(row.id_pembayaran),
+      nomor: String(row.nomor),
+      seri: String(row.seri),
+      tanggal: String(row.tanggal),
+      id_siswa: String(row.id_siswa),
+      nama_siswa: String(row.nama_siswa),
+      total: Number(row.total),
+      metode: String(row.metode) as KuitansiItem["metode"],
+    })),
+    titipan_minus: minus.rows.map((row) => ({
+      id_siswa: String(row.id_siswa),
+      nama_siswa: String(row.nama_siswa),
+      saldo: Number(row.saldo),
+    })),
+  };
+}
+
+/** Cermin `series`. Web tidak punya kode perangkat; serinya selalu `WEB`. */
+export async function series(client: Client): Promise<SeriKuitansi> {
+  const result = await client.execute(
+    `SELECT device_code, seri, nama_perangkat, updated_at FROM keu_seri_perangkat
+     ORDER BY seri, device_code LIMIT 500;`,
+  );
+  return {
+    device_code: null,
+    seri_aktif: SERI_KUITANSI_WEB,
+    terdaftar: true,
+    items: result.rows.map((row) => ({
+      device_code: String(row.device_code),
+      seri: String(row.seri),
+      nama_perangkat: String(row.nama_perangkat ?? ""),
+      updated_at: String(row.updated_at),
+    })),
+  };
+}
+
+/** Cermin `save_series`. */
+export async function saveSeries(
+  client: Client,
+  deviceCodeMentah: string,
+  seriMentah: string,
+  namaMentah: string,
+): Promise<{ sukses: true; seri: string }> {
+  const deviceCode = deviceCodeMentah.trim();
+  if (!deviceCode || Array.from(deviceCode).length > 100) {
+    throw new Error("Kode perangkat wajib diisi.");
+  }
+  const cek = validateSeri(seriMentah);
+  if (!cek.ok) throw new Error(cek.error);
+  const nama = namaMentah.trim();
+  if (Array.from(nama).length > MAKS_NAMA_PERANGKAT) {
+    throw new Error("Nama perangkat maksimal 60 karakter.");
+  }
+  return withTransaction(client, async (tx) => {
+    const dipakai = await tx.execute({
+      sql: "SELECT EXISTS(SELECT 1 FROM keu_seri_perangkat WHERE UPPER(seri) = ? AND device_code <> ?) AS ada;",
+      args: [cek.value, deviceCode],
+    });
+    if (Number(dipakai.rows[0]?.ada) === 1) {
+      throw new Error("Seri ini sudah dipakai perangkat lain.");
+    }
+    await tx.execute({
+      sql: `INSERT INTO keu_seri_perangkat (device_code, seri, nama_perangkat, created_at, updated_at)
+            VALUES (?, ?, ?, datetime('now'), datetime('now'))
+            ON CONFLICT(device_code) DO UPDATE SET
+              seri = excluded.seri,
+              nama_perangkat = excluded.nama_perangkat,
+              updated_at = excluded.updated_at;`,
+      args: [deviceCode, cek.value, nama],
+    });
+    return { sukses: true as const, seri: cek.value };
+  });
 }

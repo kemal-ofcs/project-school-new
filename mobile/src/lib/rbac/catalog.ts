@@ -405,8 +405,13 @@ export const PERMISSION_CATALOG = [
     group: "Keuangan",
   },
   {
+    key: "billing.collect",
+    name: "Catat Pembayaran Tagihan",
+    group: "Keuangan",
+  },
+  {
     key: "billing.cancel",
-    name: "Batalkan Tagihan",
+    name: "Batalkan Tagihan & Kuitansi",
     group: "Keuangan",
   },
 ] as const;

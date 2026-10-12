@@ -7,8 +7,23 @@ import { initDatabaseSchema } from "@/lib/db-schema";
 
 mock.module("server-only", () => ({}));
 
-const { cancel, issue, list, preview, saveJenis, saveKeringanan, saveTarif } =
-  await import("@/lib/services/billing");
+const {
+  account,
+  cancel,
+  cancelPayment,
+  issue,
+  list,
+  moveToDeposit,
+  pay,
+  paymentDetail,
+  payments,
+  preview,
+  review,
+  saveJenis,
+  saveKeringanan,
+  saveSeries,
+  saveTarif,
+} = await import("@/lib/services/billing");
 const { trialBalance } = await import("@/lib/services/accounting");
 
 // Berkas sungguhan, satu klien per berkas (pola `inventory.test.ts`).
@@ -27,10 +42,10 @@ beforeAll(async () => {
          ('S-01', 'S-01', 'Ani', 'Siswa', 1, 'Siswa', 'Aktif', 'SMP'),
          ('S-02', 'S-02', 'Budi', 'Siswa', 1, 'Siswa', 'Aktif', 'SMP'),
          ('S-03', 'S-03', 'Cici', 'Siswa', 1, 'Siswa', 'Aktif', 'SMP');`,
-      `INSERT INTO siswa_data (id_siswa, nama_lengkap, id_rombel, angkatan, status, created_at, updated_at) VALUES
-         ('S-01', 'Ani', 'r7', 2026, 'Aktif', 'x', 'x'),
-         ('S-02', 'Budi', 'r8', 2025, 'Aktif', 'x', 'x'),
-         ('S-03', 'Cici', 'r8', 2025, 'Lulus', 'x', 'x');`,
+      `INSERT INTO siswa_data (id_siswa, nama_lengkap, id_rombel, angkatan, status, created_at, updated_at, no_whatsapp_wali) VALUES
+         ('S-01', 'Ani', 'r7', 2026, 'Aktif', 'x', 'x', '+6281234567890'),
+         ('S-02', 'Budi', 'r8', 2025, 'Aktif', 'x', 'x', NULL),
+         ('S-03', 'Cici', 'r8', 2025, 'Lulus', 'x', 'x', NULL);`,
     ],
     "write",
   );
@@ -138,5 +153,154 @@ describe("tagihan Web terhadap skema cloud asli", () => {
     const daftar = await list(client, { periode: "2026-07", status: "Aktif" });
     expect(daftar.items.length).toBe(1);
     expect(daftar.total_sisa).toBe(150_000);
+  });
+});
+
+// Cermin `pembayaran_alokasi_titipan_dan_tinjauan` di `desktop/billing.rs`.
+// Siswa S-02 dipakai di sini karena S-01 sudah punya tagihan batal di atas.
+describe("pembayaran Web terhadap skema cloud asli", () => {
+  test("alokasi, titipan, pembatalan, pindah ke titipan, dan tinjauan", async () => {
+    const { id_jenis_tagihan: jt } = await saveJenis(client, {
+      nama: "Uang Kegiatan",
+      periodik: "Bulanan",
+      nominal_bawaan: 300_000,
+      id_akun_pendapatan: "akun-pendapatan-spp",
+    });
+    await issue(client, "tu", jt, "2026-07", "2026-07-10", null, "r8");
+    await issue(client, "tu", jt, "2026-08", "2026-08-10", null, "r8");
+    const juli = `tgh-${jt}-S-02-2026-07`;
+    const agustus = `tgh-${jt}-S-02-2026-08`;
+    const piutangAwal = await saldo("akun-piutang-siswa");
+    const kasAwal = await saldo("akun-kas");
+
+    await expect(
+      pay(client, "tu", {
+        id_siswa: "S-02",
+        tanggal: "2999-01-01",
+        metode: "Tunai",
+        total: 1,
+        id_akun_kas: "akun-kas",
+        id_tagihan: [juli],
+      }),
+    ).rejects.toThrow("Tanggal pembayaran tidak boleh melewati hari ini.");
+
+    const kwt1 = await pay(client, "tu", {
+      id_siswa: "S-02",
+      tanggal: "2026-07-15",
+      metode: "Tunai",
+      total: 400_000,
+      id_akun_kas: "akun-kas",
+      id_tagihan: [agustus, juli],
+    });
+    expect(kwt1.nomor).toBe("KWT/2026/WEB/0001");
+    expect(await saldo("akun-piutang-siswa")).toBe(piutangAwal - 400_000);
+    expect(await saldo("akun-kas")).toBe(kasAwal + 400_000);
+    const daftar = await list(client, { id_jenis_tagihan: jt });
+    const item = (id: string) => daftar.items.find((t) => t.id_tagihan === id);
+    expect(item(juli)?.status).toBe("Lunas");
+    expect(item(agustus)?.sisa).toBe(200_000);
+    await expect(cancel(client, "kepala", juli, "x")).rejects.toThrow(
+      "Tagihan ini sudah dibayar. Batalkan kuitansinya atau pindahkan ke titipan lebih dulu.",
+    );
+
+    const kwt2 = await pay(client, "tu", {
+      id_siswa: "S-02",
+      tanggal: "2026-07-16",
+      metode: "Transfer",
+      total: 250_000,
+      id_akun_kas: "akun-bank",
+      id_tagihan: [agustus],
+    });
+    expect(kwt2.ke_titipan).toBe(50_000);
+    expect(kwt2.nomor).toBe("KWT/2026/WEB/0002");
+    const akun = await account(client, "S-02");
+    expect(akun.titipan).toBe(50_000);
+    expect(akun.tagihan.filter((t) => t.id_tagihan.includes(jt)).length).toBe(
+      0,
+    );
+    expect(akun.riwayat.length).toBe(2);
+
+    await expect(
+      pay(client, "tu", {
+        id_siswa: "S-02",
+        tanggal: "2026-07-16",
+        metode: "Titipan",
+        total: 10_000,
+        id_tagihan: [agustus],
+      }),
+    ).rejects.toThrow(
+      "Pembayaran dari titipan tidak boleh melebihi sisa tagihan yang dipilih.",
+    );
+
+    await cancelPayment(client, "kepala", kwt1.id_pembayaran, "Salah input");
+    await expect(
+      cancelPayment(client, "kepala", kwt1.id_pembayaran, "Lagi"),
+    ).rejects.toThrow("Kuitansi ini sudah dibatalkan.");
+    expect(await saldo("akun-kas")).toBe(kasAwal);
+
+    const kwt3 = await pay(client, "tu", {
+      id_siswa: "S-02",
+      tanggal: "2026-07-17",
+      metode: "Titipan",
+      total: 50_000,
+      id_tagihan: [juli],
+    });
+    expect((await account(client, "S-02")).titipan).toBe(0);
+    await expect(
+      pay(client, "tu", {
+        id_siswa: "S-02",
+        tanggal: "2026-07-17",
+        metode: "Titipan",
+        total: 1,
+        id_tagihan: [juli],
+      }),
+    ).rejects.toThrow("Saldo titipan tidak cukup. Tersedia Rp0.");
+
+    const pengganti = await moveToDeposit(
+      client,
+      "kepala",
+      kwt2.id_pembayaran,
+      "Sudah dibayar di perangkat lain",
+    );
+    expect(pengganti.ke_titipan).toBe(250_000);
+    expect((await account(client, "S-02")).titipan).toBe(200_000);
+    expect(await saldo("akun-titipan-wali")).toBe(-200_000);
+    await expect(
+      moveToDeposit(client, "kepala", kwt3.id_pembayaran, "x"),
+    ).rejects.toThrow(
+      "Kuitansi dari titipan cukup dibatalkan; saldonya kembali dengan sendirinya.",
+    );
+
+    await client.batch(
+      [
+        `INSERT INTO keu_pembayaran (id_pembayaran, id_siswa, nama_siswa, tanggal, seri, nomor_urut, nomor, metode, id_akun_kas, total, dibuat_oleh)
+           VALUES ('kwt-lain', 'S-02', 'Budi', '2026-07-17', 'TU9', 1, 'KWT/2026/TU9/0001', 'Titipan', NULL, 50000, 'tu2');`,
+        {
+          sql: `INSERT INTO keu_pembayaran_alokasi (id_alokasi, id_pembayaran, id_tagihan, nominal)
+                VALUES ('kwt-lain-1', 'kwt-lain', ?, 50000);`,
+          args: [juli],
+        },
+      ],
+      "write",
+    );
+    const tinjau = await review(client);
+    expect(tinjau.kemungkinan_ganda.length).toBe(2);
+    expect(tinjau.lebih_bayar.length).toBe(0);
+    expect(tinjau.titipan_minus.length).toBe(0);
+
+    const detail = await paymentDetail(client, pengganti.id_pembayaran);
+    expect(detail.pembayaran.no_wali).toBe("");
+    expect(detail.alokasi[0]?.id_tagihan).toBeNull();
+    expect(detail.pembayaran.keterangan?.startsWith("Pengganti KWT/")).toBe(
+      true,
+    );
+    const semua = await payments(client, "2026-07-01", "2026-07-31", null);
+    expect(semua.items.length).toBe(5);
+    expect(semua.total_sah).toBe(350_000);
+
+    await saveSeries(client, "W-AB12", " tu1 ", "Loket TU");
+    await expect(saveSeries(client, "kode-lain", "TU1", "")).rejects.toThrow(
+      "Seri ini sudah dipakai perangkat lain.",
+    );
   });
 });

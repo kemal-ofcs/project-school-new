@@ -6,24 +6,37 @@ import { invokeDesktop, kickDesktopSync } from "@/lib/runtime/desktop-commands";
 import type {
   JenisTagihanDraft,
   KeringananDraft,
+  PembayaranDraft,
   TarifDraft,
 } from "@/lib/validations/billing";
 import type {
+  AkunSiswaTagihan,
+  DetailKuitansi,
+  HasilBayar,
   KeringananItem,
+  KuitansiItem,
   MasterTagihan,
   PratinjauTagihan,
+  SeriKuitansi,
   SiswaTagihan,
   TagihanItem,
+  TinjauanPembayaran,
 } from "@/types/billing";
 
 export type {
+  AkunSiswaTagihan,
+  DetailKuitansi,
+  HasilBayar,
   JenisTagihanItem,
   KeringananItem,
+  KuitansiItem,
   MasterTagihan,
   PratinjauTagihan,
+  SeriKuitansi,
   SiswaTagihan,
   TagihanItem,
   TarifItem,
+  TinjauanPembayaran,
 } from "@/types/billing";
 
 // Command `desktop_billing_*` terdaftar di biner Desktop DAN Mobile
@@ -155,5 +168,85 @@ export function batalkanTagihan(
     { idTagihan, alasan },
     "/api/billing/cancel",
     { idTagihan, alasan },
+  );
+}
+
+// ── Pembayaran (K3b) ────────────────────────────────────────────────────────
+
+export function getAkunSiswa(idSiswa: string): Promise<AkunSiswaTagihan> {
+  return baca("desktop_billing_account", { idSiswa }, "/api/billing/account");
+}
+
+export function catatPembayaran(draft: PembayaranDraft): Promise<HasilBayar> {
+  return tulis("desktop_billing_pay", { draft }, "/api/billing/pay", draft);
+}
+
+export function daftarKuitansi(
+  dari: string,
+  sampai: string,
+  seri: string | null,
+): Promise<{ items: KuitansiItem[]; total_sah: number }> {
+  return baca(
+    "desktop_billing_payments",
+    { dari, sampai, seri },
+    "/api/billing/payments",
+  );
+}
+
+export function getDetailKuitansi(
+  idPembayaran: string,
+): Promise<DetailKuitansi> {
+  return baca(
+    "desktop_billing_payment_detail",
+    { idPembayaran },
+    "/api/billing/payment-detail",
+  );
+}
+
+export function batalkanKuitansi(
+  idPembayaran: string,
+  alasan: string,
+): Promise<{ sukses: boolean }> {
+  const args = { idPembayaran, alasan };
+  return tulis(
+    "desktop_billing_cancel_payment",
+    args,
+    "/api/billing/cancel-payment",
+    args,
+  );
+}
+
+export function pindahkanKeTitipan(
+  idPembayaran: string,
+  alasan: string,
+): Promise<HasilBayar> {
+  const args = { idPembayaran, alasan };
+  return tulis(
+    "desktop_billing_move_to_deposit",
+    args,
+    "/api/billing/move-to-deposit",
+    args,
+  );
+}
+
+export function getTinjauanPembayaran(): Promise<TinjauanPembayaran> {
+  return baca("desktop_billing_review", {}, "/api/billing/review");
+}
+
+export function getSeriKuitansi(): Promise<SeriKuitansi> {
+  return baca("desktop_billing_series", {}, "/api/billing/series");
+}
+
+export function simpanSeriKuitansi(
+  deviceCode: string,
+  seri: string,
+  namaPerangkat: string,
+): Promise<{ sukses: boolean; seri: string }> {
+  const args = { deviceCode, seri, namaPerangkat };
+  return tulis(
+    "desktop_billing_save_series",
+    args,
+    "/api/billing/save-series",
+    args,
   );
 }

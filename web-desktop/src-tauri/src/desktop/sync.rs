@@ -19,7 +19,7 @@ use super::{
 /// `CURRENT_SCHEMA_VERSION` di `web-desktop/src/lib/db-schema.ts` setiap kali
 /// migrasi baru ditambahkan, karena keduanya membaca tabel `schema_migration`
 /// yang sama di Turso.
-pub const CLIENT_SCHEMA_VERSION: i64 = 41;
+pub const CLIENT_SCHEMA_VERSION: i64 = 42;
 
 /// Hanya `cloud > client` yang berbahaya; `cloud <= client` adalah kondisi normal.
 fn is_client_schema_outdated(cloud_version: i64) -> bool {
@@ -1224,6 +1224,74 @@ const SNAPSHOT_TABLES: &[SnapshotTable] = &[
         entity_column: "id_tagihan",
         delete_missing: false,
     },
+    // ── v42: Pembayaran tagihan siswa ──
+    //
+    // Kuitansi, alokasi, dan pembatalannya append-only. Seri perangkat bisa
+    // diubah, tetapi barisnya tidak pernah dihapus.
+    SnapshotTable {
+        payload_key: "receiptSeries",
+        domain: "billing-series",
+        table: "keu_seri_perangkat",
+        columns: &[
+            "device_code",
+            "seri",
+            "nama_perangkat",
+            "created_at",
+            "updated_at",
+        ],
+        conflict_column: "device_code",
+        entity_column: "device_code",
+        delete_missing: false,
+    },
+    SnapshotTable {
+        payload_key: "studentPayments",
+        domain: "billing-payment",
+        table: "keu_pembayaran",
+        columns: &[
+            "id_pembayaran",
+            "id_siswa",
+            "nama_siswa",
+            "tanggal",
+            "seri",
+            "nomor_urut",
+            "nomor",
+            "metode",
+            "id_akun_kas",
+            "total",
+            "keterangan",
+            "dibuat_oleh",
+            "created_at",
+        ],
+        conflict_column: "id_pembayaran",
+        entity_column: "id_pembayaran",
+        delete_missing: false,
+    },
+    SnapshotTable {
+        payload_key: "studentPaymentAllocations",
+        // Domain sendiri, pola `accounting-journal-line`: cache revisi disimpan
+        // per (domain, kunci), jadi baris yang memakai domain kuitansinya akan
+        // saling menimpa.
+        domain: "billing-payment-allocation",
+        table: "keu_pembayaran_alokasi",
+        columns: &["id_alokasi", "id_pembayaran", "id_tagihan", "nominal"],
+        conflict_column: "id_alokasi",
+        entity_column: "id_alokasi",
+        delete_missing: false,
+    },
+    SnapshotTable {
+        payload_key: "studentPaymentCancellations",
+        domain: "billing-payment-cancel",
+        table: "keu_pembayaran_batal",
+        columns: &[
+            "id_pembayaran",
+            "alasan",
+            "dibatalkan_oleh",
+            "created_at",
+        ],
+        conflict_column: "id_pembayaran",
+        entity_column: "id_pembayaran",
+        delete_missing: false,
+    },
 ];
 
 const CANONICAL_SYNC_ROUTES: &[(&str, &str)] = &[
@@ -1293,8 +1361,11 @@ const CANONICAL_SYNC_ROUTES: &[(&str, &str)] = &[
     ("billing", "create"),
     ("billing-cancel", "create"),
     ("billing-discount", "save"),
+    ("billing-payment", "create"),
+    ("billing-payment-cancel", "create"),
     ("billing-rate", "delete"),
     ("billing-rate", "save"),
+    ("billing-series", "save"),
     ("billing-type", "save"),
     ("face-template", "delete"),
     ("face-template", "save"),
@@ -1366,6 +1437,9 @@ pub const APPEND_ONLY_TABLES: &[&str] = &[
     "keu_pinjaman_mutasi",
     "keu_tagihan",
     "keu_tagihan_batal",
+    "keu_pembayaran",
+    "keu_pembayaran_alokasi",
+    "keu_pembayaran_batal",
 ];
 
 /// Batas baris per tabel per siklus pada tarikan inkremental. Bila tercapai,

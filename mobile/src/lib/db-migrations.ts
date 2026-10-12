@@ -48,6 +48,7 @@ const FACE_VERIFICATION_MIGRATION_VERSION = 38;
 const ACCOUNTING_MIGRATION_VERSION = 39;
 const EMPLOYEE_LOAN_MIGRATION_VERSION = 40;
 const STUDENT_BILLING_MIGRATION_VERSION = 41;
+const STUDENT_PAYMENT_MIGRATION_VERSION = 42;
 
 /**
  * v21 — aturan jam scan baru: Jam Kerja Normal = (Jam Pulang − Jam Masuk) −
@@ -1823,6 +1824,69 @@ export async function runDatabaseMigrations(client: Client) {
     sql: `INSERT OR IGNORE INTO schema_migration (version, name, applied_at)
           VALUES (?, 'student-billing', ?);`,
     args: [STUDENT_BILLING_MIGRATION_VERSION, now],
+  });
+
+  // v42 — pembayaran tagihan siswa. `keu_pembayaran`, alokasinya, dan
+  // pembatalannya append-only; `id_tagihan` alokasi yang NULL = Titipan Wali.
+  // DDL WAJIB identik dengan `storage.rs` dan `turso.rs`.
+  await client.execute(`
+    CREATE TABLE IF NOT EXISTS keu_seri_perangkat (
+      device_code TEXT PRIMARY KEY,
+      seri TEXT NOT NULL,
+      nama_perangkat TEXT NOT NULL DEFAULT '',
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+  `);
+  await client.execute(`
+    CREATE TABLE IF NOT EXISTS keu_pembayaran (
+      id_pembayaran TEXT PRIMARY KEY,
+      id_siswa TEXT NOT NULL,
+      nama_siswa TEXT NOT NULL,
+      tanggal TEXT NOT NULL,
+      seri TEXT NOT NULL,
+      nomor_urut INTEGER NOT NULL CHECK (nomor_urut > 0),
+      nomor TEXT NOT NULL,
+      metode TEXT NOT NULL CHECK (metode IN ('Tunai', 'Transfer', 'Titipan')),
+      id_akun_kas TEXT,
+      total INTEGER NOT NULL CHECK (total > 0),
+      keterangan TEXT,
+      dibuat_oleh TEXT NOT NULL,
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+  `);
+  await client.execute(`
+    CREATE TABLE IF NOT EXISTS keu_pembayaran_alokasi (
+      id_alokasi TEXT PRIMARY KEY,
+      id_pembayaran TEXT NOT NULL,
+      id_tagihan TEXT,
+      nominal INTEGER NOT NULL CHECK (nominal > 0)
+    );
+  `);
+  await client.execute(`
+    CREATE TABLE IF NOT EXISTS keu_pembayaran_batal (
+      id_pembayaran TEXT PRIMARY KEY,
+      alasan TEXT NOT NULL,
+      dibatalkan_oleh TEXT NOT NULL,
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+  `);
+  await client.execute(
+    "CREATE INDEX IF NOT EXISTS idx_keu_pembayaran_siswa ON keu_pembayaran(id_siswa);",
+  );
+  await client.execute(
+    "CREATE INDEX IF NOT EXISTS idx_keu_pembayaran_tanggal ON keu_pembayaran(tanggal);",
+  );
+  await client.execute(
+    "CREATE INDEX IF NOT EXISTS idx_keu_pembayaran_alokasi_pembayaran ON keu_pembayaran_alokasi(id_pembayaran);",
+  );
+  await client.execute(
+    "CREATE INDEX IF NOT EXISTS idx_keu_pembayaran_alokasi_tagihan ON keu_pembayaran_alokasi(id_tagihan);",
+  );
+  await client.execute({
+    sql: `INSERT OR IGNORE INTO schema_migration (version, name, applied_at)
+          VALUES (?, 'student-payment', ?);`,
+    args: [STUDENT_PAYMENT_MIGRATION_VERSION, now],
   });
 
   await client.execute(

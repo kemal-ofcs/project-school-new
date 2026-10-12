@@ -56,6 +56,10 @@ const filesToCopy = [
   "components/keuangan/PilihAkunBayar.tsx",
   // Tagihan siswa (K3a).
   "components/keuangan/TagihanWorkspace.tsx",
+  // Pembayaran dan kuitansi (K3b): tab Bayar, Kuitansi, Tinjauan, Seri, dan
+  // cetak/teks WhatsApp kuitansi.
+  "components/keuangan/PembayaranPanel.tsx",
+  "components/keuangan/kuitansi.ts",
   // UI Buku Kunjungan UKS, termasuk pemberitahuan offline dan "sinkronisasi
   // terakhir"; bergantung pada `Modal` dan gaya inventaris yang ikut tersalin.
   "components/uks/UksWorkspace.tsx",

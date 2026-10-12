@@ -2933,10 +2933,11 @@ pub fn desktop_billing_save_discount(
     billing::save_keringanan(&state, &operator.username, draft)
 }
 
-/// Siswa aktif untuk dipilih pada keringanan, dengan izin tagihan.
+/// Siswa aktif untuk dipilih pada keringanan dan pembayaran, dengan izin
+/// tagihan.
 #[tauri::command]
 pub fn desktop_billing_students(state: State<'_, MobileState>) -> Result<Value, CommandError> {
-    require_permission(&state, "billing.manage")?;
+    require_any_permission(&state, &["billing.manage", "billing.collect"])?;
     billing::students(&state)
 }
 
@@ -3009,6 +3010,92 @@ pub fn desktop_billing_cancel(
 ) -> Result<Value, CommandError> {
     let operator = require_permission(&state, "billing.cancel")?;
     billing::cancel(&state, &operator.username, &id_tagihan, &alasan)
+}
+
+/// Tunggakan, saldo titipan, dan kuitansi terakhir satu siswa untuk layar Bayar.
+#[tauri::command]
+pub fn desktop_billing_account(
+    state: State<'_, MobileState>,
+    id_siswa: String,
+) -> Result<Value, CommandError> {
+    require_any_permission(&state, &["billing.collect", "billing.view"])?;
+    billing::account(&state, &id_siswa)
+}
+
+/// Mencatat pembayaran: satu kuitansi bernomor seri perangkat, alokasi ke
+/// tagihan terlama, kelebihan ke Titipan Wali, dan jurnalnya.
+#[tauri::command]
+pub fn desktop_billing_pay(
+    state: State<'_, MobileState>,
+    draft: Value,
+) -> Result<Value, CommandError> {
+    let operator = require_permission(&state, "billing.collect")?;
+    billing::pay(&state, &operator.username, draft)
+}
+
+#[tauri::command]
+pub fn desktop_billing_payments(
+    state: State<'_, MobileState>,
+    dari: String,
+    sampai: String,
+    seri: Option<String>,
+) -> Result<Value, CommandError> {
+    require_permission(&state, "billing.view")?;
+    billing::payments(&state, &dari, &sampai, seri.as_deref())
+}
+
+#[tauri::command]
+pub fn desktop_billing_payment_detail(
+    state: State<'_, MobileState>,
+    id_pembayaran: String,
+) -> Result<Value, CommandError> {
+    require_any_permission(&state, &["billing.view", "billing.collect"])?;
+    billing::payment_detail(&state, &id_pembayaran)
+}
+
+/// Pembatalan kuitansi: izin sensitif yang sama dengan membatalkan tagihan.
+#[tauri::command]
+pub fn desktop_billing_cancel_payment(
+    state: State<'_, MobileState>,
+    id_pembayaran: String,
+    alasan: String,
+) -> Result<Value, CommandError> {
+    let operator = require_permission(&state, "billing.cancel")?;
+    billing::cancel_payment(&state, &operator.username, &id_pembayaran, &alasan)
+}
+
+/// Membatalkan kuitansi dan menggantinya dengan kuitansi titipan bernilai sama.
+#[tauri::command]
+pub fn desktop_billing_move_to_deposit(
+    state: State<'_, MobileState>,
+    id_pembayaran: String,
+    alasan: String,
+) -> Result<Value, CommandError> {
+    let operator = require_permission(&state, "billing.cancel")?;
+    billing::move_to_deposit(&state, &operator.username, &id_pembayaran, &alasan)
+}
+
+#[tauri::command]
+pub fn desktop_billing_review(state: State<'_, MobileState>) -> Result<Value, CommandError> {
+    require_permission(&state, "billing.view")?;
+    billing::review(&state)
+}
+
+#[tauri::command]
+pub fn desktop_billing_series(state: State<'_, MobileState>) -> Result<Value, CommandError> {
+    require_any_permission(&state, &["billing.view", "billing.collect"])?;
+    billing::series(&state)
+}
+
+#[tauri::command]
+pub fn desktop_billing_save_series(
+    state: State<'_, MobileState>,
+    device_code: String,
+    seri: String,
+    nama_perangkat: String,
+) -> Result<Value, CommandError> {
+    require_permission(&state, "billing.manage")?;
+    billing::save_series(&state, &device_code, &seri, &nama_perangkat)
 }
 
 #[tauri::command]

@@ -1119,6 +1119,27 @@ const SNAPSHOT_SOURCES: &[SnapshotSource] = &[
         table: "keu_tagihan_batal",
         sql: "SELECT * FROM keu_tagihan_batal ORDER BY created_at, id_tagihan\n-- sengaja-utuh: pembatalan yang terlewat membuat tagihan batal terhitung tunggakan; sesudah tarikan pertama ditarik inkremental.\n;",
     },
+    // ── v42: Pembayaran tagihan siswa ──
+    SnapshotSource {
+        payload_key: "receiptSeries",
+        table: "keu_seri_perangkat",
+        sql: "SELECT * FROM keu_seri_perangkat ORDER BY device_code\n-- batas: satu baris per perangkat lembaga\n;",
+    },
+    SnapshotSource {
+        payload_key: "studentPayments",
+        table: "keu_pembayaran",
+        sql: "SELECT * FROM keu_pembayaran ORDER BY created_at, id_pembayaran\n-- sengaja-utuh: sisa tagihan dan saldo titipan adalah jumlah SELURUH kuitansi; tarikan pertama wajib utuh, sesudahnya inkremental lewat `sync_append_log`.\n;",
+    },
+    SnapshotSource {
+        payload_key: "studentPaymentAllocations",
+        table: "keu_pembayaran_alokasi",
+        sql: "SELECT * FROM keu_pembayaran_alokasi ORDER BY id_pembayaran, id_alokasi\n-- sengaja-utuh: alokasi yang terlewat membuat tagihan yang sudah dibayar terhitung tunggakan; sesudah tarikan pertama ditarik inkremental.\n;",
+    },
+    SnapshotSource {
+        payload_key: "studentPaymentCancellations",
+        table: "keu_pembayaran_batal",
+        sql: "SELECT * FROM keu_pembayaran_batal ORDER BY created_at, id_pembayaran\n-- sengaja-utuh: pembatalan yang terlewat membuat kuitansi batal tetap melunasi tagihan; sesudah tarikan pertama ditarik inkremental.\n;",
+    },
 ];
 
 pub struct TursoClient {
@@ -2440,6 +2461,70 @@ impl TursoClient {
                 "CREATE INDEX IF NOT EXISTS idx_keu_tagihan_siswa ON keu_tagihan(id_siswa);",
                 vec![],
             ),
+            // Pembayaran tagihan siswa (v42). WAJIB identik dengan `storage.rs`
+            // dan `db-migrations.ts`.
+            Statement::new(
+                r#"CREATE TABLE IF NOT EXISTS keu_seri_perangkat (
+                        device_code TEXT PRIMARY KEY,
+                        seri TEXT NOT NULL,
+                        nama_perangkat TEXT NOT NULL DEFAULT '',
+                        created_at TEXT NOT NULL DEFAULT (datetime('now')),
+                        updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+                      );"#,
+                vec![],
+            ),
+            Statement::new(
+                r#"CREATE TABLE IF NOT EXISTS keu_pembayaran (
+                        id_pembayaran TEXT PRIMARY KEY,
+                        id_siswa TEXT NOT NULL,
+                        nama_siswa TEXT NOT NULL,
+                        tanggal TEXT NOT NULL,
+                        seri TEXT NOT NULL,
+                        nomor_urut INTEGER NOT NULL CHECK (nomor_urut > 0),
+                        nomor TEXT NOT NULL,
+                        metode TEXT NOT NULL CHECK (metode IN ('Tunai', 'Transfer', 'Titipan')),
+                        id_akun_kas TEXT,
+                        total INTEGER NOT NULL CHECK (total > 0),
+                        keterangan TEXT,
+                        dibuat_oleh TEXT NOT NULL,
+                        created_at TEXT NOT NULL DEFAULT (datetime('now'))
+                      );"#,
+                vec![],
+            ),
+            Statement::new(
+                r#"CREATE TABLE IF NOT EXISTS keu_pembayaran_alokasi (
+                        id_alokasi TEXT PRIMARY KEY,
+                        id_pembayaran TEXT NOT NULL,
+                        id_tagihan TEXT,
+                        nominal INTEGER NOT NULL CHECK (nominal > 0)
+                      );"#,
+                vec![],
+            ),
+            Statement::new(
+                r#"CREATE TABLE IF NOT EXISTS keu_pembayaran_batal (
+                        id_pembayaran TEXT PRIMARY KEY,
+                        alasan TEXT NOT NULL,
+                        dibatalkan_oleh TEXT NOT NULL,
+                        created_at TEXT NOT NULL DEFAULT (datetime('now'))
+                      );"#,
+                vec![],
+            ),
+            Statement::new(
+                "CREATE INDEX IF NOT EXISTS idx_keu_pembayaran_siswa ON keu_pembayaran(id_siswa);",
+                vec![],
+            ),
+            Statement::new(
+                "CREATE INDEX IF NOT EXISTS idx_keu_pembayaran_tanggal ON keu_pembayaran(tanggal);",
+                vec![],
+            ),
+            Statement::new(
+                "CREATE INDEX IF NOT EXISTS idx_keu_pembayaran_alokasi_pembayaran ON keu_pembayaran_alokasi(id_pembayaran);",
+                vec![],
+            ),
+            Statement::new(
+                "CREATE INDEX IF NOT EXISTS idx_keu_pembayaran_alokasi_tagihan ON keu_pembayaran_alokasi(id_tagihan);",
+                vec![],
+            ),
             // Buku Kunjungan UKS (v36). Di luar SNAPSHOT_SOURCES: barisnya
             // didorong dari perangkat pencatat dan tidak pernah ditarik ke
             // perangkat lain. WAJIB identik dengan `storage.rs` dan
@@ -2751,7 +2836,8 @@ impl TursoClient {
                 ('loan.approve', 'Setujui & Batalkan Kasbon', 'Keuangan', 'Menyetujui (mencairkan), menolak, atau membatalkan kasbon karyawan.', 1, 1312),
                 ('billing.view', 'Lihat Tagihan Siswa', 'Keuangan', 'Melihat tagihan dan tunggakan siswa beserta keringanannya.', 1, 1320),
                 ('billing.manage', 'Kelola & Terbitkan Tagihan', 'Keuangan', 'Mengatur jenis tagihan, tarif, keringanan, dan menerbitkan tagihan.', 1, 1321),
-                ('billing.cancel', 'Batalkan Tagihan', 'Keuangan', 'Membatalkan tagihan siswa yang sudah terbit.', 1, 1323);"#,
+                ('billing.collect', 'Catat Pembayaran Tagihan', 'Keuangan', 'Mencatat pembayaran tagihan siswa, menerbitkan kuitansi, dan memakai titipan wali.', 1, 1322),
+                ('billing.cancel', 'Batalkan Tagihan & Kuitansi', 'Keuangan', 'Membatalkan tagihan siswa yang sudah terbit dan kuitansi pembayaran.', 1, 1323);"#,
                 vec![],
             ),
             // Seed Default Role Permissions untuk Role Superadmin (Role 1)
@@ -3986,6 +4072,11 @@ impl TursoClient {
             vec![],
         )
         .await?;
+        self.query_one(
+            "INSERT OR IGNORE INTO schema_migration (version, name, applied_at) VALUES (-2023, 'student-payment-v1', datetime('now'));",
+            vec![],
+        )
+        .await?;
 
         Ok(())
     }
@@ -4297,7 +4388,7 @@ impl TursoClient {
                 // Sentinel WAJIB dinaikkan setiap kali ensure_schema menambah
                 // tabel atau kolom — nilainya di sini dan pada INSERT di atas
                 // harus selalu sama.
-                "SELECT COUNT(*) AS total FROM schema_migration WHERE version = -2022;",
+                "SELECT COUNT(*) AS total FROM schema_migration WHERE version = -2023;",
                 vec![],
             )
             .await
@@ -8585,6 +8676,9 @@ fn canonical_sync_route(domain: &str, operation: &str) -> Option<(&'static str, 
         ("billing-discount", "save") => ("billing-discount", "save"),
         ("billing", "create") => ("billing", "create"),
         ("billing-cancel", "create") => ("billing-cancel", "create"),
+        ("billing-series", "save") => ("billing-series", "save"),
+        ("billing-payment", "create") => ("billing-payment", "create"),
+        ("billing-payment-cancel", "create") => ("billing-payment-cancel", "create"),
         ("face-template", "save") => ("face-template", "save"),
         ("face-template", "delete") => ("face-template", "delete"),
         ("uks-visit", "save") => ("uks-visit", "save"),
@@ -9602,6 +9696,29 @@ async fn apply_event_to_turso(
             if let Some(values) = billing::cloud_bill_cancel_values(payload, entity_key) {
                 turso
                     .query_one(billing::CLOUD_INSERT_BILL_CANCEL_SQL, values)
+                    .await?;
+            }
+        }
+        ("billing-series", "save") => {
+            if let Some(values) = billing::cloud_series_values(payload, entity_key) {
+                turso
+                    .query_one(billing::CLOUD_UPSERT_SERIES_SQL, values)
+                    .await?;
+            }
+        }
+        ("billing-payment", "create") => {
+            // Kuitansi dan seluruh alokasinya dalam SATU event, diterapkan
+            // atomik seperti jurnal: cloud tidak pernah memegang separuh kuitansi.
+            if let Some(statements) = billing::cloud_payment_statements(payload, entity_key) {
+                for (sql, values) in statements {
+                    turso.query_one(sql, values).await?;
+                }
+            }
+        }
+        ("billing-payment-cancel", "create") => {
+            if let Some(values) = billing::cloud_payment_cancel_values(payload, entity_key) {
+                turso
+                    .query_one(billing::CLOUD_INSERT_PAYMENT_CANCEL_SQL, values)
                     .await?;
             }
         }
@@ -15565,7 +15682,7 @@ mod tests {
             connection
                 .execute_batch(
                     "DROP TABLE riwayat_identitas_karyawan;
-                     DELETE FROM schema_migration WHERE version IN (-2017, -2018, -2019, -2020, -2021, -2022);",
+                     DELETE FROM schema_migration WHERE version IN (-2017, -2018, -2019, -2020, -2021, -2022, -2023);",
                 )
                 .expect("siapkan database lama");
 
@@ -15601,7 +15718,7 @@ mod tests {
             connection
                 .execute_batch(
                     "DROP TABLE inventory_unit;
-                     DELETE FROM schema_migration WHERE version IN (-2018, -2019, -2020, -2021, -2022);",
+                     DELETE FROM schema_migration WHERE version IN (-2018, -2019, -2020, -2021, -2022, -2023);",
                 )
                 .expect("siapkan database lama");
 
@@ -15638,7 +15755,7 @@ mod tests {
                 .execute_batch(
                     "DROP TABLE personil_wajah;
                      ALTER TABLE absensi_foto DROP COLUMN wajah_vonis;
-                     DELETE FROM schema_migration WHERE version IN (-2019, -2020, -2021, -2022);",
+                     DELETE FROM schema_migration WHERE version IN (-2019, -2020, -2021, -2022, -2023);",
                 )
                 .expect("siapkan database lama");
 
@@ -15677,7 +15794,7 @@ mod tests {
                     "DROP TABLE keu_akun;
                      DROP TABLE keu_jurnal;
                      DROP TABLE keu_jurnal_baris;
-                     DELETE FROM schema_migration WHERE version IN (-2020, -2021, -2022);",
+                     DELETE FROM schema_migration WHERE version IN (-2020, -2021, -2022, -2023);",
                 )
                 .expect("siapkan database lama");
 
@@ -15790,7 +15907,7 @@ mod tests {
                     "DROP TABLE keu_pinjaman;
                      DROP TABLE keu_pinjaman_mutasi;
                      DROP TABLE keu_pinjaman_tunda;
-                     DELETE FROM schema_migration WHERE version IN (-2021, -2022);",
+                     DELETE FROM schema_migration WHERE version IN (-2021, -2022, -2023);",
                 )
                 .expect("siapkan database lama");
 
@@ -15827,7 +15944,7 @@ mod tests {
                 .execute_batch(
                     "DROP TABLE keu_tagihan;
                      DROP TABLE keu_tagihan_batal;
-                     DELETE FROM schema_migration WHERE version = -2022;",
+                     DELETE FROM schema_migration WHERE version IN (-2022, -2023);",
                 )
                 .expect("siapkan database lama");
             client.ensure_schema_current().await.expect("skema mutakhir");
@@ -15839,6 +15956,44 @@ mod tests {
                 )
                 .expect("cek skema");
             assert_eq!(tabel, 2, "database bersentinel -2021 tidak diperbarui");
+        });
+    }
+
+    /// Database bersentinel `-2022` (v41) menerima tabel pembayaran lewat
+    /// `ensure_schema_current`.
+    #[test]
+    fn sentinel_2022_memicu_skema_pembayaran() {
+        let runtime = tokio::runtime::Builder::new_current_thread()
+            .build()
+            .expect("runtime uji");
+        runtime.block_on(async {
+            let dir = tempfile::tempdir().expect("direktori sementara");
+            let hub = dir.path().join("sppg-hub.db");
+            let client = TursoClient::local_file(
+                Url::parse("https://sentinel-2022.sppg.invalid").expect("origin uji"),
+                &hub,
+                Client::new(),
+            );
+            client.ensure_schema().await.expect("provisioning lokal");
+            let connection = rusqlite::Connection::open(&hub).expect("buka hub");
+            connection
+                .execute_batch(
+                    "DROP TABLE keu_seri_perangkat;
+                     DROP TABLE keu_pembayaran;
+                     DROP TABLE keu_pembayaran_alokasi;
+                     DROP TABLE keu_pembayaran_batal;
+                     DELETE FROM schema_migration WHERE version = -2023;",
+                )
+                .expect("siapkan database lama");
+            client.ensure_schema_current().await.expect("skema mutakhir");
+            let tabel: i64 = connection
+                .query_row(
+                    "SELECT COUNT(*) FROM sqlite_master WHERE name IN ('keu_seri_perangkat', 'keu_pembayaran', 'keu_pembayaran_alokasi', 'keu_pembayaran_batal');",
+                    [],
+                    |row| row.get(0),
+                )
+                .expect("cek skema");
+            assert_eq!(tabel, 4, "database bersentinel -2022 tidak diperbarui");
         });
     }
 

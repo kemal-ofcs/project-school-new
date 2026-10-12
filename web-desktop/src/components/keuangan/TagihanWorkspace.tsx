@@ -17,6 +17,12 @@ import {
   TOMBOL_KEDUA,
   TOMBOL_UTAMA,
 } from "@/components/inventory/gaya";
+import {
+  PanelBayar,
+  PanelKuitansi,
+  PanelSeri,
+  PanelTinjauan,
+} from "@/components/keuangan/PembayaranPanel";
 import { PilihAkunBayar } from "@/components/keuangan/PilihAkunBayar";
 import { Modal } from "@/components/ui/Modal";
 import { hasPermission } from "@/lib/auth/access";
@@ -57,14 +63,26 @@ import {
  * pernah dihitung di sini: semuanya datang dari backend.
  */
 
-type Tab = "tunggakan" | "terbitkan" | "jenis" | "keringanan";
+type Tab =
+  | "tunggakan"
+  | "bayar"
+  | "kuitansi"
+  | "tinjauan"
+  | "terbitkan"
+  | "jenis"
+  | "keringanan"
+  | "seri";
 type Feedback = { tone: "success" | "error"; message: string } | null;
 
 const LABEL_TAB: Record<Tab, string> = {
   tunggakan: "Tunggakan",
+  bayar: "Bayar",
+  kuitansi: "Kuitansi",
+  tinjauan: "Tinjauan",
   terbitkan: "Terbitkan",
   jenis: "Jenis & Tarif",
   keringanan: "Keringanan",
+  seri: "Seri Kuitansi",
 };
 
 const LABEL_PERIODIK: Record<Periodik, string> = {
@@ -89,8 +107,10 @@ export function TagihanWorkspace() {
   const { user } = useAuth();
   const bolehKelola = hasPermission(user, "billing.manage");
   const bolehBatal = hasPermission(user, "billing.cancel");
+  const bolehBayar = hasPermission(user, "billing.collect");
   const tabs = (Object.keys(LABEL_TAB) as Tab[]).filter(
-    (id) => id !== "terbitkan" || bolehKelola,
+    (id) =>
+      (id !== "terbitkan" || bolehKelola) && (id !== "bayar" || bolehBayar),
   );
 
   const [tab, setTab] = useState<Tab>("tunggakan");
@@ -179,6 +199,14 @@ export function TagihanWorkspace() {
               Coba muat lagi
             </button>
           </div>
+        ) : tab === "bayar" ? (
+          <PanelBayar bolehBatal={bolehBatal} onInfo={info} />
+        ) : tab === "kuitansi" ? (
+          <PanelKuitansi bolehBatal={bolehBatal} onInfo={info} />
+        ) : tab === "tinjauan" ? (
+          <PanelTinjauan bolehBatal={bolehBatal} onInfo={info} />
+        ) : tab === "seri" ? (
+          <PanelSeri bolehKelola={bolehKelola} onInfo={info} />
         ) : !master ? (
           <p className="p-10 text-center text-sm text-slate-400">
             Memuat data tagihan...
@@ -316,7 +344,8 @@ function PanelTunggakan({
             value={status}
             onChange={(e) => setStatus(e.target.value)}
           >
-            <option value="Aktif">Belum dibatalkan</option>
+            <option value="Aktif">Belum lunas</option>
+            <option value="Lunas">Lunas</option>
             <option value="Dibatalkan">Dibatalkan</option>
             <option value="">Semua</option>
           </select>
@@ -369,7 +398,7 @@ function PanelTunggakan({
                       {item.status === "Aktif" ? (
                         <Rp nilai={item.sisa} />
                       ) : (
-                        "Dibatalkan"
+                        item.status
                       )}
                     </span>
                   </span>
@@ -382,6 +411,11 @@ function PanelTunggakan({
                     {item.potongan > 0 ? (
                       <span>
                         Keringanan <Rp nilai={item.potongan} />
+                      </span>
+                    ) : null}
+                    {item.status === "Aktif" && item.dibayar > 0 ? (
+                      <span>
+                        Sudah dibayar <Rp nilai={item.dibayar} />
                       </span>
                     ) : null}
                     {item.terlambat ? (
@@ -494,11 +528,17 @@ function DialogTagihan({
             <dd className="text-slate-100">{item.jatuh_tempo}</dd>
           </div>
           <div>
+            <dt className="text-xs text-slate-400">Sudah dibayar</dt>
+            <dd className="text-slate-100">
+              <Rp nilai={item.dibayar} />
+            </dd>
+          </div>
+          <div>
             <dt className="text-xs text-slate-400">Status</dt>
             <dd className="text-slate-100">
               {item.status === "Aktif"
                 ? `Sisa ${formatRupiah(item.sisa)}`
-                : "Dibatalkan"}
+                : item.status}
             </dd>
           </div>
           {item.alasan_batal ? (
@@ -511,7 +551,12 @@ function DialogTagihan({
           ) : null}
         </dl>
 
-        {item.status === "Aktif" && bolehBatal ? (
+        {item.status === "Aktif" && item.dibayar > 0 && bolehBatal ? (
+          <p className="text-xs text-slate-400">
+            Tagihan yang sudah dibayar sebagian tidak bisa dibatalkan langsung.
+            Batalkan kuitansinya atau pindahkan ke titipan dari tab Kuitansi.
+          </p>
+        ) : item.status === "Aktif" && bolehBatal ? (
           <form
             onSubmit={batalkan}
             className="space-y-2 p-3 rounded-lg border border-rose-500/30"

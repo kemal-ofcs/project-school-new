@@ -898,6 +898,50 @@ pub fn initialize(path: &Path) -> Result<(), String> {
       CREATE INDEX IF NOT EXISTS idx_keu_keringanan_jenis ON keu_keringanan(id_jenis_tagihan, id_siswa);
       CREATE INDEX IF NOT EXISTS idx_keu_tagihan_jenis_periode ON keu_tagihan(id_jenis_tagihan, periode);
       CREATE INDEX IF NOT EXISTS idx_keu_tagihan_siswa ON keu_tagihan(id_siswa);
+      -- Pembayaran tagihan siswa (v42). `keu_pembayaran`, alokasinya, dan
+      -- pembatalannya append-only; status "Dibatalkan" diturunkan dari baris
+      -- `keu_pembayaran_batal`. `id_tagihan` alokasi yang NULL = Titipan Wali.
+      -- `keu_seri_perangkat` memetakan kode perangkat ke seri kuitansi. Tanpa
+      -- UNIQUE selain PK. DDL WAJIB identik dengan `turso.rs` dan
+      -- `db-migrations.ts`.
+      CREATE TABLE IF NOT EXISTS keu_seri_perangkat (
+        device_code TEXT PRIMARY KEY,
+        seri TEXT NOT NULL,
+        nama_perangkat TEXT NOT NULL DEFAULT '',
+        created_at TEXT NOT NULL DEFAULT (datetime('now')),
+        updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+      );
+      CREATE TABLE IF NOT EXISTS keu_pembayaran (
+        id_pembayaran TEXT PRIMARY KEY,
+        id_siswa TEXT NOT NULL,
+        nama_siswa TEXT NOT NULL,
+        tanggal TEXT NOT NULL,
+        seri TEXT NOT NULL,
+        nomor_urut INTEGER NOT NULL CHECK (nomor_urut > 0),
+        nomor TEXT NOT NULL,
+        metode TEXT NOT NULL CHECK (metode IN ('Tunai', 'Transfer', 'Titipan')),
+        id_akun_kas TEXT,
+        total INTEGER NOT NULL CHECK (total > 0),
+        keterangan TEXT,
+        dibuat_oleh TEXT NOT NULL,
+        created_at TEXT NOT NULL DEFAULT (datetime('now'))
+      );
+      CREATE TABLE IF NOT EXISTS keu_pembayaran_alokasi (
+        id_alokasi TEXT PRIMARY KEY,
+        id_pembayaran TEXT NOT NULL,
+        id_tagihan TEXT,
+        nominal INTEGER NOT NULL CHECK (nominal > 0)
+      );
+      CREATE TABLE IF NOT EXISTS keu_pembayaran_batal (
+        id_pembayaran TEXT PRIMARY KEY,
+        alasan TEXT NOT NULL,
+        dibatalkan_oleh TEXT NOT NULL,
+        created_at TEXT NOT NULL DEFAULT (datetime('now'))
+      );
+      CREATE INDEX IF NOT EXISTS idx_keu_pembayaran_siswa ON keu_pembayaran(id_siswa);
+      CREATE INDEX IF NOT EXISTS idx_keu_pembayaran_tanggal ON keu_pembayaran(tanggal);
+      CREATE INDEX IF NOT EXISTS idx_keu_pembayaran_alokasi_pembayaran ON keu_pembayaran_alokasi(id_pembayaran);
+      CREATE INDEX IF NOT EXISTS idx_keu_pembayaran_alokasi_tagihan ON keu_pembayaran_alokasi(id_tagihan);
       -- Buku Kunjungan UKS (v36). SENGAJA di luar SNAPSHOT_TABLES, pola
       -- `absensi_foto`: ditulis lokal, didorong ke cloud lewat outbox, tidak
       -- pernah ditarik ke perangkat lain. Isinya data kesehatan anak, jadi
@@ -1854,6 +1898,11 @@ pub(crate) const CLOUD_MIRRORED_TABLES: &[&str] = &[
     "keu_keringanan",
     "keu_tagihan",
     "keu_tagihan_batal",
+    // v42 — pembayaran dan seri kuitansi, milik lembaga database asalnya.
+    "keu_seri_perangkat",
+    "keu_pembayaran",
+    "keu_pembayaran_alokasi",
+    "keu_pembayaran_batal",
     // Di luar snapshot, tetapi milik database asalnya seperti `absensi_foto`.
     "uks_kunjungan",
     "company_profile",

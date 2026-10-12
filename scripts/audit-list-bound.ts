@@ -72,6 +72,9 @@ const TABEL_TUMBUH: Record<string, string> = {
 	keu_jurnal_baris: "dua baris atau lebih per transaksi keuangan",
 	keu_pinjaman_mutasi: "satu baris per cicilan kasbon yang dipotong atau dilunasi",
 	keu_tagihan: "satu baris per siswa per jenis tagihan per periode",
+	keu_pembayaran: "satu baris per kuitansi pembayaran",
+	keu_pembayaran_alokasi: "satu baris atau lebih per kuitansi pembayaran",
+	keu_pembayaran_batal: "satu baris per kuitansi yang dibatalkan",
 };
 
 const SUMBER: Array<{ dir: string; ext: ".ts" | ".rs" }> = [
