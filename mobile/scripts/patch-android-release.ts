@@ -51,8 +51,15 @@
  * `.agents/skills/absensi-sppg-rules/references/04-hardware-and-android-lifecycle.md`
  */
 
-import { existsSync, readFileSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
+import {
+  existsSync,
+  mkdirSync,
+  readdirSync,
+  readFileSync,
+  statSync,
+  writeFileSync,
+} from "node:fs";
+import { dirname, join } from "node:path";
 
 const akarMobile = join(import.meta.dir, "..");
 const gradle = join(akarMobile, "src-tauri/gen/android/app/build.gradle.kts");
@@ -388,6 +395,32 @@ if (existsSync(mainActivityPath)) {
   }
 }
 
+// ── 4c. Ikon peluncur ───────────────────────────────────────────────────────
+//
+// `tauri android init` memasang ikon bawaan Tauri, dan build tetap hijau
+// dengan ikon itu. Ikon produk dihasilkan `tauri icon` ke
+// `src-tauri/icons/android` (ikut di-commit) lalu disalin ke sini.
+const ikonSumber = join(akarMobile, "src-tauri/icons/android");
+const ikonTujuan = join(akarMobile, "src-tauri/gen/android/app/src/main/res");
+if (!existsSync(ikonSumber)) {
+  keluarDenganPesan(
+    "src-tauri/icons/android tidak ada. Jalankan `tauri icon` sesuai\n" +
+      "   web-desktop/src-tauri/icons/sumber/README.md.",
+  );
+}
+const berkasIkon = readdirSync(ikonSumber, { recursive: true })
+  .map(String)
+  .filter((berkas) => statSync(join(ikonSumber, berkas)).isFile());
+for (const berkas of berkasIkon) {
+  const isi = readFileSync(join(ikonSumber, berkas));
+  const tujuan = join(ikonTujuan, berkas);
+  if (!existsSync(tujuan) || !readFileSync(tujuan).equals(isi)) {
+    mkdirSync(dirname(tujuan), { recursive: true });
+    writeFileSync(tujuan, isi);
+    berubah = true;
+  }
+}
+
 // ── 5. Verifikasi — inilah yang membedakan skrip ini dari sekadar menambal ──
 const gradleAkhir = readFileSync(gradle, "utf8");
 const releaseAkhir = blokRelease.exec(gradleAkhir)?.[2] ?? "";
@@ -465,6 +498,15 @@ if (existsSync(stringsXml)) {
         `strings.xml: ${kunci} masih "${nilai ?? "(tidak ada)"}" — APK akan terpasang dengan nama lama`,
       );
     }
+  }
+}
+for (const berkas of berkasIkon) {
+  const tujuan = join(ikonTujuan, berkas);
+  if (
+    !existsSync(tujuan) ||
+    !readFileSync(tujuan).equals(readFileSync(join(ikonSumber, berkas)))
+  ) {
+    gagal.push(`res/${berkas}: ikon peluncur bukan ikon produk`);
   }
 }
 
