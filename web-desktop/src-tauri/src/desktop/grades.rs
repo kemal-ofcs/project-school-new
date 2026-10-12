@@ -93,20 +93,79 @@ fn semester(raw: &str) -> Result<&str, CommandError> {
     }
 }
 
-/// Daftar penilaian pada satu rombel + mapel + semester.
+/// Daftar penilaian satu semester, disaring rombel, mapel, dan jenis.
 ///
 /// `AVG(skor)` mengabaikan NULL dengan sendirinya — itulah yang diinginkan:
 /// rata-rata dihitung dari anak yang SUDAH dinilai, bukan dari seluruh roster
 /// dengan nol untuk yang belum. `jumlah_dinilai` dan `jumlah_siswa` dipisah
 /// supaya guru bisa melihat berapa yang masih kosong.
+///
+/// Rombel kosong berarti SEMUA rombel; karena itu `nama_rombel` ikut dibawa,
+/// supaya halamannya bisa menampilkan kolom Kelas.
 pub fn list_assessments(
     state: &DesktopState,
     id_tahun_ajaran: &str,
     semester_filter: &str,
-    id_rombel: &str,
+    id_rombel: Option<&str>,
     id_mapel: Option<&str>,
+    jenis: Option<&str>,
 ) -> Result<Value, CommandError> {
+    let (sql, args) =
+        assessment_list_query(id_tahun_ajaran, semester_filter, id_rombel, id_mapel, jenis)?;
     let conn = storage::database(&state.data_dir)?;
+
+    let mut stmt = conn.prepare(&sql).map_err(|e| {
+        CommandError::new("DB_ERROR", format!("Gagal menyiapkan daftar nilai: {e}"))
+    })?;
+
+    let rows: Vec<Value> = stmt
+        .query_map(rusqlite::params_from_iter(args.iter()), |row| {
+            Ok(json!({
+                "id_penilaian": row.get::<_, String>(0)?,
+                "id_tahun_ajaran": row.get::<_, String>(1)?,
+                "semester": row.get::<_, String>(2)?,
+                "id_rombel": row.get::<_, String>(3)?,
+                "id_mapel": row.get::<_, String>(4)?,
+                "id_guru": row.get::<_, String>(5)?,
+                "jenis": row.get::<_, String>(6)?,
+                "nama_penilaian": row.get::<_, String>(7)?,
+                "tanggal": row.get::<_, String>(8)?,
+                "bobot": row.get::<_, i64>(9)?,
+                "kkm": row.get::<_, i64>(10)?,
+                "nilai_maks": row.get::<_, i64>(11)?,
+                "catatan": row.get::<_, Option<String>>(12)?,
+                "created_at": row.get::<_, String>(13)?,
+                "updated_at": row.get::<_, String>(14)?,
+                "nama_mapel": row.get::<_, String>(15)?,
+                "nama_rombel": row.get::<_, String>(16)?,
+                "jumlah_siswa": row.get::<_, i64>(17)?,
+                "jumlah_dinilai": row.get::<_, i64>(18)?,
+                // `Option<f64>`: NULL berarti belum ada satu pun skor, bukan nol.
+                "rata_rata": row.get::<_, Option<f64>>(19)?,
+            }))
+        })
+        .map_err(|_| CommandError::internal())?
+        .filter_map(Result::ok)
+        .collect();
+
+    Ok(json!({ "items": rows }))
+}
+
+/// SQL + argumen `list_assessments`. Cerminan `listAssessments` di
+/// `services/grades.ts`: filter kosong diabaikan, jenis asing DITOLAK.
+fn assessment_list_query(
+    id_tahun_ajaran: &str,
+    semester_filter: &str,
+    id_rombel: Option<&str>,
+    id_mapel: Option<&str>,
+    jenis: Option<&str>,
+) -> Result<(String, Vec<String>), CommandError> {
+    let isi = |nilai: Option<&str>| {
+        nilai
+            .map(str::trim)
+            .filter(|teks| !teks.is_empty())
+            .map(str::to_owned)
+    };
 
     let mut sql = String::from(
         r#"
@@ -114,6 +173,7 @@ pub fn list_assessments(
                p.id_mapel, p.id_guru, p.jenis, p.nama_penilaian, p.tanggal,
                p.bobot, p.kkm, p.nilai_maks, p.catatan, p.created_at, p.updated_at,
                COALESCE(m.nama_mapel, '') AS nama_mapel,
+               COALESCE(r.nama_rombel, '') AS nama_rombel,
                (SELECT COUNT(*) FROM nilai_siswa n WHERE n.id_penilaian = p.id_penilaian)
                  AS jumlah_siswa,
                (SELECT COUNT(*) FROM nilai_siswa n
@@ -124,64 +184,30 @@ pub fn list_assessments(
                  AS rata_rata
           FROM nilai_penilaian p
           LEFT JOIN akademik_mapel m ON m.id_mapel = p.id_mapel
-         WHERE p.id_tahun_ajaran = ?1 AND p.semester = ?2 AND p.id_rombel = ?3
+          LEFT JOIN akademik_rombel r ON r.id_rombel = p.id_rombel
+         WHERE p.id_tahun_ajaran = ? AND p.semester = ?
         "#,
     );
+    let mut args = vec![id_tahun_ajaran.to_owned(), semester_filter.to_owned()];
 
-    let mapel = id_mapel.unwrap_or("").trim().to_owned();
-    if !mapel.is_empty() {
-        sql.push_str(" AND p.id_mapel = ?4");
+    if let Some(rombel) = isi(id_rombel) {
+        sql.push_str(" AND p.id_rombel = ?");
+        args.push(rombel);
+    }
+    if let Some(mapel) = isi(id_mapel) {
+        sql.push_str(" AND p.id_mapel = ?");
+        args.push(mapel);
+    }
+    if let Some(raw) = isi(jenis) {
+        sql.push_str(" AND p.jenis = ?");
+        args.push(jenis_penilaian(&raw)?.to_owned());
     }
     // Berbatas meski `nilai_penilaian` tumbuh per semester, bukan per hari:
-    // satu rombel bisa punya ratusan penilaian dalam setahun dan halamannya
-    // merender semuanya sekaligus.
+    // tanpa rombel, satu semester seluruh sekolah bisa ribuan penilaian dan
+    // halamannya merender semuanya sekaligus.
     sql.push_str(" ORDER BY p.tanggal DESC, p.created_at DESC LIMIT 300;");
 
-    let mut stmt = conn.prepare(&sql).map_err(|e| {
-        CommandError::new("DB_ERROR", format!("Gagal menyiapkan daftar nilai: {e}"))
-    })?;
-
-    let petakan = |row: &rusqlite::Row<'_>| -> rusqlite::Result<Value> {
-        Ok(json!({
-            "id_penilaian": row.get::<_, String>(0)?,
-            "id_tahun_ajaran": row.get::<_, String>(1)?,
-            "semester": row.get::<_, String>(2)?,
-            "id_rombel": row.get::<_, String>(3)?,
-            "id_mapel": row.get::<_, String>(4)?,
-            "id_guru": row.get::<_, String>(5)?,
-            "jenis": row.get::<_, String>(6)?,
-            "nama_penilaian": row.get::<_, String>(7)?,
-            "tanggal": row.get::<_, String>(8)?,
-            "bobot": row.get::<_, i64>(9)?,
-            "kkm": row.get::<_, i64>(10)?,
-            "nilai_maks": row.get::<_, i64>(11)?,
-            "catatan": row.get::<_, Option<String>>(12)?,
-            "created_at": row.get::<_, String>(13)?,
-            "updated_at": row.get::<_, String>(14)?,
-            "nama_mapel": row.get::<_, String>(15)?,
-            "jumlah_siswa": row.get::<_, i64>(16)?,
-            "jumlah_dinilai": row.get::<_, i64>(17)?,
-            // `Option<f64>`: NULL berarti belum ada satu pun skor, bukan nol.
-            "rata_rata": row.get::<_, Option<f64>>(18)?,
-        }))
-    };
-
-    let rows: Vec<Value> = if mapel.is_empty() {
-        stmt.query_map(params![id_tahun_ajaran, semester_filter, id_rombel], petakan)
-            .map_err(|_| CommandError::internal())?
-            .filter_map(Result::ok)
-            .collect()
-    } else {
-        stmt.query_map(
-            params![id_tahun_ajaran, semester_filter, id_rombel, mapel],
-            petakan,
-        )
-        .map_err(|_| CommandError::internal())?
-        .filter_map(Result::ok)
-        .collect()
-    };
-
-    Ok(json!({ "items": rows }))
+    Ok((sql, args))
 }
 
 /// Satu penilaian beserta skor seluruh siswa rombelnya.
@@ -704,5 +730,70 @@ mod tests {
         let ids: std::collections::HashSet<String> =
             (0..200).map(|_| new_grade_id("nis-")).collect();
         assert_eq!(ids.len(), 200, "id nilai bertabrakan dalam satu batch");
+    }
+
+    fn state_uji() -> (tempfile::TempDir, DesktopState) {
+        let dir = tempfile::tempdir().expect("tempdir");
+        storage::initialize(dir.path()).expect("skema lokal");
+        let state = DesktopState {
+            server_origin: std::sync::RwLock::new("http://localhost:3000".to_string()),
+            offline_max_age_hours: 24,
+            data_dir: dir.path().to_path_buf(),
+            http: reqwest::Client::new(),
+            turso_config: std::sync::RwLock::new(None),
+            session: std::sync::Mutex::new(None),
+            vault_lock: std::sync::Mutex::new(()),
+        };
+        (dir, state)
+    }
+
+    /// Vektor kembar: `listAssessments` di `services/grades.test.ts` memakai
+    /// data dan harapan yang sama.
+    #[test]
+    fn daftar_penilaian_semua_rombel_dan_filter_jenis() {
+        let (_dir, state) = state_uji();
+        let conn = storage::database(&state.data_dir).expect("db");
+        conn.execute_batch(
+            r#"
+            INSERT INTO akademik_rombel (id_rombel, id_tahun_ajaran, tingkat, nama_rombel)
+            VALUES ('r7a', 'ta1', 7, 'VII A'), ('r7b', 'ta1', 7, 'VII B');
+            INSERT INTO nilai_penilaian (id_penilaian, id_tahun_ajaran, semester, id_rombel,
+              id_mapel, id_guru, jenis, nama_penilaian, tanggal, created_at, updated_at)
+            VALUES
+              ('p1', 'ta1', 'Ganjil', 'r7a', 'mtk', 'g', 'UTS', 'UTS MTK', '2026-09-01', 'x', 'x'),
+              ('p2', 'ta1', 'Ganjil', 'r7b', 'mtk', 'g', 'Tugas', 'Tugas 1', '2026-09-02', 'x', 'x'),
+              ('p3', 'ta1', 'Ganjil', 'r7b', 'ipa', 'g', 'UTS', 'UTS IPA', '2026-09-03', 'x', 'x'),
+              ('p4', 'ta1', 'Genap', 'r7a', 'mtk', 'g', 'UTS', 'UTS Genap', '2026-09-04', 'x', 'x');
+            "#,
+        )
+        .expect("seed");
+
+        let ids = |rombel: Option<&str>, mapel: Option<&str>, jenis: Option<&str>| {
+            let hasil =
+                list_assessments(&state, "ta1", "Ganjil", rombel, mapel, jenis).expect("daftar");
+            hasil["items"]
+                .as_array()
+                .expect("items")
+                .iter()
+                .map(|item| {
+                    format!(
+                        "{}:{}",
+                        item["id_penilaian"].as_str().unwrap_or(""),
+                        item["nama_rombel"].as_str().unwrap_or("")
+                    )
+                })
+                .collect::<Vec<_>>()
+        };
+
+        assert_eq!(ids(None, None, None), ["p3:VII B", "p2:VII B", "p1:VII A"]);
+        // String kosong = tanpa filter, sama dengan None.
+        assert_eq!(ids(Some(" "), Some(""), Some("")), ids(None, None, None));
+        assert_eq!(ids(Some("r7b"), None, None), ["p3:VII B", "p2:VII B"]);
+        assert_eq!(ids(None, None, Some("UTS")), ["p3:VII B", "p1:VII A"]);
+        assert_eq!(ids(Some("r7b"), Some("mtk"), Some("Tugas")), ["p2:VII B"]);
+
+        let galat = list_assessments(&state, "ta1", "Ganjil", None, None, Some("Kuis"))
+            .expect_err("jenis asing harus ditolak");
+        assert_eq!(galat.code, "VALIDATION_ERROR");
     }
 }

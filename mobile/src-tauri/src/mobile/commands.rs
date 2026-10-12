@@ -3874,22 +3874,24 @@ mod tests_gabung_antrean_wa {
 // ke SQLite LOKAL dan mendaftarkan event outbox, sehingga bekerja penuh tanpa
 // jaringan. Guru menilai di kelas, dan kelas tidak selalu punya sinyal.
 
-/// Daftar penilaian pada satu rombel, mapel, dan semester.
+/// Daftar penilaian satu semester; rombel, mapel, dan jenis opsional.
 #[tauri::command]
 pub fn desktop_list_assessments(
     state: State<'_, MobileState>,
     id_tahun_ajaran: String,
     semester: String,
-    id_rombel: String,
+    id_rombel: Option<String>,
     id_mapel: Option<String>,
+    jenis: Option<String>,
 ) -> Result<Value, CommandError> {
     require_permission(&state, "grades.view")?;
     super::grades::list_assessments(
         &state,
         &id_tahun_ajaran,
         &semester,
-        &id_rombel,
+        id_rombel.as_deref(),
         id_mapel.as_deref(),
+        jenis.as_deref(),
     )
 }
 

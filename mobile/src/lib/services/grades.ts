@@ -59,6 +59,10 @@ function teksWajib(nilai: unknown, pesan: string): string {
   return teks;
 }
 
+/**
+ * Cerminan `assessment_list_query` di `grades.rs`: filter kosong diabaikan
+ * (rombel kosong = semua rombel), jenis asing DITOLAK, `LIMIT` selalu ada.
+ */
 export async function listAssessments(
   client: Client,
   filter: PenilaianFilter,
@@ -68,6 +72,7 @@ export async function listAssessments(
            p.id_mapel, p.id_guru, p.jenis, p.nama_penilaian, p.tanggal,
            p.bobot, p.kkm, p.nilai_maks, p.catatan, p.created_at, p.updated_at,
            COALESCE(m.nama_mapel, '') AS nama_mapel,
+           COALESCE(r.nama_rombel, '') AS nama_rombel,
            (SELECT COUNT(*) FROM nilai_siswa n WHERE n.id_penilaian = p.id_penilaian)
              AS jumlah_siswa,
            (SELECT COUNT(*) FROM nilai_siswa n
@@ -78,17 +83,29 @@ export async function listAssessments(
              AS rata_rata
       FROM nilai_penilaian p
       LEFT JOIN akademik_mapel m ON m.id_mapel = p.id_mapel
-     WHERE p.id_tahun_ajaran = ? AND p.semester = ? AND p.id_rombel = ?`;
-  const args: string[] = [
-    filter.id_tahun_ajaran,
-    filter.semester,
-    filter.id_rombel,
-  ];
+      LEFT JOIN akademik_rombel r ON r.id_rombel = p.id_rombel
+     WHERE p.id_tahun_ajaran = ? AND p.semester = ?`;
+  const args: string[] = [filter.id_tahun_ajaran, filter.semester];
 
+  const rombel = String(filter.id_rombel ?? "").trim();
+  if (rombel) {
+    query += " AND p.id_rombel = ?";
+    args.push(rombel);
+  }
   const mapel = String(filter.id_mapel ?? "").trim();
   if (mapel) {
     query += " AND p.id_mapel = ?";
     args.push(mapel);
+  }
+  const jenis = String(filter.jenis ?? "").trim();
+  if (jenis) {
+    if (!(JENIS_PENILAIAN as readonly string[]).includes(jenis)) {
+      throw new GradeValidationError(
+        `Jenis penilaian '${jenis}' tidak dikenal. Gunakan salah satu dari: ${JENIS_PENILAIAN.join(", ")}.`,
+      );
+    }
+    query += " AND p.jenis = ?";
+    args.push(jenis);
   }
   query += " ORDER BY p.tanggal DESC, p.created_at DESC LIMIT 300;";
 

@@ -24,7 +24,13 @@ import {
 } from "@/lib/gateways/grades";
 import { useConfirmDialog } from "@/lib/hooks/useConfirmDialog";
 import { useHydrated } from "@/lib/hooks/useHydrated";
-import { JENIS_PENILAIAN, SEMESTER_LIST, type Semester } from "@/types/grades";
+import {
+  BATAS_DAFTAR_PENILAIAN,
+  JENIS_PENILAIAN,
+  type JenisPenilaian,
+  SEMESTER_LIST,
+  type Semester,
+} from "@/types/grades";
 
 interface Opsi {
   id: string;
@@ -78,10 +84,12 @@ export default function NilaiMobilePage() {
   const [semester, setSemester] = useState<Semester>("Ganjil");
   const [idRombel, setIdRombel] = useState("");
   const [idMapel, setIdMapel] = useState("");
+  const [jenis, setJenis] = useState<JenisPenilaian | "">("");
 
   const [penilaian, setPenilaian] = useState<PenilaianItem[]>([]);
   const [detail, setDetail] = useState<PenilaianDetail | null>(null);
   const [skor, setSkor] = useState<Record<string, string>>({});
+  const [cari, setCari] = useState("");
   const [modalBaru, setModalBaru] = useState(false);
   const [draft, setDraft] = useState(DRAFT_KOSONG);
   const { konfirmasi, dialogKonfirmasi } = useConfirmDialog();
@@ -134,7 +142,7 @@ export default function NilaiMobilePage() {
   }, [isAuthenticated]);
 
   const muatPenilaian = useCallback(async () => {
-    if (!idTahunAjaran || !idRombel) {
+    if (!idTahunAjaran) {
       setPenilaian([]);
       return;
     }
@@ -144,8 +152,9 @@ export default function NilaiMobilePage() {
       const hasil = await daftarPenilaian({
         id_tahun_ajaran: idTahunAjaran,
         semester,
-        id_rombel: idRombel,
+        id_rombel: idRombel || null,
         id_mapel: idMapel || null,
+        jenis: jenis || null,
       });
       setPenilaian(hasil.items);
     } catch (error) {
@@ -158,7 +167,7 @@ export default function NilaiMobilePage() {
     } finally {
       setMemuat(false);
     }
-  }, [idTahunAjaran, semester, idRombel, idMapel]);
+  }, [idTahunAjaran, semester, idRombel, idMapel, jenis]);
 
   useEffect(() => {
     void muatPenilaian();
@@ -288,6 +297,18 @@ export default function NilaiMobilePage() {
 
   const bolehKelola = hasPermission(user, "grades.manage");
   const bolehHapus = hasPermission(user, "grades.delete");
+  const semuaRombel = !idRombel;
+
+  // Pencarian hanya menyaring TAMPILAN. "Simpan nilai" tetap mengirim seluruh
+  // roster dari `detail.items`; mengirim baris yang tampil saja akan
+  // mengosongkan skor anak yang sedang tersaring keluar.
+  const kataCari = cari.trim().toLowerCase();
+  const barisSkor = (detail?.items ?? []).filter(
+    (item) =>
+      !kataCari ||
+      item.nama_lengkap.toLowerCase().includes(kataCari) ||
+      item.nis.toLowerCase().includes(kataCari),
+  );
 
   return (
     <MobileAppShell>
@@ -295,7 +316,7 @@ export default function NilaiMobilePage() {
         <header>
           <h1 className="font-bold text-white text-xl">Nilai Akademik</h1>
           <p className="mt-1 text-slate-400 text-xs leading-relaxed">
-            Mengisi nilai siswa per mata pelajaran. Bekerja tanpa jaringan —
+            Mengisi nilai siswa per mata pelajaran. Bekerja tanpa jaringan:
             nilai tersimpan di perangkat dan terkirim saat sinkronisasi.
           </p>
           {bolehKelola && idRombel && idMapel ? (
@@ -333,7 +354,7 @@ export default function NilaiMobilePage() {
               Tahun ajaran
             </label>
             <select
-              className="mt-1 w-full rounded-xl border border-white/10 bg-slate-950 px-3 py-2 text-sm text-white"
+              className="mt-1 min-h-11 w-full rounded-xl border border-white/10 bg-slate-950 px-3 py-2 text-sm text-white"
               id={`${id}-ta`}
               onChange={(e) => setIdTahunAjaran(e.target.value)}
               value={idTahunAjaran}
@@ -356,7 +377,7 @@ export default function NilaiMobilePage() {
                 Semester
               </label>
               <select
-                className="mt-1 w-full rounded-xl border border-white/10 bg-slate-950 px-3 py-2 text-sm text-white"
+                className="mt-1 min-h-11 w-full rounded-xl border border-white/10 bg-slate-950 px-3 py-2 text-sm text-white"
                 id={`${id}-semester`}
                 onChange={(e) => setSemester(e.target.value as Semester)}
                 value={semester}
@@ -376,12 +397,12 @@ export default function NilaiMobilePage() {
                 Rombel
               </label>
               <select
-                className="mt-1 w-full rounded-xl border border-white/10 bg-slate-950 px-3 py-2 text-sm text-white"
+                className="mt-1 min-h-11 w-full rounded-xl border border-white/10 bg-slate-950 px-3 py-2 text-sm text-white"
                 id={`${id}-rombel`}
                 onChange={(e) => setIdRombel(e.target.value)}
                 value={idRombel}
               >
-                <option value="">Pilih rombel</option>
+                <option value="">Semua rombel</option>
                 {rombel.map((item) => (
                   <option key={item.id} value={item.id}>
                     {item.nama}
@@ -399,7 +420,7 @@ export default function NilaiMobilePage() {
               Mata pelajaran
             </label>
             <select
-              className="mt-1 w-full rounded-xl border border-white/10 bg-slate-950 px-3 py-2 text-sm text-white"
+              className="mt-1 min-h-11 w-full rounded-xl border border-white/10 bg-slate-950 px-3 py-2 text-sm text-white"
               id={`${id}-mapel`}
               onChange={(e) => setIdMapel(e.target.value)}
               value={idMapel}
@@ -412,19 +433,36 @@ export default function NilaiMobilePage() {
               ))}
             </select>
           </div>
+
+          <div>
+            <label
+              className="block text-slate-400 text-xs"
+              htmlFor={`${id}-filter-jenis`}
+            >
+              Jenis penilaian
+            </label>
+            <select
+              className="mt-1 min-h-11 w-full rounded-xl border border-white/10 bg-slate-950 px-3 py-2 text-sm text-white"
+              id={`${id}-filter-jenis`}
+              onChange={(e) => setJenis(e.target.value as JenisPenilaian | "")}
+              value={jenis}
+            >
+              <option value="">Semua jenis</option>
+              {JENIS_PENILAIAN.map((item) => (
+                <option key={item} value={item}>
+                  {item}
+                </option>
+              ))}
+            </select>
+          </div>
         </section>
 
         <section className="space-y-2">
           {memuat ? (
             <p className="text-slate-400 text-sm">Memuat penilaian…</p>
-          ) : !idRombel ? (
-            <p className="rounded-2xl border border-white/10 border-dashed p-4 text-slate-400 text-sm">
-              Pilih rombel untuk melihat daftar penilaian.
-            </p>
           ) : penilaian.length === 0 ? (
             <p className="rounded-2xl border border-white/10 border-dashed p-4 text-slate-400 text-sm">
-              Belum ada penilaian pada rombel dan semester ini. Penilaian baru
-              dibuat lewat panel admin di layar besar.
+              Belum ada penilaian yang cocok dengan filter ini.
             </p>
           ) : (
             penilaian.map((item) => (
@@ -441,6 +479,7 @@ export default function NilaiMobilePage() {
                     {item.nama_penilaian}
                   </p>
                   <p className="mt-1 text-slate-400 text-xs">
+                    {semuaRombel ? `${item.nama_rombel} · ` : ""}
                     {item.jenis} · {item.nama_mapel} · {item.tanggal}
                   </p>
                   <p className="mt-2 text-slate-300 text-xs">
@@ -463,12 +502,22 @@ export default function NilaiMobilePage() {
               </div>
             ))
           )}
+          {!memuat && penilaian.length >= BATAS_DAFTAR_PENILAIAN ? (
+            <p className="text-slate-400 text-xs">
+              Hanya {BATAS_DAFTAR_PENILAIAN} penilaian terbaru yang ditampilkan.
+              Pilih rombel, mata pelajaran, atau jenis untuk mempersempit
+              daftar.
+            </p>
+          ) : null}
         </section>
       </div>
 
       <Modal
         isOpen={detail !== null}
-        onClose={() => setDetail(null)}
+        onClose={() => {
+          setDetail(null);
+          setCari("");
+        }}
         title={detail?.penilaian.nama_penilaian ?? "Input Nilai"}
       >
         {detail ? (
@@ -477,18 +526,45 @@ export default function NilaiMobilePage() {
               {detail.penilaian.nama_rombel} · KKM {detail.penilaian.kkm} ·
               maksimum {detail.penilaian.nilai_maks}
             </p>
-            <p className="text-slate-500 text-xs leading-relaxed">
-              Kolom yang dikosongkan berarti belum dinilai — bukan nol.
+            <p className="text-slate-400 text-xs leading-relaxed">
+              Kolom yang dikosongkan berarti belum dinilai, bukan nol.
             </p>
 
+            <div>
+              <label
+                className="block text-slate-400 text-xs"
+                htmlFor={`${id}-cari-siswa`}
+              >
+                Cari peserta didik
+              </label>
+              <input
+                className="mt-1 min-h-11 w-full rounded-xl border border-white/10 bg-slate-950 px-3 py-2 text-white"
+                id={`${id}-cari-siswa`}
+                onChange={(e) => setCari(e.target.value)}
+                placeholder="Nama atau NIS"
+                type="search"
+                value={cari}
+              />
+              <p aria-live="polite" className="mt-1 text-slate-400 text-xs">
+                {!kataCari
+                  ? null
+                  : barisSkor.length === 0
+                    ? `Tidak ada peserta didik yang cocok dengan "${cari.trim()}".`
+                    : `${barisSkor.length} dari ${detail.items.length} peserta didik`}
+              </p>
+            </div>
+
             <ul className="max-h-[50vh] space-y-2 overflow-y-auto">
-              {detail.items.map((item) => (
+              {barisSkor.map((item) => (
                 <li
                   className="flex items-center justify-between gap-3 rounded-xl border border-white/10 px-3 py-2"
                   key={item.id_siswa}
                 >
                   <span className="min-w-0 flex-1 text-white text-xs">
                     {item.nama_lengkap}
+                    {item.nis ? (
+                      <span className="block text-slate-400">{item.nis}</span>
+                    ) : null}
                   </span>
                   <label
                     className="sr-only"
@@ -642,7 +718,7 @@ export default function NilaiMobilePage() {
               />
             </div>
           </div>
-          <p className="text-slate-500 text-xs leading-relaxed">
+          <p className="text-slate-400 text-xs leading-relaxed">
             KKM diambil dari mata pelajaran dan dibekukan saat penilaian dibuat,
             sehingga perubahan KKM di kemudian hari tidak mengubah penilaian
             ini.

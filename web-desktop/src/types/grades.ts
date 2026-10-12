@@ -37,6 +37,7 @@ export interface PenilaianItem {
   created_at: string;
   updated_at: string;
   nama_mapel: string;
+  nama_rombel: string;
   jumlah_siswa: number;
   jumlah_dinilai: number;
   /**
@@ -77,7 +78,7 @@ export interface NilaiSiswaItem {
 }
 
 export interface PenilaianDetail {
-  penilaian: PenilaianItem & { nama_rombel: string };
+  penilaian: PenilaianItem;
   items: NilaiSiswaItem[];
 }
 
@@ -90,9 +91,18 @@ export interface SimpanNilaiDraft {
   }>;
 }
 
+/**
+ * Batas baris daftar penilaian. Cermin `LIMIT 300` di `listAssessments`
+ * (`services/grades.ts`) dan `assessment_list_query` (`grades.rs`); dipakai UI
+ * untuk memberi tahu bahwa daftarnya terpotong.
+ */
+export const BATAS_DAFTAR_PENILAIAN = 300;
+
 export interface PenilaianFilter {
   id_tahun_ajaran: string;
   semester: Semester;
-  id_rombel: string;
+  /** Kosong/`null` berarti semua rombel. */
+  id_rombel?: string | null;
   id_mapel?: string | null;
+  jenis?: JenisPenilaian | null;
 }

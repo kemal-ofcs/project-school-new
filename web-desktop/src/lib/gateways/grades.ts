@@ -44,8 +44,9 @@ export async function daftarPenilaian(
       {
         idTahunAjaran: filter.id_tahun_ajaran,
         semester: filter.semester,
-        idRombel: filter.id_rombel,
-        idMapel: filter.id_mapel ?? null,
+        idRombel: filter.id_rombel || null,
+        idMapel: filter.id_mapel || null,
+        jenis: filter.jenis || null,
       },
     );
   }
