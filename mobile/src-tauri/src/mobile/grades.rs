@@ -6,7 +6,12 @@
 use rusqlite::{params, OptionalExtension};
 use serde_json::{json, Value};
 
-use super::{config::MobileState, models::CommandError, storage, sync};
+use super::{
+    config::MobileState,
+    models::CommandError,
+    nilai_akhir::{self, JENIS_EFEKTIF_SQL},
+    storage, sync,
+};
 
 /// Modul nilai akademik (v28).
 ///
@@ -87,6 +92,17 @@ fn jenis_penilaian(raw: &str) -> Result<&str, CommandError> {
         })
 }
 
+/// Nilai saringan jenis: nama jenis lama diterjemahkan ke id bawaannya, id
+/// jenis (`jns-...`) diterima apa adanya, selain itu DITOLAK. Cermin
+/// `jenisSaringan` di `services/grades.ts`.
+fn jenis_saringan(raw: &str) -> Result<String, CommandError> {
+    if raw.starts_with("jns-") {
+        return Ok(raw.to_owned());
+    }
+    let jenis = jenis_penilaian(raw)?;
+    nilai_akhir::id_jenis_efektif(None, jenis).ok_or_else(CommandError::internal)
+}
+
 fn semester(raw: &str) -> Result<&str, CommandError> {
     match raw {
         "Ganjil" => Ok("Ganjil"),
@@ -147,6 +163,8 @@ pub fn list_assessments(
                 "jumlah_dinilai": row.get::<_, i64>(18)?,
                 // `Option<f64>`: NULL berarti belum ada satu pun skor, bukan nol.
                 "rata_rata": row.get::<_, Option<f64>>(19)?,
+                "id_jenis": row.get::<_, Option<String>>(20)?,
+                "nama_jenis": row.get::<_, String>(21)?,
             }))
         })
         .map_err(|_| CommandError::internal())?
@@ -172,7 +190,7 @@ fn assessment_list_query(
             .map(str::to_owned)
     };
 
-    let mut sql = String::from(
+    let mut sql = format!(
         r#"
         SELECT p.id_penilaian, p.id_tahun_ajaran, p.semester, p.id_rombel,
                p.id_mapel, p.id_guru, p.jenis, p.nama_penilaian, p.tanggal,
@@ -186,12 +204,15 @@ fn assessment_list_query(
                  AS jumlah_dinilai,
                (SELECT AVG(n.skor) FROM nilai_siswa n
                  WHERE n.id_penilaian = p.id_penilaian AND n.skor IS NOT NULL)
-                 AS rata_rata
+                 AS rata_rata,
+               {JENIS_EFEKTIF_SQL} AS id_jenis,
+               COALESCE(j.nama, p.jenis) AS nama_jenis
           FROM nilai_penilaian p
           LEFT JOIN akademik_mapel m ON m.id_mapel = p.id_mapel
           LEFT JOIN akademik_rombel r ON r.id_rombel = p.id_rombel
+          LEFT JOIN nilai_jenis j ON j.id_jenis = {JENIS_EFEKTIF_SQL}
          WHERE p.id_tahun_ajaran = ? AND p.semester = ?
-        "#,
+        "#
     );
     let mut args = vec![id_tahun_ajaran.to_owned(), semester_filter.to_owned()];
 
@@ -204,8 +225,8 @@ fn assessment_list_query(
         args.push(mapel);
     }
     if let Some(raw) = isi(jenis) {
-        sql.push_str(" AND p.jenis = ?");
-        args.push(jenis_penilaian(&raw)?.to_owned());
+        sql.push_str(&format!(" AND {JENIS_EFEKTIF_SQL} = ?"));
+        args.push(jenis_saringan(&raw)?);
     }
     // Berbatas meski `nilai_penilaian` tumbuh per semester, bukan per hari:
     // tanpa rombel, satu semester seluruh sekolah bisa ribuan penilaian dan
@@ -226,16 +247,21 @@ pub fn get_assessment(state: &MobileState, id_penilaian: &str) -> Result<Value, 
 
     let penilaian: Option<Value> = conn
         .query_row(
-            r#"SELECT p.id_penilaian, p.id_tahun_ajaran, p.semester, p.id_rombel,
+            &format!(
+                r#"SELECT p.id_penilaian, p.id_tahun_ajaran, p.semester, p.id_rombel,
                       p.id_mapel, p.id_guru, p.jenis, p.nama_penilaian, p.tanggal,
                       p.bobot, p.kkm, p.nilai_maks, p.catatan,
                       COALESCE(m.nama_mapel, '') AS nama_mapel,
-                      COALESCE(r.nama_rombel, '') AS nama_rombel
+                      COALESCE(r.nama_rombel, '') AS nama_rombel,
+                      {JENIS_EFEKTIF_SQL} AS id_jenis,
+                      COALESCE(j.nama, p.jenis) AS nama_jenis
                  FROM nilai_penilaian p
                  LEFT JOIN akademik_mapel m ON m.id_mapel = p.id_mapel
                  LEFT JOIN akademik_rombel r ON r.id_rombel = p.id_rombel
+                 LEFT JOIN nilai_jenis j ON j.id_jenis = {JENIS_EFEKTIF_SQL}
                 WHERE p.id_penilaian = ?1
-                LIMIT 1;"#,
+                LIMIT 1;"#
+            ),
             params![id_penilaian],
             |row| {
                 Ok(json!({
@@ -254,6 +280,8 @@ pub fn get_assessment(state: &MobileState, id_penilaian: &str) -> Result<Value, 
                     "catatan": row.get::<_, Option<String>>(12)?,
                     "nama_mapel": row.get::<_, String>(13)?,
                     "nama_rombel": row.get::<_, String>(14)?,
+                    "id_jenis": row.get::<_, Option<String>>(15)?,
+                    "nama_jenis": row.get::<_, String>(16)?,
                 }))
             },
         )
@@ -261,10 +289,7 @@ pub fn get_assessment(state: &MobileState, id_penilaian: &str) -> Result<Value, 
         .map_err(|_| CommandError::internal())?;
 
     let Some(penilaian) = penilaian else {
-        return Err(CommandError::new(
-            "NOT_FOUND",
-            "Penilaian tidak ditemukan.",
-        ));
+        return Err(CommandError::new("NOT_FOUND", "Penilaian tidak ditemukan."));
     };
 
     let id_rombel = penilaian
@@ -304,6 +329,62 @@ pub fn get_assessment(state: &MobileState, id_penilaian: &str) -> Result<Value, 
     Ok(json!({ "penilaian": penilaian, "items": items }))
 }
 
+/// `(id_jenis, jenis warisan)` untuk penilaian yang disimpan.
+///
+/// Klien baru mengirim `id_jenis`; klien lama hanya `jenis`. Kolom `jenis`
+/// tetap terisi nama yang lolos CHECK lama (`nilai_akhir::jenis_warisan`),
+/// supaya perangkat yang belum diperbarui tetap menerima barisnya. Jenis
+/// nonaktif ditolak, kecuali penilaian itu memang sudah memakainya.
+fn jenis_untuk_simpan(
+    tx: &rusqlite::Transaction<'_>,
+    draft: &Value,
+    id_penilaian: &str,
+    is_new: bool,
+) -> Result<(String, String), CommandError> {
+    let Some(id_jenis) = optional_text(draft, "id_jenis") else {
+        let jenis = jenis_penilaian(text(draft, "jenis"))?;
+        let id = nilai_akhir::id_jenis_efektif(None, jenis).ok_or_else(CommandError::internal)?;
+        return Ok((id, jenis.to_owned()));
+    };
+    let aktif: Option<i64> = tx
+        .query_row(
+            "SELECT is_aktif FROM nilai_jenis WHERE id_jenis = ?1;",
+            params![id_jenis],
+            |row| row.get(0),
+        )
+        .optional()
+        .map_err(|_| CommandError::internal())?;
+    let Some(aktif) = aktif else {
+        return Err(CommandError::new(
+            "VALIDATION_ERROR",
+            "Jenis penilaian tidak ditemukan.",
+        ));
+    };
+    if aktif != 1 {
+        let tersimpan: Option<Option<String>> = if is_new {
+            None
+        } else {
+            tx.query_row(
+                &format!(
+                    "SELECT {JENIS_EFEKTIF_SQL} FROM nilai_penilaian p WHERE p.id_penilaian = ?1;"
+                ),
+                params![id_penilaian],
+                |row| row.get(0),
+            )
+            .optional()
+            .map_err(|_| CommandError::internal())?
+        };
+        if tersimpan.flatten().as_deref() != Some(id_jenis.as_str()) {
+            return Err(CommandError::new(
+                "VALIDATION_ERROR",
+                "Jenis penilaian ini nonaktif.",
+            ));
+        }
+    }
+    let jenis = nilai_akhir::jenis_warisan(&id_jenis);
+    Ok((id_jenis, jenis))
+}
+
 /// Buat atau perbarui satu penilaian.
 ///
 /// `kkm` hanya diambil dari draft saat penilaian BARU dibuat; pada pembaruan,
@@ -328,7 +409,7 @@ pub fn save_assessment(state: &MobileState, draft: &Value) -> Result<Value, Comm
     let id_rombel = text(draft, "id_rombel");
     let id_mapel = text(draft, "id_mapel");
     let id_guru = text(draft, "id_guru");
-    let jenis = jenis_penilaian(text(draft, "jenis"))?;
+    let (id_jenis, jenis) = jenis_untuk_simpan(&tx, draft, &id_penilaian, is_new)?;
     let nama_penilaian = text(draft, "nama_penilaian");
     let tanggal = text(draft, "tanggal");
     let catatan = optional_text(draft, "catatan");
@@ -427,9 +508,10 @@ pub fn save_assessment(state: &MobileState, draft: &Value) -> Result<Value, Comm
         INSERT INTO nilai_penilaian (
             id_penilaian, id_tahun_ajaran, semester, id_rombel, id_mapel, id_guru,
             jenis, nama_penilaian, tanggal, bobot, kkm, nilai_maks, catatan,
-            created_at, updated_at
-        ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15)
+            created_at, updated_at, id_jenis
+        ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16)
         ON CONFLICT(id_penilaian) DO UPDATE SET
+            id_jenis = excluded.id_jenis,
             id_tahun_ajaran = excluded.id_tahun_ajaran,
             semester = excluded.semester,
             id_rombel = excluded.id_rombel,
@@ -459,6 +541,7 @@ pub fn save_assessment(state: &MobileState, draft: &Value) -> Result<Value, Comm
             catatan,
             created_at,
             now,
+            id_jenis,
         ],
     )
     .map_err(|e| CommandError::new("DB_ERROR", format!("Gagal menyimpan penilaian: {e}")))?;
@@ -472,6 +555,7 @@ pub fn save_assessment(state: &MobileState, draft: &Value) -> Result<Value, Comm
         "id_mapel": id_mapel,
         "id_guru": id_guru,
         "jenis": jenis,
+        "id_jenis": id_jenis,
         "nama_penilaian": nama_penilaian,
         "tanggal": tanggal,
         "bobot": bobot,
@@ -641,10 +725,7 @@ pub fn delete_assessment(state: &MobileState, id_penilaian: &str) -> Result<Valu
         .map_err(|_| CommandError::internal())?;
 
     if ada.is_none() {
-        return Err(CommandError::new(
-            "NOT_FOUND",
-            "Penilaian tidak ditemukan.",
-        ));
+        return Err(CommandError::new("NOT_FOUND", "Penilaian tidak ditemukan."));
     }
 
     let client_id = sync::ensure_client_id(state)?;

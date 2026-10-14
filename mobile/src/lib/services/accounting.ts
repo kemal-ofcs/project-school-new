@@ -4,6 +4,7 @@ import { randomBytes } from "node:crypto";
 import type { Client, InStatement, Transaction } from "@libsql/client";
 import {
   AKUN_SISTEM_IDS,
+  type AkunSaldo,
   akunDraftSchema,
   aturanUbahAkun,
   type BarisJurnalValid,
@@ -13,6 +14,7 @@ import {
   type JurnalAsal,
   jurnalDraftSchema,
   kolomNeracaSaldo,
+  MAKS_AKUN_KAS,
   MAKS_BARIS_BUKU_BESAR,
   type SaldoNormal,
   SERI_WEB,
@@ -20,7 +22,10 @@ import {
   type SumberJurnal,
   saldoAkun,
   saldoBerjalan,
+  susunAktivitas,
+  susunArusKas,
   susunPembalik,
+  susunPosisiKeuangan,
   validateAkun,
   validateJurnal,
 } from "@/lib/validations/accounting";
@@ -29,6 +34,9 @@ import type {
   BukuBesar,
   JurnalDetail,
   JurnalItem,
+  LaporanAktivitas,
+  LaporanArusKas,
+  LaporanPosisiKeuangan,
   NeracaSaldo,
 } from "@/types/accounting";
 
@@ -679,4 +687,134 @@ export async function trialBalance(
       };
     });
   return { items, total_debit: totalDebit, total_kredit: totalKredit };
+}
+
+// ── Laporan keuangan ISAK 35 (K4a) ──────────────────────────────────────────
+
+/** Cermin `saldo_per_akun`. */
+async function saldoPerAkun(
+  client: Client,
+  dari: string,
+  sampai: string,
+): Promise<AkunSaldo[]> {
+  const result = await client.execute({
+    sql: `SELECT a.id_akun, a.kode, a.nama, a.kelompok, a.saldo_normal,
+                 COALESCE(t.debit, 0) AS debit, COALESCE(t.kredit, 0) AS kredit
+          FROM keu_akun a
+          LEFT JOIN (
+              SELECT b.id_akun, SUM(b.debit) AS debit, SUM(b.kredit) AS kredit
+              FROM keu_jurnal_baris b
+              JOIN keu_jurnal j ON j.id_jurnal = b.id_jurnal
+              WHERE j.tanggal >= ?1 AND j.tanggal <= ?2
+              GROUP BY b.id_akun
+          ) t ON t.id_akun = a.id_akun
+          ORDER BY a.kode, a.id_akun
+          LIMIT 1000;`,
+    args: [dari, sampai],
+  });
+  return result.rows.map((row) => ({
+    id_akun: String(row.id_akun),
+    kode: String(row.kode),
+    nama: String(row.nama),
+    kelompok: String(row.kelompok),
+    saldo_normal: String(row.saldo_normal),
+    debit: Number(row.debit),
+    kredit: Number(row.kredit),
+  }));
+}
+
+/** Cermin `report_position`. */
+export async function reportPosition(
+  client: Client,
+  sampai: string,
+): Promise<LaporanPosisiKeuangan> {
+  if (!isValidDate(sampai)) throw new Error("Tanggal tidak valid.");
+  return {
+    sampai,
+    ...susunPosisiKeuangan(await saldoPerAkun(client, "0001-01-01", sampai)),
+  };
+}
+
+/** Cermin `report_activity`. */
+export async function reportActivity(
+  client: Client,
+  dari: string,
+  sampai: string,
+): Promise<LaporanAktivitas> {
+  assertRentang(dari, sampai);
+  return {
+    dari,
+    sampai,
+    ...susunAktivitas(await saldoPerAkun(client, dari, sampai)),
+  };
+}
+
+/** Cermin `report_cashflow`. */
+export async function reportCashflow(
+  client: Client,
+  dari: string,
+  sampai: string,
+  akunKas: readonly string[],
+): Promise<LaporanArusKas> {
+  assertRentang(dari, sampai);
+  const akun: string[] = [];
+  for (const id of akunKas) {
+    const bersih = id.trim();
+    if (bersih && !akun.includes(bersih)) akun.push(bersih);
+  }
+  if (akun.length === 0) throw new Error("Pilih minimal satu akun kas.");
+  if (akun.length > MAKS_AKUN_KAS)
+    throw new Error("Akun kas paling banyak 20.");
+  const namaAkun: LaporanArusKas["akun_kas"] = [];
+  for (const id of akun) {
+    const baris = await client.execute({
+      sql: "SELECT kode, nama, kelompok FROM keu_akun WHERE id_akun = ?;",
+      args: [id],
+    });
+    const row = baris.rows[0];
+    if (!row || String(row.kelompok) !== "Aset") {
+      throw new Error("Akun kas harus akun aset.");
+    }
+    namaAkun.push({
+      id_akun: id,
+      kode: String(row.kode),
+      nama: String(row.nama),
+    });
+  }
+  const daftar = akun.map((_, i) => `?${i + 3}`).join(", ");
+  const args = [dari, sampai, ...akun];
+  const awal = await client.execute({
+    sql: `SELECT COALESCE(SUM(b.debit - b.kredit), 0) AS saldo
+          FROM keu_jurnal_baris b
+          JOIN keu_jurnal j ON j.id_jurnal = b.id_jurnal
+          WHERE j.tanggal < ?1 AND b.id_akun IN (${daftar})
+          -- batas: agregat, selalu satu baris
+          ;`,
+    args,
+  });
+  const mutasi = await client.execute({
+    sql: `SELECT COALESCE(asal.sumber, j.sumber) AS sumber,
+                 SUM(b.debit) AS debit, SUM(b.kredit) AS kredit
+          FROM keu_jurnal_baris b
+          JOIN keu_jurnal j ON j.id_jurnal = b.id_jurnal
+          LEFT JOIN keu_jurnal asal ON asal.id_jurnal = j.id_jurnal_batal
+          WHERE j.tanggal >= ?1 AND j.tanggal <= ?2 AND b.id_akun IN (${daftar})
+          GROUP BY 1
+          -- batas: agregat per sumber jurnal
+          ;`,
+    args,
+  });
+  return {
+    dari,
+    sampai,
+    akun_kas: namaAkun,
+    ...susunArusKas(
+      Number(awal.rows[0]?.saldo ?? 0),
+      mutasi.rows.map((row) => ({
+        sumber: String(row.sumber),
+        debit: Number(row.debit),
+        kredit: Number(row.kredit),
+      })),
+    ),
+  };
 }

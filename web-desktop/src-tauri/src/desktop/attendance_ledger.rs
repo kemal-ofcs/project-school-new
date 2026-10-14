@@ -1,7 +1,7 @@
 use rusqlite::{params, OptionalExtension};
 use serde_json::{json, Value};
 
-use super::{config::DesktopState, models::CommandError, storage, sync};
+use super::{config::DesktopState, models::CommandError, nilai_akhir, storage, sync};
 
 fn text<'a>(value: &'a Value, key: &str) -> &'a str {
     value.get(key).and_then(Value::as_str).unwrap_or("").trim()
@@ -41,10 +41,13 @@ fn sqlite_now(transaction: &rusqlite::Transaction<'_>) -> String {
         .unwrap_or_default()
 }
 
-/// Pratinjau langsung dihitung on-the-fly dari absensi_harian dan presensi_mapel_detail.
-///
-/// Multi-sesi dicegah berganda lewat subquery agregasi GATE_SUMMARY_SUBQUERY,
-/// persis aturan wajib nomor 31 pada GEMINI.md / CLAUDE.md.
+/// Pratinjau leger dihitung saat diminta dengan pengklasifikasi hari yang SAMA
+/// dengan rekap nilai akhir (`nilai_akhir::kehadiran_siswa`, keputusan E N2):
+/// hari efektif = tanggal dalam rentang SEMESTER yang termasuk Hari Sekolah
+/// unit siswa dan bukan libur aktif; hari bolos dihitung Alfa. Sebelumnya hari
+/// efektif adalah `COUNT(DISTINCT tanggal)` seluruh `absensi_harian` sepanjang
+/// baris tahun ajaran, sehingga Minggu yang hanya berisi scan satpam ikut
+/// terhitung dan angka rapor berbeda dari angka nilai akhir.
 pub fn get_ledger_preview(
     state: &DesktopState,
     id_tahun_ajaran: &str,
@@ -52,124 +55,39 @@ pub fn get_ledger_preview(
     id_rombel: Option<&str>,
 ) -> Result<Value, CommandError> {
     let conn = storage::database(&state.data_dir)?;
+    let (start_date, end_date) = nilai_akhir::rentang_untuk(&conn, id_tahun_ajaran, semester)?;
+    let total_hari_efektif = nilai_akhir::hari_efektif_bawaan(&conn, &start_date, &end_date)?;
+    let siswa = nilai_akhir::siswa_berunit(&conn, id_rombel)?;
+    let kehadiran = nilai_akhir::kehadiran_siswa(&conn, &start_date, &end_date, id_rombel, &siswa)?;
 
-    let ta_info: Option<(String, String)> = conn
-        .query_row(
-            "SELECT tanggal_mulai, tanggal_selesai FROM akademik_tahun_ajaran WHERE id_tahun_ajaran = ?1 LIMIT 1;",
-            params![id_tahun_ajaran],
-            |row| Ok((row.get(0)?, row.get(1)?)),
-        )
-        .optional()
-        .map_err(|_| CommandError::internal())?;
-
-    let (start_date, end_date) = match ta_info {
-        Some((s, e)) => (s, e),
-        None => {
-            return Err(CommandError::new(
-                "NOT_FOUND",
-                "Tahun ajaran tidak ditemukan.",
-            ))
-        }
-    };
-
-    let total_hari_efektif: i64 = conn
-        .query_row(
-            "SELECT COUNT(DISTINCT tanggal) FROM absensi_harian WHERE tanggal >= ?1 AND tanggal <= ?2;",
-            params![start_date, end_date],
-            |row| row.get(0),
-        )
-        .unwrap_or(0);
-
-    let sql = r#"
-        SELECT
-            s.id_siswa,
-            s.nis,
-            s.nisn,
-            s.nama_lengkap,
-            s.id_rombel,
-            r.nama_rombel,
-            COALESCE(att.hadir, 0) AS hadir,
-            COALESCE(att.izin, 0) AS izin,
-            COALESCE(att.sakit, 0) AS sakit,
-            COALESCE(att.alfa, 0) AS alfa,
-            COALESCE(att.dispensasi, 0) AS dispensasi
-        FROM siswa_data s
-        JOIN akademik_rombel r ON r.id_rombel = s.id_rombel
-        LEFT JOIN (
-            SELECT
-                g.id_karyawan,
-                SUM(CASE WHEN g.hadir_gerbang = 1 OR g.status_kehadiran IN ('Hadir', 'Terlambat') THEN 1 ELSE 0 END) AS hadir,
-                SUM(CASE WHEN g.status_kehadiran = 'Izin' THEN 1 ELSE 0 END) AS izin,
-                SUM(CASE WHEN g.status_kehadiran = 'Sakit' THEN 1 ELSE 0 END) AS sakit,
-                SUM(CASE WHEN g.status_kehadiran = 'Alfa' THEN 1 ELSE 0 END) AS alfa,
-                SUM(CASE WHEN g.status_kehadiran = 'Dispensasi' THEN 1 ELSE 0 END) AS dispensasi
-            FROM (
-                SELECT
-                    id_karyawan,
-                    tanggal,
-                    MIN(NULLIF(TRIM(jam_masuk), '')) AS jam_masuk,
-                    MAX(CASE
-                          WHEN COALESCE(TRIM(jam_masuk), '') <> ''
-                           AND COALESCE(status_kehadiran, '') <> 'Alfa'
-                          THEN 1 ELSE 0
-                        END) AS hadir_gerbang,
-                    MAX(COALESCE(status_kehadiran, '')) AS status_kehadiran
-                FROM absensi_harian
-                WHERE tanggal >= ?1 AND tanggal <= ?2
-                GROUP BY id_karyawan, tanggal
-            ) g
-            GROUP BY g.id_karyawan
-        ) att ON att.id_karyawan = s.id_siswa
-        WHERE s.status = 'Aktif'
-          AND (?3 IS NULL OR s.id_rombel = ?3)
-        ORDER BY s.nama_lengkap ASC;
-    "#;
-
-    let mut stmt = conn.prepare(sql).map_err(|_| CommandError::internal())?;
-    let rows = stmt
-        .query_map(params![start_date, end_date, id_rombel], |row| {
-            let id_siswa: String = row.get(0)?;
-            let nis: Option<String> = row.get(1)?;
-            let nisn: Option<String> = row.get(2)?;
-            let nama_lengkap: String = row.get(3)?;
-            let rombel_id: String = row.get(4)?;
-            let nama_rombel: String = row.get(5)?;
-            let hadir: i64 = row.get(6)?;
-            let izin: i64 = row.get(7)?;
-            let sakit: i64 = row.get(8)?;
-            let alfa: i64 = row.get(9)?;
-            let dispensasi: i64 = row.get(10)?;
-
-            let penyebut = if total_hari_efektif > 0 {
-                total_hari_efektif
-            } else {
-                (hadir + izin + sakit + alfa + dispensasi).max(1)
-            };
-
-            let persen = ((hadir as f64) * 100.0 / (penyebut as f64) * 10.0).round() / 10.0;
-            let persen_clamped = persen.clamp(0.0, 100.0);
-
-            Ok(json!({
+    let rows: Vec<Value> = siswa
+        .iter()
+        .map(|item| {
+            let id_siswa = item["id_siswa"].as_str().unwrap_or("");
+            let k = kehadiran.get(id_siswa).cloned().unwrap_or_default();
+            let persen = k
+                .persen()
+                .map(|p| (p * 10.0 + 0.5).floor() / 10.0)
+                .unwrap_or(0.0);
+            json!({
                 "id_siswa": id_siswa,
-                "nis": nis,
-                "nisn": nisn,
-                "nama_lengkap": nama_lengkap,
-                "id_rombel": rombel_id,
-                "nama_rombel": nama_rombel,
+                "nis": item["nis"],
+                "nisn": item["nisn"],
+                "nama_lengkap": item["nama_lengkap"],
+                "id_rombel": item["id_rombel"],
+                "nama_rombel": item["nama_rombel"],
                 "id_tahun_ajaran": id_tahun_ajaran,
                 "semester": semester,
-                "total_hari_efektif": penyebut,
-                "hadir": hadir,
-                "izin": izin,
-                "sakit": sakit,
-                "alfa": alfa,
-                "dispensasi": dispensasi,
-                "persen_kehadiran": persen_clamped,
-            }))
+                "total_hari_efektif": k.hari_efektif,
+                "hadir": k.hadir,
+                "izin": k.izin,
+                "sakit": k.sakit,
+                "alfa": k.alfa + k.bolos,
+                "dispensasi": k.dispensasi,
+                "persen_kehadiran": persen,
+            })
         })
-        .map_err(|_| CommandError::internal())?
-        .filter_map(Result::ok)
-        .collect::<Vec<_>>();
+        .collect();
 
     Ok(json!({
         "id_tahun_ajaran": id_tahun_ajaran,

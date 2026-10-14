@@ -19,6 +19,8 @@ use super::{
     billing,
     // Payload kasbon dicek dengan enum yang sama dengan lokal.
     loan,
+    // Jenis penilaian: bobot dan jenis bawaan dicek dengan aturan lokal.
+    nilai_akhir,
     models::{CommandError, OperatorUser},
     // Validasi payload inventaris di cloud memakai daftar enum yang sama
     // dengan validasi lokal.
@@ -660,6 +662,7 @@ pub const ADMIN_DEFAULT_EXCLUDED_PERMISSIONS: &[&str] = &[
     "pmb.delete",
     "pmb.promote",
     "grades.delete",
+    "grades.configure",
     "students.reset_wali_password",
     "content.delete",
     "inventory.adjust",
@@ -1022,6 +1025,11 @@ const SNAPSHOT_SOURCES: &[SnapshotSource] = &[
     // `sync_pulse` di cloud. Tabel yang hadir di satu daftar saja akan
     // tersinkronisasi tanpa penghitung perubahan — atau punya penghitung yang
     // tidak pernah dibaca siapa pun.
+    SnapshotSource {
+        payload_key: "nilaiPenilaian",
+        table: "nilai_jenis",
+        sql: "SELECT * FROM nilai_jenis ORDER BY urutan, id_jenis\n-- batas: daftar jenis penilaian sekolah, tidak tumbuh per hari\n;",
+    },
     SnapshotSource {
         payload_key: "nilaiPenilaian",
         table: "nilai_penilaian",
@@ -1675,7 +1683,7 @@ impl TursoClient {
         let Some(existing) = existing else {
             return Ok(());
         };
-        if existing.contains("'uks'") {
+        if existing.contains("'tagihan'") {
             return Ok(());
         }
 
@@ -1715,7 +1723,7 @@ impl TursoClient {
                 r#"CREATE TABLE notifikasi_wa__rebuild (
                     id_notifikasi TEXT PRIMARY KEY,
                     dedupe_key TEXT NOT NULL,
-                    jenis TEXT NOT NULL CHECK (jenis IN ('scan_masuk', 'scan_pulang', 'bolos', 'ambang_alfa', 'koreksi_admin', 'import_manual', 'uks')),
+                    jenis TEXT NOT NULL CHECK (jenis IN ('scan_masuk', 'scan_pulang', 'bolos', 'ambang_alfa', 'koreksi_admin', 'import_manual', 'uks', 'tagihan')),
                     id_siswa TEXT,
                     tujuan_nomor TEXT NOT NULL,
                     isi_pesan TEXT NOT NULL,
@@ -2810,6 +2818,7 @@ impl TursoClient {
                 ('grades.view', 'Lihat Nilai Akademik', 'Akademik', 'Melihat daftar penilaian dan nilai siswa per mata pelajaran.', 1, 800),
                 ('grades.manage', 'Kelola Penilaian & Input Nilai', 'Akademik', 'Membuat penilaian baru dan menginput nilai siswa.', 1, 801),
                 ('grades.delete', 'Hapus Penilaian Beserta Nilainya', 'Akademik', 'Menghapus penilaian beserta seluruh nilai siswa di dalamnya.', 1, 802),
+                ('grades.configure', 'Atur Jenis & Bobot Nilai', 'Akademik', 'Mengatur jenis penilaian, bobot nilai akhir, bobot kehadiran, dan Hari Sekolah per unit.', 1, 803),
                 ('content.view', 'Lihat Konten & Berita CMS', 'Situs Publik', 'Melihat daftar berita dan konten situs publik.', 1, 900),
                 ('content.manage', 'Kelola Konten & Berita CMS', 'Situs Publik', 'Membuat atau mengedit berita dan konten situs publik.', 1, 901),
                 ('content.delete', 'Hapus Konten & Berita CMS', 'Situs Publik', 'Menghapus berita atau artikel dari CMS situs publik.', 1, 902),
@@ -3320,7 +3329,7 @@ impl TursoClient {
                 r#"CREATE TABLE IF NOT EXISTS notifikasi_wa (
                     id_notifikasi TEXT PRIMARY KEY,
                     dedupe_key TEXT NOT NULL,
-                    jenis TEXT NOT NULL CHECK (jenis IN ('scan_masuk', 'scan_pulang', 'bolos', 'ambang_alfa', 'koreksi_admin', 'import_manual', 'uks')),
+                    jenis TEXT NOT NULL CHECK (jenis IN ('scan_masuk', 'scan_pulang', 'bolos', 'ambang_alfa', 'koreksi_admin', 'import_manual', 'uks', 'tagihan')),
                     id_siswa TEXT,
                     tujuan_nomor TEXT NOT NULL,
                     isi_pesan TEXT NOT NULL,
@@ -3351,6 +3360,7 @@ impl TursoClient {
                     koreksi_admin_enabled INTEGER NOT NULL DEFAULT 0,
                     import_manual_enabled INTEGER NOT NULL DEFAULT 0,
                     uks_enabled INTEGER NOT NULL DEFAULT 0,
+                    tagihan_enabled INTEGER NOT NULL DEFAULT 0,
                     created_at TEXT NOT NULL,
                     updated_at TEXT NOT NULL
                 );"#,
@@ -3547,6 +3557,20 @@ impl TursoClient {
             // `kkm` dibekukan dari `akademik_mapel` saat penilaian dibuat, bukan
             // di-join saat dibaca: KKM yang diubah admin di tengah semester
             // tidak boleh mengubah penilaian yang sudah dilihat orang tua.
+            // Jenis penilaian dinamis berbobot (v43). WAJIB identik dengan
+            // `storage.rs` dan `db-migrations.ts`.
+            Statement::new(
+                r#"CREATE TABLE IF NOT EXISTS nilai_jenis (
+                      id_jenis TEXT PRIMARY KEY,
+                      nama TEXT NOT NULL,
+                      bobot INTEGER NOT NULL DEFAULT 0 CHECK (bobot >= 0 AND bobot <= 100),
+                      urutan INTEGER NOT NULL DEFAULT 0,
+                      is_aktif INTEGER NOT NULL DEFAULT 1 CHECK (is_aktif IN (0, 1)),
+                      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+                      updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+                    );"#,
+                vec![],
+            ),
             Statement::new(
                 r#"CREATE TABLE IF NOT EXISTS nilai_penilaian (
                     id_penilaian TEXT PRIMARY KEY,
@@ -3557,6 +3581,7 @@ impl TursoClient {
                     id_guru TEXT NOT NULL,
                     jenis TEXT NOT NULL
                         CHECK (jenis IN ('Tugas', 'Ulangan Harian', 'Praktik', 'UTS', 'UAS')),
+                    id_jenis TEXT,
                     nama_penilaian TEXT NOT NULL,
                     tanggal TEXT NOT NULL,
                     bobot INTEGER NOT NULL DEFAULT 1,
@@ -3663,7 +3688,9 @@ impl TursoClient {
                 (39, 'accounting-foundation', datetime('now')),
                 (40, 'employee-loan', datetime('now')),
                 (41, 'student-billing', datetime('now')),
-                (42, 'student-payment', datetime('now'));"#,
+                (42, 'student-payment', datetime('now')),
+                (43, 'grade-type-dynamic', datetime('now')),
+                (44, 'wa-billing-reminder', datetime('now'));"#,
                 vec![],
             ),
         ];
@@ -3696,6 +3723,21 @@ impl TursoClient {
                             json!(akun.kelompok),
                             json!(akun.saldo_normal),
                         ],
+                    )
+                })
+                .collect(),
+        )
+        .await?;
+
+        // Jenis penilaian bawaan dari berkas JSON yang sama dengan seed lokal
+        // dan seed Web. `INSERT OR IGNORE`: bobot yang sudah diatur tidak ditimpa.
+        self.execute_pipeline(
+            nilai_akhir::jenis_bawaan()
+                .iter()
+                .map(|jenis| {
+                    Statement::new(
+                        nilai_akhir::SEED_JENIS_SQL,
+                        vec![json!(jenis.id_jenis), json!(jenis.nama), json!(jenis.urutan)],
                     )
                 })
                 .collect(),
@@ -3830,9 +3872,12 @@ impl TursoClient {
             ("app_wa_config", "koreksi_admin_enabled", "ALTER TABLE app_wa_config ADD COLUMN koreksi_admin_enabled INTEGER NOT NULL DEFAULT 0;"),
             ("app_wa_config", "import_manual_enabled", "ALTER TABLE app_wa_config ADD COLUMN import_manual_enabled INTEGER NOT NULL DEFAULT 0;"),
             ("app_wa_config", "uks_enabled", "ALTER TABLE app_wa_config ADD COLUMN uks_enabled INTEGER NOT NULL DEFAULT 0;"),
+            ("app_wa_config", "tagihan_enabled", "ALTER TABLE app_wa_config ADD COLUMN tagihan_enabled INTEGER NOT NULL DEFAULT 0;"),
             // Vonis verifikasi wajah pada foto bukti (v38).
             ("absensi_foto", "wajah_vonis", "ALTER TABLE absensi_foto ADD COLUMN wajah_vonis TEXT;"),
             ("absensi_foto", "wajah_skor", "ALTER TABLE absensi_foto ADD COLUMN wajah_skor REAL;"),
+            // Jenis penilaian dinamis (v43). Nullable; CHECK lama `jenis` dibiarkan.
+            ("nilai_penilaian", "id_jenis", "ALTER TABLE nilai_penilaian ADD COLUMN id_jenis TEXT;"),
         ] {
             self.ensure_column(table, column, sql).await?;
         }
@@ -4069,6 +4114,16 @@ impl TursoClient {
         .await?;
         self.query_one(
             "INSERT OR IGNORE INTO schema_migration (version, name, applied_at) VALUES (-2023, 'student-payment-v1', datetime('now'));",
+            vec![],
+        )
+        .await?;
+        self.query_one(
+            "INSERT OR IGNORE INTO schema_migration (version, name, applied_at) VALUES (-2024, 'grade-type-v1', datetime('now'));",
+            vec![],
+        )
+        .await?;
+        self.query_one(
+            "INSERT OR IGNORE INTO schema_migration (version, name, applied_at) VALUES (-2025, 'wa-billing-reminder-v1', datetime('now'));",
             vec![],
         )
         .await?;
@@ -4383,7 +4438,7 @@ impl TursoClient {
                 // Sentinel WAJIB dinaikkan setiap kali ensure_schema menambah
                 // tabel atau kolom — nilainya di sini dan pada INSERT di atas
                 // harus selalu sama.
-                "SELECT COUNT(*) AS total FROM schema_migration WHERE version = -2023;",
+                "SELECT COUNT(*) AS total FROM schema_migration WHERE version = -2025;",
                 vec![],
             )
             .await
@@ -6767,7 +6822,7 @@ impl TursoClient {
         self.ensure_schema_current().await?;
         let res = self
             .query_one(
-                "SELECT id, provider, api_key, api_url, sender_number, is_active, daily_limit, scan_masuk_enabled, scan_pulang_enabled, bolos_enabled, ambang_alfa_enabled, koreksi_admin_enabled, import_manual_enabled, uks_enabled, created_at, updated_at FROM app_wa_config WHERE id = 'default' LIMIT 1;",
+                "SELECT id, provider, api_key, api_url, sender_number, is_active, daily_limit, scan_masuk_enabled, scan_pulang_enabled, bolos_enabled, ambang_alfa_enabled, koreksi_admin_enabled, import_manual_enabled, uks_enabled, tagihan_enabled, created_at, updated_at FROM app_wa_config WHERE id = 'default' LIMIT 1;",
                 vec![],
             )
             .await?;
@@ -6800,6 +6855,7 @@ impl TursoClient {
                 "koreksiAdminEnabled": on("koreksi_admin_enabled"),
                 "importManualEnabled": on("import_manual_enabled"),
                 "uksEnabled": on("uks_enabled"),
+                "tagihanEnabled": on("tagihan_enabled"),
                 "createdAt": text("created_at"),
                 "updatedAt": text("updated_at"),
             });
@@ -6867,6 +6923,7 @@ impl TursoClient {
                 "koreksiAdminEnabled": false,
                 "importManualEnabled": false,
                 "uksEnabled": false,
+                "tagihanEnabled": false,
                 "ambangAlfaLimit": super::wa_notification::DEFAULT_AMBANG_ALFA_LIMIT,
                 "ambangAlfaDays": super::wa_notification::DEFAULT_AMBANG_ALFA_DAYS,
                 "autoSendEnabled": false,
@@ -6922,6 +6979,7 @@ impl TursoClient {
         let koreksi_admin_enabled = switches.koreksi_admin;
         let import_manual_enabled = switches.import_manual;
         let uks_enabled = switches.uks;
+        let tagihan_enabled = switches.tagihan;
 
         let new_key = draft
             .get("apiKey")
@@ -6959,9 +7017,9 @@ impl TursoClient {
             r#"INSERT INTO app_wa_config (
                 id, provider, api_key, api_url, sender_number, is_active, daily_limit,
                 scan_masuk_enabled, scan_pulang_enabled, bolos_enabled, ambang_alfa_enabled,
-                koreksi_admin_enabled, import_manual_enabled, uks_enabled,
+                koreksi_admin_enabled, import_manual_enabled, uks_enabled, tagihan_enabled,
                 created_at, updated_at
-            ) VALUES ('default', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))
+            ) VALUES ('default', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))
             ON CONFLICT(id) DO UPDATE SET
                 provider = excluded.provider,
                 api_key = excluded.api_key,
@@ -6976,6 +7034,7 @@ impl TursoClient {
                 koreksi_admin_enabled = excluded.koreksi_admin_enabled,
                 import_manual_enabled = excluded.import_manual_enabled,
                 uks_enabled = excluded.uks_enabled,
+                tagihan_enabled = excluded.tagihan_enabled,
                 updated_at = datetime('now');"#,
             vec![
                 json!(provider),
@@ -6997,6 +7056,7 @@ impl TursoClient {
                 json!(koreksi_admin_enabled),
                 json!(import_manual_enabled),
                 json!(uks_enabled),
+                json!(tagihan_enabled),
             ],
         )];
 
@@ -8843,6 +8903,17 @@ fn canonical_sync_route(domain: &str, operation: &str) -> Option<(&'static str, 
             "wa-notification" | "wa_notification" | "notifikasi-wa" | "notifikasi_wa",
             "cancel" | "delete",
         ) => ("wa-notification", "cancel"),
+        // Nilai akademik (v28). Kelima rute ini sempat terlewat di sini sejak
+        // modulnya lahir, sehingga setiap penilaian dan skor dari Desktop/Mobile
+        // ditolak sebagai "domain tidak dikenali" dan tidak pernah sampai ke
+        // cloud. Tes rute di bawah kini menjaganya.
+        ("grade", "create") => ("grade", "create"),
+        ("grade", "update") => ("grade", "update"),
+        ("grade", "delete") => ("grade", "delete"),
+        ("grade-detail", "save") => ("grade-detail", "save"),
+        ("grade-detail", "delete") => ("grade-detail", "delete"),
+        ("grade-type", "save") => ("grade-type", "save"),
+        ("grade-type", "delete") => ("grade-type", "delete"),
         _ => return None,
     };
     sync::is_canonical_sync_route(route.0, route.1).then_some(route)
@@ -11812,6 +11883,27 @@ async fn apply_event_to_turso(
                 ).await?;
             }
         }
+        ("grade-type", "save") => {
+            if let Some(values) = nilai_akhir::cloud_grade_type_values(payload, entity_key) {
+                turso
+                    .query_one(nilai_akhir::CLOUD_UPSERT_GRADE_TYPE_SQL, values)
+                    .await?;
+            }
+        }
+        ("grade-type", "delete") => {
+            let id = payload
+                .get("id_jenis")
+                .and_then(Value::as_str)
+                .filter(|value| !value.trim().is_empty())
+                .unwrap_or(entity_key);
+            // Jenis bawaan tidak pernah dihapus: seed `INSERT OR IGNORE` akan
+            // menghidupkannya lagi dan setiap perangkat berselisih soal isinya.
+            if !id.trim().is_empty() && !nilai_akhir::is_jenis_bawaan(id) {
+                turso
+                    .query_one("DELETE FROM nilai_jenis WHERE id_jenis = ?;", vec![json!(id)])
+                    .await?;
+            }
+        }
         ("grade", "create") | ("grade", "update") => {
             let row = payload
                 .get("grade")
@@ -11833,9 +11925,12 @@ async fn apply_event_to_turso(
                         r#"INSERT INTO nilai_penilaian (
                             id_penilaian, id_tahun_ajaran, semester, id_rombel, id_mapel,
                             id_guru, jenis, nama_penilaian, tanggal, bobot, kkm,
-                            nilai_maks, catatan, created_at, updated_at
-                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                            nilai_maks, catatan, created_at, updated_at, id_jenis
+                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                         ON CONFLICT(id_penilaian) DO UPDATE SET
+                            -- `id_jenis` hanya diperbarui bila pengirim membawanya:
+                            -- perangkat lama tidak mengenal kolom ini.
+                            id_jenis = COALESCE(excluded.id_jenis, nilai_penilaian.id_jenis),
                             id_tahun_ajaran = excluded.id_tahun_ajaran,
                             semester = excluded.semester,
                             id_rombel = excluded.id_rombel,
@@ -11868,6 +11963,11 @@ async fn apply_event_to_turso(
                             json!(row.get("catatan").and_then(Value::as_str)),
                             json!(teks("created_at")),
                             json!(teks("updated_at")),
+                            json!(row
+                                .get("id_jenis")
+                                .and_then(Value::as_str)
+                                .map(str::trim)
+                                .filter(|v| !v.is_empty())),
                         ],
                     )
                     .await?;
@@ -12206,7 +12306,18 @@ async fn apply_event_to_turso(
                         r#"INSERT INTO notifikasi_wa (
                         id_notifikasi, dedupe_key, jenis, id_siswa, tujuan_nomor,
                         isi_pesan, status, attempt_count, created_at, updated_at
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, 0, ?, ?)
+                    )
+                    -- Satu dedupe_key satu pesan, juga lintas perangkat: dua
+                    -- perangkat offline yang mengantre peristiwa yang sama
+                    -- (misalnya pengingat tagihan siswa yang sama pada hari
+                    -- yang sama) masing-masing lolos pemeriksaan lokalnya.
+                    -- Event yang terdorong ulang dengan id yang sama tetap
+                    -- masuk ke cabang ON CONFLICT di bawah.
+                    SELECT ?, ?, ?, ?, ?, ?, ?, 0, ?, ?
+                    WHERE NOT EXISTS (
+                        SELECT 1 FROM notifikasi_wa
+                        WHERE dedupe_key = ? AND id_notifikasi <> ?
+                    )
                     ON CONFLICT(id_notifikasi) DO UPDATE SET
                         dedupe_key = excluded.dedupe_key,
                         jenis = excluded.jenis,
@@ -12236,6 +12347,8 @@ async fn apply_event_to_turso(
                             json!(status),
                             json!(created_at),
                             json!(updated_at),
+                            json!(dedupe_key),
+                            json!(id),
                         ],
                     )
                     .await?;
@@ -15677,7 +15790,7 @@ mod tests {
             connection
                 .execute_batch(
                     "DROP TABLE riwayat_identitas_karyawan;
-                     DELETE FROM schema_migration WHERE version IN (-2017, -2018, -2019, -2020, -2021, -2022, -2023);",
+                     DELETE FROM schema_migration WHERE version IN (-2017, -2018, -2019, -2020, -2021, -2022, -2023, -2024, -2025);",
                 )
                 .expect("siapkan database lama");
 
@@ -15713,7 +15826,7 @@ mod tests {
             connection
                 .execute_batch(
                     "DROP TABLE inventory_unit;
-                     DELETE FROM schema_migration WHERE version IN (-2018, -2019, -2020, -2021, -2022, -2023);",
+                     DELETE FROM schema_migration WHERE version IN (-2018, -2019, -2020, -2021, -2022, -2023, -2024, -2025);",
                 )
                 .expect("siapkan database lama");
 
@@ -15750,7 +15863,7 @@ mod tests {
                 .execute_batch(
                     "DROP TABLE personil_wajah;
                      ALTER TABLE absensi_foto DROP COLUMN wajah_vonis;
-                     DELETE FROM schema_migration WHERE version IN (-2019, -2020, -2021, -2022, -2023);",
+                     DELETE FROM schema_migration WHERE version IN (-2019, -2020, -2021, -2022, -2023, -2024, -2025);",
                 )
                 .expect("siapkan database lama");
 
@@ -15789,7 +15902,7 @@ mod tests {
                     "DROP TABLE keu_akun;
                      DROP TABLE keu_jurnal;
                      DROP TABLE keu_jurnal_baris;
-                     DELETE FROM schema_migration WHERE version IN (-2020, -2021, -2022, -2023);",
+                     DELETE FROM schema_migration WHERE version IN (-2020, -2021, -2022, -2023, -2024, -2025);",
                 )
                 .expect("siapkan database lama");
 
@@ -15902,7 +16015,7 @@ mod tests {
                     "DROP TABLE keu_pinjaman;
                      DROP TABLE keu_pinjaman_mutasi;
                      DROP TABLE keu_pinjaman_tunda;
-                     DELETE FROM schema_migration WHERE version IN (-2021, -2022, -2023);",
+                     DELETE FROM schema_migration WHERE version IN (-2021, -2022, -2023, -2024, -2025);",
                 )
                 .expect("siapkan database lama");
 
@@ -15939,7 +16052,7 @@ mod tests {
                 .execute_batch(
                     "DROP TABLE keu_tagihan;
                      DROP TABLE keu_tagihan_batal;
-                     DELETE FROM schema_migration WHERE version IN (-2022, -2023);",
+                     DELETE FROM schema_migration WHERE version IN (-2022, -2023, -2024, -2025);",
                 )
                 .expect("siapkan database lama");
             client.ensure_schema_current().await.expect("skema mutakhir");
@@ -15977,7 +16090,7 @@ mod tests {
                      DROP TABLE keu_pembayaran;
                      DROP TABLE keu_pembayaran_alokasi;
                      DROP TABLE keu_pembayaran_batal;
-                     DELETE FROM schema_migration WHERE version = -2023;",
+                     DELETE FROM schema_migration WHERE version IN (-2023, -2024, -2025);",
                 )
                 .expect("siapkan database lama");
             client.ensure_schema_current().await.expect("skema mutakhir");
@@ -15989,6 +16102,46 @@ mod tests {
                 )
                 .expect("cek skema");
             assert_eq!(tabel, 4, "database bersentinel -2022 tidak diperbarui");
+        });
+    }
+
+    /// Database bersentinel `-2023` (v42) menerima `nilai_jenis` dan kolom
+    /// `nilai_penilaian.id_jenis` lewat `ensure_schema_current`.
+    #[test]
+    fn sentinel_2023_memicu_skema_jenis_nilai() {
+        let runtime = tokio::runtime::Builder::new_current_thread()
+            .build()
+            .expect("runtime uji");
+        runtime.block_on(async {
+            let dir = tempfile::tempdir().expect("direktori sementara");
+            let hub = dir.path().join("sppg-hub.db");
+            let client = TursoClient::local_file(
+                Url::parse("https://sentinel-2023.sppg.invalid").expect("origin uji"),
+                &hub,
+                Client::new(),
+            );
+            client.ensure_schema().await.expect("provisioning lokal");
+            let connection = rusqlite::Connection::open(&hub).expect("buka hub");
+            connection
+                .execute_batch(
+                    "DROP TABLE nilai_jenis;
+                     ALTER TABLE nilai_penilaian DROP COLUMN id_jenis;
+                     DELETE FROM schema_migration WHERE version IN (-2024, -2025);",
+                )
+                .expect("siapkan database lama");
+            client.ensure_schema_current().await.expect("skema mutakhir");
+            let jenis: i64 = connection
+                .query_row("SELECT COUNT(*) FROM nilai_jenis;", [], |row| row.get(0))
+                .expect("jenis bawaan");
+            assert_eq!(jenis, 5, "jenis bawaan tidak ditanam ulang");
+            let kolom: i64 = connection
+                .query_row(
+                    "SELECT COUNT(*) FROM pragma_table_info('nilai_penilaian') WHERE name = 'id_jenis';",
+                    [],
+                    |row| row.get(0),
+                )
+                .expect("kolom");
+            assert_eq!(kolom, 1, "kolom id_jenis tidak ditambahkan");
         });
     }
 
@@ -16197,6 +16350,15 @@ mod tests {
         );
         assert_eq!(canonical_sync_route("employee", "delete"), None);
         assert_eq!(canonical_sync_route("unknown_domain", "update"), None);
+        // Setiap rute yang boleh dikirim perangkat wajib bisa diterapkan di
+        // cloud; rute nilai pernah hilang dari sini tanpa satu tes pun gagal.
+        for (domain, operation) in crate::desktop::sync::CANONICAL_SYNC_ROUTES {
+            assert_eq!(
+                canonical_sync_route(domain, operation),
+                Some((*domain, *operation)),
+                "rute kanonik {domain}/{operation} tidak dipetakan"
+            );
+        }
     }
 
     #[test]

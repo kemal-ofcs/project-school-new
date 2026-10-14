@@ -31,6 +31,10 @@ pub const WA_NOTIFY_IMPORT_MANUAL_KEY: &str = "wa_notify_import_manual";
 /// Kunjungan UKS (Fase 4b). Bawaannya MATI seperti sakelar lain: pesan ke
 /// nomor wali tidak bisa ditarik kembali.
 pub const WA_NOTIFY_UKS_KEY: &str = "wa_notify_uks";
+/// Pengingat tunggakan tagihan siswa (K4b). Bawaannya MATI. Pesannya diantre
+/// manual dari tab Tunggakan, tetapi sakelar ini tetap gerbangnya supaya
+/// sekolah yang belum siap tidak bisa mengirimnya tanpa sengaja.
+pub const WA_NOTIFY_TAGIHAN_KEY: &str = "wa_notify_tagihan";
 
 /// Sakelar "Kirim otomatis": runner di aplikasi menguras antrean sendiri tanpa
 /// tombol. BAWAANNYA MATI — pemasangan berjalan tidak boleh mulai mengirim
@@ -111,6 +115,7 @@ pub struct WaSwitches {
     pub koreksi_admin: i64,
     pub import_manual: i64,
     pub uks: i64,
+    pub tagihan: i64,
     pub ambang_limit: i64,
     pub ambang_days: i64,
     pub auto_send: i64,
@@ -158,6 +163,7 @@ pub fn parse_wa_switches(draft: &Value) -> WaSwitches {
         koreksi_admin: flag(draft, "koreksiAdminEnabled"),
         import_manual: flag(draft, "importManualEnabled"),
         uks: flag(draft, "uksEnabled"),
+        tagihan: flag(draft, "tagihanEnabled"),
         auto_send: flag(draft, "autoSendEnabled"),
         ambang_limit: clamp_ambang_alfa_limit(
             draft
@@ -175,7 +181,7 @@ pub fn parse_wa_switches(draft: &Value) -> WaSwitches {
 }
 
 /// Pasangan kunci/nilai `setting_gex_system` yang mencerminkan sakelar di atas.
-pub fn wa_setting_mirror(switches: &WaSwitches) -> [(&'static str, String); 10] {
+pub fn wa_setting_mirror(switches: &WaSwitches) -> [(&'static str, String); 11] {
     let boolean = |v: i64| (if v != 0 { "true" } else { "false" }).to_owned();
     [
         (WA_NOTIFY_SCAN_MASUK_KEY, boolean(switches.scan_masuk)),
@@ -191,6 +197,7 @@ pub fn wa_setting_mirror(switches: &WaSwitches) -> [(&'static str, String); 10] 
             boolean(switches.import_manual),
         ),
         (WA_NOTIFY_UKS_KEY, boolean(switches.uks)),
+        (WA_NOTIFY_TAGIHAN_KEY, boolean(switches.tagihan)),
         (
             WA_NOTIFY_AMBANG_ALFA_LIMIT_KEY,
             switches.ambang_limit.to_string(),
@@ -241,6 +248,7 @@ pub fn wa_notify_setting_key(jenis: &str) -> Option<&'static str> {
         "koreksi_admin" => Some(WA_NOTIFY_KOREKSI_ADMIN_KEY),
         "import_manual" => Some(WA_NOTIFY_IMPORT_MANUAL_KEY),
         "uks" => Some(WA_NOTIFY_UKS_KEY),
+        "tagihan" => Some(WA_NOTIFY_TAGIHAN_KEY),
         _ => None,
     }
 }
@@ -270,7 +278,7 @@ pub const MAX_WA_TEMPLATE_CHARS: usize = 1000;
 /// Keenam jenis antrean ditambah dua pesan manual tombol "Hubungi Wali" di
 /// Rekonsiliasi KBM. Dua yang terakhir tidak pernah diantre, jadi tidak punya
 /// sakelar `wa_notify_*` dan tidak ada di CHECK `notifikasi_wa.jenis`.
-pub const WA_TEMPLATE_KINDS: [&str; 9] = [
+pub const WA_TEMPLATE_KINDS: [&str; 10] = [
     "scan_masuk",
     "scan_pulang",
     "bolos",
@@ -278,6 +286,7 @@ pub const WA_TEMPLATE_KINDS: [&str; 9] = [
     "koreksi_admin",
     "import_manual",
     "uks",
+    "tagihan",
     "rekonsiliasi_bolos",
     "rekonsiliasi_tanpa_scan",
 ];
@@ -297,6 +306,7 @@ pub fn wa_template_label(jenis: &str) -> &'static str {
         "koreksi_admin" => "Koreksi admin",
         "import_manual" => "Input manual",
         "uks" => "Kunjungan UKS",
+        "tagihan" => "Pengingat tagihan",
         "rekonsiliasi_bolos" => "Rekonsiliasi: siswa bolos",
         "rekonsiliasi_tanpa_scan" => "Rekonsiliasi: tanpa scan gerbang",
         _ => "Pesan",
@@ -313,6 +323,7 @@ pub fn default_wa_template(jenis: &str) -> Option<&'static str> {
         "koreksi_admin" => "Yth. Wali Murid dari {nama} ({rombel}). Kami informasikan bahwa catatan kehadiran ananda pada {tanggal} telah dikoreksi oleh admin sekolah menjadi: {status}. Keterangan: {keterangan}. Mohon konfirmasi bila ada yang tidak sesuai.",
         "import_manual" => "Yth. Wali Murid dari {nama} ({rombel}). Kami informasikan bahwa catatan kehadiran ananda pada {tanggal} dimasukkan secara manual oleh admin sekolah dengan status: {status}. Keterangan: {keterangan}. Mohon konfirmasi bila ada yang tidak sesuai.",
         "uks" => "Yth. Wali Murid dari {nama} ({rombel}). Kami informasikan bahwa ananda mendapat penanganan di UKS sekolah pada {tanggal} pukul {jam_masuk}. Tindak lanjut: {tindak_lanjut}.",
+        "tagihan" => "Yth. Wali Murid dari {nama} ({rombel}). Kami informasikan bahwa ananda memiliki {jumlah} tagihan sekolah yang belum lunas dengan total {total}:\n{rincian}\nJatuh tempo paling awal: {jatuh_tempo}. Mohon abaikan pesan ini bila sudah membayar. Terima kasih.",
         "rekonsiliasi_bolos" => "Yth. Bapak/Ibu Wali dari {nama}, diberitahukan bahwa ananda tercatat hadir di gerbang sekolah (pukul {jam_gerbang}), namun TIDAK HADIR (Alfa) pada {mapel} jam ke-{jam_ke} ({guru}). Mohon konfirmasi kehadiran siswa. Terima kasih.",
         "rekonsiliasi_tanpa_scan" => "Yth. Bapak/Ibu Wali dari {nama}, ananda tercatat HADIR pada {mapel} jam ke-{jam_ke} ({guru}), namun tidak ditemukan catatan scan di gerbang sekolah hari ini. Mohon dipastikan ananda membawa kartu pelajarnya dan memindai di gerbang saat tiba. Terima kasih.",
         _ => return None,
@@ -328,6 +339,7 @@ pub fn wa_template_placeholders(jenis: &str) -> &'static [&'static str] {
         "ambang_alfa" => &["nama", "rombel", "total_alfa", "hari"],
         "koreksi_admin" | "import_manual" => &["nama", "rombel", "tanggal", "status", "keterangan"],
         "uks" => &["nama", "rombel", "tanggal", "jam_masuk", "jam_keluar", "tindak_lanjut", "keluhan"],
+        "tagihan" => &["nama", "rombel", "total", "jumlah", "rincian", "jatuh_tempo"],
         "rekonsiliasi_bolos" => &["nama", "rombel", "mapel", "jam_ke", "guru", "jam_gerbang", "tanggal"],
         "rekonsiliasi_tanpa_scan" => &["nama", "rombel", "mapel", "jam_ke", "guru", "tanggal"],
         _ => &[],
@@ -753,10 +765,11 @@ pub fn queue_wa_notification_tx(
             | "koreksi_admin"
             | "import_manual"
             | "uks"
+            | "tagihan"
     ) {
         return Err(CommandError::new(
             "VALIDATION_ERROR",
-            "Jenis notifikasi tidak valid. Pilihan: scan_masuk, scan_pulang, bolos, ambang_alfa, koreksi_admin, import_manual, uks.",
+            "Jenis notifikasi tidak valid. Pilihan: scan_masuk, scan_pulang, bolos, ambang_alfa, koreksi_admin, import_manual, uks, tagihan.",
         ));
     }
 

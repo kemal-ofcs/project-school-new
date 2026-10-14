@@ -12,6 +12,9 @@ const {
   listJournals,
   ledger,
   postJournal,
+  reportActivity,
+  reportCashflow,
+  reportPosition,
   reverseJournal,
   saveAccount,
   trialBalance,
@@ -126,6 +129,31 @@ describe("akuntansi Web terhadap skema cloud asli", () => {
     );
     expect(items.length).toBe(2);
     expect(items.some((item) => item.dibatalkan)).toBe(true);
+
+    // Laporan ISAK 35 (K4a), cermin asersi `posting_pembalik_dan_laporan`.
+    const posisi = await reportPosition(client, "2099-12-31");
+    expect(posisi.total_aset).toBe(10_000_000);
+    expect(posisi.total_aset_neto).toBe(10_000_000);
+    expect(posisi.surplus_akumulasi).toBe(0);
+    expect(posisi.selisih).toBe(0);
+    const aktivitas = await reportActivity(client, "2026-10-05", "2026-10-05");
+    expect(aktivitas.total_beban).toBe(250_000);
+    expect(aktivitas.surplus).toBe(-250_000);
+    const arus = await reportCashflow(client, "2026-10-01", "2099-12-31", [
+      "akun-kas",
+    ]);
+    expect(arus.saldo_awal).toBe(10_000_000);
+    expect(arus.kelompok.length).toBe(1);
+    expect(arus.kelompok[0]?.label).toBe("Jurnal umum");
+    expect(arus.kelompok[0]?.masuk).toBe(250_000);
+    expect(arus.kelompok[0]?.keluar).toBe(250_000);
+    expect(arus.saldo_akhir).toBe(10_000_000);
+    await expect(
+      reportCashflow(client, "2026-10-01", "2026-10-31", ["akun-beban-atk"]),
+    ).rejects.toThrow("Akun kas harus akun aset.");
+    await expect(
+      reportCashflow(client, "2026-10-01", "2026-10-31", [" "]),
+    ).rejects.toThrow("Pilih minimal satu akun kas.");
   });
 
   test("kode ganda dan akun nonaktif ditolak", async () => {

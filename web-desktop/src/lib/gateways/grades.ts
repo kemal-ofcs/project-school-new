@@ -4,20 +4,29 @@ import { requestWebApi } from "@/lib/client/api-client";
 import { isDesktopRuntime } from "@/lib/runtime/app-runtime";
 import { invokeDesktop } from "@/lib/runtime/desktop-commands";
 import type {
+  HariSekolah,
+  JenisNilaiDraft,
+} from "@/lib/validations/nilai-akhir";
+import type {
+  KonfigurasiNilai,
   PenilaianDetail,
   PenilaianDraft,
   PenilaianFilter,
   PenilaianItem,
+  RekapNilaiAkhir,
   SimpanNilaiDraft,
 } from "@/types/grades";
 
 export type {
+  JenisNilaiItem,
   JenisPenilaian,
+  KonfigurasiNilai,
   NilaiSiswaItem,
   PenilaianDetail,
   PenilaianDraft,
   PenilaianFilter,
   PenilaianItem,
+  RekapNilaiAkhir,
   Semester,
   SimpanNilaiDraft,
 } from "@/types/grades";
@@ -113,4 +122,72 @@ export async function hapusPenilaian(idPenilaian: string): Promise<void> {
     return;
   }
   await requestWebApi("/api/academic/grades/delete", "POST", { idPenilaian });
+}
+
+// ── Nilai akhir (N2a) ───────────────────────────────────────────────────────
+// Command `desktop_grade_*` terdaftar di Desktop DAN Mobile (`nilai_akhir.rs`
+// disalin `sync-rust-modules.ts`), jadi satu cabang `isDesktopRuntime()`.
+
+async function panggil<T>(
+  command: string,
+  args: Record<string, unknown>,
+  url: string,
+): Promise<T> {
+  if (isDesktopRuntime()) return invokeDesktop<T>(command, args);
+  return requestWebApi<T>(url, "POST", args);
+}
+
+export function getKonfigurasiNilai(): Promise<KonfigurasiNilai> {
+  return panggil("desktop_grade_config", {}, "/api/academic/grades/config");
+}
+
+export function simpanJenisNilai(
+  draft: JenisNilaiDraft,
+): Promise<{ sukses: boolean; id_jenis: string }> {
+  if (isDesktopRuntime()) {
+    return invokeDesktop("desktop_grade_save_type", { draft });
+  }
+  return requestWebApi("/api/academic/grades/save-type", "POST", draft);
+}
+
+export function hapusJenisNilai(idJenis: string): Promise<{ sukses: boolean }> {
+  return panggil(
+    "desktop_grade_delete_type",
+    { idJenis },
+    "/api/academic/grades/delete-type",
+  );
+}
+
+export function simpanBobotNilai(
+  bobotKehadiran: number,
+  items: Array<{ id_jenis: string; bobot: number }>,
+): Promise<{ sukses: boolean }> {
+  return panggil(
+    "desktop_grade_save_weights",
+    { bobotKehadiran, items },
+    "/api/academic/grades/save-weights",
+  );
+}
+
+export function simpanHariSekolah(
+  hariSekolah: HariSekolah,
+): Promise<{ sukses: boolean; hari_sekolah: HariSekolah }> {
+  return panggil(
+    "desktop_grade_save_school_days",
+    { hariSekolah },
+    "/api/academic/grades/save-school-days",
+  );
+}
+
+export function getRekapNilaiAkhir(
+  idTahunAjaran: string,
+  semester: string,
+  idRombel: string,
+  idMapel: string,
+): Promise<RekapNilaiAkhir> {
+  return panggil(
+    "desktop_grade_recap",
+    { idTahunAjaran, semester, idRombel, idMapel },
+    "/api/academic/grades/recap",
+  );
 }

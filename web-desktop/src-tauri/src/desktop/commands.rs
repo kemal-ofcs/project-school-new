@@ -2782,6 +2782,39 @@ pub fn desktop_accounting_trial_balance(
     accounting::trial_balance(&state, &sampai)
 }
 
+/// Laporan Posisi Keuangan per tanggal (ISAK 35).
+#[tauri::command]
+pub fn desktop_accounting_report_position(
+    state: State<'_, DesktopState>,
+    sampai: String,
+) -> Result<Value, CommandError> {
+    require_permission(&state, "accounting.view")?;
+    accounting::report_position(&state, &sampai)
+}
+
+/// Laporan Penghasilan Komprehensif untuk satu rentang (ISAK 35).
+#[tauri::command]
+pub fn desktop_accounting_report_activity(
+    state: State<'_, DesktopState>,
+    dari: String,
+    sampai: String,
+) -> Result<Value, CommandError> {
+    require_permission(&state, "accounting.view")?;
+    accounting::report_activity(&state, &dari, &sampai)
+}
+
+/// Laporan Arus Kas metode langsung untuk akun kas yang dipilih.
+#[tauri::command]
+pub fn desktop_accounting_report_cashflow(
+    state: State<'_, DesktopState>,
+    dari: String,
+    sampai: String,
+    akun_kas: Vec<String>,
+) -> Result<Value, CommandError> {
+    require_permission(&state, "accounting.view")?;
+    accounting::report_cashflow(&state, &dari, &sampai, &akun_kas)
+}
+
 /// Daftar kasbon beserta sisa yang dihitung dari mutasinya.
 #[tauri::command]
 pub fn desktop_loan_list(state: State<'_, DesktopState>) -> Result<Value, CommandError> {
@@ -2991,6 +3024,23 @@ pub fn desktop_billing_list(
         id_jenis_tagihan.as_deref(),
         id_rombel.as_deref(),
         status.as_deref(),
+    )
+}
+
+/// Pengingat tunggakan WhatsApp ke wali, satu pesan per siswa per hari (K4b).
+#[tauri::command]
+pub fn desktop_billing_remind(
+    state: State<'_, DesktopState>,
+    periode: Option<String>,
+    id_jenis_tagihan: Option<String>,
+    id_rombel: Option<String>,
+) -> Result<Value, CommandError> {
+    require_permission(&state, "billing.manage")?;
+    billing::remind(
+        &state,
+        periode.as_deref(),
+        id_jenis_tagihan.as_deref(),
+        id_rombel.as_deref(),
     )
 }
 
@@ -4316,6 +4366,65 @@ pub fn desktop_delete_assessment(
 ) -> Result<Value, CommandError> {
     require_permission(&state, "grades.delete")?;
     super::grades::delete_assessment(&state, &id_penilaian)
+}
+
+/// Jenis penilaian, bobot, Hari Sekolah, dan unit untuk tab Pengaturan Nilai.
+#[tauri::command]
+pub fn desktop_grade_config(state: State<'_, DesktopState>) -> Result<Value, CommandError> {
+    require_permission(&state, "grades.view")?;
+    super::nilai_akhir::config(&state)
+}
+
+/// Mengubah jenis penilaian: izin sensitif, karena bobotnya mengubah nilai
+/// akhir seluruh siswa.
+#[tauri::command]
+pub fn desktop_grade_save_type(
+    state: State<'_, DesktopState>,
+    draft: Value,
+) -> Result<Value, CommandError> {
+    require_permission(&state, "grades.configure")?;
+    super::nilai_akhir::save_type(&state, draft)
+}
+
+#[tauri::command]
+pub fn desktop_grade_delete_type(
+    state: State<'_, DesktopState>,
+    id_jenis: String,
+) -> Result<Value, CommandError> {
+    require_permission(&state, "grades.configure")?;
+    super::nilai_akhir::delete_type(&state, &id_jenis)
+}
+
+#[tauri::command]
+pub fn desktop_grade_save_weights(
+    state: State<'_, DesktopState>,
+    bobot_kehadiran: Value,
+    items: Vec<Value>,
+) -> Result<Value, CommandError> {
+    require_permission(&state, "grades.configure")?;
+    super::nilai_akhir::save_weights(&state, bobot_kehadiran, items)
+}
+
+#[tauri::command]
+pub fn desktop_grade_save_school_days(
+    state: State<'_, DesktopState>,
+    hari_sekolah: Value,
+) -> Result<Value, CommandError> {
+    require_permission(&state, "grades.configure")?;
+    super::nilai_akhir::save_school_days(&state, hari_sekolah)
+}
+
+/// Rekap nilai akhir satu rombel × mapel × semester, dihitung saat diminta.
+#[tauri::command]
+pub fn desktop_grade_recap(
+    state: State<'_, DesktopState>,
+    id_tahun_ajaran: String,
+    semester: String,
+    id_rombel: String,
+    id_mapel: String,
+) -> Result<Value, CommandError> {
+    require_permission(&state, "grades.view")?;
+    super::nilai_akhir::recap(&state, &id_tahun_ajaran, &semester, &id_rombel, &id_mapel)
 }
 
 /// Mengambil daftar artikel berita (Cloud-Only).

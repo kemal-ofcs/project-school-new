@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-desktop-grade-delete-type"
+description = "Enables the desktop_grade_delete_type command without any pre-configured scope."
+commands.allow = ["desktop_grade_delete_type"]
+
+[[permission]]
+identifier = "deny-desktop-grade-delete-type"
+description = "Denies the desktop_grade_delete_type command without any pre-configured scope."
+commands.deny = ["desktop_grade_delete_type"]

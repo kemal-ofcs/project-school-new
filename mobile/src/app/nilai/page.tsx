@@ -3,6 +3,8 @@
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { MobileAppShell } from "@/components/MobileAppShell";
+import { PengaturanNilai } from "@/components/nilai/PengaturanNilai";
+import { RekapNilai } from "@/components/nilai/RekapNilai";
 import { FeedbackBanner } from "@/components/ui/FeedbackBanner";
 import { Modal } from "@/components/ui/Modal";
 import { formatTanggalOperasional } from "@/lib/attendance/time-policy";
@@ -15,8 +17,10 @@ import {
 } from "@/lib/gateways/academic";
 import {
   daftarPenilaian,
+  getKonfigurasiNilai,
   getPenilaian,
   hapusPenilaian,
+  type JenisNilaiItem,
   type PenilaianDetail,
   type PenilaianItem,
   simpanNilai,
@@ -26,8 +30,6 @@ import { useConfirmDialog } from "@/lib/hooks/useConfirmDialog";
 import { useHydrated } from "@/lib/hooks/useHydrated";
 import {
   BATAS_DAFTAR_PENILAIAN,
-  JENIS_PENILAIAN,
-  type JenisPenilaian,
   SEMESTER_LIST,
   type Semester,
 } from "@/types/grades";
@@ -38,7 +40,7 @@ interface Opsi {
 }
 
 const DRAFT_KOSONG = {
-  jenis: "Ulangan Harian" as (typeof JENIS_PENILAIAN)[number],
+  id_jenis: "",
   nama_penilaian: "",
   tanggal: formatTanggalOperasional(Date.now()),
   bobot: 1,
@@ -84,7 +86,11 @@ export default function NilaiMobilePage() {
   const [semester, setSemester] = useState<Semester>("Ganjil");
   const [idRombel, setIdRombel] = useState("");
   const [idMapel, setIdMapel] = useState("");
-  const [jenis, setJenis] = useState<JenisPenilaian | "">("");
+  const [jenis, setJenis] = useState("");
+  const [daftarJenis, setDaftarJenis] = useState<JenisNilaiItem[]>([]);
+  const [tab, setTab] = useState<"penilaian" | "rekap" | "pengaturan">(
+    "penilaian",
+  );
 
   const [penilaian, setPenilaian] = useState<PenilaianItem[]>([]);
   const [detail, setDetail] = useState<PenilaianDetail | null>(null);
@@ -140,6 +146,34 @@ export default function NilaiMobilePage() {
         );
       });
   }, [isAuthenticated]);
+
+  const muatJenis = useCallback(async () => {
+    try {
+      const hasil = await getKonfigurasiNilai();
+      setDaftarJenis(hasil.jenis);
+      const aktif = hasil.jenis.filter((j) => j.is_aktif === 1);
+      setDraft((d) =>
+        aktif.some((j) => j.id_jenis === d.id_jenis)
+          ? d
+          : {
+              ...d,
+              id_jenis:
+                (aktif.find((j) => j.id_jenis === "jns-uh") ?? aktif[0])
+                  ?.id_jenis ?? "",
+            },
+      );
+    } catch (error) {
+      setGalat(
+        error instanceof Error
+          ? error.message
+          : "Gagal memuat jenis penilaian.",
+      );
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!authLoading && isAuthenticated) void muatJenis();
+  }, [authLoading, isAuthenticated, muatJenis]);
 
   const muatPenilaian = useCallback(async () => {
     if (!idTahunAjaran) {
@@ -235,7 +269,7 @@ export default function NilaiMobilePage() {
         id_rombel: idRombel,
         id_mapel: idMapel,
         id_guru: String(user?.username ?? ""),
-        jenis: draft.jenis,
+        id_jenis: draft.id_jenis,
         nama_penilaian: draft.nama_penilaian,
         tanggal: draft.tanggal,
         bobot: draft.bobot,
@@ -243,7 +277,7 @@ export default function NilaiMobilePage() {
       });
       setKabar("Penilaian dibuat.");
       setModalBaru(false);
-      setDraft(DRAFT_KOSONG);
+      setDraft((d) => ({ ...DRAFT_KOSONG, id_jenis: d.id_jenis }));
       await muatPenilaian();
     } catch (error) {
       setGalat(
@@ -319,7 +353,7 @@ export default function NilaiMobilePage() {
             Mengisi nilai siswa per mata pelajaran. Bekerja tanpa jaringan:
             nilai tersimpan di perangkat dan terkirim saat sinkronisasi.
           </p>
-          {bolehKelola && idRombel && idMapel ? (
+          {tab === "penilaian" && bolehKelola && idRombel && idMapel ? (
             <button
               className="mt-3 w-full rounded-xl bg-amber-500 px-4 py-2.5 font-semibold text-slate-950 text-sm"
               onClick={() => setModalBaru(true)}
@@ -444,72 +478,133 @@ export default function NilaiMobilePage() {
             <select
               className="mt-1 min-h-11 w-full rounded-xl border border-white/10 bg-slate-950 px-3 py-2 text-sm text-white"
               id={`${id}-filter-jenis`}
-              onChange={(e) => setJenis(e.target.value as JenisPenilaian | "")}
+              onChange={(e) => setJenis(e.target.value)}
               value={jenis}
             >
               <option value="">Semua jenis</option>
-              {JENIS_PENILAIAN.map((item) => (
-                <option key={item} value={item}>
-                  {item}
+              {daftarJenis.map((item) => (
+                <option key={item.id_jenis} value={item.id_jenis}>
+                  {item.nama}
+                  {item.is_aktif === 1 ? "" : " (nonaktif)"}
                 </option>
               ))}
             </select>
           </div>
         </section>
 
-        <section className="space-y-2">
-          {memuat ? (
-            <p className="text-slate-400 text-sm">Memuat penilaian…</p>
-          ) : penilaian.length === 0 ? (
-            <p className="rounded-2xl border border-white/10 border-dashed p-4 text-slate-400 text-sm">
-              Belum ada penilaian yang cocok dengan filter ini.
-            </p>
+        <div
+          aria-label="Bagian nilai"
+          className="flex gap-1 overflow-x-auto rounded-xl border border-white/10 bg-slate-900/60 p-1"
+          role="tablist"
+        >
+          {(
+            [
+              ["penilaian", "Penilaian"],
+              ["rekap", "Rekap Nilai Akhir"],
+              ["pengaturan", "Pengaturan Nilai"],
+            ] as const
+          ).map(([kunci, label]) => (
+            <button
+              aria-selected={tab === kunci}
+              className={`min-h-11 flex-1 whitespace-nowrap rounded-lg px-4 py-2 font-medium text-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 ${
+                tab === kunci
+                  ? "bg-amber-500 text-slate-950"
+                  : "text-slate-300 hover:bg-slate-800"
+              }`}
+              key={kunci}
+              aria-controls="panel-nilai"
+              id={`tab-nilai-${kunci}`}
+              onClick={() => setTab(kunci)}
+              role="tab"
+              type="button"
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+
+        <div
+          aria-labelledby={`tab-nilai-${tab}`}
+          id="panel-nilai"
+          role="tabpanel"
+        >
+          {tab === "rekap" ? (
+            <RekapNilai
+              idMapel={idMapel}
+              idRombel={idRombel}
+              namaRombel={rombel.find((r) => r.id === idRombel)?.nama ?? ""}
+              namaTahun={
+                tahunAjaran.find((t) => t.id === idTahunAjaran)?.nama ?? ""
+              }
+              idTahunAjaran={idTahunAjaran}
+              semester={semester}
+            />
+          ) : tab === "pengaturan" ? (
+            <PengaturanNilai
+              bolehAtur={hasPermission(user, "grades.configure")}
+              onBerubah={(pesan) => {
+                setKabar(pesan);
+                void muatJenis();
+              }}
+            />
           ) : (
-            penilaian.map((item) => (
-              <div
-                className="rounded-2xl border border-white/10 bg-slate-900/95 p-4"
-                key={item.id_penilaian}
-              >
-                <button
-                  className="w-full text-left"
-                  onClick={() => void bukaDetail(item.id_penilaian)}
-                  type="button"
-                >
-                  <p className="font-semibold text-sm text-white">
-                    {item.nama_penilaian}
-                  </p>
-                  <p className="mt-1 text-slate-400 text-xs">
-                    {semuaRombel ? `${item.nama_rombel} · ` : ""}
-                    {item.jenis} · {item.nama_mapel} · {item.tanggal}
-                  </p>
-                  <p className="mt-2 text-slate-300 text-xs">
-                    Dinilai {item.jumlah_dinilai} dari {item.jumlah_siswa} siswa
-                    · rata-rata{" "}
-                    {/* `null` = belum ada satu pun skor. Menampilkan "0" akan
-                        membuat kelas yang belum dinilai tampak gagal total. */}
-                    {item.rata_rata === null ? "—" : item.rata_rata.toFixed(1)}
-                  </p>
-                </button>
-                {bolehHapus ? (
-                  <button
-                    className="mt-3 rounded-lg border border-rose-500/40 px-3 py-1.5 text-rose-300 text-xs"
-                    onClick={() => void hapus(item)}
-                    type="button"
+            <section className="space-y-2">
+              {memuat ? (
+                <p className="text-slate-400 text-sm">Memuat penilaian…</p>
+              ) : penilaian.length === 0 ? (
+                <p className="rounded-2xl border border-white/10 border-dashed p-4 text-slate-400 text-sm">
+                  Belum ada penilaian yang cocok dengan filter ini.
+                </p>
+              ) : (
+                penilaian.map((item) => (
+                  <div
+                    className="rounded-2xl border border-white/10 bg-slate-900/95 p-4"
+                    key={item.id_penilaian}
                   >
-                    Hapus penilaian
-                  </button>
-                ) : null}
-              </div>
-            ))
+                    <button
+                      className="w-full text-left"
+                      onClick={() => void bukaDetail(item.id_penilaian)}
+                      type="button"
+                    >
+                      <p className="font-semibold text-sm text-white">
+                        {item.nama_penilaian}
+                      </p>
+                      <p className="mt-1 text-slate-400 text-xs">
+                        {semuaRombel ? `${item.nama_rombel} · ` : ""}
+                        {item.nama_jenis} · {item.nama_mapel} · {item.tanggal}
+                      </p>
+                      <p className="mt-2 text-slate-300 text-xs">
+                        Dinilai {item.jumlah_dinilai} dari {item.jumlah_siswa}{" "}
+                        siswa · rata-rata{" "}
+                        {/* `null` = belum ada satu pun skor. Menampilkan "0" akan
+                        membuat kelas yang belum dinilai tampak gagal total. */}
+                        {item.rata_rata === null
+                          ? "—"
+                          : item.rata_rata.toFixed(1)}
+                      </p>
+                    </button>
+                    {bolehHapus ? (
+                      <button
+                        className="mt-3 rounded-lg border border-rose-500/40 px-3 py-1.5 text-rose-300 text-xs"
+                        onClick={() => void hapus(item)}
+                        type="button"
+                      >
+                        Hapus penilaian
+                      </button>
+                    ) : null}
+                  </div>
+                ))
+              )}
+              {!memuat && penilaian.length >= BATAS_DAFTAR_PENILAIAN ? (
+                <p className="text-slate-400 text-xs">
+                  Hanya {BATAS_DAFTAR_PENILAIAN} penilaian terbaru yang
+                  ditampilkan. Pilih rombel, mata pelajaran, atau jenis untuk
+                  mempersempit daftar.
+                </p>
+              ) : null}
+            </section>
           )}
-          {!memuat && penilaian.length >= BATAS_DAFTAR_PENILAIAN ? (
-            <p className="text-slate-400 text-xs">
-              Hanya {BATAS_DAFTAR_PENILAIAN} penilaian terbaru yang ditampilkan.
-              Pilih rombel, mata pelajaran, atau jenis untuk mempersempit
-              daftar.
-            </p>
-          ) : null}
-        </section>
+        </div>
       </div>
 
       <Modal
@@ -523,7 +618,7 @@ export default function NilaiMobilePage() {
         {detail ? (
           <div className="space-y-3 text-sm">
             <p className="text-slate-400 text-xs">
-              {detail.penilaian.nama_rombel} · KKM {detail.penilaian.kkm} ·
+              {detail.penilaian.nama_rombel} · KKTP {detail.penilaian.kkm} ·
               maksimum {detail.penilaian.nilai_maks}
             </p>
             <p className="text-slate-400 text-xs leading-relaxed">
@@ -642,18 +737,18 @@ export default function NilaiMobilePage() {
                 className="mt-1 w-full rounded-xl border border-white/10 bg-slate-950 px-3 py-2 text-white"
                 id={`${id}-jenis`}
                 onChange={(e) =>
-                  setDraft((d) => ({
-                    ...d,
-                    jenis: e.target.value as (typeof JENIS_PENILAIAN)[number],
-                  }))
+                  setDraft((d) => ({ ...d, id_jenis: e.target.value }))
                 }
-                value={draft.jenis}
+                required
+                value={draft.id_jenis}
               >
-                {JENIS_PENILAIAN.map((item) => (
-                  <option key={item} value={item}>
-                    {item}
-                  </option>
-                ))}
+                {daftarJenis
+                  .filter((item) => item.is_aktif === 1)
+                  .map((item) => (
+                    <option key={item.id_jenis} value={item.id_jenis}>
+                      {item.nama}
+                    </option>
+                  ))}
               </select>
             </div>
             <div>
@@ -719,9 +814,9 @@ export default function NilaiMobilePage() {
             </div>
           </div>
           <p className="text-slate-400 text-xs leading-relaxed">
-            KKM diambil dari mata pelajaran dan dibekukan saat penilaian dibuat,
-            sehingga perubahan KKM di kemudian hari tidak mengubah penilaian
-            ini.
+            KKTP diambil dari mata pelajaran dan dibekukan saat penilaian
+            dibuat, sehingga perubahan KKTP di kemudian hari tidak mengubah
+            penilaian ini.
           </p>
           <button
             className="w-full rounded-xl bg-amber-500 px-4 py-3 font-semibold text-slate-950"

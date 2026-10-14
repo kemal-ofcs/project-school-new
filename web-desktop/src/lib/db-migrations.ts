@@ -5,6 +5,10 @@ import {
   PERMISSION_CATALOG,
 } from "@/lib/rbac/catalog";
 import { AKUN_BAWAAN, SEED_AKUN_SQL } from "@/lib/validations/accounting";
+import {
+  JENIS_NILAI_BAWAAN,
+  SEED_JENIS_SQL,
+} from "@/lib/validations/nilai-akhir";
 import TARIF_PAYROLL_BAWAAN from "@/lib/validations/tarif-payroll-bawaan.json";
 
 const RBAC_MIGRATION_VERSION = 1;
@@ -49,6 +53,8 @@ const ACCOUNTING_MIGRATION_VERSION = 39;
 const EMPLOYEE_LOAN_MIGRATION_VERSION = 40;
 const STUDENT_BILLING_MIGRATION_VERSION = 41;
 const STUDENT_PAYMENT_MIGRATION_VERSION = 42;
+const GRADE_TYPE_MIGRATION_VERSION = 43;
+const WA_BILLING_REMINDER_MIGRATION_VERSION = 44;
 
 /**
  * v21 — aturan jam scan baru: Jam Kerja Normal = (Jam Pulang − Jam Masuk) −
@@ -518,6 +524,11 @@ export async function runDatabaseMigrations(client: Client) {
       "uks_enabled",
       "ALTER TABLE app_wa_config ADD COLUMN uks_enabled INTEGER NOT NULL DEFAULT 0;",
     ],
+    [
+      "app_wa_config",
+      "tagihan_enabled",
+      "ALTER TABLE app_wa_config ADD COLUMN tagihan_enabled INTEGER NOT NULL DEFAULT 0;",
+    ],
     // Vonis verifikasi wajah pada foto bukti (v38). Cerminan `ensure_column`
     // di `turso.rs` dan `storage.rs`.
     [
@@ -529,6 +540,13 @@ export async function runDatabaseMigrations(client: Client) {
       "absensi_foto",
       "wajah_skor",
       "ALTER TABLE absensi_foto ADD COLUMN wajah_skor REAL;",
+    ],
+    // Jenis penilaian dinamis (v43). Cerminan `ensure_column` di `turso.rs`
+    // dan `storage.rs`; CHECK lama `jenis` dibiarkan.
+    [
+      "nilai_penilaian",
+      "id_jenis",
+      "ALTER TABLE nilai_penilaian ADD COLUMN id_jenis TEXT;",
     ],
   ] as const) {
     if (
@@ -668,7 +686,7 @@ export async function runDatabaseMigrations(client: Client) {
     sql: "SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'notifikasi_wa';",
   });
   const ddlNotif = String(notifDdl.rows[0]?.sql ?? "");
-  if (ddlNotif && !ddlNotif.includes("'uks'")) {
+  if (ddlNotif && !ddlNotif.includes("'tagihan'")) {
     // Irisan kolom, bukan daftar tetap (cermin `storage.rs`/`turso.rs`): tabel
     // lama bisa belum punya `klaim_oleh`/`klaim_sampai`, dan tabel yang sudah
     // punya tidak boleh kehilangan klaim pengiriman yang sedang berjalan.
@@ -697,7 +715,7 @@ export async function runDatabaseMigrations(client: Client) {
         `CREATE TABLE notifikasi_wa__rebuild (
           id_notifikasi TEXT PRIMARY KEY,
           dedupe_key TEXT NOT NULL,
-          jenis TEXT NOT NULL CHECK (jenis IN ('scan_masuk', 'scan_pulang', 'bolos', 'ambang_alfa', 'koreksi_admin', 'import_manual', 'uks')),
+          jenis TEXT NOT NULL CHECK (jenis IN ('scan_masuk', 'scan_pulang', 'bolos', 'ambang_alfa', 'koreksi_admin', 'import_manual', 'uks', 'tagihan')),
           id_siswa TEXT,
           tujuan_nomor TEXT NOT NULL,
           isi_pesan TEXT NOT NULL,
@@ -1889,6 +1907,40 @@ export async function runDatabaseMigrations(client: Client) {
     args: [STUDENT_PAYMENT_MIGRATION_VERSION, now],
   });
 
+  // v43 — jenis penilaian dinamis berbobot. DDL WAJIB identik dengan
+  // `storage.rs` dan `turso.rs`; jenis bawaan dari berkas JSON yang sama.
+  await client.execute(`
+    CREATE TABLE IF NOT EXISTS nilai_jenis (
+      id_jenis TEXT PRIMARY KEY,
+      nama TEXT NOT NULL,
+      bobot INTEGER NOT NULL DEFAULT 0 CHECK (bobot >= 0 AND bobot <= 100),
+      urutan INTEGER NOT NULL DEFAULT 0,
+      is_aktif INTEGER NOT NULL DEFAULT 1 CHECK (is_aktif IN (0, 1)),
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+  `);
+  await client.batch(
+    JENIS_NILAI_BAWAAN.map((jenis) => ({
+      sql: SEED_JENIS_SQL,
+      args: [jenis.id_jenis, jenis.nama, jenis.urutan],
+    })),
+    "write",
+  );
+  await client.execute({
+    sql: `INSERT OR IGNORE INTO schema_migration (version, name, applied_at)
+          VALUES (?, 'grade-type-dynamic', ?);`,
+    args: [GRADE_TYPE_MIGRATION_VERSION, now],
+  });
+
+  // v44 — pengingat tagihan lewat WhatsApp: jenis `tagihan` di CHECK
+  // `notifikasi_wa.jenis` (bangun ulang di atas) dan `app_wa_config.tagihan_enabled`.
+  await client.execute({
+    sql: `INSERT OR IGNORE INTO schema_migration (version, name, applied_at)
+          VALUES (?, 'wa-billing-reminder', ?);`,
+    args: [WA_BILLING_REMINDER_MIGRATION_VERSION, now],
+  });
+
   await client.execute(
     "CREATE INDEX IF NOT EXISTS idx_jurnal_presensi ON jurnal_mengajar(id_presensi_mapel);",
   );
@@ -1909,7 +1961,7 @@ export async function runDatabaseMigrations(client: Client) {
     CREATE TABLE IF NOT EXISTS notifikasi_wa (
       id_notifikasi TEXT PRIMARY KEY,
       dedupe_key TEXT NOT NULL,
-      jenis TEXT NOT NULL CHECK (jenis IN ('scan_masuk', 'scan_pulang', 'bolos', 'ambang_alfa', 'koreksi_admin', 'import_manual', 'uks')),
+      jenis TEXT NOT NULL CHECK (jenis IN ('scan_masuk', 'scan_pulang', 'bolos', 'ambang_alfa', 'koreksi_admin', 'import_manual', 'uks', 'tagihan')),
       id_siswa TEXT,
       tujuan_nomor TEXT NOT NULL,
       isi_pesan TEXT NOT NULL,
@@ -1940,6 +1992,7 @@ export async function runDatabaseMigrations(client: Client) {
       koreksi_admin_enabled INTEGER NOT NULL DEFAULT 0,
       import_manual_enabled INTEGER NOT NULL DEFAULT 0,
       uks_enabled INTEGER NOT NULL DEFAULT 0,
+      tagihan_enabled INTEGER NOT NULL DEFAULT 0,
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL
     );
@@ -2352,6 +2405,7 @@ export async function runDatabaseMigrations(client: Client) {
       id_guru TEXT NOT NULL,
       jenis TEXT NOT NULL
         CHECK (jenis IN ('Tugas', 'Ulangan Harian', 'Praktik', 'UTS', 'UAS')),
+      id_jenis TEXT,
       nama_penilaian TEXT NOT NULL,
       tanggal TEXT NOT NULL,
       bobot INTEGER NOT NULL DEFAULT 1,

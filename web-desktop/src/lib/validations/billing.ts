@@ -589,3 +589,81 @@ export function barisJurnalPembayaran(
   }
   return baris;
 }
+
+// ── Pengingat tunggakan lewat WhatsApp (K4b) ────────────────────────────────
+
+/** Cermin `MAKS_RINCIAN_PENGINGAT`. */
+export const MAKS_RINCIAN_PENGINGAT = 5;
+/** Cermin `MAKS_SISWA_PENGINGAT`: siswa paling banyak per satu tekan tombol. */
+export const MAKS_SISWA_PENGINGAT = 500;
+export const PESAN_PENGINGAT_MATI =
+  "Pengingat tagihan lewat WhatsApp belum dinyalakan. Nyalakan di Pengaturan, bagian Notifikasi WhatsApp.";
+
+const NAMA_BULAN = [
+  "Januari",
+  "Februari",
+  "Maret",
+  "April",
+  "Mei",
+  "Juni",
+  "Juli",
+  "Agustus",
+  "September",
+  "Oktober",
+  "November",
+  "Desember",
+];
+
+/** Cermin `label_periode`: `2026-09` → `September 2026`, `SEKALI` → kosong. */
+export function labelPeriode(periode: string): string {
+  if (periode === PERIODE_SEKALI) return "";
+  const cocok = /^(\d{4})-(\d{2})$/.exec(periode);
+  const bulan = cocok ? Number(cocok[2]) : 0;
+  return cocok && bulan >= 1 && bulan <= 12
+    ? `${NAMA_BULAN[bulan - 1]} ${cocok[1]}`
+    : periode;
+}
+
+function tanggalTampil(tanggal: string): string {
+  const bagian = tanggal.split("-");
+  return bagian.length === 3
+    ? `${bagian[2]}/${bagian[1]}/${bagian[0]}`
+    : tanggal;
+}
+
+export interface TagihanPengingat {
+  nama_tagihan: string;
+  periode: string;
+  jatuh_tempo: string;
+  sisa: number;
+}
+
+/**
+ * Cermin `isian_pengingat`: isian `{total}`, `{jumlah}`, `{rincian}`, dan
+ * `{jatuh_tempo}` dari tunggakan seorang siswa yang sudah berurutan jatuh tempo.
+ */
+export function isianPengingat(
+  tagihan: readonly TagihanPengingat[],
+): Record<"total" | "jumlah" | "rincian" | "jatuh_tempo", string> {
+  const total = tagihan.reduce((jumlah, t) => jumlah + t.sisa, 0);
+  const rincian = tagihan.slice(0, MAKS_RINCIAN_PENGINGAT).map((t) => {
+    const periode = labelPeriode(t.periode);
+    const nama = periode ? `${t.nama_tagihan} ${periode}` : t.nama_tagihan;
+    return `- ${nama}: ${formatRupiah(t.sisa)}`;
+  });
+  if (tagihan.length > MAKS_RINCIAN_PENGINGAT) {
+    rincian.push(
+      `- dan ${tagihan.length - MAKS_RINCIAN_PENGINGAT} tagihan lain`,
+    );
+  }
+  const jatuhTempo = tagihan
+    .map((t) => t.jatuh_tempo)
+    .filter((j) => j !== "")
+    .sort()[0];
+  return {
+    total: formatRupiah(total),
+    jumlah: String(tagihan.length),
+    rincian: rincian.join("\n"),
+    jatuh_tempo: jatuhTempo ? tanggalTampil(jatuhTempo) : "-",
+  };
+}

@@ -9,6 +9,9 @@ import type {
   BukuBesar,
   JurnalDetail,
   JurnalItem,
+  LaporanAktivitas,
+  LaporanArusKas,
+  LaporanPosisiKeuangan,
   NeracaSaldo,
 } from "@/types/accounting";
 
@@ -17,6 +20,9 @@ export type {
   BukuBesar,
   JurnalDetail,
   JurnalItem,
+  LaporanAktivitas,
+  LaporanArusKas,
+  LaporanPosisiKeuangan,
   NeracaSaldo,
 } from "@/types/accounting";
 
@@ -124,4 +130,50 @@ export async function getNeracaSaldo(sampai: string): Promise<NeracaSaldo> {
     return invokeDesktop("desktop_accounting_trial_balance", { sampai });
   }
   return requestWebApi("/api/accounting/trial-balance", "POST", { sampai });
+}
+
+// ── Laporan keuangan ISAK 35 (K4a) ──────────────────────────────────────────
+
+export async function getLaporanPosisi(
+  sampai: string,
+): Promise<LaporanPosisiKeuangan> {
+  if (isDesktopRuntime()) {
+    return invokeDesktop("desktop_accounting_report_position", { sampai });
+  }
+  return requestWebApi("/api/accounting/report-position", "POST", { sampai });
+}
+
+export async function getLaporanAktivitas(
+  dari: string,
+  sampai: string,
+): Promise<LaporanAktivitas> {
+  if (isDesktopRuntime()) {
+    return invokeDesktop("desktop_accounting_report_activity", {
+      dari,
+      sampai,
+    });
+  }
+  return requestWebApi("/api/accounting/report-activity", "POST", {
+    dari,
+    sampai,
+  });
+}
+
+export async function getLaporanArusKas(
+  dari: string,
+  sampai: string,
+  akunKas: string[],
+): Promise<LaporanArusKas> {
+  if (isDesktopRuntime()) {
+    return invokeDesktop("desktop_accounting_report_cashflow", {
+      dari,
+      sampai,
+      akunKas,
+    });
+  }
+  return requestWebApi("/api/accounting/report-cashflow", "POST", {
+    dari,
+    sampai,
+    akunKas,
+  });
 }

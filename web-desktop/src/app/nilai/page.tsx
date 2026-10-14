@@ -3,6 +3,8 @@
 import { redirect } from "next/navigation";
 import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { AppShell } from "@/components/AppShell";
+import { PengaturanNilai } from "@/components/nilai/PengaturanNilai";
+import { RekapNilai } from "@/components/nilai/RekapNilai";
 import { FeedbackBanner } from "@/components/ui/FeedbackBanner";
 import { Modal } from "@/components/ui/Modal";
 import { PageHeader } from "@/components/ui/PageHeader";
@@ -16,8 +18,10 @@ import {
 } from "@/lib/gateways/academic";
 import {
   daftarPenilaian,
+  getKonfigurasiNilai,
   getPenilaian,
   hapusPenilaian,
+  type JenisNilaiItem,
   type PenilaianDetail,
   type PenilaianItem,
   simpanNilai,
@@ -26,8 +30,6 @@ import {
 import { useConfirmDialog } from "@/lib/hooks/useConfirmDialog";
 import {
   BATAS_DAFTAR_PENILAIAN,
-  JENIS_PENILAIAN,
-  type JenisPenilaian,
   SEMESTER_LIST,
   type Semester,
 } from "@/types/grades";
@@ -38,7 +40,7 @@ interface Opsi {
 }
 
 const DRAFT_KOSONG = {
-  jenis: "Ulangan Harian" as (typeof JENIS_PENILAIAN)[number],
+  id_jenis: "",
   nama_penilaian: "",
   tanggal: formatTanggalOperasional(Date.now()),
   bobot: 1,
@@ -62,7 +64,11 @@ export default function NilaiPage() {
   const [semester, setSemester] = useState<Semester>("Ganjil");
   const [idRombel, setIdRombel] = useState("");
   const [idMapel, setIdMapel] = useState("");
-  const [jenis, setJenis] = useState<JenisPenilaian | "">("");
+  const [jenis, setJenis] = useState("");
+  const [daftarJenis, setDaftarJenis] = useState<JenisNilaiItem[]>([]);
+  const [tab, setTab] = useState<"penilaian" | "rekap" | "pengaturan">(
+    "penilaian",
+  );
 
   const [penilaian, setPenilaian] = useState<PenilaianItem[]>([]);
   const [detail, setDetail] = useState<PenilaianDetail | null>(null);
@@ -110,6 +116,34 @@ export default function NilaiPage() {
         );
       });
   }, [authLoading, isAuthenticated]);
+
+  const muatJenis = useCallback(async () => {
+    try {
+      const hasil = await getKonfigurasiNilai();
+      setDaftarJenis(hasil.jenis);
+      const aktif = hasil.jenis.filter((j) => j.is_aktif === 1);
+      setDraft((d) =>
+        aktif.some((j) => j.id_jenis === d.id_jenis)
+          ? d
+          : {
+              ...d,
+              id_jenis:
+                (aktif.find((j) => j.id_jenis === "jns-uh") ?? aktif[0])
+                  ?.id_jenis ?? "",
+            },
+      );
+    } catch (error) {
+      setGalat(
+        error instanceof Error
+          ? error.message
+          : "Gagal memuat jenis penilaian.",
+      );
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!authLoading && isAuthenticated) void muatJenis();
+  }, [authLoading, isAuthenticated, muatJenis]);
 
   const muatPenilaian = useCallback(async () => {
     if (!idTahunAjaran) {
@@ -205,7 +239,7 @@ export default function NilaiPage() {
         id_rombel: idRombel,
         id_mapel: idMapel,
         id_guru: String(user?.username ?? ""),
-        jenis: draft.jenis,
+        id_jenis: draft.id_jenis,
         nama_penilaian: draft.nama_penilaian,
         tanggal: draft.tanggal,
         bobot: draft.bobot,
@@ -213,7 +247,7 @@ export default function NilaiPage() {
       });
       setKabar("Penilaian dibuat.");
       setModalBaru(false);
-      setDraft(DRAFT_KOSONG);
+      setDraft((d) => ({ ...DRAFT_KOSONG, id_jenis: d.id_jenis }));
       await muatPenilaian();
     } catch (error) {
       setGalat(
@@ -293,7 +327,7 @@ export default function NilaiPage() {
       <div className="space-y-6">
         <PageHeader
           actions={
-            bolehKelola && idRombel && idMapel ? (
+            tab === "penilaian" && bolehKelola && idRombel && idMapel ? (
               <button
                 className="rounded-lg bg-amber-500 px-4 py-2 font-semibold text-slate-950 text-sm"
                 onClick={() => setModalBaru(true)}
@@ -413,101 +447,170 @@ export default function NilaiPage() {
             <select
               className="mt-1 w-full rounded-lg border border-white/10 bg-slate-950 px-3 py-2 text-sm text-white"
               id={`${id}-filter-jenis`}
-              onChange={(e) => setJenis(e.target.value as JenisPenilaian | "")}
+              onChange={(e) => setJenis(e.target.value)}
               value={jenis}
             >
               <option value="">Semua jenis</option>
-              {JENIS_PENILAIAN.map((item) => (
-                <option key={item} value={item}>
-                  {item}
+              {daftarJenis.map((item) => (
+                <option key={item.id_jenis} value={item.id_jenis}>
+                  {item.nama}
+                  {item.is_aktif === 1 ? "" : " (nonaktif)"}
                 </option>
               ))}
             </select>
           </div>
         </section>
 
-        <section className="rounded-xl border border-white/10 bg-slate-900/95 p-4">
-          {memuat ? (
-            <p className="text-slate-400 text-sm">Memuat penilaian…</p>
-          ) : penilaian.length === 0 ? (
-            <p className="text-slate-400 text-sm">
-              Belum ada penilaian yang cocok dengan filter ini.
-            </p>
+        <div
+          aria-label="Bagian nilai"
+          className="flex gap-1 overflow-x-auto rounded-xl border border-white/10 bg-slate-900/60 p-1"
+          role="tablist"
+        >
+          {(
+            [
+              ["penilaian", "Penilaian"],
+              ["rekap", "Rekap Nilai Akhir"],
+              ["pengaturan", "Pengaturan Nilai"],
+            ] as const
+          ).map(([kunci, label]) => (
+            <button
+              aria-selected={tab === kunci}
+              className={`min-h-11 flex-1 whitespace-nowrap rounded-lg px-4 py-2 font-medium text-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 ${
+                tab === kunci
+                  ? "bg-amber-500 text-slate-950"
+                  : "text-slate-300 hover:bg-slate-800"
+              }`}
+              key={kunci}
+              aria-controls="panel-nilai"
+              id={`tab-nilai-${kunci}`}
+              onClick={() => setTab(kunci)}
+              role="tab"
+              type="button"
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+
+        <div
+          aria-labelledby={`tab-nilai-${tab}`}
+          id="panel-nilai"
+          role="tabpanel"
+        >
+          {tab === "rekap" ? (
+            <RekapNilai
+              idMapel={idMapel}
+              idRombel={idRombel}
+              namaRombel={rombel.find((r) => r.id === idRombel)?.nama ?? ""}
+              namaTahun={
+                tahunAjaran.find((t) => t.id === idTahunAjaran)?.nama ?? ""
+              }
+              idTahunAjaran={idTahunAjaran}
+              semester={semester}
+            />
+          ) : tab === "pengaturan" ? (
+            <PengaturanNilai
+              bolehAtur={hasPermission(user, "grades.configure")}
+              onBerubah={(pesan) => {
+                setKabar(pesan);
+                void muatJenis();
+              }}
+            />
           ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-sm">
-                <thead className="text-slate-400 text-xs uppercase">
-                  <tr>
-                    <th className="py-2">Tanggal</th>
-                    {semuaRombel ? <th className="py-2">Kelas</th> : null}
-                    <th className="py-2">Penilaian</th>
-                    <th className="py-2">Jenis</th>
-                    <th className="py-2">Mapel</th>
-                    <th className="py-2">Dinilai</th>
-                    <th className="py-2">Rata-rata</th>
-                    <th className="py-2">Aksi</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {penilaian.map((item) => (
-                    <tr
-                      className="border-white/5 border-t"
-                      key={item.id_penilaian}
-                    >
-                      <td className="py-2 text-slate-400">{item.tanggal}</td>
-                      {semuaRombel ? (
-                        <td className="py-2 text-slate-300">
-                          {item.nama_rombel}
-                        </td>
-                      ) : null}
-                      <td className="py-2 text-white">{item.nama_penilaian}</td>
-                      <td className="py-2 text-slate-400">{item.jenis}</td>
-                      <td className="py-2 text-slate-400">{item.nama_mapel}</td>
-                      <td className="py-2 text-slate-300">
-                        {item.jumlah_dinilai} / {item.jumlah_siswa}
-                      </td>
-                      <td className="py-2 text-slate-300">
-                        {/* `null` = belum ada satu pun skor. Menampilkan "0"
+            <section className="rounded-xl border border-white/10 bg-slate-900/95 p-4">
+              {memuat ? (
+                <p className="text-slate-400 text-sm">Memuat penilaian…</p>
+              ) : penilaian.length === 0 ? (
+                <p className="text-slate-400 text-sm">
+                  Belum ada penilaian yang cocok dengan filter ini.
+                </p>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-sm">
+                    <thead className="text-slate-400 text-xs uppercase">
+                      <tr>
+                        <th className="py-2">Tanggal</th>
+                        {semuaRombel ? <th className="py-2">Kelas</th> : null}
+                        <th className="py-2">Penilaian</th>
+                        <th className="py-2">Jenis</th>
+                        <th className="py-2">Mapel</th>
+                        <th className="py-2">Dinilai</th>
+                        <th className="py-2">Rata-rata</th>
+                        <th className="py-2">Aksi</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {penilaian.map((item) => (
+                        <tr
+                          className="border-white/5 border-t"
+                          key={item.id_penilaian}
+                        >
+                          <td className="py-2 text-slate-400">
+                            {item.tanggal}
+                          </td>
+                          {semuaRombel ? (
+                            <td className="py-2 text-slate-300">
+                              {item.nama_rombel}
+                            </td>
+                          ) : null}
+                          <td className="py-2 text-white">
+                            {item.nama_penilaian}
+                          </td>
+                          <td className="py-2 text-slate-400">
+                            {item.nama_jenis}
+                          </td>
+                          <td className="py-2 text-slate-400">
+                            {item.nama_mapel}
+                          </td>
+                          <td className="py-2 text-slate-300">
+                            {item.jumlah_dinilai} / {item.jumlah_siswa}
+                          </td>
+                          <td className="py-2 text-slate-300">
+                            {/* `null` = belum ada satu pun skor. Menampilkan "0"
                             di sini akan membuat kelas yang belum dinilai
                             tampak gagal total. */}
-                        {item.rata_rata === null
-                          ? "—"
-                          : item.rata_rata.toFixed(1)}
-                      </td>
-                      <td className="py-2">
-                        <div className="flex gap-2">
-                          <button
-                            className="rounded-md border border-white/15 px-2 py-1 text-white text-xs"
-                            onClick={() => void bukaDetail(item.id_penilaian)}
-                            type="button"
-                          >
-                            Input Nilai
-                          </button>
-                          {bolehHapus ? (
-                            <button
-                              className="rounded-md border border-rose-500/40 px-2 py-1 text-rose-300 text-xs"
-                              onClick={() => void hapus(item)}
-                              type="button"
-                            >
-                              Hapus
-                            </button>
-                          ) : null}
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-              {penilaian.length >= BATAS_DAFTAR_PENILAIAN ? (
-                <p className="mt-3 text-slate-400 text-xs">
-                  Hanya {BATAS_DAFTAR_PENILAIAN} penilaian terbaru yang
-                  ditampilkan. Pilih rombel, mata pelajaran, atau jenis untuk
-                  mempersempit daftar.
-                </p>
-              ) : null}
-            </div>
+                            {item.rata_rata === null
+                              ? "—"
+                              : item.rata_rata.toFixed(1)}
+                          </td>
+                          <td className="py-2">
+                            <div className="flex gap-2">
+                              <button
+                                className="rounded-md border border-white/15 px-2 py-1 text-white text-xs"
+                                onClick={() =>
+                                  void bukaDetail(item.id_penilaian)
+                                }
+                                type="button"
+                              >
+                                Input Nilai
+                              </button>
+                              {bolehHapus ? (
+                                <button
+                                  className="rounded-md border border-rose-500/40 px-2 py-1 text-rose-300 text-xs"
+                                  onClick={() => void hapus(item)}
+                                  type="button"
+                                >
+                                  Hapus
+                                </button>
+                              ) : null}
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                  {penilaian.length >= BATAS_DAFTAR_PENILAIAN ? (
+                    <p className="mt-3 text-slate-400 text-xs">
+                      Hanya {BATAS_DAFTAR_PENILAIAN} penilaian terbaru yang
+                      ditampilkan. Pilih rombel, mata pelajaran, atau jenis
+                      untuk mempersempit daftar.
+                    </p>
+                  ) : null}
+                </div>
+              )}
+            </section>
           )}
-        </section>
+        </div>
       </div>
 
       <Modal
@@ -522,7 +625,7 @@ export default function NilaiPage() {
           <div className="space-y-4 text-sm">
             <p className="text-slate-400">
               {detail.penilaian.nama_rombel} · {detail.penilaian.nama_mapel} ·
-              KKM {detail.penilaian.kkm} · nilai maksimum{" "}
+              KKTP {detail.penilaian.kkm} · nilai maksimum{" "}
               {detail.penilaian.nilai_maks}
             </p>
             <p className="text-slate-400 text-xs leading-relaxed">
@@ -653,18 +756,18 @@ export default function NilaiPage() {
                 className="mt-1 w-full rounded-lg border border-white/10 bg-slate-950 px-3 py-2 text-white"
                 id={`${id}-jenis`}
                 onChange={(e) =>
-                  setDraft((d) => ({
-                    ...d,
-                    jenis: e.target.value as (typeof JENIS_PENILAIAN)[number],
-                  }))
+                  setDraft((d) => ({ ...d, id_jenis: e.target.value }))
                 }
-                value={draft.jenis}
+                required
+                value={draft.id_jenis}
               >
-                {JENIS_PENILAIAN.map((item) => (
-                  <option key={item} value={item}>
-                    {item}
-                  </option>
-                ))}
+                {daftarJenis
+                  .filter((item) => item.is_aktif === 1)
+                  .map((item) => (
+                    <option key={item.id_jenis} value={item.id_jenis}>
+                      {item.nama}
+                    </option>
+                  ))}
               </select>
             </div>
             <div>
@@ -730,9 +833,9 @@ export default function NilaiPage() {
             </div>
           </div>
           <p className="text-slate-400 text-xs leading-relaxed">
-            KKM diambil dari mata pelajaran dan dibekukan saat penilaian dibuat,
-            sehingga perubahan KKM di kemudian hari tidak mengubah penilaian
-            ini.
+            KKTP diambil dari mata pelajaran dan dibekukan saat penilaian
+            dibuat, sehingga perubahan KKTP di kemudian hari tidak mengubah
+            penilaian ini.
           </p>
           <button
             className="w-full rounded-lg bg-amber-500 px-4 py-2 font-semibold text-slate-950"

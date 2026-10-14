@@ -12,7 +12,10 @@ import {
   saldoAkun,
   saldoBerjalan,
   saldoNormalBawaan,
+  susunAktivitas,
+  susunArusKas,
   susunPembalik,
+  susunPosisiKeuangan,
   validateAkun,
   validateJurnal,
 } from "./accounting";
@@ -358,5 +361,62 @@ describe("susunPembalik", () => {
     expect(galat("Manual", "a".repeat(151))).toBe(
       "Alasan pembatalan maksimal 150 karakter.",
     );
+  });
+});
+
+// Vektor kembar `laporan_isak35_kembar` di `desktop/accounting.rs`.
+describe("laporan ISAK 35", () => {
+  test("posisi keuangan, aktivitas, dan arus kas", () => {
+    const a = (
+      id: string,
+      kelompok: string,
+      saldo_normal: string,
+      debit: number,
+      kredit: number,
+    ) => ({
+      id_akun: id,
+      kode: id,
+      nama: id,
+      kelompok,
+      saldo_normal,
+      debit,
+      kredit,
+    });
+    const akun = [
+      a("kas", "Aset", "Debit", 900_000, 300_000),
+      a("piutang", "Aset", "Debit", 500_000, 200_000),
+      a("bangunan", "Aset", "Debit", 0, 0),
+      a("titipan", "Kewajiban", "Kredit", 0, 50_000),
+      a("aset-neto", "Aset Neto", "Kredit", 0, 400_000),
+      a("spp", "Pendapatan", "Kredit", 0, 700_000),
+      a("gaji", "Beban", "Debit", 300_000, 0),
+    ];
+    const posisi = susunPosisiKeuangan(akun);
+    expect(posisi.total_aset).toBe(900_000);
+    expect(posisi.aset.length).toBe(2);
+    expect(posisi.total_kewajiban).toBe(50_000);
+    expect(posisi.surplus_akumulasi).toBe(400_000);
+    expect(posisi.total_aset_neto).toBe(800_000);
+    expect(posisi.selisih).toBe(50_000);
+
+    const aktivitas = susunAktivitas(akun);
+    expect(aktivitas.total_pendapatan).toBe(700_000);
+    expect(aktivitas.total_beban).toBe(300_000);
+    expect(aktivitas.surplus).toBe(400_000);
+    expect(aktivitas.beban[0]?.saldo).toBe(300_000);
+
+    const arus = susunArusKas(100_000, [
+      { sumber: "Payroll", debit: 0, kredit: 250_000 },
+      { sumber: "Pembayaran", debit: 600_000, kredit: 50_000 },
+      { sumber: "Manual", debit: 0, kredit: 0 },
+    ]);
+    expect(arus.kelompok.length).toBe(2);
+    // Urutan mengikuti `SUMBER_JURNAL`.
+    expect(arus.kelompok[0]?.label).toBe("Pembayaran gaji");
+    expect(arus.kelompok[1]?.label).toBe("Penerimaan pembayaran siswa");
+    expect(arus.kelompok[1]?.bersih).toBe(550_000);
+    expect(arus.total_masuk).toBe(600_000);
+    expect(arus.total_keluar).toBe(300_000);
+    expect(arus.saldo_akhir).toBe(400_000);
   });
 });

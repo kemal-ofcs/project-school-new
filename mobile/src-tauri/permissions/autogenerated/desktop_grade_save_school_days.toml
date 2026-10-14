@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-desktop-grade-save-school-days"
+description = "Enables the desktop_grade_save_school_days command without any pre-configured scope."
+commands.allow = ["desktop_grade_save_school_days"]
+
+[[permission]]
+identifier = "deny-desktop-grade-save-school-days"
+description = "Denies the desktop_grade_save_school_days command without any pre-configured scope."
+commands.deny = ["desktop_grade_save_school_days"]

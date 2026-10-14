@@ -24,7 +24,7 @@ use super::{
     config::DesktopState,
     license, loan,
     models::CommandError,
-    storage, sync,
+    storage, sync, wa_notification,
 };
 
 /// WAJIB sama dengan CHECK `keu_jenis_tagihan.periodik` di ketiga DDL.
@@ -590,6 +590,92 @@ pub fn baris_jurnal_pembayaran(
         baris.push((AKUN_TITIPAN_WALI.to_owned(), 0, ke_titipan));
     }
     baris
+}
+
+// ── Pengingat tunggakan lewat WhatsApp (K4b) ────────────────────────────────
+
+/// Rincian yang ditulis di satu pesan; sisanya diringkas "dan N tagihan lain".
+pub const MAKS_RINCIAN_PENGINGAT: usize = 5;
+/// Siswa paling banyak per satu tekan tombol. Cermin `MAKS_SISWA_PENGINGAT`.
+pub const MAKS_SISWA_PENGINGAT: usize = 500;
+pub const PESAN_PENGINGAT_MATI: &str = "Pengingat tagihan lewat WhatsApp belum dinyalakan. Nyalakan di Pengaturan, bagian Notifikasi WhatsApp.";
+
+const NAMA_BULAN: [&str; 12] = [
+    "Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September",
+    "Oktober", "November", "Desember",
+];
+
+/// Cermin `labelPeriode`: `2026-09` → `September 2026`, `SEKALI` → kosong,
+/// nama tahun ajaran apa adanya.
+pub fn label_periode(periode: &str) -> String {
+    if periode == PERIODE_SEKALI {
+        return String::new();
+    }
+    let huruf: Vec<char> = periode.chars().collect();
+    if huruf.len() == 7 && huruf[4] == '-' {
+        let tahun: String = huruf[..4].iter().collect();
+        let bulan: String = huruf[5..].iter().collect();
+        if let (Ok(_), Ok(bulan)) = (tahun.parse::<u32>(), bulan.parse::<usize>()) {
+            if (1..=12).contains(&bulan) {
+                return format!("{} {tahun}", NAMA_BULAN[bulan - 1]);
+            }
+        }
+    }
+    periode.to_owned()
+}
+
+/// `2026-09-10` → `10/09/2026`; teks lain apa adanya.
+fn tanggal_tampil(tanggal: &str) -> String {
+    let bagian: Vec<&str> = tanggal.split('-').collect();
+    match bagian.as_slice() {
+        [tahun, bulan, hari] => format!("{hari}/{bulan}/{tahun}"),
+        _ => tanggal.to_owned(),
+    }
+}
+
+pub struct TagihanPengingat {
+    pub nama_tagihan: String,
+    pub periode: String,
+    pub jatuh_tempo: String,
+    pub sisa: i64,
+}
+
+/// Cermin `isianPengingat`: isian `{total}`, `{jumlah}`, `{rincian}`, dan
+/// `{jatuh_tempo}` dari tunggakan seorang siswa yang sudah berurutan jatuh tempo.
+pub fn isian_pengingat(tagihan: &[TagihanPengingat]) -> Vec<(&'static str, String)> {
+    let total: i64 = tagihan.iter().map(|t| t.sisa).sum();
+    let mut rincian: Vec<String> = tagihan
+        .iter()
+        .take(MAKS_RINCIAN_PENGINGAT)
+        .map(|t| {
+            let periode = label_periode(&t.periode);
+            let nama = if periode.is_empty() {
+                t.nama_tagihan.clone()
+            } else {
+                format!("{} {periode}", t.nama_tagihan)
+            };
+            format!("- {nama}: {}", accounting::format_rupiah(t.sisa))
+        })
+        .collect();
+    if tagihan.len() > MAKS_RINCIAN_PENGINGAT {
+        rincian.push(format!(
+            "- dan {} tagihan lain",
+            tagihan.len() - MAKS_RINCIAN_PENGINGAT
+        ));
+    }
+    let jatuh_tempo = tagihan
+        .iter()
+        .map(|t| t.jatuh_tempo.as_str())
+        .filter(|j| !j.is_empty())
+        .min()
+        .map(tanggal_tampil)
+        .unwrap_or_else(|| "-".to_owned());
+    vec![
+        ("total", accounting::format_rupiah(total)),
+        ("jumlah", tagihan.len().to_string()),
+        ("rincian", rincian.join("\n")),
+        ("jatuh_tempo", jatuh_tempo),
+    ]
 }
 
 // ── I/O lokal ───────────────────────────────────────────────────────────────
@@ -1400,7 +1486,115 @@ pub fn list(
         .iter()
         .map(|row| row["sisa"].as_i64().unwrap_or(0))
         .sum();
-    Ok(json!({ "items": items, "total_sisa": total_sisa }))
+    Ok(json!({
+        "items": items,
+        "total_sisa": total_sisa,
+        "pengingat_wa": pengingat_aktif(&connection)?,
+    }))
+}
+
+/// Sakelar `wa_notify_tagihan` di `setting_gex_system` lokal.
+fn pengingat_aktif(connection: &Connection) -> Result<bool, CommandError> {
+    let nilai: Option<String> = connection
+        .query_row(
+            "SELECT value FROM setting_gex_system WHERE key = ?1 LIMIT 1;",
+            params![wa_notification::WA_NOTIFY_TAGIHAN_KEY],
+            |row| row.get(0),
+        )
+        .optional()
+        .map_err(db_error)?;
+    Ok(nilai.is_some_and(|v| v.trim().eq_ignore_ascii_case("true")))
+}
+
+/// Antre pengingat tunggakan ke wali, satu pesan per siswa (K4b). Saringan
+/// memilih SISWA-nya; pesannya memuat seluruh tunggakan siswa itu, karena
+/// wali yang hanya diberi tahu sebagian tagihannya akan mengira sisanya lunas.
+/// Syarat lain (siswa, nomor wali sah, belum diingatkan hari ini lewat
+/// dedupe `tagihan:<siswa>:<tanggal WIB>`) dinilai `queue_wali_notification_tx`.
+/// Cermin `remind` di `services/billing.ts`.
+pub fn remind(
+    state: &DesktopState,
+    periode: Option<&str>,
+    id_jenis: Option<&str>,
+    id_rombel: Option<&str>,
+) -> Result<Value, CommandError> {
+    let client_id = sync::ensure_client_id(state)?;
+    let mut connection = storage::database(&state.data_dir)?;
+    if !pengingat_aktif(&connection)? {
+        return Err(invalid(PESAN_PENGINGAT_MATI));
+    }
+    let isi = |v: Option<&str>| {
+        v.map(str::trim)
+            .filter(|v| !v.is_empty())
+            .map(str::to_owned)
+    };
+    let mut sql = String::from(
+        "SELECT DISTINCT t.id_siswa
+         FROM keu_tagihan t
+         LEFT JOIN keu_tagihan_batal b ON b.id_tagihan = t.id_tagihan
+         -- subquery ini = `DIBAYAR_SQL`, ditulis utuh supaya `audit:sql` bisa menjalankannya
+         LEFT JOIN (
+            SELECT a.id_tagihan, SUM(a.nominal) AS dibayar
+            FROM keu_pembayaran_alokasi a
+            JOIN keu_pembayaran p ON p.id_pembayaran = a.id_pembayaran
+            LEFT JOIN keu_pembayaran_batal pb ON pb.id_pembayaran = p.id_pembayaran
+            WHERE a.id_tagihan IS NOT NULL AND pb.id_pembayaran IS NULL
+            GROUP BY a.id_tagihan
+         ) d ON d.id_tagihan = t.id_tagihan
+         LEFT JOIN siswa_data s ON s.id_siswa = t.id_siswa
+         WHERE b.id_tagihan IS NULL AND t.nominal - t.potongan > COALESCE(d.dibayar, 0)",
+    );
+    let mut args: Vec<String> = Vec::new();
+    if let Some(value) = isi(periode) {
+        sql.push_str(" AND t.periode = ?");
+        args.push(value);
+    }
+    if let Some(value) = isi(id_jenis) {
+        sql.push_str(" AND t.id_jenis_tagihan = ?");
+        args.push(value);
+    }
+    if let Some(value) = isi(id_rombel) {
+        sql.push_str(" AND s.id_rombel = ?");
+        args.push(value);
+    }
+    // `LIMIT 501` = `MAKS_SISWA_PENGINGAT` + 1, supaya pemotongan terdeteksi.
+    sql.push_str(" ORDER BY t.id_siswa LIMIT 501;");
+    let params: Vec<&dyn rusqlite::ToSql> =
+        args.iter().map(|a| a as &dyn rusqlite::ToSql).collect();
+    let mut siswa: Vec<String> = query_json(&connection, &sql, &params)?
+        .into_iter()
+        .filter_map(|row| row["id_siswa"].as_str().map(str::to_owned))
+        .collect();
+    let terpotong = siswa.len() > MAKS_SISWA_PENGINGAT;
+    siswa.truncate(MAKS_SISWA_PENGINGAT);
+
+    let hari = hari_ini(&connection)?;
+    let transaction = connection.transaction().map_err(db_error)?;
+    let mut diantre = 0;
+    for id_siswa in &siswa {
+        let tagihan: Vec<TagihanPengingat> = tagihan_terbuka(&transaction, id_siswa)?
+            .into_iter()
+            .map(|row| TagihanPengingat {
+                nama_tagihan: row["nama_tagihan"].as_str().unwrap_or("").to_owned(),
+                periode: row["periode"].as_str().unwrap_or("").to_owned(),
+                jatuh_tempo: row["jatuh_tempo"].as_str().unwrap_or("").to_owned(),
+                sisa: row["sisa"].as_i64().unwrap_or(0),
+            })
+            .collect();
+        let isian = isian_pengingat(&tagihan);
+        if wa_notification::queue_wali_notification_tx(
+            &transaction,
+            &client_id,
+            "tagihan",
+            id_siswa,
+            &format!("tagihan:{id_siswa}:{hari}"),
+            |wali| wali.isian(isian),
+        )? {
+            diantre += 1;
+        }
+    }
+    transaction.commit().map_err(db_error)?;
+    Ok(json!({ "siswa": siswa.len(), "diantre": diantre, "terpotong": terpotong }))
 }
 
 // ── Pembayaran dan kuitansi (K3b) ───────────────────────────────────────────
@@ -3089,5 +3283,127 @@ mod tests {
         )
         .expect("bayar dengan seri");
         assert_eq!(kwt4["nomor"], "KWT/2026/TU1/0001");
+    }
+
+    fn tp(nama: &str, periode: &str, jatuh_tempo: &str, sisa: i64) -> TagihanPengingat {
+        TagihanPengingat {
+            nama_tagihan: nama.into(),
+            periode: periode.into(),
+            jatuh_tempo: jatuh_tempo.into(),
+            sisa,
+        }
+    }
+
+    // Vektor kembar `isianPengingat` di `src/lib/validations/billing.test.ts`.
+    #[test]
+    fn isian_pengingat_kembar() {
+        assert_eq!(label_periode("2026-09"), "September 2026");
+        assert_eq!(label_periode("2026-13"), "2026-13");
+        assert_eq!(label_periode("2026/2027"), "2026/2027");
+        assert_eq!(label_periode("SEKALI"), "");
+
+        let dua = isian_pengingat(&[
+            tp("SPP", "2026-08", "2026-08-10", 150_000),
+            tp("Seragam", "SEKALI", "", 275_000),
+        ]);
+        assert_eq!(
+            dua,
+            vec![
+                ("total", "Rp425.000".to_owned()),
+                ("jumlah", "2".to_owned()),
+                (
+                    "rincian",
+                    "- SPP Agustus 2026: Rp150.000\n- Seragam: Rp275.000".to_owned()
+                ),
+                ("jatuh_tempo", "10/08/2026".to_owned()),
+            ]
+        );
+
+        let tujuh: Vec<TagihanPengingat> = (1..=7)
+            .map(|bulan| tp("SPP", &format!("2026-0{bulan}"), &format!("2026-0{bulan}-10"), 100_000))
+            .collect();
+        let isian = isian_pengingat(&tujuh);
+        assert_eq!(isian[0].1, "Rp700.000");
+        assert_eq!(isian[1].1, "7");
+        assert_eq!(
+            isian[2].1,
+            "- SPP Januari 2026: Rp100.000\n- SPP Februari 2026: Rp100.000\n- SPP Maret 2026: Rp100.000\n- SPP April 2026: Rp100.000\n- SPP Mei 2026: Rp100.000\n- dan 2 tagihan lain"
+        );
+        assert_eq!(isian[3].1, "10/01/2026");
+
+        assert_eq!(isian_pengingat(&[])[3].1, "-");
+    }
+
+    #[test]
+    fn pengingat_tunggakan_sekali_sehari() {
+        let (_dir, state) = state_uji();
+        let connection = storage::database(&state.data_dir).expect("db");
+        connection
+            .execute_batch(
+                "INSERT INTO akademik_rombel (id_rombel, id_tahun_ajaran, tingkat, nama_rombel) VALUES
+                    ('r7', 'ta', 7, 'VII A');
+                 INSERT INTO master_data (id_unik, kode_karyawan, nama, divisi, id_shift, jenis_personil, status_aktif, unit) VALUES
+                    ('S-01', 'S-01', 'Ani', 'Siswa', 1, 'SISWA', 'Aktif', 'SMP'),
+                    ('S-02', 'S-02', 'Budi', 'Siswa', 1, 'Siswa', 'Aktif', 'SMP');
+                 INSERT INTO siswa_data (id_siswa, nama_lengkap, id_rombel, angkatan, status, no_whatsapp_wali, created_at, updated_at) VALUES
+                    ('S-01', 'Ani', 'r7', 2026, 'Aktif', '081234567890', 'x', 'x'),
+                    ('S-02', 'Budi', 'r7', 2026, 'Aktif', '', 'x', 'x');",
+            )
+            .expect("seed siswa");
+        let jt = save_jenis(
+            &state,
+            json!({ "nama": "SPP", "periodik": "Bulanan", "nominal_bawaan": 300_000, "id_akun_pendapatan": "akun-pendapatan-spp" }),
+        )
+        .expect("jenis")["id_jenis_tagihan"]
+            .as_str()
+            .expect("id")
+            .to_owned();
+        issue(&state, "bendahara", &jt, "2026-07", "2026-07-10", None, None).expect("terbit");
+
+        assert_eq!(
+            remind(&state, None, None, None).expect_err("sakelar mati").message,
+            PESAN_PENGINGAT_MATI
+        );
+        assert_eq!(
+            list(&state, None, None, None, None).expect("daftar")["pengingat_wa"],
+            json!(false)
+        );
+        connection
+            .execute(
+                "INSERT INTO setting_gex_system (key, value) VALUES ('wa_notify_tagihan', 'true');",
+                [],
+            )
+            .expect("sakelar");
+        assert_eq!(
+            list(&state, None, None, None, None).expect("daftar")["pengingat_wa"],
+            json!(true)
+        );
+
+        // Budi tidak punya nomor wali: dihitung sebagai siswa, tidak diantre.
+        let hasil = remind(&state, None, None, Some("r7")).expect("pengingat");
+        assert_eq!(hasil, json!({ "siswa": 2, "diantre": 1, "terpotong": false }));
+        let (isi, dedupe, jenis): (String, String, String) = connection
+            .query_row(
+                "SELECT isi_pesan, dedupe_key, jenis FROM notifikasi_wa;",
+                [],
+                |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
+            )
+            .expect("antrean");
+        assert_eq!(jenis, "tagihan");
+        assert!(dedupe.starts_with("tagihan:S-01:"));
+        assert!(isi.contains("Ani (VII A)"), "{isi}");
+        assert!(isi.contains("- SPP Juli 2026: Rp300.000"));
+        assert!(isi.contains("Jatuh tempo paling awal: 10/07/2026"));
+
+        let ulang = remind(&state, None, None, None).expect("pengingat ulang");
+        assert_eq!(ulang["diantre"], json!(0));
+        let outbox: i64 = connection
+            .query_row(
+                "SELECT COUNT(*) FROM desktop_sync_outbox WHERE domain = 'wa-notification';",
+                [],
+                |row| row.get(0),
+            )
+            .expect("outbox");
+        assert_eq!(outbox, 1);
     }
 }

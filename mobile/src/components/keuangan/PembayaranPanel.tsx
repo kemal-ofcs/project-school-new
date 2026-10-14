@@ -18,12 +18,14 @@ import {
   TOMBOL_UTAMA,
 } from "@/components/inventory/gaya";
 import {
+  buatKuitansiPdf,
   cetakKuitansi,
   namaAlokasi,
   teksKuitansiWa,
 } from "@/components/keuangan/kuitansi";
 import { PilihAkunBayar } from "@/components/keuangan/PilihAkunBayar";
 import { Modal } from "@/components/ui/Modal";
+import { saveFileWithPicker } from "@/lib/client/download";
 import { openWhatsAppChat } from "@/lib/client/open-url";
 import {
   type AkunSiswaTagihan,
@@ -615,7 +617,10 @@ export function DialogKuitansi({
   const [aksi, setAksi] = useState<AksiKuitansi | null>(null);
   const [galat, setGalat] = useState<string | null>(null);
   const [sibuk, setSibuk] = useState(false);
-  const [pesanWa, setPesanWa] = useState<string | null>(null);
+  const [pesanWa, setPesanWa] = useState<{
+    teks: string;
+    galat: boolean;
+  } | null>(null);
   const isSubmittingRef = useRef(false);
 
   const muat = useCallback(async () => {
@@ -657,6 +662,32 @@ export function DialogKuitansi({
     }
   }
 
+  async function unduhPdf() {
+    if (!detail) return;
+    setPesanWa(null);
+    try {
+      const isi = await buatKuitansiPdf(detail);
+      const hasil = await saveFileWithPicker(
+        new Blob([isi], { type: "application/pdf" }),
+        `kuitansi-${detail.pembayaran.nomor.replaceAll("/", "-")}.pdf`,
+        {
+          description: "Dokumen PDF (*.pdf)",
+          accept: { "application/pdf": [".pdf"] },
+        },
+      );
+      if (hasil.sukses) {
+        setPesanWa({ teks: "Berkas PDF tersimpan.", galat: false });
+      } else if (!hasil.cancelled) {
+        setPesanWa({ teks: "Berkas PDF tidak bisa disimpan.", galat: true });
+      }
+    } catch (error) {
+      setPesanWa({
+        teks: pesanGalat(error, "Berkas PDF tidak bisa dibuat."),
+        galat: true,
+      });
+    }
+  }
+
   async function kirimWa() {
     if (!detail) return;
     setPesanWa(null);
@@ -664,7 +695,12 @@ export function DialogKuitansi({
       detail.pembayaran.no_wali,
       teksKuitansiWa(detail),
     );
-    if (!terbuka) setPesanWa("WhatsApp tidak bisa dibuka di perangkat ini.");
+    if (!terbuka) {
+      setPesanWa({
+        teks: "WhatsApp tidak bisa dibuka di perangkat ini.",
+        galat: true,
+      });
+    }
   }
 
   const p = detail?.pembayaran;
@@ -741,6 +777,13 @@ export function DialogKuitansi({
           ) : null}
 
           <div className="flex flex-wrap gap-2">
+            <button
+              className={TOMBOL_KEDUA}
+              onClick={() => void unduhPdf()}
+              type="button"
+            >
+              Unduh PDF
+            </button>
             {isMobileRuntime() ? null : (
               <button
                 type="button"
@@ -764,7 +807,14 @@ export function DialogKuitansi({
               </p>
             )}
           </div>
-          {pesanWa ? <p className="text-xs text-rose-100">{pesanWa}</p> : null}
+          {pesanWa ? (
+            <p
+              className={`text-xs ${pesanWa.galat ? "text-rose-100" : "text-emerald-100"}`}
+              role={pesanWa.galat ? "alert" : "status"}
+            >
+              {pesanWa.teks}
+            </p>
+          ) : null}
 
           {p.status === "Sah" && bolehBatal ? (
             <form

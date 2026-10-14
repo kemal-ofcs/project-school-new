@@ -2,6 +2,13 @@ import "server-only";
 
 import { db, ensureDbInitialized } from "@/lib/db";
 import { ApiRequestError } from "@/lib/server/http/api-response";
+import {
+  hariEfektifBawaan,
+  kehadiranSiswa,
+  persenDari,
+  rentangUntuk,
+  siswaBerunit,
+} from "@/lib/services/nilai-akhir";
 
 export interface LedgerStudentItem {
   id_siswa: string;
@@ -43,104 +50,34 @@ export async function getLedgerPreview(
     throw new ApiRequestError("ID Tahun Ajaran wajib diisi.", 400);
   }
 
-  const taRes = await db.execute({
-    sql: "SELECT tanggal_mulai, tanggal_selesai FROM akademik_tahun_ajaran WHERE id_tahun_ajaran = ? LIMIT 1;",
-    args: [idTa],
-  });
-  if (taRes.rows.length === 0) {
-    throw new ApiRequestError("Tahun ajaran tidak ditemukan.", 404);
-  }
+  // Pengklasifikasi hari yang SAMA dengan rekap nilai akhir (keputusan E N2),
+  // cermin `get_ledger_preview`. Hari efektif = rentang SEMESTER, Hari
+  // Sekolah unit siswa, dan bukan libur aktif; hari bolos dihitung Alfa.
+  const { mulai, selesai } = await rentangUntuk(db, idTa, sem);
+  const totalHariEfektif = await hariEfektifBawaan(db, mulai, selesai);
+  const siswa = await siswaBerunit(db, rombel);
+  const kehadiran = await kehadiranSiswa(db, mulai, selesai, rombel, siswa);
 
-  const startDate = String(taRes.rows[0].tanggal_mulai);
-  const endDate = String(taRes.rows[0].tanggal_selesai);
-
-  const effectiveRes = await db.execute({
-    sql: "SELECT COUNT(DISTINCT tanggal) as total FROM absensi_harian WHERE tanggal >= ? AND tanggal <= ?;",
-    args: [startDate, endDate],
-  });
-  const totalHariEfektif = Number(effectiveRes.rows[0]?.total || 0);
-
-  const querySql = `
-    SELECT
-        s.id_siswa,
-        s.nis,
-        s.nisn,
-        s.nama_lengkap,
-        s.id_rombel,
-        r.nama_rombel,
-        COALESCE(att.hadir, 0) AS hadir,
-        COALESCE(att.izin, 0) AS izin,
-        COALESCE(att.sakit, 0) AS sakit,
-        COALESCE(att.alfa, 0) AS alfa,
-        COALESCE(att.dispensasi, 0) AS dispensasi
-    FROM siswa_data s
-    JOIN akademik_rombel r ON r.id_rombel = s.id_rombel
-    LEFT JOIN (
-        SELECT
-            g.id_karyawan,
-            SUM(CASE WHEN g.hadir_gerbang = 1 OR g.status_kehadiran IN ('Hadir', 'Terlambat') THEN 1 ELSE 0 END) AS hadir,
-            SUM(CASE WHEN g.status_kehadiran = 'Izin' THEN 1 ELSE 0 END) AS izin,
-            SUM(CASE WHEN g.status_kehadiran = 'Sakit' THEN 1 ELSE 0 END) AS sakit,
-            SUM(CASE WHEN g.status_kehadiran = 'Alfa' THEN 1 ELSE 0 END) AS alfa,
-            SUM(CASE WHEN g.status_kehadiran = 'Dispensasi' THEN 1 ELSE 0 END) AS dispensasi
-        FROM (
-            SELECT
-                id_karyawan,
-                tanggal,
-                MIN(NULLIF(TRIM(jam_masuk), '')) AS jam_masuk,
-                MAX(CASE
-                      WHEN COALESCE(TRIM(jam_masuk), '') <> ''
-                       AND COALESCE(status_kehadiran, '') <> 'Alfa'
-                      THEN 1 ELSE 0
-                    END) AS hadir_gerbang,
-                MAX(COALESCE(status_kehadiran, '')) AS status_kehadiran
-            FROM absensi_harian
-            WHERE tanggal >= ? AND tanggal <= ?
-            GROUP BY id_karyawan, tanggal
-        ) g
-        GROUP BY g.id_karyawan
-    ) att ON att.id_karyawan = s.id_siswa
-    WHERE s.status = 'Aktif'
-      AND (? IS NULL OR s.id_rombel = ?)
-    ORDER BY s.nama_lengkap ASC;
-  `;
-
-  const studentsRes = await db.execute({
-    sql: querySql,
-    args: [startDate, endDate, rombel, rombel],
-  });
-
-  const students: LedgerStudentItem[] = studentsRes.rows.map((row) => {
-    const hadir = Number(row.hadir || 0);
-    const izin = Number(row.izin || 0);
-    const sakit = Number(row.sakit || 0);
-    const alfa = Number(row.alfa || 0);
-    const dispensasi = Number(row.dispensasi || 0);
-
-    const penyebut =
-      totalHariEfektif > 0
-        ? totalHariEfektif
-        : Math.max(hadir + izin + sakit + alfa + dispensasi, 1);
-
-    const persen = Math.round(((hadir * 100) / penyebut) * 10) / 10;
-    const persenClamped = Math.max(0, Math.min(100, persen));
-
+  const students: LedgerStudentItem[] = siswa.map((item) => {
+    const k = kehadiran.get(item.id_siswa);
+    const persen = k ? persenDari(k) : null;
     return {
-      id_siswa: String(row.id_siswa),
-      nis: row.nis ? String(row.nis) : null,
-      nisn: row.nisn ? String(row.nisn) : null,
-      nama_lengkap: String(row.nama_lengkap),
-      id_rombel: String(row.id_rombel),
-      nama_rombel: String(row.nama_rombel),
+      id_siswa: item.id_siswa,
+      nis: item.nis,
+      nisn: item.nisn,
+      nama_lengkap: item.nama_lengkap,
+      id_rombel: item.id_rombel,
+      nama_rombel: item.nama_rombel,
       id_tahun_ajaran: idTa,
       semester: sem,
-      total_hari_efektif: penyebut,
-      hadir,
-      izin,
-      sakit,
-      alfa,
-      dispensasi,
-      persen_kehadiran: persenClamped,
+      total_hari_efektif: k?.hari_efektif ?? 0,
+      hadir: k?.hadir ?? 0,
+      izin: k?.izin ?? 0,
+      sakit: k?.sakit ?? 0,
+      alfa: (k?.alfa ?? 0) + (k?.bolos ?? 0),
+      dispensasi: k?.dispensasi ?? 0,
+      persen_kehadiran:
+        persen === null ? 0 : Math.floor(persen * 10 + 0.5) / 10,
     };
   });
 

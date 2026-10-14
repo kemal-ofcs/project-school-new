@@ -12,7 +12,7 @@ import {
 } from "@/lib/server/http/api-response";
 import { assertSameOriginMutation } from "@/lib/server/http/request-security";
 import { listAssessments } from "@/lib/services/grades";
-import { JENIS_PENILAIAN, SEMESTER_LIST } from "@/types/grades";
+import { SEMESTER_LIST } from "@/types/grades";
 
 export const runtime = "nodejs";
 
@@ -24,7 +24,7 @@ const bodySchema = z
     semester: z.enum(SEMESTER_LIST),
     id_rombel: opsional,
     id_mapel: opsional,
-    jenis: z.enum(JENIS_PENILAIAN).nullish(),
+    jenis: opsional,
   })
   .strict();
 

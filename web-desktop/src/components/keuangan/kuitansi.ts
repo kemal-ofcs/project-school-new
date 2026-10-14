@@ -3,9 +3,9 @@ import { formatRupiah } from "@/lib/validations/accounting";
 
 /**
  * Kuitansi pembayaran: dicetak setengah A4 (A5) lewat dialog cetak
- * browser/WebView2, atau dikirim sebagai teks ke WhatsApp wali. WebView
- * Android tidak punya dialog cetak, jadi pemanggil menyembunyikan tombol
- * cetaknya di Mobile, sama seperti berita acara inventaris.
+ * browser/WebView2, diunduh sebagai PDF (semua build, satu-satunya jalan
+ * berkas di Mobile karena WebView Android tidak punya dialog cetak), atau
+ * dikirim sebagai teks ke WhatsApp wali.
  */
 
 const ROOT_ID = "kos-print-root";
@@ -147,4 +147,96 @@ export function cetakKuitansi(detail: DetailKuitansi): void {
     window.print();
     setTimeout(() => root.remove(), 3000);
   }, 300);
+}
+
+/**
+ * Isi PDF kuitansi (A5 mendatar, Fase N2b). Logo hanya dipakai bila berupa
+ * data URL: aplikasi bekerja tanpa jaringan dan tidak boleh mengunduh gambar.
+ */
+export async function buatKuitansiPdf(
+  detail: DetailKuitansi,
+): Promise<ArrayBuffer> {
+  const [{ jsPDF }, { autoTable }] = await Promise.all([
+    import("jspdf"),
+    import("jspdf-autotable"),
+  ]);
+  const p = detail.pembayaran;
+  const kop = detail.kop;
+  const doc = new jsPDF({ orientation: "landscape", unit: "mm", format: "a5" });
+  const lebar = doc.internal.pageSize.getWidth();
+  let x = 12;
+  if (kop.logo_url?.startsWith("data:image/")) {
+    try {
+      doc.addImage(kop.logo_url, 12, 9, 14, 14);
+      x = 30;
+    } catch {
+      // Logo rusak tidak boleh menggagalkan kuitansi.
+    }
+  }
+  doc.setFont("times", "bold");
+  doc.setFontSize(13);
+  doc.text((kop.nama || "Nama Sekolah").toUpperCase(), x, 13);
+  doc.setFont("times", "normal");
+  doc.setFontSize(8);
+  const kontak = [kop.alamat, kop.telepon, kop.email, kop.website]
+    .filter(Boolean)
+    .join(" | ");
+  if (kontak) {
+    doc.text(doc.splitTextToSize(kontak, lebar - x - 12) as string[], x, 18);
+  }
+  doc.setLineWidth(0.6);
+  doc.line(12, 25, lebar - 12, 25);
+
+  doc.setFont("times", "bold");
+  doc.setFontSize(13);
+  doc.text("KUITANSI", lebar / 2, 33, { align: "center" });
+  doc.setFont("times", "normal");
+  doc.setFontSize(10);
+  doc.text(`Nomor: ${p.nomor}`, lebar / 2, 38, { align: "center" });
+  let y = 45;
+  if (p.status === "Dibatalkan") {
+    doc.setFont("times", "bold");
+    doc.text(`DIBATALKAN: ${p.alasan_batal ?? ""}`, lebar / 2, y, {
+      align: "center",
+    });
+    doc.setFont("times", "normal");
+    y += 6;
+  }
+  const data: Array<[string, string]> = [
+    ["Untuk siswa", `${p.nama_siswa}${p.kelas ? ` (${p.kelas})` : ""}`],
+    ["Tanggal", tanggalPanjang(p.tanggal)],
+    ["Cara bayar", keteranganMetode(detail)],
+    ...(p.keterangan
+      ? ([["Keterangan", p.keterangan]] as Array<[string, string]>)
+      : []),
+  ];
+  for (const [label, nilai] of data) {
+    doc.text(label, 12, y);
+    doc.text(`: ${nilai}`, 40, y);
+    y += 5;
+  }
+  autoTable(doc, {
+    head: [["Untuk pembayaran", "Jumlah"]],
+    body: detail.alokasi.map((item) => [
+      namaAlokasi(item),
+      formatRupiah(item.nominal),
+    ]),
+    foot: [["Total", formatRupiah(p.total)]],
+    startY: y,
+    theme: "grid",
+    styles: { font: "times", fontSize: 9, cellPadding: 1.5, textColor: 0 },
+    headStyles: { fillColor: 255, textColor: 0, lineWidth: 0.2 },
+    footStyles: { fillColor: 255, textColor: 0, lineWidth: 0.2 },
+    columnStyles: { 1: { halign: "right" } },
+    margin: { left: 12, right: 12 },
+  });
+  const akhir =
+    (doc as unknown as { lastAutoTable?: { finalY: number } }).lastAutoTable
+      ?.finalY ?? y;
+  const tengahTtd = lebar - 45;
+  doc.text("Penerima", tengahTtd, akhir + 8, { align: "center" });
+  doc.text(p.dibuat_oleh, tengahTtd, akhir + 24, { align: "center" });
+  doc.setLineWidth(0.2);
+  doc.line(tengahTtd - 25, akhir + 20, tengahTtd + 25, akhir + 20);
+  return doc.output("arraybuffer");
 }

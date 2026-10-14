@@ -1,6 +1,8 @@
 import "server-only";
 
 import type { Client } from "@libsql/client";
+import { JENIS_EFEKTIF_SQL } from "@/lib/services/nilai-akhir";
+import { idJenisEfektif, jenisWarisan } from "@/lib/validations/nilai-akhir";
 import type {
   NilaiSiswaItem,
   PenilaianDetail,
@@ -53,6 +55,22 @@ function buatIdNilai(prefix: string): string {
   return `${prefix}${Math.floor(Date.now() / 1000)}-${hex}`;
 }
 
+function jenisTidakDikenal(jenis: string): GradeValidationError {
+  return new GradeValidationError(
+    `Jenis penilaian '${jenis}' tidak dikenal. Gunakan salah satu dari: ${JENIS_PENILAIAN.join(", ")}.`,
+  );
+}
+
+/** Cermin `jenis_saringan`: nama jenis lama → id bawaan, `jns-...` apa adanya, lainnya ditolak. */
+function jenisSaringan(raw: string): string {
+  if (raw.startsWith("jns-")) return raw;
+  const id = (JENIS_PENILAIAN as readonly string[]).includes(raw)
+    ? idJenisEfektif(null, raw)
+    : null;
+  if (!id) throw jenisTidakDikenal(raw);
+  return id;
+}
+
 function teksWajib(nilai: unknown, pesan: string): string {
   const teks = String(nilai ?? "").trim();
   if (!teks) throw new GradeValidationError(pesan);
@@ -80,10 +98,13 @@ export async function listAssessments(
              AS jumlah_dinilai,
            (SELECT AVG(n.skor) FROM nilai_siswa n
              WHERE n.id_penilaian = p.id_penilaian AND n.skor IS NOT NULL)
-             AS rata_rata
+             AS rata_rata,
+           ${JENIS_EFEKTIF_SQL} AS id_jenis,
+           COALESCE(j.nama, p.jenis) AS nama_jenis
       FROM nilai_penilaian p
       LEFT JOIN akademik_mapel m ON m.id_mapel = p.id_mapel
       LEFT JOIN akademik_rombel r ON r.id_rombel = p.id_rombel
+      LEFT JOIN nilai_jenis j ON j.id_jenis = ${JENIS_EFEKTIF_SQL}
      WHERE p.id_tahun_ajaran = ? AND p.semester = ?`;
   const args: string[] = [filter.id_tahun_ajaran, filter.semester];
 
@@ -99,13 +120,8 @@ export async function listAssessments(
   }
   const jenis = String(filter.jenis ?? "").trim();
   if (jenis) {
-    if (!(JENIS_PENILAIAN as readonly string[]).includes(jenis)) {
-      throw new GradeValidationError(
-        `Jenis penilaian '${jenis}' tidak dikenal. Gunakan salah satu dari: ${JENIS_PENILAIAN.join(", ")}.`,
-      );
-    }
-    query += " AND p.jenis = ?";
-    args.push(jenis);
+    query += ` AND ${JENIS_EFEKTIF_SQL} = ?`;
+    args.push(jenisSaringan(jenis));
   }
   query += " ORDER BY p.tanggal DESC, p.created_at DESC LIMIT 300;";
 
@@ -131,10 +147,13 @@ export async function getAssessment(
                  p.bobot, p.kkm, p.nilai_maks, p.catatan,
                  p.created_at, p.updated_at,
                  COALESCE(m.nama_mapel, '') AS nama_mapel,
-                 COALESCE(r.nama_rombel, '') AS nama_rombel
+                 COALESCE(r.nama_rombel, '') AS nama_rombel,
+                 ${JENIS_EFEKTIF_SQL} AS id_jenis,
+                 COALESCE(j.nama, p.jenis) AS nama_jenis
             FROM nilai_penilaian p
             LEFT JOIN akademik_mapel m ON m.id_mapel = p.id_mapel
             LEFT JOIN akademik_rombel r ON r.id_rombel = p.id_rombel
+            LEFT JOIN nilai_jenis j ON j.id_jenis = ${JENIS_EFEKTIF_SQL}
            WHERE p.id_penilaian = ?
            LIMIT 1;`,
     args: [idPenilaian],
@@ -161,6 +180,46 @@ export async function getAssessment(
   };
 }
 
+/**
+ * Cermin `jenis_untuk_simpan`: klien baru mengirim `id_jenis`, klien lama
+ * hanya `jenis`. Kolom `jenis` tetap terisi nama yang lolos CHECK lama.
+ */
+async function jenisUntukSimpan(
+  client: Client,
+  draft: PenilaianDraft,
+  idPenilaian: string,
+  baru: boolean,
+): Promise<{ idJenis: string; jenis: string }> {
+  const idJenis = String(draft.id_jenis ?? "").trim();
+  if (!idJenis) {
+    const lama = String(draft.jenis ?? "");
+    const id = (JENIS_PENILAIAN as readonly string[]).includes(lama)
+      ? idJenisEfektif(null, lama)
+      : null;
+    if (!id) throw jenisTidakDikenal(lama);
+    return { idJenis: id, jenis: lama };
+  }
+  const baris = await client.execute({
+    sql: "SELECT is_aktif FROM nilai_jenis WHERE id_jenis = ?;",
+    args: [idJenis],
+  });
+  if (!baris.rows[0]) {
+    throw new GradeValidationError("Jenis penilaian tidak ditemukan.");
+  }
+  if (Number(baris.rows[0].is_aktif) !== 1) {
+    const tersimpan = baru
+      ? null
+      : await client.execute({
+          sql: `SELECT ${JENIS_EFEKTIF_SQL} AS id_jenis FROM nilai_penilaian p WHERE p.id_penilaian = ?;`,
+          args: [idPenilaian],
+        });
+    if (String(tersimpan?.rows[0]?.id_jenis ?? "") !== idJenis) {
+      throw new GradeValidationError("Jenis penilaian ini nonaktif.");
+    }
+  }
+  return { idJenis, jenis: jenisWarisan(idJenis) };
+}
+
 export async function saveAssessment(
   client: Client,
   draft: PenilaianDraft,
@@ -185,9 +244,7 @@ export async function saveAssessment(
   if (!(SEMESTER_LIST as readonly string[]).includes(draft.semester)) {
     throw new GradeValidationError("Semester tidak dikenal.");
   }
-  if (!(JENIS_PENILAIAN as readonly string[]).includes(draft.jenis)) {
-    throw new GradeValidationError("Jenis penilaian tidak dikenal.");
-  }
+  const { idJenis, jenis } = await jenisUntukSimpan(client, draft, id, baru);
 
   const bobot = Math.min(100, Math.max(1, Number(draft.bobot ?? 1)));
   const nilaiMaks = Math.min(
@@ -235,9 +292,10 @@ export async function saveAssessment(
     sql: `INSERT INTO nilai_penilaian (
             id_penilaian, id_tahun_ajaran, semester, id_rombel, id_mapel, id_guru,
             jenis, nama_penilaian, tanggal, bobot, kkm, nilai_maks, catatan,
-            created_at, updated_at
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))
+            created_at, updated_at, id_jenis
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'), ?)
           ON CONFLICT(id_penilaian) DO UPDATE SET
+            id_jenis = excluded.id_jenis,
             id_tahun_ajaran = excluded.id_tahun_ajaran,
             semester = excluded.semester,
             id_rombel = excluded.id_rombel,
@@ -257,13 +315,14 @@ export async function saveAssessment(
       idRombel,
       idMapel,
       idGuru,
-      draft.jenis,
+      jenis,
       nama,
       tanggal,
       bobot,
       kkm,
       nilaiMaks,
       draft.catatan?.trim() || null,
+      idJenis,
     ],
   });
 

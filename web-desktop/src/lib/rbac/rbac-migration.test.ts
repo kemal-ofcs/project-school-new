@@ -137,6 +137,10 @@ describe("dynamic RBAC migration", () => {
       41,
       // v42 — pembayaran tagihan, kuitansi, alokasi, dan seri perangkat.
       42,
+      // v43 — jenis penilaian dinamis berbobot (`nilai_jenis`).
+      43,
+      // v44 — pengingat tagihan WhatsApp (jenis `tagihan`).
+      44,
     ]);
 
     const sessionColumns = await client.execute(

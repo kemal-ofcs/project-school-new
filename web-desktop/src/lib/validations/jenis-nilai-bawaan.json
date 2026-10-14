@@ -1,0 +1,7 @@
+[
+  { "id_jenis": "jns-tugas", "nama": "Tugas", "urutan": 1 },
+  { "id_jenis": "jns-uh", "nama": "Ulangan Harian", "urutan": 2 },
+  { "id_jenis": "jns-praktik", "nama": "Praktik", "urutan": 3 },
+  { "id_jenis": "jns-uts", "nama": "UTS", "urutan": 4 },
+  { "id_jenis": "jns-uas", "nama": "UAS", "urutan": 5 }
+]

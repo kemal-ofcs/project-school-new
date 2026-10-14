@@ -5,11 +5,13 @@ import {
   formatNomorKuitansi,
   hitungPotongan,
   idTagihan,
+  isianPengingat,
   type JenisTagihanDraft,
   jenisTagihanDraftSchema,
   type KeringananDraft,
   keringananBerlaku,
   keringananDraftSchema,
+  labelPeriode,
   type PembayaranDraft,
   pembayaranDraftSchema,
   pilihTarif,
@@ -338,5 +340,54 @@ describe("pembayaran", () => {
       { id_akun: "akun-titipan-wali", debit: 40_000, kredit: 0 },
       { id_akun: "akun-piutang-siswa", debit: 0, kredit: 40_000 },
     ]);
+  });
+});
+
+// Vektor kembar `isian_pengingat_kembar` di `desktop/billing.rs`.
+describe("isian pengingat tagihan", () => {
+  const NL = String.fromCharCode(10);
+  const tp = (
+    nama_tagihan: string,
+    periode: string,
+    jatuh_tempo: string,
+    sisa: number,
+  ) => ({ nama_tagihan, periode, jatuh_tempo, sisa });
+
+  test("label periode", () => {
+    expect(labelPeriode("2026-09")).toBe("September 2026");
+    expect(labelPeriode("2026-13")).toBe("2026-13");
+    expect(labelPeriode("2026/2027")).toBe("2026/2027");
+    expect(labelPeriode("SEKALI")).toBe("");
+  });
+
+  test("rincian, total, dan jatuh tempo terawal", () => {
+    expect(
+      isianPengingat([
+        tp("SPP", "2026-08", "2026-08-10", 150_000),
+        tp("Seragam", "SEKALI", "", 275_000),
+      ]),
+    ).toEqual({
+      total: "Rp425.000",
+      jumlah: "2",
+      rincian: "- SPP Agustus 2026: Rp150.000" + NL + "- Seragam: Rp275.000",
+      jatuh_tempo: "10/08/2026",
+    });
+    const tujuh = [1, 2, 3, 4, 5, 6, 7].map((bulan) =>
+      tp("SPP", `2026-0${bulan}`, `2026-0${bulan}-10`, 100_000),
+    );
+    expect(isianPengingat(tujuh)).toEqual({
+      total: "Rp700.000",
+      jumlah: "7",
+      rincian: [
+        "- SPP Januari 2026: Rp100.000",
+        "- SPP Februari 2026: Rp100.000",
+        "- SPP Maret 2026: Rp100.000",
+        "- SPP April 2026: Rp100.000",
+        "- SPP Mei 2026: Rp100.000",
+        "- dan 2 tagihan lain",
+      ].join(NL),
+      jatuh_tempo: "10/01/2026",
+    });
+    expect(isianPengingat([]).jatuh_tempo).toBe("-");
   });
 });

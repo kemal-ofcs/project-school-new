@@ -239,7 +239,7 @@ fn ensure_wa_notification_kind_values(connection: &Connection) -> Result<(), Str
     let Some(existing) = existing else {
         return Ok(());
     };
-    if existing.contains("'uks'") {
+    if existing.contains("'tagihan'") {
         return Ok(());
     }
 
@@ -280,7 +280,7 @@ fn ensure_wa_notification_kind_values(connection: &Connection) -> Result<(), Str
         CREATE TABLE notifikasi_wa__rebuild (
           id_notifikasi TEXT PRIMARY KEY,
           dedupe_key TEXT NOT NULL,
-          jenis TEXT NOT NULL CHECK (jenis IN ('scan_masuk', 'scan_pulang', 'bolos', 'ambang_alfa', 'koreksi_admin', 'import_manual', 'uks')),
+          jenis TEXT NOT NULL CHECK (jenis IN ('scan_masuk', 'scan_pulang', 'bolos', 'ambang_alfa', 'koreksi_admin', 'import_manual', 'uks', 'tagihan')),
           id_siswa TEXT,
           tujuan_nomor TEXT NOT NULL,
           isi_pesan TEXT NOT NULL,
@@ -1391,6 +1391,18 @@ pub fn initialize(path: &Path) -> Result<(), String> {
       -- memeriksanya.
       --
       -- Tanpa UNIQUE dan tanpa FOREIGN KEY: keduanya tabel tersinkronisasi.
+      -- Jenis penilaian dinamis berbobot (v43). Lima jenis bawaan berid tetap
+      -- ditanam dari `jenis-nilai-bawaan.json`. Tanpa UNIQUE pada `nama`.
+      -- DDL WAJIB identik dengan `turso.rs` dan `db-migrations.ts`.
+      CREATE TABLE IF NOT EXISTS nilai_jenis (
+        id_jenis TEXT PRIMARY KEY,
+        nama TEXT NOT NULL,
+        bobot INTEGER NOT NULL DEFAULT 0 CHECK (bobot >= 0 AND bobot <= 100),
+        urutan INTEGER NOT NULL DEFAULT 0,
+        is_aktif INTEGER NOT NULL DEFAULT 1 CHECK (is_aktif IN (0, 1)),
+        created_at TEXT NOT NULL DEFAULT (datetime('now')),
+        updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+      );
       CREATE TABLE IF NOT EXISTS nilai_penilaian (
         id_penilaian TEXT PRIMARY KEY,
         id_tahun_ajaran TEXT NOT NULL,
@@ -1400,6 +1412,7 @@ pub fn initialize(path: &Path) -> Result<(), String> {
         id_guru TEXT NOT NULL,
         jenis TEXT NOT NULL
           CHECK (jenis IN ('Tugas', 'Ulangan Harian', 'Praktik', 'UTS', 'UAS')),
+        id_jenis TEXT,
         nama_penilaian TEXT NOT NULL,
         tanggal TEXT NOT NULL,
         bobot INTEGER NOT NULL DEFAULT 1,
@@ -1484,7 +1497,7 @@ pub fn initialize(path: &Path) -> Result<(), String> {
       CREATE TABLE IF NOT EXISTS notifikasi_wa (
         id_notifikasi TEXT PRIMARY KEY,
         dedupe_key TEXT NOT NULL,
-        jenis TEXT NOT NULL CHECK (jenis IN ('scan_masuk', 'scan_pulang', 'bolos', 'ambang_alfa', 'koreksi_admin', 'import_manual', 'uks')),
+        jenis TEXT NOT NULL CHECK (jenis IN ('scan_masuk', 'scan_pulang', 'bolos', 'ambang_alfa', 'koreksi_admin', 'import_manual', 'uks', 'tagihan')),
         id_siswa TEXT,
         tujuan_nomor TEXT NOT NULL,
         isi_pesan TEXT NOT NULL,
@@ -1592,6 +1605,8 @@ pub fn initialize(path: &Path) -> Result<(), String> {
     seed_payroll_rate_tables(&connection)?;
     super::accounting::seed_akun_bawaan(&connection)
         .map_err(|_| "Bagan akun bawaan tidak dapat disiapkan.".to_owned())?;
+    super::nilai_akhir::seed_jenis_bawaan(&connection)
+        .map_err(|_| "Jenis penilaian bawaan tidak dapat disiapkan.".to_owned())?;
 
     ensure_attendance_source_check(&connection)?;
 
@@ -1690,6 +1705,15 @@ pub fn initialize(path: &Path) -> Result<(), String> {
         "master_data",
         "unit",
         "ALTER TABLE master_data ADD COLUMN unit TEXT;",
+    )?;
+
+    // Jenis penilaian dinamis (v43). Nullable: baris lama menurunkan jenisnya
+    // dari kolom `jenis` (`nilai_akhir::id_jenis_efektif`).
+    ensure_column(
+        &connection,
+        "nilai_penilaian",
+        "id_jenis",
+        "ALTER TABLE nilai_penilaian ADD COLUMN id_jenis TEXT;",
     )?;
 
     // Pemisahan jam kerja hari libur (v14). Database lokal yang dibuat sebelum
@@ -1995,6 +2019,7 @@ pub(crate) const CLOUD_MIRRORED_TABLES: &[&str] = &[
     // v28 — nilai akademik. Ikut dibuang saat pindah database: skor seorang
     // anak milik sekolah tempat ia bersekolah, dan membiarkannya tertinggal
     // membuat nilai dari database lama muncul di kelas database baru.
+    "nilai_jenis",
     "nilai_penilaian",
     "nilai_siswa",
     // Di luar snapshot tetapi tetap milik database asalnya: foto didorong ke
@@ -2113,6 +2138,12 @@ pub fn reset_cloud_linked_data(
         CommandError::new(
             "LOCAL_RESET_FAILED",
             "Bagan akun bawaan tidak dapat disiapkan.",
+        )
+    })?;
+    super::nilai_akhir::seed_jenis_bawaan(&transaction).map_err(|_| {
+        CommandError::new(
+            "LOCAL_RESET_FAILED",
+            "Jenis penilaian bawaan tidak dapat disiapkan.",
         )
     })?;
 

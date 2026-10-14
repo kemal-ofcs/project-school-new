@@ -19,7 +19,7 @@ use super::{
 /// `CURRENT_SCHEMA_VERSION` di `web-desktop/src/lib/db-schema.ts` setiap kali
 /// migrasi baru ditambahkan, karena keduanya membaca tabel `schema_migration`
 /// yang sama di Turso.
-pub const CLIENT_SCHEMA_VERSION: i64 = 42;
+pub const CLIENT_SCHEMA_VERSION: i64 = 43;
 
 /// Hanya `cloud > client` yang berbahaya; `cloud <= client` adalah kondisi normal.
 fn is_client_schema_outdated(cloud_version: i64) -> bool {
@@ -847,6 +847,27 @@ const SNAPSHOT_TABLES: &[SnapshotTable] = &[
     // batas jaringan; kolom yang hanya ada di satu sisi membuat push gagal
     // "no such column" pada perangkat yang tidak memilikinya. `audit:schema`
     // bagian 4 yang memeriksanya.
+    // ── v43: Jenis penilaian dinamis ──
+    //
+    // Penghapusan disebarkan lewat event `grade-type/delete`, seperti tabel
+    // akademik lain; jenis bawaan tidak pernah dihapus.
+    SnapshotTable {
+        payload_key: "gradeTypes",
+        domain: "grade-type",
+        table: "nilai_jenis",
+        columns: &[
+            "id_jenis",
+            "nama",
+            "bobot",
+            "urutan",
+            "is_aktif",
+            "created_at",
+            "updated_at",
+        ],
+        conflict_column: "id_jenis",
+        entity_column: "id_jenis",
+        delete_missing: false,
+    },
     SnapshotTable {
         payload_key: "nilaiPenilaian",
         domain: "grade",
@@ -859,6 +880,7 @@ const SNAPSHOT_TABLES: &[SnapshotTable] = &[
             "id_mapel",
             "id_guru",
             "jenis",
+            "id_jenis",
             "nama_penilaian",
             "tanggal",
             "bobot",
@@ -1294,10 +1316,12 @@ const SNAPSHOT_TABLES: &[SnapshotTable] = &[
     },
 ];
 
-const CANONICAL_SYNC_ROUTES: &[(&str, &str)] = &[
+pub(crate) const CANONICAL_SYNC_ROUTES: &[(&str, &str)] = &[
     ("grade", "create"),
     ("grade", "delete"),
     ("grade", "update"),
+    ("grade-type", "delete"),
+    ("grade-type", "save"),
     ("grade-detail", "delete"),
     ("grade-detail", "save"),
     ("academic-assignment", "create"),

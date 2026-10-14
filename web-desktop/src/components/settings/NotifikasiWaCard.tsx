@@ -36,6 +36,7 @@ export function NotifikasiWaCard({
   const [koreksiAdmin, setKoreksiAdmin] = useState(false);
   const [importManual, setImportManual] = useState(false);
   const [uks, setUks] = useState(false);
+  const [tagihan, setTagihan] = useState(false);
   const [ambangLimit, setAmbangLimit] = useState(DEFAULT_AMBANG_ALFA_LIMIT);
   const [ambangDays, setAmbangDays] = useState(DEFAULT_AMBANG_ALFA_DAYS);
   const [isDirty, setIsDirty] = useState(false);
@@ -49,6 +50,7 @@ export function NotifikasiWaCard({
       setKoreksiAdmin(config.koreksiAdminEnabled);
       setImportManual(config.importManualEnabled);
       setUks(config.uksEnabled);
+      setTagihan(config.tagihanEnabled);
       setAmbangLimit(config.ambangAlfaLimit ?? DEFAULT_AMBANG_ALFA_LIMIT);
       setAmbangDays(config.ambangAlfaDays ?? DEFAULT_AMBANG_ALFA_DAYS);
       setIsDirty(false);
@@ -71,6 +73,7 @@ export function NotifikasiWaCard({
       koreksiAdminEnabled: koreksiAdmin,
       importManualEnabled: importManual,
       uksEnabled: uks,
+      tagihanEnabled: tagihan,
       ambangAlfaLimit: ambangLimit,
       ambangAlfaDays: ambangDays,
       autoSendEnabled: config.autoSendEnabled,
@@ -406,6 +409,41 @@ export function NotifikasiWaCard({
           ) : (
             <span className="text-xs font-semibold text-slate-400">
               {uks ? "Aktif" : "Nonaktif"}
+            </span>
+          )}
+        </div>
+
+        {/* Sakelar 8: Pengingat tagihan */}
+        <div className="flex flex-col gap-3 rounded-2xl border border-white/10 bg-slate-950/60 p-4 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <span className="text-sm font-bold text-white">
+              Pengingat Tagihan Siswa
+            </span>
+            <p className="text-xs text-slate-400">
+              Menampilkan tombol "Kirim pengingat WhatsApp" di tab Tunggakan
+              halaman Tagihan. Pesan hanya diantre saat tombol itu ditekan,
+              paling banyak satu pesan per siswa per hari.
+            </p>
+          </div>
+          {canManage ? (
+            <label className="relative inline-flex cursor-pointer items-center">
+              <input
+                type="checkbox"
+                checked={tagihan}
+                disabled={busy}
+                onChange={(e) => {
+                  setTagihan(e.target.checked);
+                  setIsDirty(true);
+                }}
+                className="sr-only peer"
+                id="toggle-wa-tagihan"
+                aria-label="Pengingat tagihan siswa"
+              />
+              <div className="h-6 w-11 rounded-full bg-slate-800 peer peer-checked:bg-emerald-500 peer-focus:outline-none after:absolute after:top-0.5 after:left-[2px] after:h-5 after:w-5 after:rounded-full after:border after:border-slate-300 after:bg-white after:transition-all after:content-[''] peer-checked:after:translate-x-full peer-checked:after:border-white disabled:opacity-50" />
+            </label>
+          ) : (
+            <span className="text-xs font-semibold text-slate-400">
+              {tagihan ? "Aktif" : "Nonaktif"}
             </span>
           )}
         </div>

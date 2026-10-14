@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-desktop-grade-config"
+description = "Enables the desktop_grade_config command without any pre-configured scope."
+commands.allow = ["desktop_grade_config"]
+
+[[permission]]
+identifier = "deny-desktop-grade-config"
+description = "Denies the desktop_grade_config command without any pre-configured scope."
+commands.deny = ["desktop_grade_config"]

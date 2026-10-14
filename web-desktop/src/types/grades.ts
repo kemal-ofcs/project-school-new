@@ -6,7 +6,13 @@
  * punya sinyal.
  */
 
-/** Dieja sama persis dengan CHECK constraint `nilai_penilaian.jenis`. */
+import type { HariSekolah } from "@/lib/validations/nilai-akhir";
+
+/**
+ * Dieja sama persis dengan CHECK constraint `nilai_penilaian.jenis`. Sejak
+ * N2a ini hanya nilai WARISAN kolom `jenis`; jenis yang sesungguhnya adalah
+ * `id_jenis` (tabel `nilai_jenis`).
+ */
 export const JENIS_PENILAIAN = [
   "Tugas",
   "Ulangan Harian",
@@ -48,6 +54,9 @@ export interface PenilaianItem {
    * angka seluruh kelas hanya karena gurunya belum selesai.
    */
   rata_rata: number | null;
+  /** Jenis efektif: `id_jenis`, atau turunan nama jenis lama. */
+  id_jenis: string | null;
+  nama_jenis: string;
 }
 
 export interface PenilaianDraft {
@@ -57,7 +66,9 @@ export interface PenilaianDraft {
   id_rombel: string;
   id_mapel: string;
   id_guru: string;
-  jenis: JenisPenilaian;
+  /** Klien lama hanya mengirim `jenis`; klien baru mengirim `id_jenis`. */
+  jenis?: JenisPenilaian;
+  id_jenis?: string | null;
   nama_penilaian: string;
   tanggal: string;
   bobot: number;
@@ -104,5 +115,68 @@ export interface PenilaianFilter {
   /** Kosong/`null` berarti semua rombel. */
   id_rombel?: string | null;
   id_mapel?: string | null;
-  jenis?: JenisPenilaian | null;
+  /** `id_jenis`, atau nama jenis lama. */
+  jenis?: string | null;
+}
+
+// ── Nilai akhir (N2a) ───────────────────────────────────────────────────────
+
+export interface JenisNilaiItem {
+  id_jenis: string;
+  nama: string;
+  bobot: number;
+  urutan: number;
+  is_aktif: number;
+  bawaan: boolean;
+  /** Banyak penilaian yang memakai jenis ini. */
+  dipakai: number;
+}
+
+export interface KonfigurasiNilai {
+  jenis: JenisNilaiItem[];
+  bobot_kehadiran: number;
+  total_bobot: number;
+  hari_sekolah: HariSekolah;
+  unit: Array<{ id_unit: string; nama_unit: string }>;
+}
+
+export interface RekapNilaiAkhir {
+  nama_mapel: string;
+  rentang: { mulai: string; selesai: string };
+  bobot_kehadiran: number;
+  jenis: Array<{
+    id_jenis: string;
+    nama: string;
+    bobot: number;
+    jumlah_penilaian: number;
+  }>;
+  /** "<Mapel>: belum ada penilaian <Jenis>". */
+  catatan: string[];
+  /** Banyak skor kosong yang dihitung 0. */
+  nilai_kosong: number;
+  siswa: Array<{
+    id_siswa: string;
+    nama_lengkap: string;
+    nis: string;
+    komponen: Array<{
+      id_jenis: string;
+      rata: number | null;
+      bobot_efektif: number | null;
+      nilai_berbobot: number | null;
+    }>;
+    kehadiran: {
+      hari_efektif: number;
+      masuk: number;
+      izin_sakit: number;
+      tidak_masuk: number;
+      persen: number | null;
+      bobot_efektif: number | null;
+      nilai_berbobot: number | null;
+      bolos: Array<{ tanggal: string; mapel: string[] }>;
+    };
+    nilai_akhir: number | null;
+    kosong: number;
+  }>;
+  /** Waktu cetak (WIB); rekap tidak dibekukan. */
+  dicetak: string;
 }

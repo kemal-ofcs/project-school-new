@@ -21,6 +21,7 @@ const filesToSync = [
   "teaching_journal.rs",
   // Inventaris: aturan stok dan validasi mutasi wajib identik dengan Desktop.
   "inventory.rs",
+  "nilai_akhir.rs",
   // Buku Kunjungan UKS: aturan dan alur salinan wajib identik dengan Desktop.
   "uks.rs",
   // Verifikasi wajah 1:1: aturan vonis wajib identik dengan Desktop dan TS.

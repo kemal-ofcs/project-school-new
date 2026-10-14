@@ -100,3 +100,53 @@ export interface NeracaSaldo {
   total_debit: number;
   total_kredit: number;
 }
+
+// ── Laporan keuangan ISAK 35 (K4a) ──────────────────────────────────────────
+
+export interface BarisLaporanAkun {
+  id_akun: string;
+  kode: string;
+  nama: string;
+  saldo: number;
+}
+
+export interface LaporanPosisiKeuangan {
+  sampai: string;
+  aset: BarisLaporanAkun[];
+  kewajiban: BarisLaporanAkun[];
+  aset_neto: BarisLaporanAkun[];
+  /** Pendapatan dikurangi beban sepanjang masa; tutup buku belum ada. */
+  surplus_akumulasi: number;
+  total_aset: number;
+  total_kewajiban: number;
+  total_aset_neto: number;
+  /** Bukan nol berarti laporan timpang. */
+  selisih: number;
+}
+
+export interface LaporanAktivitas {
+  dari: string;
+  sampai: string;
+  pendapatan: BarisLaporanAkun[];
+  beban: BarisLaporanAkun[];
+  total_pendapatan: number;
+  total_beban: number;
+  surplus: number;
+}
+
+export interface LaporanArusKas {
+  dari: string;
+  sampai: string;
+  akun_kas: Array<{ id_akun: string; kode: string; nama: string }>;
+  saldo_awal: number;
+  kelompok: Array<{
+    sumber: string;
+    label: string;
+    masuk: number;
+    keluar: number;
+    bersih: number;
+  }>;
+  total_masuk: number;
+  total_keluar: number;
+  saldo_akhir: number;
+}

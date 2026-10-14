@@ -23,6 +23,7 @@ pub mod grades;
 pub mod inventory;
 pub mod license;
 pub mod loan;
+pub mod nilai_akhir;
 pub mod payroll;
 pub mod portability;
 pub mod teaching_journal;

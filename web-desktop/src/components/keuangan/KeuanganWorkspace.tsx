@@ -17,6 +17,14 @@ import {
   TOMBOL_KEDUA,
   TOMBOL_UTAMA,
 } from "@/components/inventory/gaya";
+import {
+  eksporBukuBesar,
+  eksporNeracaSaldo,
+} from "@/components/keuangan/eksporKeuangan";
+import {
+  BarisEkspor,
+  LaporanKeuangan,
+} from "@/components/keuangan/LaporanKeuangan";
 import { Modal } from "@/components/ui/Modal";
 import { hasPermission } from "@/lib/auth/access";
 import { useAuth } from "@/lib/context/AuthContext";
@@ -54,13 +62,14 @@ import {
  * `FeedbackBanner` kedua workspace punya props yang berbeda.
  */
 
-type Tab = "jurnal" | "buku" | "neraca" | "akun";
+type Tab = "jurnal" | "buku" | "neraca" | "laporan" | "akun";
 type Feedback = { tone: "success" | "error"; message: string } | null;
 
 const LABEL_TAB: Record<Tab, string> = {
   jurnal: "Jurnal",
   buku: "Buku Besar",
   neraca: "Neraca Saldo",
+  laporan: "Laporan",
   akun: "Bagan Akun",
 };
 
@@ -185,6 +194,8 @@ export function KeuanganWorkspace() {
           <PanelBukuBesar akun={akun} />
         ) : tab === "neraca" ? (
           <PanelNeracaSaldo />
+        ) : tab === "laporan" ? (
+          <LaporanKeuangan akun={akun} />
         ) : (
           <PanelAkun
             akun={akun}
@@ -1018,6 +1029,15 @@ function PanelBukuBesar({ akun }: { akun: AkunItem[] }) {
               tanggal untuk melihat rinciannya.
             </p>
           ) : null}
+          <BarisEkspor
+            aksi={[
+              {
+                label: "Ekspor Excel",
+                jenis: "Excel",
+                kerja: () => eksporBukuBesar(data, dari, sampai),
+              },
+            ]}
+          />
         </div>
       )}
     </div>
@@ -1130,6 +1150,15 @@ function PanelNeracaSaldo() {
               </tbody>
             </table>
           </div>
+          <BarisEkspor
+            aksi={[
+              {
+                label: "Ekspor Excel",
+                jenis: "Excel",
+                kerja: () => eksporNeracaSaldo(data, sampai),
+              },
+            ]}
+          />
         </div>
       )}
     </div>

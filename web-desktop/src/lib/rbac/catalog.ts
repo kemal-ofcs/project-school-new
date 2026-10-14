@@ -310,6 +310,11 @@ export const PERMISSION_CATALOG = [
     group: "Akademik",
   },
   {
+    key: "grades.configure",
+    name: "Atur Jenis & Bobot Nilai",
+    group: "Akademik",
+  },
+  {
     key: "grades.delete",
     name: "Hapus Penilaian Beserta Nilainya",
     group: "Akademik",
@@ -481,6 +486,7 @@ export const SENSITIVE_MUTATION_PERMISSIONS = new Set<PermissionKey>([
   // dan tidak ada jalan memulihkannya selain menilai ulang. Alasan yang sama
   // dengan .
   "grades.delete",
+  "grades.configure",
   // Reset password wali menerbitkan kredensial login baru dan mencabut sesi wali yang sedang aktif.
   "students.reset_wali_password",
   // Menghapus berita atau artikel dari CMS situs publik.

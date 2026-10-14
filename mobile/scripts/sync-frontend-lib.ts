@@ -60,6 +60,13 @@ const filesToCopy = [
   // cetak/teks WhatsApp kuitansi.
   "components/keuangan/PembayaranPanel.tsx",
   "components/keuangan/kuitansi.ts",
+  // Laporan keuangan ISAK 35 dan ekspor Excel/PDF (K4a).
+  "components/keuangan/LaporanKeuangan.tsx",
+  "components/keuangan/eksporKeuangan.ts",
+  // Nilai akhir (N2a): tab Pengaturan Nilai dan Rekap Nilai Akhir.
+  "components/nilai/PengaturanNilai.tsx",
+  "components/nilai/RekapNilai.tsx",
+  "components/nilai/rekapPdf.ts",
   // UI Buku Kunjungan UKS, termasuk pemberitahuan offline dan "sinkronisasi
   // terakhir"; bergantung pada `Modal` dan gaya inventaris yang ikut tersalin.
   "components/uks/UksWorkspace.tsx",

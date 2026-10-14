@@ -5,6 +5,10 @@ import {
   PERMISSION_CATALOG,
 } from "@/lib/rbac/catalog";
 import { AKUN_BAWAAN, SEED_AKUN_SQL } from "@/lib/validations/accounting";
+import {
+  JENIS_NILAI_BAWAAN,
+  SEED_JENIS_SQL,
+} from "@/lib/validations/nilai-akhir";
 import TARIF_PAYROLL_BAWAAN from "@/lib/validations/tarif-payroll-bawaan.json";
 
 const RBAC_MIGRATION_VERSION = 1;
@@ -49,6 +53,7 @@ const ACCOUNTING_MIGRATION_VERSION = 39;
 const EMPLOYEE_LOAN_MIGRATION_VERSION = 40;
 const STUDENT_BILLING_MIGRATION_VERSION = 41;
 const STUDENT_PAYMENT_MIGRATION_VERSION = 42;
+const GRADE_TYPE_MIGRATION_VERSION = 43;
 
 /**
  * v21 — aturan jam scan baru: Jam Kerja Normal = (Jam Pulang − Jam Masuk) −
@@ -529,6 +534,13 @@ export async function runDatabaseMigrations(client: Client) {
       "absensi_foto",
       "wajah_skor",
       "ALTER TABLE absensi_foto ADD COLUMN wajah_skor REAL;",
+    ],
+    // Jenis penilaian dinamis (v43). Cerminan `ensure_column` di `turso.rs`
+    // dan `storage.rs`; CHECK lama `jenis` dibiarkan.
+    [
+      "nilai_penilaian",
+      "id_jenis",
+      "ALTER TABLE nilai_penilaian ADD COLUMN id_jenis TEXT;",
     ],
   ] as const) {
     if (
@@ -1889,6 +1901,32 @@ export async function runDatabaseMigrations(client: Client) {
     args: [STUDENT_PAYMENT_MIGRATION_VERSION, now],
   });
 
+  // v43 — jenis penilaian dinamis berbobot. DDL WAJIB identik dengan
+  // `storage.rs` dan `turso.rs`; jenis bawaan dari berkas JSON yang sama.
+  await client.execute(`
+    CREATE TABLE IF NOT EXISTS nilai_jenis (
+      id_jenis TEXT PRIMARY KEY,
+      nama TEXT NOT NULL,
+      bobot INTEGER NOT NULL DEFAULT 0 CHECK (bobot >= 0 AND bobot <= 100),
+      urutan INTEGER NOT NULL DEFAULT 0,
+      is_aktif INTEGER NOT NULL DEFAULT 1 CHECK (is_aktif IN (0, 1)),
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+  `);
+  await client.batch(
+    JENIS_NILAI_BAWAAN.map((jenis) => ({
+      sql: SEED_JENIS_SQL,
+      args: [jenis.id_jenis, jenis.nama, jenis.urutan],
+    })),
+    "write",
+  );
+  await client.execute({
+    sql: `INSERT OR IGNORE INTO schema_migration (version, name, applied_at)
+          VALUES (?, 'grade-type-dynamic', ?);`,
+    args: [GRADE_TYPE_MIGRATION_VERSION, now],
+  });
+
   await client.execute(
     "CREATE INDEX IF NOT EXISTS idx_jurnal_presensi ON jurnal_mengajar(id_presensi_mapel);",
   );
@@ -2352,6 +2390,7 @@ export async function runDatabaseMigrations(client: Client) {
       id_guru TEXT NOT NULL,
       jenis TEXT NOT NULL
         CHECK (jenis IN ('Tugas', 'Ulangan Harian', 'Praktik', 'UTS', 'UAS')),
+      id_jenis TEXT,
       nama_penilaian TEXT NOT NULL,
       tanggal TEXT NOT NULL,
       bobot INTEGER NOT NULL DEFAULT 1,

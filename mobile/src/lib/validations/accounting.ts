@@ -433,3 +433,143 @@ export function susunPembalik(
     },
   };
 }
+
+// ── Laporan keuangan ISAK 35 (Fase K4a) ─────────────────────────────────────
+
+export const MAKS_AKUN_KAS = 20;
+
+/** Satu akun beserta jumlah debit dan kredit dalam rentang laporan. */
+export interface AkunSaldo {
+  id_akun: string;
+  kode: string;
+  nama: string;
+  kelompok: string;
+  saldo_normal: string;
+  debit: number;
+  kredit: number;
+}
+
+export interface BarisLaporan {
+  id_akun: string;
+  kode: string;
+  nama: string;
+  saldo: number;
+}
+
+function kelompokLaporan(
+  akun: readonly AkunSaldo[],
+  kelompok: string,
+): { baris: BarisLaporan[]; total: number } {
+  let total = 0;
+  const baris: BarisLaporan[] = [];
+  for (const a of akun) {
+    if (a.kelompok !== kelompok) continue;
+    const saldo = saldoAkun(a.saldo_normal as SaldoNormal, a.debit, a.kredit);
+    if (saldo === 0) continue;
+    total += saldo;
+    baris.push({ id_akun: a.id_akun, kode: a.kode, nama: a.nama, saldo });
+  }
+  return { baris, total };
+}
+
+/**
+ * Cermin `susun_posisi_keuangan`. Tutup buku belum ada, jadi selisih
+ * pendapatan dan beban sepanjang masa tampil sebagai "Surplus (defisit)
+ * akumulasi" di aset neto. Akun bersaldo nol tidak ditampilkan.
+ */
+export function susunPosisiKeuangan(akun: readonly AkunSaldo[]) {
+  const aset = kelompokLaporan(akun, "Aset");
+  const kewajiban = kelompokLaporan(akun, "Kewajiban");
+  const asetNeto = kelompokLaporan(akun, "Aset Neto");
+  const surplus =
+    kelompokLaporan(akun, "Pendapatan").total -
+    kelompokLaporan(akun, "Beban").total;
+  const totalAsetNeto = asetNeto.total + surplus;
+  return {
+    aset: aset.baris,
+    kewajiban: kewajiban.baris,
+    aset_neto: asetNeto.baris,
+    surplus_akumulasi: surplus,
+    total_aset: aset.total,
+    total_kewajiban: kewajiban.total,
+    total_aset_neto: totalAsetNeto,
+    selisih: aset.total - (kewajiban.total + totalAsetNeto),
+  };
+}
+
+/** Cermin `susun_aktivitas`: Laporan Penghasilan Komprehensif satu rentang. */
+export function susunAktivitas(akun: readonly AkunSaldo[]) {
+  const pendapatan = kelompokLaporan(akun, "Pendapatan");
+  const beban = kelompokLaporan(akun, "Beban");
+  return {
+    pendapatan: pendapatan.baris,
+    beban: beban.baris,
+    total_pendapatan: pendapatan.total,
+    total_beban: beban.total,
+    surplus: pendapatan.total - beban.total,
+  };
+}
+
+/** Cermin `label_sumber_kas`. */
+export function labelSumberKas(sumber: string): string {
+  switch (sumber) {
+    case "Pembayaran":
+      return "Penerimaan pembayaran siswa";
+    case "Payroll":
+      return "Pembayaran gaji";
+    case "Kasbon":
+      return "Kasbon karyawan";
+    case "Tagihan":
+      return "Tagihan siswa";
+    case "Manual":
+      return "Jurnal umum";
+    default:
+      return "Pembatalan";
+  }
+}
+
+/**
+ * Cermin `susun_arus_kas`: arus kas metode langsung per sumber jurnal,
+ * berurutan seperti `SUMBER_JURNAL`. Pembatalan sudah dipetakan pemanggil ke
+ * sumber jurnal yang dibatalkannya.
+ */
+export function susunArusKas(
+  saldoAwal: number,
+  mutasi: ReadonlyArray<{ sumber: string; debit: number; kredit: number }>,
+) {
+  const kelompok: Array<{
+    sumber: string;
+    label: string;
+    masuk: number;
+    keluar: number;
+    bersih: number;
+  }> = [];
+  let totalMasuk = 0;
+  let totalKeluar = 0;
+  for (const sumber of SUMBER_JURNAL) {
+    let masuk = 0;
+    let keluar = 0;
+    for (const m of mutasi) {
+      if (m.sumber !== sumber) continue;
+      masuk += m.debit;
+      keluar += m.kredit;
+    }
+    if (masuk === 0 && keluar === 0) continue;
+    totalMasuk += masuk;
+    totalKeluar += keluar;
+    kelompok.push({
+      sumber,
+      label: labelSumberKas(sumber),
+      masuk,
+      keluar,
+      bersih: masuk - keluar,
+    });
+  }
+  return {
+    saldo_awal: saldoAwal,
+    kelompok,
+    total_masuk: totalMasuk,
+    total_keluar: totalKeluar,
+    saldo_akhir: saldoAwal + totalMasuk - totalKeluar,
+  };
+}

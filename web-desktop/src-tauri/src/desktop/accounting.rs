@@ -1284,6 +1284,275 @@ pub fn trial_balance(state: &DesktopState, sampai: &str) -> Result<Value, Comman
     }))
 }
 
+// ── Laporan keuangan ISAK 35 (Fase K4a) ─────────────────────────────────────
+
+/// Satu akun beserta jumlah debit dan kredit dalam rentang laporan.
+#[derive(Debug, Clone)]
+pub struct AkunSaldo {
+    pub id_akun: String,
+    pub kode: String,
+    pub nama: String,
+    pub kelompok: String,
+    pub saldo_normal: String,
+    pub debit: i64,
+    pub kredit: i64,
+}
+
+fn baris_laporan(akun: &AkunSaldo) -> Value {
+    json!({
+        "id_akun": akun.id_akun,
+        "kode": akun.kode,
+        "nama": akun.nama,
+        "saldo": saldo_akun(&akun.saldo_normal, akun.debit, akun.kredit),
+    })
+}
+
+fn kelompok_laporan(akun: &[AkunSaldo], kelompok: &str) -> (Vec<Value>, i64) {
+    let mut total = 0;
+    let baris = akun
+        .iter()
+        .filter(|a| a.kelompok == kelompok)
+        .filter(|a| saldo_akun(&a.saldo_normal, a.debit, a.kredit) != 0)
+        .map(|a| {
+            total += saldo_akun(&a.saldo_normal, a.debit, a.kredit);
+            baris_laporan(a)
+        })
+        .collect();
+    (baris, total)
+}
+
+/// Cermin `susunPosisiKeuangan`. Tutup buku belum ada, jadi selisih
+/// pendapatan dan beban sepanjang masa tampil sebagai "Surplus (defisit)
+/// akumulasi" di aset neto. Akun bersaldo nol tidak ditampilkan.
+pub fn susun_posisi_keuangan(akun: &[AkunSaldo]) -> Value {
+    let (aset, total_aset) = kelompok_laporan(akun, "Aset");
+    let (kewajiban, total_kewajiban) = kelompok_laporan(akun, "Kewajiban");
+    let (aset_neto, total_aset_neto_akun) = kelompok_laporan(akun, "Aset Neto");
+    let (_, pendapatan) = kelompok_laporan(akun, "Pendapatan");
+    let (_, beban) = kelompok_laporan(akun, "Beban");
+    let surplus = pendapatan - beban;
+    let total_aset_neto = total_aset_neto_akun + surplus;
+    json!({
+        "aset": aset,
+        "kewajiban": kewajiban,
+        "aset_neto": aset_neto,
+        "surplus_akumulasi": surplus,
+        "total_aset": total_aset,
+        "total_kewajiban": total_kewajiban,
+        "total_aset_neto": total_aset_neto,
+        "selisih": total_aset - (total_kewajiban + total_aset_neto),
+    })
+}
+
+/// Cermin `susunAktivitas`: Laporan Penghasilan Komprehensif satu rentang.
+pub fn susun_aktivitas(akun: &[AkunSaldo]) -> Value {
+    let (pendapatan, total_pendapatan) = kelompok_laporan(akun, "Pendapatan");
+    let (beban, total_beban) = kelompok_laporan(akun, "Beban");
+    json!({
+        "pendapatan": pendapatan,
+        "beban": beban,
+        "total_pendapatan": total_pendapatan,
+        "total_beban": total_beban,
+        "surplus": total_pendapatan - total_beban,
+    })
+}
+
+/// Cermin `labelSumberKas`.
+pub fn label_sumber_kas(sumber: &str) -> &'static str {
+    match sumber {
+        "Pembayaran" => "Penerimaan pembayaran siswa",
+        "Payroll" => "Pembayaran gaji",
+        "Kasbon" => "Kasbon karyawan",
+        "Tagihan" => "Tagihan siswa",
+        "Manual" => "Jurnal umum",
+        _ => "Pembatalan",
+    }
+}
+
+/// Cermin `susunArusKas`: arus kas metode langsung per sumber jurnal.
+/// `mutasi` = `(sumber efektif, debit, kredit)` pada akun kas terpilih.
+pub fn susun_arus_kas(saldo_awal: i64, mutasi: &[(String, i64, i64)]) -> Value {
+    let mut kelompok = Vec::new();
+    let (mut masuk_total, mut keluar_total) = (0i64, 0i64);
+    for sumber in SUMBER_JURNAL {
+        let (masuk, keluar) = mutasi
+            .iter()
+            .filter(|(s, _, _)| s == sumber)
+            .fold((0, 0), |(m, k), (_, d, c)| (m + d, k + c));
+        if masuk == 0 && keluar == 0 {
+            continue;
+        }
+        masuk_total += masuk;
+        keluar_total += keluar;
+        kelompok.push(json!({
+            "sumber": sumber,
+            "label": label_sumber_kas(sumber),
+            "masuk": masuk,
+            "keluar": keluar,
+            "bersih": masuk - keluar,
+        }));
+    }
+    json!({
+        "saldo_awal": saldo_awal,
+        "kelompok": kelompok,
+        "total_masuk": masuk_total,
+        "total_keluar": keluar_total,
+        "saldo_akhir": saldo_awal + masuk_total - keluar_total,
+    })
+}
+
+pub const MAKS_AKUN_KAS: usize = 20;
+
+/// Saldo debit dan kredit setiap akun dalam rentang `[dari, sampai]`.
+fn saldo_per_akun(
+    connection: &Connection,
+    dari: &str,
+    sampai: &str,
+) -> Result<Vec<AkunSaldo>, CommandError> {
+    let mut statement = connection
+        .prepare(
+            "SELECT a.id_akun, a.kode, a.nama, a.kelompok, a.saldo_normal,
+                    COALESCE(t.debit, 0), COALESCE(t.kredit, 0)
+             FROM keu_akun a
+             LEFT JOIN (
+                 SELECT b.id_akun, SUM(b.debit) AS debit, SUM(b.kredit) AS kredit
+                 FROM keu_jurnal_baris b
+                 JOIN keu_jurnal j ON j.id_jurnal = b.id_jurnal
+                 WHERE j.tanggal >= ?1 AND j.tanggal <= ?2
+                 GROUP BY b.id_akun
+             ) t ON t.id_akun = a.id_akun
+             ORDER BY a.kode, a.id_akun
+             LIMIT 1000;",
+        )
+        .map_err(db_error)?;
+    let rows = statement
+        .query_map(params![dari, sampai], |row| {
+            Ok(AkunSaldo {
+                id_akun: row.get(0)?,
+                kode: row.get(1)?,
+                nama: row.get(2)?,
+                kelompok: row.get(3)?,
+                saldo_normal: row.get(4)?,
+                debit: row.get(5)?,
+                kredit: row.get(6)?,
+            })
+        })
+        .map_err(db_error)?
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(db_error)?;
+    Ok(rows)
+}
+
+/// Laporan Posisi Keuangan per tanggal.
+pub fn report_position(state: &DesktopState, sampai: &str) -> Result<Value, CommandError> {
+    if !super::inventory::is_valid_date(sampai) {
+        return Err(invalid("Tanggal tidak valid."));
+    }
+    let connection = storage::database(&state.data_dir)?;
+    let mut hasil = susun_posisi_keuangan(&saldo_per_akun(&connection, "0001-01-01", sampai)?);
+    hasil["sampai"] = json!(sampai);
+    Ok(hasil)
+}
+
+/// Laporan Penghasilan Komprehensif untuk satu rentang.
+pub fn report_activity(
+    state: &DesktopState,
+    dari: &str,
+    sampai: &str,
+) -> Result<Value, CommandError> {
+    rentang(dari, sampai)?;
+    let connection = storage::database(&state.data_dir)?;
+    let mut hasil = susun_aktivitas(&saldo_per_akun(&connection, dari, sampai)?);
+    hasil["dari"] = json!(dari);
+    hasil["sampai"] = json!(sampai);
+    Ok(hasil)
+}
+
+/// Laporan Arus Kas metode langsung untuk akun kas yang dipilih.
+pub fn report_cashflow(
+    state: &DesktopState,
+    dari: &str,
+    sampai: &str,
+    akun_kas: &[String],
+) -> Result<Value, CommandError> {
+    rentang(dari, sampai)?;
+    let mut akun: Vec<String> = Vec::new();
+    for id in akun_kas {
+        let id = id.trim();
+        if !id.is_empty() && !akun.iter().any(|a| a == id) {
+            akun.push(id.to_owned());
+        }
+    }
+    if akun.is_empty() {
+        return Err(invalid("Pilih minimal satu akun kas."));
+    }
+    if akun.len() > MAKS_AKUN_KAS {
+        return Err(invalid("Akun kas paling banyak 20."));
+    }
+    let connection = storage::database(&state.data_dir)?;
+    let mut nama_akun = Vec::new();
+    for id in &akun {
+        let baris: Option<(String, String, String)> = connection
+            .query_row(
+                "SELECT kode, nama, kelompok FROM keu_akun WHERE id_akun = ?;",
+                params![id],
+                |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
+            )
+            .optional()
+            .map_err(db_error)?;
+        match baris {
+            Some((kode, nama, kelompok)) if kelompok == "Aset" => {
+                nama_akun.push(json!({ "id_akun": id, "kode": kode, "nama": nama }));
+            }
+            _ => return Err(invalid("Akun kas harus akun aset.")),
+        }
+    }
+    let tanda: Vec<String> = (0..akun.len()).map(|i| format!("?{}", i + 3)).collect();
+    let daftar = tanda.join(", ");
+    let mut args: Vec<&dyn rusqlite::ToSql> = vec![&dari, &sampai];
+    for id in &akun {
+        args.push(id);
+    }
+    let saldo_awal: i64 = connection
+        .query_row(
+            &format!(
+                "SELECT COALESCE(SUM(b.debit - b.kredit), 0)
+                 FROM keu_jurnal_baris b
+                 JOIN keu_jurnal j ON j.id_jurnal = b.id_jurnal
+                 WHERE j.tanggal < ?1 AND b.id_akun IN ({daftar})
+                 -- batas: agregat, selalu satu baris
+                 ;"
+            ),
+            args.as_slice(),
+            |row| row.get(0),
+        )
+        .map_err(db_error)?;
+    let mut statement = connection
+        .prepare(&format!(
+            "SELECT COALESCE(asal.sumber, j.sumber), SUM(b.debit), SUM(b.kredit)
+             FROM keu_jurnal_baris b
+             JOIN keu_jurnal j ON j.id_jurnal = b.id_jurnal
+             LEFT JOIN keu_jurnal asal ON asal.id_jurnal = j.id_jurnal_batal
+             WHERE j.tanggal >= ?1 AND j.tanggal <= ?2 AND b.id_akun IN ({daftar})
+             GROUP BY 1
+             -- batas: agregat per sumber jurnal
+             ;"
+        ))
+        .map_err(db_error)?;
+    let mutasi = statement
+        .query_map(args.as_slice(), |row| {
+            Ok((row.get::<_, String>(0)?, row.get::<_, i64>(1)?, row.get::<_, i64>(2)?))
+        })
+        .map_err(db_error)?
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(db_error)?;
+    let mut hasil = susun_arus_kas(saldo_awal, &mutasi);
+    hasil["dari"] = json!(dari);
+    hasil["sampai"] = json!(sampai);
+    hasil["akun_kas"] = json!(nama_akun);
+    Ok(hasil)
+}
+
 // ── Penerapan event di cloud ────────────────────────────────────────────────
 
 fn payload_text(row: &Value, key: &str) -> Option<String> {
@@ -1910,6 +2179,37 @@ mod tests {
         let manual = daftar["items"].as_array().expect("items");
         assert_eq!(manual.len(), 2);
         assert!(manual.iter().any(|item| item["dibatalkan"] == json!(true)));
+
+        // Laporan ISAK 35 dari jurnal yang sama (K4a).
+        let posisi = report_position(&state, "2099-12-31").expect("posisi keuangan");
+        assert_eq!(posisi["total_aset"], json!(10_000_000));
+        assert_eq!(posisi["total_aset_neto"], json!(10_000_000));
+        assert_eq!(posisi["surplus_akumulasi"], json!(0));
+        assert_eq!(posisi["selisih"], json!(0));
+        let aktivitas = report_activity(&state, "2026-10-05", "2026-10-05").expect("aktivitas");
+        assert_eq!(aktivitas["total_beban"], json!(250_000));
+        assert_eq!(aktivitas["surplus"], json!(-250_000));
+        let arus = report_cashflow(&state, "2026-10-01", "2099-12-31", &["akun-kas".into()])
+            .expect("arus kas");
+        assert_eq!(arus["saldo_awal"], json!(10_000_000));
+        // Pembalik ikut kelompok sumber jurnal yang dibatalkannya.
+        assert_eq!(arus["kelompok"].as_array().expect("kelompok").len(), 1);
+        assert_eq!(arus["kelompok"][0]["label"], json!("Jurnal umum"));
+        assert_eq!(arus["kelompok"][0]["masuk"], json!(250_000));
+        assert_eq!(arus["kelompok"][0]["keluar"], json!(250_000));
+        assert_eq!(arus["saldo_akhir"], json!(10_000_000));
+        assert_eq!(
+            report_cashflow(&state, "2026-10-01", "2026-10-31", &["akun-beban-atk".into()])
+                .expect_err("bukan aset")
+                .message,
+            "Akun kas harus akun aset."
+        );
+        assert_eq!(
+            report_cashflow(&state, "2026-10-01", "2026-10-31", &[" ".into()])
+                .expect_err("kosong")
+                .message,
+            "Pilih minimal satu akun kas."
+        );
     }
 
     #[test]
@@ -1961,5 +2261,57 @@ mod tests {
             ]
         });
         assert!(cloud_journal_statements(&payload, "jrn-x").is_none());
+    }
+
+    #[test]
+    fn laporan_isak35_kembar() {
+        let a = |id: &str, kelompok: &str, normal: &str, debit: i64, kredit: i64| AkunSaldo {
+            id_akun: id.into(),
+            kode: id.into(),
+            nama: id.into(),
+            kelompok: kelompok.into(),
+            saldo_normal: normal.into(),
+            debit,
+            kredit,
+        };
+        let akun = vec![
+            a("kas", "Aset", "Debit", 900_000, 300_000),
+            a("piutang", "Aset", "Debit", 500_000, 200_000),
+            a("bangunan", "Aset", "Debit", 0, 0),
+            a("titipan", "Kewajiban", "Kredit", 0, 50_000),
+            a("aset-neto", "Aset Neto", "Kredit", 0, 400_000),
+            a("spp", "Pendapatan", "Kredit", 0, 700_000),
+            a("gaji", "Beban", "Debit", 300_000, 0),
+        ];
+        let posisi = susun_posisi_keuangan(&akun);
+        assert_eq!(posisi["total_aset"], json!(900_000));
+        assert_eq!(posisi["aset"].as_array().expect("aset").len(), 2);
+        assert_eq!(posisi["total_kewajiban"], json!(50_000));
+        assert_eq!(posisi["surplus_akumulasi"], json!(400_000));
+        assert_eq!(posisi["total_aset_neto"], json!(800_000));
+        assert_eq!(posisi["selisih"], json!(50_000));
+
+        let aktivitas = susun_aktivitas(&akun);
+        assert_eq!(aktivitas["total_pendapatan"], json!(700_000));
+        assert_eq!(aktivitas["total_beban"], json!(300_000));
+        assert_eq!(aktivitas["surplus"], json!(400_000));
+        assert_eq!(aktivitas["beban"][0]["saldo"], json!(300_000));
+
+        let arus = susun_arus_kas(
+            100_000,
+            &[
+                ("Payroll".into(), 0, 250_000),
+                ("Pembayaran".into(), 600_000, 50_000),
+                ("Manual".into(), 0, 0),
+            ],
+        );
+        assert_eq!(arus["kelompok"].as_array().expect("kelompok").len(), 2);
+        // Urutan mengikuti `SUMBER_JURNAL`.
+        assert_eq!(arus["kelompok"][0]["label"], json!("Pembayaran gaji"));
+        assert_eq!(arus["kelompok"][1]["label"], json!("Penerimaan pembayaran siswa"));
+        assert_eq!(arus["kelompok"][1]["bersih"], json!(550_000));
+        assert_eq!(arus["total_masuk"], json!(600_000));
+        assert_eq!(arus["total_keluar"], json!(300_000));
+        assert_eq!(arus["saldo_akhir"], json!(400_000));
     }
 }

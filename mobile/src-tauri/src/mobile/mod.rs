@@ -28,6 +28,7 @@ pub mod inventory;
 pub mod license;
 // Kasbon karyawan (K2): SALINAN `desktop/loan.rs` oleh sync-rust-modules.ts.
 pub mod loan;
+pub mod nilai_akhir;
 pub mod payroll;
 // Administrasi payroll: SALINAN `desktop/payroll/*` oleh sync-rust-modules.ts.
 pub mod payroll_admin;

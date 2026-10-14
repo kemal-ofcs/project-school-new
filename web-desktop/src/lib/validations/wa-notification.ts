@@ -24,6 +24,8 @@ export const WA_NOTIFY_KOREKSI_ADMIN_KEY = "wa_notify_koreksi_admin";
 export const WA_NOTIFY_IMPORT_MANUAL_KEY = "wa_notify_import_manual";
 /** Kunjungan UKS (Fase 4b), cermin `WA_NOTIFY_UKS_KEY` di Rust. Bawaannya MATI. */
 export const WA_NOTIFY_UKS_KEY = "wa_notify_uks";
+/** Pengingat tunggakan tagihan (K4b), cermin `WA_NOTIFY_TAGIHAN_KEY`. Bawaannya MATI. */
+export const WA_NOTIFY_TAGIHAN_KEY = "wa_notify_tagihan";
 
 /**
  * Sakelar "Kirim otomatis" — cerminan `WA_AUTO_SEND_KEY` di Rust. Bawaannya
@@ -47,6 +49,7 @@ export const WA_NOTIFICATION_KINDS = [
   "koreksi_admin",
   "import_manual",
   "uks",
+  "tagihan",
 ] as const;
 
 export type WaNotificationKind = (typeof WA_NOTIFICATION_KINDS)[number];
@@ -104,6 +107,8 @@ export function waNotifySettingKey(jenis: string): string | null {
       return WA_NOTIFY_IMPORT_MANUAL_KEY;
     case "uks":
       return WA_NOTIFY_UKS_KEY;
+    case "tagihan":
+      return WA_NOTIFY_TAGIHAN_KEY;
     default:
       return null;
   }
@@ -229,6 +234,7 @@ export const WA_TEMPLATE_LABELS: Record<WaTemplateKind, string> = {
   koreksi_admin: "Koreksi admin",
   import_manual: "Input manual",
   uks: "Kunjungan UKS",
+  tagihan: "Pengingat tagihan",
   rekonsiliasi_bolos: "Rekonsiliasi: siswa bolos",
   rekonsiliasi_tanpa_scan: "Rekonsiliasi: tanpa scan gerbang",
 };
@@ -250,6 +256,8 @@ export const DEFAULT_WA_TEMPLATES: WaTemplateMap = {
   // Bawaan sengaja tanpa {keluhan}: isi pesan terbaca siapa pun yang bisa
   // meninjau antrean WA. Sekolah boleh menambahkannya dengan sadar.
   uks: "Yth. Wali Murid dari {nama} ({rombel}). Kami informasikan bahwa ananda mendapat penanganan di UKS sekolah pada {tanggal} pukul {jam_masuk}. Tindak lanjut: {tindak_lanjut}.",
+  tagihan:
+    "Yth. Wali Murid dari {nama} ({rombel}). Kami informasikan bahwa ananda memiliki {jumlah} tagihan sekolah yang belum lunas dengan total {total}:\n{rincian}\nJatuh tempo paling awal: {jatuh_tempo}. Mohon abaikan pesan ini bila sudah membayar. Terima kasih.",
   rekonsiliasi_bolos:
     "Yth. Bapak/Ibu Wali dari {nama}, diberitahukan bahwa ananda tercatat hadir di gerbang sekolah (pukul {jam_gerbang}), namun TIDAK HADIR (Alfa) pada {mapel} jam ke-{jam_ke} ({guru}). Mohon konfirmasi kehadiran siswa. Terima kasih.",
   rekonsiliasi_tanpa_scan:
@@ -276,6 +284,7 @@ export const WA_TEMPLATE_PLACEHOLDERS: Record<
     "tindak_lanjut",
     "keluhan",
   ],
+  tagihan: ["nama", "rombel", "total", "jumlah", "rincian", "jatuh_tempo"],
   rekonsiliasi_bolos: [
     "nama",
     "rombel",
