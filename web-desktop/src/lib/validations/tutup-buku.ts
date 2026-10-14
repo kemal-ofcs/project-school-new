@@ -15,6 +15,11 @@ export const STATUS_TUTUP = [
 export type StatusTutup = (typeof STATUS_TUTUP)[number];
 
 export const MAKS_ALASAN_BUKA = 150;
+export const MAKS_CATATAN_KEPUTUSAN = 150;
+
+/** Cermin `KEPUTUSAN_TUTUP`: versi yang `Menunggu` dipakai atau ditolak. */
+export const KEPUTUSAN_TUTUP = ["pakai", "tolak"] as const;
+export type KeputusanTutup = (typeof KEPUTUSAN_TUTUP)[number];
 
 /** `2026-09-30` → `30/09/2026`. */
 export function tanggalTampil(tanggal: string): string {
@@ -98,4 +103,130 @@ export function saldoTutupJson(
         `{"id_akun":${JSON.stringify(a.id_akun)},"debit":${a.debit},"kredit":${a.kredit}}`,
     );
   return `[${isi.join(",")}]`;
+}
+
+/** Cermin `validate_catatan_keputusan`: boleh kosong, paling banyak 150. */
+export function validateCatatanKeputusan(
+  catatanMentah: string,
+): Hasil<string | null> {
+  const catatan = catatanMentah.trim();
+  if ([...catatan].length > MAKS_CATATAN_KEPUTUSAN) {
+    return {
+      ok: false,
+      error: `Catatan paling banyak ${MAKS_CATATAN_KEPUTUSAN} karakter.`,
+    };
+  }
+  return { ok: true, value: catatan || null };
+}
+
+function saldoBersih(jsonSaldo: string): Map<string, number> {
+  let isi: unknown;
+  try {
+    isi = JSON.parse(jsonSaldo);
+  } catch {
+    // Potret yang tidak terbaca diperlakukan kosong, sama dengan Rust.
+    return new Map();
+  }
+  const hasil = new Map<string, number>();
+  if (!Array.isArray(isi)) return hasil;
+  for (const item of isi) {
+    if (item && typeof item.id_akun === "string") {
+      hasil.set(
+        item.id_akun,
+        (Number(item.debit) || 0) - (Number(item.kredit) || 0),
+      );
+    }
+  }
+  return hasil;
+}
+
+/**
+ * Cermin `banding_saldo`: akun yang saldo bersihnya (debit - kredit) berbeda
+ * antara dua potret, urut `id_akun` secara biner.
+ */
+export function bandingSaldo(
+  sebelum: string,
+  sesudah: string,
+): Array<[string, number, number]> {
+  const a = saldoBersih(sebelum);
+  const b = saldoBersih(sesudah);
+  const kunci = [...new Set([...a.keys(), ...b.keys()])].sort((x, y) =>
+    x < y ? -1 : x > y ? 1 : 0,
+  );
+  return kunci
+    .map((id): [string, number, number] => [id, a.get(id) ?? 0, b.get(id) ?? 0])
+    .filter(([, x, y]) => x !== y);
+}
+
+// ── Tahap 3: pemberitahuan WhatsApp ke pemegang izin Tutup Buku ─────────────
+
+/** Cermin `KEJADIAN_TUTUP`. */
+export const KEJADIAN_TUTUP = ["menunggu", "berubah"] as const;
+export type JenisKejadianTutup = (typeof KEJADIAN_TUTUP)[number];
+/** Cermin `ALASAN_PEMBERITAHUAN_MATI`. */
+export const ALASAN_PEMBERITAHUAN_MATI =
+  "Pemberitahuan tutup buku belum dinyalakan.";
+
+/** Cermin `KejadianTutup`. */
+export interface KejadianTutup {
+  id_tutup: string;
+  kejadian: JenisKejadianTutup;
+  sampai: string;
+  dibuat_oleh: string;
+}
+
+/** Cermin `kunci_pemberitahuan`. */
+export function kunciPemberitahuan(
+  idTutup: string,
+  kejadian: string,
+  idOperator: string,
+): string {
+  return `tutup_buku:${idTutup}:${kejadian}:${idOperator}`;
+}
+
+/** Isian template `tutup_buku`. Cermin `isian_pemberitahuan`. */
+export function isianPemberitahuan(
+  kejadian: KejadianTutup,
+  nama: string,
+): Record<string, string> {
+  const menunggu = kejadian.kejadian === "menunggu";
+  return {
+    nama: nama.trim() || "Bapak/Ibu",
+    tanggal: tanggalTampil(kejadian.sampai),
+    kejadian: menunggu
+      ? "ada versi lain yang menunggu keputusan"
+      : "saldonya berubah sesudah ditutup",
+    rincian: menunggu
+      ? `Versi itu ditutup oleh ${kejadian.dibuat_oleh}.`
+      : `Ada transaksi baru di periode yang ditutup oleh ${kejadian.dibuat_oleh}.`,
+  };
+}
+
+/** Cermin `kejadian_dari_riwayat`. */
+export function kejadianDariRiwayat(
+  riwayat: ReadonlyArray<{
+    id_tutup: string;
+    status: string;
+    sampai_tanggal: string;
+    dibuat_oleh: string;
+    perlu_ditinjau?: boolean;
+  }>,
+): KejadianTutup[] {
+  const hasil: KejadianTutup[] = [];
+  for (const baris of riwayat) {
+    const kejadian =
+      baris.status === "Menunggu"
+        ? "menunggu"
+        : baris.status === "Aktif" && baris.perlu_ditinjau === true
+          ? "berubah"
+          : null;
+    if (!kejadian) continue;
+    hasil.push({
+      id_tutup: baris.id_tutup,
+      kejadian,
+      sampai: baris.sampai_tanggal,
+      dibuat_oleh: baris.dibuat_oleh,
+    });
+  }
+  return hasil;
 }

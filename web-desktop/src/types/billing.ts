@@ -113,6 +113,17 @@ export interface HasilPengingat {
   terpotong: boolean;
 }
 
+/** Hasil satu panggilan pengingat otomatis dari komponen latar. */
+export type HasilPengingatOtomatis =
+  | { dijalankan: false; alasan: string; hari?: string }
+  | {
+      dijalankan: true;
+      hari: string;
+      siswa: number;
+      diantre: number;
+      terpotong: boolean;
+    };
+
 export interface TagihanTerbukaItem {
   id_tagihan: string;
   nama_tagihan: string;

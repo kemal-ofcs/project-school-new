@@ -8,7 +8,9 @@ import { initDatabaseSchema } from "@/lib/db-schema";
 mock.module("server-only", () => ({}));
 
 const { postJournal } = await import("@/lib/services/accounting");
-const { close, reopen, status } = await import("@/lib/services/tutup-buku");
+const { close, decide, notify, reopen, review, revise, status } = await import(
+  "@/lib/services/tutup-buku"
+);
 
 let client: Client;
 let testDirectory: string;
@@ -83,5 +85,110 @@ describe("tutup buku Web", () => {
     const riwayat = (await status(client)).riwayat;
     expect(riwayat[0]?.status).toBe("Dibuka");
     expect(riwayat[0]?.alasan_buka).toBe("Kuitansi Januari tertinggal");
+  });
+});
+
+// Cermin `transaksi_telat_ditinjau_lalu_ditutup_ulang` dan
+// `versi_menunggu_dipakai_atau_ditolak` di `desktop/tutup_buku.rs`.
+describe("tutup buku Web: Tahap 2", () => {
+  test("transaksi telat ditinjau lalu ditutup ulang", async () => {
+    await jurnal("2021-01-15");
+    const lama = (await close(client, "kepala", "2021-01-31")).tutup.id_tutup;
+    expect((await status(client)).perlu_perhatian).toBe(0);
+    await client.batch(
+      [
+        `INSERT INTO keu_jurnal (id_jurnal, tanggal, seri, nomor_urut, nomor, keterangan, sumber, dibuat_oleh, created_at)
+         VALUES ('jrn-telat', '2021-01-20', 'M1234', 1, 'JU/2021/M1234/0001', 'SPP dari HP offline', 'Manual', 'bendahara', datetime('now', '+1 minute'));`,
+        `INSERT INTO keu_jurnal_baris (id_baris, id_jurnal, id_akun, debit, kredit, urutan) VALUES
+           ('jrn-telat-1', 'jrn-telat', 'akun-kas', 50000, 0, 1),
+           ('jrn-telat-2', 'jrn-telat', 'akun-pendapatan-spp', 0, 50000, 2);`,
+      ],
+      "write",
+    );
+    const st = await status(client);
+    expect(st.perlu_perhatian).toBe(1);
+    expect(st.riwayat.find((t) => t.id_tutup === lama)?.perlu_ditinjau).toBe(
+      true,
+    );
+    const tinjau = await review(client, lama);
+    const kas = tinjau.selisih.find((b) => b.id_akun === "akun-kas");
+    expect(kas?.sesudah).toBe((kas?.sebelum ?? 0) + 50000);
+    expect(tinjau.jurnal[0]?.id_jurnal).toBe("jrn-telat");
+    expect(tinjau.jurnal[0]?.total).toBe(50000);
+
+    const baru = await revise(client, "kepala", lama, "");
+    expect(baru.tutup.status).toBe("Aktif");
+    expect((await status(client)).perlu_perhatian).toBe(0);
+    const riwayat = (await status(client)).riwayat;
+    const versiLama = riwayat.find((t) => t.id_tutup === lama);
+    expect(versiLama?.status).toBe("Digantikan");
+    expect(versiLama?.catatan_keputusan).toBe(
+      "Ditutup ulang dengan saldo sekarang.",
+    );
+    await expect(
+      revise(client, "kepala", baru.tutup.id_tutup, ""),
+    ).rejects.toThrow("Saldo periode ini tidak berubah sejak ditutup.");
+  });
+
+  test("versi yang menunggu dipakai", async () => {
+    const berlaku = (await status(client)).riwayat.find(
+      (t) => t.status === "Aktif",
+    );
+    if (!berlaku) throw new Error("tidak ada tutup buku berlaku");
+    await client.execute({
+      sql: `INSERT INTO keu_tutup_buku (id_tutup, sampai_tanggal, dibuat_oleh, kode_perangkat, waktu_perangkat, diterima_cloud, saldo_json, status) VALUES
+              ('tb-hp', ?, 'bendahara', 'A9F3', '2021-02-01 07:00:00', '2021-02-03 10:00:00', '[]', 'Menunggu');`,
+      args: [berlaku.sampai_tanggal],
+    });
+    expect((await status(client)).perlu_perhatian).toBe(1);
+    const tinjau = await review(client, "tb-hp");
+    expect(tinjau.pembanding?.id_tutup).toBe(berlaku.id_tutup);
+    expect(tinjau.selisih.length).toBeGreaterThan(0);
+    await expect(
+      decide(client, "kepala", "tb-hp", "abaikan", ""),
+    ).rejects.toThrow("Keputusan tidak dikenal.");
+    await expect(
+      decide(client, "kepala", berlaku.id_tutup, "pakai", ""),
+    ).rejects.toThrow(
+      "Hanya tutup buku yang menunggu keputusan yang bisa diputuskan.",
+    );
+    await decide(client, "kepala", "tb-hp", "pakai", "Sesuai buku kas");
+    const riwayat = (await status(client)).riwayat;
+    expect(riwayat.find((t) => t.id_tutup === "tb-hp")?.status).toBe("Aktif");
+    const digantikan = riwayat.find((t) => t.id_tutup === berlaku.id_tutup);
+    expect(digantikan?.status).toBe("Digantikan");
+    expect(digantikan?.diputuskan_oleh).toBe("kepala");
+  });
+});
+
+// Cermin `pemberitahuan_diantre_sekali_per_penerima` di `desktop/tutup_buku.rs`.
+describe("tutup buku Web: pemberitahuan WhatsApp", () => {
+  test("hanya pemegang izin aktif, sekali per kejadian", async () => {
+    expect((await notify(client)).alasan).toBe(
+      "Pemberitahuan tutup buku belum dinyalakan.",
+    );
+    await client.batch(
+      [
+        "INSERT INTO setting_gex_system (key, value) VALUES ('wa_notify_tutup_buku', 'true') ON CONFLICT(key) DO UPDATE SET value = excluded.value;",
+        "INSERT INTO app_role (id, role_key, nama_role, created_at, updated_at) VALUES (901, 'uji-bendahara', 'Uji Bendahara', datetime('now'), datetime('now')), (902, 'uji-tu', 'Uji TU', datetime('now'), datetime('now'));",
+        "INSERT INTO role_permission (role_id, permission_key, is_allowed, updated_at) VALUES (901, 'accounting.close', 1, datetime('now')), (902, 'accounting.close', 0, datetime('now'));",
+        `INSERT INTO master_operator (id, kode_operator, nama_operator, username, password_hash, role_id, no_hp, status) VALUES
+           (901, 'U901', 'Bu Sari', 'uji-sari', 'x', 901, '081234567890', 'Aktif'),
+           (902, 'U902', 'Pak Tu', 'uji-tu', 'x', 902, '081234567891', 'Aktif'),
+           (903, 'U903', 'Mantan', 'uji-mantan', 'x', 901, '081234567892', 'Nonaktif');`,
+        "INSERT INTO keu_tutup_buku (id_tutup, sampai_tanggal, dibuat_oleh, kode_perangkat, waktu_perangkat, diterima_cloud, saldo_json, status, created_at, updated_at) VALUES ('tb-uji-wa', '2019-06-30', 'bendahara', 'A9F3', '2019-07-01 07:00:00', '2019-07-02 08:00:00', '[]', 'Menunggu', datetime('now'), datetime('now'));",
+      ],
+      "write",
+    );
+    const baris = async () =>
+      (
+        await client.execute(
+          "SELECT tujuan_nomor, jenis FROM notifikasi_wa WHERE dedupe_key LIKE 'tutup_buku:tb-uji-wa:%' LIMIT 10;",
+        )
+      ).rows.map((row) => [String(row.tujuan_nomor), String(row.jenis)]);
+    await notify(client);
+    expect(await baris()).toEqual([["+6281234567890", "tutup_buku"]]);
+    await notify(client);
+    expect(await baris()).toEqual([["+6281234567890", "tutup_buku"]]);
   });
 });

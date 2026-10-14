@@ -598,6 +598,33 @@ pub fn baris_jurnal_pembayaran(
 // ── Pengingat tunggakan lewat WhatsApp (K4b) ────────────────────────────────
 
 /// Rincian yang ditulis di satu pesan; sisanya diringkas "dan N tagihan lain".
+/// Saringan jatuh tempo tab Tunggakan (cermin `SARINGAN_JATUH_TEMPO`):
+/// lewat = sebelum hari ini, segera = hari ini s.d. 7 hari lagi, belum = hari
+/// ini atau sesudahnya. "Hari ini" = tanggal WIB jam database.
+pub const SARINGAN_JATUH_TEMPO: [&str; 3] = ["lewat", "segera", "belum"];
+pub const PESAN_SARINGAN_JATUH_TEMPO: &str = "Saringan jatuh tempo tidak dikenal.";
+
+fn saringan_jatuh_tempo(nilai: Option<&str>) -> Result<Option<&str>, CommandError> {
+    match nilai.map(str::trim).filter(|v| !v.is_empty()) {
+        None => Ok(None),
+        Some(v) if SARINGAN_JATUH_TEMPO.contains(&v) => Ok(Some(v)),
+        Some(_) => Err(invalid(PESAN_SARINGAN_JATUH_TEMPO)),
+    }
+}
+
+/// Potongan SQL literal per pilihan, supaya `audit:sql` dan
+/// `audit:list-bound` tetap bisa merakit kuerinya.
+fn tambah_saringan_jatuh_tempo(sql: &mut String, nilai: Option<&str>) {
+    match nilai {
+        Some("lewat") => sql.push_str(" AND t.jatuh_tempo < date('now', '+7 hours')"),
+        Some("segera") => sql.push_str(
+            " AND t.jatuh_tempo >= date('now', '+7 hours') AND t.jatuh_tempo <= date('now', '+7 hours', '+7 days')",
+        ),
+        Some("belum") => sql.push_str(" AND t.jatuh_tempo >= date('now', '+7 hours')"),
+        _ => {}
+    }
+}
+
 pub const MAKS_RINCIAN_PENGINGAT: usize = 5;
 /// Siswa paling banyak per satu tekan tombol. Cermin `MAKS_SISWA_PENGINGAT`.
 pub const MAKS_SISWA_PENGINGAT: usize = 500;
@@ -1550,7 +1577,9 @@ pub fn list(
     id_jenis: Option<&str>,
     id_rombel: Option<&str>,
     status: Option<&str>,
+    jatuh_tempo: Option<&str>,
 ) -> Result<Value, CommandError> {
+    let jatuh_tempo = saringan_jatuh_tempo(jatuh_tempo)?;
     let connection = storage::database(&state.data_dir)?;
     let isi = |v: Option<&str>| {
         v.map(str::trim)
@@ -1611,8 +1640,9 @@ pub fn list(
             _ => " AND b.id_tagihan IS NOT NULL",
         });
     }
-    // `LIMIT 1000` = `BATAS_DAFTAR_TAGIHAN` di `validations/billing.ts`.
-    sql.push_str(" ORDER BY t.periode DESC, kelas, t.nama_siswa, t.id_tagihan LIMIT 1000;");
+    tambah_saringan_jatuh_tempo(&mut sql, jatuh_tempo);
+    // Jatuh tempo terlama di atas. `LIMIT 1000` = `BATAS_DAFTAR_TAGIHAN`.
+    sql.push_str(" ORDER BY t.jatuh_tempo, kelas, t.nama_siswa, t.id_tagihan LIMIT 1000;");
     let params: Vec<&dyn rusqlite::ToSql> =
         args.iter().map(|a| a as &dyn rusqlite::ToSql).collect();
     let hari = hari_ini(&connection)?;
@@ -1790,7 +1820,9 @@ pub fn remind(
     periode: Option<&str>,
     id_jenis: Option<&str>,
     id_rombel: Option<&str>,
+    jatuh_tempo: Option<&str>,
 ) -> Result<Value, CommandError> {
+    let jatuh_tempo = saringan_jatuh_tempo(jatuh_tempo)?;
     let client_id = sync::ensure_client_id(state)?;
     let mut connection = storage::database(&state.data_dir)?;
     if !pengingat_aktif(&connection)? {
@@ -1830,6 +1862,7 @@ pub fn remind(
         sql.push_str(" AND s.id_rombel = ?");
         args.push(value);
     }
+    tambah_saringan_jatuh_tempo(&mut sql, jatuh_tempo);
     // `LIMIT 501` = `MAKS_SISWA_PENGINGAT` + 1, supaya pemotongan terdeteksi.
     sql.push_str(" ORDER BY t.id_siswa LIMIT 501;");
     let params: Vec<&dyn rusqlite::ToSql> =
@@ -1843,8 +1876,21 @@ pub fn remind(
 
     let hari = hari_ini(&connection)?;
     let transaction = connection.transaction().map_err(db_error)?;
+    let diantre = antre_pengingat(&transaction, &client_id, &siswa, &hari)?;
+    transaction.commit().map_err(db_error)?;
+    Ok(json!({ "siswa": siswa.len(), "diantre": diantre, "terpotong": terpotong }))
+}
+
+/// Antre satu pesan pengingat per siswa (dedupe `tagihan:<siswa>:<hari>`),
+/// berisi seluruh tunggakannya. Dipakai tombol manual dan pengingat otomatis.
+fn antre_pengingat(
+    transaction: &Transaction<'_>,
+    client_id: &str,
+    siswa: &[String],
+    hari: &str,
+) -> Result<usize, CommandError> {
     let mut diantre = 0;
-    for id_siswa in &siswa {
+    for id_siswa in siswa {
         let tagihan: Vec<TagihanPengingat> = tagihan_terbuka(&transaction, id_siswa)?
             .into_iter()
             .map(|row| TagihanPengingat {
@@ -1856,8 +1902,8 @@ pub fn remind(
             .collect();
         let isian = isian_pengingat(&tagihan);
         if wa_notification::queue_wali_notification_tx(
-            &transaction,
-            &client_id,
+            transaction,
+            client_id,
             "tagihan",
             id_siswa,
             &format!("tagihan:{id_siswa}:{hari}"),
@@ -1866,8 +1912,132 @@ pub fn remind(
             diantre += 1;
         }
     }
+    Ok(diantre)
+}
+
+fn setelan(connection: &Connection, key: &str) -> Result<Option<String>, CommandError> {
+    connection
+        .query_row(
+            "SELECT value FROM setting_gex_system WHERE key = ?1 LIMIT 1;",
+            params![key],
+            |row| row.get(0),
+        )
+        .optional()
+        .map_err(db_error)
+}
+
+/// Pengingat tagihan otomatis (lanjutan K4b), dipanggil komponen latar tiap
+/// 30 menit. Berjalan paling banyak sekali sehari per database: tanggal WIB
+/// terakhir disimpan di setting tersinkron `pengingat_tagihan_terakhir`, dan
+/// dua perangkat yang tetap sama-sama berjalan dicegah dedupe per siswa per
+/// hari (lokal dan cloud). Siswa dipilih bila punya tunggakan yang jatuh
+/// tempo tepat H-n, dan/atau (pada hari yang dipilih) yang sudah lewat jatuh
+/// tempo. Cermin `remindAuto` di `services/billing.ts`.
+pub fn remind_auto(state: &DesktopState) -> Result<Value, CommandError> {
+    let client_id = sync::ensure_client_id(state)?;
+    let mut connection = storage::database(&state.data_dir)?;
+    let nyala = |nilai: Option<String>| {
+        nilai.is_some_and(|v| v.trim().eq_ignore_ascii_case("true"))
+    };
+    if !pengingat_aktif(&connection)?
+        || !nyala(setelan(&connection, wa_notification::PENGINGAT_OTOMATIS_KEY)?)
+    {
+        return Ok(json!({ "dijalankan": false, "alasan": "Pengingat otomatis belum dinyalakan." }));
+    }
+    let hari = hari_ini(&connection)?;
+    if setelan(&connection, wa_notification::PENGINGAT_TERAKHIR_KEY)?.as_deref() == Some(hari.as_str()) {
+        return Ok(json!({ "dijalankan": false, "alasan": "Sudah dijalankan hari ini.", "hari": hari }));
+    }
+    let angka = |nilai: Option<String>| nilai.and_then(|v| v.trim().parse::<i64>().ok());
+    let hari_sebelum = wa_notification::clamp_pengingat_hari_sebelum(
+        angka(setelan(&connection, wa_notification::PENGINGAT_HARI_SEBELUM_KEY)?)
+            .unwrap_or(wa_notification::DEFAULT_PENGINGAT_HARI_SEBELUM),
+    );
+    let hari_lewat = wa_notification::clamp_pengingat_hari_lewat(
+        angka(setelan(&connection, wa_notification::PENGINGAT_HARI_LEWAT_KEY)?)
+            .unwrap_or(wa_notification::DEFAULT_PENGINGAT_HARI_LEWAT),
+    );
+    let minggu_ke: i64 = connection
+        .query_row(
+            "SELECT CAST(strftime('%w', date('now', '+7 hours')) AS INTEGER);",
+            [],
+            |row| row.get(0),
+        )
+        .map_err(db_error)?;
+    let hari_iso = if minggu_ke == 0 { 7 } else { minggu_ke };
+    let (sebelum, lewat) = wa_notification::pengingat_hari_ini(hari_sebelum, hari_lewat, hari_iso);
+
+    let mut siswa: Vec<String> = Vec::new();
+    if sebelum {
+        let geser = format!("+{hari_sebelum} days");
+        siswa.extend(
+            query_json(
+                &connection,
+                "SELECT DISTINCT t.id_siswa
+                 FROM keu_tagihan t
+                 LEFT JOIN keu_tagihan_batal b ON b.id_tagihan = t.id_tagihan
+                 LEFT JOIN (
+                    SELECT a.id_tagihan, SUM(a.nominal) AS dibayar
+                    FROM keu_pembayaran_alokasi a
+                    JOIN keu_pembayaran p ON p.id_pembayaran = a.id_pembayaran
+                    LEFT JOIN keu_pembayaran_batal pb ON pb.id_pembayaran = p.id_pembayaran
+                    WHERE a.id_tagihan IS NOT NULL AND pb.id_pembayaran IS NULL
+                    GROUP BY a.id_tagihan
+                 ) d ON d.id_tagihan = t.id_tagihan
+                 WHERE b.id_tagihan IS NULL AND t.nominal - t.potongan > COALESCE(d.dibayar, 0)
+                   AND t.jatuh_tempo = date('now', '+7 hours', ?)
+                 ORDER BY t.id_siswa LIMIT 501;",
+                &[&geser],
+            )?
+            .into_iter()
+            .filter_map(|row| row["id_siswa"].as_str().map(str::to_owned)),
+        );
+    }
+    if lewat {
+        siswa.extend(
+            query_json(
+                &connection,
+                "SELECT DISTINCT t.id_siswa
+                 FROM keu_tagihan t
+                 LEFT JOIN keu_tagihan_batal b ON b.id_tagihan = t.id_tagihan
+                 LEFT JOIN (
+                    SELECT a.id_tagihan, SUM(a.nominal) AS dibayar
+                    FROM keu_pembayaran_alokasi a
+                    JOIN keu_pembayaran p ON p.id_pembayaran = a.id_pembayaran
+                    LEFT JOIN keu_pembayaran_batal pb ON pb.id_pembayaran = p.id_pembayaran
+                    WHERE a.id_tagihan IS NOT NULL AND pb.id_pembayaran IS NULL
+                    GROUP BY a.id_tagihan
+                 ) d ON d.id_tagihan = t.id_tagihan
+                 WHERE b.id_tagihan IS NULL AND t.nominal - t.potongan > COALESCE(d.dibayar, 0)
+                   AND t.jatuh_tempo < date('now', '+7 hours')
+                 ORDER BY t.id_siswa LIMIT 501;",
+                &[],
+            )?
+            .into_iter()
+            .filter_map(|row| row["id_siswa"].as_str().map(str::to_owned)),
+        );
+    }
+    siswa.sort();
+    siswa.dedup();
+    let terpotong = siswa.len() > MAKS_SISWA_PENGINGAT;
+    siswa.truncate(MAKS_SISWA_PENGINGAT);
+
+    let transaction = connection.transaction().map_err(db_error)?;
+    let diantre = antre_pengingat(&transaction, &client_id, &siswa, &hari)?;
+    super::nilai_akhir::tulis_setting(
+        &transaction,
+        &client_id,
+        wa_notification::PENGINGAT_TERAKHIR_KEY,
+        &hari,
+    )?;
     transaction.commit().map_err(db_error)?;
-    Ok(json!({ "siswa": siswa.len(), "diantre": diantre, "terpotong": terpotong }))
+    Ok(json!({
+        "dijalankan": true,
+        "hari": hari,
+        "siswa": siswa.len(),
+        "diantre": diantre,
+        "terpotong": terpotong,
+    }))
 }
 
 // ── Pembayaran dan kuitansi (K3b) ───────────────────────────────────────────
@@ -3336,7 +3506,7 @@ mod tests {
             "Tagihan ini sudah dibatalkan."
         );
         assert_eq!(saldo(&state, AKUN_PIUTANG_SISWA), 150_000);
-        let daftar = list(&state, Some("2026-07"), None, None, Some("Aktif")).expect("daftar");
+        let daftar = list(&state, Some("2026-07"), None, None, Some("Aktif"), None).expect("daftar");
         assert_eq!(daftar["items"].as_array().expect("items").len(), 1);
         assert_eq!(daftar["total_sisa"], json!(150_000));
     }
@@ -3392,7 +3562,7 @@ mod tests {
         assert!(nomor1.starts_with("KWT/2026/") && nomor1.ends_with("/0001"));
         assert_eq!(saldo(&state, AKUN_PIUTANG_SISWA), 200_000);
         assert_eq!(saldo(&state, "akun-kas"), 400_000);
-        let daftar = list(&state, None, None, None, None).expect("daftar");
+        let daftar = list(&state, None, None, None, None, None).expect("daftar");
         let item = |id: &str| {
             daftar["items"]
                 .as_array()
@@ -3634,11 +3804,11 @@ mod tests {
         issue(&state, "bendahara", &jt, "2026-07", "2026-07-10", None, None).expect("terbit");
 
         assert_eq!(
-            remind(&state, None, None, None).expect_err("sakelar mati").message,
+            remind(&state, None, None, None, None).expect_err("sakelar mati").message,
             PESAN_PENGINGAT_MATI
         );
         assert_eq!(
-            list(&state, None, None, None, None).expect("daftar")["pengingat_wa"],
+            list(&state, None, None, None, None, None).expect("daftar")["pengingat_wa"],
             json!(false)
         );
         connection
@@ -3648,12 +3818,12 @@ mod tests {
             )
             .expect("sakelar");
         assert_eq!(
-            list(&state, None, None, None, None).expect("daftar")["pengingat_wa"],
+            list(&state, None, None, None, None, None).expect("daftar")["pengingat_wa"],
             json!(true)
         );
 
         // Budi tidak punya nomor wali: dihitung sebagai siswa, tidak diantre.
-        let hasil = remind(&state, None, None, Some("r7")).expect("pengingat");
+        let hasil = remind(&state, None, None, Some("r7"), None).expect("pengingat");
         assert_eq!(hasil, json!({ "siswa": 2, "diantre": 1, "terpotong": false }));
         let (isi, dedupe, jenis): (String, String, String) = connection
             .query_row(
@@ -3668,7 +3838,7 @@ mod tests {
         assert!(isi.contains("- SPP Juli 2026: Rp300.000"));
         assert!(isi.contains("Jatuh tempo paling awal: 10/07/2026"));
 
-        let ulang = remind(&state, None, None, None).expect("pengingat ulang");
+        let ulang = remind(&state, None, None, None, None).expect("pengingat ulang");
         assert_eq!(ulang["diantre"], json!(0));
         let outbox: i64 = connection
             .query_row(
@@ -3824,5 +3994,98 @@ INSERT INTO keu_pembayaran_batal (id_pembayaran, alasan, dibatalkan_oleh) VALUES
         let kalender = recap_receipts(&state, "2026-01").expect("penerimaan kalender");
         assert_eq!(kalender["total"], json!(700000));
         assert_eq!(kalender["kas"][0]["per_bulan"][5], json!(50000));
+    }
+
+    #[test]
+    fn saringan_dan_urutan_jatuh_tempo() {
+        let (_dir, state) = state_uji();
+        let connection = storage::database(&state.data_dir).expect("db");
+        connection
+            .execute_batch(
+                "INSERT INTO keu_tagihan (id_tagihan, id_siswa, nama_siswa, id_jenis_tagihan, nama_tagihan, periode, nominal, potongan, jatuh_tempo, dibuat_oleh) VALUES
+                   ('t-jauh', 'S-1', 'Ani', 'spp', 'SPP', '2999-01', 100, 0, '2999-01-10', 'tu'),
+                   ('t-lewat', 'S-2', 'Budi', 'spp', 'SPP', '2000-01', 100, 0, '2000-01-10', 'tu'),
+                   ('t-segera', 'S-3', 'Cici', 'spp', 'SPP', '2026-10', 100, 0, date('now', '+7 hours', '+3 days'), 'tu');",
+            )
+            .expect("tagihan");
+        let id = |hasil: Value| -> Vec<String> {
+            hasil["items"]
+                .as_array()
+                .expect("items")
+                .iter()
+                .map(|i| i["id_tagihan"].as_str().unwrap_or("").to_owned())
+                .collect()
+        };
+        assert_eq!(
+            id(list(&state, None, None, None, None, None).expect("semua")),
+            vec!["t-lewat", "t-segera", "t-jauh"],
+            "jatuh tempo terlama di atas"
+        );
+        assert_eq!(id(list(&state, None, None, None, None, Some("lewat")).expect("lewat")), vec!["t-lewat"]);
+        assert_eq!(id(list(&state, None, None, None, None, Some("segera")).expect("segera")), vec!["t-segera"]);
+        assert_eq!(
+            id(list(&state, None, None, None, None, Some("belum")).expect("belum")),
+            vec!["t-segera", "t-jauh"]
+        );
+        assert_eq!(
+            list(&state, None, None, None, None, Some("kemarin")).expect_err("asing").message,
+            PESAN_SARINGAN_JATUH_TEMPO
+        );
+    }
+
+    #[test]
+    fn pengingat_otomatis_h_n_dan_lewat_sekali_sehari() {
+        let (_dir, state) = state_uji();
+        let connection = storage::database(&state.data_dir).expect("db");
+        connection
+            .execute_batch(
+                "INSERT INTO akademik_rombel (id_rombel, id_tahun_ajaran, tingkat, nama_rombel) VALUES ('r7', 'ta', 7, 'VII A');
+                 INSERT INTO master_data (id_unik, kode_karyawan, nama, divisi, id_shift, jenis_personil, status_aktif) VALUES
+                   ('S-1', 'S-1', 'Ani', 'Siswa', 1, 'Siswa', 'Aktif'),
+                   ('S-2', 'S-2', 'Budi', 'Siswa', 1, 'Siswa', 'Aktif'),
+                   ('S-3', 'S-3', 'Cici', 'Siswa', 1, 'Siswa', 'Aktif');
+                 INSERT INTO siswa_data (id_siswa, nama_lengkap, id_rombel, angkatan, status, no_whatsapp_wali, created_at, updated_at) VALUES
+                   ('S-1', 'Ani', 'r7', 2026, 'Aktif', '081200000001', 'x', 'x'),
+                   ('S-2', 'Budi', 'r7', 2026, 'Aktif', '081200000002', 'x', 'x'),
+                   ('S-3', 'Cici', 'r7', 2026, 'Aktif', '081200000003', 'x', 'x');
+                 INSERT INTO keu_tagihan (id_tagihan, id_siswa, nama_siswa, id_jenis_tagihan, nama_tagihan, periode, nominal, potongan, jatuh_tempo, dibuat_oleh) VALUES
+                   ('t-h3', 'S-1', 'Ani', 'spp', 'SPP', '2026-10', 100000, 0, date('now', '+7 hours', '+3 days'), 'tu'),
+                   ('t-lewat', 'S-2', 'Budi', 'spp', 'SPP', '2000-01', 100000, 0, '2000-01-10', 'tu'),
+                   ('t-jauh', 'S-3', 'Cici', 'spp', 'SPP', '2999-01', 100000, 0, '2999-01-10', 'tu');
+                 INSERT INTO setting_gex_system (key, value) VALUES ('wa_notify_tagihan', 'true');",
+            )
+            .expect("seed");
+        assert_eq!(remind_auto(&state).expect("mati")["dijalankan"], json!(false));
+        let hari_ini_iso: i64 = connection
+            .query_row(
+                "SELECT CASE CAST(strftime('%w', date('now', '+7 hours')) AS INTEGER) WHEN 0 THEN 7 ELSE CAST(strftime('%w', date('now', '+7 hours')) AS INTEGER) END;",
+                [],
+                |row| row.get(0),
+            )
+            .expect("hari");
+        connection
+            .execute_batch(&format!(
+                "INSERT INTO setting_gex_system (key, value) VALUES
+                   ('pengingat_tagihan_otomatis', 'true'),
+                   ('pengingat_tagihan_hari_sebelum', '3'),
+                   ('pengingat_tagihan_hari_lewat', '{hari_ini_iso}');"
+            ))
+            .expect("setelan");
+
+        let hasil = remind_auto(&state).expect("jalan");
+        assert_eq!(hasil["dijalankan"], json!(true));
+        // H-3 (Ani) dan lewat jatuh tempo (Budi); Cici jatuh tempo jauh.
+        assert_eq!((hasil["siswa"].clone(), hasil["diantre"].clone()), (json!(2), json!(2)));
+        let ulang = remind_auto(&state).expect("ulang");
+        assert_eq!(ulang["dijalankan"], json!(false));
+        assert_eq!(ulang["alasan"], json!("Sudah dijalankan hari ini."));
+        let penanda: i64 = connection
+            .query_row(
+                "SELECT COUNT(*) FROM desktop_sync_outbox WHERE domain = 'setting' AND entity_key = 'pengingat_tagihan_terakhir';",
+                [],
+                |row| row.get(0),
+            )
+            .expect("outbox");
+        assert_eq!(penanda, 1);
     }
 }

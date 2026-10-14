@@ -239,7 +239,7 @@ fn ensure_wa_notification_kind_values(connection: &Connection) -> Result<(), Str
     let Some(existing) = existing else {
         return Ok(());
     };
-    if existing.contains("'tagihan'") {
+    if existing.contains("'tutup_buku'") {
         return Ok(());
     }
 
@@ -280,7 +280,7 @@ fn ensure_wa_notification_kind_values(connection: &Connection) -> Result<(), Str
         CREATE TABLE notifikasi_wa__rebuild (
           id_notifikasi TEXT PRIMARY KEY,
           dedupe_key TEXT NOT NULL,
-          jenis TEXT NOT NULL CHECK (jenis IN ('scan_masuk', 'scan_pulang', 'bolos', 'ambang_alfa', 'koreksi_admin', 'import_manual', 'uks', 'tagihan')),
+          jenis TEXT NOT NULL CHECK (jenis IN ('scan_masuk', 'scan_pulang', 'bolos', 'ambang_alfa', 'koreksi_admin', 'import_manual', 'uks', 'tagihan', 'tutup_buku')),
           id_siswa TEXT,
           tujuan_nomor TEXT NOT NULL,
           isi_pesan TEXT NOT NULL,
@@ -1519,7 +1519,7 @@ pub fn initialize(path: &Path) -> Result<(), String> {
       CREATE TABLE IF NOT EXISTS notifikasi_wa (
         id_notifikasi TEXT PRIMARY KEY,
         dedupe_key TEXT NOT NULL,
-        jenis TEXT NOT NULL CHECK (jenis IN ('scan_masuk', 'scan_pulang', 'bolos', 'ambang_alfa', 'koreksi_admin', 'import_manual', 'uks', 'tagihan')),
+        jenis TEXT NOT NULL CHECK (jenis IN ('scan_masuk', 'scan_pulang', 'bolos', 'ambang_alfa', 'koreksi_admin', 'import_manual', 'uks', 'tagihan', 'tutup_buku')),
         id_siswa TEXT,
         tujuan_nomor TEXT NOT NULL,
         isi_pesan TEXT NOT NULL,

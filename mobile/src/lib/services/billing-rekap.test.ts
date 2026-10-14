@@ -7,7 +7,9 @@ import { initDatabaseSchema } from "@/lib/db-schema";
 
 mock.module("server-only", () => ({}));
 
-const { recapReceipts, recapRombel } = await import("@/lib/services/billing");
+const { list, recapReceipts, recapRombel } = await import(
+  "@/lib/services/billing"
+);
 
 /** Salinan apa adanya `SEED_REKAP` di `desktop/billing.rs`. */
 const SEED_REKAP = `
@@ -189,6 +191,29 @@ describe("rekap tagihan: skenario kembar Rust", () => {
     expect(kalender.kas[0]?.per_bulan[5]).toBe(50000);
     await expect(recapReceipts(client, "2026-13")).rejects.toThrow(
       "Bulan awal harus berbentuk YYYY-MM.",
+    );
+  });
+});
+
+// Cermin `saringan_dan_urutan_jatuh_tempo` di `desktop/billing.rs`.
+describe("saringan jatuh tempo", () => {
+  test("lewat, segera, belum, dan urutan jatuh tempo terlama", async () => {
+    await client.execute(
+      `INSERT INTO keu_tagihan (id_tagihan, id_siswa, nama_siswa, id_jenis_tagihan, nama_tagihan, periode, nominal, potongan, jatuh_tempo, dibuat_oleh) VALUES
+         ('t-jauh', 'S-1', 'Ani', 'jt', 'Uji', '2999-01', 100, 0, '2999-01-10', 'tu'),
+         ('t-lewat', 'S-2', 'Budi', 'jt', 'Uji', '2000-01', 100, 0, '2000-01-10', 'tu'),
+         ('t-segera', 'S-3', 'Cici', 'jt', 'Uji', '2026-10', 100, 0, date('now', '+7 hours', '+3 days'), 'tu');`,
+    );
+    const id = async (jatuh_tempo: string | null) =>
+      (await list(client, { id_jenis_tagihan: "jt", jatuh_tempo })).items.map(
+        (i) => i.id_tagihan,
+      );
+    expect(await id(null)).toEqual(["t-lewat", "t-segera", "t-jauh"]);
+    expect(await id("lewat")).toEqual(["t-lewat"]);
+    expect(await id("segera")).toEqual(["t-segera"]);
+    expect(await id("belum")).toEqual(["t-segera", "t-jauh"]);
+    await expect(id("kemarin")).rejects.toThrow(
+      "Saringan jatuh tempo tidak dikenal.",
     );
   });
 });

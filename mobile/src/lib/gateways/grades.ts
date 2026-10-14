@@ -8,6 +8,7 @@ import type {
   JenisNilaiDraft,
 } from "@/lib/validations/nilai-akhir";
 import type {
+  BahanErapor,
   KonfigurasiNilai,
   PenilaianDetail,
   PenilaianDraft,
@@ -18,6 +19,7 @@ import type {
 } from "@/types/grades";
 
 export type {
+  BahanErapor,
   JenisNilaiItem,
   JenisPenilaian,
   KonfigurasiNilai,
@@ -189,5 +191,18 @@ export function getRekapNilaiAkhir(
     "desktop_grade_recap",
     { idTahunAjaran, semester, idRombel, idMapel },
     "/api/academic/grades/recap",
+  );
+}
+
+/** Bahan ekspor e-Rapor satu rombel × semester (N3). */
+export function getBahanErapor(
+  idTahunAjaran: string,
+  semester: string,
+  idRombel: string,
+): Promise<BahanErapor> {
+  return panggil(
+    "desktop_grade_erapor",
+    { idTahunAjaran, semester, idRombel },
+    "/api/academic/grades/erapor",
   );
 }

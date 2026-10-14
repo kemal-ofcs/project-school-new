@@ -7,8 +7,15 @@ import { initDatabaseSchema } from "@/lib/db-schema";
 
 mock.module("server-only", () => ({}));
 
-const { config, deleteType, recap, saveSchoolDays, saveType, saveWeights } =
-  await import("@/lib/services/nilai-akhir");
+const {
+  config,
+  deleteType,
+  erapor,
+  recap,
+  saveSchoolDays,
+  saveType,
+  saveWeights,
+} = await import("@/lib/services/nilai-akhir");
 
 // Skenario kembar `pengaturan_dan_rekap_nilai_akhir` di `desktop/nilai_akhir.rs`.
 // SQL seed-nya disalin apa adanya dari `SEED_SKENARIO`.
@@ -146,5 +153,44 @@ describe("nilai akhir Web terhadap skema cloud asli", () => {
     expect(budi?.kehadiran.persen).toBe(100);
     expect(budi?.nilai_akhir).toBe(84);
     expect(budi?.kosong).toBe(1);
+  });
+});
+
+// Cermin `bahan_erapor_dari_rekap_n2` di `desktop/nilai_akhir.rs`.
+describe("bahan ekspor e-Rapor", () => {
+  test("satu rombel, semua mapel berpenilaian, rekap N2", async () => {
+    await client.executeMultiple(`
+      UPDATE siswa_data SET nis = '1001', nisn = '0012345678' WHERE id_siswa = 'S1';
+      INSERT OR IGNORE INTO master_data (id_unik, kode_karyawan, nama, divisi, id_shift, jenis_personil, status_aktif)
+        VALUES ('g', 'G1', 'Budi Santoso', 'Guru', 1, 'GURU', 'Aktif');
+      INSERT OR IGNORE INTO guru_data (id_guru, gelar, created_at, updated_at) VALUES ('g', 'S.Kom.', 'x', 'x');
+    `);
+    const aktif = (await config(client)).jenis.filter((j) => j.is_aktif);
+    await saveWeights(
+      client,
+      0,
+      aktif.map((j) => ({
+        id_jenis: j.id_jenis,
+        bobot: j.id_jenis === "jns-tugas" || j.id_jenis === "jns-uts" ? 50 : 0,
+      })),
+    );
+    const data = await erapor(client, "ta1", "Ganjil", "r7");
+    expect(data.tahun_ajaran).toBe("2026/2027");
+    expect([data.rombel, data.tingkat]).toEqual(["VII A", 7]);
+    expect(data.mapel.length).toBe(1);
+    const mtk = data.mapel[0];
+    expect(mtk?.kode_mapel).toBe("MTK");
+    expect(mtk?.guru).toBe("Budi Santoso, S.Kom.");
+    expect(mtk?.penilaian.length).toBe(3);
+    expect(mtk?.skor.length).toBe(5);
+    const rekap = (id: string) => mtk?.rekap.find((r) => r.id_siswa === id);
+    expect(rekap("S1")?.nilai_akhir).toBe(75);
+    expect(rekap("S1")?.rata["jns-tugas"]).toBe(80);
+    expect(rekap("S2")?.nilai_akhir).toBe(78);
+    expect(data.siswa[0]?.nisn).toBe("0012345678");
+    expect(data.siswa[1]?.nisn).toBe("");
+    await expect(erapor(client, "ta1", "Ganjil", "tidak-ada")).rejects.toThrow(
+      "Rombel tidak ditemukan.",
+    );
   });
 });

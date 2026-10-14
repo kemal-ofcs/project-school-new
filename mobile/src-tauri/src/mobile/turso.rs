@@ -1698,7 +1698,7 @@ impl TursoClient {
         let Some(existing) = existing else {
             return Ok(());
         };
-        if existing.contains("'tagihan'") {
+        if existing.contains("'tutup_buku'") {
             return Ok(());
         }
 
@@ -1738,7 +1738,7 @@ impl TursoClient {
                 r#"CREATE TABLE notifikasi_wa__rebuild (
                     id_notifikasi TEXT PRIMARY KEY,
                     dedupe_key TEXT NOT NULL,
-                    jenis TEXT NOT NULL CHECK (jenis IN ('scan_masuk', 'scan_pulang', 'bolos', 'ambang_alfa', 'koreksi_admin', 'import_manual', 'uks', 'tagihan')),
+                    jenis TEXT NOT NULL CHECK (jenis IN ('scan_masuk', 'scan_pulang', 'bolos', 'ambang_alfa', 'koreksi_admin', 'import_manual', 'uks', 'tagihan', 'tutup_buku')),
                     id_siswa TEXT,
                     tujuan_nomor TEXT NOT NULL,
                     isi_pesan TEXT NOT NULL,
@@ -2541,6 +2541,9 @@ impl TursoClient {
         alasan_buka TEXT,
         dibuka_oleh TEXT,
         dibuka_pada TEXT,
+        diputuskan_oleh TEXT,
+        diputuskan_pada TEXT,
+        catatan_keputusan TEXT,
         created_at TEXT NOT NULL DEFAULT (datetime('now')),
         updated_at TEXT NOT NULL DEFAULT (datetime('now'))
       );"#,
@@ -3365,7 +3368,7 @@ impl TursoClient {
                 r#"CREATE TABLE IF NOT EXISTS notifikasi_wa (
                     id_notifikasi TEXT PRIMARY KEY,
                     dedupe_key TEXT NOT NULL,
-                    jenis TEXT NOT NULL CHECK (jenis IN ('scan_masuk', 'scan_pulang', 'bolos', 'ambang_alfa', 'koreksi_admin', 'import_manual', 'uks', 'tagihan')),
+                    jenis TEXT NOT NULL CHECK (jenis IN ('scan_masuk', 'scan_pulang', 'bolos', 'ambang_alfa', 'koreksi_admin', 'import_manual', 'uks', 'tagihan', 'tutup_buku')),
                     id_siswa TEXT,
                     tujuan_nomor TEXT NOT NULL,
                     isi_pesan TEXT NOT NULL,
@@ -3397,6 +3400,7 @@ impl TursoClient {
                     import_manual_enabled INTEGER NOT NULL DEFAULT 0,
                     uks_enabled INTEGER NOT NULL DEFAULT 0,
                     tagihan_enabled INTEGER NOT NULL DEFAULT 0,
+                    tutup_buku_enabled INTEGER NOT NULL DEFAULT 0,
                     created_at TEXT NOT NULL,
                     updated_at TEXT NOT NULL
                 );"#,
@@ -3727,7 +3731,9 @@ impl TursoClient {
                 (42, 'student-payment', datetime('now')),
                 (43, 'grade-type-dynamic', datetime('now')),
                 (44, 'wa-billing-reminder', datetime('now')),
-                (45, 'book-closing', datetime('now'));"#,
+                (45, 'book-closing', datetime('now')),
+                (46, 'book-closing-decision', datetime('now')),
+                (47, 'wa-book-closing', datetime('now'));"#,
                 vec![],
             ),
         ];
@@ -3910,11 +3916,16 @@ impl TursoClient {
             ("app_wa_config", "import_manual_enabled", "ALTER TABLE app_wa_config ADD COLUMN import_manual_enabled INTEGER NOT NULL DEFAULT 0;"),
             ("app_wa_config", "uks_enabled", "ALTER TABLE app_wa_config ADD COLUMN uks_enabled INTEGER NOT NULL DEFAULT 0;"),
             ("app_wa_config", "tagihan_enabled", "ALTER TABLE app_wa_config ADD COLUMN tagihan_enabled INTEGER NOT NULL DEFAULT 0;"),
+            ("app_wa_config", "tutup_buku_enabled", "ALTER TABLE app_wa_config ADD COLUMN tutup_buku_enabled INTEGER NOT NULL DEFAULT 0;"),
             // Vonis verifikasi wajah pada foto bukti (v38).
             ("absensi_foto", "wajah_vonis", "ALTER TABLE absensi_foto ADD COLUMN wajah_vonis TEXT;"),
             ("absensi_foto", "wajah_skor", "ALTER TABLE absensi_foto ADD COLUMN wajah_skor REAL;"),
             // Jenis penilaian dinamis (v43). Nullable; CHECK lama `jenis` dibiarkan.
             ("nilai_penilaian", "id_jenis", "ALTER TABLE nilai_penilaian ADD COLUMN id_jenis TEXT;"),
+            // Keputusan tutup buku (v46).
+            ("keu_tutup_buku", "diputuskan_oleh", "ALTER TABLE keu_tutup_buku ADD COLUMN diputuskan_oleh TEXT;"),
+            ("keu_tutup_buku", "diputuskan_pada", "ALTER TABLE keu_tutup_buku ADD COLUMN diputuskan_pada TEXT;"),
+            ("keu_tutup_buku", "catatan_keputusan", "ALTER TABLE keu_tutup_buku ADD COLUMN catatan_keputusan TEXT;"),
         ] {
             self.ensure_column(table, column, sql).await?;
         }
@@ -4166,6 +4177,16 @@ impl TursoClient {
         .await?;
         self.query_one(
             "INSERT OR IGNORE INTO schema_migration (version, name, applied_at) VALUES (-2026, 'book-closing-v1', datetime('now'));",
+            vec![],
+        )
+        .await?;
+        self.query_one(
+            "INSERT OR IGNORE INTO schema_migration (version, name, applied_at) VALUES (-2027, 'book-closing-decision-v1', datetime('now'));",
+            vec![],
+        )
+        .await?;
+        self.query_one(
+            "INSERT OR IGNORE INTO schema_migration (version, name, applied_at) VALUES (-2028, 'wa-book-closing-v1', datetime('now'));",
             vec![],
         )
         .await?;
@@ -4480,7 +4501,7 @@ impl TursoClient {
                 // Sentinel WAJIB dinaikkan setiap kali ensure_schema menambah
                 // tabel atau kolom — nilainya di sini dan pada INSERT di atas
                 // harus selalu sama.
-                "SELECT COUNT(*) AS total FROM schema_migration WHERE version = -2026;",
+                "SELECT COUNT(*) AS total FROM schema_migration WHERE version = -2028;",
                 vec![],
             )
             .await
@@ -6864,7 +6885,7 @@ impl TursoClient {
         self.ensure_schema_current().await?;
         let res = self
             .query_one(
-                "SELECT id, provider, api_key, api_url, sender_number, is_active, daily_limit, scan_masuk_enabled, scan_pulang_enabled, bolos_enabled, ambang_alfa_enabled, koreksi_admin_enabled, import_manual_enabled, uks_enabled, tagihan_enabled, created_at, updated_at FROM app_wa_config WHERE id = 'default' LIMIT 1;",
+                "SELECT id, provider, api_key, api_url, sender_number, is_active, daily_limit, scan_masuk_enabled, scan_pulang_enabled, bolos_enabled, ambang_alfa_enabled, koreksi_admin_enabled, import_manual_enabled, uks_enabled, tagihan_enabled, tutup_buku_enabled, created_at, updated_at FROM app_wa_config WHERE id = 'default' LIMIT 1;",
                 vec![],
             )
             .await?;
@@ -6898,17 +6919,22 @@ impl TursoClient {
                 "importManualEnabled": on("import_manual_enabled"),
                 "uksEnabled": on("uks_enabled"),
                 "tagihanEnabled": on("tagihan_enabled"),
+                "tutupBukuEnabled": on("tutup_buku_enabled"),
                 "createdAt": text("created_at"),
                 "updatedAt": text("updated_at"),
             });
 
             let settings_res = self
                 .query_one(
-                    "SELECT key, value FROM setting_gex_system WHERE key IN (?, ?, ?);",
+                    "SELECT key, value FROM setting_gex_system WHERE key IN (?, ?, ?, ?, ?, ?, ?);",
                     vec![
                         json!(super::wa_notification::WA_NOTIFY_AMBANG_ALFA_LIMIT_KEY),
                         json!(super::wa_notification::WA_NOTIFY_AMBANG_ALFA_DAYS_KEY),
                         json!(super::wa_notification::WA_AUTO_SEND_KEY),
+                        json!(super::wa_notification::PENGINGAT_OTOMATIS_KEY),
+                        json!(super::wa_notification::PENGINGAT_HARI_SEBELUM_KEY),
+                        json!(super::wa_notification::PENGINGAT_HARI_LEWAT_KEY),
+                        json!(super::wa_notification::PENGINGAT_TERAKHIR_KEY),
                     ],
                 )
                 .await
@@ -6916,6 +6942,10 @@ impl TursoClient {
             let mut ambang_limit = super::wa_notification::DEFAULT_AMBANG_ALFA_LIMIT;
             let mut ambang_days = super::wa_notification::DEFAULT_AMBANG_ALFA_DAYS;
             let mut auto_send = false;
+            let mut pengingat_otomatis = false;
+            let mut pengingat_hari_sebelum = super::wa_notification::DEFAULT_PENGINGAT_HARI_SEBELUM;
+            let mut pengingat_hari_lewat = super::wa_notification::DEFAULT_PENGINGAT_HARI_LEWAT;
+            let mut pengingat_terakhir: Option<String> = None;
             if let Some(s_res) = settings_res {
                 for r in s_res.to_objects() {
                     let k = r.get("key").and_then(Value::as_str).unwrap_or("");
@@ -6937,12 +6967,30 @@ impl TursoClient {
                         }
                     } else if k == super::wa_notification::WA_AUTO_SEND_KEY {
                         auto_send = v.trim().eq_ignore_ascii_case("true");
+                    } else if k == super::wa_notification::PENGINGAT_OTOMATIS_KEY {
+                        pengingat_otomatis = v.trim().eq_ignore_ascii_case("true");
+                    } else if k == super::wa_notification::PENGINGAT_HARI_SEBELUM_KEY {
+                        if let Ok(parsed) = v.trim().parse::<i64>() {
+                            pengingat_hari_sebelum =
+                                super::wa_notification::clamp_pengingat_hari_sebelum(parsed);
+                        }
+                    } else if k == super::wa_notification::PENGINGAT_TERAKHIR_KEY {
+                        pengingat_terakhir = Some(v.trim().to_owned()).filter(|v| !v.is_empty());
+                    } else if k == super::wa_notification::PENGINGAT_HARI_LEWAT_KEY {
+                        if let Ok(parsed) = v.trim().parse::<i64>() {
+                            pengingat_hari_lewat =
+                                super::wa_notification::clamp_pengingat_hari_lewat(parsed);
+                        }
                     }
                 }
             }
             obj["ambangAlfaLimit"] = json!(ambang_limit);
             obj["ambangAlfaDays"] = json!(ambang_days);
             obj["autoSendEnabled"] = json!(auto_send);
+            obj["pengingatOtomatis"] = json!(pengingat_otomatis);
+            obj["pengingatHariSebelum"] = json!(pengingat_hari_sebelum);
+            obj["pengingatHariLewat"] = json!(pengingat_hari_lewat);
+            obj["pengingatTerakhir"] = json!(pengingat_terakhir);
             Ok(obj)
         } else {
             Ok(json!({
@@ -6966,9 +7014,13 @@ impl TursoClient {
                 "importManualEnabled": false,
                 "uksEnabled": false,
                 "tagihanEnabled": false,
+                "tutupBukuEnabled": false,
                 "ambangAlfaLimit": super::wa_notification::DEFAULT_AMBANG_ALFA_LIMIT,
                 "ambangAlfaDays": super::wa_notification::DEFAULT_AMBANG_ALFA_DAYS,
                 "autoSendEnabled": false,
+                "pengingatOtomatis": false,
+                "pengingatHariSebelum": super::wa_notification::DEFAULT_PENGINGAT_HARI_SEBELUM,
+                "pengingatHariLewat": super::wa_notification::DEFAULT_PENGINGAT_HARI_LEWAT,
                 "createdAt": "",
                 "updatedAt": ""
             }))
@@ -7022,6 +7074,7 @@ impl TursoClient {
         let import_manual_enabled = switches.import_manual;
         let uks_enabled = switches.uks;
         let tagihan_enabled = switches.tagihan;
+        let tutup_buku_enabled = switches.tutup_buku;
 
         let new_key = draft
             .get("apiKey")
@@ -7060,8 +7113,8 @@ impl TursoClient {
                 id, provider, api_key, api_url, sender_number, is_active, daily_limit,
                 scan_masuk_enabled, scan_pulang_enabled, bolos_enabled, ambang_alfa_enabled,
                 koreksi_admin_enabled, import_manual_enabled, uks_enabled, tagihan_enabled,
-                created_at, updated_at
-            ) VALUES ('default', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))
+                tutup_buku_enabled, created_at, updated_at
+            ) VALUES ('default', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))
             ON CONFLICT(id) DO UPDATE SET
                 provider = excluded.provider,
                 api_key = excluded.api_key,
@@ -7077,6 +7130,7 @@ impl TursoClient {
                 import_manual_enabled = excluded.import_manual_enabled,
                 uks_enabled = excluded.uks_enabled,
                 tagihan_enabled = excluded.tagihan_enabled,
+                tutup_buku_enabled = excluded.tutup_buku_enabled,
                 updated_at = datetime('now');"#,
             vec![
                 json!(provider),
@@ -7099,6 +7153,7 @@ impl TursoClient {
                 json!(import_manual_enabled),
                 json!(uks_enabled),
                 json!(tagihan_enabled),
+                json!(tutup_buku_enabled),
             ],
         )];
 
@@ -8776,6 +8831,7 @@ fn canonical_sync_route(domain: &str, operation: &str) -> Option<(&'static str, 
         ("billing-series", "save") => ("billing-series", "save"),
         ("accounting-close", "create") => ("accounting-close", "create"),
         ("accounting-close", "reopen") => ("accounting-close", "reopen"),
+        ("accounting-close", "decide") => ("accounting-close", "decide"),
         ("billing-payment", "create") => ("billing-payment", "create"),
         ("billing-payment-cancel", "create") => ("billing-payment-cancel", "create"),
         ("face-template", "save") => ("face-template", "save"),
@@ -9819,6 +9875,13 @@ async fn apply_event_to_turso(
         ("accounting-close", "reopen") => {
             if let Some(values) = tutup_buku::cloud_reopen_values(payload) {
                 turso.query_one(tutup_buku::CLOUD_REOPEN_SQL, values).await?;
+            }
+        }
+        ("accounting-close", "decide") => {
+            if let Some(statements) = tutup_buku::cloud_decide_statements(payload) {
+                for (sql, values) in statements {
+                    turso.query_one(sql, values).await?;
+                }
             }
         }
         ("billing-series", "save") => {
@@ -15810,6 +15873,33 @@ mod tests {
             assert_eq!(jumlah, 2);
             assert_ne!(diterima, "1999-01-01 00:00:00", "waktu terima diambil dari payload");
 
+            // Potret yang berbeda untuk tanggal yang sama: Menunggu, bukan ditolak.
+            let mut beda = tutup("tb-c");
+            beda["saldo_json"] = json!(r#"[{"id_akun":"akun-kas","debit":1,"kredit":0}]"#);
+            terapkan("create", "tb-c", beda).await;
+            let status_dari = |id: &str| -> String {
+                connection
+                    .query_row(
+                        "SELECT status FROM keu_tutup_buku WHERE id_tutup = ?;",
+                        [id],
+                        |row| row.get(0),
+                    )
+                    .expect("status")
+            };
+            assert_eq!(status_dari("tb-c"), "Menunggu");
+            terapkan(
+                "decide",
+                "tb-c",
+                json!({
+                    "id_tutup": "tb-c", "keputusan": "pakai", "diputuskan_oleh": "kepala",
+                    "diputuskan_pada": "2026-10-02 08:00:00", "catatan_keputusan": "Sesuai kas"
+                }),
+            )
+            .await;
+            assert_eq!(status_dari("tb-c"), "Aktif");
+            assert_eq!(status_dari("tb-a"), "Digantikan");
+            assert_eq!(status_dari("tb-b"), "Digantikan");
+
             terapkan(
                 "reopen",
                 "tb-a",
@@ -16019,7 +16109,7 @@ mod tests {
             connection
                 .execute_batch(
                     "DROP TABLE riwayat_identitas_karyawan;
-                     DELETE FROM schema_migration WHERE version IN (-2017, -2018, -2019, -2020, -2021, -2022, -2023, -2024, -2025, -2026);",
+                     DELETE FROM schema_migration WHERE version IN (-2017, -2018, -2019, -2020, -2021, -2022, -2023, -2024, -2025, -2026, -2027, -2028);",
                 )
                 .expect("siapkan database lama");
 
@@ -16055,7 +16145,7 @@ mod tests {
             connection
                 .execute_batch(
                     "DROP TABLE inventory_unit;
-                     DELETE FROM schema_migration WHERE version IN (-2018, -2019, -2020, -2021, -2022, -2023, -2024, -2025, -2026);",
+                     DELETE FROM schema_migration WHERE version IN (-2018, -2019, -2020, -2021, -2022, -2023, -2024, -2025, -2026, -2027, -2028);",
                 )
                 .expect("siapkan database lama");
 
@@ -16092,7 +16182,7 @@ mod tests {
                 .execute_batch(
                     "DROP TABLE personil_wajah;
                      ALTER TABLE absensi_foto DROP COLUMN wajah_vonis;
-                     DELETE FROM schema_migration WHERE version IN (-2019, -2020, -2021, -2022, -2023, -2024, -2025, -2026);",
+                     DELETE FROM schema_migration WHERE version IN (-2019, -2020, -2021, -2022, -2023, -2024, -2025, -2026, -2027, -2028);",
                 )
                 .expect("siapkan database lama");
 
@@ -16131,7 +16221,7 @@ mod tests {
                     "DROP TABLE keu_akun;
                      DROP TABLE keu_jurnal;
                      DROP TABLE keu_jurnal_baris;
-                     DELETE FROM schema_migration WHERE version IN (-2020, -2021, -2022, -2023, -2024, -2025, -2026);",
+                     DELETE FROM schema_migration WHERE version IN (-2020, -2021, -2022, -2023, -2024, -2025, -2026, -2027, -2028);",
                 )
                 .expect("siapkan database lama");
 
@@ -16244,7 +16334,7 @@ mod tests {
                     "DROP TABLE keu_pinjaman;
                      DROP TABLE keu_pinjaman_mutasi;
                      DROP TABLE keu_pinjaman_tunda;
-                     DELETE FROM schema_migration WHERE version IN (-2021, -2022, -2023, -2024, -2025, -2026);",
+                     DELETE FROM schema_migration WHERE version IN (-2021, -2022, -2023, -2024, -2025, -2026, -2027, -2028);",
                 )
                 .expect("siapkan database lama");
 
@@ -16281,7 +16371,7 @@ mod tests {
                 .execute_batch(
                     "DROP TABLE keu_tagihan;
                      DROP TABLE keu_tagihan_batal;
-                     DELETE FROM schema_migration WHERE version IN (-2022, -2023, -2024, -2025, -2026);",
+                     DELETE FROM schema_migration WHERE version IN (-2022, -2023, -2024, -2025, -2026, -2027, -2028);",
                 )
                 .expect("siapkan database lama");
             client.ensure_schema_current().await.expect("skema mutakhir");
@@ -16319,7 +16409,7 @@ mod tests {
                      DROP TABLE keu_pembayaran;
                      DROP TABLE keu_pembayaran_alokasi;
                      DROP TABLE keu_pembayaran_batal;
-                     DELETE FROM schema_migration WHERE version IN (-2023, -2024, -2025, -2026);",
+                     DELETE FROM schema_migration WHERE version IN (-2023, -2024, -2025, -2026, -2027, -2028);",
                 )
                 .expect("siapkan database lama");
             client.ensure_schema_current().await.expect("skema mutakhir");
@@ -16355,7 +16445,7 @@ mod tests {
                 .execute_batch(
                     "DROP TABLE nilai_jenis;
                      ALTER TABLE nilai_penilaian DROP COLUMN id_jenis;
-                     DELETE FROM schema_migration WHERE version IN (-2024, -2025, -2026);",
+                     DELETE FROM schema_migration WHERE version IN (-2024, -2025, -2026, -2027, -2028);",
                 )
                 .expect("siapkan database lama");
             client.ensure_schema_current().await.expect("skema mutakhir");

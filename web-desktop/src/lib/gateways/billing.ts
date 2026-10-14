@@ -15,6 +15,7 @@ import type {
   DetailKuitansi,
   HasilBayar,
   HasilPengingat,
+  HasilPengingatOtomatis,
   KeringananItem,
   KuitansiItem,
   MasterTagihan,
@@ -32,6 +33,7 @@ export type {
   DetailKuitansi,
   HasilBayar,
   HasilPengingat,
+  HasilPengingatOtomatis,
   JenisTagihanItem,
   KeringananItem,
   KuitansiItem,
@@ -162,6 +164,7 @@ export function daftarTagihan(filter: {
   idJenisTagihan: string | null;
   idRombel: string | null;
   status: string | null;
+  jatuhTempo: string | null;
 }): Promise<DaftarTagihan> {
   return baca("desktop_billing_list", filter, "/api/billing/list");
 }
@@ -183,6 +186,7 @@ export function kirimPengingatTagihan(filter: {
   periode: string | null;
   idJenisTagihan: string | null;
   idRombel: string | null;
+  jatuhTempo: string | null;
 }): Promise<HasilPengingat> {
   return tulis("desktop_billing_remind", filter, "/api/billing/remind", filter);
 }
@@ -297,5 +301,15 @@ export function getRekapPenerimaan(mulai: string): Promise<RekapPenerimaan> {
     "desktop_billing_recap_receipts",
     { mulai },
     "/api/billing/recap-receipts",
+  );
+}
+
+/** Pengingat tagihan otomatis; dipanggil komponen latar, sekali sehari. */
+export function jalankanPengingatOtomatis(): Promise<HasilPengingatOtomatis> {
+  return tulis(
+    "desktop_billing_remind_auto",
+    {},
+    "/api/billing/remind-auto",
+    {},
   );
 }

@@ -75,7 +75,7 @@ export default async function HalamanProgram() {
       </div>
 
       {ringkasanFasilitas || ringkasanEkskul ? (
-        <div className="mt-12 grid gap-6 sm:grid-cols-2">
+        <div className="mt-12 kartu-tengah sm:[--kolom:2]">
           {ringkasanFasilitas ? (
             <section className="rounded-lg border border-garis p-5">
               <h2 className="font-medium text-lg">Fasilitas</h2>

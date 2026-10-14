@@ -252,11 +252,15 @@ export default function NotifikasiWaPage() {
       importManualEnabled: config.importManualEnabled,
       uksEnabled: config.uksEnabled,
       tagihanEnabled: config.tagihanEnabled,
+      tutupBukuEnabled: config.tutupBukuEnabled,
       // Ikut dibawa walau formulir ini tidak menampilkannya: draft yang
       // menghilangkannya menyimpan ulang ambang alfa ke bawaan 3/30.
       ambangAlfaLimit: config.ambangAlfaLimit,
       ambangAlfaDays: config.ambangAlfaDays,
       autoSendEnabled: config.autoSendEnabled,
+      pengingatOtomatis: config.pengingatOtomatis,
+      pengingatHariSebelum: config.pengingatHariSebelum,
+      pengingatHariLewat: config.pengingatHariLewat,
     });
     setShowApiKey(false);
     setConfigModalOpen(true);
@@ -371,6 +375,12 @@ export default function NotifikasiWaPage() {
         return (
           <span className="inline-flex items-center rounded-md bg-amber-500/10 px-2 py-0.5 text-xs font-semibold text-amber-400 ring-1 ring-inset ring-amber-500/20">
             Pengingat Tagihan
+          </span>
+        );
+      case "tutup_buku":
+        return (
+          <span className="inline-flex items-center rounded-md bg-sky-500/10 px-2 py-0.5 text-xs font-semibold text-sky-400 ring-1 ring-inset ring-sky-500/20">
+            Tutup Buku
           </span>
         );
     }
@@ -577,6 +587,7 @@ export default function NotifikasiWaPage() {
                 <option value="import_manual">Import Manual</option>
                 <option value="uks">Kunjungan UKS</option>
                 <option value="tagihan">Pengingat Tagihan</option>
+                <option value="tutup_buku">Tutup Buku</option>
               </select>
             </div>
 

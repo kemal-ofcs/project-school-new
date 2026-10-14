@@ -5,6 +5,7 @@ export type WaNotificationJenis =
   | "import_manual"
   | "uks"
   | "tagihan"
+  | "tutup_buku"
   | "bolos"
   | "ambang_alfa";
 
@@ -69,10 +70,16 @@ export interface WaConfig {
   importManualEnabled: boolean;
   uksEnabled: boolean;
   tagihanEnabled: boolean;
+  tutupBukuEnabled: boolean;
   ambangAlfaLimit?: number;
   ambangAlfaDays?: number;
   /** Runner di aplikasi menguras antrean sendiri. Bawaannya mati. */
   autoSendEnabled: boolean;
+  pengingatOtomatis?: boolean;
+  pengingatHariSebelum?: number;
+  pengingatHariLewat?: number;
+  /** Tanggal WIB pengingat otomatis terakhir dijalankan; hanya dibaca. */
+  pengingatTerakhir?: string | null;
   createdAt?: string;
   updatedAt?: string;
 }
@@ -92,9 +99,13 @@ export interface WaConfigDraft {
   importManualEnabled: boolean;
   uksEnabled: boolean;
   tagihanEnabled: boolean;
+  tutupBukuEnabled: boolean;
   ambangAlfaLimit?: number;
   ambangAlfaDays?: number;
   autoSendEnabled: boolean;
+  pengingatOtomatis?: boolean;
+  pengingatHariSebelum?: number;
+  pengingatHariLewat?: number;
 }
 
 /**

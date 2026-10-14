@@ -246,6 +246,7 @@ export async function drainWaQueue(
         import_manual: config.importManualEnabled,
         uks: config.uksEnabled,
         tagihan: config.tagihanEnabled,
+        tutup_buku: config.tutupBukuEnabled,
       },
       seenDedupeKeys,
       String(row.dedupe_key),

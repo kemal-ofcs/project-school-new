@@ -1,5 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import {
+  clampPengingatHariLewat,
+  clampPengingatHariSebelum,
   composeWaMessage,
   DEFAULT_AMBANG_ALFA_DAYS,
   DEFAULT_AMBANG_ALFA_LIMIT,
@@ -7,6 +9,7 @@ import {
   isValidWaNotificationStatus,
   parseAmbangAlfaDays,
   parseAmbangAlfaLimit,
+  pengingatHariIni,
   renderWaTemplate,
   validateWaTemplate,
   WA_NOTIFICATION_KINDS,
@@ -264,4 +267,18 @@ describe("template teks pesan WhatsApp", () => {
       "Yth. Wali Murid dari Budi",
     );
   });
+});
+
+// Vektor kembar `setelan_pengingat_otomatis_kembar` di `wa_notification.rs`.
+test("setelan pengingat tagihan otomatis", () => {
+  expect(clampPengingatHariSebelum(0)).toBe(0);
+  expect(clampPengingatHariSebelum(14)).toBe(14);
+  expect(clampPengingatHariSebelum(15)).toBe(3);
+  expect(clampPengingatHariSebelum(-1)).toBe(3);
+  expect(clampPengingatHariLewat(0)).toBe(0);
+  expect(clampPengingatHariLewat(7)).toBe(7);
+  expect(clampPengingatHariLewat(8)).toBe(1);
+  expect(pengingatHariIni(3, 1, 1)).toEqual([true, true]);
+  expect(pengingatHariIni(0, 1, 2)).toEqual([false, false]);
+  expect(pengingatHariIni(3, 0, 7)).toEqual([true, false]);
 });

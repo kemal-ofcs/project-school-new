@@ -2792,6 +2792,14 @@ pub fn desktop_accounting_close_decide(
     tutup_buku::decide(&state, &operator.username, &id_tutup, &keputusan, &catatan)
 }
 
+/// Pemberitahuan WhatsApp tutup buku ke pemegang izin Tutup Buku, dipanggil
+/// komponen latar. Penerimanya dibaca dari cloud.
+#[tauri::command]
+pub async fn desktop_accounting_close_notify(state: State<'_, DesktopState>) -> Result<Value, CommandError> {
+    require_permission(&state, "accounting.view")?;
+    tutup_buku::notify(&state).await
+}
+
 /// Tutup ulang tutup buku yang saldonya berubah sejak ditutup.
 #[tauri::command]
 pub fn desktop_accounting_close_revise(
@@ -3079,6 +3087,7 @@ pub fn desktop_billing_list(
     id_jenis_tagihan: Option<String>,
     id_rombel: Option<String>,
     status: Option<String>,
+    jatuh_tempo: Option<String>,
 ) -> Result<Value, CommandError> {
     require_permission(&state, "billing.view")?;
     billing::list(
@@ -3087,6 +3096,7 @@ pub fn desktop_billing_list(
         id_jenis_tagihan.as_deref(),
         id_rombel.as_deref(),
         status.as_deref(),
+        jatuh_tempo.as_deref(),
     )
 }
 
@@ -3121,6 +3131,13 @@ pub fn desktop_billing_save_portal(
     billing::save_portal(&state, aktif)
 }
 
+/// Pengingat tagihan otomatis, dipanggil komponen latar; sekali sehari.
+#[tauri::command]
+pub fn desktop_billing_remind_auto(state: State<'_, DesktopState>) -> Result<Value, CommandError> {
+    require_permission(&state, "billing.manage")?;
+    billing::remind_auto(&state)
+}
+
 /// Pengingat tunggakan WhatsApp ke wali, satu pesan per siswa per hari (K4b).
 #[tauri::command]
 pub fn desktop_billing_remind(
@@ -3128,6 +3145,7 @@ pub fn desktop_billing_remind(
     periode: Option<String>,
     id_jenis_tagihan: Option<String>,
     id_rombel: Option<String>,
+    jatuh_tempo: Option<String>,
 ) -> Result<Value, CommandError> {
     require_permission(&state, "billing.manage")?;
     billing::remind(
@@ -3135,6 +3153,7 @@ pub fn desktop_billing_remind(
         periode.as_deref(),
         id_jenis_tagihan.as_deref(),
         id_rombel.as_deref(),
+        jatuh_tempo.as_deref(),
     )
 }
 
@@ -4519,6 +4538,18 @@ pub fn desktop_grade_recap(
 ) -> Result<Value, CommandError> {
     require_permission(&state, "grades.view")?;
     super::nilai_akhir::recap(&state, &id_tahun_ajaran, &semester, &id_rombel, &id_mapel)
+}
+
+/// Bahan ekspor e-Rapor satu rombel × semester (semua mapel berpenilaian).
+#[tauri::command]
+pub fn desktop_grade_erapor(
+    state: State<'_, DesktopState>,
+    id_tahun_ajaran: String,
+    semester: String,
+    id_rombel: String,
+) -> Result<Value, CommandError> {
+    require_permission(&state, "grades.view")?;
+    super::nilai_akhir::erapor(&state, &id_tahun_ajaran, &semester, &id_rombel)
 }
 
 /// Mengambil daftar artikel berita (Cloud-Only).

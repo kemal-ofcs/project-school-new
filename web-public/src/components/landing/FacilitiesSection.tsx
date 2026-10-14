@@ -84,7 +84,7 @@ export function FacilitiesSection({ konten = {} }: FacilitiesSectionProps) {
         ) : null}
 
         {/* Facilities Grid */}
-        <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="kartu-tengah sm:[--kolom:2] lg:[--kolom:3]">
           {facilitiesList.map((item, i) => {
             const Icon = item.icon;
             return (

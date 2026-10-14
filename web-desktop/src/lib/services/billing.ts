@@ -35,6 +35,7 @@ import {
   type KeringananBerlaku,
   keringananBerlaku,
   keringananDraftSchema,
+  klausaJatuhTempo,
   kunciUnit,
   MAKS_ALASAN_BATAL_TAGIHAN,
   MAKS_NAMA_PERANGKAT,
@@ -59,7 +60,16 @@ import {
   validateTarif,
 } from "@/lib/validations/billing";
 import {
+  clampPengingatHariLewat,
+  clampPengingatHariSebelum,
   composeWaMessage,
+  DEFAULT_PENGINGAT_HARI_LEWAT,
+  DEFAULT_PENGINGAT_HARI_SEBELUM,
+  PENGINGAT_HARI_LEWAT_KEY,
+  PENGINGAT_HARI_SEBELUM_KEY,
+  PENGINGAT_OTOMATIS_KEY,
+  PENGINGAT_TERAKHIR_KEY,
+  pengingatHariIni,
   settingEnabled,
   WA_NOTIFY_TAGIHAN_KEY,
   waTemplateKey,
@@ -70,6 +80,7 @@ import type {
   DetailKuitansi,
   HasilBayar,
   HasilPengingat,
+  HasilPengingatOtomatis,
   KeringananItem,
   KuitansiItem,
   MasterTagihan,
@@ -713,8 +724,10 @@ export async function list(
     id_jenis_tagihan?: string | null;
     id_rombel?: string | null;
     status?: string | null;
+    jatuh_tempo?: string | null;
   },
 ): Promise<DaftarTagihan> {
+  const saringanJatuhTempo = klausaJatuhTempo(filter.jatuh_tempo);
   const isi = (value: string | null | undefined) => value?.trim() || null;
   const periode = isi(filter.periode);
   const idJenis = isi(filter.id_jenis_tagihan);
@@ -757,9 +770,10 @@ export async function list(
   } else if (status) {
     query += " AND b.id_tagihan IS NOT NULL";
   }
-  // `LIMIT 1000` = `BATAS_DAFTAR_TAGIHAN`.
+  query += saringanJatuhTempo;
+  // Jatuh tempo terlama di atas. `LIMIT 1000` = `BATAS_DAFTAR_TAGIHAN`.
   query +=
-    " ORDER BY t.periode DESC, kelas, t.nama_siswa, t.id_tagihan LIMIT 1000;";
+    " ORDER BY t.jatuh_tempo, kelas, t.nama_siswa, t.id_tagihan LIMIT 1000;";
   const [result, hari, sakelar] = await Promise.all([
     client.execute({ sql: query, args }),
     hariIni(client),
@@ -812,8 +826,10 @@ export async function remind(
     periode?: string | null;
     id_jenis_tagihan?: string | null;
     id_rombel?: string | null;
+    jatuh_tempo?: string | null;
   },
 ): Promise<HasilPengingat> {
+  const saringanJatuhTempo = klausaJatuhTempo(filter.jatuh_tempo);
   return withTransaction(client, async (tx) => {
     const setelan = await tx.execute({
       sql: "SELECT key, value FROM setting_gex_system WHERE key IN (?, ?);",
@@ -848,6 +864,7 @@ export async function remind(
       query += " AND s.id_rombel = ?";
       args.push(idRombel);
     }
+    query += saringanJatuhTempo;
     // `LIMIT 501` = `MAKS_SISWA_PENGINGAT` + 1, supaya pemotongan terdeteksi.
     query += " ORDER BY t.id_siswa LIMIT 501;";
     const semua = (await tx.execute({ sql: query, args })).rows.map((row) =>
@@ -862,82 +879,215 @@ export async function remind(
     if (siswa.length === 0) return hasil;
 
     const hari = await hariIni(tx);
-    const tanda = siswa.map(() => "?").join(", ");
-    const [tunggakan, wali, sudah] = await Promise.all([
-      tx.execute({
-        sql: `SELECT t.id_siswa, t.nama_tagihan, t.periode, t.jatuh_tempo,
-                     t.nominal - t.potongan - COALESCE(d.dibayar, 0) AS sisa
-              FROM keu_tagihan t
-              LEFT JOIN keu_tagihan_batal b ON b.id_tagihan = t.id_tagihan
-              LEFT JOIN (${DIBAYAR_SQL}) d ON d.id_tagihan = t.id_tagihan
-              WHERE t.id_siswa IN (${tanda}) AND b.id_tagihan IS NULL
-                AND t.nominal - t.potongan > COALESCE(d.dibayar, 0)
-              ORDER BY t.id_siswa, t.jatuh_tempo, t.periode, t.id_tagihan
-              -- batas: paling banyak MAKS_SISWA_PENGINGAT siswa dari langkah pertama
-              LIMIT 250000;`,
-        args: siswa,
-      }),
-      tx.execute({
-        sql: `SELECT m.id_unik,
-                     COALESCE(s.no_whatsapp_wali, m.no_hp, '') AS no_wa,
-                     COALESCE(s.nama_lengkap, m.nama, '') AS nama,
-                     COALESCE(r.nama_rombel, m.divisi, '') AS rombel
-              FROM master_data m
-              LEFT JOIN siswa_data s ON s.id_siswa = m.id_unik
-              LEFT JOIN akademik_rombel r ON r.id_rombel = s.id_rombel
-              WHERE m.id_unik IN (${tanda})
-                AND (LOWER(TRIM(COALESCE(m.jenis_personil, ''))) = 'siswa'
-                     OR s.id_siswa IS NOT NULL);`,
-        args: siswa,
-      }),
-      tx.execute({
-        // `LIMIT 500` = `MAKS_SISWA_PENGINGAT`: satu kunci per siswa.
-        sql: `SELECT dedupe_key FROM notifikasi_wa WHERE dedupe_key IN (${tanda}) LIMIT 500;`,
-        args: siswa.map((id) => `tagihan:${id}:${hari}`),
-      }),
-    ]);
-
-    const perSiswa = new Map<string, TagihanPengingat[]>();
-    for (const row of tunggakan.rows) {
-      const id = String(row.id_siswa);
-      const daftar = perSiswa.get(id) ?? [];
-      // Cermin `LIMIT 500` per siswa di `tagihan_terbuka`.
-      if (daftar.length < 500) {
-        daftar.push({
-          nama_tagihan: String(row.nama_tagihan),
-          periode: String(row.periode),
-          jatuh_tempo: String(row.jatuh_tempo ?? ""),
-          sisa: Number(row.sisa),
-        });
-      }
-      perSiswa.set(id, daftar);
-    }
-    const sudahDiantre = new Set(
-      sudah.rows.map((row) => String(row.dedupe_key)),
+    hasil.diantre = await antrePengingatTx(
+      tx,
+      siswa,
+      hari,
+      nilai.get(waTemplateKey("tagihan")) ?? null,
     );
-    const template = nilai.get(waTemplateKey("tagihan"));
-    const statements: InStatement[] = [];
-    for (const row of wali.rows) {
-      const id = String(row.id_unik);
-      const dedupe = `tagihan:${id}:${hari}`;
-      const nomor = normalizeOperatorPhone(String(row.no_wa ?? ""));
-      if (sudahDiantre.has(dedupe) || !isValidOperatorPhone(nomor)) continue;
-      const pesan = composeWaMessage("tagihan", template, {
-        nama: String(row.nama ?? "") || "Siswa",
-        rombel: String(row.rombel ?? "") || "-",
-        ...isianPengingat(perSiswa.get(id) ?? []),
-      });
-      statements.push({
-        sql: `INSERT INTO notifikasi_wa (
-                id_notifikasi, dedupe_key, jenis, id_siswa, tujuan_nomor,
-                isi_pesan, status, attempt_count, created_at, updated_at
-              ) VALUES (?, ?, 'tagihan', ?, ?, ?, 'Menunggu', 0, datetime('now'), datetime('now'));`,
-        args: [generateWaNotificationId(), dedupe, id, nomor, pesan],
+    return hasil;
+  });
+}
+
+/**
+ * Antre satu pesan pengingat per siswa (dedupe `tagihan:<siswa>:<hari>`),
+ * berisi seluruh tunggakannya, dalam satu batch. Cermin `antre_pengingat`;
+ * dipakai tombol manual dan pengingat otomatis.
+ */
+async function antrePengingatTx(
+  tx: Transaction,
+  siswa: string[],
+  hari: string,
+  template: string | null,
+): Promise<number> {
+  if (siswa.length === 0) return 0;
+  const tanda = siswa.map(() => "?").join(", ");
+  const [tunggakan, wali, sudah] = await Promise.all([
+    tx.execute({
+      sql: `SELECT t.id_siswa, t.nama_tagihan, t.periode, t.jatuh_tempo,
+                   t.nominal - t.potongan - COALESCE(d.dibayar, 0) AS sisa
+            FROM keu_tagihan t
+            LEFT JOIN keu_tagihan_batal b ON b.id_tagihan = t.id_tagihan
+            LEFT JOIN (${DIBAYAR_SQL}) d ON d.id_tagihan = t.id_tagihan
+            WHERE t.id_siswa IN (${tanda}) AND b.id_tagihan IS NULL
+              AND t.nominal - t.potongan > COALESCE(d.dibayar, 0)
+            ORDER BY t.id_siswa, t.jatuh_tempo, t.periode, t.id_tagihan
+            -- batas: paling banyak MAKS_SISWA_PENGINGAT siswa dari langkah pertama
+            LIMIT 250000;`,
+      args: siswa,
+    }),
+    tx.execute({
+      sql: `SELECT m.id_unik,
+                   COALESCE(s.no_whatsapp_wali, m.no_hp, '') AS no_wa,
+                   COALESCE(s.nama_lengkap, m.nama, '') AS nama,
+                   COALESCE(r.nama_rombel, m.divisi, '') AS rombel
+            FROM master_data m
+            LEFT JOIN siswa_data s ON s.id_siswa = m.id_unik
+            LEFT JOIN akademik_rombel r ON r.id_rombel = s.id_rombel
+            WHERE m.id_unik IN (${tanda})
+              AND (LOWER(TRIM(COALESCE(m.jenis_personil, ''))) = 'siswa'
+                   OR s.id_siswa IS NOT NULL);`,
+      args: siswa,
+    }),
+    tx.execute({
+      // `LIMIT 500` = `MAKS_SISWA_PENGINGAT`: satu kunci per siswa.
+      sql: `SELECT dedupe_key FROM notifikasi_wa WHERE dedupe_key IN (${tanda}) LIMIT 500;`,
+      args: siswa.map((id) => `tagihan:${id}:${hari}`),
+    }),
+  ]);
+
+  const perSiswa = new Map<string, TagihanPengingat[]>();
+  for (const row of tunggakan.rows) {
+    const id = String(row.id_siswa);
+    const daftar = perSiswa.get(id) ?? [];
+    // Cermin `LIMIT 500` per siswa di `tagihan_terbuka`.
+    if (daftar.length < 500) {
+      daftar.push({
+        nama_tagihan: String(row.nama_tagihan),
+        periode: String(row.periode),
+        jatuh_tempo: String(row.jatuh_tempo ?? ""),
+        sisa: Number(row.sisa),
       });
     }
-    if (statements.length > 0) await tx.batch(statements);
-    hasil.diantre = statements.length;
-    return hasil;
+    perSiswa.set(id, daftar);
+  }
+  const sudahDiantre = new Set(sudah.rows.map((row) => String(row.dedupe_key)));
+  const statements: InStatement[] = [];
+  for (const row of wali.rows) {
+    const id = String(row.id_unik);
+    const dedupe = `tagihan:${id}:${hari}`;
+    const nomor = normalizeOperatorPhone(String(row.no_wa ?? ""));
+    if (sudahDiantre.has(dedupe) || !isValidOperatorPhone(nomor)) continue;
+    const pesan = composeWaMessage("tagihan", template, {
+      nama: String(row.nama ?? "") || "Siswa",
+      rombel: String(row.rombel ?? "") || "-",
+      ...isianPengingat(perSiswa.get(id) ?? []),
+    });
+    statements.push({
+      sql: `INSERT INTO notifikasi_wa (
+              id_notifikasi, dedupe_key, jenis, id_siswa, tujuan_nomor,
+              isi_pesan, status, attempt_count, created_at, updated_at
+            ) VALUES (?, ?, 'tagihan', ?, ?, ?, 'Menunggu', 0, datetime('now'), datetime('now'));`,
+      args: [generateWaNotificationId(), dedupe, id, nomor, pesan],
+    });
+  }
+  if (statements.length > 0) await tx.batch(statements);
+  return statements.length;
+}
+
+/** Siswa yang punya tunggakan, untuk satu potongan saringan jatuh tempo. */
+async function siswaMenunggak(
+  tx: Transaction,
+  klausa: string,
+  args: string[],
+): Promise<string[]> {
+  const hasil = await tx.execute({
+    sql: `SELECT DISTINCT t.id_siswa
+          FROM keu_tagihan t
+          LEFT JOIN keu_tagihan_batal b ON b.id_tagihan = t.id_tagihan
+          LEFT JOIN (${DIBAYAR_SQL}) d ON d.id_tagihan = t.id_tagihan
+          WHERE b.id_tagihan IS NULL AND t.nominal - t.potongan > COALESCE(d.dibayar, 0)${klausa}
+          ORDER BY t.id_siswa LIMIT 501;`,
+    args,
+  });
+  return hasil.rows.map((row) => String(row.id_siswa));
+}
+
+/**
+ * Cermin `remind_auto`: pengingat otomatis, paling banyak sekali sehari per
+ * database (setting tersinkron `pengingat_tagihan_terakhir`), untuk tunggakan
+ * yang jatuh tempo tepat H-n dan/atau (pada hari yang dipilih) yang sudah
+ * lewat jatuh tempo.
+ */
+export async function remindAuto(
+  client: Client,
+): Promise<HasilPengingatOtomatis> {
+  return withTransaction(client, async (tx) => {
+    const setelan = await tx.execute({
+      sql: "SELECT key, value FROM setting_gex_system WHERE key IN (?, ?, ?, ?, ?, ?);",
+      args: [
+        WA_NOTIFY_TAGIHAN_KEY,
+        waTemplateKey("tagihan"),
+        PENGINGAT_OTOMATIS_KEY,
+        PENGINGAT_HARI_SEBELUM_KEY,
+        PENGINGAT_HARI_LEWAT_KEY,
+        PENGINGAT_TERAKHIR_KEY,
+      ],
+    });
+    const nilai = new Map(
+      setelan.rows.map((row) => [String(row.key), text(row.value)]),
+    );
+    if (
+      !settingEnabled(nilai.get(WA_NOTIFY_TAGIHAN_KEY)) ||
+      !settingEnabled(nilai.get(PENGINGAT_OTOMATIS_KEY))
+    ) {
+      return {
+        dijalankan: false as const,
+        alasan: "Pengingat otomatis belum dinyalakan.",
+      };
+    }
+    const hari = await hariIni(tx);
+    if (nilai.get(PENGINGAT_TERAKHIR_KEY) === hari) {
+      return {
+        dijalankan: false as const,
+        alasan: "Sudah dijalankan hari ini.",
+        hari,
+      };
+    }
+    const hariSebelum = nilai.has(PENGINGAT_HARI_SEBELUM_KEY)
+      ? clampPengingatHariSebelum(nilai.get(PENGINGAT_HARI_SEBELUM_KEY))
+      : DEFAULT_PENGINGAT_HARI_SEBELUM;
+    const hariLewat = nilai.has(PENGINGAT_HARI_LEWAT_KEY)
+      ? clampPengingatHariLewat(nilai.get(PENGINGAT_HARI_LEWAT_KEY))
+      : DEFAULT_PENGINGAT_HARI_LEWAT;
+    const minggu = await tx.execute(
+      "SELECT CAST(strftime('%w', date('now', '+7 hours')) AS INTEGER) AS hari;",
+    );
+    const mingguKe = Number(minggu.rows[0]?.hari ?? 0);
+    const [sebelum, lewat] = pengingatHariIni(
+      hariSebelum,
+      hariLewat,
+      mingguKe === 0 ? 7 : mingguKe,
+    );
+    const semua = new Set<string>();
+    if (sebelum) {
+      for (const id of await siswaMenunggak(
+        tx,
+        " AND t.jatuh_tempo = date('now', '+7 hours', ?)",
+        [`+${hariSebelum} days`],
+      )) {
+        semua.add(id);
+      }
+    }
+    if (lewat) {
+      for (const id of await siswaMenunggak(
+        tx,
+        " AND t.jatuh_tempo < date('now', '+7 hours')",
+        [],
+      )) {
+        semua.add(id);
+      }
+    }
+    const urut = [...semua].sort((a, b) => (a < b ? -1 : a > b ? 1 : 0));
+    const siswa = urut.slice(0, MAKS_SISWA_PENGINGAT);
+    const diantre = await antrePengingatTx(
+      tx,
+      siswa,
+      hari,
+      nilai.get(waTemplateKey("tagihan")) ?? null,
+    );
+    await tx.execute({
+      sql: `INSERT INTO setting_gex_system (key, value) VALUES (?, ?)
+            ON CONFLICT(key) DO UPDATE SET value = excluded.value;`,
+      args: [PENGINGAT_TERAKHIR_KEY, hari],
+    });
+    return {
+      dijalankan: true as const,
+      hari,
+      siswa: siswa.length,
+      diantre,
+      terpotong: urut.length > MAKS_SISWA_PENGINGAT,
+    };
   });
 }
 

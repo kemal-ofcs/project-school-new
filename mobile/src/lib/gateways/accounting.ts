@@ -14,6 +14,7 @@ import type {
   LaporanPosisiKeuangan,
   NeracaSaldo,
   StatusTutupBuku,
+  TinjauanTutupBuku,
   TutupBukuItem,
 } from "@/types/accounting";
 
@@ -27,6 +28,7 @@ export type {
   LaporanPosisiKeuangan,
   NeracaSaldo,
   StatusTutupBuku,
+  TinjauanTutupBuku,
   TutupBukuItem,
 } from "@/types/accounting";
 
@@ -217,4 +219,69 @@ export async function bukaKembaliBuku(
     return hasil;
   }
   return requestWebApi("/api/accounting/reopen", "POST", { alasan });
+}
+
+// ── Tutup buku Tahap 2 (v46) ────────────────────────────────────────────────
+
+export async function getTinjauanTutupBuku(
+  idTutup: string,
+): Promise<TinjauanTutupBuku> {
+  if (isDesktopRuntime()) {
+    return invokeDesktop("desktop_accounting_close_review", { idTutup });
+  }
+  return requestWebApi("/api/accounting/close-review", "POST", { idTutup });
+}
+
+export async function putuskanTutupBuku(
+  idTutup: string,
+  keputusan: "pakai" | "tolak",
+  catatan: string,
+): Promise<{ sukses: boolean; batas: string | null }> {
+  if (isDesktopRuntime()) {
+    const hasil = await invokeDesktop<{
+      sukses: boolean;
+      batas: string | null;
+    }>("desktop_accounting_close_decide", { idTutup, keputusan, catatan });
+    kickDesktopSync();
+    return hasil;
+  }
+  return requestWebApi("/api/accounting/close-decide", "POST", {
+    idTutup,
+    keputusan,
+    catatan,
+  });
+}
+
+export async function tutupUlangBuku(
+  idTutup: string,
+  catatan: string,
+): Promise<{ sukses: boolean; tutup: TutupBukuItem }> {
+  if (isDesktopRuntime()) {
+    const hasil = await invokeDesktop<{
+      sukses: boolean;
+      tutup: TutupBukuItem;
+    }>("desktop_accounting_close_revise", { idTutup, catatan });
+    kickDesktopSync();
+    return hasil;
+  }
+  return requestWebApi("/api/accounting/close-revise", "POST", {
+    idTutup,
+    catatan,
+  });
+}
+
+/** Pemberitahuan WhatsApp tutup buku; dipanggil komponen latar. */
+export async function jalankanPemberitahuanTutupBuku(): Promise<{
+  diantre: number;
+  alasan: string | null;
+}> {
+  if (isDesktopRuntime()) {
+    const hasil = await invokeDesktop<{
+      diantre: number;
+      alasan: string | null;
+    }>("desktop_accounting_close_notify");
+    if (hasil.diantre > 0) kickDesktopSync();
+    return hasil;
+  }
+  return requestWebApi("/api/accounting/close-notify", "POST", {});
 }

@@ -24,12 +24,20 @@
 use rusqlite::{params, Connection};
 use serde_json::{json, Value};
 
-use super::{accounting, config::MobileState, inventory, license, models::CommandError, storage, sync};
+use super::{
+    accounting, config::MobileState, inventory, license, models::CommandError, storage, sync, uks,
+    wa_notification,
+};
 
 /// WAJIB sama dengan CHECK `keu_tutup_buku.status` di ketiga DDL. `Digantikan`
 /// dan `Menunggu` dipakai keputusan bentrokan (Tahap 2).
+#[cfg(test)]
 pub const STATUS_TUTUP: [&str; 4] = ["Aktif", "Dibuka", "Digantikan", "Menunggu"];
 pub const MAKS_ALASAN_BUKA: usize = 150;
+pub const MAKS_CATATAN_KEPUTUSAN: usize = 150;
+/// Keputusan atas tutup buku yang `Menunggu`: dipakai (yang lain digantikan)
+/// atau ditolak (digantikan). Cermin `KEPUTUSAN_TUTUP`.
+pub const KEPUTUSAN_TUTUP: [&str; 2] = ["pakai", "tolak"];
 
 fn invalid(message: impl Into<String>) -> CommandError {
     CommandError::new("VALIDATION_ERROR", message)
@@ -112,6 +120,44 @@ pub fn saldo_tutup_json(akun: &[(String, i64, i64)]) -> String {
     format!("[{}]", isi.join(","))
 }
 
+/// Cermin `validateCatatanKeputusan`: catatan boleh kosong, paling banyak 150.
+pub fn validate_catatan_keputusan(catatan: &str) -> Result<Option<String>, String> {
+    let catatan = catatan.trim();
+    if catatan.chars().count() > MAKS_CATATAN_KEPUTUSAN {
+        return Err(format!("Catatan paling banyak {MAKS_CATATAN_KEPUTUSAN} karakter."));
+    }
+    Ok((!catatan.is_empty()).then(|| catatan.to_owned()))
+}
+
+fn saldo_bersih(json_saldo: &str) -> std::collections::BTreeMap<String, i64> {
+    serde_json::from_str::<Vec<Value>>(json_saldo)
+        .unwrap_or_default()
+        .iter()
+        .filter_map(|item| {
+            let id = item["id_akun"].as_str()?.to_owned();
+            Some((id, item["debit"].as_i64().unwrap_or(0) - item["kredit"].as_i64().unwrap_or(0)))
+        })
+        .collect()
+}
+
+/// Cermin `bandingSaldo`: akun yang saldo bersihnya (debit - kredit) berbeda
+/// antara dua potret, urut `id_akun`. Potret yang tidak terbaca = kosong.
+pub fn banding_saldo(sebelum: &str, sesudah: &str) -> Vec<(String, i64, i64)> {
+    let a = saldo_bersih(sebelum);
+    let b = saldo_bersih(sesudah);
+    let mut kunci: Vec<&String> = a.keys().chain(b.keys()).collect();
+    kunci.sort();
+    kunci.dedup();
+    kunci
+        .into_iter()
+        .filter_map(|id| {
+            let x = a.get(id).copied().unwrap_or(0);
+            let y = b.get(id).copied().unwrap_or(0);
+            (x != y).then(|| (id.clone(), x, y))
+        })
+        .collect()
+}
+
 /// Tanggal batas yang berlaku di database ini, atau `None`.
 pub fn batas_tutup(connection: &Connection) -> Result<Option<String>, CommandError> {
     connection
@@ -137,7 +183,8 @@ fn hari_ini(connection: &Connection) -> Result<String, CommandError> {
 }
 
 const KOLOM_TUTUP: &str = "id_tutup, sampai_tanggal, dibuat_oleh, kode_perangkat, waktu_perangkat,
-    diterima_cloud, saldo_json, status, alasan_buka, dibuka_oleh, dibuka_pada, created_at, updated_at";
+    diterima_cloud, saldo_json, status, alasan_buka, dibuka_oleh, dibuka_pada, created_at, updated_at,
+    diputuskan_oleh, diputuskan_pada, catatan_keputusan";
 
 fn baris_json(row: &rusqlite::Row<'_>) -> rusqlite::Result<Value> {
     Ok(json!({
@@ -154,7 +201,43 @@ fn baris_json(row: &rusqlite::Row<'_>) -> rusqlite::Result<Value> {
         "dibuka_pada": row.get::<_, Option<String>>(10)?,
         "created_at": row.get::<_, String>(11)?,
         "updated_at": row.get::<_, String>(12)?,
+        "diputuskan_oleh": row.get::<_, Option<String>>(13)?,
+        "diputuskan_pada": row.get::<_, Option<String>>(14)?,
+        "catatan_keputusan": row.get::<_, Option<String>>(15)?,
     }))
+}
+
+/// Potret saldo kanonik saat ini sampai `sampai`, dari jurnal lokal.
+fn saldo_sekarang(state: &MobileState, sampai: &str) -> Result<String, CommandError> {
+    let neraca = accounting::trial_balance(state, sampai)?;
+    let akun: Vec<(String, i64, i64)> = neraca["items"]
+        .as_array()
+        .map(|items| {
+            items
+                .iter()
+                .map(|item| {
+                    (
+                        item["id_akun"].as_str().unwrap_or("").to_owned(),
+                        item["debit"].as_i64().unwrap_or(0),
+                        item["kredit"].as_i64().unwrap_or(0),
+                    )
+                })
+                .collect()
+        })
+        .unwrap_or_default();
+    Ok(saldo_tutup_json(&akun))
+}
+
+fn baca_tutup(connection: &Connection, id: &str) -> Result<Option<Value>, CommandError> {
+    use rusqlite::OptionalExtension;
+    connection
+        .query_row(
+            &format!("SELECT {KOLOM_TUTUP} FROM keu_tutup_buku WHERE id_tutup = ?;"),
+            params![id],
+            baris_json,
+        )
+        .optional()
+        .map_err(db_error)
 }
 
 /// Batas yang berlaku dan riwayat tutup buku. Cermin `status` di TS.
@@ -167,12 +250,41 @@ pub fn status(state: &MobileState) -> Result<Value, CommandError> {
              LIMIT 200;"
         ))
         .map_err(db_error)?;
-    let riwayat = statement
+    let mut riwayat = statement
         .query_map([], baris_json)
         .map_err(db_error)?
         .collect::<Result<Vec<_>, _>>()
         .map_err(db_error)?;
-    Ok(json!({ "batas": batas_tutup(&connection)?, "riwayat": riwayat }))
+    // Tutup buku berlaku yang saldonya berubah sejak ditutup: ada transaksi
+    // yang masuk ke periode itu sesudahnya (biasanya dari perangkat offline).
+    let mut cache: std::collections::HashMap<String, String> = std::collections::HashMap::new();
+    let mut perhatian = 0;
+    for baris in &mut riwayat {
+        let berlaku = baris["status"] == "Aktif";
+        let perlu = if berlaku {
+            let sampai = baris["sampai_tanggal"].as_str().unwrap_or("").to_owned();
+            let sekarang = match cache.get(&sampai) {
+                Some(nilai) => nilai.clone(),
+                None => {
+                    let nilai = saldo_sekarang(state, &sampai)?;
+                    cache.insert(sampai, nilai.clone());
+                    nilai
+                }
+            };
+            baris["saldo_json"].as_str() != Some(sekarang.as_str())
+        } else {
+            false
+        };
+        if perlu || baris["status"] == "Menunggu" {
+            perhatian += 1;
+        }
+        baris["perlu_ditinjau"] = json!(perlu);
+    }
+    Ok(json!({
+        "batas": batas_tutup(&connection)?,
+        "perlu_perhatian": perhatian,
+        "riwayat": riwayat,
+    }))
 }
 
 /// Tutup buku sampai `sampai`, dengan potret saldo saat itu.
@@ -277,6 +389,272 @@ pub fn reopen(state: &MobileState, operator: &str, alasan: &str) -> Result<Value
     Ok(json!({ "sukses": true, "batas": batas_tutup(&connection)? }))
 }
 
+// ── Tahap 2: tinjauan dan keputusan ─────────────────────────────────────────
+
+/// Bahan tinjauan satu tutup buku. `Menunggu`: dibandingkan dengan versi
+/// berlaku bertanggal sama. `Aktif`: dibandingkan dengan saldo sekarang,
+/// beserta jurnal bertanggal di periode itu yang dicatat sesudah ditutup
+/// (menurut jam pencatatnya). Cermin `review` di TS.
+pub fn review(state: &MobileState, id_tutup: &str) -> Result<Value, CommandError> {
+    let connection = storage::database(&state.data_dir)?;
+    let tutup = baca_tutup(&connection, id_tutup)?
+        .ok_or_else(|| invalid("Tutup buku tidak ditemukan."))?;
+    let sampai = tutup["sampai_tanggal"].as_str().unwrap_or("").to_owned();
+    let saldo = tutup["saldo_json"].as_str().unwrap_or("[]").to_owned();
+    let mut pembanding = Value::Null;
+    let mut jurnal: Vec<Value> = Vec::new();
+    let selisih = match tutup["status"].as_str() {
+        Some("Menunggu") => {
+            let mut statement = connection
+                .prepare(&format!(
+                    "SELECT {KOLOM_TUTUP} FROM keu_tutup_buku
+                     WHERE sampai_tanggal = ? AND status = 'Aktif' AND id_tutup <> ?
+                     ORDER BY id_tutup LIMIT 1;"
+                ))
+                .map_err(db_error)?;
+            pembanding = statement
+                .query_map(params![sampai, id_tutup], baris_json)
+                .map_err(db_error)?
+                .next()
+                .transpose()
+                .map_err(db_error)?
+                .unwrap_or(Value::Null);
+            banding_saldo(pembanding["saldo_json"].as_str().unwrap_or("[]"), &saldo)
+        }
+        Some("Aktif") => {
+            let hasil = banding_saldo(&saldo, &saldo_sekarang(state, &sampai)?);
+            if !hasil.is_empty() {
+                let mut statement = connection
+                    .prepare(
+                        "SELECT j.id_jurnal, j.tanggal, j.nomor, j.keterangan, j.sumber, j.dibuat_oleh,
+                                j.created_at, COALESCE(SUM(b.debit), 0)
+                         FROM keu_jurnal j
+                         LEFT JOIN keu_jurnal_baris b ON b.id_jurnal = j.id_jurnal
+                         WHERE j.tanggal <= ? AND j.created_at > ?
+                         GROUP BY j.id_jurnal
+                         ORDER BY j.created_at DESC, j.id_jurnal
+                         LIMIT 200;",
+                    )
+                    .map_err(db_error)?;
+                jurnal = statement
+                    .query_map(params![sampai, tutup["created_at"].as_str().unwrap_or("")], |row| {
+                        Ok(json!({
+                            "id_jurnal": row.get::<_, String>(0)?,
+                            "tanggal": row.get::<_, String>(1)?,
+                            "nomor": row.get::<_, String>(2)?,
+                            "keterangan": row.get::<_, String>(3)?,
+                            "sumber": row.get::<_, String>(4)?,
+                            "dibuat_oleh": row.get::<_, String>(5)?,
+                            "created_at": row.get::<_, String>(6)?,
+                            "total": row.get::<_, i64>(7)?,
+                        }))
+                    })
+                    .map_err(db_error)?
+                    .collect::<Result<Vec<_>, _>>()
+                    .map_err(db_error)?;
+            }
+            hasil
+        }
+        _ => Vec::new(),
+    };
+    let mut daftar = Vec::with_capacity(selisih.len());
+    for (id_akun, sebelum, sesudah) in selisih {
+        let (kode, nama): (String, String) = {
+            use rusqlite::OptionalExtension;
+            connection
+                .query_row(
+                    "SELECT kode, nama FROM keu_akun WHERE id_akun = ?;",
+                    params![id_akun],
+                    |row| Ok((row.get(0)?, row.get(1)?)),
+                )
+                .optional()
+                .map_err(db_error)?
+                .unwrap_or_else(|| (String::new(), id_akun.clone()))
+        };
+        daftar.push(json!({
+            "id_akun": id_akun, "kode": kode, "nama": nama, "sebelum": sebelum, "sesudah": sesudah,
+        }));
+    }
+    Ok(json!({ "tutup": tutup, "pembanding": pembanding, "selisih": daftar, "jurnal": jurnal }))
+}
+
+/// Dipakai lokal DAN di cloud (parameter posisional sama): versi lain
+/// bertanggal sama yang masih berlaku atau menunggu menjadi `Digantikan`.
+pub const PAKAI_SINGKIRKAN_SQL: &str = "UPDATE keu_tutup_buku
+    SET status = 'Digantikan', diputuskan_oleh = ?, diputuskan_pada = ?, catatan_keputusan = ?,
+        updated_at = datetime('now')
+    WHERE sampai_tanggal = (SELECT sampai_tanggal FROM keu_tutup_buku WHERE id_tutup = ?)
+      AND id_tutup <> ?
+      AND status IN ('Aktif', 'Menunggu')
+      AND EXISTS (SELECT 1 FROM keu_tutup_buku WHERE id_tutup = ? AND status IN ('Aktif', 'Menunggu'));";
+
+pub const PAKAI_SQL: &str = "UPDATE keu_tutup_buku
+    SET status = 'Aktif', diputuskan_oleh = ?, diputuskan_pada = ?, catatan_keputusan = ?,
+        updated_at = datetime('now')
+    WHERE id_tutup = ? AND status IN ('Aktif', 'Menunggu');";
+
+pub const TOLAK_SQL: &str = "UPDATE keu_tutup_buku
+    SET status = 'Digantikan', diputuskan_oleh = ?, diputuskan_pada = ?, catatan_keputusan = ?,
+        updated_at = datetime('now')
+    WHERE id_tutup = ? AND status IN ('Aktif', 'Menunggu');";
+
+/// Pernyataan satu keputusan. Cermin `statementKeputusan`.
+pub fn statement_keputusan(
+    id_tutup: &str,
+    keputusan: &str,
+    oleh: &str,
+    pada: &str,
+    catatan: Option<&str>,
+) -> Option<Vec<(&'static str, Vec<Value>)>> {
+    let cap = vec![json!(oleh), json!(pada), json!(catatan)];
+    let dengan = |tambahan: Vec<Value>| {
+        let mut v = cap.clone();
+        v.extend(tambahan);
+        v
+    };
+    match keputusan {
+        "pakai" => Some(vec![
+            (PAKAI_SINGKIRKAN_SQL, dengan(vec![json!(id_tutup), json!(id_tutup), json!(id_tutup)])),
+            (PAKAI_SQL, dengan(vec![json!(id_tutup)])),
+        ]),
+        "tolak" => Some(vec![(TOLAK_SQL, dengan(vec![json!(id_tutup)]))]),
+        _ => None,
+    }
+}
+
+fn jalankan_lokal(
+    transaction: &rusqlite::Transaction<'_>,
+    pernyataan: Vec<(&'static str, Vec<Value>)>,
+) -> Result<(), CommandError> {
+    for (sql, nilai) in pernyataan {
+        let args: Vec<rusqlite::types::Value> = nilai
+            .into_iter()
+            .map(|v| match v {
+                Value::String(s) => rusqlite::types::Value::Text(s),
+                _ => rusqlite::types::Value::Null,
+            })
+            .collect();
+        transaction
+            .execute(sql, rusqlite::params_from_iter(args))
+            .map_err(db_error)?;
+    }
+    Ok(())
+}
+
+fn waktu_sekarang(connection: &Connection) -> Result<String, CommandError> {
+    connection
+        .query_row("SELECT datetime('now', '+7 hours');", [], |row| row.get(0))
+        .map_err(db_error)
+}
+
+/// Putuskan tutup buku yang `Menunggu`: dipakai atau ditolak.
+pub fn decide(
+    state: &MobileState,
+    operator: &str,
+    id_tutup: &str,
+    keputusan: &str,
+    catatan: &str,
+) -> Result<Value, CommandError> {
+    if !KEPUTUSAN_TUTUP.contains(&keputusan) {
+        return Err(invalid("Keputusan tidak dikenal."));
+    }
+    let catatan = validate_catatan_keputusan(catatan).map_err(invalid)?;
+    let client_id = sync::ensure_client_id(state)?;
+    let mut connection = storage::database(&state.data_dir)?;
+    let tutup = baca_tutup(&connection, id_tutup)?
+        .ok_or_else(|| invalid("Tutup buku tidak ditemukan."))?;
+    if tutup["status"] != "Menunggu" {
+        return Err(invalid("Hanya tutup buku yang menunggu keputusan yang bisa diputuskan."));
+    }
+    let pada = waktu_sekarang(&connection)?;
+    let transaction = connection.transaction().map_err(db_error)?;
+    let pernyataan = statement_keputusan(id_tutup, keputusan, operator, &pada, catatan.as_deref())
+        .ok_or_else(|| invalid("Keputusan tidak dikenal."))?;
+    jalankan_lokal(&transaction, pernyataan)?;
+    sync::enqueue(
+        &transaction,
+        &client_id,
+        "accounting-close",
+        "decide",
+        id_tutup,
+        &json!({
+            "id_tutup": id_tutup, "keputusan": keputusan, "diputuskan_oleh": operator,
+            "diputuskan_pada": pada, "catatan_keputusan": catatan,
+        }),
+        None,
+    )?;
+    transaction.commit().map_err(db_error)?;
+    Ok(json!({ "sukses": true, "batas": batas_tutup(&connection)? }))
+}
+
+/// Tutup ulang tutup buku berlaku yang saldonya berubah: versi lama
+/// `Digantikan`, versi baru dengan saldo sekarang `Aktif`. Keputusan didorong
+/// LEBIH DULU daripada versi baru, sehingga cloud tidak menganggap versi baru
+/// bentrok dengan versi lama.
+pub fn revise(
+    state: &MobileState,
+    operator: &str,
+    id_tutup: &str,
+    catatan: &str,
+) -> Result<Value, CommandError> {
+    let catatan = validate_catatan_keputusan(catatan)
+        .map_err(invalid)?
+        .unwrap_or_else(|| "Ditutup ulang dengan saldo sekarang.".to_owned());
+    let client_id = sync::ensure_client_id(state)?;
+    let kode_perangkat = license::current_device_code(state)?;
+    let mut connection = storage::database(&state.data_dir)?;
+    let tutup = baca_tutup(&connection, id_tutup)?
+        .ok_or_else(|| invalid("Tutup buku tidak ditemukan."))?;
+    if tutup["status"] != "Aktif" {
+        return Err(invalid("Hanya tutup buku yang berlaku yang bisa ditutup ulang."));
+    }
+    let sampai = tutup["sampai_tanggal"].as_str().unwrap_or("").to_owned();
+    let sekarang = saldo_sekarang(state, &sampai)?;
+    if tutup["saldo_json"].as_str() == Some(sekarang.as_str()) {
+        return Err(invalid("Saldo periode ini tidak berubah sejak ditutup."));
+    }
+    let pada = waktu_sekarang(&connection)?;
+    let mut bytes = [0u8; 16];
+    rand_core::RngCore::fill_bytes(&mut rand_core::OsRng, &mut bytes);
+    let id_baru = format!("tb-{}", hex::encode(bytes));
+
+    let transaction = connection.transaction().map_err(db_error)?;
+    let pernyataan = statement_keputusan(id_tutup, "tolak", operator, &pada, Some(&catatan))
+        .ok_or_else(CommandError::internal)?;
+    jalankan_lokal(&transaction, pernyataan)?;
+    sync::enqueue(
+        &transaction,
+        &client_id,
+        "accounting-close",
+        "decide",
+        id_tutup,
+        &json!({
+            "id_tutup": id_tutup, "keputusan": "tolak", "diputuskan_oleh": operator,
+            "diputuskan_pada": pada, "catatan_keputusan": catatan,
+        }),
+        None,
+    )?;
+    transaction
+        .execute(
+            "INSERT INTO keu_tutup_buku (
+                id_tutup, sampai_tanggal, dibuat_oleh, kode_perangkat, waktu_perangkat,
+                diterima_cloud, saldo_json, status
+             ) VALUES (?, ?, ?, ?, datetime('now', '+7 hours'), NULL, ?, 'Aktif');",
+            params![id_baru, sampai, operator, kode_perangkat, sekarang],
+        )
+        .map_err(db_error)?;
+    let baris = transaction
+        .query_row(
+            &format!("SELECT {KOLOM_TUTUP} FROM keu_tutup_buku WHERE id_tutup = ?;"),
+            params![id_baru],
+            baris_json,
+        )
+        .map_err(db_error)?;
+    sync::enqueue(&transaction, &client_id, "accounting-close", "create", &id_baru, &baris, None)?;
+    transaction.commit().map_err(db_error)?;
+    Ok(json!({ "sukses": true, "tutup": baris }))
+}
+
 // ── Penerapan event di cloud ────────────────────────────────────────────────
 
 fn teks(row: &Value, key: &str) -> Option<String> {
@@ -290,10 +668,21 @@ fn teks(row: &Value, key: &str) -> Option<String> {
 /// `diterima_cloud` selalu diisi jam database cloud di sini, tidak pernah
 /// dari payload: itulah satu-satunya waktu yang tidak bisa dipalsukan
 /// perangkat.
+///
+/// Bentrokan (Tahap 2): bila cloud sudah memegang tutup buku BERLAKU lain
+/// bertanggal sama dengan potret saldo yang BERBEDA, versi yang datang
+/// disimpan `Menunggu` untuk diputuskan pemegang `accounting.close`. Potret
+/// identik digabung otomatis (keduanya berlaku). Tidak ada yang ditolak, jadi
+/// antrean sinkron tidak macet.
 pub const CLOUD_INSERT_CLOSE_SQL: &str = "INSERT INTO keu_tutup_buku (
         id_tutup, sampai_tanggal, dibuat_oleh, kode_perangkat, waktu_perangkat,
         diterima_cloud, saldo_json, status, created_at, updated_at
-    ) VALUES (?, ?, ?, ?, ?, datetime('now', '+7 hours'), ?, 'Aktif',
+    ) VALUES (?, ?, ?, ?, ?, datetime('now', '+7 hours'), ?,
+              CASE WHEN EXISTS (
+                  SELECT 1 FROM keu_tutup_buku k
+                  WHERE k.sampai_tanggal = ? AND k.status = 'Aktif'
+                    AND k.id_tutup <> ? AND k.saldo_json <> ?
+              ) THEN 'Menunggu' ELSE 'Aktif' END,
               COALESCE(?, datetime('now')), COALESCE(?, datetime('now')))
     ON CONFLICT(id_tutup) DO NOTHING;";
 
@@ -316,9 +705,26 @@ pub fn cloud_close_values(row: &Value, entity_key: &str) -> Option<Vec<Value>> {
         json!(kode_perangkat),
         json!(waktu_perangkat),
         json!(saldo_json),
+        json!(sampai),
+        json!(id),
+        json!(saldo_json),
         json!(teks(row, "created_at")),
         json!(teks(row, "updated_at")),
     ])
+}
+
+/// Pernyataan event `accounting-close/decide`; payload cacat dilewati.
+pub fn cloud_decide_statements(row: &Value) -> Option<Vec<(&'static str, Vec<Value>)>> {
+    let id = teks(row, "id_tutup")?;
+    let keputusan = teks(row, "keputusan")?;
+    let catatan = validate_catatan_keputusan(&teks(row, "catatan_keputusan").unwrap_or_default()).ok()?;
+    statement_keputusan(
+        &id,
+        &keputusan,
+        &teks(row, "diputuskan_oleh")?,
+        &teks(row, "diputuskan_pada")?,
+        catatan.as_deref(),
+    )
 }
 
 pub const CLOUD_REOPEN_SQL: &str = "UPDATE keu_tutup_buku
@@ -336,6 +742,200 @@ pub fn cloud_reopen_values(row: &Value) -> Option<Vec<Value>> {
         json!(teks(row, "dibuka_pada")?),
         json!(sampai),
     ])
+}
+
+// ── Tahap 3: pemberitahuan WhatsApp ke pemegang izin Tutup Buku ─────────────
+
+/// Kejadian yang diberitahukan. WAJIB sama dengan `KEJADIAN_TUTUP` di TS.
+pub const KEJADIAN_TUTUP: [&str; 2] = ["menunggu", "berubah"];
+/// Desktop/Mobile menghitung kejadian dari data LOKAL, jadi hanya bila
+/// sinkronisasi terakhir masih segar: perangkat yang belum menarik jurnal
+/// perangkat lain melihat saldo "berubah" padahal tidak, dan pesan yang
+/// terlanjur terkirim tidak bisa ditarik.
+pub const MAKS_DETIK_SINKRON_PEMBERITAHUAN: i64 = 900;
+pub const ALASAN_PEMBERITAHUAN_MATI: &str = "Pemberitahuan tutup buku belum dinyalakan.";
+const ALASAN_SINKRON_BASI: &str = "Sinkronisasi terakhir lebih dari 15 menit lalu.";
+
+/// Satu kejadian yang perlu diberitahukan. Cermin `KejadianTutup` di TS.
+#[derive(Debug, PartialEq)]
+pub struct KejadianTutup {
+    pub id_tutup: String,
+    pub kejadian: &'static str,
+    pub sampai: String,
+    pub dibuat_oleh: String,
+}
+
+/// Penerima: operator aktif berizin `accounting.close` (atau Superadmin).
+pub struct PenerimaTutup {
+    pub id: String,
+    pub nama: String,
+    pub no_hp: String,
+}
+
+/// Satu pesan per kejadian per tutup buku per penerima. Cermin `kunciPemberitahuan`.
+pub fn kunci_pemberitahuan(id_tutup: &str, kejadian: &str, id_operator: &str) -> String {
+    format!("tutup_buku:{id_tutup}:{kejadian}:{id_operator}")
+}
+
+/// Isian template `tutup_buku`. Cermin `isianPemberitahuan`.
+pub fn isian_pemberitahuan(kejadian: &KejadianTutup, nama: &str) -> Vec<(&'static str, String)> {
+    let (sebab, rincian) = if kejadian.kejadian == "menunggu" {
+        (
+            "ada versi lain yang menunggu keputusan",
+            format!("Versi itu ditutup oleh {}.", kejadian.dibuat_oleh),
+        )
+    } else {
+        (
+            "saldonya berubah sesudah ditutup",
+            format!("Ada transaksi baru di periode yang ditutup oleh {}.", kejadian.dibuat_oleh),
+        )
+    };
+    vec![
+        ("nama", if nama.trim().is_empty() { "Bapak/Ibu".to_owned() } else { nama.trim().to_owned() }),
+        ("tanggal", tanggal_tampil(&kejadian.sampai)),
+        ("kejadian", sebab.to_owned()),
+        ("rincian", rincian),
+    ]
+}
+
+/// Versi `Menunggu` dan tutup buku berlaku yang saldonya berubah, dari
+/// riwayat `status`. Cermin `kejadianDariRiwayat`.
+pub fn kejadian_dari_riwayat(riwayat: &[Value]) -> Vec<KejadianTutup> {
+    riwayat
+        .iter()
+        .filter_map(|baris| {
+            let kejadian = if baris["status"] == "Menunggu" {
+                "menunggu"
+            } else if baris["status"] == "Aktif" && baris["perlu_ditinjau"] == true {
+                "berubah"
+            } else {
+                return None;
+            };
+            Some(KejadianTutup {
+                id_tutup: baris["id_tutup"].as_str()?.to_owned(),
+                kejadian,
+                sampai: baris["sampai_tanggal"].as_str()?.to_owned(),
+                dibuat_oleh: baris["dibuat_oleh"].as_str().unwrap_or("").to_owned(),
+            })
+        })
+        .collect()
+}
+
+/// Kejadian yang perlu diberitahukan, atau alasan tidak berjalan.
+fn kejadian_lokal(state: &MobileState) -> Result<Result<Vec<KejadianTutup>, &'static str>, CommandError> {
+    use rusqlite::OptionalExtension;
+    {
+        let connection = storage::database(&state.data_dir)?;
+        let aktif: Option<String> = connection
+            .query_row(
+                "SELECT value FROM setting_gex_system WHERE key = ?1 LIMIT 1;",
+                params![wa_notification::WA_NOTIFY_TUTUP_BUKU_KEY],
+                |row| row.get(0),
+            )
+            .optional()
+            .map_err(db_error)?;
+        if !aktif.is_some_and(|value| value.trim().eq_ignore_ascii_case("true")) {
+            return Ok(Err(ALASAN_PEMBERITAHUAN_MATI));
+        }
+        if !uks::detik_sejak_sync(&connection).is_some_and(|detik| detik <= MAKS_DETIK_SINKRON_PEMBERITAHUAN) {
+            return Ok(Err(ALASAN_SINKRON_BASI));
+        }
+    }
+    let status = status(state)?;
+    Ok(Ok(kejadian_dari_riwayat(status["riwayat"].as_array().map(Vec::as_slice).unwrap_or(&[]))))
+}
+
+/// Antre pesan yang belum pernah diantre di perangkat ini, dalam satu
+/// transaksi. Kembaran dari perangkat lain ditolak cloud lewat `dedupe_key`.
+fn antre_pemberitahuan(
+    state: &MobileState,
+    kejadian: &[KejadianTutup],
+    penerima: &[PenerimaTutup],
+) -> Result<usize, CommandError> {
+    use rusqlite::OptionalExtension;
+    let client_id = sync::ensure_client_id(state)?;
+    let mut connection = storage::database(&state.data_dir)?;
+    let tx = connection.transaction().map_err(db_error)?;
+    let mut diantre = 0;
+    for item in kejadian {
+        for orang in penerima {
+            let nomor = wa_notification::normalize_phone_canonical(&orang.no_hp);
+            if !wa_notification::is_valid_phone(&nomor) {
+                continue;
+            }
+            let kunci = kunci_pemberitahuan(&item.id_tutup, item.kejadian, &orang.id);
+            let sudah = tx
+                .query_row("SELECT 1 FROM notifikasi_wa WHERE dedupe_key = ?1 LIMIT 1;", params![kunci], |_| Ok(()))
+                .optional()
+                .map_err(db_error)?
+                .is_some();
+            if sudah {
+                continue;
+            }
+            let isi = wa_notification::compose_wa_message(&tx, "tutup_buku", &isian_pemberitahuan(item, &orang.nama));
+            wa_notification::queue_wa_notification_tx(
+                &tx,
+                &client_id,
+                &json!({
+                    "dedupe_key": kunci,
+                    "jenis": "tutup_buku",
+                    "tujuan_nomor": nomor,
+                    "isi_pesan": isi,
+                }),
+            )?;
+            diantre += 1;
+        }
+    }
+    tx.commit().map_err(db_error)?;
+    Ok(diantre)
+}
+
+fn sel_teks(value: Option<&Value>) -> String {
+    match value {
+        Some(Value::String(teks)) => teks.clone(),
+        Some(Value::Number(angka)) => angka.to_string(),
+        _ => String::new(),
+    }
+}
+
+/// Beri tahu pemegang izin Tutup Buku lewat WhatsApp. Penerima dibaca dari
+/// cloud (akun dan role tidak disalin ke perangkat). Cermin `notify` di TS.
+pub async fn notify(state: &MobileState) -> Result<Value, CommandError> {
+    let kejadian = match kejadian_lokal(state)? {
+        Ok(kejadian) => kejadian,
+        Err(alasan) => return Ok(json!({ "diantre": 0, "alasan": alasan })),
+    };
+    if kejadian.is_empty() {
+        return Ok(json!({ "diantre": 0, "alasan": null }));
+    }
+    let hasil = state
+        .get_turso_client()?
+        .query_one(
+            "SELECT o.id, o.nama_operator, o.no_hp
+             FROM master_operator o
+             JOIN app_role r ON r.id = o.role_id
+             WHERE o.status = 'Aktif' AND r.status = 'Aktif'
+               AND TRIM(COALESCE(o.no_hp, '')) <> ''
+               AND (r.is_superadmin = 1 OR EXISTS (
+                     SELECT 1 FROM role_permission p
+                     WHERE p.role_id = r.id AND p.permission_key = 'accounting.close'
+                       AND p.is_allowed = 1))
+             ORDER BY o.id
+             LIMIT 100;",
+            vec![],
+        )
+        .await?;
+    let penerima: Vec<PenerimaTutup> = hasil
+        .to_objects()
+        .iter()
+        .map(|baris| PenerimaTutup {
+            id: sel_teks(baris.get("id")),
+            nama: sel_teks(baris.get("nama_operator")),
+            no_hp: sel_teks(baris.get("no_hp")),
+        })
+        .collect();
+    let diantre = antre_pemberitahuan(state, &kejadian, &penerima)?;
+    Ok(json!({ "diantre": diantre, "alasan": null }))
 }
 
 #[cfg(test)]
@@ -455,5 +1055,208 @@ mod tests {
             .collect::<Result<_, _>>()
             .expect("baris");
         assert_eq!(events, vec!["create".to_owned(), "reopen".to_owned()]);
+    }
+
+    // Vektor kembar `src/lib/validations/tutup-buku.test.ts` (Tahap 2).
+    #[test]
+    fn aturan_keputusan_kembar() {
+        assert_eq!(
+            banding_saldo(
+                r#"[{"id_akun":"akun-kas","debit":100,"kredit":0},{"id_akun":"akun-spp","debit":0,"kredit":100}]"#,
+                r#"[{"id_akun":"akun-bank","debit":50,"kredit":0},{"id_akun":"akun-kas","debit":100,"kredit":0},{"id_akun":"akun-spp","debit":0,"kredit":150}]"#,
+            ),
+            vec![("akun-bank".to_owned(), 0, 50), ("akun-spp".to_owned(), -100, -150)]
+        );
+        assert_eq!(banding_saldo("rusak", "[]"), Vec::<(String, i64, i64)>::new());
+        assert_eq!(validate_catatan_keputusan("  "), Ok(None));
+        assert_eq!(validate_catatan_keputusan(" Cocok dengan kas "), Ok(Some("Cocok dengan kas".to_owned())));
+        assert_eq!(
+            validate_catatan_keputusan(&"a".repeat(151)),
+            Err("Catatan paling banyak 150 karakter.".to_owned())
+        );
+    }
+
+    #[test]
+    fn status_tutup_diterima_check_lokal() {
+        let (_dir, state) = state_uji();
+        let connection = storage::database(&state.data_dir).expect("db");
+        for (i, status) in STATUS_TUTUP.iter().enumerate() {
+            connection
+                .execute(
+                    "INSERT INTO keu_tutup_buku (id_tutup, sampai_tanggal, dibuat_oleh, kode_perangkat, waktu_perangkat, saldo_json, status)
+                     VALUES (?, '2020-01-31', 'a', 'D', 'x', '[]', ?);",
+                    params![format!("tb-{i}"), status],
+                )
+                .expect("status diterima CHECK");
+        }
+    }
+
+    /// Jurnal yang tiba lewat tarikan (tanpa gerbang lokal) ke periode yang
+    /// sudah ditutup: tutup buku menjadi "perlu ditinjau", lalu ditutup ulang.
+    #[test]
+    fn transaksi_telat_ditinjau_lalu_ditutup_ulang() {
+        let (_dir, state) = state_uji();
+        accounting::post_journal(&state, "tu", jurnal("2020-01-15")).expect("jurnal awal");
+        let lama = close(&state, "kepala", "2020-01-31").expect("tutup")["tutup"]["id_tutup"]
+            .as_str()
+            .expect("id")
+            .to_owned();
+        assert_eq!(status(&state).expect("status")["perlu_perhatian"], json!(0));
+
+        let connection = storage::database(&state.data_dir).expect("db");
+        connection
+            .execute_batch(
+                "INSERT INTO keu_jurnal (id_jurnal, tanggal, seri, nomor_urut, nomor, keterangan, sumber, dibuat_oleh, created_at)
+                 VALUES ('jrn-telat', '2020-01-20', 'M1234', 1, 'JU/2020/M1234/0001', 'SPP dari HP offline', 'Manual', 'bendahara', datetime('now', '+1 minute'));
+                 INSERT INTO keu_jurnal_baris (id_baris, id_jurnal, id_akun, debit, kredit, urutan) VALUES
+                   ('jrn-telat-1', 'jrn-telat', 'akun-kas', 50000, 0, 1),
+                   ('jrn-telat-2', 'jrn-telat', 'akun-pendapatan-spp', 0, 50000, 2);",
+            )
+            .expect("jurnal telat");
+
+        let st = status(&state).expect("status");
+        assert_eq!(st["perlu_perhatian"], json!(1));
+        assert_eq!(st["riwayat"][0]["perlu_ditinjau"], json!(true));
+        let tinjau = review(&state, &lama).expect("tinjau");
+        let kas = tinjau["selisih"]
+            .as_array()
+            .expect("selisih")
+            .iter()
+            .find(|baris| baris["id_akun"] == "akun-kas")
+            .cloned()
+            .expect("akun kas berubah");
+        assert_eq!((kas["sebelum"].clone(), kas["sesudah"].clone()), (json!(100000), json!(150000)));
+        assert_eq!(tinjau["jurnal"][0]["id_jurnal"], json!("jrn-telat"));
+        assert_eq!(tinjau["jurnal"][0]["total"], json!(50000));
+
+        let baru = revise(&state, "kepala", &lama, "").expect("tutup ulang");
+        assert_eq!(baru["tutup"]["status"], json!("Aktif"));
+        let st = status(&state).expect("status");
+        assert_eq!(st["perlu_perhatian"], json!(0));
+        assert_eq!(st["batas"], json!("2020-01-31"));
+        let lama_baris = baca_tutup(&connection, &lama).expect("baca").expect("ada");
+        assert_eq!(lama_baris["status"], json!("Digantikan"));
+        assert_eq!(lama_baris["catatan_keputusan"], json!("Ditutup ulang dengan saldo sekarang."));
+        assert_eq!(
+            revise(&state, "kepala", baru["tutup"]["id_tutup"].as_str().expect("id"), "")
+                .expect_err("tidak berubah")
+                .message,
+            "Saldo periode ini tidak berubah sejak ditutup."
+        );
+        // Keputusan harus sampai ke cloud SEBELUM versi baru.
+        let urutan: Vec<String> = connection
+            .prepare(
+                "SELECT operation FROM desktop_sync_outbox WHERE domain = 'accounting-close' ORDER BY created_at, rowid;",
+            )
+            .expect("siapkan")
+            .query_map([], |row| row.get(0))
+            .expect("baca")
+            .collect::<Result<_, _>>()
+            .expect("baris");
+        assert_eq!(urutan, vec!["create".to_owned(), "decide".to_owned(), "create".to_owned()]);
+    }
+
+    /// Versi yang `Menunggu` (ditarik dari cloud) diputuskan atasan.
+    #[test]
+    fn versi_menunggu_dipakai_atau_ditolak() {
+        let (_dir, state) = state_uji();
+        accounting::post_journal(&state, "tu", jurnal("2020-01-15")).expect("jurnal awal");
+        let berlaku = close(&state, "kepala", "2020-01-31").expect("tutup")["tutup"]["id_tutup"]
+            .as_str()
+            .expect("id")
+            .to_owned();
+        let connection = storage::database(&state.data_dir).expect("db");
+        connection
+            .execute_batch(
+                "INSERT INTO keu_tutup_buku (id_tutup, sampai_tanggal, dibuat_oleh, kode_perangkat, waktu_perangkat, diterima_cloud, saldo_json, status) VALUES
+                   ('tb-hp', '2020-01-31', 'bendahara', 'A9F3', '2020-02-01 07:00:00', '2020-02-03 10:00:00', '[]', 'Menunggu'),
+                   ('tb-hp2', '2020-01-31', 'tu', 'B111', '2020-02-01 08:00:00', '2020-02-03 11:00:00', '[]', 'Menunggu');",
+            )
+            .expect("versi menunggu");
+        assert_eq!(status(&state).expect("status")["perlu_perhatian"], json!(2));
+
+        let tinjau = review(&state, "tb-hp").expect("tinjau");
+        assert_eq!(tinjau["pembanding"]["id_tutup"], json!(berlaku));
+        assert_eq!(tinjau["selisih"].as_array().expect("selisih").len(), 2);
+
+        assert_eq!(
+            decide(&state, "kepala", "tb-hp", "abaikan", "").expect_err("keputusan asing").message,
+            "Keputusan tidak dikenal."
+        );
+        assert_eq!(
+            decide(&state, "kepala", &berlaku, "pakai", "").expect_err("bukan menunggu").message,
+            "Hanya tutup buku yang menunggu keputusan yang bisa diputuskan."
+        );
+        decide(&state, "kepala", "tb-hp", "pakai", "Sesuai buku kas").expect("pakai");
+        let status_dari = |id: &str| baca_tutup(&connection, id).expect("baca").expect("ada")["status"].clone();
+        assert_eq!(status_dari("tb-hp"), json!("Aktif"));
+        assert_eq!(status_dari(&berlaku), json!("Digantikan"));
+        assert_eq!(status_dari("tb-hp2"), json!("Digantikan"));
+        assert_eq!(
+            baca_tutup(&connection, &berlaku).expect("baca").expect("ada")["diputuskan_oleh"],
+            json!("kepala")
+        );
+        assert_eq!(status(&state).expect("status")["batas"], json!("2020-01-31"));
+    }
+
+    #[test]
+    fn pemberitahuan_kembar() {
+        let riwayat = vec![
+            json!({"id_tutup": "tb-1", "status": "Menunggu", "sampai_tanggal": "2026-09-30", "dibuat_oleh": "bendahara", "perlu_ditinjau": false}),
+            json!({"id_tutup": "tb-2", "status": "Aktif", "sampai_tanggal": "2026-08-31", "dibuat_oleh": "kepala", "perlu_ditinjau": true}),
+            json!({"id_tutup": "tb-3", "status": "Aktif", "sampai_tanggal": "2026-07-31", "dibuat_oleh": "kepala", "perlu_ditinjau": false}),
+            json!({"id_tutup": "tb-4", "status": "Dibuka", "sampai_tanggal": "2026-06-30", "dibuat_oleh": "kepala", "perlu_ditinjau": false}),
+        ];
+        let kejadian = kejadian_dari_riwayat(&riwayat);
+        assert_eq!(kejadian.len(), 2);
+        assert_eq!((kejadian[0].id_tutup.as_str(), kejadian[0].kejadian), ("tb-1", "menunggu"));
+        assert_eq!((kejadian[1].id_tutup.as_str(), kejadian[1].kejadian), ("tb-2", "berubah"));
+        assert_eq!(kunci_pemberitahuan("tb-1", "menunggu", "7"), "tutup_buku:tb-1:menunggu:7");
+        let teks = |item: &KejadianTutup, nama: &str| {
+            wa_notification::render_wa_template(
+                wa_notification::default_wa_template("tutup_buku").expect("bawaan"),
+                &isian_pemberitahuan(item, nama),
+            )
+        };
+        assert_eq!(
+            teks(&kejadian[0], "Bu Sari"),
+            "Yth. Bu Sari. Tutup buku sampai 30/09/2026 perlu ditinjau karena ada versi lain yang menunggu keputusan. Versi itu ditutup oleh bendahara. Buka halaman Keuangan, tab Tutup Buku, untuk memutuskan."
+        );
+        assert_eq!(
+            teks(&kejadian[1], "  "),
+            "Yth. Bapak/Ibu. Tutup buku sampai 31/08/2026 perlu ditinjau karena saldonya berubah sesudah ditutup. Ada transaksi baru di periode yang ditutup oleh kepala. Buka halaman Keuangan, tab Tutup Buku, untuk memutuskan."
+        );
+    }
+
+    #[test]
+    fn pemberitahuan_diantre_sekali_per_penerima() {
+        let (_dir, state) = state_uji();
+        let connection = storage::database(&state.data_dir).expect("db");
+        connection
+            .execute(
+                "INSERT INTO setting_gex_system (key, value) VALUES (?1, 'true');",
+                params![wa_notification::WA_NOTIFY_TUTUP_BUKU_KEY],
+            )
+            .expect("sakelar");
+        let kejadian = vec![KejadianTutup {
+            id_tutup: "tb-1".into(),
+            kejadian: "menunggu",
+            sampai: "2026-09-30".into(),
+            dibuat_oleh: "bendahara".into(),
+        }];
+        let penerima = vec![
+            PenerimaTutup { id: "1".into(), nama: "Kepala".into(), no_hp: "081234567890".into() },
+            PenerimaTutup { id: "2".into(), nama: "Tanpa nomor".into(), no_hp: "12".into() },
+        ];
+        assert_eq!(antre_pemberitahuan(&state, &kejadian, &penerima).expect("antre"), 1);
+        assert_eq!(antre_pemberitahuan(&state, &kejadian, &penerima).expect("antre ulang"), 0);
+        let (jenis, nomor): (String, String) = connection
+            .query_row(
+                "SELECT jenis, tujuan_nomor FROM notifikasi_wa WHERE dedupe_key = 'tutup_buku:tb-1:menunggu:1';",
+                [],
+                |row| Ok((row.get(0)?, row.get(1)?)),
+            )
+            .expect("baris");
+        assert_eq!((jenis.as_str(), nomor.as_str()), ("tutup_buku", "+6281234567890"));
     }
 }

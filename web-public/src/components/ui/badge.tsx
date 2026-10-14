@@ -25,7 +25,7 @@ export function Badge({
         variant === "secondary" &&
           "bg-secondary text-secondary-foreground shadow-sm",
         variant === "prestige" &&
-          "bg-primary-container text-primary-container-foreground font-mono",
+          "border border-primary/20 bg-muted text-primary",
         variant === "success" && "bg-accent text-accent-foreground",
         variant === "warning" &&
           "bg-secondary-container text-secondary-container-foreground font-bold",

@@ -47,7 +47,7 @@ export default async function HalamanBerita() {
           <DaftarKosong pesan="Belum ada berita yang dipublikasikan. Pengumuman sekolah akan tampil di halaman ini." />
         </div>
       ) : (
-        <div className="mt-10 grid gap-8 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="mt-10 kartu-tengah [--jarak:2rem] sm:[--kolom:2] lg:[--kolom:3]">
           {articles.map((item) => (
             <article
               key={item.id_berita}

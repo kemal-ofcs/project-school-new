@@ -8,6 +8,7 @@ import {
   syncNow,
 } from "@/lib/gateways/sync-status";
 import { AutoAlfaRunner } from "./AutoAlfaRunner";
+import { AutoPemberitahuanRunner } from "./AutoPemberitahuanRunner";
 import { AutoSyncRunner } from "./AutoSyncRunner";
 import { AutoWaSenderRunner } from "./AutoWaSenderRunner";
 import { LicenseNotice } from "./license/LicenseNotice";
@@ -77,6 +78,7 @@ export function MobileAppShell({
       <AutoAlfaRunner />
       <AutoSyncRunner />
       <AutoWaSenderRunner />
+      <AutoPemberitahuanRunner />
       <MobileHeader />
       <LicenseNotice />
       <PullToRefresh

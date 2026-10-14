@@ -60,6 +60,7 @@ import {
   PERIODIK,
   type Periodik,
 } from "@/lib/validations/billing";
+import { tanggalTampil } from "@/lib/validations/tutup-buku";
 
 /**
  * Seluruh UI tagihan siswa, dipakai apa adanya oleh halaman Web/Desktop dan
@@ -266,6 +267,7 @@ function PanelTunggakan({
   const [idJenis, setIdJenis] = useState("");
   const [idRombel, setIdRombel] = useState("");
   const [status, setStatus] = useState("Aktif");
+  const [jatuhTempo, setJatuhTempo] = useState("");
   const [data, setData] = useState<DaftarTagihan | null>(null);
   const [galatMuat, setGalatMuat] = useState<string | null>(null);
   const [dipilih, setDipilih] = useState<TagihanItem | null>(null);
@@ -289,12 +291,13 @@ function PanelTunggakan({
           idJenisTagihan: idJenis || null,
           idRombel: idRombel || null,
           status: status || null,
+          jatuhTempo: jatuhTempo || null,
         }),
       );
     } catch (error) {
       setGalatMuat(pesanGalat(error, "Daftar tagihan tidak bisa dimuat."));
     }
-  }, [periode, idJenis, idRombel, status]);
+  }, [periode, idJenis, idRombel, status, jatuhTempo]);
 
   useEffect(() => {
     void muat();
@@ -303,7 +306,7 @@ function PanelTunggakan({
 
   return (
     <div className="space-y-4">
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
         <div>
           <label className={LABEL} htmlFor="tunggakan-periode">
             Periode (opsional)
@@ -366,6 +369,22 @@ function PanelTunggakan({
             <option value="Lunas">Lunas</option>
             <option value="Dibatalkan">Dibatalkan</option>
             <option value="">Semua</option>
+          </select>
+        </div>
+        <div>
+          <label className={LABEL} htmlFor="tunggakan-jatuh-tempo">
+            Jatuh tempo
+          </label>
+          <select
+            id="tunggakan-jatuh-tempo"
+            className={INPUT}
+            value={jatuhTempo}
+            onChange={(e) => setJatuhTempo(e.target.value)}
+          >
+            <option value="">Semua</option>
+            <option value="lewat">Lewat jatuh tempo</option>
+            <option value="segera">Jatuh tempo 7 hari lagi atau kurang</option>
+            <option value="belum">Belum jatuh tempo</option>
           </select>
         </div>
       </div>
@@ -444,7 +463,7 @@ function PanelTunggakan({
                       {item.nama_tagihan}{" "}
                       {item.periode === "SEKALI" ? "" : item.periode}
                     </span>
-                    <span>Jatuh tempo {item.jatuh_tempo}</span>
+                    <span>Jatuh tempo {tanggalTampil(item.jatuh_tempo)}</span>
                     {item.potongan > 0 ? (
                       <span>
                         Keringanan <Rp nilai={item.potongan} />
@@ -485,6 +504,7 @@ function PanelTunggakan({
             periode: periode.trim() || null,
             idJenisTagihan: idJenis || null,
             idRombel: idRombel || null,
+            jatuhTempo: jatuhTempo || null,
           }}
           jumlahSiswa={siswaMenunggak}
           onClose={() => setBukaPengingat(false)}
@@ -543,6 +563,7 @@ function DialogPengingat({
     periode: string | null;
     idJenisTagihan: string | null;
     idRombel: string | null;
+    jatuhTempo: string | null;
   };
   jumlahSiswa: number;
   onClose: () => void;
@@ -669,7 +690,9 @@ function DialogTagihan({
           </div>
           <div>
             <dt className="text-xs text-slate-400">Jatuh tempo</dt>
-            <dd className="text-slate-100">{item.jatuh_tempo}</dd>
+            <dd className="text-slate-100">
+              {tanggalTampil(item.jatuh_tempo)}
+            </dd>
           </div>
           <div>
             <dt className="text-xs text-slate-400">Sudah dibayar</dt>

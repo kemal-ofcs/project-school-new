@@ -26,6 +26,8 @@ export const WA_NOTIFY_IMPORT_MANUAL_KEY = "wa_notify_import_manual";
 export const WA_NOTIFY_UKS_KEY = "wa_notify_uks";
 /** Pengingat tunggakan tagihan (K4b), cermin `WA_NOTIFY_TAGIHAN_KEY`. Bawaannya MATI. */
 export const WA_NOTIFY_TAGIHAN_KEY = "wa_notify_tagihan";
+/** Pemberitahuan tutup buku, cermin `WA_NOTIFY_TUTUP_BUKU_KEY`. Bawaannya MATI. */
+export const WA_NOTIFY_TUTUP_BUKU_KEY = "wa_notify_tutup_buku";
 
 /**
  * Sakelar "Kirim otomatis" — cerminan `WA_AUTO_SEND_KEY` di Rust. Bawaannya
@@ -33,6 +35,43 @@ export const WA_NOTIFY_TAGIHAN_KEY = "wa_notify_tagihan";
  * dipanggil runner, bukan oleh runner-nya.
  */
 export const WA_AUTO_SEND_KEY = "wa_kirim_otomatis";
+
+/** Pengingat tagihan otomatis, cermin konstanta bernama sama di Rust. */
+export const PENGINGAT_OTOMATIS_KEY = "pengingat_tagihan_otomatis";
+export const PENGINGAT_HARI_SEBELUM_KEY = "pengingat_tagihan_hari_sebelum";
+export const PENGINGAT_HARI_LEWAT_KEY = "pengingat_tagihan_hari_lewat";
+export const PENGINGAT_TERAKHIR_KEY = "pengingat_tagihan_terakhir";
+export const DEFAULT_PENGINGAT_HARI_SEBELUM = 3;
+export const MAX_PENGINGAT_HARI_SEBELUM = 14;
+/** 1 = Senin ... 7 = Minggu, 0 = tidak dipakai. */
+export const DEFAULT_PENGINGAT_HARI_LEWAT = 1;
+
+/** Cermin `clamp_pengingat_hari_sebelum`. */
+export function clampPengingatHariSebelum(nilai: unknown): number {
+  const angka = Number(nilai);
+  return Number.isInteger(angka) &&
+    angka >= 0 &&
+    angka <= MAX_PENGINGAT_HARI_SEBELUM
+    ? angka
+    : DEFAULT_PENGINGAT_HARI_SEBELUM;
+}
+
+/** Cermin `clamp_pengingat_hari_lewat`. */
+export function clampPengingatHariLewat(nilai: unknown): number {
+  const angka = Number(nilai);
+  return Number.isInteger(angka) && angka >= 0 && angka <= 7
+    ? angka
+    : DEFAULT_PENGINGAT_HARI_LEWAT;
+}
+
+/** Cermin `pengingat_hari_ini`: `[ingatkan H-n, ingatkan yang lewat]`. */
+export function pengingatHariIni(
+  hariSebelum: number,
+  hariLewat: number,
+  hariIso: number,
+): [boolean, boolean] {
+  return [hariSebelum > 0, hariLewat !== 0 && hariLewat === hariIso];
+}
 
 /** Kunci setting dinamis untuk ambang jumlah alfa dan rentang hari evaluasi. */
 export const WA_NOTIFY_AMBANG_ALFA_LIMIT_KEY = "wa_notify_ambang_alfa_limit";
@@ -50,6 +89,7 @@ export const WA_NOTIFICATION_KINDS = [
   "import_manual",
   "uks",
   "tagihan",
+  "tutup_buku",
 ] as const;
 
 export type WaNotificationKind = (typeof WA_NOTIFICATION_KINDS)[number];
@@ -109,6 +149,8 @@ export function waNotifySettingKey(jenis: string): string | null {
       return WA_NOTIFY_UKS_KEY;
     case "tagihan":
       return WA_NOTIFY_TAGIHAN_KEY;
+    case "tutup_buku":
+      return WA_NOTIFY_TUTUP_BUKU_KEY;
     default:
       return null;
   }
@@ -235,6 +277,7 @@ export const WA_TEMPLATE_LABELS: Record<WaTemplateKind, string> = {
   import_manual: "Input manual",
   uks: "Kunjungan UKS",
   tagihan: "Pengingat tagihan",
+  tutup_buku: "Pemberitahuan tutup buku",
   rekonsiliasi_bolos: "Rekonsiliasi: siswa bolos",
   rekonsiliasi_tanpa_scan: "Rekonsiliasi: tanpa scan gerbang",
 };
@@ -258,6 +301,8 @@ export const DEFAULT_WA_TEMPLATES: WaTemplateMap = {
   uks: "Yth. Wali Murid dari {nama} ({rombel}). Kami informasikan bahwa ananda mendapat penanganan di UKS sekolah pada {tanggal} pukul {jam_masuk}. Tindak lanjut: {tindak_lanjut}.",
   tagihan:
     "Yth. Wali Murid dari {nama} ({rombel}). Kami informasikan bahwa ananda memiliki {jumlah} tagihan sekolah yang belum lunas dengan total {total}:\n{rincian}\nJatuh tempo paling awal: {jatuh_tempo}. Mohon abaikan pesan ini bila sudah membayar. Terima kasih.",
+  tutup_buku:
+    "Yth. {nama}. Tutup buku sampai {tanggal} perlu ditinjau karena {kejadian}. {rincian} Buka halaman Keuangan, tab Tutup Buku, untuk memutuskan.",
   rekonsiliasi_bolos:
     "Yth. Bapak/Ibu Wali dari {nama}, diberitahukan bahwa ananda tercatat hadir di gerbang sekolah (pukul {jam_gerbang}), namun TIDAK HADIR (Alfa) pada {mapel} jam ke-{jam_ke} ({guru}). Mohon konfirmasi kehadiran siswa. Terima kasih.",
   rekonsiliasi_tanpa_scan:
@@ -285,6 +330,7 @@ export const WA_TEMPLATE_PLACEHOLDERS: Record<
     "keluhan",
   ],
   tagihan: ["nama", "rombel", "total", "jumlah", "rincian", "jatuh_tempo"],
+  tutup_buku: ["nama", "tanggal", "kejadian", "rincian"],
   rekonsiliasi_bolos: [
     "nama",
     "rombel",

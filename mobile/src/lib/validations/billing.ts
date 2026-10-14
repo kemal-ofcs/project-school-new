@@ -594,6 +594,30 @@ export function barisJurnalPembayaran(
 
 // ── Pengingat tunggakan lewat WhatsApp (K4b) ────────────────────────────────
 
+/**
+ * Cermin `SARINGAN_JATUH_TEMPO`: lewat = sebelum hari ini, segera = hari ini
+ * s.d. 7 hari lagi, belum = hari ini atau sesudahnya (tanggal WIB database).
+ */
+export const SARINGAN_JATUH_TEMPO = ["lewat", "segera", "belum"] as const;
+export type SaringanJatuhTempo = (typeof SARINGAN_JATUH_TEMPO)[number];
+export const PESAN_SARINGAN_JATUH_TEMPO = "Saringan jatuh tempo tidak dikenal.";
+
+/** Cermin `tambah_saringan_jatuh_tempo`: potongan SQL per pilihan. */
+export function klausaJatuhTempo(nilai: string | null | undefined): string {
+  switch (nilai?.trim() || "") {
+    case "":
+      return "";
+    case "lewat":
+      return " AND t.jatuh_tempo < date('now', '+7 hours')";
+    case "segera":
+      return " AND t.jatuh_tempo >= date('now', '+7 hours') AND t.jatuh_tempo <= date('now', '+7 hours', '+7 days')";
+    case "belum":
+      return " AND t.jatuh_tempo >= date('now', '+7 hours')";
+    default:
+      throw new Error(PESAN_SARINGAN_JATUH_TEMPO);
+  }
+}
+
 /** Cermin `MAKS_RINCIAN_PENGINGAT`. */
 export const MAKS_RINCIAN_PENGINGAT = 5;
 /** Cermin `MAKS_SISWA_PENGINGAT`: siswa paling banyak per satu tekan tombol. */

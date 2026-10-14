@@ -21,6 +21,7 @@ import {
   type WaNotificationItem,
 } from "@/lib/gateways/wa-notification";
 import { useConfirmDialog } from "@/lib/hooks/useConfirmDialog";
+import { tanggalTampil } from "@/lib/validations/tutup-buku";
 
 /**
  * Tinjauan antrean WhatsApp versi genggam — HANYA BACA, dan dari CLOUD.
@@ -65,7 +66,19 @@ const JENIS_LABEL: Record<string, string> = {
   import_manual: "Import Manual",
   uks: "Kunjungan UKS",
   tagihan: "Pengingat Tagihan",
+  tutup_buku: "Tutup Buku",
 };
+
+const NAMA_HARI_PENGINGAT = [
+  "Tidak dipakai",
+  "Senin",
+  "Selasa",
+  "Rabu",
+  "Kamis",
+  "Jumat",
+  "Sabtu",
+  "Minggu",
+];
 
 /**
  * Sakelar jenis notifikasi, sama dengan kartu Notifikasi WhatsApp di
@@ -83,6 +96,7 @@ const SAKELAR_JENIS: ReadonlyArray<
       | "importManualEnabled"
       | "uksEnabled"
       | "tagihanEnabled"
+      | "tutupBukuEnabled"
     ),
     string,
   ]
@@ -95,6 +109,7 @@ const SAKELAR_JENIS: ReadonlyArray<
   ["importManualEnabled", "Input manual"],
   ["uksEnabled", "Kunjungan UKS"],
   ["tagihanEnabled", "Pengingat tagihan siswa"],
+  ["tutupBukuEnabled", "Pemberitahuan tutup buku (ke atasan)"],
 ];
 
 function warnaStatus(status: string) {
@@ -643,7 +658,7 @@ export default function NotifikasiWaMobilePage() {
                 Kirim otomatis tanpa menekan tombol
               </label>
             </div>
-            <p className="text-[11px] text-slate-500 leading-relaxed">
+            <p className="text-[11px] text-slate-400 leading-relaxed">
               Antrean dikuras sendiri setiap menit selama aplikasi terbuka oleh
               operator yang berizin mengirim notifikasi. Di Android, aplikasi
               yang di-minimize berhenti mengirim.
@@ -672,10 +687,110 @@ export default function NotifikasiWaMobilePage() {
                   </label>
                 </div>
               ))}
-              <p className="text-[11px] text-slate-500 leading-relaxed">
+              <p className="text-[11px] text-slate-400 leading-relaxed">
                 Ikut sinkronisasi ke semua perangkat dan dibaca saat pesan
                 diantre. Jenis yang dimatikan tidak diantre lagi, dan pesannya
                 yang masih menunggu dibatalkan saat antrean dikirim.
+              </p>
+            </fieldset>
+            <fieldset className="space-y-2 rounded-xl border border-white/10 p-3">
+              <legend className="px-1 text-slate-400 text-xs">
+                Pengingat tagihan otomatis
+              </legend>
+              <div className="flex items-center gap-2">
+                <input
+                  checked={config.pengingatOtomatis ?? false}
+                  id="wa-cfg-pengingat-otomatis"
+                  onChange={(e) =>
+                    setConfig((c) =>
+                      c ? { ...c, pengingatOtomatis: e.target.checked } : c,
+                    )
+                  }
+                  type="checkbox"
+                />
+                <label
+                  className="text-slate-300 text-xs"
+                  htmlFor="wa-cfg-pengingat-otomatis"
+                >
+                  Kirim pengingat otomatis
+                </label>
+              </div>
+              <div>
+                <label
+                  className="block text-slate-400 text-xs"
+                  htmlFor="wa-cfg-pengingat-sebelum"
+                >
+                  Ingatkan sebelum jatuh tempo
+                </label>
+                <select
+                  className="mt-1 w-full rounded-xl border border-white/10 bg-slate-950 px-3 py-2 text-white"
+                  id="wa-cfg-pengingat-sebelum"
+                  onChange={(e) =>
+                    setConfig((c) =>
+                      c
+                        ? { ...c, pengingatHariSebelum: Number(e.target.value) }
+                        : c,
+                    )
+                  }
+                  value={config.pengingatHariSebelum ?? 3}
+                >
+                  <option value={0}>Tidak dipakai</option>
+                  {Array.from({ length: 14 }, (_, i) => i + 1).map((n) => (
+                    <option key={n} value={n}>
+                      {n} hari sebelumnya
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label
+                  className="block text-slate-400 text-xs"
+                  htmlFor="wa-cfg-pengingat-lewat"
+                >
+                  Ingatkan yang lewat jatuh tempo setiap
+                </label>
+                <select
+                  className="mt-1 w-full rounded-xl border border-white/10 bg-slate-950 px-3 py-2 text-white"
+                  id="wa-cfg-pengingat-lewat"
+                  onChange={(e) =>
+                    setConfig((c) =>
+                      c
+                        ? { ...c, pengingatHariLewat: Number(e.target.value) }
+                        : c,
+                    )
+                  }
+                  value={config.pengingatHariLewat ?? 1}
+                >
+                  {NAMA_HARI_PENGINGAT.map((nama, n) => (
+                    <option key={nama} value={n}>
+                      {nama}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              {!config.tagihanEnabled && config.pengingatOtomatis ? (
+                <p role="alert" className="text-[11px] text-amber-300">
+                  Belum berjalan: sakelar Pengingat tagihan siswa di atas masih
+                  mati.
+                </p>
+              ) : null}
+              {config.pengingatOtomatis &&
+              (config.pengingatHariSebelum ?? 3) === 0 &&
+              (config.pengingatHariLewat ?? 1) === 0 ? (
+                <p role="alert" className="text-[11px] text-amber-300">
+                  Kedua jadwal tidak dipakai, jadi tidak ada pengingat yang
+                  diantre.
+                </p>
+              ) : null}
+              <p className="text-[11px] text-slate-400">
+                {config.pengingatTerakhir
+                  ? `Terakhir dijalankan ${tanggalTampil(config.pengingatTerakhir)}.`
+                  : "Belum pernah dijalankan."}
+              </p>
+              <p className="text-[11px] text-slate-400 leading-relaxed">
+                Butuh sakelar Pengingat tagihan siswa di atas menyala. Berjalan
+                selama aplikasi terbuka oleh pemegang izin Kelola Tagihan,
+                paling banyak satu pesan per siswa per hari.
               </p>
             </fieldset>
             <button

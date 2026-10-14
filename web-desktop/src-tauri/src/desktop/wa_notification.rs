@@ -35,6 +35,8 @@ pub const WA_NOTIFY_UKS_KEY: &str = "wa_notify_uks";
 /// manual dari tab Tunggakan, tetapi sakelar ini tetap gerbangnya supaya
 /// sekolah yang belum siap tidak bisa mengirimnya tanpa sengaja.
 pub const WA_NOTIFY_TAGIHAN_KEY: &str = "wa_notify_tagihan";
+/// Pemberitahuan tutup buku ke pemegang izin Tutup Buku. Bawaannya MATI.
+pub const WA_NOTIFY_TUTUP_BUKU_KEY: &str = "wa_notify_tutup_buku";
 
 /// Sakelar "Kirim otomatis": runner di aplikasi menguras antrean sendiri tanpa
 /// tombol. BAWAANNYA MATI — pemasangan berjalan tidak boleh mulai mengirim
@@ -83,6 +85,43 @@ pub fn clamp_ambang_alfa_days(value: i64) -> i64 {
     }
 }
 
+/// Pengingat tagihan otomatis (lanjutan K4b), semuanya setting tersinkron.
+/// Cermin konstanta bernama sama di `validations/wa-notification.ts`.
+pub const PENGINGAT_OTOMATIS_KEY: &str = "pengingat_tagihan_otomatis";
+pub const PENGINGAT_HARI_SEBELUM_KEY: &str = "pengingat_tagihan_hari_sebelum";
+pub const PENGINGAT_HARI_LEWAT_KEY: &str = "pengingat_tagihan_hari_lewat";
+/// Tanggal WIB terakhir pengingat otomatis dijalankan, supaya pemeriksaan
+/// tiap 30 menit tidak mengulang pekerjaan; pesan ganda tetap dicegah dedupe.
+pub const PENGINGAT_TERAKHIR_KEY: &str = "pengingat_tagihan_terakhir";
+pub const DEFAULT_PENGINGAT_HARI_SEBELUM: i64 = 3;
+pub const MAX_PENGINGAT_HARI_SEBELUM: i64 = 14;
+/// 1 = Senin ... 7 = Minggu, 0 = tidak dipakai.
+pub const DEFAULT_PENGINGAT_HARI_LEWAT: i64 = 1;
+
+/// Cermin `clampPengingatHariSebelum`: 0-14, di luar rentang = bawaan.
+pub fn clamp_pengingat_hari_sebelum(value: i64) -> i64 {
+    if (0..=MAX_PENGINGAT_HARI_SEBELUM).contains(&value) {
+        value
+    } else {
+        DEFAULT_PENGINGAT_HARI_SEBELUM
+    }
+}
+
+/// Cermin `clampPengingatHariLewat`: 0-7, di luar rentang = bawaan.
+pub fn clamp_pengingat_hari_lewat(value: i64) -> i64 {
+    if (0..=7).contains(&value) {
+        value
+    } else {
+        DEFAULT_PENGINGAT_HARI_LEWAT
+    }
+}
+
+/// Cermin `pengingatHariIni`: `(ingatkan H-n, ingatkan yang lewat)` untuk hari
+/// ISO `hari_iso` (1 = Senin ... 7 = Minggu).
+pub fn pengingat_hari_ini(hari_sebelum: i64, hari_lewat: i64, hari_iso: i64) -> (bool, bool) {
+    (hari_sebelum > 0, hari_lewat != 0 && hari_lewat == hari_iso)
+}
+
 /// Urai nilai batas alfa dan rentang hari dari tabel settings.
 pub fn parse_ambang_alfa_settings(settings: &HashMap<String, String>) -> (i64, i64) {
     let limit = settings
@@ -116,6 +155,10 @@ pub struct WaSwitches {
     pub import_manual: i64,
     pub uks: i64,
     pub tagihan: i64,
+    pub tutup_buku: i64,
+    pub pengingat_otomatis: i64,
+    pub pengingat_hari_sebelum: i64,
+    pub pengingat_hari_lewat: i64,
     pub ambang_limit: i64,
     pub ambang_days: i64,
     pub auto_send: i64,
@@ -164,6 +207,20 @@ pub fn parse_wa_switches(draft: &Value) -> WaSwitches {
         import_manual: flag(draft, "importManualEnabled"),
         uks: flag(draft, "uksEnabled"),
         tagihan: flag(draft, "tagihanEnabled"),
+        tutup_buku: flag(draft, "tutupBukuEnabled"),
+        pengingat_otomatis: flag(draft, "pengingatOtomatis"),
+        pengingat_hari_sebelum: clamp_pengingat_hari_sebelum(
+            draft
+                .get("pengingatHariSebelum")
+                .and_then(Value::as_i64)
+                .unwrap_or(DEFAULT_PENGINGAT_HARI_SEBELUM),
+        ),
+        pengingat_hari_lewat: clamp_pengingat_hari_lewat(
+            draft
+                .get("pengingatHariLewat")
+                .and_then(Value::as_i64)
+                .unwrap_or(DEFAULT_PENGINGAT_HARI_LEWAT),
+        ),
         auto_send: flag(draft, "autoSendEnabled"),
         ambang_limit: clamp_ambang_alfa_limit(
             draft
@@ -181,7 +238,7 @@ pub fn parse_wa_switches(draft: &Value) -> WaSwitches {
 }
 
 /// Pasangan kunci/nilai `setting_gex_system` yang mencerminkan sakelar di atas.
-pub fn wa_setting_mirror(switches: &WaSwitches) -> [(&'static str, String); 11] {
+pub fn wa_setting_mirror(switches: &WaSwitches) -> [(&'static str, String); 15] {
     let boolean = |v: i64| (if v != 0 { "true" } else { "false" }).to_owned();
     [
         (WA_NOTIFY_SCAN_MASUK_KEY, boolean(switches.scan_masuk)),
@@ -198,6 +255,13 @@ pub fn wa_setting_mirror(switches: &WaSwitches) -> [(&'static str, String); 11] 
         ),
         (WA_NOTIFY_UKS_KEY, boolean(switches.uks)),
         (WA_NOTIFY_TAGIHAN_KEY, boolean(switches.tagihan)),
+        (WA_NOTIFY_TUTUP_BUKU_KEY, boolean(switches.tutup_buku)),
+        (PENGINGAT_OTOMATIS_KEY, boolean(switches.pengingat_otomatis)),
+        (
+            PENGINGAT_HARI_SEBELUM_KEY,
+            switches.pengingat_hari_sebelum.to_string(),
+        ),
+        (PENGINGAT_HARI_LEWAT_KEY, switches.pengingat_hari_lewat.to_string()),
         (
             WA_NOTIFY_AMBANG_ALFA_LIMIT_KEY,
             switches.ambang_limit.to_string(),
@@ -249,6 +313,7 @@ pub fn wa_notify_setting_key(jenis: &str) -> Option<&'static str> {
         "import_manual" => Some(WA_NOTIFY_IMPORT_MANUAL_KEY),
         "uks" => Some(WA_NOTIFY_UKS_KEY),
         "tagihan" => Some(WA_NOTIFY_TAGIHAN_KEY),
+        "tutup_buku" => Some(WA_NOTIFY_TUTUP_BUKU_KEY),
         _ => None,
     }
 }
@@ -278,7 +343,7 @@ pub const MAX_WA_TEMPLATE_CHARS: usize = 1000;
 /// Keenam jenis antrean ditambah dua pesan manual tombol "Hubungi Wali" di
 /// Rekonsiliasi KBM. Dua yang terakhir tidak pernah diantre, jadi tidak punya
 /// sakelar `wa_notify_*` dan tidak ada di CHECK `notifikasi_wa.jenis`.
-pub const WA_TEMPLATE_KINDS: [&str; 10] = [
+pub const WA_TEMPLATE_KINDS: [&str; 11] = [
     "scan_masuk",
     "scan_pulang",
     "bolos",
@@ -287,6 +352,7 @@ pub const WA_TEMPLATE_KINDS: [&str; 10] = [
     "import_manual",
     "uks",
     "tagihan",
+    "tutup_buku",
     "rekonsiliasi_bolos",
     "rekonsiliasi_tanpa_scan",
 ];
@@ -307,6 +373,7 @@ pub fn wa_template_label(jenis: &str) -> &'static str {
         "import_manual" => "Input manual",
         "uks" => "Kunjungan UKS",
         "tagihan" => "Pengingat tagihan",
+        "tutup_buku" => "Pemberitahuan tutup buku",
         "rekonsiliasi_bolos" => "Rekonsiliasi: siswa bolos",
         "rekonsiliasi_tanpa_scan" => "Rekonsiliasi: tanpa scan gerbang",
         _ => "Pesan",
@@ -324,6 +391,7 @@ pub fn default_wa_template(jenis: &str) -> Option<&'static str> {
         "import_manual" => "Yth. Wali Murid dari {nama} ({rombel}). Kami informasikan bahwa catatan kehadiran ananda pada {tanggal} dimasukkan secara manual oleh admin sekolah dengan status: {status}. Keterangan: {keterangan}. Mohon konfirmasi bila ada yang tidak sesuai.",
         "uks" => "Yth. Wali Murid dari {nama} ({rombel}). Kami informasikan bahwa ananda mendapat penanganan di UKS sekolah pada {tanggal} pukul {jam_masuk}. Tindak lanjut: {tindak_lanjut}.",
         "tagihan" => "Yth. Wali Murid dari {nama} ({rombel}). Kami informasikan bahwa ananda memiliki {jumlah} tagihan sekolah yang belum lunas dengan total {total}:\n{rincian}\nJatuh tempo paling awal: {jatuh_tempo}. Mohon abaikan pesan ini bila sudah membayar. Terima kasih.",
+        "tutup_buku" => "Yth. {nama}. Tutup buku sampai {tanggal} perlu ditinjau karena {kejadian}. {rincian} Buka halaman Keuangan, tab Tutup Buku, untuk memutuskan.",
         "rekonsiliasi_bolos" => "Yth. Bapak/Ibu Wali dari {nama}, diberitahukan bahwa ananda tercatat hadir di gerbang sekolah (pukul {jam_gerbang}), namun TIDAK HADIR (Alfa) pada {mapel} jam ke-{jam_ke} ({guru}). Mohon konfirmasi kehadiran siswa. Terima kasih.",
         "rekonsiliasi_tanpa_scan" => "Yth. Bapak/Ibu Wali dari {nama}, ananda tercatat HADIR pada {mapel} jam ke-{jam_ke} ({guru}), namun tidak ditemukan catatan scan di gerbang sekolah hari ini. Mohon dipastikan ananda membawa kartu pelajarnya dan memindai di gerbang saat tiba. Terima kasih.",
         _ => return None,
@@ -340,6 +408,7 @@ pub fn wa_template_placeholders(jenis: &str) -> &'static [&'static str] {
         "koreksi_admin" | "import_manual" => &["nama", "rombel", "tanggal", "status", "keterangan"],
         "uks" => &["nama", "rombel", "tanggal", "jam_masuk", "jam_keluar", "tindak_lanjut", "keluhan"],
         "tagihan" => &["nama", "rombel", "total", "jumlah", "rincian", "jatuh_tempo"],
+        "tutup_buku" => &["nama", "tanggal", "kejadian", "rincian"],
         "rekonsiliasi_bolos" => &["nama", "rombel", "mapel", "jam_ke", "guru", "jam_gerbang", "tanggal"],
         "rekonsiliasi_tanpa_scan" => &["nama", "rombel", "mapel", "jam_ke", "guru", "tanggal"],
         _ => &[],
@@ -766,10 +835,11 @@ pub fn queue_wa_notification_tx(
             | "import_manual"
             | "uks"
             | "tagihan"
+            | "tutup_buku"
     ) {
         return Err(CommandError::new(
             "VALIDATION_ERROR",
-            "Jenis notifikasi tidak valid. Pilihan: scan_masuk, scan_pulang, bolos, ambang_alfa, koreksi_admin, import_manual, uks, tagihan.",
+            "Jenis notifikasi tidak valid. Pilihan: scan_masuk, scan_pulang, bolos, ambang_alfa, koreksi_admin, import_manual, uks, tagihan, tutup_buku.",
         ));
     }
 
@@ -1596,5 +1666,20 @@ mod tests {
             .expect("list notifications");
         let items_after = list_after["items"].as_array().expect("array");
         assert_eq!(items_after[0]["status"], "Dibatalkan");
+    }
+
+    // Vektor kembar `validations/wa-notification.test.ts`.
+    #[test]
+    fn setelan_pengingat_otomatis_kembar() {
+        assert_eq!(clamp_pengingat_hari_sebelum(0), 0);
+        assert_eq!(clamp_pengingat_hari_sebelum(14), 14);
+        assert_eq!(clamp_pengingat_hari_sebelum(15), 3);
+        assert_eq!(clamp_pengingat_hari_sebelum(-1), 3);
+        assert_eq!(clamp_pengingat_hari_lewat(0), 0);
+        assert_eq!(clamp_pengingat_hari_lewat(7), 7);
+        assert_eq!(clamp_pengingat_hari_lewat(8), 1);
+        assert_eq!(pengingat_hari_ini(3, 1, 1), (true, true));
+        assert_eq!(pengingat_hari_ini(0, 1, 2), (false, false));
+        assert_eq!(pengingat_hari_ini(3, 0, 7), (true, false));
     }
 }

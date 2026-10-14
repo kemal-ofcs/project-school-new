@@ -169,10 +169,45 @@ export interface TutupBukuItem {
   dibuka_pada: string | null;
   created_at: string;
   updated_at: string;
+  diputuskan_oleh: string | null;
+  diputuskan_pada: string | null;
+  catatan_keputusan: string | null;
+  /** Hanya di daftar status: saldo berlaku berubah sejak ditutup. */
+  perlu_ditinjau?: boolean;
 }
 
 export interface StatusTutupBuku {
   /** Tanggal terkunci terakhir, atau `null` bila belum pernah ditutup. */
   batas: string | null;
+  /** Versi `Menunggu` ditambah tutup buku berlaku yang perlu ditinjau. */
+  perlu_perhatian: number;
   riwayat: TutupBukuItem[];
+}
+
+export interface TinjauanTutupBuku {
+  tutup: TutupBukuItem;
+  /** Versi berlaku bertanggal sama, untuk tutup buku yang `Menunggu`. */
+  pembanding: TutupBukuItem | null;
+  /**
+   * `Menunggu`: sebelum = versi berlaku, sesudah = versi ini.
+   * `Aktif`: sebelum = saat ditutup, sesudah = sekarang.
+   */
+  selisih: Array<{
+    id_akun: string;
+    kode: string;
+    nama: string;
+    sebelum: number;
+    sesudah: number;
+  }>;
+  /** Jurnal bertanggal di periode itu yang dicatat sesudah ditutup. */
+  jurnal: Array<{
+    id_jurnal: string;
+    tanggal: string;
+    nomor: string;
+    keterangan: string;
+    sumber: string;
+    dibuat_oleh: string;
+    created_at: string;
+    total: number;
+  }>;
 }

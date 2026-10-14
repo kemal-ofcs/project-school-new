@@ -180,3 +180,38 @@ export interface RekapNilaiAkhir {
   /** Waktu cetak (WIB); rekap tidak dibekukan. */
   dicetak: string;
 }
+
+// ── Ekspor e-Rapor (N3) ─────────────────────────────────────────────────────
+
+export interface BahanErapor {
+  tahun_ajaran: string;
+  semester: "Ganjil" | "Genap";
+  rombel: string;
+  tingkat: number;
+  dicetak: string;
+  jenis: Array<{ id_jenis: string; nama: string; is_aktif: number }>;
+  siswa: Array<{ id_siswa: string; nama: string; nis: string; nisn: string }>;
+  mapel: Array<{
+    id_mapel: string;
+    kode_mapel: string;
+    nama_mapel: string;
+    /** Guru yang memberi penilaian, dipisah "; ". */
+    guru: string;
+    penilaian: Array<{
+      id_penilaian: string;
+      id_jenis: string;
+      nama_penilaian: string;
+      tanggal: string;
+      nilai_maks: number;
+      kkm: number;
+    }>;
+    /** Hanya skor yang sudah diisi. */
+    skor: Array<{ id_penilaian: string; id_siswa: string; skor: number }>;
+    /** Dari rekap nilai akhir N2. */
+    rekap: Array<{
+      id_siswa: string;
+      nilai_akhir: number | null;
+      rata: Record<string, number | null>;
+    }>;
+  }>;
+}

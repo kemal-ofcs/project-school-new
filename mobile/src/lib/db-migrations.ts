@@ -56,6 +56,8 @@ const STUDENT_PAYMENT_MIGRATION_VERSION = 42;
 const GRADE_TYPE_MIGRATION_VERSION = 43;
 const WA_BILLING_REMINDER_MIGRATION_VERSION = 44;
 const BOOK_CLOSING_MIGRATION_VERSION = 45;
+const BOOK_CLOSING_DECISION_MIGRATION_VERSION = 46;
+const WA_BOOK_CLOSING_MIGRATION_VERSION = 47;
 
 /**
  * v21 — aturan jam scan baru: Jam Kerja Normal = (Jam Pulang − Jam Masuk) −
@@ -530,6 +532,11 @@ export async function runDatabaseMigrations(client: Client) {
       "tagihan_enabled",
       "ALTER TABLE app_wa_config ADD COLUMN tagihan_enabled INTEGER NOT NULL DEFAULT 0;",
     ],
+    [
+      "app_wa_config",
+      "tutup_buku_enabled",
+      "ALTER TABLE app_wa_config ADD COLUMN tutup_buku_enabled INTEGER NOT NULL DEFAULT 0;",
+    ],
     // Vonis verifikasi wajah pada foto bukti (v38). Cerminan `ensure_column`
     // di `turso.rs` dan `storage.rs`.
     [
@@ -548,6 +555,23 @@ export async function runDatabaseMigrations(client: Client) {
       "nilai_penilaian",
       "id_jenis",
       "ALTER TABLE nilai_penilaian ADD COLUMN id_jenis TEXT;",
+    ],
+    // Keputusan tutup buku (v46). Cerminan `ensure_column` di `turso.rs` dan
+    // `storage.rs`.
+    [
+      "keu_tutup_buku",
+      "diputuskan_oleh",
+      "ALTER TABLE keu_tutup_buku ADD COLUMN diputuskan_oleh TEXT;",
+    ],
+    [
+      "keu_tutup_buku",
+      "diputuskan_pada",
+      "ALTER TABLE keu_tutup_buku ADD COLUMN diputuskan_pada TEXT;",
+    ],
+    [
+      "keu_tutup_buku",
+      "catatan_keputusan",
+      "ALTER TABLE keu_tutup_buku ADD COLUMN catatan_keputusan TEXT;",
     ],
   ] as const) {
     if (
@@ -687,7 +711,7 @@ export async function runDatabaseMigrations(client: Client) {
     sql: "SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'notifikasi_wa';",
   });
   const ddlNotif = String(notifDdl.rows[0]?.sql ?? "");
-  if (ddlNotif && !ddlNotif.includes("'tagihan'")) {
+  if (ddlNotif && !ddlNotif.includes("'tutup_buku'")) {
     // Irisan kolom, bukan daftar tetap (cermin `storage.rs`/`turso.rs`): tabel
     // lama bisa belum punya `klaim_oleh`/`klaim_sampai`, dan tabel yang sudah
     // punya tidak boleh kehilangan klaim pengiriman yang sedang berjalan.
@@ -716,7 +740,7 @@ export async function runDatabaseMigrations(client: Client) {
         `CREATE TABLE notifikasi_wa__rebuild (
           id_notifikasi TEXT PRIMARY KEY,
           dedupe_key TEXT NOT NULL,
-          jenis TEXT NOT NULL CHECK (jenis IN ('scan_masuk', 'scan_pulang', 'bolos', 'ambang_alfa', 'koreksi_admin', 'import_manual', 'uks', 'tagihan')),
+          jenis TEXT NOT NULL CHECK (jenis IN ('scan_masuk', 'scan_pulang', 'bolos', 'ambang_alfa', 'koreksi_admin', 'import_manual', 'uks', 'tagihan', 'tutup_buku')),
           id_siswa TEXT,
           tujuan_nomor TEXT NOT NULL,
           isi_pesan TEXT NOT NULL,
@@ -1956,6 +1980,9 @@ export async function runDatabaseMigrations(client: Client) {
       alasan_buka TEXT,
       dibuka_oleh TEXT,
       dibuka_pada TEXT,
+      diputuskan_oleh TEXT,
+      diputuskan_pada TEXT,
+      catatan_keputusan TEXT,
       created_at TEXT NOT NULL DEFAULT (datetime('now')),
       updated_at TEXT NOT NULL DEFAULT (datetime('now'))
     );
@@ -1964,6 +1991,19 @@ export async function runDatabaseMigrations(client: Client) {
     sql: `INSERT OR IGNORE INTO schema_migration (version, name, applied_at)
           VALUES (?, 'book-closing', ?);`,
     args: [BOOK_CLOSING_MIGRATION_VERSION, now],
+  });
+  // v46 — kolom keputusan tutup buku (ALTER-nya ada di daftar kolom di atas).
+  await client.execute({
+    sql: `INSERT OR IGNORE INTO schema_migration (version, name, applied_at)
+          VALUES (?, 'book-closing-decision', ?);`,
+    args: [BOOK_CLOSING_DECISION_MIGRATION_VERSION, now],
+  });
+  // v47 — pemberitahuan WhatsApp tutup buku: jenis `tutup_buku` di CHECK
+  // `notifikasi_wa.jenis` (bangun ulang di atas) dan `app_wa_config.tutup_buku_enabled`.
+  await client.execute({
+    sql: `INSERT OR IGNORE INTO schema_migration (version, name, applied_at)
+          VALUES (?, 'wa-book-closing', ?);`,
+    args: [WA_BOOK_CLOSING_MIGRATION_VERSION, now],
   });
 
   await client.execute(
@@ -1986,7 +2026,7 @@ export async function runDatabaseMigrations(client: Client) {
     CREATE TABLE IF NOT EXISTS notifikasi_wa (
       id_notifikasi TEXT PRIMARY KEY,
       dedupe_key TEXT NOT NULL,
-      jenis TEXT NOT NULL CHECK (jenis IN ('scan_masuk', 'scan_pulang', 'bolos', 'ambang_alfa', 'koreksi_admin', 'import_manual', 'uks', 'tagihan')),
+      jenis TEXT NOT NULL CHECK (jenis IN ('scan_masuk', 'scan_pulang', 'bolos', 'ambang_alfa', 'koreksi_admin', 'import_manual', 'uks', 'tagihan', 'tutup_buku')),
       id_siswa TEXT,
       tujuan_nomor TEXT NOT NULL,
       isi_pesan TEXT NOT NULL,
@@ -2018,6 +2058,7 @@ export async function runDatabaseMigrations(client: Client) {
       import_manual_enabled INTEGER NOT NULL DEFAULT 0,
       uks_enabled INTEGER NOT NULL DEFAULT 0,
       tagihan_enabled INTEGER NOT NULL DEFAULT 0,
+      tutup_buku_enabled INTEGER NOT NULL DEFAULT 0,
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL
     );

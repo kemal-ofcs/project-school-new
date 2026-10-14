@@ -148,9 +148,11 @@ html[data-theme="dark"] {
   --color-primary: var(--primary);
   --color-primary-foreground: var(--primary-foreground);
   --color-primary-container: var(--primary-container);
+  --color-primary-container-foreground: var(--primary-container-foreground);
   --color-secondary: var(--secondary);
   --color-secondary-foreground: var(--secondary-foreground);
   --color-secondary-container: var(--secondary-container);
+  --color-secondary-container-foreground: var(--secondary-container-foreground);
   --color-accent: var(--accent);
   --color-accent-foreground: var(--accent-foreground);
   --color-muted: var(--muted);
@@ -165,6 +167,8 @@ html[data-theme="dark"] {
   --color-latar-lembut: var(--latar-lembut);
   --color-garis: var(--garis);
   --color-teks: var(--teks);
+  --color-teks-utama: var(--foreground);
+  --color-kartu: var(--card);
   --color-teks-lembut: var(--teks-lembut);
   --color-aksen: var(--aksen);
   --color-aksen-teks: var(--aksen-teks);
@@ -176,6 +180,30 @@ html[data-theme="dark"] {
 }
 .pt-safe {
   padding-top: env(safe-area-inset-top, 0px);
+}
+
+/*
+ * Kartu koleksi CMS: baris terakhir yang tidak penuh diletakkan di tengah.
+ * `grid` selalu mengisi dari kiri, sehingga tiga kartu di kisi empat kolom
+ * meninggalkan sisi kanan kosong. Jumlah kolom diatur `--kolom` per titik
+ * henti (`sm:[--kolom:2]`), jadi kontainernya di layer components supaya
+ * utilitas itu menang. Aturan anaknya sengaja di luar layer supaya
+ * `height: auto` mengalahkan `h-full` kartu: tinggi 100% di dalam flex
+ * mematikan stretch, dan kartu sebaris jadi tidak sama tinggi.
+ */
+@layer components {
+  .kartu-tengah {
+    --kolom: 1;
+    --jarak: 1.5rem;
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: var(--jarak);
+  }
+}
+.kartu-tengah > * {
+  width: calc((100% - (var(--kolom) - 1) * var(--jarak)) / var(--kolom));
+  height: auto;
 }
 
 body {

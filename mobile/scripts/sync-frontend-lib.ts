@@ -34,6 +34,7 @@ const filesToCopy = [
   "lib/db-migrations.ts",
   "components/AutoAlfaRunner.tsx",
   "components/AutoWaSenderRunner.tsx",
+  "components/AutoPemberitahuanRunner.tsx",
   "components/AutoSyncRunner.tsx",
   "components/LivenessCapture.tsx",
   // UI inventaris: satu komponen untuk ketiga build. Hanya bergantung pada
@@ -70,6 +71,8 @@ const filesToCopy = [
   // Nilai akhir (N2a): tab Pengaturan Nilai dan Rekap Nilai Akhir.
   "components/nilai/PengaturanNilai.tsx",
   "components/nilai/RekapNilai.tsx",
+  // Ekspor format e-Rapor (N3).
+  "components/nilai/EksporErapor.tsx",
   "components/nilai/rekapPdf.ts",
   // UI Buku Kunjungan UKS, termasuk pemberitahuan offline dan "sinkronisasi
   // terakhir"; bergantung pada `Modal` dan gaya inventaris yang ikut tersalin.

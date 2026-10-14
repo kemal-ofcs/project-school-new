@@ -24,7 +24,7 @@ use super::{
 /// `CURRENT_SCHEMA_VERSION` di `web-desktop/src/lib/db-schema.ts` setiap kali
 /// migrasi baru ditambahkan, karena keduanya membaca tabel `schema_migration`
 /// yang sama di Turso.
-pub const CLIENT_SCHEMA_VERSION: i64 = 45;
+pub const CLIENT_SCHEMA_VERSION: i64 = 47;
 
 /// Hanya `cloud > client` yang berbahaya; `cloud <= client` adalah kondisi normal.
 fn is_client_schema_outdated(cloud_version: i64) -> bool {
@@ -1292,6 +1292,9 @@ const SNAPSHOT_TABLES: &[SnapshotTable] = &[
             "dibuka_pada",
             "created_at",
             "updated_at",
+            "diputuskan_oleh",
+            "diputuskan_pada",
+            "catatan_keputusan",
         ],
         conflict_column: "id_tutup",
         entity_column: "id_tutup",
@@ -1424,6 +1427,7 @@ pub(crate) const CANONICAL_SYNC_ROUTES: &[(&str, &str)] = &[
     ("billing-series", "save"),
     ("accounting-close", "create"),
     ("accounting-close", "reopen"),
+    ("accounting-close", "decide"),
     ("billing-type", "save"),
     ("face-template", "delete"),
     ("face-template", "save"),
@@ -1576,6 +1580,7 @@ impl SnapshotTable {
         self.entity_column
     }
 
+    #[cfg(test)]
     pub fn payload_key(&self) -> &'static str {
         self.payload_key
     }

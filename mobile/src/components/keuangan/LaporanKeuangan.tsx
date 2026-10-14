@@ -42,9 +42,11 @@ function keteranganTutup(
   const tutup = status?.riwayat
     .filter((t) => t.status === "Aktif" && t.sampai_tanggal >= sampai)
     .sort((a, b) => (a.sampai_tanggal < b.sampai_tanggal ? -1 : 1))[0];
-  return tutup
-    ? `Periode ini sudah ditutup sampai ${tanggalTampil(tutup.sampai_tanggal)} oleh ${tutup.dibuat_oleh} pada ${waktuTampil(tutup.waktu_perangkat)} (menurut jam perangkat).`
-    : undefined;
+  if (!tutup) return undefined;
+  const dasar = `Periode ini sudah ditutup sampai ${tanggalTampil(tutup.sampai_tanggal)} oleh ${tutup.dibuat_oleh} pada ${waktuTampil(tutup.waktu_perangkat)} (menurut jam perangkat).`;
+  return tutup.perlu_ditinjau
+    ? `${dasar} Angkanya sudah berubah sejak ditutup karena ada transaksi yang masuk sesudahnya; tinjau di tab Tutup Buku.`
+    : dasar;
 }
 
 const LABEL_JENIS: Record<JenisLaporan, string> = {

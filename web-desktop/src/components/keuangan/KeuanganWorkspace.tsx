@@ -39,6 +39,7 @@ import {
   getBukuBesar,
   getJurnal,
   getNeracaSaldo,
+  getStatusTutupBuku,
   type JurnalDetail,
   type JurnalItem,
   type NeracaSaldo,
@@ -118,6 +119,26 @@ export function KeuanganWorkspace() {
   }, [muatAkun]);
   useEffect(() => subscribeSyncCompleted(() => void muatAkun()), [muatAkun]);
 
+  // Tanda angka di tab Tutup Buku: versi yang menunggu keputusan ditambah
+  // tutup buku yang saldonya berubah.
+  const [perhatian, setPerhatian] = useState(0);
+  const muatPerhatian = useCallback(async () => {
+    try {
+      setPerhatian((await getStatusTutupBuku()).perlu_perhatian);
+    } catch {
+      // Hanya tanda angka; tab Tutup Buku sendiri menampilkan kegagalannya
+      // beserta tombol muat ulang saat dibuka.
+      setPerhatian(0);
+    }
+  }, []);
+  useEffect(() => {
+    void muatPerhatian();
+  }, [muatPerhatian]);
+  useEffect(
+    () => subscribeSyncCompleted(() => void muatPerhatian()),
+    [muatPerhatian],
+  );
+
   const info = (message: string) => setFeedback({ tone: "success", message });
 
   return (
@@ -143,6 +164,12 @@ export function KeuanganWorkspace() {
             }`}
           >
             {LABEL_TAB[id]}
+            {id === "tutup" && perhatian > 0 ? (
+              <span className="ml-2 rounded-full bg-amber-500 px-1.5 text-xs font-semibold text-slate-950">
+                {perhatian}
+                <span className="sr-only"> perlu ditinjau</span>
+              </span>
+            ) : null}
           </button>
         ))}
       </div>
@@ -200,7 +227,11 @@ export function KeuanganWorkspace() {
         ) : tab === "laporan" ? (
           <LaporanKeuangan akun={akun} />
         ) : tab === "tutup" ? (
-          <TutupBukuPanel bolehTutup={bolehTutup} onInfo={info} />
+          <TutupBukuPanel
+            bolehTutup={bolehTutup}
+            onInfo={info}
+            onBerubah={() => void muatPerhatian()}
+          />
         ) : (
           <PanelAkun
             akun={akun}

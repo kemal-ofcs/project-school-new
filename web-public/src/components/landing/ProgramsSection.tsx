@@ -175,7 +175,7 @@ export function ProgramsSection({
                 </Button>
               </div>
             ) : (
-              <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
+              <div className="kartu-tengah md:[--kolom:2] lg:[--kolom:3]">
                 {prodiTerfilter.map((prodi) => (
                   <SpotlightCard
                     key={prodi.kode || prodi.nama}
@@ -266,7 +266,7 @@ export function ProgramsSection({
                 </Button>
               </div>
             ) : (
-              <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
+              <div className="kartu-tengah sm:[--kolom:2] lg:[--kolom:3]">
                 {ekskulTerfilter.map((item, i) => {
                   const Icon = item.icon;
                   return (

@@ -22,7 +22,11 @@ import {
   validateHariSekolah,
   validateJenisNilai,
 } from "@/lib/validations/nilai-akhir";
-import type { KonfigurasiNilai, RekapNilaiAkhir } from "@/types/grades";
+import type {
+  BahanErapor,
+  KonfigurasiNilai,
+  RekapNilaiAkhir,
+} from "@/types/grades";
 
 /**
  * Sisi Web nilai akhir, cermin `desktop/nilai_akhir.rs`. Pesan galat wajib
@@ -656,5 +660,138 @@ export async function recap(
     nilai_kosong: nilaiKosong,
     siswa: baris,
     dicetak: String(dicetak.rows[0]?.t ?? ""),
+  };
+}
+
+// ── Ekspor e-Rapor (Fase N3) ────────────────────────────────────────────────
+
+/**
+ * Cermin `erapor`: bahan ekspor satu rombel × semester untuk semua mapel yang
+ * punya penilaian. Rata per jenis dan nilai akhir dari `recap` (rumus N2).
+ */
+export async function erapor(
+  client: Client,
+  idTahunAjaran: string,
+  semester: string,
+  idRombel: string,
+): Promise<BahanErapor> {
+  if (semester !== "Ganjil" && semester !== "Genap") {
+    throw new Error(
+      `Semester '${semester}' tidak dikenal. Gunakan Ganjil atau Genap.`,
+    );
+  }
+  if (!idRombel.trim()) throw new Error("Rombel wajib dipilih.");
+  const [tahun, rombel, mapel] = await Promise.all([
+    client.execute({
+      sql: "SELECT nama_tahun FROM akademik_tahun_ajaran WHERE id_tahun_ajaran = ?;",
+      args: [idTahunAjaran],
+    }),
+    client.execute({
+      sql: "SELECT nama_rombel, tingkat FROM akademik_rombel WHERE id_rombel = ?;",
+      args: [idRombel],
+    }),
+    client.execute({
+      sql: `SELECT p.id_mapel, COALESCE(m.kode_mapel, '') AS kode_mapel,
+                   COALESCE(m.nama_mapel, p.id_mapel) AS nama_mapel
+            FROM (SELECT DISTINCT id_mapel FROM nilai_penilaian
+                  WHERE id_tahun_ajaran = ?1 AND semester = ?2 AND id_rombel = ?3) p
+            LEFT JOIN akademik_mapel m ON m.id_mapel = p.id_mapel
+            ORDER BY COALESCE(m.kode_mapel, ''), COALESCE(m.nama_mapel, p.id_mapel), p.id_mapel
+            LIMIT 100;`,
+      args: [idTahunAjaran, semester, idRombel],
+    }),
+  ]);
+  const barisRombel = rombel.rows[0];
+  if (!barisRombel) throw new Error("Rombel tidak ditemukan.");
+  const daftar: BahanErapor["mapel"] = [];
+  for (const item of mapel.rows) {
+    const idMapel = String(item.id_mapel);
+    const args = [idTahunAjaran, semester, idRombel, idMapel];
+    const [guru, penilaian, skor] = await Promise.all([
+      client.execute({
+        sql: `SELECT DISTINCT TRIM(COALESCE(m.nama, p.id_guru)
+                     || CASE WHEN TRIM(COALESCE(g.gelar, '')) <> '' THEN ', ' || TRIM(g.gelar) ELSE '' END) AS nama
+              FROM nilai_penilaian p
+              LEFT JOIN master_data m ON m.id_unik = p.id_guru
+              LEFT JOIN guru_data g ON g.id_guru = p.id_guru
+              WHERE p.id_tahun_ajaran = ?1 AND p.semester = ?2 AND p.id_rombel = ?3 AND p.id_mapel = ?4
+              ORDER BY 1
+              LIMIT 10;`,
+        args,
+      }),
+      client.execute({
+        sql: `SELECT p.id_penilaian, ${JENIS_EFEKTIF_SQL} AS id_jenis, p.nama_penilaian, p.tanggal,
+                     p.nilai_maks, p.kkm
+              FROM nilai_penilaian p
+              WHERE p.id_tahun_ajaran = ?1 AND p.semester = ?2 AND p.id_rombel = ?3 AND p.id_mapel = ?4
+              ORDER BY p.tanggal, p.id_penilaian
+              LIMIT 500;`,
+        args,
+      }),
+      client.execute({
+        sql: `SELECT n.id_penilaian, n.id_siswa, n.skor
+              FROM nilai_siswa n
+              JOIN nilai_penilaian p ON p.id_penilaian = n.id_penilaian
+              WHERE p.id_tahun_ajaran = ?1 AND p.semester = ?2 AND p.id_rombel = ?3 AND p.id_mapel = ?4
+                AND n.skor IS NOT NULL
+              LIMIT 100000;`,
+        args,
+      }),
+    ]);
+    const rekap = await recap(
+      client,
+      idTahunAjaran,
+      semester,
+      idRombel,
+      idMapel,
+    );
+    daftar.push({
+      id_mapel: idMapel,
+      kode_mapel: String(item.kode_mapel ?? ""),
+      nama_mapel: String(item.nama_mapel ?? idMapel),
+      guru: guru.rows.map((row) => String(row.nama)).join("; "),
+      penilaian: penilaian.rows.map((row) => ({
+        id_penilaian: String(row.id_penilaian),
+        id_jenis: String(row.id_jenis),
+        nama_penilaian: String(row.nama_penilaian),
+        tanggal: String(row.tanggal),
+        nilai_maks: Number(row.nilai_maks),
+        kkm: Number(row.kkm),
+      })),
+      skor: skor.rows.map((row) => ({
+        id_penilaian: String(row.id_penilaian),
+        id_siswa: String(row.id_siswa),
+        skor: Number(row.skor),
+      })),
+      rekap: rekap.siswa.map((s) => ({
+        id_siswa: s.id_siswa,
+        nilai_akhir: s.nilai_akhir,
+        rata: Object.fromEntries(s.komponen.map((k) => [k.id_jenis, k.rata])),
+      })),
+    });
+  }
+  const [siswa, jenis, dicetak] = await Promise.all([
+    siswaBerunit(client, idRombel),
+    semuaJenis(client),
+    client.execute("SELECT datetime('now', '+7 hours') AS waktu;"),
+  ]);
+  return {
+    tahun_ajaran: String(tahun.rows[0]?.nama_tahun ?? idTahunAjaran),
+    semester,
+    rombel: String(barisRombel.nama_rombel),
+    tingkat: Number(barisRombel.tingkat),
+    dicetak: String(dicetak.rows[0]?.waktu ?? ""),
+    jenis: jenis.map((j) => ({
+      id_jenis: j.id_jenis,
+      nama: j.nama,
+      is_aktif: j.is_aktif,
+    })),
+    siswa: siswa.map((s) => ({
+      id_siswa: s.id_siswa,
+      nama: s.nama_lengkap,
+      nis: s.nis ?? "",
+      nisn: s.nisn ?? "",
+    })),
+    mapel: daftar,
   };
 }

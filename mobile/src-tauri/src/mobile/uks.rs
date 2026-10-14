@@ -584,7 +584,7 @@ fn json_ke_sql(value: &Value) -> rusqlite::types::Value {
     }
 }
 
-fn detik_sejak_sync(connection: &Connection) -> Option<i64> {
+pub fn detik_sejak_sync(connection: &Connection) -> Option<i64> {
     let terakhir: Option<i64> = connection
         .query_row(
             "SELECT updated_at FROM desktop_sync_cursor WHERE domain = 'operational';",

@@ -6,6 +6,7 @@ import { Icon } from "@/components/ui/Icon";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { hasPermission } from "@/lib/auth/access";
 import type { useAuth } from "@/lib/context/AuthContext";
+import { tanggalTampil } from "@/lib/validations/tutup-buku";
 import {
   DEFAULT_AMBANG_ALFA_DAYS,
   DEFAULT_AMBANG_ALFA_LIMIT,
@@ -18,6 +19,17 @@ export interface NotifikasiWaCardProps {
   busy: boolean;
   onSave: (draft: WaConfigDraft) => Promise<void>;
 }
+
+const NAMA_HARI_PENGINGAT = [
+  "Tidak dipakai",
+  "Senin",
+  "Selasa",
+  "Rabu",
+  "Kamis",
+  "Jumat",
+  "Sabtu",
+  "Minggu",
+];
 
 export function NotifikasiWaCard({
   user,
@@ -37,6 +49,10 @@ export function NotifikasiWaCard({
   const [importManual, setImportManual] = useState(false);
   const [uks, setUks] = useState(false);
   const [tagihan, setTagihan] = useState(false);
+  const [tutupBuku, setTutupBuku] = useState(false);
+  const [pengingatOtomatis, setPengingatOtomatis] = useState(false);
+  const [hariSebelum, setHariSebelum] = useState(3);
+  const [hariLewat, setHariLewat] = useState(1);
   const [ambangLimit, setAmbangLimit] = useState(DEFAULT_AMBANG_ALFA_LIMIT);
   const [ambangDays, setAmbangDays] = useState(DEFAULT_AMBANG_ALFA_DAYS);
   const [isDirty, setIsDirty] = useState(false);
@@ -51,6 +67,10 @@ export function NotifikasiWaCard({
       setImportManual(config.importManualEnabled);
       setUks(config.uksEnabled);
       setTagihan(config.tagihanEnabled);
+      setTutupBuku(config.tutupBukuEnabled);
+      setPengingatOtomatis(config.pengingatOtomatis ?? false);
+      setHariSebelum(config.pengingatHariSebelum ?? 3);
+      setHariLewat(config.pengingatHariLewat ?? 1);
       setAmbangLimit(config.ambangAlfaLimit ?? DEFAULT_AMBANG_ALFA_LIMIT);
       setAmbangDays(config.ambangAlfaDays ?? DEFAULT_AMBANG_ALFA_DAYS);
       setIsDirty(false);
@@ -74,6 +94,10 @@ export function NotifikasiWaCard({
       importManualEnabled: importManual,
       uksEnabled: uks,
       tagihanEnabled: tagihan,
+      tutupBukuEnabled: tutupBuku,
+      pengingatOtomatis,
+      pengingatHariSebelum: hariSebelum,
+      pengingatHariLewat: hariLewat,
       ambangAlfaLimit: ambangLimit,
       ambangAlfaDays: ambangDays,
       autoSendEnabled: config.autoSendEnabled,
@@ -444,6 +468,148 @@ export function NotifikasiWaCard({
           ) : (
             <span className="text-xs font-semibold text-slate-400">
               {tagihan ? "Aktif" : "Nonaktif"}
+            </span>
+          )}
+        </div>
+
+        {/* Pemberitahuan tutup buku */}
+        <div className="flex flex-col gap-3 rounded-2xl border border-white/10 bg-slate-950/60 p-4 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <span className="text-sm font-bold text-white">
+              Pemberitahuan Tutup Buku
+            </span>
+            <p className="text-xs text-slate-400">
+              Mengirim WhatsApp ke pemegang izin Tutup Buku saat ada versi tutup
+              buku yang menunggu keputusan, atau saat saldo periode yang sudah
+              ditutup berubah. Satu pesan per kejadian per orang. Penerimanya
+              Superadmin dan pemegang izin Tutup Buku yang nomor HP-nya terisi
+              di Master Operator. Diperiksa tiap 30 menit selama aplikasi
+              terbuka oleh pemegang izin lihat pembukuan; di Desktop dan Mobile
+              hanya bila sinkronisasi terakhir paling lama 15 menit.
+            </p>
+          </div>
+          {canManage ? (
+            <label className="relative inline-flex cursor-pointer items-center">
+              <input
+                type="checkbox"
+                checked={tutupBuku}
+                disabled={busy}
+                onChange={(e) => {
+                  setTutupBuku(e.target.checked);
+                  setIsDirty(true);
+                }}
+                className="sr-only peer"
+                id="toggle-wa-tutup-buku"
+                aria-label="Pemberitahuan tutup buku"
+              />
+              <div className="h-6 w-11 rounded-full bg-slate-800 peer peer-checked:bg-emerald-500 peer-focus:outline-none after:absolute after:top-0.5 after:left-[2px] after:h-5 after:w-5 after:rounded-full after:border after:border-slate-300 after:bg-white after:transition-all after:content-[''] peer-checked:after:translate-x-full peer-checked:after:border-white disabled:opacity-50" />
+            </label>
+          ) : (
+            <span className="text-xs font-semibold text-slate-400">
+              {tutupBuku ? "Aktif" : "Nonaktif"}
+            </span>
+          )}
+        </div>
+
+        {/* Pengingat tagihan otomatis (lanjutan K4b) */}
+        <div className="space-y-3 rounded-2xl border border-white/10 bg-slate-950/60 p-4">
+          <div>
+            <span className="text-sm font-bold text-white">
+              Pengingat Tagihan Otomatis
+            </span>
+            <p className="text-xs text-slate-400">
+              Mengantre pengingat sendiri setiap hari, tanpa menekan tombol.
+              Butuh sakelar Pengingat Tagihan Siswa di atas menyala, dan baru
+              berjalan selama aplikasi terbuka oleh pemegang izin Kelola
+              Tagihan. Paling banyak satu pesan per siswa per hari.
+            </p>
+          </div>
+          {canManage ? (
+            <>
+              <label className="flex min-h-11 items-center gap-2 text-sm text-slate-200">
+                <input
+                  type="checkbox"
+                  checked={pengingatOtomatis}
+                  disabled={busy}
+                  onChange={(e) => {
+                    setPengingatOtomatis(e.target.checked);
+                    setIsDirty(true);
+                  }}
+                />
+                Kirim pengingat otomatis
+              </label>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div>
+                  <label
+                    className="block text-xs text-slate-400"
+                    htmlFor="pengingat-hari-sebelum"
+                  >
+                    Ingatkan sebelum jatuh tempo
+                  </label>
+                  <select
+                    id="pengingat-hari-sebelum"
+                    className="mt-1 w-full rounded-xl border border-white/10 bg-slate-950 px-3 py-2 text-sm text-white"
+                    value={hariSebelum}
+                    disabled={busy}
+                    onChange={(e) => {
+                      setHariSebelum(Number(e.target.value));
+                      setIsDirty(true);
+                    }}
+                  >
+                    <option value={0}>Tidak dipakai</option>
+                    {Array.from({ length: 14 }, (_, i) => i + 1).map((n) => (
+                      <option key={n} value={n}>
+                        {n} hari sebelumnya
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label
+                    className="block text-xs text-slate-400"
+                    htmlFor="pengingat-hari-lewat"
+                  >
+                    Ingatkan yang lewat jatuh tempo setiap
+                  </label>
+                  <select
+                    id="pengingat-hari-lewat"
+                    className="mt-1 w-full rounded-xl border border-white/10 bg-slate-950 px-3 py-2 text-sm text-white"
+                    value={hariLewat}
+                    disabled={busy}
+                    onChange={(e) => {
+                      setHariLewat(Number(e.target.value));
+                      setIsDirty(true);
+                    }}
+                  >
+                    {NAMA_HARI_PENGINGAT.map((nama, n) => (
+                      <option key={nama} value={n}>
+                        {nama}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+              {!tagihan && pengingatOtomatis ? (
+                <p role="alert" className="text-xs text-amber-300">
+                  Belum berjalan: sakelar Pengingat Tagihan Siswa di atas masih
+                  mati.
+                </p>
+              ) : null}
+              {pengingatOtomatis && hariSebelum === 0 && hariLewat === 0 ? (
+                <p role="alert" className="text-xs text-amber-300">
+                  Kedua jadwal tidak dipakai, jadi tidak ada pengingat yang
+                  diantre.
+                </p>
+              ) : null}
+              <p className="text-xs text-slate-400">
+                {config?.pengingatTerakhir
+                  ? `Terakhir dijalankan ${tanggalTampil(config.pengingatTerakhir)}.`
+                  : "Belum pernah dijalankan."}
+              </p>
+            </>
+          ) : (
+            <span className="text-xs font-semibold text-slate-400">
+              {pengingatOtomatis ? "Aktif" : "Nonaktif"}
             </span>
           )}
         </div>

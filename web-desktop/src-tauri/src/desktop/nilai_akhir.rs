@@ -1177,6 +1177,160 @@ pub fn recap(
     }))
 }
 
+// ── Ekspor e-Rapor (Fase N3) ────────────────────────────────────────────────
+
+/// Bahan ekspor e-Rapor satu rombel × semester untuk SEMUA mapel yang punya
+/// penilaian. Rata per jenis dan nilai akhir diambil dari `recap` (rumus N2,
+/// keputusan E1), sehingga angka di berkas sama dengan layar Rekap Nilai;
+/// baris berkasnya sendiri disusun di klien (`validations/erapor.ts`).
+/// Cermin `erapor` di `services/nilai-akhir.ts`.
+pub fn erapor(
+    state: &DesktopState,
+    id_tahun_ajaran: &str,
+    semester: &str,
+    id_rombel: &str,
+) -> Result<Value, CommandError> {
+    if semester != "Ganjil" && semester != "Genap" {
+        return Err(invalid(format!(
+            "Semester '{semester}' tidak dikenal. Gunakan Ganjil atau Genap."
+        )));
+    }
+    if id_rombel.trim().is_empty() {
+        return Err(invalid("Rombel wajib dipilih."));
+    }
+    let connection = storage::database(&state.data_dir)?;
+    let tahun_ajaran: String = connection
+        .query_row(
+            "SELECT nama_tahun FROM akademik_tahun_ajaran WHERE id_tahun_ajaran = ?;",
+            params![id_tahun_ajaran],
+            |row| row.get(0),
+        )
+        .optional()
+        .map_err(db_error)?
+        .unwrap_or_else(|| id_tahun_ajaran.to_owned());
+    let (nama_rombel, tingkat): (String, i64) = connection
+        .query_row(
+            "SELECT nama_rombel, tingkat FROM akademik_rombel WHERE id_rombel = ?;",
+            params![id_rombel],
+            |row| Ok((row.get(0)?, row.get(1)?)),
+        )
+        .optional()
+        .map_err(db_error)?
+        .ok_or_else(|| invalid("Rombel tidak ditemukan."))?;
+    let mapel = query_json(
+        &connection,
+        "SELECT m.id_mapel, COALESCE(m.kode_mapel, '') AS kode_mapel,
+                COALESCE(m.nama_mapel, p.id_mapel) AS nama_mapel
+         FROM (SELECT DISTINCT id_mapel FROM nilai_penilaian
+               WHERE id_tahun_ajaran = ?1 AND semester = ?2 AND id_rombel = ?3) p
+         LEFT JOIN akademik_mapel m ON m.id_mapel = p.id_mapel
+         ORDER BY COALESCE(m.kode_mapel, ''), COALESCE(m.nama_mapel, p.id_mapel), p.id_mapel
+         LIMIT 100;",
+        &[&id_tahun_ajaran, &semester, &id_rombel],
+    )?;
+    let mut daftar = Vec::with_capacity(mapel.len());
+    for item in mapel {
+        let id_mapel = item["id_mapel"].as_str().unwrap_or("").to_owned();
+        let args: [&dyn rusqlite::ToSql; 4] = [&id_tahun_ajaran, &semester, &id_rombel, &id_mapel];
+        // Guru pengampu: nama + gelar, semua guru yang memberi penilaian.
+        let guru: Vec<String> = query_json(
+            &connection,
+            "SELECT DISTINCT TRIM(COALESCE(m.nama, p.id_guru)
+                    || CASE WHEN TRIM(COALESCE(g.gelar, '')) <> '' THEN ', ' || TRIM(g.gelar) ELSE '' END) AS nama
+             FROM nilai_penilaian p
+             LEFT JOIN master_data m ON m.id_unik = p.id_guru
+             LEFT JOIN guru_data g ON g.id_guru = p.id_guru
+             WHERE p.id_tahun_ajaran = ?1 AND p.semester = ?2 AND p.id_rombel = ?3 AND p.id_mapel = ?4
+             ORDER BY 1
+             LIMIT 10;",
+            &args,
+        )?
+        .into_iter()
+        .filter_map(|row| row["nama"].as_str().map(str::to_owned))
+        .collect();
+        let penilaian = query_json(
+            &connection,
+            &format!(
+                "SELECT p.id_penilaian, {JENIS_EFEKTIF_SQL} AS id_jenis, p.nama_penilaian, p.tanggal,
+                        p.nilai_maks, p.kkm
+                 FROM nilai_penilaian p
+                 WHERE p.id_tahun_ajaran = ?1 AND p.semester = ?2 AND p.id_rombel = ?3 AND p.id_mapel = ?4
+                 ORDER BY p.tanggal, p.id_penilaian
+                 LIMIT 500;"
+            ),
+            &args,
+        )?;
+        let skor = query_json(
+            &connection,
+            "SELECT n.id_penilaian, n.id_siswa, n.skor
+             FROM nilai_siswa n
+             JOIN nilai_penilaian p ON p.id_penilaian = n.id_penilaian
+             WHERE p.id_tahun_ajaran = ?1 AND p.semester = ?2 AND p.id_rombel = ?3 AND p.id_mapel = ?4
+               AND n.skor IS NOT NULL
+             LIMIT 100000;",
+            &args,
+        )?;
+        let rekap = recap(state, id_tahun_ajaran, semester, id_rombel, &id_mapel)?;
+        let ringkas: Vec<Value> = rekap["siswa"]
+            .as_array()
+            .map(|baris| {
+                baris
+                    .iter()
+                    .map(|b| {
+                        let rata: serde_json::Map<String, Value> = b["komponen"]
+                            .as_array()
+                            .map(|komponen| {
+                                komponen
+                                    .iter()
+                                    .map(|k| (k["id_jenis"].as_str().unwrap_or("").to_owned(), k["rata"].clone()))
+                                    .collect()
+                            })
+                            .unwrap_or_default();
+                        json!({ "id_siswa": b["id_siswa"], "nilai_akhir": b["nilai_akhir"], "rata": rata })
+                    })
+                    .collect()
+            })
+            .unwrap_or_default();
+        daftar.push(json!({
+            "id_mapel": id_mapel,
+            "kode_mapel": item["kode_mapel"],
+            "nama_mapel": item["nama_mapel"],
+            "guru": guru.join("; "),
+            "penilaian": penilaian,
+            "skor": skor,
+            "rekap": ringkas,
+        }));
+    }
+    let siswa: Vec<Value> = siswa_berunit(&connection, Some(id_rombel))?
+        .into_iter()
+        .map(|s| {
+            json!({
+                "id_siswa": s["id_siswa"],
+                "nama": s["nama_lengkap"],
+                "nis": s["nis"].as_str().unwrap_or(""),
+                "nisn": s["nisn"].as_str().unwrap_or(""),
+            })
+        })
+        .collect();
+    let jenis: Vec<Value> = semua_jenis(&connection)?
+        .into_iter()
+        .map(|row| json!({ "id_jenis": row["id_jenis"], "nama": row["nama"], "is_aktif": row["is_aktif"] }))
+        .collect();
+    let dicetak: String = connection
+        .query_row("SELECT datetime('now', '+7 hours');", [], |row| row.get(0))
+        .map_err(db_error)?;
+    Ok(json!({
+        "tahun_ajaran": tahun_ajaran,
+        "semester": semester,
+        "rombel": nama_rombel,
+        "tingkat": tingkat,
+        "dicetak": dicetak,
+        "jenis": jenis,
+        "siswa": siswa,
+        "mapel": daftar,
+    }))
+}
+
 // ── Penerapan event di cloud ────────────────────────────────────────────────
 
 pub const CLOUD_UPSERT_GRADE_TYPE_SQL: &str = "INSERT INTO nilai_jenis (
@@ -1653,5 +1807,58 @@ mod tests {
             .expect("hapus penanda");
         pulihkan_tarikan_jenis(&connection).expect("pemulihan pertama");
         assert_eq!(ada(&connection), 0);
+    }
+
+    #[test]
+    fn bahan_erapor_dari_rekap_n2() {
+        let (_dir, state) = state_uji();
+        let connection = storage::database(&state.data_dir).expect("db");
+        connection.execute_batch(SEED_SKENARIO).expect("seed");
+        connection
+            .execute_batch(
+                "UPDATE siswa_data SET nis = '1001', nisn = '0012345678' WHERE id_siswa = 'S1';
+                 INSERT INTO master_data (id_unik, kode_karyawan, nama, divisi, id_shift, jenis_personil, status_aktif)
+                   VALUES ('g', 'G1', 'Budi Santoso', 'Guru', 1, 'GURU', 'Aktif');
+                 INSERT INTO guru_data (id_guru, gelar, created_at, updated_at) VALUES ('g', 'S.Kom.', 'x', 'x');",
+            )
+            .expect("data tambahan");
+        save_weights(
+            &state,
+            json!(0),
+            vec![
+                json!({ "id_jenis": "jns-tugas", "bobot": 50 }),
+                json!({ "id_jenis": "jns-uts", "bobot": 50 }),
+            ],
+        )
+        .expect("bobot");
+
+        let data = erapor(&state, "ta1", "Ganjil", "r7").expect("erapor");
+        assert_eq!(data["tahun_ajaran"], json!("2026/2027"));
+        assert_eq!((data["rombel"].clone(), data["tingkat"].clone()), (json!("VII A"), json!(7)));
+        let mapel = data["mapel"].as_array().expect("mapel");
+        assert_eq!(mapel.len(), 1, "hanya mapel yang punya penilaian");
+        assert_eq!(mapel[0]["kode_mapel"], json!("MTK"));
+        assert_eq!(mapel[0]["guru"], json!("Budi Santoso, S.Kom."));
+        assert_eq!(mapel[0]["penilaian"].as_array().expect("penilaian").len(), 3);
+        assert_eq!(mapel[0]["skor"].as_array().expect("skor").len(), 5);
+        let rekap = |id: &str| {
+            mapel[0]["rekap"]
+                .as_array()
+                .expect("rekap")
+                .iter()
+                .find(|b| b["id_siswa"] == id)
+                .cloned()
+                .expect("siswa")
+        };
+        assert_eq!(rekap("S1")["nilai_akhir"], json!(75));
+        assert_eq!(rekap("S1")["rata"]["jns-tugas"], json!(80.0));
+        assert_eq!(rekap("S2")["nilai_akhir"], json!(78));
+        let siswa = data["siswa"].as_array().expect("siswa");
+        assert_eq!(siswa[0]["nisn"], json!("0012345678"));
+        assert_eq!(siswa[1]["nisn"], json!(""));
+        assert_eq!(
+            erapor(&state, "ta1", "Ganjil", "tidak-ada").expect_err("rombel").message,
+            "Rombel tidak ditemukan."
+        );
     }
 }

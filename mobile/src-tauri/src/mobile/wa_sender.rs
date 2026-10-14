@@ -217,7 +217,7 @@ fn int(row: &HashMap<String, Value>, key: &str, fallback: i64) -> i64 {
 async fn read_config(turso: &TursoClient) -> Result<Option<WaConfig>, CommandError> {
     let Some(row) = turso
         .query_one(
-            "SELECT provider, api_key, api_url, sender_number, is_active, daily_limit, scan_masuk_enabled, scan_pulang_enabled, bolos_enabled, ambang_alfa_enabled, koreksi_admin_enabled, import_manual_enabled, uks_enabled, tagihan_enabled FROM app_wa_config WHERE id = 'default' LIMIT 1;",
+            "SELECT provider, api_key, api_url, sender_number, is_active, daily_limit, scan_masuk_enabled, scan_pulang_enabled, bolos_enabled, ambang_alfa_enabled, koreksi_admin_enabled, import_manual_enabled, uks_enabled, tagihan_enabled, tutup_buku_enabled FROM app_wa_config WHERE id = 'default' LIMIT 1;",
             vec![],
         )
         .await?
@@ -237,6 +237,7 @@ async fn read_config(turso: &TursoClient) -> Result<Option<WaConfig>, CommandErr
         ("import_manual", flag("import_manual_enabled", 0)),
         ("uks", flag("uks_enabled", 0)),
         ("tagihan", flag("tagihan_enabled", 0)),
+        ("tutup_buku", flag("tutup_buku_enabled", 0)),
     ]
     .into_iter()
     .map(|(jenis, on)| (jenis.to_owned(), on))

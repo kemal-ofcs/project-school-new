@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { EksporErapor } from "@/components/nilai/EksporErapor";
 import { buatRekapPdf } from "@/components/nilai/rekapPdf";
 import { saveFileWithPicker } from "@/lib/client/download";
 import { saveWorkbook } from "@/lib/client/xlsx";
@@ -40,21 +41,37 @@ function catatanBolos(
     .join("; ");
 }
 
-export function RekapNilai({
-  idTahunAjaran,
-  semester,
-  idRombel,
-  idMapel,
-  namaRombel,
-  namaTahun,
-}: {
+interface PropsRekap {
   idTahunAjaran: string;
   semester: string;
   idRombel: string;
   idMapel: string;
   namaRombel: string;
   namaTahun: string;
-}) {
+}
+
+/** Ekspor e-Rapor (N3) cukup butuh rombel; rekap per mapel di bawahnya. */
+export function RekapNilai(props: PropsRekap) {
+  return (
+    <div className="space-y-4">
+      <EksporErapor
+        idTahunAjaran={props.idTahunAjaran}
+        semester={props.semester}
+        idRombel={props.idRombel}
+      />
+      <RekapIsi {...props} />
+    </div>
+  );
+}
+
+function RekapIsi({
+  idTahunAjaran,
+  semester,
+  idRombel,
+  idMapel,
+  namaRombel,
+  namaTahun,
+}: PropsRekap) {
   const [data, setData] = useState<RekapNilaiAkhir | null>(null);
   const [galat, setGalat] = useState<string | null>(null);
   const [memuat, setMemuat] = useState(false);

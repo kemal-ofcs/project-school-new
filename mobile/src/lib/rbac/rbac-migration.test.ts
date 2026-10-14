@@ -143,6 +143,10 @@ describe("dynamic RBAC migration", () => {
       44,
       // v45 — tutup buku (`keu_tutup_buku`).
       45,
+      // v46 — keputusan tutup buku.
+      46,
+      // v47 — pemberitahuan WhatsApp tutup buku.
+      47,
     ]);
 
     const sessionColumns = await client.execute(

@@ -21,6 +21,7 @@ const bodySchema = z
     idJenisTagihan: z.string().max(160).nullish(),
     idRombel: z.string().max(160).nullish(),
     status: z.string().max(20).nullish(),
+    jatuhTempo: z.enum(["lewat", "segera", "belum"]).nullish(),
   })
   .strict();
 
@@ -42,6 +43,7 @@ export async function POST(request: NextRequest) {
         id_jenis_tagihan: parsed.data.idJenisTagihan,
         id_rombel: parsed.data.idRombel,
         status: parsed.data.status,
+        jatuh_tempo: parsed.data.jatuhTempo,
       }),
     );
   } catch (error) {

@@ -8,10 +8,18 @@ import {
 } from "@/lib/operators/contact";
 import { ApiRequestError } from "@/lib/server/http/api-response";
 import {
+  clampPengingatHariLewat,
+  clampPengingatHariSebelum,
   composeWaMessage,
+  DEFAULT_PENGINGAT_HARI_LEWAT,
+  DEFAULT_PENGINGAT_HARI_SEBELUM,
   isValidWaNotificationStatus,
   isWaNotificationKind,
   isWaTemplateKind,
+  PENGINGAT_HARI_LEWAT_KEY,
+  PENGINGAT_HARI_SEBELUM_KEY,
+  PENGINGAT_OTOMATIS_KEY,
+  PENGINGAT_TERAKHIR_KEY,
   parseAmbangAlfaDays,
   parseAmbangAlfaLimit,
   settingEnabled,
@@ -28,6 +36,7 @@ import {
   WA_NOTIFY_SCAN_MASUK_KEY,
   WA_NOTIFY_SCAN_PULANG_KEY,
   WA_NOTIFY_TAGIHAN_KEY,
+  WA_NOTIFY_TUTUP_BUKU_KEY,
   WA_NOTIFY_UKS_KEY,
   WA_TEMPLATE_KINDS,
   WA_TEMPLATE_LABELS,
@@ -314,7 +323,7 @@ export async function getWaConfig(client: Client): Promise<WaConfig> {
       SELECT id, provider, api_key, api_url, sender_number, is_active, daily_limit,
              scan_masuk_enabled, scan_pulang_enabled, bolos_enabled, ambang_alfa_enabled,
       koreksi_admin_enabled, import_manual_enabled, uks_enabled, tagihan_enabled,
-             created_at, updated_at
+             tutup_buku_enabled, created_at, updated_at
       FROM app_wa_config
       WHERE id = 'default'
       LIMIT 1;
@@ -363,9 +372,13 @@ export async function getWaConfig(client: Client): Promise<WaConfig> {
       importManualEnabled: false,
       uksEnabled: false,
       tagihanEnabled: false,
+      tutupBukuEnabled: false,
       ambangAlfaLimit,
       ambangAlfaDays,
       autoSendEnabled: settingEnabled(settingsMap.get(WA_AUTO_SEND_KEY)),
+      pengingatOtomatis: false,
+      pengingatHariSebelum: DEFAULT_PENGINGAT_HARI_SEBELUM,
+      pengingatHariLewat: DEFAULT_PENGINGAT_HARI_LEWAT,
       createdAt: "",
       updatedAt: "",
     };
@@ -373,11 +386,15 @@ export async function getWaConfig(client: Client): Promise<WaConfig> {
 
   const rawKey = row.api_key == null ? "" : String(row.api_key).trim();
   const settingsRes = await client.execute({
-    sql: "SELECT key, value FROM setting_gex_system WHERE key IN (?, ?, ?);",
+    sql: "SELECT key, value FROM setting_gex_system WHERE key IN (?, ?, ?, ?, ?, ?, ?);",
     args: [
       WA_NOTIFY_AMBANG_ALFA_LIMIT_KEY,
       WA_NOTIFY_AMBANG_ALFA_DAYS_KEY,
       WA_AUTO_SEND_KEY,
+      PENGINGAT_OTOMATIS_KEY,
+      PENGINGAT_HARI_SEBELUM_KEY,
+      PENGINGAT_HARI_LEWAT_KEY,
+      PENGINGAT_TERAKHIR_KEY,
     ],
   });
   const settingsMap = new Map<string, string>();
@@ -409,9 +426,18 @@ export async function getWaConfig(client: Client): Promise<WaConfig> {
     importManualEnabled: Number(row.import_manual_enabled ?? 0) === 1,
     uksEnabled: Number(row.uks_enabled ?? 0) === 1,
     tagihanEnabled: Number(row.tagihan_enabled ?? 0) === 1,
+    tutupBukuEnabled: Number(row.tutup_buku_enabled ?? 0) === 1,
     ambangAlfaLimit,
     ambangAlfaDays,
     autoSendEnabled: settingEnabled(settingsMap.get(WA_AUTO_SEND_KEY)),
+    pengingatOtomatis: settingEnabled(settingsMap.get(PENGINGAT_OTOMATIS_KEY)),
+    pengingatHariSebelum: settingsMap.has(PENGINGAT_HARI_SEBELUM_KEY)
+      ? clampPengingatHariSebelum(settingsMap.get(PENGINGAT_HARI_SEBELUM_KEY))
+      : DEFAULT_PENGINGAT_HARI_SEBELUM,
+    pengingatHariLewat: settingsMap.has(PENGINGAT_HARI_LEWAT_KEY)
+      ? clampPengingatHariLewat(settingsMap.get(PENGINGAT_HARI_LEWAT_KEY))
+      : DEFAULT_PENGINGAT_HARI_LEWAT,
+    pengingatTerakhir: settingsMap.get(PENGINGAT_TERAKHIR_KEY)?.trim() || null,
     createdAt: row.created_at != null ? String(row.created_at) : "",
     updatedAt: row.updated_at != null ? String(row.updated_at) : "",
   };
@@ -447,8 +473,8 @@ export async function saveWaConfig(
         id, provider, api_key, api_url, sender_number, is_active, daily_limit,
         scan_masuk_enabled, scan_pulang_enabled, bolos_enabled, ambang_alfa_enabled,
         koreksi_admin_enabled, import_manual_enabled, uks_enabled, tagihan_enabled,
-        created_at, updated_at
-      ) VALUES ('default', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))
+        tutup_buku_enabled, created_at, updated_at
+      ) VALUES ('default', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))
       ON CONFLICT(id) DO UPDATE SET
         provider = excluded.provider,
         api_key = excluded.api_key,
@@ -464,6 +490,7 @@ export async function saveWaConfig(
         import_manual_enabled = excluded.import_manual_enabled,
         uks_enabled = excluded.uks_enabled,
         tagihan_enabled = excluded.tagihan_enabled,
+        tutup_buku_enabled = excluded.tutup_buku_enabled,
         updated_at = datetime('now');
     `,
     args: [
@@ -481,6 +508,7 @@ export async function saveWaConfig(
       draft.importManualEnabled ? 1 : 0,
       draft.uksEnabled ? 1 : 0,
       draft.tagihanEnabled ? 1 : 0,
+      draft.tutupBukuEnabled ? 1 : 0,
     ],
   };
 
@@ -501,6 +529,7 @@ export async function saveWaConfig(
       ],
       [WA_NOTIFY_UKS_KEY, draft.uksEnabled ? "true" : "false"],
       [WA_NOTIFY_TAGIHAN_KEY, draft.tagihanEnabled ? "true" : "false"],
+      [WA_NOTIFY_TUTUP_BUKU_KEY, draft.tutupBukuEnabled ? "true" : "false"],
       [
         WA_NOTIFY_AMBANG_ALFA_LIMIT_KEY,
         String(parseAmbangAlfaLimit(draft.ambangAlfaLimit)),
@@ -510,6 +539,23 @@ export async function saveWaConfig(
         String(parseAmbangAlfaDays(draft.ambangAlfaDays)),
       ],
       [WA_AUTO_SEND_KEY, draft.autoSendEnabled ? "true" : "false"],
+      [PENGINGAT_OTOMATIS_KEY, draft.pengingatOtomatis ? "true" : "false"],
+      [
+        PENGINGAT_HARI_SEBELUM_KEY,
+        String(
+          clampPengingatHariSebelum(
+            draft.pengingatHariSebelum ?? DEFAULT_PENGINGAT_HARI_SEBELUM,
+          ),
+        ),
+      ],
+      [
+        PENGINGAT_HARI_LEWAT_KEY,
+        String(
+          clampPengingatHariLewat(
+            draft.pengingatHariLewat ?? DEFAULT_PENGINGAT_HARI_LEWAT,
+          ),
+        ),
+      ],
     ] as const
   ).map(([key, val]) => ({
     sql: `
