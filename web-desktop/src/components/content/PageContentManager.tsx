@@ -17,6 +17,7 @@ import {
   simpanKontenHalaman,
 } from "@/lib/gateways/content";
 import { CollectionRepeater } from "./CollectionRepeater";
+import { FotoJurusanEditor } from "./FotoJurusanEditor";
 import { HeroImageUploader } from "./HeroImageUploader";
 
 export function PageContentManager() {
@@ -208,7 +209,13 @@ export function PageContentManager() {
                       ℹ️ {field.description}
                     </p>
                   ) : null}
-                  {field.type === "image" ? (
+                  {field.type === "foto_jurusan" ? (
+                    <FotoJurusanEditor
+                      value={value}
+                      onChange={(val) => handleFieldChange(field.key, val)}
+                      disabled={!canManage}
+                    />
+                  ) : field.type === "image" ? (
                     <HeroImageUploader
                       value={value}
                       onChange={(val) => handleFieldChange(field.key, val)}

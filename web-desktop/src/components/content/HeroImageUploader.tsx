@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { Icon } from "@/components/ui/Icon";
-import { optimizeImageFile } from "@/lib/client/image-optimizer";
+import { siapkanFotoKonten, usePratinjauGambar } from "./GambarKontenInput";
 
 interface HeroImageUploaderProps {
   value: string | undefined | null;
@@ -20,47 +20,24 @@ export function HeroImageUploader({
 
   const hasImage = Boolean(value && value.trim().length > 0);
 
+  const pratinjau = usePratinjauGambar(value);
+
+  // Foto disimpan di `konten_gambar` dan field ini hanya memegang id-nya, jadi
+  // situs publik menyajikannya sebagai berkas ber-cache, bukan menyisipkan
+  // data URL ke HTML beranda pada setiap kunjungan. Data URL lama (sebelum
+  // v48) tetap tampil sampai foto diunggah ulang.
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     e.target.value = "";
     if (!file) return;
 
-    if (!["image/jpeg", "image/png", "image/webp"].includes(file.type)) {
-      setError("Format file harus berupa gambar JPEG, PNG, atau WebP.");
-      return;
-    }
-
-    if (file.size > 5 * 1024 * 1024) {
-      setError("Ukuran file gambar maksimal 5 MB sebelum kompresi.");
-      return;
-    }
-
     setIsProcessing(true);
     setError(null);
-
     try {
-      const { dataUrl } = await optimizeImageFile(file, {
-        maxWidth: 1920,
-        maxHeight: 1080,
-        quality: 0.82,
-        mimeType: "image/jpeg",
-        fit: "contain",
-      });
-
-      if (dataUrl.length > 2_000_000) {
-        setError(
-          "Gambar masih terlalu besar setelah dikompres. Silakan pilih foto dengan resolusi lebih rendah.",
-        );
-        return;
-      }
-
-      onChange(dataUrl);
-      setError(null);
+      onChange(await siapkanFotoKonten(file));
     } catch (err) {
       setError(
-        err instanceof Error
-          ? err.message
-          : "Gagal memproses gambar latar hero.",
+        err instanceof Error ? err.message : "Gagal memproses foto latar hero.",
       );
     } finally {
       setIsProcessing(false);
@@ -104,7 +81,7 @@ export function HeroImageUploader({
           <div className="relative aspect-video w-full max-w-md overflow-hidden rounded-xl border border-white/15 shadow-md">
             {/* biome-ignore lint/performance/noImgElement: user uploaded data url preview */}
             <img
-              src={value || ""}
+              src={pratinjau || ""}
               alt="Pratinjau Foto Latar Hero"
               className="h-full w-full object-cover"
             />
@@ -136,7 +113,7 @@ export function HeroImageUploader({
             Belum ada foto latar khusus
           </p>
           <p className="text-[10px] text-slate-500 mt-0.5">
-            Halaman publik saat ini memakai animasi gradien dinamis sekolah.
+            Hero situs publik saat ini memakai warna sekolah.
           </p>
         </div>
       )}
@@ -184,7 +161,7 @@ export function HeroImageUploader({
             className="inline-flex items-center gap-1.5 rounded-xl border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-xs font-bold text-rose-300 hover:bg-rose-500/20 transition active:scale-95"
           >
             <Icon name="trash" className="size-3.5" />
-            <span>Hapus Foto (Kembali ke Gradien)</span>
+            <span>Hapus Foto</span>
           </button>
         ) : null}
       </div>

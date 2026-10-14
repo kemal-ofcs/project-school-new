@@ -120,9 +120,10 @@ export default async function HalamanPmb() {
       <section className="mt-10">
         <h2 className="font-semibold text-xl">Program yang dibuka</h2>
         <p className="mt-3 text-sm text-teks-lembut leading-relaxed">
-          Daftar program keahlian beserta penjelasannya tersedia di{" "}
+          Program, fasilitas, dan kegiatan sekolah beserta penjelasannya
+          tersedia di{" "}
           <Link className="text-aksen hover:underline" href="/program">
-            halaman Program Keahlian
+            halaman Program
           </Link>
           .
         </p>

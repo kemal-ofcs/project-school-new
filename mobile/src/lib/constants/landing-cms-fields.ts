@@ -10,7 +10,8 @@
 export interface CmsFieldConfig {
   key: string;
   label: string;
-  type: "text" | "textarea" | "image";
+  /** `foto_jurusan`: peta JSON `{kode_jurusan: id foto}`, editornya `FotoJurusanEditor`. */
+  type: "text" | "textarea" | "image" | "foto_jurusan";
   placeholder: string;
   rows?: number;
   description?: string;
@@ -134,6 +135,40 @@ export const HALAMAN_CMS: Record<
         type: "text",
         placeholder: "Senin - Jumat, 07:00 - 16:00 WIB",
       },
+      {
+        key: "kontak.instagram",
+        label: "Alamat Instagram",
+        type: "text",
+        placeholder: "https://instagram.com/akun.sekolah",
+        description:
+          "Alamat lengkap diawali https://. Media sosial yang diisi tampil di footer dan halaman Kontak.",
+      },
+      {
+        key: "kontak.facebook",
+        label: "Alamat Facebook",
+        type: "text",
+        placeholder: "https://facebook.com/akun.sekolah",
+      },
+      {
+        key: "kontak.youtube",
+        label: "Alamat YouTube",
+        type: "text",
+        placeholder: "https://youtube.com/@akun.sekolah",
+      },
+      {
+        key: "kontak.tiktok",
+        label: "Alamat TikTok",
+        type: "text",
+        placeholder: "https://tiktok.com/@akun.sekolah",
+      },
+      {
+        key: "kontak.galeri_url",
+        label: "Tautan Galeri Foto",
+        type: "text",
+        placeholder: "https://instagram.com/akun.sekolah",
+        description:
+          'Tujuan tombol "Lihat foto lainnya" di bagian Fasilitas dan Ekstrakurikuler. Bila kosong, tombol memakai alamat Instagram.',
+      },
     ],
   },
   program: {
@@ -179,11 +214,11 @@ export const LANDING_PAGE_SUBSECTIONS: CmsSubSectionConfig[] = [
         type: "image",
         placeholder: "Pilih foto kampus atau gedung sekolah",
         description:
-          "Foto gedung atau kampus sekolah (rasio landscape 16:9). Bila dikosongkan, halaman menggunakan animasi gradien sekolah.",
+          "Foto gedung atau kampus sekolah (rasio landscape 16:9). Bila dikosongkan, hero memakai warna sekolah.",
       },
       {
         key: "landing.hero_badge",
-        label: "Badge Pill Atas (Akreditasi & Nama Sekolah)",
+        label: "Label Kecil di Atas Judul",
         type: "text",
         placeholder: "Akreditasi A Unggul (BAN-SM)",
       },
@@ -278,10 +313,18 @@ export const LANDING_PAGE_SUBSECTIONS: CmsSubSectionConfig[] = [
   },
   {
     id: "extracurricular",
-    title: "Ekstrakurikuler Unggulan",
+    title: "Jurusan & Ekstrakurikuler",
     description:
-      "Klub dan kegiatan kesiswaan pada tab Ekstrakurikuler di landing page. Jurusan dikelola di menu Akademik.",
+      "Foto jurusan dan daftar ekstrakurikuler di landing page. Nama dan deskripsi jurusan dikelola di menu Akademik.",
     fields: [
+      {
+        key: "landing.jurusan_foto",
+        label: "Foto Jurusan",
+        type: "foto_jurusan",
+        placeholder: "",
+        description:
+          "Satu foto per jurusan aktif. Jurusan tanpa foto tampil dengan ikon.",
+      },
       {
         key: "landing.ekskul_eyebrow",
         label: "Eyebrow Bagian",
@@ -415,7 +458,7 @@ export interface KoleksiLandingConfig {
   fields: {
     name: string;
     label: string;
-    type?: "text" | "textarea";
+    type?: "text" | "textarea" | "gambar";
     placeholder?: string;
     multiline?: boolean;
   }[];
@@ -469,6 +512,7 @@ export const KOLEKSI_LANDING: Record<string, KoleksiLandingConfig> = {
       { name: "title", label: "Nama Kegiatan" },
       { name: "category", label: "Kategori" },
       { name: "desc", label: "Deskripsi", type: "textarea" },
+      { name: "foto", label: "Foto Kegiatan", type: "gambar" },
     ],
     // Ejaan kunci lamanya `_cat`, sedangkan field koleksinya `category`.
     lama: {
@@ -486,6 +530,7 @@ export const KOLEKSI_LANDING: Record<string, KoleksiLandingConfig> = {
       { name: "tag", label: "Label Kecil (tag)" },
       { name: "desc", label: "Deskripsi Singkat", type: "textarea" },
       { name: "specs", label: "Spesifikasi", multiline: true },
+      { name: "foto", label: "Foto Fasilitas", type: "gambar" },
     ],
     lama: {
       awalan: "fasilitas",

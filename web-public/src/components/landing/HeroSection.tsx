@@ -10,6 +10,7 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { AnimatedCounter } from "@/components/visual/AnimatedCounter";
 import { PmbCountdown } from "@/components/visual/PmbCountdown";
+import { srcGambarKonten } from "@/lib/services/gambar-konten";
 import { koleksiStat } from "@/lib/services/landing-collections";
 import type { GelombangAktif } from "@/lib/services/pmb";
 
@@ -30,7 +31,7 @@ export function HeroSection({
   const heroTitle = konten["landing.hero_title"] || namaSekolah;
   const heroSubtitle = konten["landing.hero_subtitle"];
   const heroBadge = konten["landing.hero_badge"];
-  const heroImage = konten["landing.hero_image"];
+  const heroImage = srcGambarKonten(konten["landing.hero_image"]);
 
   // Ikon tetap di kode karena ia komponen React; paletnya diputar berdasarkan
   // posisi sehingga kartu ke-N tetap punya ikon.
@@ -40,7 +41,7 @@ export function HeroSection({
     Ikon: IKON_STAT[i % IKON_STAT.length],
   }));
 
-  const hasCustomHeroImage = Boolean(heroImage && heroImage.trim().length > 0);
+  const hasCustomHeroImage = heroImage !== null;
 
   return (
     <section className="relative overflow-hidden bg-primary text-primary-foreground py-14 sm:py-20 lg:py-28 border-b border-primary-container">
@@ -52,8 +53,10 @@ export function HeroSection({
         >
           {/* biome-ignore lint/performance/noImgElement: user uploaded data url or photo */}
           <img
-            src={heroImage}
+            src={heroImage ?? ""}
             alt=""
+            fetchPriority="high"
+            decoding="async"
             className="h-full w-full object-cover object-center"
           />
           {/* Lapisan Gradien Elegan: Foto sekolah tetap jelas dan hidup, teks tetap kontras tajam */}

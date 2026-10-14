@@ -10,6 +10,7 @@ import { StatusTidakTerbaca } from "@/components/StatusData";
 import { muatKontenHalaman } from "@/lib/server/content-data";
 import { muatGelombangAktif } from "@/lib/server/pmb-data";
 import { muatProfilSekolah, muatProgramStudi } from "@/lib/server/school-data";
+import { tautanGaleri } from "@/lib/services/gambar-konten";
 import { namaTampil } from "@/lib/services/school-profile";
 
 /**
@@ -21,12 +22,15 @@ export const revalidate = 0;
 
 export default async function Beranda() {
   // Pemuatan data paralel dari database Turso
-  const [hasilProfil, hasilProgram, hasilGelombang, hasilKonten] =
+  // `kontak` sudah dimuat layout untuk footer; `cache()` membuat panggilan
+  // ini tidak menambah perjalanan ke database.
+  const [hasilProfil, hasilProgram, hasilGelombang, hasilKonten, hasilKontak] =
     await Promise.all([
       muatProfilSekolah(),
       muatProgramStudi(),
       muatGelombangAktif(),
       muatKontenHalaman("landing"),
+      muatKontenHalaman("kontak"),
     ]);
 
   if (hasilProfil.status !== "ok") {
@@ -43,6 +47,9 @@ export default async function Beranda() {
   const gelombangAktif =
     hasilGelombang.status === "ok" ? hasilGelombang.data : null;
   const kontenLanding = hasilKonten.status === "ok" ? hasilKonten.data : {};
+  const galeri = tautanGaleri(
+    hasilKontak.status === "ok" ? hasilKontak.data : {},
+  );
 
   return (
     <main className="flex flex-col w-full">
@@ -64,10 +71,14 @@ export default async function Beranda() {
       <PillarsSection profil={profil} konten={kontenLanding} />
 
       {/* 3. Program Keahlian / Jurusan (Dari DB) & Ekstrakurikuler */}
-      <ProgramsSection programStudi={programStudi} konten={kontenLanding} />
+      <ProgramsSection
+        programStudi={programStudi}
+        konten={kontenLanding}
+        galeri={galeri}
+      />
 
       {/* 4. Fasilitas Kampus Unggulan dengan Modal Preview */}
-      <FacilitiesSection konten={kontenLanding} />
+      <FacilitiesSection konten={kontenLanding} galeri={galeri} />
 
       {/* 5. Alur PMB 4 Tahapan & Rincian Gelombang Aktif */}
       <PmbOverviewSection

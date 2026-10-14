@@ -23,6 +23,7 @@ import {
 } from "@/components/ui/dialog";
 import { SpotlightCard } from "@/components/visual/SpotlightCard";
 import { koleksiFasilitas } from "@/lib/services/landing-collections";
+import { FotoKartu, TautanGaleri, type TautanGaleriData } from "./FotoKartu";
 
 /**
  * Ikon fasilitas diputar berdasarkan posisi. Ia komponen React sehingga tidak
@@ -32,9 +33,16 @@ const IKON_FASILITAS = [Tv, Cpu, BookOpen, Dumbbell, Radio, Building2];
 
 interface FacilitiesSectionProps {
   konten?: Record<string, string>;
+  galeri?: TautanGaleriData | null;
+  /** Pengganti judul CMS beranda, dipakai halaman Program. */
+  kepala?: React.ReactNode;
 }
 
-export function FacilitiesSection({ konten = {} }: FacilitiesSectionProps) {
+export function FacilitiesSection({
+  konten = {},
+  galeri = null,
+  kepala,
+}: FacilitiesSectionProps) {
   // Seluruh teksnya dari CMS; tidak ada teks contoh di kode.
   const eyebrow = konten["landing.fasilitas_eyebrow"];
   const title = konten["landing.fasilitas_title"];
@@ -46,6 +54,7 @@ export function FacilitiesSection({ konten = {} }: FacilitiesSectionProps) {
     tag: item.tag,
     shortDesc: item.desc,
     specs: item.specs,
+    foto: item.foto,
   }));
 
   const [selectedFacility, setSelectedFacility] = React.useState<
@@ -57,12 +66,15 @@ export function FacilitiesSection({ konten = {} }: FacilitiesSectionProps) {
   // dipanggil berubah begitu fasilitas pertama diisi dan React menjatuhkan
   // seluruh halaman depan.
   if (facilitiesList.length === 0) return null;
+  const adaFoto = facilitiesList.some((item) => item.foto);
   const adaHeader = Boolean(eyebrow || title || subtitle);
 
   return (
     <section className="muncul py-20 sm:py-28 bg-background">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 space-y-12">
-        {adaHeader ? (
+        {kepala ? (
+          kepala
+        ) : adaHeader ? (
           <div className="text-center max-w-2xl mx-auto space-y-3">
             {eyebrow ? (
               <div className="inline-flex items-center gap-1.5 text-xs font-bold uppercase tracking-widest text-secondary">
@@ -89,12 +101,23 @@ export function FacilitiesSection({ konten = {} }: FacilitiesSectionProps) {
             const Icon = item.icon;
             return (
               <SpotlightCard key={`${i}-${item.name}`} className="h-full">
-                <Card className="group flex flex-col justify-between h-full p-6 transition-all duration-300 hover:shadow-lg bg-card border-border">
+                <Card className="group flex flex-col justify-between h-full overflow-hidden p-6 transition-colors duration-300 hover:border-primary/40 bg-card border-border">
                   <div className="space-y-4">
+                    <FotoKartu
+                      id={item.foto}
+                      alt={item.name}
+                      ikon={
+                        adaFoto ? <Icon className="h-12 w-12" /> : undefined
+                      }
+                    />
                     <div className="flex items-center justify-between">
-                      <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10 text-primary group-hover:bg-primary group-hover:text-primary-foreground transition-colors">
-                        <Icon className="h-6 w-6" />
-                      </div>
+                      {adaFoto ? (
+                        <span />
+                      ) : (
+                        <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10 text-primary group-hover:bg-primary group-hover:text-primary-foreground transition-colors">
+                          <Icon className="h-6 w-6" />
+                        </div>
+                      )}
                       {item.tag ? (
                         <Badge variant="outline" className="text-[11px]">
                           {item.tag}
@@ -156,6 +179,8 @@ export function FacilitiesSection({ konten = {} }: FacilitiesSectionProps) {
             );
           })}
         </div>
+
+        <TautanGaleri tautan={galeri} />
 
         {/* Interactive Facility Modal Dialog */}
         <Dialog

@@ -58,6 +58,7 @@ const WA_BILLING_REMINDER_MIGRATION_VERSION = 44;
 const BOOK_CLOSING_MIGRATION_VERSION = 45;
 const BOOK_CLOSING_DECISION_MIGRATION_VERSION = 46;
 const WA_BOOK_CLOSING_MIGRATION_VERSION = 47;
+const CONTENT_IMAGE_MIGRATION_VERSION = 48;
 
 /**
  * v21 — aturan jam scan baru: Jam Kerja Normal = (Jam Pulang − Jam Masuk) −
@@ -2005,6 +2006,12 @@ export async function runDatabaseMigrations(client: Client) {
           VALUES (?, 'wa-book-closing', ?);`,
     args: [WA_BOOK_CLOSING_MIGRATION_VERSION, now],
   });
+  // v48 — foto konten situs publik (`konten_gambar`, dibuat di blok CMS).
+  await client.execute({
+    sql: `INSERT OR IGNORE INTO schema_migration (version, name, applied_at)
+          VALUES (?, 'content-image', ?);`,
+    args: [CONTENT_IMAGE_MIGRATION_VERSION, now],
+  });
 
   await client.execute(
     "CREATE INDEX IF NOT EXISTS idx_jurnal_presensi ON jurnal_mengajar(id_presensi_mapel);",
@@ -2572,6 +2579,18 @@ export async function runDatabaseMigrations(client: Client) {
       nilai TEXT NOT NULL,
       updated_at TEXT NOT NULL DEFAULT (datetime('now')),
       PRIMARY KEY (halaman, kunci)
+    );
+  `);
+
+  // v48 — foto konten situs publik. Cloud-only seperti `konten_publik`:
+  // tidak pernah disalin ke perangkat, dirujuk dari konten lewat id hash.
+  await client.execute(`
+    CREATE TABLE IF NOT EXISTS konten_gambar (
+      id_gambar TEXT PRIMARY KEY,
+      jenis TEXT NOT NULL CHECK (jenis IN ('image/webp', 'image/jpeg')),
+      data_base64 TEXT NOT NULL,
+      ukuran_byte INTEGER NOT NULL,
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
     );
   `);
 

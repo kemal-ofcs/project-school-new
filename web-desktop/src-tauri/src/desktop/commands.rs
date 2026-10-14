@@ -4619,6 +4619,28 @@ pub async fn desktop_save_page_content(
     state.get_turso_client()?.save_page_content(&halaman, &items).await
 }
 
+/// Mengunggah satu foto konten situs publik (Cloud-Only), mengembalikan id-nya.
+#[tauri::command]
+pub async fn desktop_upload_content_image(
+    state: State<'_, DesktopState>,
+    data_url: String,
+) -> Result<Value, CommandError> {
+    require_permission(&state, "content.manage")?;
+    let client = state.get_turso_client()?;
+    crate::desktop::konten_gambar::simpan(&client, &data_url).await
+}
+
+/// Data URL beberapa foto konten untuk pratinjau panel konten (Cloud-Only).
+#[tauri::command]
+pub async fn desktop_get_content_images(
+    state: State<'_, DesktopState>,
+    ids: Vec<String>,
+) -> Result<Value, CommandError> {
+    require_permission(&state, "content.view")?;
+    let client = state.get_turso_client()?;
+    crate::desktop::konten_gambar::ambil(&client, &ids).await
+}
+
 /// Membuka URL eksternal lewat sistem operasi: browser/WhatsApp di Desktop,
 /// `Intent.ACTION_VIEW` (tauri-plugin-opener) di Android.
 ///

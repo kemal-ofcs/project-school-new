@@ -324,6 +324,8 @@ const MOBILE_COMMANDS: &[&str] = &[
     "desktop_delete_article",
     "desktop_get_page_content",
     "desktop_save_page_content",
+    "desktop_upload_content_image",
+    "desktop_get_content_images",
     "desktop_open_external_url",
 ];
 

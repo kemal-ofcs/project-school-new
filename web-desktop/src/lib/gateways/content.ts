@@ -134,3 +134,34 @@ export async function simpanKontenHalaman(
     { halaman, items },
   );
 }
+
+/** Unggah satu foto konten (data URL WebP/JPEG); mengembalikan id-nya. */
+export async function unggahGambarKonten(
+  dataUrl: string,
+): Promise<{ id: string }> {
+  if (isDesktopRuntime()) {
+    return invokeDesktop<{ id: string }>("desktop_upload_content_image", {
+      dataUrl,
+    });
+  }
+  return requestWebApi<{ id: string }>("/api/content/images/upload", "POST", {
+    dataUrl,
+  });
+}
+
+/** Data URL beberapa foto konten untuk pratinjau, dikunci dengan id. */
+export async function ambilGambarKonten(
+  ids: string[],
+): Promise<{ items: Record<string, string> }> {
+  if (isDesktopRuntime()) {
+    return invokeDesktop<{ items: Record<string, string> }>(
+      "desktop_get_content_images",
+      { ids },
+    );
+  }
+  return requestWebApi<{ items: Record<string, string> }>(
+    "/api/content/images/query",
+    "POST",
+    { ids },
+  );
+}

@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { cn } from "@/lib/utils";
 
 /**
  * Kepala halaman dalam (Profil, Kontak, Program, Berita).
@@ -17,11 +18,12 @@ export function KepalaHalaman({
   label: string;
   judul: string;
   children?: ReactNode;
+  /** Kelas lebar (dan bila perlu jarak tepi) agar sejajar dengan isi halaman. */
   lebar?: string;
 }) {
   return (
     <div className="border-b border-border bg-muted/60">
-      <div className={`mx-auto ${lebar} px-6 py-12 sm:py-16`}>
+      <div className={cn("mx-auto px-6 py-12 sm:py-16", lebar)}>
         <p className="text-sm font-semibold text-primary">{label}</p>
         <h1 className="mt-2 font-extrabold text-3xl sm:text-4xl tracking-tight text-foreground">
           {judul}

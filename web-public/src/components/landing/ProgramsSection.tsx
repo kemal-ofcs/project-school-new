@@ -20,8 +20,13 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { SpotlightCard } from "@/components/visual/SpotlightCard";
-import { koleksiEkskul } from "@/lib/services/landing-collections";
+import {
+  fotoJurusan,
+  type ItemEkskul,
+  koleksiEkskul,
+} from "@/lib/services/landing-collections";
 import type { ProgramStudi } from "@/lib/services/school-profile";
+import { FotoKartu, TautanGaleri, type TautanGaleriData } from "./FotoKartu";
 
 /**
  * Ikon ekstrakurikuler diputar berdasarkan posisi. Ia komponen React sehingga
@@ -32,11 +37,13 @@ const IKON_EKSKUL = [Code2, FlaskConical, Mic, Trophy, Palette, GraduationCap];
 interface ProgramsSectionProps {
   programStudi: ProgramStudi[];
   konten?: Record<string, string>;
+  galeri?: TautanGaleriData | null;
 }
 
 export function ProgramsSection({
   programStudi,
   konten = {},
+  galeri = null,
 }: ProgramsSectionProps) {
   const [kataKunci, setKataKunci] = React.useState("");
   const [kategoriEkskul, setKategoriEkskul] = React.useState("Semua");
@@ -45,12 +52,14 @@ export function ProgramsSection({
   const title = konten["landing.ekskul_title"];
   const subtitle = konten["landing.ekskul_subtitle"];
 
+  const fotoPerJurusan = React.useMemo(() => fotoJurusan(konten), [konten]);
+  const adaFotoJurusan = Object.keys(fotoPerJurusan).length > 0;
+
   const ekskulList = React.useMemo(() => {
-    return koleksiEkskul(konten).map((item, i) => ({
-      ...item,
-      icon: IKON_EKSKUL[i % IKON_EKSKUL.length],
-    }));
+    return koleksiEkskul(konten).map((item, i) => ({ ...item, indeks: i }));
   }, [konten]);
+
+  const adaFotoEkskul = ekskulList.some((item) => item.foto);
 
   // Ekstrak kategori unik untuk filter chips
   const daftarKategori = React.useMemo(() => {
@@ -90,7 +99,9 @@ export function ProgramsSection({
     });
   }, [ekskulList, kataKunci, kategoriEkskul]);
 
-  if (programStudi.length === 0 && ekskulList.length === 0) return null;
+  const adaJurusan = programStudi.length > 0;
+  const adaEkskul = ekskulList.length > 0;
+  if (!adaJurusan && !adaEkskul) return null;
   const adaHeader = Boolean(eyebrow || title || subtitle);
 
   return (
@@ -117,17 +128,25 @@ export function ProgramsSection({
           </div>
         ) : null}
 
-        {/* Interactive Tabs */}
-        <Tabs defaultValue="jurusan" className="w-full space-y-6">
+        {/* Tab hanya bila keduanya ada. Sekolah tanpa jurusan (SMP, SD)
+            tidak melihat tab "Jurusan (0)" yang kosong. */}
+        <Tabs
+          defaultValue={adaJurusan ? "jurusan" : "ekskul"}
+          className="w-full space-y-6"
+        >
           <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
-            <TabsList>
-              <TabsTrigger value="jurusan">
-                Program Keahlian / Jurusan ({programStudi.length})
-              </TabsTrigger>
-              <TabsTrigger value="ekskul">
-                Ekstrakurikuler Unggulan ({ekskulList.length})
-              </TabsTrigger>
-            </TabsList>
+            {adaJurusan && adaEkskul ? (
+              <TabsList>
+                <TabsTrigger value="jurusan">
+                  Jurusan ({programStudi.length})
+                </TabsTrigger>
+                <TabsTrigger value="ekskul">
+                  Ekstrakurikuler ({ekskulList.length})
+                </TabsTrigger>
+              </TabsList>
+            ) : (
+              <span />
+            )}
 
             {/* Pencarian Cepat */}
             <div className="relative w-full sm:w-72">
@@ -136,8 +155,16 @@ export function ProgramsSection({
                 type="text"
                 value={kataKunci}
                 onChange={(e) => setKataKunci(e.target.value)}
-                placeholder="Cari jurusan atau ekskul..."
-                aria-label="Cari jurusan atau ekstrakurikuler"
+                placeholder={
+                  adaJurusan
+                    ? "Cari jurusan atau ekskul..."
+                    : "Cari ekstrakurikuler..."
+                }
+                aria-label={
+                  adaJurusan
+                    ? "Cari jurusan atau ekstrakurikuler"
+                    : "Cari ekstrakurikuler"
+                }
                 className="w-full h-10 pl-9 pr-8 rounded-xl border border-border bg-card text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/40 transition-shadow"
               />
               {kataKunci ? (
@@ -177,46 +204,12 @@ export function ProgramsSection({
             ) : (
               <div className="kartu-tengah md:[--kolom:2] lg:[--kolom:3]">
                 {prodiTerfilter.map((prodi) => (
-                  <SpotlightCard
+                  <KartuJurusan
                     key={prodi.kode || prodi.nama}
-                    className="h-full"
-                  >
-                    <Card className="flex flex-col justify-between h-full p-6 transition-all duration-300 hover:shadow-lg hover:border-primary/50 bg-card border-border">
-                      <div className="space-y-4">
-                        <div className="flex items-center justify-between">
-                          <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-primary/10 text-primary">
-                            <BookOpen className="h-5 w-5" />
-                          </div>
-                          {prodi.kode ? (
-                            <Badge variant="prestige" className="text-xs">
-                              {prodi.kode}
-                            </Badge>
-                          ) : null}
-                        </div>
-
-                        <div className="space-y-2">
-                          <h3 className="font-bold text-lg text-foreground">
-                            {prodi.nama}
-                          </h3>
-                          {prodi.deskripsi ? (
-                            <p className="text-sm text-muted-foreground leading-relaxed line-clamp-3">
-                              {prodi.deskripsi}
-                            </p>
-                          ) : null}
-                        </div>
-                      </div>
-
-                      <div className="pt-6 mt-4 border-t border-border/60 flex items-center justify-between text-xs font-semibold text-primary">
-                        <Link
-                          href="/pmb"
-                          className="inline-flex items-center gap-1.5 hover:underline"
-                        >
-                          <span>Pilih di PMB</span>
-                          <ArrowRight className="h-3.5 w-3.5" />
-                        </Link>
-                      </div>
-                    </Card>
-                  </SpotlightCard>
+                    prodi={prodi}
+                    foto={fotoPerJurusan[prodi.kode] ?? ""}
+                    adaFoto={adaFotoJurusan}
+                  />
                 ))}
               </div>
             )}
@@ -267,44 +260,132 @@ export function ProgramsSection({
               </div>
             ) : (
               <div className="kartu-tengah sm:[--kolom:2] lg:[--kolom:3]">
-                {ekskulTerfilter.map((item, i) => {
-                  const Icon = item.icon;
-                  return (
-                    <SpotlightCard
-                      key={`${i}-${item.title}`}
-                      className="h-full"
-                    >
-                      <Card className="flex flex-col justify-between h-full p-6 transition-all duration-300 hover:shadow-md hover:border-border bg-card border-border">
-                        <div className="space-y-3">
-                          <div className="flex items-center justify-between">
-                            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-secondary/15 text-secondary">
-                              <Icon className="h-5 w-5" />
-                            </div>
-                            {item.category ? (
-                              <Badge variant="outline" className="text-[11px]">
-                                {item.category}
-                              </Badge>
-                            ) : null}
-                          </div>
-
-                          <h3 className="font-bold text-base text-foreground">
-                            {item.title}
-                          </h3>
-                          {item.desc ? (
-                            <p className="text-xs sm:text-sm text-muted-foreground leading-relaxed">
-                              {item.desc}
-                            </p>
-                          ) : null}
-                        </div>
-                      </Card>
-                    </SpotlightCard>
-                  );
-                })}
+                {ekskulTerfilter.map((item) => (
+                  <KartuEkskul
+                    key={`${item.indeks}-${item.title}`}
+                    item={item}
+                    indeks={item.indeks}
+                    adaFoto={adaFotoEkskul}
+                  />
+                ))}
               </div>
             )}
+            <TautanGaleri tautan={galeri} />
           </TabsContent>
         </Tabs>
       </div>
     </section>
+  );
+}
+
+/**
+ * Kartu satu jurusan, dipakai beranda dan halaman Program. `adaFoto` = ada
+ * jurusan lain yang berfoto, sehingga yang belum berfoto diberi bingkai ikon.
+ */
+export function KartuJurusan({
+  prodi,
+  foto,
+  adaFoto,
+}: {
+  prodi: ProgramStudi;
+  foto: string;
+  adaFoto: boolean;
+}) {
+  return (
+    <SpotlightCard className="h-full">
+      <Card className="group flex flex-col justify-between h-full overflow-hidden p-6 transition-colors duration-300 hover:border-primary/40 bg-card border-border">
+        <div className="space-y-4">
+          <FotoKartu
+            id={foto}
+            alt={prodi.nama}
+            ikon={adaFoto ? <BookOpen className="h-12 w-12" /> : undefined}
+          />
+          <div className="flex items-center justify-between">
+            {adaFoto ? (
+              <span />
+            ) : (
+              <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                <BookOpen className="h-5 w-5" />
+              </div>
+            )}
+            {prodi.kode ? (
+              <Badge variant="prestige" className="text-xs">
+                {prodi.kode}
+              </Badge>
+            ) : null}
+          </div>
+
+          <div className="space-y-2">
+            <h3 className="font-bold text-lg text-foreground">{prodi.nama}</h3>
+            {prodi.deskripsi ? (
+              <p className="text-sm text-muted-foreground leading-relaxed line-clamp-3">
+                {prodi.deskripsi}
+              </p>
+            ) : null}
+          </div>
+        </div>
+
+        <div className="pt-6 mt-4 border-t border-border/60 flex items-center justify-between text-xs font-semibold text-primary">
+          <Link
+            href="/pmb"
+            className="inline-flex items-center gap-1.5 hover:underline"
+          >
+            <span>Pilih di PMB</span>
+            <ArrowRight className="h-3.5 w-3.5" />
+          </Link>
+        </div>
+      </Card>
+    </SpotlightCard>
+  );
+}
+
+/**
+ * Kartu satu kegiatan ekstrakurikuler. Ikonnya dipilih dari `indeks` di dalam
+ * komponen ini, bukan dikirim sebagai prop: halaman server tidak bisa
+ * mengirim komponen React ke komponen klien.
+ */
+export function KartuEkskul({
+  item,
+  indeks,
+  adaFoto,
+}: {
+  item: ItemEkskul;
+  indeks: number;
+  adaFoto: boolean;
+}) {
+  const Icon = IKON_EKSKUL[indeks % IKON_EKSKUL.length];
+  return (
+    <SpotlightCard className="h-full">
+      <Card className="group flex flex-col justify-between h-full overflow-hidden p-6 transition-colors duration-300 hover:border-primary/40 bg-card border-border">
+        <div className="space-y-3">
+          <FotoKartu
+            id={item.foto}
+            alt={item.title}
+            ikon={adaFoto ? <Icon className="h-12 w-12" /> : undefined}
+          />
+          <div className="flex items-center justify-between">
+            {adaFoto ? (
+              <span />
+            ) : (
+              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-secondary/15 text-secondary">
+                <Icon className="h-5 w-5" />
+              </div>
+            )}
+            {item.category ? (
+              <Badge variant="outline" className="text-[11px]">
+                {item.category}
+              </Badge>
+            ) : null}
+          </div>
+
+          <h3 className="font-bold text-base text-foreground">{item.title}</h3>
+          {item.desc ? (
+            <p className="text-xs sm:text-sm text-muted-foreground leading-relaxed">
+              {item.desc}
+            </p>
+          ) : null}
+        </div>
+      </Card>
+    </SpotlightCard>
   );
 }

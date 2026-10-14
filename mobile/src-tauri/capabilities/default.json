@@ -329,6 +329,8 @@
     "allow-desktop-delete-article",
     "allow-desktop-get-page-content",
     "allow-desktop-save-page-content",
+    "allow-desktop-upload-content-image",
+    "allow-desktop-get-content-images",
     "allow-desktop-open-external-url"
   ]
 }

@@ -8,8 +8,9 @@ export interface OptimizeImageOptions {
   maxWidth?: number;
   maxHeight?: number;
   quality?: number; // 0.85 - 0.95
-  mimeType?: "image/jpeg" | "image/png";
-  fit?: "cover" | "contain" | "exact";
+  mimeType?: "image/jpeg" | "image/png" | "image/webp";
+  /** `shrink`: hanya memperkecil, foto kecil tidak diperbesar. */
+  fit?: "cover" | "contain" | "exact" | "shrink";
 }
 
 export interface OptimizedImageResult {

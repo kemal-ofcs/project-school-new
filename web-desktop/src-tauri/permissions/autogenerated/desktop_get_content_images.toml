@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-desktop-get-content-images"
+description = "Enables the desktop_get_content_images command without any pre-configured scope."
+commands.allow = ["desktop_get_content_images"]
+
+[[permission]]
+identifier = "deny-desktop-get-content-images"
+description = "Denies the desktop_get_content_images command without any pre-configured scope."
+commands.deny = ["desktop_get_content_images"]

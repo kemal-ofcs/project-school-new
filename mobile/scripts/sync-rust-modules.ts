@@ -22,6 +22,8 @@ const filesToSync = [
   "teaching_journal.rs",
   // Inventaris: aturan stok dan validasi mutasi wajib identik dengan Desktop.
   "inventory.rs",
+  // Foto konten situs publik: aturan unggah wajib identik dengan Desktop dan TS.
+  "konten_gambar.rs",
   "nilai_akhir.rs",
   // Buku Kunjungan UKS: aturan dan alur salinan wajib identik dengan Desktop.
   "uks.rs",

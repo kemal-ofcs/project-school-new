@@ -1,6 +1,7 @@
 import { Clock, Globe, Mail, MapPin, MessageCircle, Phone } from "lucide-react";
 import type { Metadata } from "next";
 import { KepalaHalaman } from "@/components/KepalaHalaman";
+import { MediaSosial } from "@/components/MediaSosial";
 import { ProfilBelumLengkap } from "@/components/SiteChrome";
 import { StatusTidakTerbaca } from "@/components/StatusData";
 import { muatKontenHalaman } from "@/lib/server/content-data";
@@ -38,7 +39,9 @@ export default async function HalamanKontak() {
   const whatsapp = konten["kontak.whatsapp"];
   const jamKerja = konten["kontak.jam_kerja"];
 
-  const adaKontak = Boolean(alamat || telepon || email || whatsapp);
+  const adaKontak = Boolean(
+    alamat || telepon || email || whatsapp || konten["kontak.instagram"],
+  );
 
   // Bersihkan format WhatsApp untuk URL
   const waClean = whatsapp ? whatsapp.replace(/\D/g, "") : null;
@@ -145,6 +148,8 @@ export default async function HalamanKontak() {
                 })}
               </div>
             ) : null}
+
+            <MediaSosial konten={konten} className="justify-center" />
           </>
         )}
       </div>

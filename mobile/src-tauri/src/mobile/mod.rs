@@ -25,6 +25,7 @@ pub mod face_match;
 pub mod grades;
 // Inventaris: SALINAN `desktop/inventory.rs` oleh sync-rust-modules.ts.
 pub mod inventory;
+pub mod konten_gambar;
 // Lisensi offline Ed25519: SALINAN `desktop/license.rs` oleh sync-rust-modules.ts.
 pub mod license;
 // Kasbon karyawan (K2): SALINAN `desktop/loan.rs` oleh sync-rust-modules.ts.

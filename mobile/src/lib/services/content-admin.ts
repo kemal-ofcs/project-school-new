@@ -1,6 +1,7 @@
 import "server-only";
 
 import type { Client } from "@libsql/client";
+import { HAPUS_GAMBAR_YATIM_SQL } from "@/lib/validations/konten-gambar";
 import type {
   ArticleDetail,
   ArticleDraft,
@@ -359,7 +360,8 @@ export async function savePageContent(
     args: [cleanHalaman, kunci.trim(), String(nilai ?? "").trim()],
   }));
 
-  await client.batch(statements, "write");
+  // Rujukan foto yang baru dilepas baru terlihat yatim sesudah simpan ini.
+  await client.batch([...statements, HAPUS_GAMBAR_YATIM_SQL], "write");
 
   return { success: true, count: entries.length };
 }

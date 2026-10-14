@@ -42,6 +42,32 @@ function teks(nilai: unknown): string {
   return typeof nilai === "string" ? nilai.trim() : "";
 }
 
+/** Id foto `konten_gambar` (32 hex); nilai lain dianggap tanpa foto. */
+export function idFoto(nilai: unknown): string {
+  const id = teks(nilai);
+  return /^[0-9a-f]{32}$/.test(id) ? id : "";
+}
+
+/**
+ * Foto jurusan dari `landing.jurusan_foto` (`{kode_jurusan: id}`), diisi lewat
+ * editor Foto Jurusan di panel konten.
+ */
+export function fotoJurusan(konten: Konten): Record<string, string> {
+  try {
+    const mentah = JSON.parse(teks(konten["landing.jurusan_foto"]) || "{}");
+    if (!mentah || typeof mentah !== "object" || Array.isArray(mentah))
+      return {};
+    const hasil: Record<string, string> = {};
+    for (const [kode, id] of Object.entries(mentah)) {
+      const sah = idFoto(id);
+      if (sah) hasil[kode] = sah;
+    }
+    return hasil;
+  } catch {
+    return {};
+  }
+}
+
 /**
  * Urai satu kunci koleksi menjadi daftar objek.
  *
@@ -168,12 +194,15 @@ export interface ItemEkskul {
   title: string;
   category: string;
   desc: string;
+  /** Id foto di `konten_gambar`, atau "" bila belum ada. */
+  foto: string;
 }
 export interface ItemFasilitas {
   name: string;
   tag: string;
   desc: string;
   specs: string[];
+  foto: string;
 }
 export interface ItemTahapan {
   title: string;
@@ -203,6 +232,7 @@ export const koleksiEkskul = (konten: Konten): ItemEkskul[] =>
     title: teks(item.title),
     category: teks(item.category),
     desc: teks(item.desc),
+    foto: idFoto(item.foto),
   }));
 
 export const koleksiFasilitas = (konten: Konten): ItemFasilitas[] =>
@@ -211,6 +241,7 @@ export const koleksiFasilitas = (konten: Konten): ItemFasilitas[] =>
     tag: teks(item.tag),
     desc: teks(item.desc),
     specs: uraiSpecs(item.specs),
+    foto: idFoto(item.foto),
   }));
 
 export const koleksiTahapanPmb = (konten: Konten): ItemTahapan[] =>

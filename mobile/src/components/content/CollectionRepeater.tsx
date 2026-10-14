@@ -1,6 +1,7 @@
 "use client";
 
 import { Icon } from "@/components/ui/Icon";
+import { GambarKontenInput } from "./GambarKontenInput";
 
 /**
  * Editor koleksi berulang untuk CMS landing page.
@@ -20,7 +21,8 @@ export interface FieldKoleksi {
   /** Nama field di dalam objek JSON - ini bagian kontraknya. */
   name: string;
   label: string;
-  type?: "text" | "textarea";
+  /** `gambar`: id foto di `konten_gambar`, satu foto per item. */
+  type?: "text" | "textarea" | "gambar";
   placeholder?: string;
   /** Satu baris per nilai; disimpan sebagai array. */
   multiline?: boolean;
@@ -165,6 +167,18 @@ export function CollectionRepeater({
                 {fields.map((field) => {
                   const id = `koleksi-${kunci}-${index}-${field.name}`;
                   const nilai = nilaiTeks(item, field);
+                  if (field.type === "gambar") {
+                    return (
+                      <GambarKontenInput
+                        key={field.name}
+                        inputId={id}
+                        label={field.label}
+                        value={nilai}
+                        disabled={disabled}
+                        onChange={(idFoto) => ubahField(index, field, idFoto)}
+                      />
+                    );
+                  }
                   return (
                     <div key={field.name}>
                       <label

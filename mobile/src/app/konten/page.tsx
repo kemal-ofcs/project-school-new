@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState, useTransition } from "react";
 import { CollectionRepeater } from "@/components/content/CollectionRepeater";
+import { FotoJurusanEditor } from "@/components/content/FotoJurusanEditor";
 import { HeroImageUploader } from "@/components/content/HeroImageUploader";
 import { MobileAppShell } from "@/components/MobileAppShell";
 import { FeedbackBanner } from "@/components/ui/FeedbackBanner";
@@ -572,7 +573,18 @@ export default function KontenMobilePage() {
                                 ℹ️ {field.description}
                               </p>
                             ) : null}
-                            {field.type === "image" ? (
+                            {field.type === "foto_jurusan" ? (
+                              <FotoJurusanEditor
+                                value={value}
+                                onChange={(val) =>
+                                  setContentMap((prev) => ({
+                                    ...prev,
+                                    [field.key]: val,
+                                  }))
+                                }
+                                disabled={!canManage}
+                              />
+                            ) : field.type === "image" ? (
                               <HeroImageUploader
                                 value={value}
                                 onChange={(val) =>

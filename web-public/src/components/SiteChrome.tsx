@@ -9,6 +9,7 @@ import {
   UserCheck,
 } from "lucide-react";
 import Link from "next/link";
+import { MediaSosial } from "@/components/MediaSosial";
 import { MobileNav } from "@/components/MobileNav";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { Badge } from "@/components/ui/badge";
@@ -213,7 +214,7 @@ export function SiteFooter({
                   href="/program"
                 >
                   <ChevronRight className="h-3.5 w-3.5" />
-                  Program Keahlian
+                  Program & Fasilitas
                 </Link>
               </li>
               <li>
@@ -325,6 +326,7 @@ export function SiteFooter({
                   <p className="whitespace-pre-line">{jamLayanan}</p>
                 </div>
               ) : null}
+              <MediaSosial konten={konten} className="pt-2" />
             </div>
           </div>
         </div>

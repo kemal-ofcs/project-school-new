@@ -86,6 +86,8 @@ const filesToCopy = [
   // persis di tempat yang paling mahal, yaitu nama field JSON-nya.
   "components/content/CollectionRepeater.tsx",
   "components/content/HeroImageUploader.tsx",
+  "components/content/GambarKontenInput.tsx",
+  "components/content/FotoJurusanEditor.tsx",
   // Foto personil di daftar dan Detail. Hanya bergantung pada kontrak `Modal`
   // yang sama di kedua workspace (`isOpen`/`onClose`/`title`/`titleId`) dan
   // pada gateway foto yang ikut tersinkron, jadi tidak ada perilaku khusus
