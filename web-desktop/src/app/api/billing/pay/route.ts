@@ -27,7 +27,9 @@ export async function POST(request: NextRequest) {
         400,
       );
     }
-    return noStoreJson(await pay(getServerDatabase(), actor.username, parsed.data));
+    return noStoreJson(
+      await pay(getServerDatabase(), actor.username, parsed.data),
+    );
   } catch (error) {
     return toApiErrorResponse(error);
   }

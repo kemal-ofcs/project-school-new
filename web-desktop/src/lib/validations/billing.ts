@@ -532,7 +532,10 @@ export interface TagihanTerbuka {
 export function alokasiPembayaran(
   tagihan: readonly TagihanTerbuka[],
   total: number,
-): { alokasi: Array<{ id_tagihan: string; nominal: number }>; titipan: number } {
+): {
+  alokasi: Array<{ id_tagihan: string; nominal: number }>;
+  titipan: number;
+} {
   const banding = (a: string, b: string) => (a < b ? -1 : a > b ? 1 : 0);
   const urut = [...tagihan].sort(
     (a, b) =>

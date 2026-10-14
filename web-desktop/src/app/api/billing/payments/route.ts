@@ -35,12 +35,14 @@ export async function POST(request: NextRequest) {
         400,
       );
     }
-    return noStoreJson(await payments(
+    return noStoreJson(
+      await payments(
         getServerDatabase(),
         parsed.data.dari,
         parsed.data.sampai,
         parsed.data.seri ?? null,
-      ));
+      ),
+    );
   } catch (error) {
     return toApiErrorResponse(error);
   }

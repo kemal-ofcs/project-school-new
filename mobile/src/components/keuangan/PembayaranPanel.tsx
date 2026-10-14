@@ -640,7 +640,9 @@ export function DialogKuitansi({
     try {
       if (aksi === "batal") {
         await batalkanKuitansi(idPembayaran, alasan);
-        await onBerubah(`Kuitansi ${detail?.pembayaran.nomor ?? ""} dibatalkan.`);
+        await onBerubah(
+          `Kuitansi ${detail?.pembayaran.nomor ?? ""} dibatalkan.`,
+        );
       } else {
         const hasil = await pindahkanKeTitipan(idPembayaran, alasan);
         await onBerubah(
@@ -734,8 +736,7 @@ export function DialogKuitansi({
           </ul>
           {detail.saldo_titipan !== 0 ? (
             <p className="text-xs text-slate-400">
-              Saldo titipan siswa sekarang{" "}
-              <Rp nilai={detail.saldo_titipan} />.
+              Saldo titipan siswa sekarang <Rp nilai={detail.saldo_titipan} />.
             </p>
           ) : null}
 
@@ -788,7 +789,7 @@ export function DialogKuitansi({
                 Nomor kuitansi tetap terpakai dan jurnalnya dibalik.
                 {p.metode === "Titipan"
                   ? " Saldo titipannya kembali dengan sendirinya."
-                  : " Pilih \"Pindahkan ke titipan\" bila uangnya tetap disimpan sekolah, misalnya tagihannya ternyata sudah dibayar di perangkat lain."}
+                  : ' Pilih "Pindahkan ke titipan" bila uangnya tetap disimpan sekolah, misalnya tagihannya ternyata sudah dibayar di perangkat lain.'}
               </p>
               {galat ? (
                 <p role="alert" className={GALAT_KOTAK}>

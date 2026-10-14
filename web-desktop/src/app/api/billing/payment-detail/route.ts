@@ -33,7 +33,9 @@ export async function POST(request: NextRequest) {
         400,
       );
     }
-    return noStoreJson(await paymentDetail(getServerDatabase(), parsed.data.idPembayaran));
+    return noStoreJson(
+      await paymentDetail(getServerDatabase(), parsed.data.idPembayaran),
+    );
   } catch (error) {
     return toApiErrorResponse(error);
   }

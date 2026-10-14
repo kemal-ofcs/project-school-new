@@ -3662,7 +3662,8 @@ impl TursoClient {
                 (38, 'face-verification', datetime('now')),
                 (39, 'accounting-foundation', datetime('now')),
                 (40, 'employee-loan', datetime('now')),
-                (41, 'student-billing', datetime('now'));"#,
+                (41, 'student-billing', datetime('now')),
+                (42, 'student-payment', datetime('now'));"#,
                 vec![],
             ),
         ];

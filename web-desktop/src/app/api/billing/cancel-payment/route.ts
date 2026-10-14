@@ -34,12 +34,14 @@ export async function POST(request: NextRequest) {
         400,
       );
     }
-    return noStoreJson(await cancelPayment(
+    return noStoreJson(
+      await cancelPayment(
         getServerDatabase(),
         actor.username,
         parsed.data.idPembayaran,
         parsed.data.alasan,
-      ));
+      ),
+    );
   } catch (error) {
     return toApiErrorResponse(error);
   }

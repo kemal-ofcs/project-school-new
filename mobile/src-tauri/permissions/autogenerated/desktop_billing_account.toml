@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-desktop-billing-account"
+description = "Enables the desktop_billing_account command without any pre-configured scope."
+commands.allow = ["desktop_billing_account"]
+
+[[permission]]
+identifier = "deny-desktop-billing-account"
+description = "Denies the desktop_billing_account command without any pre-configured scope."
+commands.deny = ["desktop_billing_account"]

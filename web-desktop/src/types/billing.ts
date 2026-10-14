@@ -4,13 +4,13 @@
  * mengembalikan kunci yang sama.
  */
 
-import type { KopSekolah } from "@/lib/validations/inventory";
 import type {
   JenisKeringanan,
   MetodeBayar,
   Periodik,
   StatusTagihan,
 } from "@/lib/validations/billing";
+import type { KopSekolah } from "@/lib/validations/inventory";
 
 export interface JenisTagihanItem {
   id_jenis_tagihan: string;

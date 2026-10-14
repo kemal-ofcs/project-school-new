@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-desktop-billing-save-series"
+description = "Enables the desktop_billing_save_series command without any pre-configured scope."
+commands.allow = ["desktop_billing_save_series"]
+
+[[permission]]
+identifier = "deny-desktop-billing-save-series"
+description = "Denies the desktop_billing_save_series command without any pre-configured scope."
+commands.deny = ["desktop_billing_save_series"]

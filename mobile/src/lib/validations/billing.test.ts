@@ -282,10 +282,30 @@ describe("pembayaran", () => {
 
   test("alokasiPembayaran: jatuh tempo terlama dulu, kelebihan ke titipan", () => {
     const tagihan = [
-      { id_tagihan: "b", jatuh_tempo: "2026-08-10", periode: "2026-08", sisa: 300_000 },
-      { id_tagihan: "a", jatuh_tempo: "2026-07-10", periode: "2026-07", sisa: 150_000 },
-      { id_tagihan: "c", jatuh_tempo: "2026-07-10", periode: "2026-07", sisa: 0 },
-      { id_tagihan: "d", jatuh_tempo: "2026-07-10", periode: "2026-06", sisa: 100_000 },
+      {
+        id_tagihan: "b",
+        jatuh_tempo: "2026-08-10",
+        periode: "2026-08",
+        sisa: 300_000,
+      },
+      {
+        id_tagihan: "a",
+        jatuh_tempo: "2026-07-10",
+        periode: "2026-07",
+        sisa: 150_000,
+      },
+      {
+        id_tagihan: "c",
+        jatuh_tempo: "2026-07-10",
+        periode: "2026-07",
+        sisa: 0,
+      },
+      {
+        id_tagihan: "d",
+        jatuh_tempo: "2026-07-10",
+        periode: "2026-06",
+        sisa: 100_000,
+      },
     ];
     expect(alokasiPembayaran(tagihan, 400_000)).toEqual({
       alokasi: [
@@ -303,11 +323,13 @@ describe("pembayaran", () => {
   });
 
   test("barisJurnalPembayaran", () => {
-    expect(barisJurnalPembayaran("Tunai", "akun-kas", 550_000, 50_000)).toEqual([
-      { id_akun: "akun-kas", debit: 600_000, kredit: 0 },
-      { id_akun: "akun-piutang-siswa", debit: 0, kredit: 550_000 },
-      { id_akun: "akun-titipan-wali", debit: 0, kredit: 50_000 },
-    ]);
+    expect(barisJurnalPembayaran("Tunai", "akun-kas", 550_000, 50_000)).toEqual(
+      [
+        { id_akun: "akun-kas", debit: 600_000, kredit: 0 },
+        { id_akun: "akun-piutang-siswa", debit: 0, kredit: 550_000 },
+        { id_akun: "akun-titipan-wali", debit: 0, kredit: 50_000 },
+      ],
+    );
     expect(barisJurnalPembayaran("Transfer", "akun-bank", 0, 75_000)).toEqual([
       { id_akun: "akun-bank", debit: 75_000, kredit: 0 },
       { id_akun: "akun-titipan-wali", debit: 0, kredit: 75_000 },

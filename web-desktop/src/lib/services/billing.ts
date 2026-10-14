@@ -965,7 +965,9 @@ export async function pay(
   const hasil = validatePembayaran(parsed.data);
   if (!hasil.ok) throw new Error(hasil.error);
   const valid = hasil.value;
-  return withTransaction(client, (tx) => catatPembayaranTx(tx, operator, valid));
+  return withTransaction(client, (tx) =>
+    catatPembayaranTx(tx, operator, valid),
+  );
 }
 
 function validasiAlasanBatal(alasanMentah: string): string {
@@ -1074,7 +1076,8 @@ export async function payments(
     args.push(seriBersih);
   }
   // `LIMIT 1000` = `BATAS_DAFTAR_KUITANSI`.
-  query += " ORDER BY p.tanggal DESC, p.nomor DESC, p.id_pembayaran LIMIT 1000;";
+  query +=
+    " ORDER BY p.tanggal DESC, p.nomor DESC, p.id_pembayaran LIMIT 1000;";
   const result = await client.execute({ sql: query, args });
   const jumlah = new Map<string, number>();
   for (const row of result.rows) {

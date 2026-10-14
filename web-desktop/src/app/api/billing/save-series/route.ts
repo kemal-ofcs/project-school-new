@@ -35,12 +35,14 @@ export async function POST(request: NextRequest) {
         400,
       );
     }
-    return noStoreJson(await saveSeries(
+    return noStoreJson(
+      await saveSeries(
         getServerDatabase(),
         parsed.data.deviceCode,
         parsed.data.seri,
         parsed.data.namaPerangkat,
-      ));
+      ),
+    );
   } catch (error) {
     return toApiErrorResponse(error);
   }

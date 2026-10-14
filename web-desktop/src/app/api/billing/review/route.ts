@@ -15,11 +15,7 @@ import { review } from "@/lib/services/billing";
 
 export const runtime = "nodejs";
 
-const bodySchema = z
-  .object({
-
-  })
-  .strict();
+const bodySchema = z.object({}).strict();
 
 export async function POST(request: NextRequest) {
   try {
