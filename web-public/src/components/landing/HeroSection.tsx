@@ -2,7 +2,6 @@ import {
   Award,
   BookOpen,
   Calendar,
-  CheckCircle2,
   GraduationCap,
   Trophy,
   Users,
@@ -10,7 +9,6 @@ import {
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { AnimatedCounter } from "@/components/visual/AnimatedCounter";
-import { AuroraBackground } from "@/components/visual/AuroraBackground";
 import { PmbCountdown } from "@/components/visual/PmbCountdown";
 import { koleksiStat } from "@/lib/services/landing-collections";
 import type { GelombangAktif } from "@/lib/services/pmb";
@@ -56,14 +54,20 @@ export function HeroSection({
           <img
             src={heroImage}
             alt=""
-            className="h-full w-full object-cover object-center animate-ken-burns scale-105"
+            className="h-full w-full object-cover object-center"
           />
           {/* Lapisan Gradien Elegan: Foto sekolah tetap jelas dan hidup, teks tetap kontras tajam */}
           <div className="absolute inset-0 bg-gradient-to-r from-slate-950/75 via-slate-950/40 to-slate-950/15" />
           <div className="absolute inset-0 bg-gradient-to-t from-primary/85 via-primary/20 to-transparent" />
         </div>
       ) : (
-        <AuroraBackground />
+        // Satu cahaya amber yang diam di pojok kanan atas: cukup supaya navy
+        // tidak datar, tanpa gelembung yang bergerak terus menarik mata dari
+        // judul dan tombol pendaftaran.
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_85%_0%,rgba(254,166,25,0.16),transparent_55%)]"
+        />
       )}
 
       {/* 2. Konten Utama Hero */}
@@ -94,12 +98,14 @@ export function HeroSection({
 
         {/* Main Title & Lead */}
         <div className="max-w-3xl space-y-4">
-          <div className="inline-flex items-center gap-2 rounded-lg bg-accent/80 px-3 py-1 text-xs font-semibold text-white backdrop-blur-sm border border-white/10 shadow-xs">
-            <CheckCircle2 className="h-3.5 w-3.5 text-secondary-container" />
-            <span>
-              {heroBadge ? `${heroBadge} • ${namaSekolah}` : namaSekolah}
-            </span>
-          </div>
+          {/* Lencana CMS tampil sebagai teks biasa. Pil hijau yang dulu
+              selalu tampil mengulang nama sekolah, yang sudah ada di header
+              dan sering juga di judul tepat di bawahnya. */}
+          {heroBadge ? (
+            <p className="font-semibold text-sm text-secondary-container">
+              {heroBadge}
+            </p>
+          ) : null}
 
           <h1 className="font-extrabold text-3xl tracking-tight sm:text-5xl lg:text-6xl text-white leading-tight drop-shadow-sm">
             {heroTitle}
@@ -145,7 +151,7 @@ export function HeroSection({
             {statsData.map((stat) => (
               <div
                 key={`${stat.label}-${stat.value}`}
-                className="group rounded-2xl bg-white/10 p-5 backdrop-blur-md border border-white/15 shadow-md space-y-1.5 transition-all duration-300 hover:bg-white/15 hover:-translate-y-0.5"
+                className="rounded-2xl bg-white/10 p-5 border border-white/15 space-y-1.5"
               >
                 <div className="flex items-center gap-1.5 text-secondary-container">
                   <stat.Ikon className="h-4 w-4" />
