@@ -1,12 +1,29 @@
 "use client";
 
 import Link from "next/link";
-import { useId, useRef, useState } from "react";
+import {
+  type InputHTMLAttributes,
+  type ReactNode,
+  useEffect,
+  useId,
+  useRef,
+  useState,
+} from "react";
 import {
   PMB_BERKAS_MAX_BYTE,
   PMB_JENIS_BERKAS,
   PMB_MIME_BERKAS,
 } from "@/lib/validations/pmb";
+import {
+  AGAMA,
+  ALAT_TRANSPORTASI,
+  JENIS_TINGGAL,
+  JENJANG_PENDIDIKAN,
+  KEBUTUHAN_KHUSUS,
+  KUNCI_DATA_DAPODIK,
+  PEKERJAAN,
+  PENGHASILAN,
+} from "@/lib/validations/pmb-dapodik";
 
 interface BerkasTerpilih {
   jenis: (typeof PMB_JENIS_BERKAS)[number];
@@ -25,11 +42,29 @@ const LABEL_BERKAS: Record<(typeof PMB_JENIS_BERKAS)[number], string> = {
   lainnya: "Berkas lain",
 };
 
+const LANGKAH = [
+  "Calon siswa",
+  "Alamat",
+  "Orang tua & wali",
+  "Bantuan & kesehatan",
+  "Berkas & kirim",
+] as const;
+
+/**
+ * Draf isian disimpan di `sessionStorage`, bukan `localStorage`: draf tetap
+ * selamat bila halaman dimuat ulang, tetapi NIK anak dan orang tua tidak
+ * tertinggal di komputer bersama (warnet, komputer sekolah) setelah tab ditutup.
+ */
+const KUNCI_DRAF = "kos.pmb.draf";
+
 type Kiriman =
   | { keadaan: "kosong" }
   | { keadaan: "mengirim" }
   | { keadaan: "berhasil"; nomor: string; gelombang: string }
-  | { keadaan: "gagal"; pesan: string };
+  | { keadaan: "gagal"; pesan: string; rincian: string[] };
+
+const KELAS_ISIAN =
+  "mt-1 w-full min-h-11 rounded-md border border-garis bg-latar px-3 py-2";
 
 function bacaSebagaiBase64(berkas: File): Promise<string> {
   return new Promise((selesai, gagal) => {
@@ -46,8 +81,162 @@ function bacaSebagaiBase64(berkas: File): Promise<string> {
   });
 }
 
+function Label({
+  htmlFor,
+  wajib,
+  children,
+}: {
+  htmlFor: string;
+  wajib?: boolean;
+  children: ReactNode;
+}) {
+  return (
+    <label className="block text-sm text-teks-lembut" htmlFor={htmlFor}>
+      {children}
+      {wajib ? null : <span className="text-xs"> (opsional)</span>}
+    </label>
+  );
+}
+
+function Isian({
+  label,
+  name,
+  wajib = false,
+  bantuan,
+  ...lain
+}: {
+  label: string;
+  name: string;
+  wajib?: boolean;
+  bantuan?: string;
+} & InputHTMLAttributes<HTMLInputElement>) {
+  const id = useId();
+  return (
+    <div>
+      <Label htmlFor={id} wajib={wajib}>
+        {label}
+      </Label>
+      <input
+        className={KELAS_ISIAN}
+        id={id}
+        name={name}
+        required={wajib}
+        type="text"
+        {...lain}
+      />
+      {bantuan ? (
+        <p className="mt-1 text-teks-lembut text-xs">{bantuan}</p>
+      ) : null}
+    </div>
+  );
+}
+
+function Pilihan({
+  label,
+  name,
+  daftar,
+  wajib = false,
+  bawaan = "",
+}: {
+  label: string;
+  name: string;
+  daftar: readonly string[];
+  wajib?: boolean;
+  bawaan?: string;
+}) {
+  const id = useId();
+  return (
+    <div>
+      <Label htmlFor={id} wajib={wajib}>
+        {label}
+      </Label>
+      <select
+        className={KELAS_ISIAN}
+        defaultValue={bawaan}
+        id={id}
+        name={name}
+        required={wajib}
+      >
+        {bawaan ? null : <option value="">Pilih</option>}
+        {daftar.map((nilai) => (
+          <option key={nilai} value={nilai}>
+            {nilai}
+          </option>
+        ))}
+      </select>
+    </div>
+  );
+}
+
+/** Enam isian yang sama untuk ayah, ibu, dan wali. */
+function OrangTua({
+  awalan,
+  judul,
+  namaWajib = false,
+  aksi,
+}: {
+  awalan: "ayah" | "ibu" | "wali";
+  judul: string;
+  namaWajib?: boolean;
+  aksi?: ReactNode;
+}) {
+  const tahunIni = new Date().getFullYear();
+  return (
+    <div className="space-y-4 rounded-lg border border-garis p-4">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h3 className="font-semibold">{judul}</h3>
+        {aksi}
+      </div>
+      <Isian
+        label={namaWajib ? "Nama ibu kandung" : "Nama"}
+        maxLength={120}
+        name={`${awalan}Nama`}
+        wajib={namaWajib}
+      />
+      <div className="grid gap-4 sm:grid-cols-2">
+        <Isian
+          inputMode="numeric"
+          label="Tahun lahir"
+          max={tahunIni}
+          min={1900}
+          name={`${awalan}TahunLahir`}
+          type="number"
+        />
+        <Isian
+          inputMode="numeric"
+          label="NIK"
+          maxLength={16}
+          name={`${awalan}Nik`}
+          pattern="\d{16}"
+          title="16 angka sesuai KTP"
+        />
+      </div>
+      <Pilihan
+        daftar={JENJANG_PENDIDIKAN}
+        label="Pendidikan terakhir"
+        name={`${awalan}Pendidikan`}
+      />
+      <div className="grid gap-4 sm:grid-cols-2">
+        <Pilihan
+          daftar={PEKERJAAN}
+          label="Pekerjaan"
+          name={`${awalan}Pekerjaan`}
+        />
+        <Pilihan
+          daftar={PENGHASILAN}
+          label="Penghasilan per bulan"
+          name={`${awalan}Penghasilan`}
+        />
+      </div>
+    </div>
+  );
+}
+
 export function FormPendaftaran({ jurusan }: { jurusan: string[] }) {
   const id = useId();
+  const formRef = useRef<HTMLFormElement>(null);
+  const [langkah, setLangkah] = useState(0);
+  const [ringkasan, setRingkasan] = useState<[string, string][]>([]);
   const [berkas, setBerkas] = useState<BerkasTerpilih[]>([]);
   const [kiriman, setKiriman] = useState<Kiriman>({ keadaan: "kosong" });
   const [galatBerkas, setGalatBerkas] = useState<string | null>(null);
@@ -62,6 +251,118 @@ export function FormPendaftaran({ jurusan }: { jurusan: string[] }) {
    * hanya saja akibatnya lebih terlihat: dua nomor pendaftaran untuk satu anak.
    */
   const isSubmittingRef = useRef(false);
+
+  // Pulihkan draf saat halaman dibuka ulang di tab yang sama.
+  useEffect(() => {
+    const form = formRef.current;
+    if (!form) return;
+    try {
+      const draf = JSON.parse(sessionStorage.getItem(KUNCI_DRAF) ?? "{}");
+      for (const [nama, nilai] of Object.entries(draf)) {
+        const elemen = form.elements.namedItem(nama);
+        if (
+          elemen instanceof HTMLInputElement ||
+          elemen instanceof HTMLSelectElement ||
+          elemen instanceof HTMLTextAreaElement
+        ) {
+          if (elemen.type !== "file") elemen.value = String(nilai);
+        }
+      }
+    } catch {
+      // Penyimpanan diblokir atau draf rusak: formulir tetap bisa diisi.
+    }
+  }, []);
+
+  function simpanDraf() {
+    const form = formRef.current;
+    if (!form) return;
+    try {
+      const draf: Record<string, string> = {};
+      for (const [nama, nilai] of new FormData(form)) {
+        if (typeof nilai === "string") draf[nama] = nilai;
+      }
+      sessionStorage.setItem(KUNCI_DRAF, JSON.stringify(draf));
+    } catch {
+      // Tanpa penyimpanan, draf hanya hidup selama halaman terbuka.
+    }
+  }
+
+  function bagianLangkah(indeks: number) {
+    return formRef.current?.querySelector<HTMLFieldSetElement>(
+      `fieldset[data-langkah="${indeks}"]`,
+    );
+  }
+
+  /** Validasi bawaan browser untuk satu langkah; fokus ke isian pertama yang salah. */
+  function langkahSah(indeks: number): boolean {
+    const bagian = bagianLangkah(indeks);
+    if (!bagian) return true;
+    for (const elemen of Array.from(bagian.elements)) {
+      if (
+        (elemen instanceof HTMLInputElement ||
+          elemen instanceof HTMLSelectElement ||
+          elemen instanceof HTMLTextAreaElement) &&
+        !elemen.checkValidity()
+      ) {
+        elemen.reportValidity();
+        return false;
+      }
+    }
+    return true;
+  }
+
+  function pindah(ke: number) {
+    if (ke === LANGKAH.length - 1) setRingkasan(susunRingkasan());
+    setLangkah(ke);
+    formRef.current?.scrollIntoView({ block: "start" });
+  }
+
+  function lanjut() {
+    if (langkahSah(langkah)) pindah(langkah + 1);
+  }
+
+  function susunRingkasan(): [string, string][] {
+    const form = formRef.current;
+    if (!form) return [];
+    const data = new FormData(form);
+    const ambil = (nama: string) => String(data.get(nama) ?? "").trim() || "—";
+    return [
+      ["Nama", ambil("namaLengkap")],
+      ["Tanggal lahir", ambil("tanggalLahir")],
+      ["NIK", ambil("nik")],
+      [
+        "Alamat",
+        `${ambil("alamat")}, ${ambil("kelurahan")}, ${ambil("kecamatan")}`,
+      ],
+      ["Nama ibu kandung", ambil("ibuNama")],
+      ["WhatsApp orang tua/wali", ambil("noWhatsappWali")],
+    ];
+  }
+
+  function salinKeWali(dari: "ayah" | "ibu") {
+    const form = formRef.current;
+    if (!form) return;
+    for (const akhiran of [
+      "Nama",
+      "TahunLahir",
+      "Nik",
+      "Pendidikan",
+      "Pekerjaan",
+      "Penghasilan",
+    ]) {
+      const asal = form.elements.namedItem(`${dari}${akhiran}`);
+      const tujuan = form.elements.namedItem(`wali${akhiran}`);
+      if (
+        (asal instanceof HTMLInputElement ||
+          asal instanceof HTMLSelectElement) &&
+        (tujuan instanceof HTMLInputElement ||
+          tujuan instanceof HTMLSelectElement)
+      ) {
+        tujuan.value = asal.value;
+      }
+    }
+    simpanDraf();
+  }
 
   async function pilihBerkas(
     jenis: (typeof PMB_JENIS_BERKAS)[number],
@@ -111,6 +412,26 @@ export function FormPendaftaran({ jurusan }: { jurusan: string[] }) {
   async function kirim(peristiwa: React.FormEvent<HTMLFormElement>) {
     peristiwa.preventDefault();
     if (isSubmittingRef.current) return;
+
+    // Langkah yang salah dibuka lagi, lalu isiannya ditunjuk.
+    for (let indeks = 0; indeks < LANGKAH.length; indeks++) {
+      const bagian = bagianLangkah(indeks);
+      const salah = bagian
+        ? Array.from(bagian.elements).find(
+            (elemen) =>
+              (elemen instanceof HTMLInputElement ||
+                elemen instanceof HTMLSelectElement ||
+                elemen instanceof HTMLTextAreaElement) &&
+              !elemen.checkValidity(),
+          )
+        : undefined;
+      if (salah) {
+        setLangkah(indeks);
+        setTimeout(() => (salah as HTMLInputElement).reportValidity(), 0);
+        return;
+      }
+    }
+
     isSubmittingRef.current = true;
     setKiriman({ keadaan: "mengirim" });
 
@@ -134,18 +455,30 @@ export function FormPendaftaran({ jurusan }: { jurusan: string[] }) {
           emailWali: ambil("emailWali") || null,
           pilihanJurusan: ambil("pilihanJurusan"),
           berkas,
+          dataDapodik: Object.fromEntries(
+            KUNCI_DATA_DAPODIK.map((kunci) => [kunci, ambil(kunci)]),
+          ),
         }),
       });
 
       const isi = await jawaban.json();
       if (!jawaban.ok) {
+        const rincian = Array.isArray(isi?.detail)
+          ? isi.detail.map((d: { message?: string }) => String(d.message ?? ""))
+          : [];
         setKiriman({
           keadaan: "gagal",
           pesan: String(isi?.message ?? "Pendaftaran gagal dikirim."),
+          rincian: rincian.filter(Boolean),
         });
         return;
       }
 
+      try {
+        sessionStorage.removeItem(KUNCI_DRAF);
+      } catch {
+        // Draf yang tersisa akan hilang sendiri saat tab ditutup.
+      }
       setKiriman({
         keadaan: "berhasil",
         nomor: String(isi.nomorPendaftaran),
@@ -157,6 +490,7 @@ export function FormPendaftaran({ jurusan }: { jurusan: string[] }) {
         keadaan: "gagal",
         pesan:
           "Tidak dapat menghubungi server. Periksa koneksi Anda lalu coba lagi.",
+        rincian: [],
       });
     } finally {
       isSubmittingRef.current = false;
@@ -189,55 +523,52 @@ export function FormPendaftaran({ jurusan }: { jurusan: string[] }) {
   }
 
   const mengirim = kiriman.keadaan === "mengirim";
+  const terakhir = langkah === LANGKAH.length - 1;
 
   return (
-    <form className="space-y-8" onSubmit={kirim}>
-      <fieldset className="space-y-4" disabled={mengirim}>
-        <legend className="font-semibold text-lg">Data calon siswa</legend>
+    <form
+      // Header situs lengket setinggi ±72px; tanpa jarak ini judul langkah
+      // tertutup header setiap kali pindah langkah.
+      className="scroll-mt-24 space-y-8"
+      noValidate
+      onInput={simpanDraf}
+      onSubmit={kirim}
+      ref={formRef}
+    >
+      <nav aria-label="Langkah pendaftaran">
+        <p className="text-sm text-teks-lembut">
+          Langkah {langkah + 1} dari {LANGKAH.length}
+        </p>
+        <ol className="mt-2 flex gap-1.5">
+          {LANGKAH.map((nama, indeks) => (
+            <li
+              aria-current={indeks === langkah ? "step" : undefined}
+              className={`h-1.5 flex-1 rounded-full ${indeks <= langkah ? "bg-aksen" : "bg-garis"}`}
+              key={nama}
+              title={nama}
+            >
+              <span className="sr-only">{nama}</span>
+            </li>
+          ))}
+        </ol>
+        <h2 className="mt-4 font-semibold text-xl">{LANGKAH[langkah]}</h2>
+      </nav>
 
-        <div>
-          <label
-            className="block text-sm text-teks-lembut"
-            htmlFor={`${id}-nama`}
-          >
-            Nama lengkap
-          </label>
-          <input
-            className="mt-1 w-full rounded-md border border-garis bg-latar px-3 py-2"
-            id={`${id}-nama`}
-            maxLength={120}
-            name="namaLengkap"
-            required
-            type="text"
-          />
-        </div>
-
+      <fieldset
+        className="space-y-4"
+        data-langkah="0"
+        disabled={mengirim}
+        hidden={langkah !== 0}
+      >
+        <legend className="sr-only">{LANGKAH[0]}</legend>
+        <Isian label="Nama lengkap" maxLength={120} name="namaLengkap" wajib />
         <div className="grid gap-4 sm:grid-cols-2">
           <div>
-            <label
-              className="block text-sm text-teks-lembut"
-              htmlFor={`${id}-nisn`}
-            >
-              NISN <span className="text-xs">(opsional)</span>
-            </label>
-            <input
-              className="mt-1 w-full rounded-md border border-garis bg-latar px-3 py-2"
-              id={`${id}-nisn`}
-              inputMode="numeric"
-              maxLength={20}
-              name="nisn"
-              type="text"
-            />
-          </div>
-          <div>
-            <label
-              className="block text-sm text-teks-lembut"
-              htmlFor={`${id}-kelamin`}
-            >
+            <Label htmlFor={`${id}-kelamin`} wajib>
               Jenis kelamin
-            </label>
+            </Label>
             <select
-              className="mt-1 w-full rounded-md border border-garis bg-latar px-3 py-2"
+              className={KELAS_ISIAN}
               defaultValue=""
               id={`${id}-kelamin`}
               name="jenisKelamin"
@@ -250,83 +581,61 @@ export function FormPendaftaran({ jurusan }: { jurusan: string[] }) {
               <option value="P">Perempuan</option>
             </select>
           </div>
+          <Pilihan daftar={AGAMA} label="Agama" name="agama" wajib />
         </div>
-
         <div className="grid gap-4 sm:grid-cols-2">
-          <div>
-            <label
-              className="block text-sm text-teks-lembut"
-              htmlFor={`${id}-tempat-lahir`}
-            >
-              Tempat lahir
-            </label>
-            <input
-              className="mt-1 w-full rounded-md border border-garis bg-latar px-3 py-2"
-              id={`${id}-tempat-lahir`}
-              maxLength={80}
-              name="tempatLahir"
-              type="text"
-            />
-          </div>
-          <div>
-            <label
-              className="block text-sm text-teks-lembut"
-              htmlFor={`${id}-tanggal-lahir`}
-            >
-              Tanggal lahir
-            </label>
-            <input
-              className="mt-1 w-full rounded-md border border-garis bg-latar px-3 py-2"
-              id={`${id}-tanggal-lahir`}
-              name="tanggalLahir"
-              required
-              type="date"
-            />
-          </div>
+          <Isian
+            bantuan="16 angka, tertera di Kartu Keluarga."
+            inputMode="numeric"
+            label="NIK calon siswa"
+            maxLength={16}
+            name="nik"
+            pattern="\d{16}"
+            title="16 angka sesuai Kartu Keluarga"
+            wajib
+          />
+          <Isian inputMode="numeric" label="NISN" maxLength={20} name="nisn" />
         </div>
-
-        <div>
-          <label
-            className="block text-sm text-teks-lembut"
-            htmlFor={`${id}-asal-sekolah`}
-          >
-            Asal sekolah
-          </label>
-          <input
-            className="mt-1 w-full rounded-md border border-garis bg-latar px-3 py-2"
-            id={`${id}-asal-sekolah`}
-            maxLength={120}
-            name="asalSekolah"
-            type="text"
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Isian label="Tempat lahir" maxLength={80} name="tempatLahir" wajib />
+          <Isian label="Tanggal lahir" name="tanggalLahir" type="date" wajib />
+        </div>
+        <Isian
+          label="No registrasi akta lahir"
+          maxLength={40}
+          name="noAktaLahir"
+        />
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Isian
+            inputMode="numeric"
+            label="Anak ke-"
+            max={20}
+            min={1}
+            name="anakKe"
+            type="number"
+          />
+          <Isian
+            inputMode="numeric"
+            label="Jumlah saudara kandung"
+            max={20}
+            min={0}
+            name="jumlahSaudara"
+            type="number"
           />
         </div>
-
-        <div>
-          <label
-            className="block text-sm text-teks-lembut"
-            htmlFor={`${id}-alamat`}
-          >
-            Alamat tempat tinggal
-          </label>
-          <textarea
-            className="mt-1 w-full rounded-md border border-garis bg-latar px-3 py-2"
-            id={`${id}-alamat`}
-            maxLength={255}
-            name="alamat"
-            rows={2}
-          />
-        </div>
-
+        <Pilihan
+          bawaan="Tidak ada"
+          daftar={KEBUTUHAN_KHUSUS}
+          label="Kebutuhan khusus"
+          name="kebutuhanKhusus"
+          wajib
+        />
+        <Isian label="Sekolah asal" maxLength={120} name="asalSekolah" />
         {jurusan.length > 0 ? (
           <div>
-            <label
-              className="block text-sm text-teks-lembut"
-              htmlFor={`${id}-jurusan`}
-            >
-              Pilihan program keahlian
-            </label>
+            <Label htmlFor={`${id}-jurusan`}>Pilihan program keahlian</Label>
             <select
-              className="mt-1 w-full rounded-md border border-garis bg-latar px-3 py-2"
+              className={KELAS_ISIAN}
               defaultValue=""
               id={`${id}-jurusan`}
               name="pilihanJurusan"
@@ -340,69 +649,235 @@ export function FormPendaftaran({ jurusan }: { jurusan: string[] }) {
             </select>
           </div>
         ) : null}
-      </fieldset>
-
-      <fieldset className="space-y-4" disabled={mengirim}>
-        <legend className="font-semibold text-lg">Data wali</legend>
-
-        <div>
-          <label
-            className="block text-sm text-teks-lembut"
-            htmlFor={`${id}-nama-wali`}
-          >
-            Nama orang tua / wali
-          </label>
-          <input
-            className="mt-1 w-full rounded-md border border-garis bg-latar px-3 py-2"
-            id={`${id}-nama-wali`}
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Isian
+            inputMode="tel"
+            label="Nomor HP calon siswa"
+            name="hpSiswa"
+            type="tel"
+          />
+          <Isian
+            label="Email calon siswa"
             maxLength={120}
-            name="namaWali"
-            required
-            type="text"
+            name="emailSiswa"
+            type="email"
           />
         </div>
+      </fieldset>
 
-        <div className="grid gap-4 sm:grid-cols-2">
-          <div>
-            <label
-              className="block text-sm text-teks-lembut"
-              htmlFor={`${id}-wa-wali`}
-            >
-              Nomor WhatsApp wali
-            </label>
-            <input
-              className="mt-1 w-full rounded-md border border-garis bg-latar px-3 py-2"
-              id={`${id}-wa-wali`}
-              inputMode="tel"
-              name="noWhatsappWali"
-              required
-              type="tel"
-            />
-            <p className="mt-1 text-teks-lembut text-xs">
-              Contoh: 081200000000. Nomor ini dipakai sekolah untuk menghubungi
-              Anda.
-            </p>
+      <fieldset
+        className="space-y-4"
+        data-langkah="1"
+        disabled={mengirim}
+        hidden={langkah !== 1}
+      >
+        <legend className="sr-only">{LANGKAH[1]}</legend>
+        <Isian
+          bantuan="Nama jalan, blok, dan nomor rumah."
+          label="Alamat"
+          maxLength={255}
+          name="alamat"
+          wajib
+        />
+        <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+          <Isian
+            inputMode="numeric"
+            label="RT"
+            maxLength={3}
+            name="rt"
+            pattern="\d{1,3}"
+          />
+          <Isian
+            inputMode="numeric"
+            label="RW"
+            maxLength={3}
+            name="rw"
+            pattern="\d{1,3}"
+          />
+          <div className="col-span-2">
+            <Isian label="Dusun" maxLength={80} name="dusun" />
           </div>
-          <div>
-            <label
-              className="block text-sm text-teks-lembut"
-              htmlFor={`${id}-email-wali`}
-            >
-              Surel wali <span className="text-xs">(opsional)</span>
-            </label>
-            <input
-              className="mt-1 w-full rounded-md border border-garis bg-latar px-3 py-2"
-              id={`${id}-email-wali`}
+        </div>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Isian
+            label="Kelurahan / desa"
+            maxLength={80}
+            name="kelurahan"
+            wajib
+          />
+          <Isian label="Kecamatan" maxLength={80} name="kecamatan" wajib />
+        </div>
+        <Isian
+          inputMode="numeric"
+          label="Kode pos"
+          maxLength={5}
+          name="kodePos"
+          pattern="\d{5}"
+          title="5 angka"
+        />
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Pilihan
+            daftar={JENIS_TINGGAL}
+            label="Tinggal bersama"
+            name="jenisTinggal"
+          />
+          <Pilihan
+            daftar={ALAT_TRANSPORTASI}
+            label="Alat transportasi ke sekolah"
+            name="transportasi"
+          />
+        </div>
+        <Isian
+          inputMode="decimal"
+          label="Jarak rumah ke sekolah (km)"
+          max={500}
+          min={0}
+          name="jarakKm"
+          step="0.1"
+          type="number"
+        />
+      </fieldset>
+
+      <fieldset
+        className="space-y-6"
+        data-langkah="2"
+        disabled={mengirim}
+        hidden={langkah !== 2}
+      >
+        <legend className="sr-only">{LANGKAH[2]}</legend>
+        <div className="space-y-4">
+          <h3 className="font-semibold">Kontak yang dapat dihubungi sekolah</h3>
+          <Isian
+            label="Nama orang tua / wali"
+            maxLength={120}
+            name="namaWali"
+            wajib
+          />
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Isian
+              bantuan="Contoh: 081200000000. Pemberitahuan pendaftaran dikirim ke nomor ini."
+              inputMode="tel"
+              label="Nomor WhatsApp"
+              name="noWhatsappWali"
+              type="tel"
+              wajib
+            />
+            <Isian
+              label="Email"
               maxLength={120}
               name="emailWali"
               type="email"
             />
           </div>
         </div>
+        <Isian
+          bantuan="16 angka di bagian atas Kartu Keluarga."
+          inputMode="numeric"
+          label="Nomor Kartu Keluarga"
+          maxLength={16}
+          name="noKk"
+          pattern="\d{16}"
+          title="16 angka"
+        />
+        <OrangTua awalan="ayah" judul="Data ayah" />
+        <OrangTua awalan="ibu" judul="Data ibu" namaWajib />
+        <OrangTua
+          aksi={
+            <div className="flex gap-2">
+              <button
+                className="min-h-11 rounded-md border border-garis px-3 text-sm"
+                onClick={() => salinKeWali("ayah")}
+                type="button"
+              >
+                Sama dengan ayah
+              </button>
+              <button
+                className="min-h-11 rounded-md border border-garis px-3 text-sm"
+                onClick={() => salinKeWali("ibu")}
+                type="button"
+              >
+                Sama dengan ibu
+              </button>
+            </div>
+          }
+          awalan="wali"
+          judul="Data wali"
+        />
       </fieldset>
 
-      <fieldset className="space-y-4" disabled={mengirim}>
-        <legend className="font-semibold text-lg">Berkas persyaratan</legend>
+      <fieldset
+        className="space-y-6"
+        data-langkah="3"
+        disabled={mengirim}
+        hidden={langkah !== 3}
+      >
+        <legend className="sr-only">{LANGKAH[3]}</legend>
+        <div className="space-y-4">
+          <h3 className="font-semibold">Bantuan pemerintah</h3>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Pilihan
+              bawaan="Tidak"
+              daftar={["Tidak", "Ya"]}
+              label="Penerima KPS/PKH"
+              name="kps"
+              wajib
+            />
+            <Isian label="Nomor KPS/PKH" maxLength={40} name="noKps" />
+          </div>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Pilihan
+              bawaan="Tidak"
+              daftar={["Tidak", "Ya"]}
+              label="Penerima KIP"
+              name="kip"
+              wajib
+            />
+            <Isian label="Nomor KIP" maxLength={40} name="noKip" />
+          </div>
+          <Isian label="Nama tertera di KIP" maxLength={120} name="namaKip" />
+          <Isian label="Nomor KKS" maxLength={40} name="noKks" />
+        </div>
+        <div className="space-y-4">
+          <h3 className="font-semibold">Data kesehatan</h3>
+          <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
+            <Isian
+              inputMode="decimal"
+              label="Berat badan (kg)"
+              max={200}
+              min={1}
+              name="beratKg"
+              step="0.1"
+              type="number"
+            />
+            <Isian
+              inputMode="decimal"
+              label="Tinggi badan (cm)"
+              max={250}
+              min={30}
+              name="tinggiCm"
+              step="0.1"
+              type="number"
+            />
+            <Isian
+              inputMode="decimal"
+              label="Lingkar kepala (cm)"
+              max={80}
+              min={20}
+              name="lingkarKepalaCm"
+              step="0.1"
+              type="number"
+            />
+          </div>
+        </div>
+      </fieldset>
+
+      <fieldset
+        className="space-y-4"
+        data-langkah="4"
+        disabled={mengirim}
+        hidden={langkah !== 4}
+      >
+        <legend className="sr-only">{LANGKAH[4]}</legend>
         <p className="text-sm text-teks-lembut leading-relaxed">
           Format JPG, PNG, WEBP, atau PDF. Maksimal{" "}
           {Math.round(PMB_BERKAS_MAX_BYTE / 1024)} KB per berkas. Berkas yang
@@ -414,15 +889,10 @@ export function FormPendaftaran({ jurusan }: { jurusan: string[] }) {
             const terlampir = berkas.find((item) => item.jenis === jenis);
             return (
               <div key={jenis}>
-                <label
-                  className="block text-sm text-teks-lembut"
-                  htmlFor={`${id}-${jenis}`}
-                >
-                  {LABEL_BERKAS[jenis]}
-                </label>
+                <Label htmlFor={`${id}-${jenis}`}>{LABEL_BERKAS[jenis]}</Label>
                 <input
                   accept={PMB_MIME_BERKAS.join(",")}
-                  className="mt-1 w-full rounded-md border border-garis bg-latar px-3 py-2 text-sm"
+                  className={`${KELAS_ISIAN} text-sm`}
                   id={`${id}-${jenis}`}
                   name={`berkas-${jenis}`}
                   onChange={(peristiwa) =>
@@ -446,21 +916,72 @@ export function FormPendaftaran({ jurusan }: { jurusan: string[] }) {
             {galatBerkas}
           </p>
         ) : null}
+
+        <div className="rounded-lg border border-garis p-4">
+          <h3 className="font-semibold">Periksa sebelum mengirim</h3>
+          <dl className="mt-3 grid gap-x-4 gap-y-2 text-sm sm:grid-cols-[auto_1fr]">
+            {ringkasan.map(([label, nilai]) => (
+              <div className="contents" key={label}>
+                <dt className="text-teks-lembut">{label}</dt>
+                <dd className="font-medium wrap-break-word">{nilai}</dd>
+              </div>
+            ))}
+          </dl>
+        </div>
+
+        <p className="text-teks-lembut text-xs leading-relaxed">
+          Data ini dipakai sekolah untuk seleksi penerimaan dan pendataan
+          peserta didik di DAPODIK, dan hanya dapat dibuka panitia penerimaan.
+        </p>
       </fieldset>
 
       {kiriman.keadaan === "gagal" ? (
-        <p className="rounded-md border border-garis bg-latar-lembut p-4 text-sm leading-relaxed">
-          {kiriman.pesan}
-        </p>
+        <div
+          className="rounded-md border border-garis bg-latar-lembut p-4 text-sm leading-relaxed"
+          role="alert"
+        >
+          <p>{kiriman.pesan}</p>
+          {kiriman.rincian.length > 0 ? (
+            <ul className="mt-2 list-disc pl-5">
+              {kiriman.rincian.map((pesan) => (
+                <li key={pesan}>{pesan}</li>
+              ))}
+            </ul>
+          ) : null}
+        </div>
       ) : null}
 
-      <button
-        className="w-full rounded-md bg-aksen px-5 py-3 font-medium text-aksen-teks disabled:opacity-60 sm:w-auto"
-        disabled={mengirim}
-        type="submit"
-      >
-        {mengirim ? "Mengirim…" : "Kirim pendaftaran"}
-      </button>
+      <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-between">
+        {langkah > 0 ? (
+          <button
+            className="min-h-12 rounded-md border border-garis px-5 font-medium"
+            disabled={mengirim}
+            onClick={() => pindah(langkah - 1)}
+            type="button"
+          >
+            Kembali
+          </button>
+        ) : (
+          <span />
+        )}
+        {terakhir ? (
+          <button
+            className="min-h-12 rounded-md bg-aksen px-5 font-medium text-aksen-teks disabled:opacity-60"
+            disabled={mengirim}
+            type="submit"
+          >
+            {mengirim ? "Mengirim…" : "Kirim pendaftaran"}
+          </button>
+        ) : (
+          <button
+            className="min-h-12 rounded-md bg-aksen px-5 font-medium text-aksen-teks"
+            onClick={lanjut}
+            type="button"
+          >
+            Lanjut ke {LANGKAH[langkah + 1].toLowerCase()}
+          </button>
+        )}
+      </div>
     </form>
   );
 }

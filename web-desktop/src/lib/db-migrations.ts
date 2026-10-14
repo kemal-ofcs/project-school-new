@@ -59,6 +59,7 @@ const BOOK_CLOSING_MIGRATION_VERSION = 45;
 const BOOK_CLOSING_DECISION_MIGRATION_VERSION = 46;
 const WA_BOOK_CLOSING_MIGRATION_VERSION = 47;
 const CONTENT_IMAGE_MIGRATION_VERSION = 48;
+const PMB_DAPODIK_MIGRATION_VERSION = 49;
 
 /**
  * v21 — aturan jam scan baru: Jam Kerja Normal = (Jam Pulang − Jam Masuk) −
@@ -573,6 +574,13 @@ export async function runDatabaseMigrations(client: Client) {
       "keu_tutup_buku",
       "catatan_keputusan",
       "ALTER TABLE keu_tutup_buku ADD COLUMN catatan_keputusan TEXT;",
+    ],
+    // Data DAPODIK pendaftar PMB (v49, JSON berversi). Cerminan
+    // `ensure_column` di `turso.rs`; tabelnya cloud-only.
+    [
+      "pmb_pendaftar",
+      "data_dapodik",
+      "ALTER TABLE pmb_pendaftar ADD COLUMN data_dapodik TEXT;",
     ],
   ] as const) {
     if (
@@ -2012,6 +2020,12 @@ export async function runDatabaseMigrations(client: Client) {
           VALUES (?, 'content-image', ?);`,
     args: [CONTENT_IMAGE_MIGRATION_VERSION, now],
   });
+  // v49 — data DAPODIK pendaftar PMB (ALTER-nya ada di daftar kolom di atas).
+  await client.execute({
+    sql: `INSERT OR IGNORE INTO schema_migration (version, name, applied_at)
+          VALUES (?, 'pmb-dapodik', ?);`,
+    args: [PMB_DAPODIK_MIGRATION_VERSION, now],
+  });
 
   await client.execute(
     "CREATE INDEX IF NOT EXISTS idx_jurnal_presensi ON jurnal_mengajar(id_presensi_mapel);",
@@ -2360,7 +2374,8 @@ export async function runDatabaseMigrations(client: Client) {
       diverifikasi_at TEXT,
       id_siswa TEXT,
       created_at TEXT NOT NULL,
-      updated_at TEXT NOT NULL
+      updated_at TEXT NOT NULL,
+      data_dapodik TEXT
     );
   `);
 

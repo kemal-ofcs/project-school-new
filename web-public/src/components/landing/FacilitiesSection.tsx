@@ -21,6 +21,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { KataMuncul } from "@/components/visual/KataMuncul";
 import { SpotlightCard } from "@/components/visual/SpotlightCard";
 import { koleksiFasilitas } from "@/lib/services/landing-collections";
 import { FotoKartu, TautanGaleri, type TautanGaleriData } from "./FotoKartu";
@@ -84,7 +85,7 @@ export function FacilitiesSection({
             ) : null}
             {title ? (
               <h2 className="font-bold text-2xl sm:text-4xl text-foreground tracking-tight">
-                {title}
+                <KataMuncul teks={title} />
               </h2>
             ) : null}
             {subtitle ? (

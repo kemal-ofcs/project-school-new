@@ -197,6 +197,7 @@ export async function listPmbRegistrants(
            p.nisn, p.jenis_kelamin, p.asal_sekolah, p.pilihan_jurusan,
            p.nama_wali, p.no_whatsapp_wali, p.status, p.id_siswa,
            p.created_at, p.updated_at,
+           ${filter.dapodik ? "p.tempat_lahir, p.tanggal_lahir, p.alamat, p.data_dapodik," : ""}
            COALESCE(g.nama, '') AS nama_gelombang,
            (SELECT COUNT(*) FROM pmb_berkas b
              WHERE b.id_pendaftar = p.id_pendaftar) AS jumlah_berkas

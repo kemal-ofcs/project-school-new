@@ -3,6 +3,10 @@
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { MobileAppShell } from "@/components/MobileAppShell";
+import {
+  DataDapodikDetail,
+  TombolEksporDapodik,
+} from "@/components/pmb/DataDapodikPmb";
 import { FeedbackBanner } from "@/components/ui/FeedbackBanner";
 import { Modal } from "@/components/ui/Modal";
 import { canAccessArea, hasPermission } from "@/lib/auth/access";
@@ -416,6 +420,13 @@ export default function PmbMobilePage() {
               value={pencarian}
             />
           </div>
+          <TombolEksporDapodik
+            filter={{
+              id_gelombang: filterGelombang,
+              status: filterStatus,
+              search: pencarian || null,
+            }}
+          />
         </section>
 
         <section className="space-y-2">
@@ -472,6 +483,8 @@ export default function PmbMobilePage() {
               <dt className="text-slate-500">Status</dt>
               <dd>{detail.pendaftar.status}</dd>
             </dl>
+
+            <DataDapodikDetail pendaftar={detail.pendaftar} />
 
             <div>
               <h2 className="font-semibold text-white text-xs uppercase">

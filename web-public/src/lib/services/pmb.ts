@@ -1,10 +1,12 @@
 import type { Client, InStatement } from "@libsql/client";
+import { SchemaNotReadyError } from "@/lib/server/schema-readiness";
 import {
   buatIdBerkas,
   buatIdPendaftar,
   buatNomorPendaftaran,
   type MasukanCekStatus,
   type MasukanPendaftaran,
+  VERSI_DATA_DAPODIK,
 } from "@/lib/validations/pmb";
 
 /**
@@ -127,6 +129,16 @@ export async function tulisPendaftaran(
     }
   }
 
+  // Kolom v49 lahir saat aplikasi admin memigrasi database. Situs publik tidak
+  // pernah mengubah skema sendiri, jadi database yang belum dimigrasi dijawab
+  // "belum siap" alih-alih membuang isian DAPODIK yang sudah diketik orang tua.
+  const kolom = await client.execute("PRAGMA table_info(pmb_pendaftar);");
+  if (!kolom.rows.some((baris) => baris.name === "data_dapodik")) {
+    throw new SchemaNotReadyError(
+      "kolom pmb_pendaftar.data_dapodik (v49) belum ada",
+    );
+  }
+
   let terakhir: unknown = null;
 
   for (let percobaan = 0; percobaan < percobaanMaks; percobaan++) {
@@ -139,8 +151,8 @@ export async function tulisPendaftaran(
                 id_pendaftar, nomor_pendaftaran, id_gelombang, nama_lengkap,
                 nisn, jenis_kelamin, tempat_lahir, tanggal_lahir, asal_sekolah,
                 alamat, nama_wali, no_whatsapp_wali, email_wali, pilihan_jurusan,
-                status, created_at, updated_at
-              ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Baru',
+                data_dapodik, status, created_at, updated_at
+              ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Baru',
                         datetime('now'), datetime('now'));`,
         args: [
           idPendaftar,
@@ -157,6 +169,7 @@ export async function tulisPendaftaran(
           masukan.noWhatsappWali,
           masukan.emailWali ?? null,
           masukan.pilihanJurusan,
+          JSON.stringify({ versi: VERSI_DATA_DAPODIK, ...masukan.dataDapodik }),
         ],
       },
       ...masukan.berkas.map((berkas, urutan) => ({

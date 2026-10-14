@@ -3494,7 +3494,8 @@ impl TursoClient {
                     diverifikasi_at TEXT,
                     id_siswa TEXT,
                     created_at TEXT NOT NULL,
-                    updated_at TEXT NOT NULL
+                    updated_at TEXT NOT NULL,
+                    data_dapodik TEXT
                 );"#,
                 vec![],
             ),
@@ -3745,7 +3746,8 @@ impl TursoClient {
                 (45, 'book-closing', datetime('now')),
                 (46, 'book-closing-decision', datetime('now')),
                 (47, 'wa-book-closing', datetime('now')),
-                (48, 'content-image', datetime('now'));"#,
+                (48, 'content-image', datetime('now')),
+                (49, 'pmb-dapodik', datetime('now'));"#,
                 vec![],
             ),
         ];
@@ -3938,6 +3940,8 @@ impl TursoClient {
             ("keu_tutup_buku", "diputuskan_oleh", "ALTER TABLE keu_tutup_buku ADD COLUMN diputuskan_oleh TEXT;"),
             ("keu_tutup_buku", "diputuskan_pada", "ALTER TABLE keu_tutup_buku ADD COLUMN diputuskan_pada TEXT;"),
             ("keu_tutup_buku", "catatan_keputusan", "ALTER TABLE keu_tutup_buku ADD COLUMN catatan_keputusan TEXT;"),
+            // Data DAPODIK pendaftar PMB (v49, JSON berversi, cloud-only).
+            ("pmb_pendaftar", "data_dapodik", "ALTER TABLE pmb_pendaftar ADD COLUMN data_dapodik TEXT;"),
         ] {
             self.ensure_column(table, column, sql).await?;
         }
@@ -4204,6 +4208,11 @@ impl TursoClient {
         .await?;
         self.query_one(
             "INSERT OR IGNORE INTO schema_migration (version, name, applied_at) VALUES (-2029, 'content-image-v1', datetime('now'));",
+            vec![],
+        )
+        .await?;
+        self.query_one(
+            "INSERT OR IGNORE INTO schema_migration (version, name, applied_at) VALUES (-2030, 'pmb-dapodik-v1', datetime('now'));",
             vec![],
         )
         .await?;
@@ -4518,7 +4527,7 @@ impl TursoClient {
                 // Sentinel WAJIB dinaikkan setiap kali ensure_schema menambah
                 // tabel atau kolom — nilainya di sini dan pada INSERT di atas
                 // harus selalu sama.
-                "SELECT COUNT(*) AS total FROM schema_migration WHERE version = -2029;",
+                "SELECT COUNT(*) AS total FROM schema_migration WHERE version = -2030;",
                 vec![],
             )
             .await
@@ -7895,21 +7904,30 @@ impl TursoClient {
         status: Option<&str>,
         search: Option<&str>,
         limit: Option<i64>,
+        dapodik: bool,
     ) -> Result<Value, CommandError> {
         self.ensure_schema_current().await?;
-        let mut sql = String::from(
+        // Kolom DAPODIK hanya untuk ekspor: daftar biasa dibuka panitia
+        // berkali-kali sehari dan tidak perlu membawa JSON ±2 KB per baris.
+        let kolom_dapodik = if dapodik {
+            "p.tempat_lahir, p.tanggal_lahir, p.alamat, p.data_dapodik,"
+        } else {
+            ""
+        };
+        let mut sql = format!(
             r#"
             SELECT p.id_pendaftar, p.nomor_pendaftaran, p.id_gelombang, p.nama_lengkap,
                    p.nisn, p.jenis_kelamin, p.asal_sekolah, p.pilihan_jurusan,
                    p.nama_wali, p.no_whatsapp_wali, p.status, p.id_siswa,
                    p.created_at, p.updated_at,
+                   {kolom_dapodik}
                    COALESCE(g.nama, '') AS nama_gelombang,
                    (SELECT COUNT(*) FROM pmb_berkas b
                      WHERE b.id_pendaftar = p.id_pendaftar) AS jumlah_berkas
               FROM pmb_pendaftar p
               LEFT JOIN pmb_gelombang g ON g.id_gelombang = p.id_gelombang
              WHERE 1=1
-            "#,
+            "#
         );
         let mut args: Vec<Value> = Vec::new();
 
@@ -16131,7 +16149,7 @@ mod tests {
             connection
                 .execute_batch(
                     "DROP TABLE riwayat_identitas_karyawan;
-                     DELETE FROM schema_migration WHERE version IN (-2017, -2018, -2019, -2020, -2021, -2022, -2023, -2024, -2025, -2026, -2027, -2028, -2029);",
+                     DELETE FROM schema_migration WHERE version IN (-2017, -2018, -2019, -2020, -2021, -2022, -2023, -2024, -2025, -2026, -2027, -2028, -2029, -2030);",
                 )
                 .expect("siapkan database lama");
 
@@ -16167,7 +16185,7 @@ mod tests {
             connection
                 .execute_batch(
                     "DROP TABLE inventory_unit;
-                     DELETE FROM schema_migration WHERE version IN (-2018, -2019, -2020, -2021, -2022, -2023, -2024, -2025, -2026, -2027, -2028, -2029);",
+                     DELETE FROM schema_migration WHERE version IN (-2018, -2019, -2020, -2021, -2022, -2023, -2024, -2025, -2026, -2027, -2028, -2029, -2030);",
                 )
                 .expect("siapkan database lama");
 
@@ -16204,7 +16222,7 @@ mod tests {
                 .execute_batch(
                     "DROP TABLE personil_wajah;
                      ALTER TABLE absensi_foto DROP COLUMN wajah_vonis;
-                     DELETE FROM schema_migration WHERE version IN (-2019, -2020, -2021, -2022, -2023, -2024, -2025, -2026, -2027, -2028, -2029);",
+                     DELETE FROM schema_migration WHERE version IN (-2019, -2020, -2021, -2022, -2023, -2024, -2025, -2026, -2027, -2028, -2029, -2030);",
                 )
                 .expect("siapkan database lama");
 
@@ -16243,7 +16261,7 @@ mod tests {
                     "DROP TABLE keu_akun;
                      DROP TABLE keu_jurnal;
                      DROP TABLE keu_jurnal_baris;
-                     DELETE FROM schema_migration WHERE version IN (-2020, -2021, -2022, -2023, -2024, -2025, -2026, -2027, -2028, -2029);",
+                     DELETE FROM schema_migration WHERE version IN (-2020, -2021, -2022, -2023, -2024, -2025, -2026, -2027, -2028, -2029, -2030);",
                 )
                 .expect("siapkan database lama");
 
@@ -16356,7 +16374,7 @@ mod tests {
                     "DROP TABLE keu_pinjaman;
                      DROP TABLE keu_pinjaman_mutasi;
                      DROP TABLE keu_pinjaman_tunda;
-                     DELETE FROM schema_migration WHERE version IN (-2021, -2022, -2023, -2024, -2025, -2026, -2027, -2028, -2029);",
+                     DELETE FROM schema_migration WHERE version IN (-2021, -2022, -2023, -2024, -2025, -2026, -2027, -2028, -2029, -2030);",
                 )
                 .expect("siapkan database lama");
 
@@ -16393,7 +16411,7 @@ mod tests {
                 .execute_batch(
                     "DROP TABLE keu_tagihan;
                      DROP TABLE keu_tagihan_batal;
-                     DELETE FROM schema_migration WHERE version IN (-2022, -2023, -2024, -2025, -2026, -2027, -2028, -2029);",
+                     DELETE FROM schema_migration WHERE version IN (-2022, -2023, -2024, -2025, -2026, -2027, -2028, -2029, -2030);",
                 )
                 .expect("siapkan database lama");
             client.ensure_schema_current().await.expect("skema mutakhir");
@@ -16431,7 +16449,7 @@ mod tests {
                      DROP TABLE keu_pembayaran;
                      DROP TABLE keu_pembayaran_alokasi;
                      DROP TABLE keu_pembayaran_batal;
-                     DELETE FROM schema_migration WHERE version IN (-2023, -2024, -2025, -2026, -2027, -2028, -2029);",
+                     DELETE FROM schema_migration WHERE version IN (-2023, -2024, -2025, -2026, -2027, -2028, -2029, -2030);",
                 )
                 .expect("siapkan database lama");
             client.ensure_schema_current().await.expect("skema mutakhir");
@@ -16467,7 +16485,7 @@ mod tests {
                 .execute_batch(
                     "DROP TABLE nilai_jenis;
                      ALTER TABLE nilai_penilaian DROP COLUMN id_jenis;
-                     DELETE FROM schema_migration WHERE version IN (-2024, -2025, -2026, -2027, -2028, -2029);",
+                     DELETE FROM schema_migration WHERE version IN (-2024, -2025, -2026, -2027, -2028, -2029, -2030);",
                 )
                 .expect("siapkan database lama");
             client.ensure_schema_current().await.expect("skema mutakhir");

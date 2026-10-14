@@ -29,6 +29,9 @@ export interface StoredWaConfig {
   ambangAlfaEnabled: boolean;
   koreksiAdminEnabled: boolean;
   importManualEnabled: boolean;
+  uksEnabled: boolean;
+  tagihanEnabled: boolean;
+  tutupBukuEnabled: boolean;
 }
 
 export async function readFullWaConfig(
@@ -38,7 +41,8 @@ export async function readFullWaConfig(
     sql: `
       SELECT id, provider, api_key, api_url, sender_number, is_active, daily_limit,
              scan_masuk_enabled, scan_pulang_enabled, bolos_enabled, ambang_alfa_enabled,
-      koreksi_admin_enabled, import_manual_enabled
+      koreksi_admin_enabled, import_manual_enabled, uks_enabled, tagihan_enabled,
+      tutup_buku_enabled
       FROM app_wa_config
       WHERE id = 'default'
       LIMIT 1;
@@ -65,6 +69,9 @@ export async function readFullWaConfig(
     ambangAlfaEnabled: Number(row.ambang_alfa_enabled ?? 1) === 1,
     koreksiAdminEnabled: Number(row.koreksi_admin_enabled ?? 0) === 1,
     importManualEnabled: Number(row.import_manual_enabled ?? 0) === 1,
+    uksEnabled: Number(row.uks_enabled ?? 0) === 1,
+    tagihanEnabled: Number(row.tagihan_enabled ?? 0) === 1,
+    tutupBukuEnabled: Number(row.tutup_buku_enabled ?? 0) === 1,
   };
 }
 

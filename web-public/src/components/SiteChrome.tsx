@@ -51,7 +51,10 @@ export function SiteHeader({
   const nama = namaTampil(profil);
 
   return (
-    <header className="sticky top-0 z-40 w-full border-b border-border bg-background/90 backdrop-blur-xl shadow-xs transition-colors duration-300 pt-safe">
+    <header
+      data-kepala-situs
+      className="sticky top-0 z-40 w-full border-b border-border bg-background/90 backdrop-blur-xl shadow-xs transition-colors duration-300 pt-safe"
+    >
       <div className="mx-auto flex h-18 max-w-7xl items-center justify-between gap-4 px-4 sm:px-6 lg:px-8">
         {/* Brand & Identity */}
         <Link

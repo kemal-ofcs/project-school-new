@@ -102,6 +102,8 @@ export interface PmbRegistrantDetail {
     catatan_verifikator: string | null;
     diverifikasi_oleh: string | null;
     diverifikasi_at: string | null;
+    /** JSON berversi isian DAPODIK (v49); NULL untuk pendaftar lama. */
+    data_dapodik: string | null;
   };
   berkas: PmbFileMeta[];
 }
@@ -111,6 +113,16 @@ export interface PmbRegistrantFilter {
   status?: string | null;
   search?: string | null;
   limit?: number | null;
+  /** Ikut kolom DAPODIK (untuk ekspor); daftar biasa tidak membawanya. */
+  dapodik?: boolean | null;
+}
+
+/** Baris daftar yang diminta dengan `dapodik: true`. */
+export interface PmbRegistrantExportItem extends PmbRegistrantItem {
+  tempat_lahir: string | null;
+  tanggal_lahir: string | null;
+  alamat: string | null;
+  data_dapodik: string | null;
 }
 
 export interface PmbPromotionInput {

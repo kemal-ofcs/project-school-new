@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import { Plus_Jakarta_Sans } from "next/font/google";
 import { SiteFooter, SiteHeader } from "@/components/SiteChrome";
+import { EfekDesktop } from "@/components/visual/EfekDesktop";
+import { SKRIP_GERBANG_EFEK } from "@/components/visual/gerbang-efek";
 import { muatKontenHalaman } from "@/lib/server/content-data";
 import { muatProfilSekolah } from "@/lib/server/school-data";
 import { namaTampil, profilKosong } from "@/lib/services/school-profile";
@@ -79,13 +81,25 @@ export default async function RootLayout({
   const profil = hasil.status === "ok" ? hasil.data : profilKosong();
 
   return (
-    <html lang="id">
+    // `suppressHydrationWarning`: skrip gerbang di bawah memasang
+    // `data-efek` pada <html> sebelum React mengambil alih halaman.
+    <html lang="id" suppressHydrationWarning>
+      <head>
+        <script
+          // Harus berjalan sebelum halaman tergambar, supaya judul desktop
+          // tidak tampil lalu tiba-tiba mulai beranimasi. Isinya konstanta
+          // dari kode, bukan data dari luar.
+          // biome-ignore lint/security/noDangerouslySetInnerHtml: skrip gerbang konstanta
+          dangerouslySetInnerHTML={{ __html: SKRIP_GERBANG_EFEK }}
+        />
+      </head>
       <body
         className={`${plusJakartaSans.variable} font-sans flex min-h-dvh flex-col`}
       >
         <SiteHeader profil={profil} konten={kontenSitus} />
         <div className="flex-1">{children}</div>
         <SiteFooter profil={profil} konten={kontenSitus} />
+        <EfekDesktop />
       </body>
     </html>
   );

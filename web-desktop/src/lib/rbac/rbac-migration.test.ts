@@ -149,6 +149,8 @@ describe("dynamic RBAC migration", () => {
       47,
       // v48 — foto konten situs publik (`konten_gambar`).
       48,
+      // v49 — data DAPODIK pendaftar PMB.
+      49,
     ]);
 
     const sessionColumns = await client.execute(

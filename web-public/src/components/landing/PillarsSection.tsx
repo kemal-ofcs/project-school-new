@@ -8,6 +8,7 @@ import {
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
+import { KataMuncul } from "@/components/visual/KataMuncul";
 import { SpotlightCard } from "@/components/visual/SpotlightCard";
 import { koleksiPilar } from "@/lib/services/landing-collections";
 import type { SchoolProfile } from "@/lib/services/school-profile";
@@ -55,82 +56,88 @@ export function PillarsSection({ profil, konten = {} }: PillarsSectionProps) {
   const adaHeader = Boolean(eyebrow || title || subtitle || badgePill);
   const adaSambutan = Boolean(sambutanQuote || sambutanBody);
   if (!adaHeader && pillarsData.length === 0 && !adaSambutan) return null;
+  const sematkan = adaHeader && pillarsData.length >= 3;
 
   return (
     <section className="muncul py-20 sm:py-28 bg-background">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 space-y-16">
-        {adaHeader ? (
-          <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
-            <div className="max-w-2xl space-y-2">
-              {eyebrow ? (
-                <div className="inline-flex items-center gap-1.5 text-xs font-bold uppercase tracking-widest text-secondary">
-                  <Award className="h-3.5 w-3.5" />
-                  <span>{eyebrow}</span>
+        {/* Di desktop, judul disematkan di kiri selama pilar bergulir di kanan
+            (`.pilar-lekat` di globals.css). Tanpa judul atau dengan kurang
+            dari tiga pilar, tidak ada yang layak disematkan. */}
+        <div className={sematkan ? "pilar-lekat space-y-16" : "space-y-16"}>
+          {adaHeader ? (
+            <div className="pilar-kepala flex flex-col md:flex-row md:items-end justify-between gap-6">
+              <div className="max-w-2xl space-y-2">
+                {eyebrow ? (
+                  <div className="inline-flex items-center gap-1.5 text-xs font-bold uppercase tracking-widest text-secondary">
+                    <Award className="h-3.5 w-3.5" />
+                    <span>{eyebrow}</span>
+                  </div>
+                ) : null}
+                {title ? (
+                  <h2 className="font-bold text-2xl sm:text-4xl text-foreground tracking-tight">
+                    <KataMuncul teks={title} />
+                  </h2>
+                ) : null}
+                {subtitle ? (
+                  <p className="text-sm sm:text-base text-muted-foreground leading-relaxed">
+                    {subtitle}
+                  </p>
+                ) : null}
+              </div>
+              {badgePill ? (
+                <div className="hidden lg:flex items-center gap-2 text-xs font-semibold text-accent rounded-full bg-muted px-4 py-2">
+                  <ShieldCheck className="h-4 w-4" />
+                  <span>{badgePill}</span>
                 </div>
               ) : null}
-              {title ? (
-                <h2 className="font-bold text-2xl sm:text-4xl text-foreground tracking-tight">
-                  {title}
-                </h2>
-              ) : null}
-              {subtitle ? (
-                <p className="text-sm sm:text-base text-muted-foreground leading-relaxed">
-                  {subtitle}
-                </p>
-              ) : null}
             </div>
-            {badgePill ? (
-              <div className="hidden lg:flex items-center gap-2 text-xs font-semibold text-accent rounded-full bg-muted px-4 py-2">
-                <ShieldCheck className="h-4 w-4" />
-                <span>{badgePill}</span>
-              </div>
-            ) : null}
-          </div>
-        ) : null}
+          ) : null}
 
-        {pillarsData.length > 0 ? (
-          <div className="kartu-tengah sm:[--kolom:2] lg:[--kolom:4]">
-            {pillarsData.map((item, i) => {
-              const Icon = item.icon;
-              return (
-                <SpotlightCard
-                  key={`${i}-${item.title}`}
-                  className="rounded-2xl"
-                  glowColor="rgba(0, 35, 111, 0.14)"
-                >
-                  <Card className="h-full flex flex-col justify-between p-6 transition-all duration-300 hover:shadow-xl hover:-translate-y-1 border-border/80 bg-card/90 backdrop-blur-xs">
-                    <div className="space-y-4">
-                      <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10 text-primary group-hover:bg-primary group-hover:text-primary-foreground transition-all duration-300 shadow-xs">
-                        <Icon className="h-6 w-6" />
+          {pillarsData.length > 0 ? (
+            <div className="pilar-daftar kartu-tengah sm:[--kolom:2] lg:[--kolom:4]">
+              {pillarsData.map((item, i) => {
+                const Icon = item.icon;
+                return (
+                  <SpotlightCard
+                    key={`${i}-${item.title}`}
+                    className="rounded-2xl"
+                    glowColor="rgba(0, 35, 111, 0.14)"
+                  >
+                    <Card className="h-full flex flex-col justify-between p-6 transition-all duration-300 hover:shadow-xl hover:-translate-y-1 border-border/80 bg-card/90 backdrop-blur-xs">
+                      <div className="space-y-4">
+                        <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10 text-primary group-hover:bg-primary group-hover:text-primary-foreground transition-all duration-300 shadow-xs">
+                          <Icon className="h-6 w-6" />
+                        </div>
+                        <div className="space-y-2">
+                          <h3 className="font-bold text-lg text-foreground leading-snug group-hover:text-primary transition-colors">
+                            {item.title}
+                          </h3>
+                          {item.desc ? (
+                            <p className="text-sm text-muted-foreground leading-relaxed">
+                              {item.desc}
+                            </p>
+                          ) : null}
+                        </div>
                       </div>
-                      <div className="space-y-2">
-                        <h3 className="font-bold text-lg text-foreground leading-snug group-hover:text-primary transition-colors">
-                          {item.title}
-                        </h3>
-                        {item.desc ? (
-                          <p className="text-sm text-muted-foreground leading-relaxed">
-                            {item.desc}
-                          </p>
-                        ) : null}
-                      </div>
-                    </div>
 
-                    {item.tag ? (
-                      <div className="pt-6">
-                        <Badge
-                          variant="outline"
-                          className="text-[11px] font-semibold border-secondary/30 text-secondary bg-secondary/5"
-                        >
-                          {item.tag}
-                        </Badge>
-                      </div>
-                    ) : null}
-                  </Card>
-                </SpotlightCard>
-              );
-            })}
-          </div>
-        ) : null}
+                      {item.tag ? (
+                        <div className="pt-6">
+                          <Badge
+                            variant="outline"
+                            className="text-[11px] font-semibold border-secondary/30 text-secondary bg-secondary/5"
+                          >
+                            {item.tag}
+                          </Badge>
+                        </div>
+                      ) : null}
+                    </Card>
+                  </SpotlightCard>
+                );
+              })}
+            </div>
+          ) : null}
+        </div>
 
         {adaSambutan ? (
           <div className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm">

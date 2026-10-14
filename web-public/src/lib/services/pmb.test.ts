@@ -1,5 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { createClient } from "@libsql/client";
+import { SchemaNotReadyError } from "@/lib/server/schema-readiness";
+import { dataDapodikSchema } from "@/lib/validations/pmb-dapodik";
 import {
   GelombangTidakTerbukaError,
   KuotaPenuhError,
@@ -59,7 +61,8 @@ async function siapkanDatabase() {
       diverifikasi_at TEXT,
       id_siswa TEXT,
       created_at TEXT NOT NULL,
-      updated_at TEXT NOT NULL
+      updated_at TEXT NOT NULL,
+      data_dapodik TEXT
     );
   `);
   await client.execute(`
@@ -140,6 +143,13 @@ const MASUKAN = {
   emailWali: null,
   pilihanJurusan: "TKJ",
   berkas: [],
+  dataDapodik: dataDapodikSchema.parse({
+    nik: "3273011705100001",
+    agama: "Islam",
+    kelurahan: "Cibeunying",
+    kecamatan: "Cimenyan",
+    ibuNama: "Sri Wahyuni",
+  }),
 };
 
 describe("readGelombangAktif", () => {
@@ -430,5 +440,45 @@ describe("readStatusPendaftaran", () => {
 describe("GelombangTidakTerbukaError", () => {
   test("membawa status HTTP-nya sendiri", () => {
     expect(new GelombangTidakTerbukaError().status).toBe(409);
+  });
+});
+
+describe("data DAPODIK pendaftar (v49)", () => {
+  test("isian DAPODIK tersimpan sebagai JSON berversi", async () => {
+    const client = await siapkanDatabase();
+    await tambahGelombang(client);
+    const gelombang = await readGelombangAktif(client);
+    if (!gelombang) throw new Error("gelombang uji tidak ditemukan");
+
+    const { nomorPendaftaran } = await tulisPendaftaran(
+      client,
+      gelombang,
+      MASUKAN,
+    );
+    const baris = await client.execute({
+      sql: "SELECT data_dapodik FROM pmb_pendaftar WHERE nomor_pendaftaran = ?;",
+      args: [nomorPendaftaran],
+    });
+    const data = JSON.parse(String(baris.rows[0]?.data_dapodik));
+    expect(data.versi).toBe(1);
+    expect(data.nik).toBe("3273011705100001");
+    expect(data.ibuNama).toBe("Sri Wahyuni");
+    expect(data.kebutuhanKhusus).toBe("Tidak ada");
+  });
+
+  test("database yang belum dimigrasi v49 dijawab belum siap, tidak menulis apa pun", async () => {
+    const client = await siapkanDatabase();
+    await tambahGelombang(client);
+    await client.execute("ALTER TABLE pmb_pendaftar DROP COLUMN data_dapodik;");
+    const gelombang = await readGelombangAktif(client);
+    if (!gelombang) throw new Error("gelombang uji tidak ditemukan");
+
+    await expect(
+      tulisPendaftaran(client, gelombang, MASUKAN),
+    ).rejects.toBeInstanceOf(SchemaNotReadyError);
+    const jumlah = await client.execute(
+      "SELECT COUNT(*) AS n FROM pmb_pendaftar;",
+    );
+    expect(Number(jumlah.rows[0]?.n)).toBe(0);
   });
 });

@@ -9,6 +9,7 @@ import {
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { AnimatedCounter } from "@/components/visual/AnimatedCounter";
+import { KataMuncul } from "@/components/visual/KataMuncul";
 import { PmbCountdown } from "@/components/visual/PmbCountdown";
 import { srcGambarKonten } from "@/lib/services/gambar-konten";
 import { koleksiStat } from "@/lib/services/landing-collections";
@@ -44,11 +45,15 @@ export function HeroSection({
   const hasCustomHeroImage = heroImage !== null;
 
   return (
-    <section className="relative overflow-hidden bg-primary text-primary-foreground py-14 sm:py-20 lg:py-28 border-b border-primary-container">
+    <section
+      data-hero
+      className="relative overflow-hidden bg-primary text-primary-foreground py-14 sm:py-20 lg:py-28 border-b border-primary-container"
+    >
       {/* 1. Latar Belakang Hero Dinamis: Foto Kampus atau Aurora Ambient */}
       {hasCustomHeroImage ? (
         <div
           aria-hidden="true"
+          data-hero-latar
           className="pointer-events-none absolute inset-0 z-0 overflow-hidden"
         >
           {/* biome-ignore lint/performance/noImgElement: user uploaded data url or photo */}
@@ -69,12 +74,16 @@ export function HeroSection({
         // judul dan tombol pendaftaran.
         <div
           aria-hidden="true"
+          data-hero-latar
           className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_85%_0%,rgba(254,166,25,0.16),transparent_55%)]"
         />
       )}
 
       {/* 2. Konten Utama Hero */}
-      <div className="relative z-10 mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 flex flex-col items-start gap-8">
+      <div
+        data-hero-isi
+        className="relative z-10 mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 flex flex-col items-start gap-8"
+      >
         {/* Urgency / Active PMB Banner */}
         {gelombangAktif ? (
           <div className="inline-flex flex-wrap items-center gap-2.5 rounded-full bg-white/10 px-4 py-1.5 text-xs font-medium backdrop-blur-md border border-white/20 shadow-md">
@@ -110,8 +119,11 @@ export function HeroSection({
             </p>
           ) : null}
 
-          <h1 className="font-extrabold text-3xl tracking-tight sm:text-5xl lg:text-6xl text-white leading-tight drop-shadow-sm">
-            {heroTitle}
+          <h1
+            data-judul-halaman
+            className="font-extrabold text-3xl tracking-tight sm:text-5xl lg:text-6xl text-white leading-tight drop-shadow-sm"
+          >
+            <KataMuncul teks={heroTitle} langsung />
           </h1>
 
           {heroSubtitle ? (

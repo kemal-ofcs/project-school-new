@@ -72,6 +72,10 @@ const filesToCopy = [
   "lib/operators/contact.ts",
   "lib/operators/contact.test.ts",
   "lib/services/wa-provider.ts",
+  // Isian DAPODIK formulir PMB: validator yang dipakai formulir situs publik
+  // wajib sama dengan yang dibaca tampilan dan ekspor panel admin.
+  "lib/validations/pmb-dapodik.ts",
+  "lib/validations/pmb-dapodik.test.ts",
   // Pemeriksa lisensi. Situs publik melayani database yang sama dengan
   // aplikasi admin, jadi ia wajib menilai lisensi yang sama dengan aturan yang
   // sama persis. Tesnya TIDAK ikut disalin: ia membangun skema lewat

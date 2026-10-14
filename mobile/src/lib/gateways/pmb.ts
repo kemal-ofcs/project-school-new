@@ -93,6 +93,7 @@ export async function daftarPendaftarPmb(
         status: filter?.status ?? null,
         search: filter?.search ?? null,
         limit: filter?.limit ?? null,
+        dapodik: filter?.dapodik ?? null,
       },
     );
   }

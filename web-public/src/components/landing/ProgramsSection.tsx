@@ -19,6 +19,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { KataMuncul } from "@/components/visual/KataMuncul";
 import { SpotlightCard } from "@/components/visual/SpotlightCard";
 import {
   fotoJurusan,
@@ -117,7 +118,7 @@ export function ProgramsSection({
             ) : null}
             {title ? (
               <h2 className="font-bold text-2xl sm:text-4xl text-foreground tracking-tight">
-                {title}
+                <KataMuncul teks={title} />
               </h2>
             ) : null}
             {subtitle ? (

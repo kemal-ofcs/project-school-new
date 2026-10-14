@@ -43,6 +43,7 @@ export function SpotlightCard({
   return (
     <div
       ref={cardRef}
+      data-miring
       className={`group relative overflow-hidden transition-all duration-300 ${className}`}
     >
       {/* Radial Spotlight Overlay */}

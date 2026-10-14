@@ -3,6 +3,10 @@
 import { redirect } from "next/navigation";
 import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { AppShell } from "@/components/AppShell";
+import {
+  DataDapodikDetail,
+  TombolEksporDapodik,
+} from "@/components/pmb/DataDapodikPmb";
 import { FeedbackBanner } from "@/components/ui/FeedbackBanner";
 import { Modal } from "@/components/ui/Modal";
 import { PageHeader } from "@/components/ui/PageHeader";
@@ -407,6 +411,16 @@ export default function PmbPage() {
             </div>
           </div>
 
+          <div className="mt-3">
+            <TombolEksporDapodik
+              filter={{
+                id_gelombang: filterGelombang,
+                status: filterStatus,
+                search: pencarian || null,
+              }}
+            />
+          </div>
+
           <div className="mt-4 overflow-x-auto">
             {memuat ? (
               <p className="text-slate-400 text-sm">Memuat pendaftar…</p>
@@ -484,6 +498,8 @@ export default function PmbPage() {
               <dt className="text-slate-500">Status</dt>
               <dd>{detail.pendaftar.status}</dd>
             </dl>
+
+            <DataDapodikDetail pendaftar={detail.pendaftar} />
 
             <div>
               <h3 className="font-semibold text-white text-xs uppercase">

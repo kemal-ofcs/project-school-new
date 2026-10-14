@@ -260,3 +260,182 @@ body {
     color 0.3s ease;
   overflow-x: hidden;
 }
+
+/*
+ * ── Efek desktop ─────────────────────────────────────────────────────────
+ * Semua aturan di bawah hanya berlaku pada `html[data-efek="desktop"]`, yang
+ * dipasang skrip gerbang di `<head>` (lihat `gerbang-efek.ts`): layar >= 1024px,
+ * mouse, tidak memilih "kurangi gerakan", tidak hemat data. HP tidak pernah
+ * mendapat atribut itu, jadi tampilannya tetap seperti versi ringan.
+ */
+
+/* 1. Hero berlapis: latar bergeser berlawanan arah mouse, isi searah, lalu
+      isi menyusut dan memudar saat hero digulir keluar. Pergeseran memakai
+      properti `translate`/`scale`, keluarnya memakai `transform`, supaya
+      keduanya tidak saling menimpa. */
+html[data-efek="desktop"] [data-hero-latar] {
+  translate: calc(var(--mx, 0) * -18px) calc(var(--my, 0) * -14px);
+  scale: 1.08;
+  transition: translate 0.5s cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+html[data-efek="desktop"] [data-hero-isi] {
+  translate: calc(var(--mx, 0) * 8px) calc(var(--my, 0) * 6px);
+  transition: translate 0.5s cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+@keyframes hero-keluar {
+  to {
+    opacity: 0.1;
+    transform: translateY(-3rem) scale(0.96);
+  }
+}
+@supports (animation-timeline: view()) {
+  html[data-efek="desktop"] [data-hero-isi] {
+    animation: hero-keluar linear both;
+    animation-timeline: view();
+    animation-range: exit 0% exit 85%;
+  }
+}
+
+/* 2. Judul muncul per kata (`KataMuncul`). Judul di layar pertama berjalan
+      sekali saat dibuka; judul bagian mengikuti guliran. */
+@keyframes kata-masuk {
+  from {
+    opacity: 0;
+    transform: translateY(0.6em);
+    filter: blur(6px);
+  }
+}
+html[data-efek="desktop"] .kata {
+  display: inline-block;
+}
+html[data-efek="desktop"] .kata-langsung .kata {
+  animation: kata-masuk 0.7s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+  animation-delay: calc(var(--i) * 70ms + 80ms);
+}
+@supports (animation-timeline: view()) {
+  html[data-efek="desktop"] .kata-gulir {
+    view-timeline-name: --judul;
+  }
+  html[data-efek="desktop"] .kata-gulir .kata {
+    animation: kata-masuk linear both;
+    animation-timeline: --judul;
+    animation-range: entry calc(var(--i) * 6%) entry calc(55% + var(--i) * 6%);
+  }
+}
+
+/* 3. Kartu miring mengikuti kursor (`--rx`/`--ry` dari `efek-desktop.ts`).
+      Yang dimiringkan isi kartu, bukan pembungkusnya: pembungkus sudah
+      memakai `transform` untuk animasi muncul saat digulir. */
+html[data-efek="desktop"] [data-miring] {
+  perspective: 1000px;
+  /* Pembungkusnya tanpa sudut membulat; memotong di sini membuat kartu yang
+     miring dan membesar terpotong bersudut kotak. */
+  overflow: visible;
+}
+/* Cahaya sorot pindah ke dalam kartu (posisi kursor `--gx`/`--gy`), supaya
+   ikut miring bersama kartunya. Lapisan sorot bawaan `SpotlightCard` yang
+   tidak ikut miring disembunyikan. */
+html[data-efek="desktop"] [data-miring] > :first-child:not(:last-child) {
+  display: none;
+}
+html[data-efek="desktop"] [data-miring]:hover > :last-child {
+  background-image: radial-gradient(
+    420px circle at var(--gx, 50%) var(--gy, 50%),
+    color-mix(in srgb, var(--secondary-container) 12%, transparent),
+    transparent 65%
+  );
+}
+html[data-efek="desktop"] [data-miring] > :last-child {
+  transform: rotateX(var(--rx, 0deg)) rotateY(var(--ry, 0deg));
+  transition:
+    transform 0.25s ease-out,
+    opacity 0.3s ease,
+    scale 0.3s ease;
+}
+
+/* 6. Kartu sebaris: yang disorot sedikit membesar, sisanya meredup, supaya
+      mata tertuju pada satu kartu. Pilar dikecualikan: urutannya sudah
+      diatur efek sorot gulir di bawah. */
+html[data-efek="desktop"] .kartu-tengah:not(.pilar-daftar):has(
+    > [data-miring]:hover
+  )
+  > [data-miring]:not(:hover)
+  > :last-child {
+  opacity: 0.55;
+  scale: 0.97;
+}
+html[data-efek="desktop"] .kartu-tengah > [data-miring]:hover > :last-child {
+  scale: 1.02;
+}
+
+/* 4. Pilar disematkan: judul bagian diam di kiri selama pilar-pilarnya
+      bergulir di kanan, dan pilar yang sedang di tengah layar menyala. */
+@keyframes pilar-sorot {
+  0%,
+  100% {
+    opacity: 0.35;
+    scale: 0.96;
+  }
+  50% {
+    opacity: 1;
+    scale: 1;
+  }
+}
+html[data-efek="desktop"] .pilar-lekat {
+  display: grid;
+  grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
+  gap: 4rem;
+  align-items: start;
+}
+html[data-efek="desktop"] .pilar-lekat > * {
+  margin-block: 0;
+}
+html[data-efek="desktop"] .pilar-kepala {
+  position: sticky;
+  top: 30vh;
+  flex-direction: column;
+  align-items: flex-start;
+}
+html[data-efek="desktop"] .pilar-daftar {
+  --kolom: 1;
+  gap: 2rem;
+}
+@supports (animation-timeline: view()) {
+  html[data-efek="desktop"] .pilar-daftar > * {
+    animation: pilar-sorot linear both;
+    animation-timeline: view();
+    animation-range: cover 15% cover 85%;
+  }
+}
+
+/* 5. Transisi antarhalaman: header tetap diam, judul halaman melayang ke
+      posisi barunya, sisanya memudar dan naik sedikit. Nama transisi hanya
+      dipasang di desktop karena hanya di sana transisinya dijalankan. */
+html[data-efek="desktop"] [data-kepala-situs] {
+  view-transition-name: kepala-situs;
+}
+html[data-efek="desktop"] [data-judul-halaman] {
+  view-transition-name: judul-halaman;
+}
+@keyframes vt-keluar {
+  to {
+    opacity: 0;
+    transform: translateY(-12px);
+  }
+}
+@keyframes vt-masuk {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+}
+::view-transition-old(root) {
+  animation: vt-keluar 0.2s ease-in both;
+}
+::view-transition-new(root) {
+  animation: vt-masuk 0.35s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+}
+::view-transition-group(judul-halaman) {
+  animation-duration: 0.45s;
+  animation-timing-function: cubic-bezier(0.2, 0.7, 0.2, 1);
+}

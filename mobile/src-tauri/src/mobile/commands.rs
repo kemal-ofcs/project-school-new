@@ -4012,6 +4012,7 @@ pub async fn desktop_list_pmb_registrants(
     status: Option<String>,
     search: Option<String>,
     limit: Option<i64>,
+    dapodik: Option<bool>,
 ) -> Result<Value, CommandError> {
     require_permission(&state, "pmb.view")?;
     state
@@ -4021,6 +4022,7 @@ pub async fn desktop_list_pmb_registrants(
             status.as_deref(),
             search.as_deref(),
             limit,
+            dapodik.unwrap_or(false),
         )
         .await
 }

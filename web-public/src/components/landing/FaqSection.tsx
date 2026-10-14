@@ -9,6 +9,7 @@ import {
   AccordionTrigger,
 } from "@/components/ui/accordion";
 import { Button } from "@/components/ui/button";
+import { KataMuncul } from "@/components/visual/KataMuncul";
 import { koleksiFaq } from "@/lib/services/landing-collections";
 
 interface FaqSectionProps {
@@ -45,7 +46,7 @@ export function FaqSection({ konten = {} }: FaqSectionProps) {
             ) : null}
             {title ? (
               <h2 className="font-bold text-2xl sm:text-4xl text-foreground tracking-tight">
-                {title}
+                <KataMuncul teks={title} />
               </h2>
             ) : null}
             {subtitle ? (

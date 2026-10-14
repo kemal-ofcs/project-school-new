@@ -324,7 +324,7 @@ Tiga prinsip absolut yang wajib dipatuhi oleh setiap komponen, layout, dan inter
 
 ### 2.2 Apa yang Wajib Dihindari (Anti-Patterns)
 1. **Dilarang menggunakan gambar stok palsu yang tidak realistis:** Hindari foto bule generik yang jelas-jelas bukan siswa/guru Indonesia. Gunakan visual autentik seragam siswa Indonesia, lingkungan hijau tropis, atau placeholder berbasis ilustrasi emblem akademis beresolusi tinggi.
-2. **Dilarang memasang animasi berlebihan (No Motion Sickness):** Hindari teks berputar, partikel melayang acak, atau parallax ekstrem. Transisi dibatasi pada *fade-in*, *smooth collapse/accordion*, dan *hover lift* subtil (`translate-y: -2px`).
+2. **Dilarang memasang animasi berlebihan (No Motion Sickness):** Hindari teks berputar, partikel melayang acak, atau parallax ekstrem. Transisi dibatasi pada *fade-in*, *smooth collapse/accordion*, dan *hover lift* subtil (`translate-y: -2px`). Aturan ini berlaku untuk HP dan tablet; desktop memakai bagian **11. Desktop Enhancement**.
 3. **Dilarang menyembunyikan data di balik modal berlapis:** Calon siswa harus dapat membaca silabus atau jurusan tanpa harus dipaksa mendaftar terlebih dahulu.
 4. **Dilarang menggunakan Icon Font CDN (Material Symbols):** Menghindari ketergantungan webfont eksternal yang lambat dimuat, memicu layout shift, dan gagal saat jaringan terbatas. Seluruh ikon distandarkan ke **Lucide React** (`lucide-react`) berupa SVG inline.
 
@@ -679,3 +679,31 @@ Situs publik wajib memenuhi standar minimum **WCAG 2.1 Level AA** (dan Level AAA
   - `aria-expanded="true|false"` pada Accordion FAQ dan Mobile Menu Burger.
   - `aria-live="polite"` pada pembaruan kuota pendaftaran dan notifikasi formulir.
   - `aria-describedby` untuk pesan error validasi input.
+
+---
+
+## 11. DESKTOP ENHANCEMENT (DIAL MOTION 3)
+
+Seluruh dokumen di atas tetap menjadi dasar untuk SEMUA perangkat. Desktop mendapat lapisan efek tambahan (keputusan pemilik produk, 2026-10-15), dengan satu prinsip: **HP yang lemot tidak boleh ikut membayar efek desktop**.
+
+### 11.1 Syarat Aktif
+Efek hanya hidup bila keempat syarat ini terpenuhi, diperiksa skrip kecil di `<head>` sebelum halaman tergambar (`gerbang-efek.ts`) lalu dipantau ulang saat jendela berubah (`EfekDesktop.tsx`):
+- layar minimal **1024px**,
+- **mouse** (`hover: hover` dan `pointer: fine`),
+- pengguna **tidak** memilih "kurangi gerakan" (`prefers-reduced-motion`),
+- **tidak** dalam mode hemat data (`Save-Data`).
+
+Bila lolos, `<html data-efek="desktop">` dipasang dan modul JS efek dimuat lewat `import()` dinamis. Perangkat yang tidak lolos tidak mengunduh modul itu sama sekali, dan semua CSS efek ada di bawah selektor `html[data-efek="desktop"]`.
+
+### 11.2 Daftar Efek
+1. **Hero berlapis:** foto/latar bergeser berlawanan arah mouse, isi searah, lalu isi menyusut dan memudar saat hero digulir keluar.
+2. **Judul muncul per kata** (`KataMuncul`): judul layar pertama sekali saat dibuka, judul bagian mengikuti guliran.
+3. **Kartu miring 3D** mengikuti kursor (maksimal 6 derajat) dengan cahaya sorot di dalam kartu.
+4. **Pilar disematkan:** judul bagian pilar diam di kiri selama pilar bergulir di kanan; pilar di tengah layar menyala. Hanya bila bagian punya judul dan minimal 3 pilar.
+5. **Transisi antarhalaman** (View Transitions API): header diam, judul halaman melayang ke posisi barunya. Browser tanpa API ini pindah halaman biasa.
+6. **Fokus kartu sebaris:** kartu yang disorot sedikit membesar, sisanya meredup.
+
+### 11.3 Batasan
+- **Tanpa WebGL/3D** (Spline, Three.js). Foto sekolah asli lebih meyakinkan dan tidak memanaskan laptop tua.
+- Larangan teks berputar, partikel acak, dan animasi yang berulang tanpa henti tetap berlaku di desktop.
+- Efek berbasis guliran memakai *scroll-driven animations* CSS; browser tanpa dukungan menampilkan konten utuh tanpa efek, tidak pernah tersembunyi.

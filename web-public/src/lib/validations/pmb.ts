@@ -1,5 +1,12 @@
 import { z } from "zod";
 import {
+  dataDapodikSchema,
+  VERSI_DATA_DAPODIK,
+} from "@/lib/validations/pmb-dapodik";
+
+export { VERSI_DATA_DAPODIK };
+
+import {
   isValidOperatorPhone,
   normalizeOperatorPhone,
 } from "@/lib/operators/contact";
@@ -100,10 +107,10 @@ export const pendaftaranSchema = z
     namaLengkap: teksWajib(120),
     nisn: teksOpsional(20),
     jenisKelamin: z.enum(["L", "P"]),
-    tempatLahir: teksOpsional(80),
+    tempatLahir: teksWajib(80),
     tanggalLahir: tanggal,
     asalSekolah: teksOpsional(120),
-    alamat: teksOpsional(255),
+    alamat: teksWajib(255),
     namaWali: teksWajib(120),
     noWhatsappWali: z
       .string()
@@ -124,6 +131,9 @@ export const pendaftaranSchema = z
     // membawa seluruh berkasnya sekaligus, dan tanpa batas sebuah permintaan
     // tunggal bisa membawa puluhan megabyte base64.
     berkas: z.array(berkasPendaftaranSchema).max(6).default([]),
+    // Isian DAPODIK (v49). Wajib ada: formulir lama tanpa langkah DAPODIK
+    // ditolak, bukan diterima setengah.
+    dataDapodik: dataDapodikSchema,
   })
   .strict();
 

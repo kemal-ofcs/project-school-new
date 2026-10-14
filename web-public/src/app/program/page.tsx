@@ -7,6 +7,7 @@ import {
   KartuJurusan,
 } from "@/components/landing/ProgramsSection";
 import { DaftarKosong, StatusTidakTerbaca } from "@/components/StatusData";
+import { KataMuncul } from "@/components/visual/KataMuncul";
 import { muatKontenHalaman } from "@/lib/server/content-data";
 import { muatProgramStudi } from "@/lib/server/school-data";
 import { tautanGaleri } from "@/lib/services/gambar-konten";
@@ -153,7 +154,7 @@ function KepalaBagian({ judul, teks }: { judul: string; teks?: string }) {
   return (
     <div className="max-w-2xl">
       <h2 className="font-bold text-3xl text-foreground tracking-tight">
-        {judul}
+        <KataMuncul teks={judul} />
       </h2>
       <div
         aria-hidden="true"

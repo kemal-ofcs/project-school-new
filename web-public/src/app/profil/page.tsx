@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { KepalaHalaman } from "@/components/KepalaHalaman";
 import { ProfilBelumLengkap } from "@/components/SiteChrome";
 import { StatusTidakTerbaca } from "@/components/StatusData";
+import { KataMuncul } from "@/components/visual/KataMuncul";
 import { muatKontenHalaman } from "@/lib/server/content-data";
 import { muatProfilSekolah } from "@/lib/server/school-data";
 import { namaTampil } from "@/lib/services/school-profile";
@@ -73,7 +74,9 @@ export default async function HalamanProfil() {
 
         {butirMisi.length > 0 ? (
           <section className="muncul">
-            <h2 className="font-bold text-2xl text-foreground">Misi Sekolah</h2>
+            <h2 className="font-bold text-2xl text-foreground">
+              <KataMuncul teks="Misi Sekolah" />
+            </h2>
             {butirMisi.length === 1 ? (
               <p className="mt-6 leading-relaxed text-muted-foreground whitespace-pre-line">
                 {butirMisi[0]}
@@ -125,7 +128,7 @@ export default async function HalamanProfil() {
         {sejarah ? (
           <section className="muncul grid gap-4 md:grid-cols-[12rem_1fr] md:gap-10">
             <h2 className="font-bold text-2xl text-foreground">
-              Sejarah Singkat
+              <KataMuncul teks="Sejarah Singkat" />
             </h2>
             <p className="leading-relaxed text-muted-foreground whitespace-pre-line">
               {sejarah}
@@ -135,7 +138,7 @@ export default async function HalamanProfil() {
 
         <section className="muncul space-y-6">
           <h2 className="font-bold text-2xl text-foreground">
-            Identitas & Informasi Resmi
+            <KataMuncul teks="Identitas & Informasi Resmi" />
           </h2>
           {baris.length === 0 ? (
             <ProfilBelumLengkap />

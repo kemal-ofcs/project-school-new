@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { KataMuncul } from "@/components/visual/KataMuncul";
 import { cn } from "@/lib/utils";
 
 /**
@@ -25,8 +26,11 @@ export function KepalaHalaman({
     <div className="border-b border-border bg-muted/60">
       <div className={cn("mx-auto px-6 py-12 sm:py-16", lebar)}>
         <p className="text-sm font-semibold text-primary">{label}</p>
-        <h1 className="mt-2 font-extrabold text-3xl sm:text-4xl tracking-tight text-foreground">
-          {judul}
+        <h1
+          data-judul-halaman
+          className="mt-2 font-extrabold text-3xl sm:text-4xl tracking-tight text-foreground"
+        >
+          <KataMuncul teks={judul} langsung />
         </h1>
         <div
           aria-hidden="true"
