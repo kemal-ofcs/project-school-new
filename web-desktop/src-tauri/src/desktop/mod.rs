@@ -17,6 +17,7 @@ pub mod accounting;
 pub mod attendance_dashboard;
 pub mod attendance_ledger;
 pub mod billing;
+pub mod tutup_buku;
 pub mod class_attendance;
 pub mod face_match;
 pub mod grades;

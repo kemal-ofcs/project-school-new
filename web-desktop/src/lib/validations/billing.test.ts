@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 import {
   alokasiPembayaran,
   barisJurnalPembayaran,
+  bulanRentang,
   formatNomorKuitansi,
   hitungPotongan,
   idTagihan,
@@ -14,6 +15,7 @@ import {
   labelPeriode,
   type PembayaranDraft,
   pembayaranDraftSchema,
+  persenTerkumpul,
   pilihTarif,
   type TarifDraft,
   tarifDraftSchema,
@@ -369,7 +371,7 @@ describe("isian pengingat tagihan", () => {
     ).toEqual({
       total: "Rp425.000",
       jumlah: "2",
-      rincian: "- SPP Agustus 2026: Rp150.000" + NL + "- Seragam: Rp275.000",
+      rincian: `- SPP Agustus 2026: Rp150.000${NL}- Seragam: Rp275.000`,
       jatuh_tempo: "10/08/2026",
     });
     const tujuh = [1, 2, 3, 4, 5, 6, 7].map((bulan) =>
@@ -389,5 +391,32 @@ describe("isian pengingat tagihan", () => {
       jatuh_tempo: "10/01/2026",
     });
     expect(isianPengingat([]).jatuh_tempo).toBe("-");
+  });
+});
+
+// Vektor kembar `persen_dan_rentang_bulan_kembar` di `desktop/billing.rs`.
+describe("persen terkumpul dan rentang bulan", () => {
+  test("persen bulat setengah ke atas", () => {
+    expect(persenTerkumpul(1, 3)).toBe(33);
+    expect(persenTerkumpul(2, 3)).toBe(67);
+    expect(persenTerkumpul(1, 8)).toBe(13);
+    expect(persenTerkumpul(5, 0)).toBe(0);
+  });
+
+  test("dua belas bulan dan batas atasnya", () => {
+    const hasil = bulanRentang("2026-07");
+    if (!hasil.ok) throw new Error(hasil.error);
+    expect(hasil.value.bulan[0]).toBe("2026-07");
+    expect(hasil.value.bulan[11]).toBe("2027-06");
+    expect(hasil.value.bulan.length).toBe(12);
+    expect(hasil.value.sesudah).toBe("2027-07");
+    const januari = bulanRentang("2026-01");
+    expect(januari.ok && januari.value.sesudah).toBe("2027-01");
+    for (const salah of ["2026-13", "2026-7", "26-07", "abcd-ef"]) {
+      expect(bulanRentang(salah)).toEqual({
+        ok: false,
+        error: "Bulan awal harus berbentuk YYYY-MM.",
+      });
+    }
   });
 });

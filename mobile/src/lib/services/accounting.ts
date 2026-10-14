@@ -2,6 +2,7 @@ import "server-only";
 
 import { randomBytes } from "node:crypto";
 import type { Client, InStatement, Transaction } from "@libsql/client";
+import { assertPeriodeTerbuka } from "@/lib/services/tutup-buku";
 import {
   AKUN_SISTEM_IDS,
   type AkunSaldo,
@@ -294,6 +295,7 @@ export async function tulisJurnalTx(
     args: [header.id_jurnal],
   });
   if (ada.rows[0]) return String(ada.rows[0].nomor);
+  await assertPeriodeTerbuka(tx, header.tanggal);
   const tahun = header.tanggal.slice(0, 4);
   const nomorUrut = await nomorUrutBerikutnya(tx, tahun);
   for (const statement of statementJurnal(header, baris, nomorUrut)) {

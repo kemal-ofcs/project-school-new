@@ -11,27 +11,34 @@ import type {
 } from "@/lib/validations/billing";
 import type {
   AkunSiswaTagihan,
+  DaftarTagihan,
   DetailKuitansi,
   HasilBayar,
+  HasilPengingat,
   KeringananItem,
   KuitansiItem,
   MasterTagihan,
   PratinjauTagihan,
+  RekapPenerimaan,
+  RekapRombel,
   SeriKuitansi,
   SiswaTagihan,
-  TagihanItem,
   TinjauanPembayaran,
 } from "@/types/billing";
 
 export type {
   AkunSiswaTagihan,
+  DaftarTagihan,
   DetailKuitansi,
   HasilBayar,
+  HasilPengingat,
   JenisTagihanItem,
   KeringananItem,
   KuitansiItem,
   MasterTagihan,
   PratinjauTagihan,
+  RekapPenerimaan,
+  RekapRombel,
   SeriKuitansi,
   SiswaTagihan,
   TagihanItem,
@@ -155,8 +162,29 @@ export function daftarTagihan(filter: {
   idJenisTagihan: string | null;
   idRombel: string | null;
   status: string | null;
-}): Promise<{ items: TagihanItem[]; total_sisa: number }> {
+}): Promise<DaftarTagihan> {
   return baca("desktop_billing_list", filter, "/api/billing/list");
+}
+
+/** Buka atau tutup halaman Tagihan di portal wali (K4c). */
+export function simpanPortalTagihan(
+  aktif: boolean,
+): Promise<{ sukses: boolean; portal_wali_tagihan: boolean }> {
+  return tulis(
+    "desktop_billing_save_portal",
+    { aktif },
+    "/api/billing/save-portal",
+    { aktif },
+  );
+}
+
+/** Antre pengingat tunggakan WhatsApp untuk siswa pada saringan ini (K4b). */
+export function kirimPengingatTagihan(filter: {
+  periode: string | null;
+  idJenisTagihan: string | null;
+  idRombel: string | null;
+}): Promise<HasilPengingat> {
+  return tulis("desktop_billing_remind", filter, "/api/billing/remind", filter);
 }
 
 export function batalkanTagihan(
@@ -248,5 +276,26 @@ export function simpanSeriKuitansi(
     args,
     "/api/billing/save-series",
     args,
+  );
+}
+
+// ── Rekap (lanjutan K4) ─────────────────────────────────────────────────────
+
+export function getRekapRombel(
+  periode: string,
+  idJenisTagihan: string | null,
+): Promise<RekapRombel> {
+  return baca(
+    "desktop_billing_recap_rombel",
+    { periode, idJenisTagihan },
+    "/api/billing/recap-rombel",
+  );
+}
+
+export function getRekapPenerimaan(mulai: string): Promise<RekapPenerimaan> {
+  return baca(
+    "desktop_billing_recap_receipts",
+    { mulai },
+    "/api/billing/recap-receipts",
   );
 }

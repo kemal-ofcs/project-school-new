@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-desktop-billing-remind"
+description = "Enables the desktop_billing_remind command without any pre-configured scope."
+commands.allow = ["desktop_billing_remind"]
+
+[[permission]]
+identifier = "deny-desktop-billing-remind"
+description = "Denies the desktop_billing_remind command without any pre-configured scope."
+commands.deny = ["desktop_billing_remind"]

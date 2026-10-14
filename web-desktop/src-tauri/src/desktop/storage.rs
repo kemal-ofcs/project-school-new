@@ -939,6 +939,28 @@ pub fn initialize(path: &Path) -> Result<(), String> {
         dibatalkan_oleh TEXT NOT NULL,
         created_at TEXT NOT NULL DEFAULT (datetime('now'))
       );
+      -- Tutup buku / kunci periode (v45). `diterima_cloud` hanya diisi cloud;
+      -- status diubah oleh "buka kembali" dan keputusan bentrokan, barisnya
+      -- tidak pernah dihapus. DDL WAJIB identik dengan `turso.rs` dan
+      -- `db-migrations.ts`.
+      CREATE TABLE IF NOT EXISTS keu_tutup_buku (
+        id_tutup TEXT PRIMARY KEY,
+        sampai_tanggal TEXT NOT NULL,
+        dibuat_oleh TEXT NOT NULL,
+        kode_perangkat TEXT NOT NULL,
+        waktu_perangkat TEXT NOT NULL,
+        diterima_cloud TEXT,
+        saldo_json TEXT NOT NULL,
+        status TEXT NOT NULL DEFAULT 'Aktif' CHECK (status IN ('Aktif', 'Dibuka', 'Digantikan', 'Menunggu')),
+        alasan_buka TEXT,
+        dibuka_oleh TEXT,
+        dibuka_pada TEXT,
+        diputuskan_oleh TEXT,
+        diputuskan_pada TEXT,
+        catatan_keputusan TEXT,
+        created_at TEXT NOT NULL DEFAULT (datetime('now')),
+        updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+      );
       CREATE INDEX IF NOT EXISTS idx_keu_pembayaran_siswa ON keu_pembayaran(id_siswa);
       CREATE INDEX IF NOT EXISTS idx_keu_pembayaran_tanggal ON keu_pembayaran(tanggal);
       CREATE INDEX IF NOT EXISTS idx_keu_pembayaran_alokasi_pembayaran ON keu_pembayaran_alokasi(id_pembayaran);
@@ -1607,6 +1629,8 @@ pub fn initialize(path: &Path) -> Result<(), String> {
         .map_err(|_| "Bagan akun bawaan tidak dapat disiapkan.".to_owned())?;
     super::nilai_akhir::seed_jenis_bawaan(&connection)
         .map_err(|_| "Jenis penilaian bawaan tidak dapat disiapkan.".to_owned())?;
+    super::nilai_akhir::pulihkan_tarikan_jenis(&connection)
+        .map_err(|_| "Kursor tarikan jenis penilaian tidak dapat dipulihkan.".to_owned())?;
 
     ensure_attendance_source_check(&connection)?;
 
@@ -1714,6 +1738,25 @@ pub fn initialize(path: &Path) -> Result<(), String> {
         "nilai_penilaian",
         "id_jenis",
         "ALTER TABLE nilai_penilaian ADD COLUMN id_jenis TEXT;",
+    )?;
+    // Keputusan tutup buku (v46). Nullable: baris v45 belum pernah diputuskan.
+    ensure_column(
+        &connection,
+        "keu_tutup_buku",
+        "diputuskan_oleh",
+        "ALTER TABLE keu_tutup_buku ADD COLUMN diputuskan_oleh TEXT;",
+    )?;
+    ensure_column(
+        &connection,
+        "keu_tutup_buku",
+        "diputuskan_pada",
+        "ALTER TABLE keu_tutup_buku ADD COLUMN diputuskan_pada TEXT;",
+    )?;
+    ensure_column(
+        &connection,
+        "keu_tutup_buku",
+        "catatan_keputusan",
+        "ALTER TABLE keu_tutup_buku ADD COLUMN catatan_keputusan TEXT;",
     )?;
 
     // Pemisahan jam kerja hari libur (v14). Database lokal yang dibuat sebelum
@@ -1990,6 +2033,8 @@ pub(crate) const CLOUD_MIRRORED_TABLES: &[&str] = &[
     "keu_pembayaran",
     "keu_pembayaran_alokasi",
     "keu_pembayaran_batal",
+    // v45 — tutup buku, milik lembaga database asalnya.
+    "keu_tutup_buku",
     // Di luar snapshot, tetapi milik database asalnya seperti `absensi_foto`.
     "uks_kunjungan",
     "company_profile",

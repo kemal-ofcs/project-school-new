@@ -24,11 +24,13 @@ import {
   PanelTinjauan,
 } from "@/components/keuangan/PembayaranPanel";
 import { PilihAkunBayar } from "@/components/keuangan/PilihAkunBayar";
+import { RekapTagihan } from "@/components/keuangan/RekapTagihan";
 import { Modal } from "@/components/ui/Modal";
 import { hasPermission } from "@/lib/auth/access";
 import { useAuth } from "@/lib/context/AuthContext";
 import {
   batalkanTagihan,
+  type DaftarTagihan,
   daftarKeringanan,
   daftarSiswaTagihan,
   daftarTagihan,
@@ -36,12 +38,14 @@ import {
   hapusTarif,
   type JenisTagihanItem,
   type KeringananItem,
+  kirimPengingatTagihan,
   type MasterTagihan,
   type PratinjauTagihan,
   pratinjauTagihan,
   type SiswaTagihan,
   simpanJenisTagihan,
   simpanKeringanan,
+  simpanPortalTagihan,
   simpanTarif,
   type TagihanItem,
   terbitkanTagihan,
@@ -68,6 +72,7 @@ type Tab =
   | "bayar"
   | "kuitansi"
   | "tinjauan"
+  | "rekap"
   | "terbitkan"
   | "jenis"
   | "keringanan"
@@ -79,6 +84,7 @@ const LABEL_TAB: Record<Tab, string> = {
   bayar: "Bayar",
   kuitansi: "Kuitansi",
   tinjauan: "Tinjauan",
+  rekap: "Rekap",
   terbitkan: "Terbitkan",
   jenis: "Jenis & Tarif",
   keringanan: "Keringanan",
@@ -214,9 +220,12 @@ export function TagihanWorkspace() {
         ) : tab === "tunggakan" ? (
           <PanelTunggakan
             master={master}
+            bolehKelola={bolehKelola}
             bolehBatal={bolehBatal}
             onInfo={info}
           />
+        ) : tab === "rekap" ? (
+          <RekapTagihan master={master} />
         ) : tab === "terbitkan" ? (
           <PanelTerbitkan master={master} onInfo={info} />
         ) : tab === "jenis" ? (
@@ -244,10 +253,12 @@ export function TagihanWorkspace() {
 
 function PanelTunggakan({
   master,
+  bolehKelola,
   bolehBatal,
   onInfo,
 }: {
   master: MasterTagihan;
+  bolehKelola: boolean;
   bolehBatal: boolean;
   onInfo: (pesan: string) => void;
 }) {
@@ -255,12 +266,19 @@ function PanelTunggakan({
   const [idJenis, setIdJenis] = useState("");
   const [idRombel, setIdRombel] = useState("");
   const [status, setStatus] = useState("Aktif");
-  const [data, setData] = useState<{
-    items: TagihanItem[];
-    total_sisa: number;
-  } | null>(null);
+  const [data, setData] = useState<DaftarTagihan | null>(null);
   const [galatMuat, setGalatMuat] = useState<string | null>(null);
   const [dipilih, setDipilih] = useState<TagihanItem | null>(null);
+  const [bukaPengingat, setBukaPengingat] = useState(false);
+  const siswaMenunggak = useMemo(
+    () =>
+      new Set(
+        (data?.items ?? [])
+          .filter((item) => item.sisa > 0)
+          .map((item) => item.id_siswa),
+      ).size,
+    [data],
+  );
 
   const muat = useCallback(async () => {
     setGalatMuat(null);
@@ -373,9 +391,28 @@ function PanelTunggakan({
         </p>
       ) : (
         <div className="space-y-2">
-          <p className="text-sm text-slate-300">
-            {data.items.length} tagihan, sisa <Rp nilai={data.total_sisa} />
-          </p>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <p className="text-sm text-slate-300">
+              {data.items.length} tagihan, sisa <Rp nilai={data.total_sisa} />
+            </p>
+            {bolehKelola && siswaMenunggak > 0 ? (
+              data.pengingat_wa ? (
+                <button
+                  type="button"
+                  className={TOMBOL_KEDUA}
+                  onClick={() => setBukaPengingat(true)}
+                >
+                  Kirim pengingat WhatsApp
+                </button>
+              ) : (
+                <p className="text-xs text-slate-400">
+                  Pengingat WhatsApp belum dinyalakan. Sakelarnya ada di
+                  Pengaturan bagian Notifikasi WhatsApp (Web/Desktop) atau
+                  tombol Gateway di halaman Notifikasi WA (Mobile).
+                </p>
+              )
+            ) : null}
+          </div>
           <ul className="divide-y divide-slate-800 rounded-xl border border-slate-800 bg-slate-900/60">
             {data.items.map((item) => (
               <li key={item.id_tagihan}>
@@ -442,6 +479,22 @@ function PanelTunggakan({
         </div>
       )}
 
+      {bukaPengingat ? (
+        <DialogPengingat
+          filter={{
+            periode: periode.trim() || null,
+            idJenisTagihan: idJenis || null,
+            idRombel: idRombel || null,
+          }}
+          jumlahSiswa={siswaMenunggak}
+          onClose={() => setBukaPengingat(false)}
+          onSelesai={(pesan) => {
+            setBukaPengingat(false);
+            onInfo(pesan);
+          }}
+        />
+      ) : null}
+
       {dipilih ? (
         <DialogTagihan
           item={dipilih}
@@ -455,6 +508,97 @@ function PanelTunggakan({
         />
       ) : null}
     </div>
+  );
+}
+
+/** Kalimat hasil pengingat; yang dilewati disebut beserta dua alasannya. */
+function pesanPengingat(hasil: {
+  siswa: number;
+  diantre: number;
+  terpotong: boolean;
+}): string {
+  const lewat = hasil.siswa - hasil.diantre;
+  return [
+    hasil.diantre > 0
+      ? `${hasil.diantre} pesan pengingat masuk antrean WhatsApp.`
+      : "Tidak ada pesan baru yang masuk antrean.",
+    lewat > 0
+      ? `${lewat} siswa dilewati karena walinya sudah diingatkan hari ini atau nomor WhatsApp walinya kosong.`
+      : "",
+    hasil.terpotong
+      ? "Hanya 500 siswa pertama yang diproses. Persempit saringan lalu kirim lagi untuk sisanya."
+      : "",
+  ]
+    .filter(Boolean)
+    .join(" ");
+}
+
+function DialogPengingat({
+  filter,
+  jumlahSiswa,
+  onClose,
+  onSelesai,
+}: {
+  filter: {
+    periode: string | null;
+    idJenisTagihan: string | null;
+    idRombel: string | null;
+  };
+  jumlahSiswa: number;
+  onClose: () => void;
+  onSelesai: (pesan: string) => void;
+}) {
+  const [galat, setGalat] = useState<string | null>(null);
+  const [sibuk, setSibuk] = useState(false);
+  const isSubmittingRef = useRef(false);
+
+  async function kirim() {
+    if (isSubmittingRef.current) return;
+    isSubmittingRef.current = true;
+    setSibuk(true);
+    setGalat(null);
+    try {
+      onSelesai(pesanPengingat(await kirimPengingatTagihan(filter)));
+    } catch (error) {
+      setGalat(pesanGalat(error, "Pengingat tidak bisa diantre."));
+    } finally {
+      isSubmittingRef.current = false;
+      setSibuk(false);
+    }
+  }
+
+  return (
+    <Modal isOpen onClose={onClose} title="Kirim pengingat tagihan" hideFooter>
+      <div className="space-y-4 text-sm text-slate-200">
+        <p>
+          Wali dari {jumlahSiswa} siswa di daftar ini akan menerima satu pesan
+          WhatsApp. Pesannya memuat seluruh tunggakan siswa, termasuk yang tidak
+          tampil karena saringan.
+        </p>
+        <p className="text-slate-400">
+          Wali yang sudah diingatkan hari ini dilewati. Pesan terkirim saat
+          antrean WhatsApp dikirim, otomatis atau dari halaman Notifikasi WA.
+        </p>
+        {galat ? (
+          <p role="alert" className={GALAT_KOTAK}>
+            {galat}
+          </p>
+        ) : null}
+        <div className="flex flex-wrap justify-end gap-2">
+          <button type="button" className={TOMBOL_KEDUA} onClick={onClose}>
+            Batal
+          </button>
+          <button
+            type="button"
+            className={TOMBOL_UTAMA}
+            disabled={sibuk}
+            onClick={() => void kirim()}
+          >
+            {sibuk ? "Mengantre..." : "Kirim pengingat"}
+          </button>
+        </div>
+      </div>
+    </Modal>
   );
 }
 
@@ -895,6 +1039,77 @@ function PanelTerbitkan({
 
 // ── Jenis & tarif ───────────────────────────────────────────────────────────
 
+/**
+ * Sakelar halaman Tagihan di portal wali (K4c). Disimpan sebagai setting
+ * tersinkron, jadi berlaku untuk situs publik begitu sampai ke cloud.
+ */
+function PortalWali({
+  master,
+  bolehKelola,
+  onBerubah,
+}: {
+  master: MasterTagihan;
+  bolehKelola: boolean;
+  onBerubah: (pesan: string) => Promise<void>;
+}) {
+  const [galat, setGalat] = useState<string | null>(null);
+  const [sibuk, setSibuk] = useState(false);
+  const isSubmittingRef = useRef(false);
+
+  async function ubah(aktif: boolean) {
+    if (isSubmittingRef.current) return;
+    isSubmittingRef.current = true;
+    setSibuk(true);
+    setGalat(null);
+    try {
+      await simpanPortalTagihan(aktif);
+      await onBerubah(
+        aktif
+          ? "Halaman Tagihan di portal wali dibuka."
+          : "Halaman Tagihan di portal wali ditutup.",
+      );
+    } catch (error) {
+      setGalat(
+        pesanGalat(error, "Pengaturan portal wali tidak bisa disimpan."),
+      );
+    } finally {
+      isSubmittingRef.current = false;
+      setSibuk(false);
+    }
+  }
+
+  return (
+    <div className="p-4 rounded-xl border border-slate-800 bg-slate-900/60 space-y-2">
+      {bolehKelola ? (
+        <label className="flex min-h-11 items-center gap-3 text-sm font-semibold text-slate-100">
+          <input
+            type="checkbox"
+            checked={master.portal_wali_tagihan}
+            disabled={sibuk}
+            onChange={(e) => void ubah(e.target.checked)}
+          />
+          Tampilkan tagihan di portal wali
+        </label>
+      ) : (
+        <p className="text-sm font-semibold text-slate-100">
+          Tagihan di portal wali:{" "}
+          {master.portal_wali_tagihan ? "ditampilkan" : "tidak ditampilkan"}
+        </p>
+      )}
+      <p className="text-xs text-slate-400">
+        Wali yang masuk ke portal melihat tunggakan anaknya, saldo titipan, dan
+        kuitansi 12 bulan terakhir. Kuitansi yang dibatalkan ikut tampil dengan
+        tanda dibatalkan.
+      </p>
+      {galat ? (
+        <p role="alert" className={GALAT_KOTAK}>
+          {galat}
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
 function PanelJenis({
   master,
   bolehKelola,
@@ -924,6 +1139,11 @@ function PanelJenis({
 
   return (
     <div className="space-y-4">
+      <PortalWali
+        master={master}
+        bolehKelola={bolehKelola}
+        onBerubah={onBerubah}
+      />
       {bolehKelola ? (
         <button
           type="button"

@@ -150,3 +150,29 @@ export interface LaporanArusKas {
   total_keluar: number;
   saldo_akhir: number;
 }
+
+// ── Tutup buku (v45) ────────────────────────────────────────────────────────
+
+export interface TutupBukuItem {
+  id_tutup: string;
+  sampai_tanggal: string;
+  dibuat_oleh: string;
+  kode_perangkat: string;
+  /** Menurut jam perangkat yang menutup; bisa salah. */
+  waktu_perangkat: string;
+  /** Jam database cloud saat barisnya diterima; `null` = belum sampai cloud. */
+  diterima_cloud: string | null;
+  saldo_json: string;
+  status: "Aktif" | "Dibuka" | "Digantikan" | "Menunggu";
+  alasan_buka: string | null;
+  dibuka_oleh: string | null;
+  dibuka_pada: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface StatusTutupBuku {
+  /** Tanggal terkunci terakhir, atau `null` bila belum pernah ditutup. */
+  batas: string | null;
+  riwayat: TutupBukuItem[];
+}

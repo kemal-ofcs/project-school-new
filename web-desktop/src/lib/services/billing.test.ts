@@ -13,11 +13,14 @@ const {
   cancelPayment,
   issue,
   list,
+  master,
   moveToDeposit,
   pay,
   paymentDetail,
   payments,
   preview,
+  remind,
+  savePortal,
   review,
   saveJenis,
   saveKeringanan,
@@ -302,5 +305,68 @@ describe("pembayaran Web terhadap skema cloud asli", () => {
     await expect(saveSeries(client, "kode-lain", "TU1", "")).rejects.toThrow(
       "Seri ini sudah dipakai perangkat lain.",
     );
+  });
+});
+
+// Cermin `pengingat_tunggakan_sekali_sehari` di `desktop/billing.rs`, dengan
+// rombel dan siswa sendiri supaya tidak bergantung pada tes di atas.
+describe("pengingat tunggakan WhatsApp", () => {
+  test("satu pesan per siswa per hari, hanya bila sakelar menyala", async () => {
+    await client.batch(
+      [
+        `INSERT INTO akademik_rombel (id_rombel, id_tahun_ajaran, tingkat, nama_rombel) VALUES
+           ('r9', 'ta', 9, 'IX A');`,
+        `INSERT INTO master_data (id_unik, kode_karyawan, nama, divisi, id_shift, jenis_personil, status_aktif, unit) VALUES
+           ('S-91', 'S-91', 'Dewi', 'Siswa', 1, 'SISWA', 'Aktif', 'SMP'),
+           ('S-92', 'S-92', 'Eko', 'Siswa', 1, 'Siswa', 'Aktif', 'SMP');`,
+        `INSERT INTO siswa_data (id_siswa, nama_lengkap, id_rombel, angkatan, status, created_at, updated_at, no_whatsapp_wali) VALUES
+           ('S-91', 'Dewi', 'r9', 2024, 'Aktif', 'x', 'x', '081234567890'),
+           ('S-92', 'Eko', 'r9', 2024, 'Aktif', 'x', 'x', '');`,
+      ],
+      "write",
+    );
+    const { id_jenis_tagihan: jt } = await saveJenis(client, {
+      nama: "SPP IX",
+      periodik: "Bulanan",
+      nominal_bawaan: 300_000,
+      id_akun_pendapatan: "akun-pendapatan-spp",
+    });
+    await issue(client, "tu", jt, "2026-07", "2026-07-10", null, "r9");
+
+    await expect(remind(client, { id_rombel: "r9" })).rejects.toThrow(
+      "Pengingat tagihan lewat WhatsApp belum dinyalakan.",
+    );
+    expect((await list(client, { id_rombel: "r9" })).pengingat_wa).toBe(false);
+    await client.execute(
+      "INSERT INTO setting_gex_system (key, value) VALUES ('wa_notify_tagihan', 'true');",
+    );
+    expect((await list(client, { id_rombel: "r9" })).pengingat_wa).toBe(true);
+
+    expect(await remind(client, { id_rombel: "r9" })).toEqual({
+      siswa: 2,
+      diantre: 1,
+      terpotong: false,
+    });
+    const antrean = await client.execute(
+      "SELECT isi_pesan, dedupe_key FROM notifikasi_wa WHERE jenis = 'tagihan';",
+    );
+    expect(antrean.rows.length).toBe(1);
+    const isi = String(antrean.rows[0]?.isi_pesan);
+    expect(String(antrean.rows[0]?.dedupe_key)).toStartWith("tagihan:S-91:");
+    expect(isi).toContain("Dewi (IX A)");
+    expect(isi).toContain("- SPP IX Juli 2026: Rp300.000");
+    expect(isi).toContain("Jatuh tempo paling awal: 10/07/2026");
+
+    expect((await remind(client, { id_rombel: "r9" })).diantre).toBe(0);
+  });
+});
+
+describe("sakelar portal wali", () => {
+  test("tersimpan sebagai setting dan terbaca di master", async () => {
+    expect((await master(client)).portal_wali_tagihan).toBe(false);
+    await savePortal(client, true);
+    expect((await master(client)).portal_wali_tagihan).toBe(true);
+    await savePortal(client, false);
+    expect((await master(client)).portal_wali_tagihan).toBe(false);
   });
 });

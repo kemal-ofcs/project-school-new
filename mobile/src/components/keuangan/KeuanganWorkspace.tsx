@@ -25,6 +25,7 @@ import {
   BarisEkspor,
   LaporanKeuangan,
 } from "@/components/keuangan/LaporanKeuangan";
+import { TutupBukuPanel } from "@/components/keuangan/TutupBukuPanel";
 import { Modal } from "@/components/ui/Modal";
 import { hasPermission } from "@/lib/auth/access";
 import { useAuth } from "@/lib/context/AuthContext";
@@ -62,7 +63,7 @@ import {
  * `FeedbackBanner` kedua workspace punya props yang berbeda.
  */
 
-type Tab = "jurnal" | "buku" | "neraca" | "laporan" | "akun";
+type Tab = "jurnal" | "buku" | "neraca" | "laporan" | "tutup" | "akun";
 type Feedback = { tone: "success" | "error"; message: string } | null;
 
 const LABEL_TAB: Record<Tab, string> = {
@@ -70,6 +71,7 @@ const LABEL_TAB: Record<Tab, string> = {
   buku: "Buku Besar",
   neraca: "Neraca Saldo",
   laporan: "Laporan",
+  tutup: "Tutup Buku",
   akun: "Bagan Akun",
 };
 
@@ -91,6 +93,7 @@ export function KeuanganWorkspace() {
   const { user } = useAuth();
   const bolehKelola = hasPermission(user, "accounting.manage");
   const bolehBatal = hasPermission(user, "accounting.reverse");
+  const bolehTutup = hasPermission(user, "accounting.close");
 
   const [tab, setTab] = useState<Tab>("jurnal");
   const [feedback, setFeedback] = useState<Feedback>(null);
@@ -196,6 +199,8 @@ export function KeuanganWorkspace() {
           <PanelNeracaSaldo />
         ) : tab === "laporan" ? (
           <LaporanKeuangan akun={akun} />
+        ) : tab === "tutup" ? (
+          <TutupBukuPanel bolehTutup={bolehTutup} onInfo={info} />
         ) : (
           <PanelAkun
             akun={akun}

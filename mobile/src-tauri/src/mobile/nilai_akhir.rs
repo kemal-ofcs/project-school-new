@@ -58,6 +58,24 @@ pub const SEED_JENIS_SQL: &str = "INSERT OR IGNORE INTO nilai_jenis (id_jenis, n
 
 /// Menanam jenis bawaan ke SQLite lokal. Tidak masuk outbox: cloud menanam
 /// seed yang sama, dan `INSERT OR IGNORE` tidak menimpa bobot yang sudah diatur.
+/// Sekali per perangkat: lupakan kursor tarikan `nilai_jenis`.
+///
+/// Sampai perbaikan ini, sumber snapshot `nilai_jenis` memakai kunci payload
+/// milik `nilai_penilaian`, sehingga jenis penilaian buatan sekolah tidak
+/// pernah sampai ke perangkat lain, padahal penghitung perubahannya sudah
+/// terbaca dan tabelnya dianggap mutakhir. Menghapus kursornya membuat tarikan
+/// berikutnya mengambil seluruh tabel. Penandanya baris `pulih:nilai_jenis`
+/// di `desktop_sync_cursor`, jadi tidak berulang di setiap pembukaan aplikasi.
+pub fn pulihkan_tarikan_jenis(connection: &Connection) -> rusqlite::Result<()> {
+    connection.execute_batch(
+        "DELETE FROM desktop_sync_table_cursor
+           WHERE table_name = 'nilai_jenis'
+             AND NOT EXISTS (SELECT 1 FROM desktop_sync_cursor WHERE domain = 'pulih:nilai_jenis');
+         INSERT OR IGNORE INTO desktop_sync_cursor (domain, last_revision, updated_at)
+           VALUES ('pulih:nilai_jenis', 1, unixepoch());",
+    )
+}
+
 pub fn seed_jenis_bawaan(connection: &Connection) -> rusqlite::Result<()> {
     let mut statement = connection.prepare(SEED_JENIS_SQL)?;
     for jenis in jenis_bawaan() {
@@ -453,7 +471,7 @@ fn bobot_kehadiran(connection: &Connection) -> Result<i64, CommandError> {
         .unwrap_or(0))
 }
 
-fn tulis_setting(
+pub(crate) fn tulis_setting(
     transaction: &rusqlite::Transaction<'_>,
     client_id: &str,
     key: &str,
@@ -1607,5 +1625,38 @@ mod tests {
             )
         );
         assert_eq!(murid("S2")["persen_kehadiran"], json!(100.0));
+    }
+
+    #[test]
+    fn kursor_jenis_dilupakan_sekali_saja() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        storage::initialize(dir.path()).expect("skema lokal");
+        let connection = storage::database(dir.path()).expect("db");
+        let ada = |c: &rusqlite::Connection| -> i64 {
+            c.query_row(
+                "SELECT COUNT(*) FROM desktop_sync_table_cursor WHERE table_name = 'nilai_jenis';",
+                [],
+                |row| row.get(0),
+            )
+            .expect("kursor")
+        };
+        let tulis = |c: &rusqlite::Connection| {
+            c.execute(
+                "INSERT OR REPLACE INTO desktop_sync_table_cursor (table_name, remote_revision, updated_at)
+                 VALUES ('nilai_jenis', 7, unixepoch());",
+                [],
+            )
+            .expect("tulis kursor");
+        };
+        // `initialize` sudah menjalankan pemulihan; kursor baru tidak disentuh lagi.
+        tulis(&connection);
+        pulihkan_tarikan_jenis(&connection).expect("pemulihan kedua");
+        assert_eq!(ada(&connection), 1);
+        // Perangkat lama tanpa penanda: kursornya dilupakan.
+        connection
+            .execute("DELETE FROM desktop_sync_cursor WHERE domain = 'pulih:nilai_jenis';", [])
+            .expect("hapus penanda");
+        pulihkan_tarikan_jenis(&connection).expect("pemulihan pertama");
+        assert_eq!(ada(&connection), 0);
     }
 }

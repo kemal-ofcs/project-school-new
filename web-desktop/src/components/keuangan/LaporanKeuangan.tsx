@@ -22,11 +22,30 @@ import {
   getLaporanAktivitas,
   getLaporanArusKas,
   getLaporanPosisi,
+  getStatusTutupBuku,
+  type StatusTutupBuku,
 } from "@/lib/gateways/accounting";
 import { subscribeSyncCompleted } from "@/lib/gateways/sync-status";
 import { formatRupiah, MAKS_AKUN_KAS } from "@/lib/validations/accounting";
+import { tanggalTampil, waktuTampil } from "@/lib/validations/tutup-buku";
 
 type JenisLaporan = "posisi" | "aktivitas" | "arus";
+
+/**
+ * Keterangan untuk laporan yang tanggal akhirnya sudah masuk periode
+ * tertutup: tutup buku berlaku terkecil yang mencakup tanggal itu.
+ */
+function keteranganTutup(
+  status: StatusTutupBuku | null,
+  sampai: string,
+): string | undefined {
+  const tutup = status?.riwayat
+    .filter((t) => t.status === "Aktif" && t.sampai_tanggal >= sampai)
+    .sort((a, b) => (a.sampai_tanggal < b.sampai_tanggal ? -1 : 1))[0];
+  return tutup
+    ? `Periode ini sudah ditutup sampai ${tanggalTampil(tutup.sampai_tanggal)} oleh ${tutup.dibuat_oleh} pada ${waktuTampil(tutup.waktu_perangkat)} (menurut jam perangkat).`
+    : undefined;
+}
 
 const LABEL_JENIS: Record<JenisLaporan, string> = {
   posisi: "Posisi Keuangan",
@@ -115,16 +134,23 @@ export function LaporanKeuangan({ akun }: { akun: AkunItem[] }) {
     setTabel(null);
     setGalatMuat(null);
     try {
+      // Status tutup buku hanya keterangan; gagal membacanya tidak menahan laporan.
+      const statusTutup = getStatusTutupBuku().catch(() => null);
+      let hasil: TabelLaporan | null = null;
       if (jenis === "posisi") {
-        setTabel(tabelPosisi(await getLaporanPosisi(sampai)));
+        hasil = tabelPosisi(await getLaporanPosisi(sampai));
       } else if (jenis === "aktivitas") {
-        setTabel(tabelAktivitas(await getLaporanAktivitas(dari, sampai)));
+        hasil = tabelAktivitas(await getLaporanAktivitas(dari, sampai));
       } else if (kunciKas) {
-        setTabel(
-          tabelArusKas(
-            await getLaporanArusKas(dari, sampai, kunciKas.split(",")),
-          ),
+        hasil = tabelArusKas(
+          await getLaporanArusKas(dari, sampai, kunciKas.split(",")),
         );
+      }
+      if (hasil) {
+        setTabel({
+          ...hasil,
+          keterangan: keteranganTutup(await statusTutup, sampai),
+        });
       }
     } catch (error) {
       setGalatMuat(pesanGalat(error, "Laporan tidak bisa dimuat."));
@@ -269,6 +295,11 @@ export function LaporanKeuangan({ akun }: { akun: AkunItem[] }) {
                 {tabel.judul}
               </h2>
               <p className="text-xs text-slate-400">{tabel.periode}</p>
+              {tabel.keterangan ? (
+                <p className="mt-1 text-xs text-slate-300">
+                  {tabel.keterangan}
+                </p>
+              ) : null}
             </div>
             <table className="w-full text-left text-sm">
               <thead className="sr-only">

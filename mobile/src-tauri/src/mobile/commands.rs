@@ -10,7 +10,7 @@ use tauri::State;
 use zeroize::Zeroizing;
 
 use super::{
-    academic, accounting, administration, billing, attendance_dashboard, attendance_ledger, class_attendance,
+    academic, accounting, administration, billing, tutup_buku, attendance_dashboard, attendance_ledger, class_attendance,
     config::MobileState,
     face_match, inventory, license, loan,
     models::{
@@ -2756,6 +2756,36 @@ pub fn desktop_accounting_post_journal(
     accounting::post_journal(&state, &operator.username, draft)
 }
 
+/// Batas tutup buku yang berlaku dan riwayatnya.
+#[tauri::command]
+pub fn desktop_accounting_close_status(
+    state: State<'_, MobileState>,
+) -> Result<Value, CommandError> {
+    require_permission(&state, "accounting.view")?;
+    tutup_buku::status(&state)
+}
+
+/// Tutup buku sampai satu tanggal: izin sensitif, karena setelahnya perangkat
+/// ini menolak setiap pencatatan bertanggal di periode itu.
+#[tauri::command]
+pub fn desktop_accounting_close(
+    state: State<'_, MobileState>,
+    sampai: String,
+) -> Result<Value, CommandError> {
+    let operator = require_permission(&state, "accounting.close")?;
+    tutup_buku::close(&state, &operator.username, &sampai)
+}
+
+/// Buka kembali periode yang terakhir ditutup, dengan alasan.
+#[tauri::command]
+pub fn desktop_accounting_reopen(
+    state: State<'_, MobileState>,
+    alasan: String,
+) -> Result<Value, CommandError> {
+    let operator = require_permission(&state, "accounting.close")?;
+    tutup_buku::reopen(&state, &operator.username, &alasan)
+}
+
 /// Pembatalan menuntut izin sensitif tersendiri: jurnal pembalik mengubah
 /// saldo setiap akun yang disentuh jurnal asalnya.
 #[tauri::command]
@@ -3030,6 +3060,54 @@ pub fn desktop_billing_list(
         id_jenis_tagihan.as_deref(),
         id_rombel.as_deref(),
         status.as_deref(),
+    )
+}
+
+/// Rekap tagihan satu periode per rombel.
+#[tauri::command]
+pub fn desktop_billing_recap_rombel(
+    state: State<'_, MobileState>,
+    periode: String,
+    id_jenis_tagihan: Option<String>,
+) -> Result<Value, CommandError> {
+    require_permission(&state, "billing.view")?;
+    billing::recap_rombel(&state, &periode, id_jenis_tagihan.as_deref())
+}
+
+/// Penerimaan pembayaran siswa per jenis per bulan, 12 bulan.
+#[tauri::command]
+pub fn desktop_billing_recap_receipts(
+    state: State<'_, MobileState>,
+    mulai: String,
+) -> Result<Value, CommandError> {
+    require_permission(&state, "billing.view")?;
+    billing::recap_receipts(&state, &mulai)
+}
+
+/// Buka atau tutup halaman Tagihan di portal wali (K4c).
+#[tauri::command]
+pub fn desktop_billing_save_portal(
+    state: State<'_, MobileState>,
+    aktif: bool,
+) -> Result<Value, CommandError> {
+    require_permission(&state, "billing.manage")?;
+    billing::save_portal(&state, aktif)
+}
+
+/// Pengingat tunggakan WhatsApp ke wali, satu pesan per siswa per hari (K4b).
+#[tauri::command]
+pub fn desktop_billing_remind(
+    state: State<'_, MobileState>,
+    periode: Option<String>,
+    id_jenis_tagihan: Option<String>,
+    id_rombel: Option<String>,
+) -> Result<Value, CommandError> {
+    require_permission(&state, "billing.manage")?;
+    billing::remind(
+        &state,
+        periode.as_deref(),
+        id_jenis_tagihan.as_deref(),
+        id_rombel.as_deref(),
     )
 }
 

@@ -67,6 +67,36 @@ const JENIS_LABEL: Record<string, string> = {
   tagihan: "Pengingat Tagihan",
 };
 
+/**
+ * Sakelar jenis notifikasi, sama dengan kartu Notifikasi WhatsApp di
+ * Pengaturan Web/Desktop. Disimpan bersama konfigurasi gateway lewat
+ * `saveWaConfigGateway`, yang juga menulis cerminannya ke setting tersinkron.
+ */
+const SAKELAR_JENIS: ReadonlyArray<
+  readonly [
+    (
+      | "scanMasukEnabled"
+      | "scanPulangEnabled"
+      | "bolosEnabled"
+      | "ambangAlfaEnabled"
+      | "koreksiAdminEnabled"
+      | "importManualEnabled"
+      | "uksEnabled"
+      | "tagihanEnabled"
+    ),
+    string,
+  ]
+> = [
+  ["scanMasukEnabled", "Scan masuk"],
+  ["scanPulangEnabled", "Scan pulang"],
+  ["bolosEnabled", "Tidak ikut pelajaran (bolos)"],
+  ["ambangAlfaEnabled", "Ambang alfa"],
+  ["koreksiAdminEnabled", "Koreksi admin"],
+  ["importManualEnabled", "Input manual"],
+  ["uksEnabled", "Kunjungan UKS"],
+  ["tagihanEnabled", "Pengingat tagihan siswa"],
+];
+
 function warnaStatus(status: string) {
   if (status === "Terkirim")
     return "border-emerald-400/30 bg-emerald-400/10 text-emerald-200";
@@ -618,11 +648,36 @@ export default function NotifikasiWaMobilePage() {
               operator yang berizin mengirim notifikasi. Di Android, aplikasi
               yang di-minimize berhenti mengirim.
             </p>
-            <p className="text-[11px] text-slate-500 leading-relaxed">
-              Sakelar jenis notifikasi (scan masuk, pulang, bolos, ambang alfa)
-              ikut sinkronisasi dan diatur di halaman Pengaturan — sakelar itu
-              dibaca saat MENGANTRE, bukan saat mengirim.
-            </p>
+            <fieldset className="space-y-2 rounded-xl border border-white/10 p-3">
+              <legend className="px-1 text-slate-400 text-xs">
+                Jenis notifikasi yang diantre
+              </legend>
+              {SAKELAR_JENIS.map(([kunci, label]) => (
+                <div className="flex items-center gap-2" key={kunci}>
+                  <input
+                    checked={config[kunci]}
+                    id={`wa-cfg-${kunci}`}
+                    onChange={(e) =>
+                      setConfig((c) =>
+                        c ? { ...c, [kunci]: e.target.checked } : c,
+                      )
+                    }
+                    type="checkbox"
+                  />
+                  <label
+                    className="text-slate-300 text-xs"
+                    htmlFor={`wa-cfg-${kunci}`}
+                  >
+                    {label}
+                  </label>
+                </div>
+              ))}
+              <p className="text-[11px] text-slate-500 leading-relaxed">
+                Ikut sinkronisasi ke semua perangkat dan dibaca saat pesan
+                diantre. Jenis yang dimatikan tidak diantre lagi, dan pesannya
+                yang masih menunggu dibatalkan saat antrean dikirim.
+              </p>
+            </fieldset>
             <button
               className="w-full rounded-xl bg-indigo-500 px-4 py-3 font-bold text-sm text-white"
               type="submit"

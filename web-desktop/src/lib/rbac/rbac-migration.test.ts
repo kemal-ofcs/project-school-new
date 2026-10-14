@@ -141,6 +141,10 @@ describe("dynamic RBAC migration", () => {
       43,
       // v44 — pengingat tagihan WhatsApp (jenis `tagihan`).
       44,
+      // v45 — tutup buku (`keu_tutup_buku`).
+      45,
+      // v46 — keputusan tutup buku.
+      46,
     ]);
 
     const sessionColumns = await client.execute(

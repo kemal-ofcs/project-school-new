@@ -35,6 +35,8 @@ export interface MasterTagihan {
   unit: string[];
   rombel: Array<{ id_rombel: string; nama_rombel: string; tingkat: number }>;
   tahun_ajaran: string[];
+  /** Halaman Tagihan di portal wali dibuka (K4c). */
+  portal_wali_tagihan: boolean;
 }
 
 export interface KeringananItem {
@@ -96,6 +98,20 @@ export interface TagihanItem {
 // ── Pembayaran (K3b) ────────────────────────────────────────────────────────
 
 export type StatusKuitansi = "Sah" | "Dibatalkan";
+
+/** Hasil daftar tunggakan. `pengingat_wa` = sakelar `wa_notify_tagihan`. */
+export interface DaftarTagihan {
+  items: TagihanItem[];
+  total_sisa: number;
+  pengingat_wa: boolean;
+}
+
+/** Hasil satu kali "Kirim pengingat WhatsApp" (K4b). */
+export interface HasilPengingat {
+  siswa: number;
+  diantre: number;
+  terpotong: boolean;
+}
 
 export interface TagihanTerbukaItem {
   id_tagihan: string;
@@ -229,4 +245,41 @@ export interface SeriKuitansi {
     nama_perangkat: string;
     updated_at: string;
   }>;
+}
+
+// ── Rekap (lanjutan K4) ─────────────────────────────────────────────────────
+
+export interface BarisRekapTagihan {
+  nama: string;
+  siswa: number;
+  ditagih: number;
+  terbayar: number;
+  sisa: number;
+  persen: number;
+  menunggak: number;
+}
+
+export interface RekapRombel {
+  periode: string;
+  dicetak: string;
+  baris: BarisRekapTagihan[];
+  total: BarisRekapTagihan;
+}
+
+export interface BarisMatriksPenerimaan {
+  id_jenis: string;
+  nama: string;
+  per_bulan: number[];
+  total: number;
+}
+
+export interface RekapPenerimaan {
+  dicetak: string;
+  bulan: string[];
+  kas: BarisMatriksPenerimaan[];
+  total_per_bulan: number[];
+  total: number;
+  dipakai_titipan: BarisMatriksPenerimaan[];
+  dipakai_per_bulan: number[];
+  total_dipakai: number;
 }

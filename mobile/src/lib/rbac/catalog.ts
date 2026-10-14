@@ -385,6 +385,11 @@ export const PERMISSION_CATALOG = [
     group: "Keuangan",
   },
   {
+    key: "accounting.close",
+    name: "Tutup Buku",
+    group: "Keuangan",
+  },
+  {
     key: "loan.view",
     name: "Lihat Kasbon Karyawan",
     group: "Keuangan",
@@ -506,6 +511,9 @@ export const SENSITIVE_MUTATION_PERMISSIONS = new Set<PermissionKey>([
   "loan.approve",
   // Membatalkan tagihan menghapus piutang seorang siswa dari pembukuan.
   "billing.cancel",
+  // Menutup buku membuat setiap perangkat menolak pencatatan di periode itu,
+  // dan memutuskan bentrokan tutup buku menentukan potret saldo resmi.
+  "accounting.close",
 ]);
 
 export const SYSTEM_ROLE_KEYS = [

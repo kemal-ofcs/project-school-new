@@ -63,6 +63,10 @@ const filesToCopy = [
   // Laporan keuangan ISAK 35 dan ekspor Excel/PDF (K4a).
   "components/keuangan/LaporanKeuangan.tsx",
   "components/keuangan/eksporKeuangan.ts",
+  // Rekap tagihan per rombel dan penerimaan per bulan (lanjutan K4).
+  "components/keuangan/RekapTagihan.tsx",
+  // Tutup buku / kunci periode (v45).
+  "components/keuangan/TutupBukuPanel.tsx",
   // Nilai akhir (N2a): tab Pengaturan Nilai dan Rekap Nilai Akhir.
   "components/nilai/PengaturanNilai.tsx",
   "components/nilai/RekapNilai.tsx",

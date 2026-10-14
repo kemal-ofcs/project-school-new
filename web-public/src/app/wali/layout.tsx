@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { getReadyPublicDatabase } from "@/lib/server/db";
 import { ambilSesiWali } from "@/lib/server/wali-session";
+import { portalTagihanAktif } from "@/lib/services/wali-tagihan";
 import { TombolKeluar } from "./TombolKeluar";
 
 export const metadata: Metadata = {
@@ -34,6 +36,24 @@ export default async function WaliLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
   const sesi = await ambilSesiWali();
+  // Menu Tagihan hanya muncul bila sekolah membukanya (Fase K4c). Database
+  // yang gagal dibaca cukup menyembunyikan menunya; halamannya sendiri yang
+  // mengatakan kegagalan itu.
+  let tagihanAktif = false;
+  if (sesi) {
+    try {
+      tagihanAktif = await portalTagihanAktif(await getReadyPublicDatabase());
+    } catch (error) {
+      console.error("[web-public] gagal memeriksa menu tagihan:", error);
+    }
+  }
+  const menu = tagihanAktif
+    ? [
+        ...MENU.slice(0, 4),
+        { href: "/wali/tagihan", label: "Tagihan" },
+        ...MENU.slice(4),
+      ]
+    : MENU;
 
   return (
     <div className="mx-auto max-w-3xl px-6 py-10">
@@ -48,7 +68,7 @@ export default async function WaliLayout({
           </div>
           <nav aria-label="Navigasi portal wali" className="mt-4">
             <ul className="flex flex-wrap gap-x-5 gap-y-2 text-sm">
-              {MENU.map((item) => (
+              {menu.map((item) => (
                 <li key={item.href}>
                   <Link
                     className="text-teks-lembut transition-colors hover:text-aksen"

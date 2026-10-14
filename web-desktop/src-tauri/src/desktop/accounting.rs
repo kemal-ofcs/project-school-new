@@ -651,6 +651,8 @@ pub fn tulis_jurnal_tx(
     {
         return Ok(nomor);
     }
+    // Perangkat yang sudah tahu periodenya ditutup tidak mencatat ke sana.
+    super::tutup_buku::assert_periode_terbuka(transaction, &header.tanggal)?;
     let seri = seri_perangkat(&license::current_device_code(state)?);
     let tahun: String = header.tanggal.chars().take(4).collect();
     let nomor_urut: i64 = transaction

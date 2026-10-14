@@ -55,6 +55,8 @@ const STUDENT_BILLING_MIGRATION_VERSION = 41;
 const STUDENT_PAYMENT_MIGRATION_VERSION = 42;
 const GRADE_TYPE_MIGRATION_VERSION = 43;
 const WA_BILLING_REMINDER_MIGRATION_VERSION = 44;
+const BOOK_CLOSING_MIGRATION_VERSION = 45;
+const BOOK_CLOSING_DECISION_MIGRATION_VERSION = 46;
 
 /**
  * v21 — aturan jam scan baru: Jam Kerja Normal = (Jam Pulang − Jam Masuk) −
@@ -547,6 +549,23 @@ export async function runDatabaseMigrations(client: Client) {
       "nilai_penilaian",
       "id_jenis",
       "ALTER TABLE nilai_penilaian ADD COLUMN id_jenis TEXT;",
+    ],
+    // Keputusan tutup buku (v46). Cerminan `ensure_column` di `turso.rs` dan
+    // `storage.rs`.
+    [
+      "keu_tutup_buku",
+      "diputuskan_oleh",
+      "ALTER TABLE keu_tutup_buku ADD COLUMN diputuskan_oleh TEXT;",
+    ],
+    [
+      "keu_tutup_buku",
+      "diputuskan_pada",
+      "ALTER TABLE keu_tutup_buku ADD COLUMN diputuskan_pada TEXT;",
+    ],
+    [
+      "keu_tutup_buku",
+      "catatan_keputusan",
+      "ALTER TABLE keu_tutup_buku ADD COLUMN catatan_keputusan TEXT;",
     ],
   ] as const) {
     if (
@@ -1939,6 +1958,39 @@ export async function runDatabaseMigrations(client: Client) {
     sql: `INSERT OR IGNORE INTO schema_migration (version, name, applied_at)
           VALUES (?, 'wa-billing-reminder', ?);`,
     args: [WA_BILLING_REMINDER_MIGRATION_VERSION, now],
+  });
+
+  // v45 — tutup buku. DDL WAJIB identik dengan `storage.rs` dan `turso.rs`.
+  await client.execute(`
+    CREATE TABLE IF NOT EXISTS keu_tutup_buku (
+      id_tutup TEXT PRIMARY KEY,
+      sampai_tanggal TEXT NOT NULL,
+      dibuat_oleh TEXT NOT NULL,
+      kode_perangkat TEXT NOT NULL,
+      waktu_perangkat TEXT NOT NULL,
+      diterima_cloud TEXT,
+      saldo_json TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'Aktif' CHECK (status IN ('Aktif', 'Dibuka', 'Digantikan', 'Menunggu')),
+      alasan_buka TEXT,
+      dibuka_oleh TEXT,
+      dibuka_pada TEXT,
+      diputuskan_oleh TEXT,
+      diputuskan_pada TEXT,
+      catatan_keputusan TEXT,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+  `);
+  await client.execute({
+    sql: `INSERT OR IGNORE INTO schema_migration (version, name, applied_at)
+          VALUES (?, 'book-closing', ?);`,
+    args: [BOOK_CLOSING_MIGRATION_VERSION, now],
+  });
+  // v46 — kolom keputusan tutup buku (ALTER-nya ada di daftar kolom di atas).
+  await client.execute({
+    sql: `INSERT OR IGNORE INTO schema_migration (version, name, applied_at)
+          VALUES (?, 'book-closing-decision', ?);`,
+    args: [BOOK_CLOSING_DECISION_MIGRATION_VERSION, now],
   });
 
   await client.execute(

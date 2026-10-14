@@ -7,7 +7,9 @@ import type {
   LaporanPosisiKeuangan,
   NeracaSaldo,
 } from "@/lib/gateways/accounting";
+import type { RekapPenerimaan, RekapRombel } from "@/lib/gateways/billing";
 import { formatRupiah } from "@/lib/validations/accounting";
+import { labelPeriode } from "@/lib/validations/billing";
 
 /**
  * Laporan keuangan dalam bentuk tabel tunggal (Fase K4a). Layar, Excel, dan
@@ -29,6 +31,8 @@ export interface TabelLaporan {
   baris: BarisTabel[];
   /** Pesan yang wajib terlihat, misalnya laporan yang timpang. */
   peringatan: string | null;
+  /** Keterangan netral di bawah periode, misalnya "sudah ditutup". */
+  keterangan?: string;
 }
 
 function tanggal(teks: string): string {
@@ -156,6 +160,7 @@ export function eksporTabelExcel(t: TabelLaporan): Promise<DownloadResult> {
   const rows: Record<string, unknown>[] = [
     { Keterangan: t.judul },
     { Keterangan: t.periode },
+    ...(t.keterangan ? [{ Keterangan: t.keterangan }] : []),
     {},
     ...t.baris.map((b) => ({
       Keterangan: b.jenis === "akun" ? `  ${b.label}` : b.label,
@@ -185,6 +190,9 @@ export async function buatTabelPdf(t: TabelLaporan): Promise<ArrayBuffer> {
   doc.setFont("helvetica", "normal");
   doc.setFontSize(9);
   doc.text(doc.splitTextToSize(t.periode, 180) as string[], 14, 22);
+  if (t.keterangan) {
+    doc.text(doc.splitTextToSize(t.keterangan, 180) as string[], 14, 27);
+  }
   autoTable(doc, {
     head: [["Keterangan", "Kode", "Jumlah"]],
     body: t.baris.map((b) => [
@@ -192,7 +200,7 @@ export async function buatTabelPdf(t: TabelLaporan): Promise<ArrayBuffer> {
       b.kode ?? "",
       b.jumlah === undefined ? "" : formatRupiah(b.jumlah),
     ]),
-    startY: 30,
+    startY: t.keterangan ? 34 : 30,
     theme: "plain",
     styles: { fontSize: 9, cellPadding: 1.4 },
     headStyles: { fontStyle: "bold", lineWidth: { bottom: 0.3 } },
@@ -306,4 +314,212 @@ export function eksporNeracaSaldo(
     filename: namaBerkas("neraca-saldo", sampai, "xlsx"),
     sheetName: "Neraca Saldo",
   });
+}
+
+// ── Tabel banyak kolom: rekap tagihan dan penerimaan ────────────────────────
+
+/** Sel angka ditulis sebagai rupiah di layar dan PDF, angka mentah di Excel. */
+export type SelLebar = string | { rupiah: number } | { persen: number };
+
+export interface TabelLebar {
+  judul: string;
+  /** Nama sheet Excel, paling banyak 31 karakter dan tidak terpotong. */
+  lembar: string;
+  periode: string;
+  kolom: string[];
+  baris: Array<{ sel: SelLebar[]; tebal?: boolean }>;
+  /** Kalimat yang wajib ikut di bawah tabel, termasuk waktu cetak. */
+  catatan: string[];
+}
+
+export function teksSel(sel: SelLebar): string {
+  if (typeof sel === "string") return sel;
+  return "rupiah" in sel ? formatRupiah(sel.rupiah) : `${sel.persen}%`;
+}
+
+function nilaiExcel(sel: SelLebar): string | number {
+  if (typeof sel === "string") return sel;
+  return "rupiah" in sel ? sel.rupiah : sel.persen;
+}
+
+const BULAN_PENDEK = [
+  "Jan",
+  "Feb",
+  "Mar",
+  "Apr",
+  "Mei",
+  "Jun",
+  "Jul",
+  "Agu",
+  "Sep",
+  "Okt",
+  "Nov",
+  "Des",
+];
+
+function labelBulan(bulan: string): string {
+  const [tahun, nomor] = bulan.split("-");
+  return `${BULAN_PENDEK[Number(nomor) - 1] ?? nomor} ${tahun}`;
+}
+
+export function tabelRekapRombel(
+  d: RekapRombel,
+  namaJenis: string | null,
+): TabelLebar {
+  const sel = (b: RekapRombel["total"]): SelLebar[] => [
+    b.nama,
+    String(b.siswa),
+    { rupiah: b.ditagih },
+    { rupiah: b.terbayar },
+    { rupiah: b.sisa },
+    { persen: b.persen },
+    String(b.menunggak),
+  ];
+  return {
+    judul: "Rekap Tagihan per Rombel",
+    lembar: "Rekap per Rombel",
+    periode: `Periode ${labelPeriode(d.periode) || "sekali bayar"}${namaJenis ? `, ${namaJenis}` : ", semua jenis"}`,
+    kolom: [
+      "Rombel",
+      "Siswa ditagih",
+      "Ditagih",
+      "Terbayar",
+      "Sisa",
+      "Terkumpul",
+      "Siswa menunggak",
+    ],
+    baris: [
+      ...d.baris.map((b) => ({ sel: sel(b) })),
+      { sel: sel(d.total), tebal: true },
+    ],
+    catatan: [
+      "Rombel mengikuti kelas siswa saat ini. Tagihan yang dibatalkan tidak dihitung.",
+      `Dihitung ${d.dicetak} WIB.`,
+    ],
+  };
+}
+
+export function tabelPenerimaan(d: RekapPenerimaan): TabelLebar {
+  const baris = (
+    nama: string,
+    perBulan: number[],
+    total: number,
+    tebal = false,
+  ) => ({
+    sel: [
+      nama,
+      ...perBulan.map((n) => ({ rupiah: n })),
+      { rupiah: total },
+    ] as SelLebar[],
+    tebal,
+  });
+  const isi = [
+    ...d.kas.map((b) => baris(b.nama, b.per_bulan, b.total)),
+    baris("Jumlah penerimaan kas", d.total_per_bulan, d.total, true),
+  ];
+  if (d.dipakai_titipan.length > 0) {
+    isi.push(
+      {
+        sel: ["Dipakai dari titipan (tidak termasuk penerimaan kas)"],
+        tebal: true,
+      },
+      ...d.dipakai_titipan.map((b) => baris(b.nama, b.per_bulan, b.total)),
+      baris(
+        "Jumlah dipakai dari titipan",
+        d.dipakai_per_bulan,
+        d.total_dipakai,
+        true,
+      ),
+    );
+  }
+  return {
+    judul: "Penerimaan Pembayaran Siswa per Bulan",
+    lembar: "Penerimaan per Bulan",
+    periode: `${labelBulan(d.bulan[0] ?? "")} s.d. ${labelBulan(d.bulan[d.bulan.length - 1] ?? "")}, menurut tanggal kuitansi`,
+    kolom: ["Jenis", ...d.bulan.map(labelBulan), "Jumlah"],
+    baris: isi,
+    catatan: [
+      "Kuitansi yang dibatalkan tidak dihitung. Pembayaran dari titipan tidak masuk penerimaan kas karena uangnya sudah terhitung saat titipan diterima.",
+      `Dihitung ${d.dicetak} WIB.`,
+    ],
+  };
+}
+
+export function eksporLebarExcel(t: TabelLebar): Promise<DownloadResult> {
+  const pertama = t.kolom[0] ?? "Keterangan";
+  const rows: Record<string, unknown>[] = [
+    { [pertama]: t.judul },
+    { [pertama]: t.periode },
+    {},
+    ...t.baris.map((b) =>
+      Object.fromEntries(
+        b.sel.map((sel, i) => [t.kolom[i] ?? "", nilaiExcel(sel)]),
+      ),
+    ),
+    {},
+    ...t.catatan.map((c) => ({ [pertama]: c })),
+  ];
+  return saveWorkbook({
+    headers: t.kolom,
+    rows,
+    filename: namaBerkas(t.judul, t.periode, "xlsx"),
+    sheetName: t.lembar,
+  });
+}
+
+/** Isi PDF tabel lebar; mendatar bila kolomnya lebih dari delapan. */
+export async function buatLebarPdf(t: TabelLebar): Promise<ArrayBuffer> {
+  const [{ jsPDF }, { autoTable }] = await Promise.all([
+    import("jspdf"),
+    import("jspdf-autotable"),
+  ]);
+  const mendatar = t.kolom.length > 8;
+  const doc = new jsPDF({
+    unit: "mm",
+    format: "a4",
+    orientation: mendatar ? "landscape" : "portrait",
+  });
+  const lebar = mendatar ? 269 : 182;
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(14);
+  doc.text(t.judul, 14, 16);
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(9);
+  doc.text(doc.splitTextToSize(t.periode, lebar) as string[], 14, 22);
+  autoTable(doc, {
+    head: [t.kolom],
+    body: t.baris.map((b) => b.sel.map(teksSel)),
+    startY: 28,
+    theme: "plain",
+    styles: { fontSize: mendatar ? 7 : 9, cellPadding: 1.2 },
+    headStyles: { fontStyle: "bold", lineWidth: { bottom: 0.3 } },
+    didParseCell: (cell) => {
+      if (cell.column.index > 0) cell.cell.styles.halign = "right";
+      if (cell.section === "body" && t.baris[cell.row.index]?.tebal) {
+        cell.cell.styles.fontStyle = "bold";
+      }
+    },
+    margin: { left: 14, right: 14 },
+  });
+  const akhir =
+    (doc as unknown as { lastAutoTable?: { finalY: number } }).lastAutoTable
+      ?.finalY ?? 28;
+  doc.setFontSize(8);
+  doc.text(
+    doc.splitTextToSize(t.catatan.join(" "), lebar) as string[],
+    14,
+    akhir + 6,
+  );
+  return doc.output("arraybuffer");
+}
+
+export async function unduhLebarPdf(t: TabelLebar): Promise<DownloadResult> {
+  return saveFileWithPicker(
+    new Blob([await buatLebarPdf(t)], { type: "application/pdf" }),
+    namaBerkas(t.judul, t.periode, "pdf"),
+    {
+      description: "Dokumen PDF (*.pdf)",
+      accept: { "application/pdf": [".pdf"] },
+    },
+  );
 }

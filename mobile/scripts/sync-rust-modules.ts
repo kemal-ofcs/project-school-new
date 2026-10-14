@@ -18,6 +18,7 @@ const filesToSync = [
   "loan.rs",
   // Tagihan siswa (K3a): tarif dan keringanan wajib identik dengan Desktop dan TS.
   "billing.rs",
+  "tutup_buku.rs",
   "teaching_journal.rs",
   // Inventaris: aturan stok dan validasi mutasi wajib identik dengan Desktop.
   "inventory.rs",

@@ -21,6 +21,8 @@ use super::{
     loan,
     // Jenis penilaian: bobot dan jenis bawaan dicek dengan aturan lokal.
     nilai_akhir,
+    // Payload tutup buku dicek dengan aturan yang sama dengan lokal.
+    tutup_buku,
     models::{CommandError, OperatorUser},
     // Validasi payload inventaris di cloud memakai daftar enum yang sama
     // dengan validasi lokal.
@@ -670,6 +672,7 @@ pub const ADMIN_DEFAULT_EXCLUDED_PERMISSIONS: &[&str] = &[
     "accounting.reverse",
     "loan.approve",
     "billing.cancel",
+    "accounting.close",
 ];
 
 static SCHEMA_VERIFIED: std::sync::OnceLock<Mutex<HashSet<String>>> = std::sync::OnceLock::new();
@@ -1026,7 +1029,7 @@ const SNAPSHOT_SOURCES: &[SnapshotSource] = &[
     // tersinkronisasi tanpa penghitung perubahan — atau punya penghitung yang
     // tidak pernah dibaca siapa pun.
     SnapshotSource {
-        payload_key: "nilaiPenilaian",
+        payload_key: "gradeTypes",
         table: "nilai_jenis",
         sql: "SELECT * FROM nilai_jenis ORDER BY urutan, id_jenis\n-- batas: daftar jenis penilaian sekolah, tidak tumbuh per hari\n;",
     },
@@ -1126,6 +1129,12 @@ const SNAPSHOT_SOURCES: &[SnapshotSource] = &[
         payload_key: "receiptSeries",
         table: "keu_seri_perangkat",
         sql: "SELECT * FROM keu_seri_perangkat ORDER BY device_code\n-- batas: satu baris per perangkat lembaga\n;",
+    },
+    // ── v45: Tutup buku ──
+    SnapshotSource {
+        payload_key: "bookClosings",
+        table: "keu_tutup_buku",
+        sql: "SELECT * FROM keu_tutup_buku ORDER BY sampai_tanggal, id_tutup\n-- batas: satu baris per tutup buku, beberapa per tahun\n;",
     },
     SnapshotSource {
         payload_key: "studentPayments",
@@ -2511,6 +2520,29 @@ impl TursoClient {
                       );"#,
                 vec![],
             ),
+            // Tutup buku (v45). WAJIB identik dengan `storage.rs` dan
+            // `db-migrations.ts`.
+            Statement::new(
+                r#"CREATE TABLE IF NOT EXISTS keu_tutup_buku (
+        id_tutup TEXT PRIMARY KEY,
+        sampai_tanggal TEXT NOT NULL,
+        dibuat_oleh TEXT NOT NULL,
+        kode_perangkat TEXT NOT NULL,
+        waktu_perangkat TEXT NOT NULL,
+        diterima_cloud TEXT,
+        saldo_json TEXT NOT NULL,
+        status TEXT NOT NULL DEFAULT 'Aktif' CHECK (status IN ('Aktif', 'Dibuka', 'Digantikan', 'Menunggu')),
+        alasan_buka TEXT,
+        dibuka_oleh TEXT,
+        dibuka_pada TEXT,
+        diputuskan_oleh TEXT,
+        diputuskan_pada TEXT,
+        catatan_keputusan TEXT,
+        created_at TEXT NOT NULL DEFAULT (datetime('now')),
+        updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+      );"#,
+                vec![],
+            ),
             Statement::new(
                 "CREATE INDEX IF NOT EXISTS idx_keu_pembayaran_siswa ON keu_pembayaran(id_siswa);",
                 vec![],
@@ -2834,6 +2866,7 @@ impl TursoClient {
                 ('accounting.view', 'Lihat Pembukuan', 'Keuangan', 'Melihat bagan akun, jurnal, buku besar, dan neraca saldo.', 1, 1300),
                 ('accounting.manage', 'Kelola Akun & Catat Jurnal', 'Keuangan', 'Menambah dan mengubah akun serta mencatat jurnal umum manual.', 1, 1301),
                 ('accounting.reverse', 'Batalkan Jurnal', 'Keuangan', 'Membatalkan jurnal manual dengan jurnal pembalik.', 1, 1302),
+                ('accounting.close', 'Tutup Buku', 'Keuangan', 'Menutup dan membuka kembali periode pembukuan, serta memutuskan bentrokan tutup buku.', 1, 1303),
                 ('loan.view', 'Lihat Kasbon Karyawan', 'Keuangan', 'Melihat pinjaman karyawan, sisa, dan riwayat cicilannya.', 1, 1310),
                 ('loan.manage', 'Ajukan & Kelola Kasbon', 'Keuangan', 'Mengajukan kasbon, menunda cicilan, dan mencatat pelunasan tunai.', 1, 1311),
                 ('loan.approve', 'Setujui & Batalkan Kasbon', 'Keuangan', 'Menyetujui (mencairkan), menolak, atau membatalkan kasbon karyawan.', 1, 1312),
@@ -3690,7 +3723,9 @@ impl TursoClient {
                 (41, 'student-billing', datetime('now')),
                 (42, 'student-payment', datetime('now')),
                 (43, 'grade-type-dynamic', datetime('now')),
-                (44, 'wa-billing-reminder', datetime('now'));"#,
+                (44, 'wa-billing-reminder', datetime('now')),
+                (45, 'book-closing', datetime('now')),
+                (46, 'book-closing-decision', datetime('now'));"#,
                 vec![],
             ),
         ];
@@ -3878,6 +3913,10 @@ impl TursoClient {
             ("absensi_foto", "wajah_skor", "ALTER TABLE absensi_foto ADD COLUMN wajah_skor REAL;"),
             // Jenis penilaian dinamis (v43). Nullable; CHECK lama `jenis` dibiarkan.
             ("nilai_penilaian", "id_jenis", "ALTER TABLE nilai_penilaian ADD COLUMN id_jenis TEXT;"),
+            // Keputusan tutup buku (v46).
+            ("keu_tutup_buku", "diputuskan_oleh", "ALTER TABLE keu_tutup_buku ADD COLUMN diputuskan_oleh TEXT;"),
+            ("keu_tutup_buku", "diputuskan_pada", "ALTER TABLE keu_tutup_buku ADD COLUMN diputuskan_pada TEXT;"),
+            ("keu_tutup_buku", "catatan_keputusan", "ALTER TABLE keu_tutup_buku ADD COLUMN catatan_keputusan TEXT;"),
         ] {
             self.ensure_column(table, column, sql).await?;
         }
@@ -4124,6 +4163,16 @@ impl TursoClient {
         .await?;
         self.query_one(
             "INSERT OR IGNORE INTO schema_migration (version, name, applied_at) VALUES (-2025, 'wa-billing-reminder-v1', datetime('now'));",
+            vec![],
+        )
+        .await?;
+        self.query_one(
+            "INSERT OR IGNORE INTO schema_migration (version, name, applied_at) VALUES (-2026, 'book-closing-v1', datetime('now'));",
+            vec![],
+        )
+        .await?;
+        self.query_one(
+            "INSERT OR IGNORE INTO schema_migration (version, name, applied_at) VALUES (-2027, 'book-closing-decision-v1', datetime('now'));",
             vec![],
         )
         .await?;
@@ -4438,7 +4487,7 @@ impl TursoClient {
                 // Sentinel WAJIB dinaikkan setiap kali ensure_schema menambah
                 // tabel atau kolom — nilainya di sini dan pada INSERT di atas
                 // harus selalu sama.
-                "SELECT COUNT(*) AS total FROM schema_migration WHERE version = -2025;",
+                "SELECT COUNT(*) AS total FROM schema_migration WHERE version = -2027;",
                 vec![],
             )
             .await
@@ -8732,6 +8781,9 @@ fn canonical_sync_route(domain: &str, operation: &str) -> Option<(&'static str, 
         ("billing", "create") => ("billing", "create"),
         ("billing-cancel", "create") => ("billing-cancel", "create"),
         ("billing-series", "save") => ("billing-series", "save"),
+        ("accounting-close", "create") => ("accounting-close", "create"),
+        ("accounting-close", "reopen") => ("accounting-close", "reopen"),
+        ("accounting-close", "decide") => ("accounting-close", "decide"),
         ("billing-payment", "create") => ("billing-payment", "create"),
         ("billing-payment-cancel", "create") => ("billing-payment-cancel", "create"),
         ("face-template", "save") => ("face-template", "save"),
@@ -9763,6 +9815,25 @@ async fn apply_event_to_turso(
                 turso
                     .query_one(billing::CLOUD_INSERT_BILL_CANCEL_SQL, values)
                     .await?;
+            }
+        }
+        ("accounting-close", "create") => {
+            if let Some(values) = tutup_buku::cloud_close_values(payload, entity_key) {
+                turso
+                    .query_one(tutup_buku::CLOUD_INSERT_CLOSE_SQL, values)
+                    .await?;
+            }
+        }
+        ("accounting-close", "reopen") => {
+            if let Some(values) = tutup_buku::cloud_reopen_values(payload) {
+                turso.query_one(tutup_buku::CLOUD_REOPEN_SQL, values).await?;
+            }
+        }
+        ("accounting-close", "decide") => {
+            if let Some(statements) = tutup_buku::cloud_decide_statements(payload) {
+                for (sql, values) in statements {
+                    turso.query_one(sql, values).await?;
+                }
             }
         }
         ("billing-series", "save") => {
@@ -14701,6 +14772,27 @@ fn chrono_like_now_iso() -> String {
 mod tests {
     use super::*;
 
+    /// Snapshot dirakit dengan `snapshot[source.payload_key]` dan diterapkan
+    /// lewat `SnapshotTable.payload_key`. Kunci yang berbeda membuat tabelnya
+    /// tidak pernah ditarik, atau lebih buruk, barisnya diterapkan ke tabel
+    /// lain yang kebetulan memakai kunci itu: `nilai_jenis` (v43) pernah
+    /// memakai kunci milik `nilai_penilaian`.
+    #[test]
+    fn kunci_payload_snapshot_sama_dengan_tabel_sync() {
+        let mut kunci = std::collections::HashSet::new();
+        for source in SNAPSHOT_SOURCES {
+            let tabel = sync::snapshot_table_by_name(source.table)
+                .unwrap_or_else(|| panic!("{} tidak ada di SNAPSHOT_TABLES", source.table));
+            assert_eq!(
+                tabel.payload_key(),
+                source.payload_key,
+                "kunci payload {} berbeda",
+                source.table
+            );
+            assert!(kunci.insert(source.payload_key), "kunci {} dipakai dua tabel", source.payload_key);
+        }
+    }
+
     /// Gambar sampul berita diterima dengan aturan yang SAMA seperti
     /// `validasiGambarSampul` di `src/lib/services/content-admin.ts`.
     ///
@@ -15665,6 +15757,158 @@ mod tests {
         });
     }
 
+    /// Tutup buku dari perangkat sampai ke cloud: `diterima_cloud` diisi jam
+    /// database cloud (payload tidak bisa mengisinya), event yang terdorong
+    /// ulang tidak menggandakan baris, dan "buka kembali" membuka setiap baris
+    /// Aktif bertanggal batas yang sama.
+    #[test]
+    fn tutup_buku_cloud_mengisi_waktu_terima_dan_bisa_dibuka() {
+        let runtime = tokio::runtime::Builder::new_current_thread()
+            .build()
+            .expect("runtime uji");
+        runtime.block_on(async {
+            let dir = tempfile::tempdir().expect("direktori sementara");
+            let hub = dir.path().join("sppg-hub.db");
+            TursoClient::local_file(
+                Url::parse(LOCAL_FILE_ORIGIN).expect("origin lokal"),
+                &hub,
+                Client::new(),
+            )
+            .ensure_schema()
+            .await
+            .expect("provisioning lokal");
+            let connection = rusqlite::Connection::open(&hub).expect("buka hub");
+            let terapkan = |operation: &'static str, id: &'static str, payload: Value| {
+                let connection = &connection;
+                async move {
+                    let collector = StatementCollector::default();
+                    apply_event_to_turso(&collector, "accounting-close", operation, id, &payload)
+                        .await
+                        .expect("event diterapkan");
+                    for statement in collector.finish().expect("mutasi") {
+                        let args = statement
+                            .args
+                            .iter()
+                            .map(|arg| match arg {
+                                Value::Null => rusqlite::types::Value::Null,
+                                Value::Number(n) => n
+                                    .as_i64()
+                                    .map(rusqlite::types::Value::Integer)
+                                    .unwrap_or(rusqlite::types::Value::Null),
+                                Value::String(s) => rusqlite::types::Value::Text(s.clone()),
+                                other => rusqlite::types::Value::Text(other.to_string()),
+                            })
+                            .collect::<Vec<_>>();
+                        connection
+                            .execute(&statement.sql, rusqlite::params_from_iter(args))
+                            .expect("mutasi dijalankan pada skema cloud");
+                    }
+                }
+            };
+            let tutup = |id: &str| {
+                json!({
+                    "id_tutup": id, "sampai_tanggal": "2026-09-30", "dibuat_oleh": "kepala",
+                    "kode_perangkat": "D1", "waktu_perangkat": "2026-10-01 08:00:00",
+                    "diterima_cloud": "1999-01-01 00:00:00", "saldo_json": "[]", "status": "Aktif"
+                })
+            };
+            terapkan("create", "tb-a", tutup("tb-a")).await;
+            terapkan("create", "tb-a", tutup("tb-a")).await;
+            terapkan("create", "tb-b", tutup("tb-b")).await;
+            let (jumlah, diterima): (i64, String) = connection
+                .query_row(
+                    "SELECT COUNT(*), MIN(diterima_cloud) FROM keu_tutup_buku WHERE status = 'Aktif';",
+                    [],
+                    |row| Ok((row.get(0)?, row.get(1)?)),
+                )
+                .expect("baris tutup");
+            assert_eq!(jumlah, 2);
+            assert_ne!(diterima, "1999-01-01 00:00:00", "waktu terima diambil dari payload");
+
+            terapkan(
+                "reopen",
+                "tb-a",
+                json!({
+                    "id_tutup": "tb-a", "sampai_tanggal": "2026-09-30", "alasan_buka": "Salah tanggal",
+                    "dibuka_oleh": "kepala", "dibuka_pada": "2026-10-02 09:00:00"
+                }),
+            )
+            .await;
+            let aktif: i64 = connection
+                .query_row(
+                    "SELECT COUNT(*) FROM keu_tutup_buku WHERE status = 'Aktif';",
+                    [],
+                    |row| row.get(0),
+                )
+                .expect("aktif");
+            assert_eq!(aktif, 0);
+        });
+    }
+
+    /// Dua perangkat offline mengantre peristiwa yang sama (pengingat tagihan
+    /// siswa yang sama pada hari yang sama) dengan id berbeda: cloud hanya
+    /// menyimpan yang pertama. Event yang terdorong ulang dengan id yang sama
+    /// tetap memperbarui barisnya sendiri.
+    #[test]
+    fn antrean_wa_cloud_menolak_dedupe_ganda_lintas_perangkat() {
+        let runtime = tokio::runtime::Builder::new_current_thread()
+            .build()
+            .expect("runtime uji");
+        runtime.block_on(async {
+            let dir = tempfile::tempdir().expect("direktori sementara");
+            let hub = dir.path().join("sppg-hub.db");
+            TursoClient::local_file(
+                Url::parse(LOCAL_FILE_ORIGIN).expect("origin lokal"),
+                &hub,
+                Client::new(),
+            )
+            .ensure_schema()
+            .await
+            .expect("provisioning lokal");
+            let connection = rusqlite::Connection::open(&hub).expect("buka hub");
+
+            for (id, isi) in [("wa_a", "dari A"), ("wa_b", "dari B"), ("wa_a", "dari A ulang")] {
+                let payload = json!({
+                    "id_notifikasi": id, "dedupe_key": "tagihan:S-01:2026-10-14",
+                    "jenis": "tagihan", "id_siswa": "S-01", "tujuan_nomor": "+6281234567890",
+                    "isi_pesan": isi, "status": "Menunggu",
+                    "created_at": "2026-10-14 08:00:00", "updated_at": "2026-10-14 08:00:00"
+                });
+                let collector = StatementCollector::default();
+                apply_event_to_turso(&collector, "wa-notification", "queue", id, &payload)
+                    .await
+                    .expect("event diterapkan");
+                for statement in collector.finish().expect("mutasi") {
+                    let args = statement
+                        .args
+                        .iter()
+                        .map(|arg| match arg {
+                            Value::Null => rusqlite::types::Value::Null,
+                            Value::Number(n) => n
+                                .as_i64()
+                                .map(rusqlite::types::Value::Integer)
+                                .unwrap_or(rusqlite::types::Value::Null),
+                            Value::String(s) => rusqlite::types::Value::Text(s.clone()),
+                            other => rusqlite::types::Value::Text(other.to_string()),
+                        })
+                        .collect::<Vec<_>>();
+                    connection
+                        .execute(&statement.sql, rusqlite::params_from_iter(args))
+                        .expect("mutasi dijalankan pada skema cloud");
+                }
+            }
+
+            let baris: Vec<(String, String)> = connection
+                .prepare("SELECT id_notifikasi, isi_pesan FROM notifikasi_wa ORDER BY id_notifikasi;")
+                .expect("siapkan")
+                .query_map([], |row| Ok((row.get(0)?, row.get(1)?)))
+                .expect("baca")
+                .collect::<Result<_, _>>()
+                .expect("baris");
+            assert_eq!(baris, vec![("wa_a".to_owned(), "dari A ulang".to_owned())]);
+        });
+    }
+
     #[test]
     fn provisioning_lokal_membangun_seluruh_tabel_cloud() {
         let runtime = tokio::runtime::Builder::new_current_thread()
@@ -15790,7 +16034,7 @@ mod tests {
             connection
                 .execute_batch(
                     "DROP TABLE riwayat_identitas_karyawan;
-                     DELETE FROM schema_migration WHERE version IN (-2017, -2018, -2019, -2020, -2021, -2022, -2023, -2024, -2025);",
+                     DELETE FROM schema_migration WHERE version IN (-2017, -2018, -2019, -2020, -2021, -2022, -2023, -2024, -2025, -2026, -2027);",
                 )
                 .expect("siapkan database lama");
 
@@ -15826,7 +16070,7 @@ mod tests {
             connection
                 .execute_batch(
                     "DROP TABLE inventory_unit;
-                     DELETE FROM schema_migration WHERE version IN (-2018, -2019, -2020, -2021, -2022, -2023, -2024, -2025);",
+                     DELETE FROM schema_migration WHERE version IN (-2018, -2019, -2020, -2021, -2022, -2023, -2024, -2025, -2026, -2027);",
                 )
                 .expect("siapkan database lama");
 
@@ -15863,7 +16107,7 @@ mod tests {
                 .execute_batch(
                     "DROP TABLE personil_wajah;
                      ALTER TABLE absensi_foto DROP COLUMN wajah_vonis;
-                     DELETE FROM schema_migration WHERE version IN (-2019, -2020, -2021, -2022, -2023, -2024, -2025);",
+                     DELETE FROM schema_migration WHERE version IN (-2019, -2020, -2021, -2022, -2023, -2024, -2025, -2026, -2027);",
                 )
                 .expect("siapkan database lama");
 
@@ -15902,7 +16146,7 @@ mod tests {
                     "DROP TABLE keu_akun;
                      DROP TABLE keu_jurnal;
                      DROP TABLE keu_jurnal_baris;
-                     DELETE FROM schema_migration WHERE version IN (-2020, -2021, -2022, -2023, -2024, -2025);",
+                     DELETE FROM schema_migration WHERE version IN (-2020, -2021, -2022, -2023, -2024, -2025, -2026, -2027);",
                 )
                 .expect("siapkan database lama");
 
@@ -16015,7 +16259,7 @@ mod tests {
                     "DROP TABLE keu_pinjaman;
                      DROP TABLE keu_pinjaman_mutasi;
                      DROP TABLE keu_pinjaman_tunda;
-                     DELETE FROM schema_migration WHERE version IN (-2021, -2022, -2023, -2024, -2025);",
+                     DELETE FROM schema_migration WHERE version IN (-2021, -2022, -2023, -2024, -2025, -2026, -2027);",
                 )
                 .expect("siapkan database lama");
 
@@ -16052,7 +16296,7 @@ mod tests {
                 .execute_batch(
                     "DROP TABLE keu_tagihan;
                      DROP TABLE keu_tagihan_batal;
-                     DELETE FROM schema_migration WHERE version IN (-2022, -2023, -2024, -2025);",
+                     DELETE FROM schema_migration WHERE version IN (-2022, -2023, -2024, -2025, -2026, -2027);",
                 )
                 .expect("siapkan database lama");
             client.ensure_schema_current().await.expect("skema mutakhir");
@@ -16090,7 +16334,7 @@ mod tests {
                      DROP TABLE keu_pembayaran;
                      DROP TABLE keu_pembayaran_alokasi;
                      DROP TABLE keu_pembayaran_batal;
-                     DELETE FROM schema_migration WHERE version IN (-2023, -2024, -2025);",
+                     DELETE FROM schema_migration WHERE version IN (-2023, -2024, -2025, -2026, -2027);",
                 )
                 .expect("siapkan database lama");
             client.ensure_schema_current().await.expect("skema mutakhir");
@@ -16126,7 +16370,7 @@ mod tests {
                 .execute_batch(
                     "DROP TABLE nilai_jenis;
                      ALTER TABLE nilai_penilaian DROP COLUMN id_jenis;
-                     DELETE FROM schema_migration WHERE version IN (-2024, -2025);",
+                     DELETE FROM schema_migration WHERE version IN (-2024, -2025, -2026, -2027);",
                 )
                 .expect("siapkan database lama");
             client.ensure_schema_current().await.expect("skema mutakhir");

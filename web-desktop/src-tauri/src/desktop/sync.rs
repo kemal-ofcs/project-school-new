@@ -19,7 +19,7 @@ use super::{
 /// `CURRENT_SCHEMA_VERSION` di `web-desktop/src/lib/db-schema.ts` setiap kali
 /// migrasi baru ditambahkan, karena keduanya membaca tabel `schema_migration`
 /// yang sama di Turso.
-pub const CLIENT_SCHEMA_VERSION: i64 = 43;
+pub const CLIENT_SCHEMA_VERSION: i64 = 46;
 
 /// Hanya `cloud > client` yang berbahaya; `cloud <= client` adalah kondisi normal.
 fn is_client_schema_outdated(cloud_version: i64) -> bool {
@@ -1265,6 +1265,36 @@ const SNAPSHOT_TABLES: &[SnapshotTable] = &[
         entity_column: "device_code",
         delete_missing: false,
     },
+    // ── v45: Tutup buku ──
+    //
+    // Statusnya berubah (buka kembali, keputusan bentrokan), tetapi barisnya
+    // tidak pernah dihapus.
+    SnapshotTable {
+        payload_key: "bookClosings",
+        domain: "accounting-close",
+        table: "keu_tutup_buku",
+        columns: &[
+            "id_tutup",
+            "sampai_tanggal",
+            "dibuat_oleh",
+            "kode_perangkat",
+            "waktu_perangkat",
+            "diterima_cloud",
+            "saldo_json",
+            "status",
+            "alasan_buka",
+            "dibuka_oleh",
+            "dibuka_pada",
+            "created_at",
+            "updated_at",
+            "diputuskan_oleh",
+            "diputuskan_pada",
+            "catatan_keputusan",
+        ],
+        conflict_column: "id_tutup",
+        entity_column: "id_tutup",
+        delete_missing: false,
+    },
     SnapshotTable {
         payload_key: "studentPayments",
         domain: "billing-payment",
@@ -1390,6 +1420,9 @@ pub(crate) const CANONICAL_SYNC_ROUTES: &[(&str, &str)] = &[
     ("billing-rate", "delete"),
     ("billing-rate", "save"),
     ("billing-series", "save"),
+    ("accounting-close", "create"),
+    ("accounting-close", "reopen"),
+    ("accounting-close", "decide"),
     ("billing-type", "save"),
     ("face-template", "delete"),
     ("face-template", "save"),
@@ -1540,6 +1573,10 @@ pub fn snapshot_table_by_name(table: &str) -> Option<&'static SnapshotTable> {
 impl SnapshotTable {
     pub fn entity_column(&self) -> &'static str {
         self.entity_column
+    }
+
+    pub fn payload_key(&self) -> &'static str {
+        self.payload_key
     }
 }
 

@@ -13,6 +13,8 @@ import type {
   LaporanArusKas,
   LaporanPosisiKeuangan,
   NeracaSaldo,
+  StatusTutupBuku,
+  TutupBukuItem,
 } from "@/types/accounting";
 
 export type {
@@ -24,6 +26,8 @@ export type {
   LaporanArusKas,
   LaporanPosisiKeuangan,
   NeracaSaldo,
+  StatusTutupBuku,
+  TutupBukuItem,
 } from "@/types/accounting";
 
 // Command `desktop_accounting_*` terdaftar di biner Desktop DAN Mobile
@@ -176,4 +180,41 @@ export async function getLaporanArusKas(
     sampai,
     akunKas,
   });
+}
+
+// ── Tutup buku (v45) ────────────────────────────────────────────────────────
+
+export async function getStatusTutupBuku(): Promise<StatusTutupBuku> {
+  if (isDesktopRuntime()) {
+    return invokeDesktop("desktop_accounting_close_status", {});
+  }
+  return requestWebApi("/api/accounting/close-status", "POST", {});
+}
+
+export async function tutupBuku(
+  sampai: string,
+): Promise<{ sukses: boolean; tutup: TutupBukuItem }> {
+  if (isDesktopRuntime()) {
+    const hasil = await invokeDesktop<{
+      sukses: boolean;
+      tutup: TutupBukuItem;
+    }>("desktop_accounting_close", { sampai });
+    kickDesktopSync();
+    return hasil;
+  }
+  return requestWebApi("/api/accounting/close", "POST", { sampai });
+}
+
+export async function bukaKembaliBuku(
+  alasan: string,
+): Promise<{ sukses: boolean; batas: string | null }> {
+  if (isDesktopRuntime()) {
+    const hasil = await invokeDesktop<{
+      sukses: boolean;
+      batas: string | null;
+    }>("desktop_accounting_reopen", { alasan });
+    kickDesktopSync();
+    return hasil;
+  }
+  return requestWebApi("/api/accounting/reopen", "POST", { alasan });
 }

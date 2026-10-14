@@ -139,6 +139,10 @@ describe("dynamic RBAC migration", () => {
       42,
       // v43 — jenis penilaian dinamis berbobot (`nilai_jenis`).
       43,
+      // v44 — pengingat tagihan WhatsApp (jenis `tagihan`).
+      44,
+      // v45 — tutup buku (`keu_tutup_buku`).
+      45,
     ]);
 
     const sessionColumns = await client.execute(

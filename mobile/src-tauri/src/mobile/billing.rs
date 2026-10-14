@@ -29,7 +29,7 @@ use super::{
     config::MobileState,
     license, loan,
     models::CommandError,
-    storage, sync,
+    storage, sync, wa_notification,
 };
 
 /// WAJIB sama dengan CHECK `keu_jenis_tagihan.periodik` di ketiga DDL.
@@ -50,6 +50,9 @@ pub const MAKS_KETERANGAN_BAYAR: usize = 150;
 pub const MAKS_TAGIHAN_PER_KUITANSI: usize = 100;
 pub const MAKS_NAMA_PERANGKAT: usize = 60;
 pub const SERI_KUITANSI_WEB: &str = "WEB";
+/// Setting tersinkron yang membuka halaman Tagihan di portal wali (K4c).
+/// Cermin `PORTAL_WALI_TAGIHAN_KEY` di TS dan di `web-public`. Bawaannya mati.
+pub const PORTAL_WALI_TAGIHAN_KEY: &str = "portal_wali_tagihan";
 
 // ── Aturan murni ────────────────────────────────────────────────────────────
 
@@ -597,6 +600,234 @@ pub fn baris_jurnal_pembayaran(
     baris
 }
 
+// ── Pengingat tunggakan lewat WhatsApp (K4b) ────────────────────────────────
+
+/// Rincian yang ditulis di satu pesan; sisanya diringkas "dan N tagihan lain".
+pub const MAKS_RINCIAN_PENGINGAT: usize = 5;
+/// Siswa paling banyak per satu tekan tombol. Cermin `MAKS_SISWA_PENGINGAT`.
+pub const MAKS_SISWA_PENGINGAT: usize = 500;
+pub const PESAN_PENGINGAT_MATI: &str = "Pengingat tagihan lewat WhatsApp belum dinyalakan. Nyalakan sakelar Pengingat Tagihan Siswa di Pengaturan bagian Notifikasi WhatsApp (Web/Desktop) atau tombol Gateway di halaman Notifikasi WA (Mobile).";
+
+const NAMA_BULAN: [&str; 12] = [
+    "Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September",
+    "Oktober", "November", "Desember",
+];
+
+/// Cermin `labelPeriode`: `2026-09` → `September 2026`, `SEKALI` → kosong,
+/// nama tahun ajaran apa adanya.
+pub fn label_periode(periode: &str) -> String {
+    if periode == PERIODE_SEKALI {
+        return String::new();
+    }
+    let huruf: Vec<char> = periode.chars().collect();
+    if huruf.len() == 7 && huruf[4] == '-' {
+        let tahun: String = huruf[..4].iter().collect();
+        let bulan: String = huruf[5..].iter().collect();
+        if let (Ok(_), Ok(bulan)) = (tahun.parse::<u32>(), bulan.parse::<usize>()) {
+            if (1..=12).contains(&bulan) {
+                return format!("{} {tahun}", NAMA_BULAN[bulan - 1]);
+            }
+        }
+    }
+    periode.to_owned()
+}
+
+/// `2026-09-10` → `10/09/2026`; teks lain apa adanya.
+fn tanggal_tampil(tanggal: &str) -> String {
+    let bagian: Vec<&str> = tanggal.split('-').collect();
+    match bagian.as_slice() {
+        [tahun, bulan, hari] => format!("{hari}/{bulan}/{tahun}"),
+        _ => tanggal.to_owned(),
+    }
+}
+
+pub struct TagihanPengingat {
+    pub nama_tagihan: String,
+    pub periode: String,
+    pub jatuh_tempo: String,
+    pub sisa: i64,
+}
+
+/// Cermin `isianPengingat`: isian `{total}`, `{jumlah}`, `{rincian}`, dan
+/// `{jatuh_tempo}` dari tunggakan seorang siswa yang sudah berurutan jatuh tempo.
+pub fn isian_pengingat(tagihan: &[TagihanPengingat]) -> Vec<(&'static str, String)> {
+    let total: i64 = tagihan.iter().map(|t| t.sisa).sum();
+    let mut rincian: Vec<String> = tagihan
+        .iter()
+        .take(MAKS_RINCIAN_PENGINGAT)
+        .map(|t| {
+            let periode = label_periode(&t.periode);
+            let nama = if periode.is_empty() {
+                t.nama_tagihan.clone()
+            } else {
+                format!("{} {periode}", t.nama_tagihan)
+            };
+            format!("- {nama}: {}", accounting::format_rupiah(t.sisa))
+        })
+        .collect();
+    if tagihan.len() > MAKS_RINCIAN_PENGINGAT {
+        rincian.push(format!(
+            "- dan {} tagihan lain",
+            tagihan.len() - MAKS_RINCIAN_PENGINGAT
+        ));
+    }
+    let jatuh_tempo = tagihan
+        .iter()
+        .map(|t| t.jatuh_tempo.as_str())
+        .filter(|j| !j.is_empty())
+        .min()
+        .map(tanggal_tampil)
+        .unwrap_or_else(|| "-".to_owned());
+    vec![
+        ("total", accounting::format_rupiah(total)),
+        ("jumlah", tagihan.len().to_string()),
+        ("rincian", rincian.join("\n")),
+        ("jatuh_tempo", jatuh_tempo),
+    ]
+}
+
+// ── Rekap tagihan dan penerimaan (lanjutan K4) ──────────────────────────────
+
+/// Persen bilangan bulat dibulatkan setengah ke atas tanpa pecahan, supaya
+/// Rust dan TS menghasilkan angka yang sama. Cermin `persenTerkumpul`.
+pub fn persen_terkumpul(terbayar: i64, ditagih: i64) -> i64 {
+    if ditagih <= 0 {
+        return 0;
+    }
+    (terbayar * 200 + ditagih) / (ditagih * 2)
+}
+
+pub struct BarisRekapRombel {
+    pub id_rombel: String,
+    pub nama_rombel: String,
+    pub siswa: i64,
+    pub ditagih: i64,
+    pub terbayar: i64,
+    pub menunggak: i64,
+}
+
+/// Cermin `susunRekapRombel`: baris per rombel ditambah total. Rombel kosong
+/// (siswa tanpa rombel atau rombelnya sudah tidak ada) bernama "Tanpa rombel".
+pub fn susun_rekap_rombel(baris: &[BarisRekapRombel]) -> Value {
+    let satu = |nama: &str, siswa: i64, ditagih: i64, terbayar: i64, menunggak: i64| {
+        json!({
+            "nama": nama,
+            "siswa": siswa,
+            "ditagih": ditagih,
+            "terbayar": terbayar,
+            "sisa": ditagih - terbayar,
+            "persen": persen_terkumpul(terbayar, ditagih),
+            "menunggak": menunggak,
+        })
+    };
+    let daftar: Vec<Value> = baris
+        .iter()
+        .map(|b| {
+            let nama = if b.id_rombel.is_empty() || b.nama_rombel.is_empty() {
+                "Tanpa rombel"
+            } else {
+                b.nama_rombel.as_str()
+            };
+            satu(nama, b.siswa, b.ditagih, b.terbayar, b.menunggak)
+        })
+        .collect();
+    let jumlah = |f: fn(&BarisRekapRombel) -> i64| baris.iter().map(f).sum::<i64>();
+    json!({
+        "baris": daftar,
+        "total": satu(
+            "Jumlah",
+            jumlah(|b| b.siswa),
+            jumlah(|b| b.ditagih),
+            jumlah(|b| b.terbayar),
+            jumlah(|b| b.menunggak),
+        ),
+    })
+}
+
+/// Cermin `bulanRentang`: 12 bulan `YYYY-MM` mulai dari `mulai`, ditambah
+/// bulan sesudah yang terakhir (batas atas eksklusif kueri).
+pub fn bulan_rentang(mulai: &str) -> Result<(Vec<String>, String), String> {
+    let huruf: Vec<char> = mulai.chars().collect();
+    let pesan = || "Bulan awal harus berbentuk YYYY-MM.".to_owned();
+    if huruf.len() != 7 || huruf[4] != '-' {
+        return Err(pesan());
+    }
+    let tahun: i64 = huruf[..4].iter().collect::<String>().parse().map_err(|_| pesan())?;
+    let bulan: i64 = huruf[5..].iter().collect::<String>().parse().map_err(|_| pesan())?;
+    if !(2000..=2999).contains(&tahun) || !(1..=12).contains(&bulan) {
+        return Err(pesan());
+    }
+    let ke = |i: i64| {
+        let n = (tahun * 12 + bulan - 1) + i;
+        format!("{:04}-{:02}", n / 12, n % 12 + 1)
+    };
+    Ok(((0..12).map(ke).collect(), ke(12)))
+}
+
+pub struct BarisPenerimaan {
+    pub bulan: String,
+    /// Kosong = kelebihan bayar yang masuk titipan.
+    pub id_jenis: String,
+    pub nama: String,
+    pub dari_titipan: bool,
+    pub jumlah: i64,
+}
+
+pub const LABEL_MASUK_TITIPAN: &str = "Masuk ke titipan";
+
+/// Cermin `susunPenerimaan`: matriks jenis × 12 bulan. Kuitansi bermetode
+/// Titipan dipisah ke `dipakai_titipan` dan tidak masuk total kas, karena
+/// uangnya sudah terhitung saat titipan itu diterima.
+pub fn susun_penerimaan(bulan: &[String], baris: &[BarisPenerimaan]) -> Value {
+    let kelompok = |dari_titipan: bool| {
+        let mut urut: Vec<(String, String)> = Vec::new();
+        for b in baris.iter().filter(|b| b.dari_titipan == dari_titipan) {
+            if !urut.iter().any(|(id, _)| *id == b.id_jenis) {
+                let nama = if b.id_jenis.is_empty() {
+                    LABEL_MASUK_TITIPAN.to_owned()
+                } else {
+                    b.nama.clone()
+                };
+                urut.push((b.id_jenis.clone(), nama));
+            }
+        }
+        // Jenis menurut nama, "Masuk ke titipan" selalu paling bawah.
+        urut.sort_by(|a, b| (a.0.is_empty(), &a.1, &a.0).cmp(&(b.0.is_empty(), &b.1, &b.0)));
+        let daftar: Vec<Value> = urut
+            .iter()
+            .map(|(id, nama)| {
+                let per_bulan: Vec<i64> = bulan
+                    .iter()
+                    .map(|m| {
+                        baris
+                            .iter()
+                            .filter(|b| b.dari_titipan == dari_titipan && b.id_jenis == *id && b.bulan == *m)
+                            .map(|b| b.jumlah)
+                            .sum()
+                    })
+                    .collect();
+                json!({ "id_jenis": id, "nama": nama, "per_bulan": per_bulan, "total": per_bulan.iter().sum::<i64>() })
+            })
+            .collect();
+        let total_per_bulan: Vec<i64> = (0..bulan.len())
+            .map(|i| daftar.iter().map(|d| d["per_bulan"][i].as_i64().unwrap_or(0)).sum())
+            .collect();
+        let total: i64 = total_per_bulan.iter().sum();
+        (daftar, total_per_bulan, total)
+    };
+    let (kas, kas_per_bulan, kas_total) = kelompok(false);
+    let (dipakai, dipakai_per_bulan, dipakai_total) = kelompok(true);
+    json!({
+        "bulan": bulan,
+        "kas": kas,
+        "total_per_bulan": kas_per_bulan,
+        "total": kas_total,
+        "dipakai_titipan": dipakai,
+        "dipakai_per_bulan": dipakai_per_bulan,
+        "total_dipakai": dipakai_total,
+    })
+}
+
 // ── I/O lokal ───────────────────────────────────────────────────────────────
 
 fn invalid(message: impl Into<String>) -> CommandError {
@@ -706,7 +937,16 @@ pub fn master(state: &MobileState) -> Result<Value, CommandError> {
         "SELECT nama_tahun FROM akademik_tahun_ajaran ORDER BY nama_tahun DESC LIMIT 50;",
         &[],
     )?;
+    let portal: Option<String> = connection
+        .query_row(
+            "SELECT value FROM setting_gex_system WHERE key = ?1 LIMIT 1;",
+            params![PORTAL_WALI_TAGIHAN_KEY],
+            |row| row.get(0),
+        )
+        .optional()
+        .map_err(db_error)?;
     Ok(json!({
+        "portal_wali_tagihan": portal.is_some_and(|v| v.trim().eq_ignore_ascii_case("true")),
         "jenis": jenis,
         "tarif": tarif,
         "unit": unit.iter().filter_map(|row| row["nama"].as_str().map(str::to_owned)).collect::<Vec<_>>(),
@@ -1405,7 +1645,234 @@ pub fn list(
         .iter()
         .map(|row| row["sisa"].as_i64().unwrap_or(0))
         .sum();
-    Ok(json!({ "items": items, "total_sisa": total_sisa }))
+    Ok(json!({
+        "items": items,
+        "total_sisa": total_sisa,
+        "pengingat_wa": pengingat_aktif(&connection)?,
+    }))
+}
+
+/// Buka atau tutup halaman Tagihan di portal wali, lewat rute kanonik
+/// `setting/update`. Cermin `savePortal` di `services/billing.ts`.
+pub fn save_portal(state: &MobileState, aktif: bool) -> Result<Value, CommandError> {
+    let client_id = sync::ensure_client_id(state)?;
+    let mut connection = storage::database(&state.data_dir)?;
+    let transaction = connection.transaction().map_err(db_error)?;
+    super::nilai_akhir::tulis_setting(
+        &transaction,
+        &client_id,
+        PORTAL_WALI_TAGIHAN_KEY,
+        if aktif { "true" } else { "false" },
+    )?;
+    transaction.commit().map_err(db_error)?;
+    Ok(json!({ "sukses": true, "portal_wali_tagihan": aktif }))
+}
+
+/// Waktu cetak WIB dari jam database, untuk ekspor rekap.
+fn waktu_cetak(connection: &Connection) -> Result<String, CommandError> {
+    connection
+        .query_row("SELECT datetime('now', '+7 hours');", [], |row| row.get(0))
+        .map_err(db_error)
+}
+
+/// Rekap tagihan satu periode per rombel SAAT INI. Cermin `recapRombel`.
+pub fn recap_rombel(
+    state: &MobileState,
+    periode: &str,
+    id_jenis: Option<&str>,
+) -> Result<Value, CommandError> {
+    let periode = periode.trim();
+    if periode.is_empty() {
+        return Err(invalid("Periode tagihan wajib diisi."));
+    }
+    let connection = storage::database(&state.data_dir)?;
+    let mut sql = String::from(
+        "SELECT COALESCE(r.id_rombel, '') AS id_rombel, COALESCE(r.nama_rombel, '') AS nama_rombel,
+                COUNT(DISTINCT t.id_siswa) AS siswa,
+                SUM(t.nominal - t.potongan) AS ditagih,
+                SUM(MIN(COALESCE(d.dibayar, 0), t.nominal - t.potongan)) AS terbayar,
+                COUNT(DISTINCT CASE WHEN t.nominal - t.potongan > COALESCE(d.dibayar, 0)
+                                    THEN t.id_siswa END) AS menunggak
+         FROM keu_tagihan t
+         LEFT JOIN keu_tagihan_batal b ON b.id_tagihan = t.id_tagihan
+         -- subquery ini = `DIBAYAR_SQL`, ditulis utuh supaya `audit:sql` bisa menjalankannya
+         LEFT JOIN (
+            SELECT a.id_tagihan, SUM(a.nominal) AS dibayar
+            FROM keu_pembayaran_alokasi a
+            JOIN keu_pembayaran p ON p.id_pembayaran = a.id_pembayaran
+            LEFT JOIN keu_pembayaran_batal pb ON pb.id_pembayaran = p.id_pembayaran
+            WHERE a.id_tagihan IS NOT NULL AND pb.id_pembayaran IS NULL
+            GROUP BY a.id_tagihan
+         ) d ON d.id_tagihan = t.id_tagihan
+         LEFT JOIN siswa_data s ON s.id_siswa = t.id_siswa
+         LEFT JOIN akademik_rombel r ON r.id_rombel = s.id_rombel
+         WHERE b.id_tagihan IS NULL AND t.periode = ?",
+    );
+    let mut args: Vec<String> = vec![periode.to_owned()];
+    if let Some(value) = id_jenis.map(str::trim).filter(|v| !v.is_empty()) {
+        sql.push_str(" AND t.id_jenis_tagihan = ?");
+        args.push(value.to_owned());
+    }
+    sql.push_str(
+        " GROUP BY 1, 2 ORDER BY (r.id_rombel IS NULL), MAX(r.tingkat), 2, 1 LIMIT 500;",
+    );
+    let params: Vec<&dyn rusqlite::ToSql> =
+        args.iter().map(|a| a as &dyn rusqlite::ToSql).collect();
+    let baris: Vec<BarisRekapRombel> = query_json(&connection, &sql, &params)?
+        .into_iter()
+        .map(|row| BarisRekapRombel {
+            id_rombel: row["id_rombel"].as_str().unwrap_or("").to_owned(),
+            nama_rombel: row["nama_rombel"].as_str().unwrap_or("").to_owned(),
+            siswa: row["siswa"].as_i64().unwrap_or(0),
+            ditagih: row["ditagih"].as_i64().unwrap_or(0),
+            terbayar: row["terbayar"].as_i64().unwrap_or(0),
+            menunggak: row["menunggak"].as_i64().unwrap_or(0),
+        })
+        .collect();
+    let mut hasil = susun_rekap_rombel(&baris);
+    hasil["periode"] = json!(periode);
+    hasil["dicetak"] = json!(waktu_cetak(&connection)?);
+    Ok(hasil)
+}
+
+/// Penerimaan per jenis per bulan berbasis tanggal kuitansi, 12 bulan mulai
+/// `mulai` (`YYYY-MM`). Cermin `recapReceipts`.
+pub fn recap_receipts(state: &MobileState, mulai: &str) -> Result<Value, CommandError> {
+    let (bulan, sesudah) = bulan_rentang(mulai.trim()).map_err(invalid)?;
+    let connection = storage::database(&state.data_dir)?;
+    let baris: Vec<BarisPenerimaan> = query_json(
+        &connection,
+        "SELECT substr(p.tanggal, 1, 7) AS bulan,
+                CASE WHEN a.id_tagihan IS NULL THEN '' ELSE COALESCE(t.id_jenis_tagihan, '-') END AS id_jenis,
+                COALESCE(MAX(j.nama), MAX(t.nama_tagihan), 'Tagihan lain') AS nama,
+                p.metode = 'Titipan' AS dari_titipan,
+                SUM(a.nominal) AS jumlah
+         FROM keu_pembayaran p
+         JOIN keu_pembayaran_alokasi a ON a.id_pembayaran = p.id_pembayaran
+         LEFT JOIN keu_pembayaran_batal pb ON pb.id_pembayaran = p.id_pembayaran
+         LEFT JOIN keu_tagihan t ON t.id_tagihan = a.id_tagihan
+         LEFT JOIN keu_jenis_tagihan j ON j.id_jenis_tagihan = t.id_jenis_tagihan
+         WHERE pb.id_pembayaran IS NULL AND p.tanggal >= ? AND p.tanggal < ?
+         GROUP BY 1, 2, 4
+         LIMIT 5000;",
+        &[&format!("{}-01", bulan[0]), &format!("{sesudah}-01")],
+    )?
+    .into_iter()
+    .map(|row| BarisPenerimaan {
+        bulan: row["bulan"].as_str().unwrap_or("").to_owned(),
+        id_jenis: row["id_jenis"].as_str().unwrap_or("").to_owned(),
+        nama: row["nama"].as_str().unwrap_or("").to_owned(),
+        dari_titipan: row["dari_titipan"].as_i64().unwrap_or(0) == 1,
+        jumlah: row["jumlah"].as_i64().unwrap_or(0),
+    })
+    .collect();
+    let mut hasil = susun_penerimaan(&bulan, &baris);
+    hasil["dicetak"] = json!(waktu_cetak(&connection)?);
+    Ok(hasil)
+}
+
+/// Sakelar `wa_notify_tagihan` di `setting_gex_system` lokal.
+fn pengingat_aktif(connection: &Connection) -> Result<bool, CommandError> {
+    let nilai: Option<String> = connection
+        .query_row(
+            "SELECT value FROM setting_gex_system WHERE key = ?1 LIMIT 1;",
+            params![wa_notification::WA_NOTIFY_TAGIHAN_KEY],
+            |row| row.get(0),
+        )
+        .optional()
+        .map_err(db_error)?;
+    Ok(nilai.is_some_and(|v| v.trim().eq_ignore_ascii_case("true")))
+}
+
+/// Antre pengingat tunggakan ke wali, satu pesan per siswa (K4b). Saringan
+/// memilih SISWA-nya; pesannya memuat seluruh tunggakan siswa itu, karena
+/// wali yang hanya diberi tahu sebagian tagihannya akan mengira sisanya lunas.
+/// Syarat lain (siswa, nomor wali sah, belum diingatkan hari ini lewat
+/// dedupe `tagihan:<siswa>:<tanggal WIB>`) dinilai `queue_wali_notification_tx`.
+/// Cermin `remind` di `services/billing.ts`.
+pub fn remind(
+    state: &MobileState,
+    periode: Option<&str>,
+    id_jenis: Option<&str>,
+    id_rombel: Option<&str>,
+) -> Result<Value, CommandError> {
+    let client_id = sync::ensure_client_id(state)?;
+    let mut connection = storage::database(&state.data_dir)?;
+    if !pengingat_aktif(&connection)? {
+        return Err(invalid(PESAN_PENGINGAT_MATI));
+    }
+    let isi = |v: Option<&str>| {
+        v.map(str::trim)
+            .filter(|v| !v.is_empty())
+            .map(str::to_owned)
+    };
+    let mut sql = String::from(
+        "SELECT DISTINCT t.id_siswa
+         FROM keu_tagihan t
+         LEFT JOIN keu_tagihan_batal b ON b.id_tagihan = t.id_tagihan
+         -- subquery ini = `DIBAYAR_SQL`, ditulis utuh supaya `audit:sql` bisa menjalankannya
+         LEFT JOIN (
+            SELECT a.id_tagihan, SUM(a.nominal) AS dibayar
+            FROM keu_pembayaran_alokasi a
+            JOIN keu_pembayaran p ON p.id_pembayaran = a.id_pembayaran
+            LEFT JOIN keu_pembayaran_batal pb ON pb.id_pembayaran = p.id_pembayaran
+            WHERE a.id_tagihan IS NOT NULL AND pb.id_pembayaran IS NULL
+            GROUP BY a.id_tagihan
+         ) d ON d.id_tagihan = t.id_tagihan
+         LEFT JOIN siswa_data s ON s.id_siswa = t.id_siswa
+         WHERE b.id_tagihan IS NULL AND t.nominal - t.potongan > COALESCE(d.dibayar, 0)",
+    );
+    let mut args: Vec<String> = Vec::new();
+    if let Some(value) = isi(periode) {
+        sql.push_str(" AND t.periode = ?");
+        args.push(value);
+    }
+    if let Some(value) = isi(id_jenis) {
+        sql.push_str(" AND t.id_jenis_tagihan = ?");
+        args.push(value);
+    }
+    if let Some(value) = isi(id_rombel) {
+        sql.push_str(" AND s.id_rombel = ?");
+        args.push(value);
+    }
+    // `LIMIT 501` = `MAKS_SISWA_PENGINGAT` + 1, supaya pemotongan terdeteksi.
+    sql.push_str(" ORDER BY t.id_siswa LIMIT 501;");
+    let params: Vec<&dyn rusqlite::ToSql> =
+        args.iter().map(|a| a as &dyn rusqlite::ToSql).collect();
+    let mut siswa: Vec<String> = query_json(&connection, &sql, &params)?
+        .into_iter()
+        .filter_map(|row| row["id_siswa"].as_str().map(str::to_owned))
+        .collect();
+    let terpotong = siswa.len() > MAKS_SISWA_PENGINGAT;
+    siswa.truncate(MAKS_SISWA_PENGINGAT);
+
+    let hari = hari_ini(&connection)?;
+    let transaction = connection.transaction().map_err(db_error)?;
+    let mut diantre = 0;
+    for id_siswa in &siswa {
+        let tagihan: Vec<TagihanPengingat> = tagihan_terbuka(&transaction, id_siswa)?
+            .into_iter()
+            .map(|row| TagihanPengingat {
+                nama_tagihan: row["nama_tagihan"].as_str().unwrap_or("").to_owned(),
+                periode: row["periode"].as_str().unwrap_or("").to_owned(),
+                jatuh_tempo: row["jatuh_tempo"].as_str().unwrap_or("").to_owned(),
+                sisa: row["sisa"].as_i64().unwrap_or(0),
+            })
+            .collect();
+        let isian = isian_pengingat(&tagihan);
+        if wa_notification::queue_wali_notification_tx(
+            &transaction,
+            &client_id,
+            "tagihan",
+            id_siswa,
+            &format!("tagihan:{id_siswa}:{hari}"),
+            |wali| wali.isian(isian),
+        )? {
+            diantre += 1;
+        }
+    }
+    transaction.commit().map_err(db_error)?;
+    Ok(json!({ "siswa": siswa.len(), "diantre": diantre, "terpotong": terpotong }))
 }
 
 // ── Pembayaran dan kuitansi (K3b) ───────────────────────────────────────────
@@ -3094,5 +3561,273 @@ mod tests {
         )
         .expect("bayar dengan seri");
         assert_eq!(kwt4["nomor"], "KWT/2026/TU1/0001");
+    }
+
+    fn tp(nama: &str, periode: &str, jatuh_tempo: &str, sisa: i64) -> TagihanPengingat {
+        TagihanPengingat {
+            nama_tagihan: nama.into(),
+            periode: periode.into(),
+            jatuh_tempo: jatuh_tempo.into(),
+            sisa,
+        }
+    }
+
+    // Vektor kembar `isianPengingat` di `src/lib/validations/billing.test.ts`.
+    #[test]
+    fn isian_pengingat_kembar() {
+        assert_eq!(label_periode("2026-09"), "September 2026");
+        assert_eq!(label_periode("2026-13"), "2026-13");
+        assert_eq!(label_periode("2026/2027"), "2026/2027");
+        assert_eq!(label_periode("SEKALI"), "");
+
+        let dua = isian_pengingat(&[
+            tp("SPP", "2026-08", "2026-08-10", 150_000),
+            tp("Seragam", "SEKALI", "", 275_000),
+        ]);
+        assert_eq!(
+            dua,
+            vec![
+                ("total", "Rp425.000".to_owned()),
+                ("jumlah", "2".to_owned()),
+                (
+                    "rincian",
+                    "- SPP Agustus 2026: Rp150.000\n- Seragam: Rp275.000".to_owned()
+                ),
+                ("jatuh_tempo", "10/08/2026".to_owned()),
+            ]
+        );
+
+        let tujuh: Vec<TagihanPengingat> = (1..=7)
+            .map(|bulan| tp("SPP", &format!("2026-0{bulan}"), &format!("2026-0{bulan}-10"), 100_000))
+            .collect();
+        let isian = isian_pengingat(&tujuh);
+        assert_eq!(isian[0].1, "Rp700.000");
+        assert_eq!(isian[1].1, "7");
+        assert_eq!(
+            isian[2].1,
+            "- SPP Januari 2026: Rp100.000\n- SPP Februari 2026: Rp100.000\n- SPP Maret 2026: Rp100.000\n- SPP April 2026: Rp100.000\n- SPP Mei 2026: Rp100.000\n- dan 2 tagihan lain"
+        );
+        assert_eq!(isian[3].1, "10/01/2026");
+
+        assert_eq!(isian_pengingat(&[])[3].1, "-");
+    }
+
+    #[test]
+    fn pengingat_tunggakan_sekali_sehari() {
+        let (_dir, state) = state_uji();
+        let connection = storage::database(&state.data_dir).expect("db");
+        connection
+            .execute_batch(
+                "INSERT INTO akademik_rombel (id_rombel, id_tahun_ajaran, tingkat, nama_rombel) VALUES
+                    ('r7', 'ta', 7, 'VII A');
+                 INSERT INTO master_data (id_unik, kode_karyawan, nama, divisi, id_shift, jenis_personil, status_aktif, unit) VALUES
+                    ('S-01', 'S-01', 'Ani', 'Siswa', 1, 'SISWA', 'Aktif', 'SMP'),
+                    ('S-02', 'S-02', 'Budi', 'Siswa', 1, 'Siswa', 'Aktif', 'SMP');
+                 INSERT INTO siswa_data (id_siswa, nama_lengkap, id_rombel, angkatan, status, no_whatsapp_wali, created_at, updated_at) VALUES
+                    ('S-01', 'Ani', 'r7', 2026, 'Aktif', '081234567890', 'x', 'x'),
+                    ('S-02', 'Budi', 'r7', 2026, 'Aktif', '', 'x', 'x');",
+            )
+            .expect("seed siswa");
+        let jt = save_jenis(
+            &state,
+            json!({ "nama": "SPP", "periodik": "Bulanan", "nominal_bawaan": 300_000, "id_akun_pendapatan": "akun-pendapatan-spp" }),
+        )
+        .expect("jenis")["id_jenis_tagihan"]
+            .as_str()
+            .expect("id")
+            .to_owned();
+        issue(&state, "bendahara", &jt, "2026-07", "2026-07-10", None, None).expect("terbit");
+
+        assert_eq!(
+            remind(&state, None, None, None).expect_err("sakelar mati").message,
+            PESAN_PENGINGAT_MATI
+        );
+        assert_eq!(
+            list(&state, None, None, None, None).expect("daftar")["pengingat_wa"],
+            json!(false)
+        );
+        connection
+            .execute(
+                "INSERT INTO setting_gex_system (key, value) VALUES ('wa_notify_tagihan', 'true');",
+                [],
+            )
+            .expect("sakelar");
+        assert_eq!(
+            list(&state, None, None, None, None).expect("daftar")["pengingat_wa"],
+            json!(true)
+        );
+
+        // Budi tidak punya nomor wali: dihitung sebagai siswa, tidak diantre.
+        let hasil = remind(&state, None, None, Some("r7")).expect("pengingat");
+        assert_eq!(hasil, json!({ "siswa": 2, "diantre": 1, "terpotong": false }));
+        let (isi, dedupe, jenis): (String, String, String) = connection
+            .query_row(
+                "SELECT isi_pesan, dedupe_key, jenis FROM notifikasi_wa;",
+                [],
+                |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
+            )
+            .expect("antrean");
+        assert_eq!(jenis, "tagihan");
+        assert!(dedupe.starts_with("tagihan:S-01:"));
+        assert!(isi.contains("Ani (VII A)"), "{isi}");
+        assert!(isi.contains("- SPP Juli 2026: Rp300.000"));
+        assert!(isi.contains("Jatuh tempo paling awal: 10/07/2026"));
+
+        let ulang = remind(&state, None, None, None).expect("pengingat ulang");
+        assert_eq!(ulang["diantre"], json!(0));
+        let outbox: i64 = connection
+            .query_row(
+                "SELECT COUNT(*) FROM desktop_sync_outbox WHERE domain = 'wa-notification';",
+                [],
+                |row| row.get(0),
+            )
+            .expect("outbox");
+        assert_eq!(outbox, 1);
+    }
+
+    #[test]
+    fn sakelar_portal_wali_masuk_outbox() {
+        let (_dir, state) = state_uji();
+        assert_eq!(master(&state).expect("master")["portal_wali_tagihan"], json!(false));
+        save_portal(&state, true).expect("buka portal");
+        assert_eq!(master(&state).expect("master")["portal_wali_tagihan"], json!(true));
+        save_portal(&state, false).expect("tutup portal");
+        let connection = storage::database(&state.data_dir).expect("db");
+        let (jumlah, payload): (i64, String) = connection
+            .query_row(
+                "SELECT COUNT(*), MAX(payload_json) FROM desktop_sync_outbox
+                 WHERE domain = 'setting' AND entity_key = 'portal_wali_tagihan';",
+                [],
+                |row| Ok((row.get(0)?, row.get(1)?)),
+            )
+            .expect("outbox");
+        // Hanya nilai terakhir yang menunggu dikirim.
+        assert_eq!(jumlah, 1);
+        assert!(payload.contains("\"false\""), "{payload}");
+    }
+
+    /// Disalin apa adanya ke `services/billing.test.ts`: kedua sisi wajib
+    /// menghasilkan angka yang sama dari data yang sama.
+    const SEED_REKAP: &str = r#"
+INSERT INTO akademik_rombel (id_rombel, id_tahun_ajaran, tingkat, nama_rombel) VALUES
+  ('r8', 'ta', 8, 'VIII A'), ('r7', 'ta', 7, 'VII A');
+INSERT INTO siswa_data (id_siswa, nama_lengkap, id_rombel, angkatan, status, created_at, updated_at) VALUES
+  ('S-01', 'Ani', 'r7', 2026, 'Aktif', 'x', 'x'),
+  ('S-02', 'Budi', 'r7', 2026, 'Aktif', 'x', 'x'),
+  ('S-03', 'Cici', 'r8', 2025, 'Aktif', 'x', 'x'),
+  ('S-04', 'Dodi', 'hilang', 2025, 'Aktif', 'x', 'x');
+INSERT INTO keu_jenis_tagihan (id_jenis_tagihan, nama, periodik, nominal_bawaan, id_akun_pendapatan) VALUES
+  ('spp', 'SPP', 'Bulanan', 300000, 'akun-pendapatan-spp'),
+  ('buku', 'Buku', 'Sekali', 100000, 'akun-pendapatan-spp'),
+  ('lab', 'Lab', 'Bulanan', 50000, 'akun-pendapatan-spp');
+INSERT INTO keu_tagihan (id_tagihan, id_siswa, nama_siswa, id_jenis_tagihan, nama_tagihan, periode, nominal, potongan, jatuh_tempo, dibuat_oleh) VALUES
+  ('t1', 'S-01', 'Ani', 'spp', 'SPP', '2026-07', 300000, 0, '2026-07-10', 'tu'),
+  ('t2', 'S-02', 'Budi', 'spp', 'SPP', '2026-07', 300000, 100000, '2026-07-10', 'tu'),
+  ('t3', 'S-03', 'Cici', 'spp', 'SPP', '2026-07', 300000, 0, '2026-07-10', 'tu'),
+  ('t4', 'S-04', 'Dodi', 'spp', 'SPP', '2026-07', 300000, 0, '2026-07-10', 'tu'),
+  ('t5', 'S-01', 'Ani', 'buku', 'Buku', 'SEKALI', 100000, 0, '2026-07-10', 'tu'),
+  ('t6', 'S-02', 'Budi', 'spp', 'SPP', '2026-08', 300000, 0, '2026-08-10', 'tu'),
+  ('t7', 'S-02', 'Budi', 'lab', 'Lab', '2026-07', 50000, 0, '2026-07-10', 'tu');
+INSERT INTO keu_tagihan_batal (id_tagihan, alasan, dibatalkan_oleh) VALUES ('t7', 'Salah', 'tu');
+INSERT INTO keu_pembayaran (id_pembayaran, id_siswa, nama_siswa, tanggal, seri, nomor_urut, nomor, metode, total, dibuat_oleh) VALUES
+  ('p1', 'S-01', 'Ani', '2026-07-05', 'WEB', 1, 'KWT/1', 'Tunai', 300000, 'tu'),
+  ('p2', 'S-02', 'Budi', '2026-07-20', 'WEB', 2, 'KWT/2', 'Transfer', 250000, 'tu'),
+  ('p3', 'S-03', 'Cici', '2026-08-02', 'WEB', 3, 'KWT/3', 'Tunai', 100000, 'tu'),
+  ('p4', 'S-02', 'Budi', '2026-08-15', 'WEB', 4, 'KWT/4', 'Titipan', 50000, 'tu'),
+  ('p5', 'S-01', 'Ani', '2026-08-20', 'WEB', 5, 'KWT/5', 'Tunai', 100000, 'tu'),
+  ('p6', 'S-03', 'Cici', '2027-07-01', 'WEB', 6, 'KWT/6', 'Tunai', 10000, 'tu'),
+  ('p7', 'S-04', 'Dodi', '2026-06-30', 'WEB', 7, 'KWT/7', 'Tunai', 50000, 'tu');
+INSERT INTO keu_pembayaran_alokasi (id_alokasi, id_pembayaran, id_tagihan, nominal) VALUES
+  ('a1', 'p1', 't1', 300000),
+  ('a2', 'p2', 't2', 200000),
+  ('a3', 'p2', NULL, 50000),
+  ('a4', 'p3', 't3', 100000),
+  ('a5', 'p4', 't6', 50000),
+  ('a6', 'p5', 't5', 100000),
+  ('a7', 'p6', 't3', 10000),
+  ('a8', 'p7', 't4', 50000);
+INSERT INTO keu_pembayaran_batal (id_pembayaran, alasan, dibatalkan_oleh) VALUES ('p5', 'Ganda', 'tu');
+"#;
+
+    #[test]
+    fn persen_dan_rentang_bulan_kembar() {
+        assert_eq!(persen_terkumpul(1, 3), 33);
+        assert_eq!(persen_terkumpul(2, 3), 67);
+        assert_eq!(persen_terkumpul(1, 8), 13);
+        assert_eq!(persen_terkumpul(5, 0), 0);
+        let (bulan, sesudah) = bulan_rentang("2026-07").expect("rentang");
+        assert_eq!(bulan.first().map(String::as_str), Some("2026-07"));
+        assert_eq!(bulan.last().map(String::as_str), Some("2027-06"));
+        assert_eq!(bulan.len(), 12);
+        assert_eq!(sesudah, "2027-07");
+        assert_eq!(bulan_rentang("2026-01").expect("rentang").1, "2027-01");
+        for salah in ["2026-13", "2026-7", "26-07", "abcd-ef"] {
+            assert_eq!(
+                bulan_rentang(salah),
+                Err("Bulan awal harus berbentuk YYYY-MM.".to_owned())
+            );
+        }
+    }
+
+    #[test]
+    fn rekap_rombel_dan_penerimaan_skenario_kembar() {
+        let (_dir, state) = state_uji();
+        storage::database(&state.data_dir)
+            .expect("db")
+            .execute_batch(SEED_REKAP)
+            .expect("seed rekap");
+
+        let rekap = recap_rombel(&state, "2026-07", None).expect("rekap rombel");
+        assert_eq!(
+            rekap["baris"],
+            json!([
+                { "nama": "VII A", "siswa": 2, "ditagih": 500000, "terbayar": 500000, "sisa": 0, "persen": 100, "menunggak": 0 },
+                { "nama": "VIII A", "siswa": 1, "ditagih": 300000, "terbayar": 110000, "sisa": 190000, "persen": 37, "menunggak": 1 },
+                { "nama": "Tanpa rombel", "siswa": 1, "ditagih": 300000, "terbayar": 50000, "sisa": 250000, "persen": 17, "menunggak": 1 }
+            ])
+        );
+        assert_eq!(
+            rekap["total"],
+            json!({ "nama": "Jumlah", "siswa": 4, "ditagih": 1100000, "terbayar": 660000, "sisa": 440000, "persen": 60, "menunggak": 2 })
+        );
+        assert_eq!(
+            recap_rombel(&state, "2026-07", Some("spp")).expect("rekap spp")["total"],
+            rekap["total"]
+        );
+        assert_eq!(
+            recap_rombel(&state, "SEKALI", None).expect("rekap sekali")["baris"],
+            json!([{ "nama": "VII A", "siswa": 1, "ditagih": 100000, "terbayar": 0, "sisa": 100000, "persen": 0, "menunggak": 1 }])
+        );
+        assert_eq!(
+            recap_rombel(&state, " ", None).expect_err("periode kosong").message,
+            "Periode tagihan wajib diisi."
+        );
+
+        let ajaran = recap_receipts(&state, "2026-07").expect("penerimaan");
+        let nol = |isi: &[(usize, i64)]| {
+            let mut v = vec![0_i64; 12];
+            for (i, n) in isi {
+                v[*i] = *n;
+            }
+            v
+        };
+        assert_eq!(
+            ajaran["kas"],
+            json!([
+                { "id_jenis": "spp", "nama": "SPP", "per_bulan": nol(&[(0, 500000), (1, 100000)]), "total": 600000 },
+                { "id_jenis": "", "nama": "Masuk ke titipan", "per_bulan": nol(&[(0, 50000)]), "total": 50000 }
+            ])
+        );
+        assert_eq!(ajaran["total_per_bulan"], json!(nol(&[(0, 550000), (1, 100000)])));
+        assert_eq!(ajaran["total"], json!(650000));
+        assert_eq!(
+            ajaran["dipakai_titipan"],
+            json!([{ "id_jenis": "spp", "nama": "SPP", "per_bulan": nol(&[(1, 50000)]), "total": 50000 }])
+        );
+        assert_eq!(ajaran["total_dipakai"], json!(50000));
+
+        let kalender = recap_receipts(&state, "2026-01").expect("penerimaan kalender");
+        assert_eq!(kalender["total"], json!(700000));
+        assert_eq!(kalender["kas"][0]["per_bulan"][5], json!(50000));
     }
 }

@@ -54,6 +54,8 @@ const EMPLOYEE_LOAN_MIGRATION_VERSION = 40;
 const STUDENT_BILLING_MIGRATION_VERSION = 41;
 const STUDENT_PAYMENT_MIGRATION_VERSION = 42;
 const GRADE_TYPE_MIGRATION_VERSION = 43;
+const WA_BILLING_REMINDER_MIGRATION_VERSION = 44;
+const BOOK_CLOSING_MIGRATION_VERSION = 45;
 
 /**
  * v21 — aturan jam scan baru: Jam Kerja Normal = (Jam Pulang − Jam Masuk) −
@@ -523,6 +525,11 @@ export async function runDatabaseMigrations(client: Client) {
       "uks_enabled",
       "ALTER TABLE app_wa_config ADD COLUMN uks_enabled INTEGER NOT NULL DEFAULT 0;",
     ],
+    [
+      "app_wa_config",
+      "tagihan_enabled",
+      "ALTER TABLE app_wa_config ADD COLUMN tagihan_enabled INTEGER NOT NULL DEFAULT 0;",
+    ],
     // Vonis verifikasi wajah pada foto bukti (v38). Cerminan `ensure_column`
     // di `turso.rs` dan `storage.rs`.
     [
@@ -680,7 +687,7 @@ export async function runDatabaseMigrations(client: Client) {
     sql: "SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'notifikasi_wa';",
   });
   const ddlNotif = String(notifDdl.rows[0]?.sql ?? "");
-  if (ddlNotif && !ddlNotif.includes("'uks'")) {
+  if (ddlNotif && !ddlNotif.includes("'tagihan'")) {
     // Irisan kolom, bukan daftar tetap (cermin `storage.rs`/`turso.rs`): tabel
     // lama bisa belum punya `klaim_oleh`/`klaim_sampai`, dan tabel yang sudah
     // punya tidak boleh kehilangan klaim pengiriman yang sedang berjalan.
@@ -709,7 +716,7 @@ export async function runDatabaseMigrations(client: Client) {
         `CREATE TABLE notifikasi_wa__rebuild (
           id_notifikasi TEXT PRIMARY KEY,
           dedupe_key TEXT NOT NULL,
-          jenis TEXT NOT NULL CHECK (jenis IN ('scan_masuk', 'scan_pulang', 'bolos', 'ambang_alfa', 'koreksi_admin', 'import_manual', 'uks')),
+          jenis TEXT NOT NULL CHECK (jenis IN ('scan_masuk', 'scan_pulang', 'bolos', 'ambang_alfa', 'koreksi_admin', 'import_manual', 'uks', 'tagihan')),
           id_siswa TEXT,
           tujuan_nomor TEXT NOT NULL,
           isi_pesan TEXT NOT NULL,
@@ -1927,6 +1934,38 @@ export async function runDatabaseMigrations(client: Client) {
     args: [GRADE_TYPE_MIGRATION_VERSION, now],
   });
 
+  // v44 — pengingat tagihan lewat WhatsApp: jenis `tagihan` di CHECK
+  // `notifikasi_wa.jenis` (bangun ulang di atas) dan `app_wa_config.tagihan_enabled`.
+  await client.execute({
+    sql: `INSERT OR IGNORE INTO schema_migration (version, name, applied_at)
+          VALUES (?, 'wa-billing-reminder', ?);`,
+    args: [WA_BILLING_REMINDER_MIGRATION_VERSION, now],
+  });
+
+  // v45 — tutup buku. DDL WAJIB identik dengan `storage.rs` dan `turso.rs`.
+  await client.execute(`
+    CREATE TABLE IF NOT EXISTS keu_tutup_buku (
+      id_tutup TEXT PRIMARY KEY,
+      sampai_tanggal TEXT NOT NULL,
+      dibuat_oleh TEXT NOT NULL,
+      kode_perangkat TEXT NOT NULL,
+      waktu_perangkat TEXT NOT NULL,
+      diterima_cloud TEXT,
+      saldo_json TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'Aktif' CHECK (status IN ('Aktif', 'Dibuka', 'Digantikan', 'Menunggu')),
+      alasan_buka TEXT,
+      dibuka_oleh TEXT,
+      dibuka_pada TEXT,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+  `);
+  await client.execute({
+    sql: `INSERT OR IGNORE INTO schema_migration (version, name, applied_at)
+          VALUES (?, 'book-closing', ?);`,
+    args: [BOOK_CLOSING_MIGRATION_VERSION, now],
+  });
+
   await client.execute(
     "CREATE INDEX IF NOT EXISTS idx_jurnal_presensi ON jurnal_mengajar(id_presensi_mapel);",
   );
@@ -1947,7 +1986,7 @@ export async function runDatabaseMigrations(client: Client) {
     CREATE TABLE IF NOT EXISTS notifikasi_wa (
       id_notifikasi TEXT PRIMARY KEY,
       dedupe_key TEXT NOT NULL,
-      jenis TEXT NOT NULL CHECK (jenis IN ('scan_masuk', 'scan_pulang', 'bolos', 'ambang_alfa', 'koreksi_admin', 'import_manual', 'uks')),
+      jenis TEXT NOT NULL CHECK (jenis IN ('scan_masuk', 'scan_pulang', 'bolos', 'ambang_alfa', 'koreksi_admin', 'import_manual', 'uks', 'tagihan')),
       id_siswa TEXT,
       tujuan_nomor TEXT NOT NULL,
       isi_pesan TEXT NOT NULL,
@@ -1978,6 +2017,7 @@ export async function runDatabaseMigrations(client: Client) {
       koreksi_admin_enabled INTEGER NOT NULL DEFAULT 0,
       import_manual_enabled INTEGER NOT NULL DEFAULT 0,
       uks_enabled INTEGER NOT NULL DEFAULT 0,
+      tagihan_enabled INTEGER NOT NULL DEFAULT 0,
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL
     );

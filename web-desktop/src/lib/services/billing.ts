@@ -3,6 +3,10 @@ import "server-only";
 import { randomBytes } from "node:crypto";
 import type { Client, InStatement, Transaction } from "@libsql/client";
 import {
+  isValidOperatorPhone,
+  normalizeOperatorPhone,
+} from "@/lib/operators/contact";
+import {
   assertAkunBayar,
   balikJurnalTx,
   nomorUrutBerikutnya,
@@ -10,17 +14,23 @@ import {
   tulisJurnalTx,
 } from "@/lib/services/accounting";
 import { kopSekolah } from "@/lib/services/inventory";
+import { assertPeriodeTerbuka } from "@/lib/services/tutup-buku";
+import { generateWaNotificationId } from "@/lib/services/wa-notification";
 import { formatRupiah, isValidDate } from "@/lib/validations/accounting";
 import {
   AKUN_PIUTANG_SISWA,
   alokasiPembayaran,
+  type BarisPenerimaan,
+  type BarisRekapRombel,
   barisJurnalPembayaran,
+  bulanRentang,
   formatNomorKuitansi,
   hitungPotongan,
   idAlokasi,
   idJurnalPembayaran,
   idJurnalTagihan,
   idTagihan,
+  isianPengingat,
   jenisTagihanDraftSchema,
   type KeringananBerlaku,
   keringananBerlaku,
@@ -28,10 +38,16 @@ import {
   kunciUnit,
   MAKS_ALASAN_BATAL_TAGIHAN,
   MAKS_NAMA_PERANGKAT,
+  MAKS_SISWA_PENGINGAT,
+  PESAN_PENGINGAT_MATI,
   type PembayaranValid,
+  PORTAL_WALI_TAGIHAN_KEY,
   pembayaranDraftSchema,
   pilihTarif,
   SERI_KUITANSI_WEB,
+  susunPenerimaan,
+  susunRekapRombel,
+  type TagihanPengingat,
   type TagihanTerbuka,
   type TarifBerlaku,
   tarifDraftSchema,
@@ -42,14 +58,24 @@ import {
   validateSeri,
   validateTarif,
 } from "@/lib/validations/billing";
+import {
+  composeWaMessage,
+  settingEnabled,
+  WA_NOTIFY_TAGIHAN_KEY,
+  waTemplateKey,
+} from "@/lib/validations/wa-notification";
 import type {
   AkunSiswaTagihan,
+  DaftarTagihan,
   DetailKuitansi,
   HasilBayar,
+  HasilPengingat,
   KeringananItem,
   KuitansiItem,
   MasterTagihan,
   PratinjauTagihan,
+  RekapPenerimaan,
+  RekapRombel,
   SeriKuitansi,
   SiswaTagihan,
   TagihanItem,
@@ -118,7 +144,7 @@ const SALDO_TITIPAN_SQL = `SELECT COALESCE(SUM(CASE
 // ── Master ──────────────────────────────────────────────────────────────────
 
 export async function master(client: Client): Promise<MasterTagihan> {
-  const [jenis, tarif, unit, rombel, tahun] = await client.batch(
+  const [jenis, tarif, unit, rombel, tahun, portal] = await client.batch(
     [
       `SELECT id_jenis_tagihan, nama, periodik, nominal_bawaan, id_akun_pendapatan, is_aktif
        FROM keu_jenis_tagihan ORDER BY nama, id_jenis_tagihan LIMIT 500;`,
@@ -130,6 +156,10 @@ export async function master(client: Client): Promise<MasterTagihan> {
       `SELECT id_rombel, nama_rombel, tingkat FROM akademik_rombel WHERE is_aktif = 1
        ORDER BY tingkat, nama_rombel LIMIT 500;`,
       "SELECT nama_tahun FROM akademik_tahun_ajaran ORDER BY nama_tahun DESC LIMIT 50;",
+      {
+        sql: "SELECT value FROM setting_gex_system WHERE key = ? LIMIT 1;",
+        args: [PORTAL_WALI_TAGIHAN_KEY],
+      },
     ],
     "read",
   );
@@ -158,7 +188,21 @@ export async function master(client: Client): Promise<MasterTagihan> {
       tingkat: Number(row.tingkat),
     })),
     tahun_ajaran: tahun.rows.map((row) => String(row.nama_tahun)),
+    portal_wali_tagihan: settingEnabled(text(portal.rows[0]?.value)),
   };
+}
+
+/** Cermin `save_portal`: buka atau tutup halaman Tagihan di portal wali. */
+export async function savePortal(
+  client: Client,
+  aktif: boolean,
+): Promise<{ sukses: true; portal_wali_tagihan: boolean }> {
+  await client.execute({
+    sql: `INSERT INTO setting_gex_system (key, value) VALUES (?, ?)
+          ON CONFLICT(key) DO UPDATE SET value = excluded.value;`,
+    args: [PORTAL_WALI_TAGIHAN_KEY, aktif ? "true" : "false"],
+  });
+  return { sukses: true, portal_wali_tagihan: aktif };
 }
 
 export async function saveJenis(
@@ -544,6 +588,9 @@ export async function issue(
       idRombel,
     );
     const tanggal = await hariIni(tx);
+    // Cermin gerbang `tulis_jurnal_tx`: jalur massal ini menulis jurnal lewat
+    // `statementJurnal` tanpa melewati `tulisJurnalTx`.
+    await assertPeriodeTerbuka(tx, tanggal);
     let nomorUrut = await nomorUrutBerikutnya(tx, tanggal.slice(0, 4));
     const statements: InStatement[] = [];
     let terbit = 0;
@@ -667,7 +714,7 @@ export async function list(
     id_rombel?: string | null;
     status?: string | null;
   },
-): Promise<{ items: TagihanItem[]; total_sisa: number }> {
+): Promise<DaftarTagihan> {
   const isi = (value: string | null | undefined) => value?.trim() || null;
   const periode = isi(filter.periode);
   const idJenis = isi(filter.id_jenis_tagihan);
@@ -713,9 +760,13 @@ export async function list(
   // `LIMIT 1000` = `BATAS_DAFTAR_TAGIHAN`.
   query +=
     " ORDER BY t.periode DESC, kelas, t.nama_siswa, t.id_tagihan LIMIT 1000;";
-  const [result, hari] = await Promise.all([
+  const [result, hari, sakelar] = await Promise.all([
     client.execute({ sql: query, args }),
     hariIni(client),
+    client.execute({
+      sql: "SELECT value FROM setting_gex_system WHERE key = ? LIMIT 1;",
+      args: [WA_NOTIFY_TAGIHAN_KEY],
+    }),
   ]);
   const items = result.rows.map((row) => {
     const aktif = String(row.status) === "Aktif";
@@ -743,7 +794,151 @@ export async function list(
   return {
     items,
     total_sisa: items.reduce((sum, item) => sum + item.sisa, 0),
+    pengingat_wa: settingEnabled(text(sakelar.rows[0]?.value)),
   };
+}
+
+/**
+ * Cermin `remind` (`desktop/billing.rs`): satu pesan per siswa berisi
+ * seluruh tunggakannya. Syarat penerima sama dengan `queueWaliNotification`
+ * (siswa, nomor wali sah, dedupe `tagihan:<siswa>:<tanggal WIB>` belum ada),
+ * tetapi dibaca sekaligus untuk semua siswa lalu ditulis dalam satu batch:
+ * empat round-trip per siswa ke Turso jarak jauh terlalu lambat untuk satu
+ * angkatan.
+ */
+export async function remind(
+  client: Client,
+  filter: {
+    periode?: string | null;
+    id_jenis_tagihan?: string | null;
+    id_rombel?: string | null;
+  },
+): Promise<HasilPengingat> {
+  return withTransaction(client, async (tx) => {
+    const setelan = await tx.execute({
+      sql: "SELECT key, value FROM setting_gex_system WHERE key IN (?, ?);",
+      args: [WA_NOTIFY_TAGIHAN_KEY, waTemplateKey("tagihan")],
+    });
+    const nilai = new Map(
+      setelan.rows.map((row) => [String(row.key), text(row.value)]),
+    );
+    if (!settingEnabled(nilai.get(WA_NOTIFY_TAGIHAN_KEY))) {
+      throw new Error(PESAN_PENGINGAT_MATI);
+    }
+    const isi = (value: string | null | undefined) => value?.trim() || null;
+    let query = `SELECT DISTINCT t.id_siswa
+     FROM keu_tagihan t
+     LEFT JOIN keu_tagihan_batal b ON b.id_tagihan = t.id_tagihan
+     LEFT JOIN (${DIBAYAR_SQL}) d ON d.id_tagihan = t.id_tagihan
+     LEFT JOIN siswa_data s ON s.id_siswa = t.id_siswa
+     WHERE b.id_tagihan IS NULL AND t.nominal - t.potongan > COALESCE(d.dibayar, 0)`;
+    const args: string[] = [];
+    const periode = isi(filter.periode);
+    const idJenis = isi(filter.id_jenis_tagihan);
+    const idRombel = isi(filter.id_rombel);
+    if (periode) {
+      query += " AND t.periode = ?";
+      args.push(periode);
+    }
+    if (idJenis) {
+      query += " AND t.id_jenis_tagihan = ?";
+      args.push(idJenis);
+    }
+    if (idRombel) {
+      query += " AND s.id_rombel = ?";
+      args.push(idRombel);
+    }
+    // `LIMIT 501` = `MAKS_SISWA_PENGINGAT` + 1, supaya pemotongan terdeteksi.
+    query += " ORDER BY t.id_siswa LIMIT 501;";
+    const semua = (await tx.execute({ sql: query, args })).rows.map((row) =>
+      String(row.id_siswa),
+    );
+    const siswa = semua.slice(0, MAKS_SISWA_PENGINGAT);
+    const hasil = {
+      siswa: siswa.length,
+      diantre: 0,
+      terpotong: semua.length > MAKS_SISWA_PENGINGAT,
+    };
+    if (siswa.length === 0) return hasil;
+
+    const hari = await hariIni(tx);
+    const tanda = siswa.map(() => "?").join(", ");
+    const [tunggakan, wali, sudah] = await Promise.all([
+      tx.execute({
+        sql: `SELECT t.id_siswa, t.nama_tagihan, t.periode, t.jatuh_tempo,
+                     t.nominal - t.potongan - COALESCE(d.dibayar, 0) AS sisa
+              FROM keu_tagihan t
+              LEFT JOIN keu_tagihan_batal b ON b.id_tagihan = t.id_tagihan
+              LEFT JOIN (${DIBAYAR_SQL}) d ON d.id_tagihan = t.id_tagihan
+              WHERE t.id_siswa IN (${tanda}) AND b.id_tagihan IS NULL
+                AND t.nominal - t.potongan > COALESCE(d.dibayar, 0)
+              ORDER BY t.id_siswa, t.jatuh_tempo, t.periode, t.id_tagihan
+              -- batas: paling banyak MAKS_SISWA_PENGINGAT siswa dari langkah pertama
+              LIMIT 250000;`,
+        args: siswa,
+      }),
+      tx.execute({
+        sql: `SELECT m.id_unik,
+                     COALESCE(s.no_whatsapp_wali, m.no_hp, '') AS no_wa,
+                     COALESCE(s.nama_lengkap, m.nama, '') AS nama,
+                     COALESCE(r.nama_rombel, m.divisi, '') AS rombel
+              FROM master_data m
+              LEFT JOIN siswa_data s ON s.id_siswa = m.id_unik
+              LEFT JOIN akademik_rombel r ON r.id_rombel = s.id_rombel
+              WHERE m.id_unik IN (${tanda})
+                AND (LOWER(TRIM(COALESCE(m.jenis_personil, ''))) = 'siswa'
+                     OR s.id_siswa IS NOT NULL);`,
+        args: siswa,
+      }),
+      tx.execute({
+        // `LIMIT 500` = `MAKS_SISWA_PENGINGAT`: satu kunci per siswa.
+        sql: `SELECT dedupe_key FROM notifikasi_wa WHERE dedupe_key IN (${tanda}) LIMIT 500;`,
+        args: siswa.map((id) => `tagihan:${id}:${hari}`),
+      }),
+    ]);
+
+    const perSiswa = new Map<string, TagihanPengingat[]>();
+    for (const row of tunggakan.rows) {
+      const id = String(row.id_siswa);
+      const daftar = perSiswa.get(id) ?? [];
+      // Cermin `LIMIT 500` per siswa di `tagihan_terbuka`.
+      if (daftar.length < 500) {
+        daftar.push({
+          nama_tagihan: String(row.nama_tagihan),
+          periode: String(row.periode),
+          jatuh_tempo: String(row.jatuh_tempo ?? ""),
+          sisa: Number(row.sisa),
+        });
+      }
+      perSiswa.set(id, daftar);
+    }
+    const sudahDiantre = new Set(
+      sudah.rows.map((row) => String(row.dedupe_key)),
+    );
+    const template = nilai.get(waTemplateKey("tagihan"));
+    const statements: InStatement[] = [];
+    for (const row of wali.rows) {
+      const id = String(row.id_unik);
+      const dedupe = `tagihan:${id}:${hari}`;
+      const nomor = normalizeOperatorPhone(String(row.no_wa ?? ""));
+      if (sudahDiantre.has(dedupe) || !isValidOperatorPhone(nomor)) continue;
+      const pesan = composeWaMessage("tagihan", template, {
+        nama: String(row.nama ?? "") || "Siswa",
+        rombel: String(row.rombel ?? "") || "-",
+        ...isianPengingat(perSiswa.get(id) ?? []),
+      });
+      statements.push({
+        sql: `INSERT INTO notifikasi_wa (
+                id_notifikasi, dedupe_key, jenis, id_siswa, tujuan_nomor,
+                isi_pesan, status, attempt_count, created_at, updated_at
+              ) VALUES (?, ?, 'tagihan', ?, ?, ?, 'Menunggu', 0, datetime('now'), datetime('now'));`,
+        args: [generateWaNotificationId(), dedupe, id, nomor, pesan],
+      });
+    }
+    if (statements.length > 0) await tx.batch(statements);
+    hasil.diantre = statements.length;
+    return hasil;
+  });
 }
 
 // ── Pembayaran dan kuitansi (K3b) ───────────────────────────────────────────
@@ -1318,4 +1513,93 @@ export async function saveSeries(
     });
     return { sukses: true as const, seri: cek.value };
   });
+}
+
+// ── Rekap tagihan dan penerimaan (lanjutan K4) ──────────────────────────────
+
+async function waktuCetak(client: Client): Promise<string> {
+  const result = await client.execute(
+    "SELECT datetime('now', '+7 hours') AS waktu;",
+  );
+  return String(result.rows[0]?.waktu ?? "");
+}
+
+/** Cermin `recap_rombel`: rekap satu periode per rombel siswa SAAT INI. */
+export async function recapRombel(
+  client: Client,
+  periodeMentah: string,
+  idJenis: string | null | undefined,
+): Promise<RekapRombel> {
+  const periode = periodeMentah.trim();
+  if (!periode) throw new Error("Periode tagihan wajib diisi.");
+  let query = `SELECT COALESCE(r.id_rombel, '') AS id_rombel, COALESCE(r.nama_rombel, '') AS nama_rombel,
+            COUNT(DISTINCT t.id_siswa) AS siswa,
+            SUM(t.nominal - t.potongan) AS ditagih,
+            SUM(MIN(COALESCE(d.dibayar, 0), t.nominal - t.potongan)) AS terbayar,
+            COUNT(DISTINCT CASE WHEN t.nominal - t.potongan > COALESCE(d.dibayar, 0)
+                                THEN t.id_siswa END) AS menunggak
+     FROM keu_tagihan t
+     LEFT JOIN keu_tagihan_batal b ON b.id_tagihan = t.id_tagihan
+     LEFT JOIN (${DIBAYAR_SQL}) d ON d.id_tagihan = t.id_tagihan
+     LEFT JOIN siswa_data s ON s.id_siswa = t.id_siswa
+     LEFT JOIN akademik_rombel r ON r.id_rombel = s.id_rombel
+     WHERE b.id_tagihan IS NULL AND t.periode = ?`;
+  const args = [periode];
+  const jenis = idJenis?.trim();
+  if (jenis) {
+    query += " AND t.id_jenis_tagihan = ?";
+    args.push(jenis);
+  }
+  query +=
+    " GROUP BY 1, 2 ORDER BY (r.id_rombel IS NULL), MAX(r.tingkat), 2, 1 LIMIT 500;";
+  const [result, dicetak] = await Promise.all([
+    client.execute({ sql: query, args }),
+    waktuCetak(client),
+  ]);
+  const baris: BarisRekapRombel[] = result.rows.map((row) => ({
+    id_rombel: String(row.id_rombel ?? ""),
+    nama_rombel: String(row.nama_rombel ?? ""),
+    siswa: Number(row.siswa ?? 0),
+    ditagih: Number(row.ditagih ?? 0),
+    terbayar: Number(row.terbayar ?? 0),
+    menunggak: Number(row.menunggak ?? 0),
+  }));
+  return { periode, dicetak, ...susunRekapRombel(baris) };
+}
+
+/** Cermin `recap_receipts`: penerimaan per jenis per bulan, 12 bulan. */
+export async function recapReceipts(
+  client: Client,
+  mulai: string,
+): Promise<RekapPenerimaan> {
+  const rentang = bulanRentang(mulai.trim());
+  if (!rentang.ok) throw new Error(rentang.error);
+  const { bulan, sesudah } = rentang.value;
+  const [result, dicetak] = await Promise.all([
+    client.execute({
+      sql: `SELECT substr(p.tanggal, 1, 7) AS bulan,
+                   CASE WHEN a.id_tagihan IS NULL THEN '' ELSE COALESCE(t.id_jenis_tagihan, '-') END AS id_jenis,
+                   COALESCE(MAX(j.nama), MAX(t.nama_tagihan), 'Tagihan lain') AS nama,
+                   p.metode = 'Titipan' AS dari_titipan,
+                   SUM(a.nominal) AS jumlah
+            FROM keu_pembayaran p
+            JOIN keu_pembayaran_alokasi a ON a.id_pembayaran = p.id_pembayaran
+            LEFT JOIN keu_pembayaran_batal pb ON pb.id_pembayaran = p.id_pembayaran
+            LEFT JOIN keu_tagihan t ON t.id_tagihan = a.id_tagihan
+            LEFT JOIN keu_jenis_tagihan j ON j.id_jenis_tagihan = t.id_jenis_tagihan
+            WHERE pb.id_pembayaran IS NULL AND p.tanggal >= ? AND p.tanggal < ?
+            GROUP BY 1, 2, 4
+            LIMIT 5000;`,
+      args: [`${bulan[0]}-01`, `${sesudah}-01`],
+    }),
+    waktuCetak(client),
+  ]);
+  const baris: BarisPenerimaan[] = result.rows.map((row) => ({
+    bulan: String(row.bulan ?? ""),
+    id_jenis: String(row.id_jenis ?? ""),
+    nama: String(row.nama ?? ""),
+    dari_titipan: Number(row.dari_titipan ?? 0) === 1,
+    jumlah: Number(row.jumlah ?? 0),
+  }));
+  return { dicetak, ...susunPenerimaan(bulan, baris) };
 }

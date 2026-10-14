@@ -43,6 +43,8 @@ export const MAKS_TAGIHAN_PER_KUITANSI = 100;
 export const MAKS_NAMA_PERANGKAT = 60;
 /** Seri kuitansi milik aplikasi Web; tidak boleh didaftarkan untuk perangkat. */
 export const SERI_KUITANSI_WEB = "WEB";
+/** Cermin `PORTAL_WALI_TAGIHAN_KEY`: membuka halaman Tagihan di portal wali. */
+export const PORTAL_WALI_TAGIHAN_KEY = "portal_wali_tagihan";
 /** Cermin `LIMIT 1000` daftar kuitansi di `billing.rs` dan `services/billing.ts`. */
 export const BATAS_DAFTAR_KUITANSI = 1000;
 
@@ -597,7 +599,7 @@ export const MAKS_RINCIAN_PENGINGAT = 5;
 /** Cermin `MAKS_SISWA_PENGINGAT`: siswa paling banyak per satu tekan tombol. */
 export const MAKS_SISWA_PENGINGAT = 500;
 export const PESAN_PENGINGAT_MATI =
-  "Pengingat tagihan lewat WhatsApp belum dinyalakan. Nyalakan di Pengaturan, bagian Notifikasi WhatsApp.";
+  "Pengingat tagihan lewat WhatsApp belum dinyalakan. Nyalakan sakelar Pengingat Tagihan Siswa di Pengaturan bagian Notifikasi WhatsApp (Web/Desktop) atau tombol Gateway di halaman Notifikasi WA (Mobile).";
 
 const NAMA_BULAN = [
   "Januari",
@@ -665,5 +667,171 @@ export function isianPengingat(
     jumlah: String(tagihan.length),
     rincian: rincian.join("\n"),
     jatuh_tempo: jatuhTempo ? tanggalTampil(jatuhTempo) : "-",
+  };
+}
+
+// ── Rekap tagihan dan penerimaan (lanjutan K4) ──────────────────────────────
+
+/** Cermin `persen_terkumpul`: persen bulat setengah ke atas tanpa pecahan. */
+export function persenTerkumpul(terbayar: number, ditagih: number): number {
+  if (ditagih <= 0) return 0;
+  return Math.floor((terbayar * 200 + ditagih) / (ditagih * 2));
+}
+
+export interface BarisRekapRombel {
+  id_rombel: string;
+  nama_rombel: string;
+  siswa: number;
+  ditagih: number;
+  terbayar: number;
+  menunggak: number;
+}
+
+export interface BarisRekap {
+  nama: string;
+  siswa: number;
+  ditagih: number;
+  terbayar: number;
+  sisa: number;
+  persen: number;
+  menunggak: number;
+}
+
+/** Cermin `susun_rekap_rombel`. */
+export function susunRekapRombel(baris: readonly BarisRekapRombel[]): {
+  baris: BarisRekap[];
+  total: BarisRekap;
+} {
+  const satu = (
+    nama: string,
+    siswa: number,
+    ditagih: number,
+    terbayar: number,
+    menunggak: number,
+  ): BarisRekap => ({
+    nama,
+    siswa,
+    ditagih,
+    terbayar,
+    sisa: ditagih - terbayar,
+    persen: persenTerkumpul(terbayar, ditagih),
+    menunggak,
+  });
+  const jumlah = (f: (b: BarisRekapRombel) => number) =>
+    baris.reduce((n, b) => n + f(b), 0);
+  return {
+    baris: baris.map((b) =>
+      satu(
+        b.id_rombel && b.nama_rombel ? b.nama_rombel : "Tanpa rombel",
+        b.siswa,
+        b.ditagih,
+        b.terbayar,
+        b.menunggak,
+      ),
+    ),
+    total: satu(
+      "Jumlah",
+      jumlah((b) => b.siswa),
+      jumlah((b) => b.ditagih),
+      jumlah((b) => b.terbayar),
+      jumlah((b) => b.menunggak),
+    ),
+  };
+}
+
+/** Cermin `bulan_rentang`: 12 bulan mulai `mulai`, plus bulan sesudahnya. */
+export function bulanRentang(
+  mulai: string,
+): Hasil<{ bulan: string[]; sesudah: string }> {
+  const cocok = /^(\d{4})-(\d{2})$/.exec(mulai);
+  const tahun = cocok ? Number(cocok[1]) : 0;
+  const bulan = cocok ? Number(cocok[2]) : 0;
+  if (!cocok || tahun < 2000 || tahun > 2999 || bulan < 1 || bulan > 12) {
+    return { ok: false, error: "Bulan awal harus berbentuk YYYY-MM." };
+  }
+  const ke = (i: number) => {
+    const n = tahun * 12 + bulan - 1 + i;
+    return `${String(Math.floor(n / 12)).padStart(4, "0")}-${String((n % 12) + 1).padStart(2, "0")}`;
+  };
+  return {
+    ok: true,
+    value: {
+      bulan: Array.from({ length: 12 }, (_, i) => ke(i)),
+      sesudah: ke(12),
+    },
+  };
+}
+
+export interface BarisPenerimaan {
+  bulan: string;
+  /** Kosong = kelebihan bayar yang masuk titipan. */
+  id_jenis: string;
+  nama: string;
+  dari_titipan: boolean;
+  jumlah: number;
+}
+
+export const LABEL_MASUK_TITIPAN = "Masuk ke titipan";
+
+export interface BarisMatriks {
+  id_jenis: string;
+  nama: string;
+  per_bulan: number[];
+  total: number;
+}
+
+/** Cermin `susun_penerimaan`: matriks jenis × 12 bulan. */
+export function susunPenerimaan(
+  bulan: readonly string[],
+  baris: readonly BarisPenerimaan[],
+) {
+  const kelompok = (dariTitipan: boolean) => {
+    const urut: Array<[string, string]> = [];
+    for (const b of baris.filter((x) => x.dari_titipan === dariTitipan)) {
+      if (!urut.some(([id]) => id === b.id_jenis)) {
+        urut.push([b.id_jenis, b.id_jenis ? b.nama : LABEL_MASUK_TITIPAN]);
+      }
+    }
+    // Sama dengan urutan tuple Rust: jenis menurut nama (biner), titipan terakhir.
+    const banding = (a: string, b: string) => (a < b ? -1 : a > b ? 1 : 0);
+    urut.sort(
+      (a, b) =>
+        Number(a[0] === "") - Number(b[0] === "") ||
+        banding(a[1], b[1]) ||
+        banding(a[0], b[0]),
+    );
+    const daftar: BarisMatriks[] = urut.map(([id, nama]) => {
+      const perBulan = bulan.map((m) =>
+        baris
+          .filter(
+            (b) =>
+              b.dari_titipan === dariTitipan &&
+              b.id_jenis === id &&
+              b.bulan === m,
+          )
+          .reduce((n, b) => n + b.jumlah, 0),
+      );
+      return {
+        id_jenis: id,
+        nama,
+        per_bulan: perBulan,
+        total: perBulan.reduce((n, x) => n + x, 0),
+      };
+    });
+    const perBulan = bulan.map((_, i) =>
+      daftar.reduce((n, d) => n + (d.per_bulan[i] ?? 0), 0),
+    );
+    return { daftar, perBulan, total: perBulan.reduce((n, x) => n + x, 0) };
+  };
+  const kas = kelompok(false);
+  const dipakai = kelompok(true);
+  return {
+    bulan: [...bulan],
+    kas: kas.daftar,
+    total_per_bulan: kas.perBulan,
+    total: kas.total,
+    dipakai_titipan: dipakai.daftar,
+    dipakai_per_bulan: dipakai.perBulan,
+    total_dipakai: dipakai.total,
   };
 }
