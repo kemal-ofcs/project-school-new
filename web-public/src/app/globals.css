@@ -206,6 +206,51 @@ html[data-theme="dark"] {
   height: auto;
 }
 
+/*
+ * Muncul saat digulir: section (`.muncul`) dan setiap kartu koleksi naik
+ * pelan begitu masuk layar, supaya mata mengikuti urutan bacaan.
+ *
+ * Murni CSS (scroll-driven animation), tanpa JavaScript dan tanpa observer.
+ * Browser yang belum mengenal `animation-timeline` tidak menjalankan apa pun,
+ * jadi kontennya tetap tampil utuh; cara berbasis JS yang menyembunyikan
+ * konten lebih dulu berisiko meninggalkan section kosong bila skripnya gagal.
+ * Keyframes memakai `transform`, bukan `translate`, karena utilitas hover
+ * Tailwind v4 (`hover:-translate-y-1`) menulis properti `translate`; dengan
+ * `fill-mode: both`, animasi `translate` akan mengunci efek hover itu.
+ */
+@keyframes muncul {
+  from {
+    opacity: 0;
+    transform: translateY(1.25rem);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  @supports (animation-timeline: view()) {
+    .muncul,
+    .kartu-tengah > * {
+      animation: muncul linear both;
+      animation-timeline: view();
+      animation-range: entry 0% entry 35%;
+    }
+    /* Kartu sebaris masuk layar bersamaan; jeda kecil per kolom membuatnya
+       terbaca berurutan dari kiri ke kanan. */
+    .kartu-tengah > :nth-child(4n + 2) {
+      animation-range: entry 6% entry 41%;
+    }
+    .kartu-tengah > :nth-child(4n + 3) {
+      animation-range: entry 12% entry 47%;
+    }
+    .kartu-tengah > :nth-child(4n + 4) {
+      animation-range: entry 18% entry 53%;
+    }
+  }
+}
+
 body {
   background-color: var(--background);
   color: var(--foreground);

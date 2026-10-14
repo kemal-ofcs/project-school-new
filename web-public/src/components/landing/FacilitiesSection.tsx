@@ -60,7 +60,7 @@ export function FacilitiesSection({ konten = {} }: FacilitiesSectionProps) {
   const adaHeader = Boolean(eyebrow || title || subtitle);
 
   return (
-    <section className="py-20 sm:py-28 bg-background">
+    <section className="muncul py-20 sm:py-28 bg-background">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 space-y-12">
         {adaHeader ? (
           <div className="text-center max-w-2xl mx-auto space-y-3">

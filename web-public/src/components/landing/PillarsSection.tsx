@@ -57,7 +57,7 @@ export function PillarsSection({ profil, konten = {} }: PillarsSectionProps) {
   if (!adaHeader && pillarsData.length === 0 && !adaSambutan) return null;
 
   return (
-    <section className="py-20 sm:py-28 bg-background">
+    <section className="muncul py-20 sm:py-28 bg-background">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 space-y-16">
         {adaHeader ? (
           <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">

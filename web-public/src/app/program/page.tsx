@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { KepalaHalaman } from "@/components/KepalaHalaman";
 import { DaftarKosong, StatusTidakTerbaca } from "@/components/StatusData";
 import { muatKontenHalaman } from "@/lib/server/content-data";
 import { muatProgramStudi } from "@/lib/server/school-data";
@@ -36,35 +37,35 @@ export default async function HalamanProgram() {
   const ringkasanEkskul = konten["program.ekstrakurikuler_ringkasan"];
 
   return (
-    <main className="mx-auto max-w-3xl px-6 py-14">
-      <h1 className="font-semibold text-3xl">Program Keahlian</h1>
+    <main>
+      <KepalaHalaman label="Akademik" judul="Program Keahlian">
+        {ringkasanKejuruan ? (
+          <span className="whitespace-pre-line">{ringkasanKejuruan}</span>
+        ) : null}
+      </KepalaHalaman>
 
-      {ringkasanKejuruan ? (
-        <p className="mt-4 text-sm text-teks-lembut leading-relaxed sm:text-base">
-          {ringkasanKejuruan}
-        </p>
-      ) : null}
-
-      <div className="mt-8">
+      <div className="mx-auto max-w-4xl px-6 py-12 sm:py-16 space-y-16">
         {hasil.status !== "ok" ? (
           <StatusTidakTerbaca hasil={hasil} konteks="Daftar program keahlian" />
         ) : hasil.data.length === 0 ? (
           <DaftarKosong pesan="Belum ada program keahlian yang aktif. Administrator dapat menambahkannya melalui menu Akademik di panel admin." />
         ) : (
-          <ul className="grid gap-4">
+          <ul className="kartu-tengah sm:[--kolom:2]">
             {hasil.data.map((program) => (
               <li
-                className="rounded-lg border border-garis p-5"
+                className="rounded-2xl border border-border bg-card p-6 transition-colors duration-200 hover:border-primary/40"
                 key={program.kode || program.nama}
               >
-                <h2 className="font-medium text-lg">{program.nama}</h2>
                 {program.kode ? (
-                  <p className="mt-1 font-medium text-aksen text-xs uppercase tracking-widest">
+                  <p className="text-sm font-semibold text-secondary">
                     {program.kode}
                   </p>
                 ) : null}
+                <h2 className="mt-1 font-bold text-lg text-foreground">
+                  {program.nama}
+                </h2>
                 {program.deskripsi ? (
-                  <p className="mt-3 text-sm text-teks-lembut leading-relaxed">
+                  <p className="mt-3 text-sm text-muted-foreground leading-relaxed">
                     {program.deskripsi}
                   </p>
                 ) : null}
@@ -72,28 +73,35 @@ export default async function HalamanProgram() {
             ))}
           </ul>
         )}
-      </div>
 
-      {ringkasanFasilitas || ringkasanEkskul ? (
-        <div className="mt-12 kartu-tengah sm:[--kolom:2]">
-          {ringkasanFasilitas ? (
-            <section className="rounded-lg border border-garis p-5">
-              <h2 className="font-medium text-lg">Fasilitas</h2>
-              <p className="mt-2 whitespace-pre-line text-sm text-teks-lembut leading-relaxed">
-                {ringkasanFasilitas}
-              </p>
-            </section>
-          ) : null}
-          {ringkasanEkskul ? (
-            <section className="rounded-lg border border-garis p-5">
-              <h2 className="font-medium text-lg">Ekstrakurikuler</h2>
-              <p className="mt-2 whitespace-pre-line text-sm text-teks-lembut leading-relaxed">
-                {ringkasanEkskul}
-              </p>
-            </section>
-          ) : null}
-        </div>
-      ) : null}
+        {/* Dua ringkasan naratif ditulis sebagai teks berjalan dua kolom,
+            bukan kartu lagi, supaya halaman tidak menjadi deretan kotak
+            yang sama dari atas sampai bawah. */}
+        {ringkasanFasilitas || ringkasanEkskul ? (
+          <div className="grid gap-12 md:grid-cols-2">
+            {ringkasanFasilitas ? (
+              <section className="muncul">
+                <h2 className="font-bold text-2xl text-foreground">
+                  Fasilitas
+                </h2>
+                <p className="mt-4 whitespace-pre-line text-muted-foreground leading-relaxed">
+                  {ringkasanFasilitas}
+                </p>
+              </section>
+            ) : null}
+            {ringkasanEkskul ? (
+              <section className="muncul">
+                <h2 className="font-bold text-2xl text-foreground">
+                  Ekstrakurikuler
+                </h2>
+                <p className="mt-4 whitespace-pre-line text-muted-foreground leading-relaxed">
+                  {ringkasanEkskul}
+                </p>
+              </section>
+            ) : null}
+          </div>
+        ) : null}
+      </div>
     </main>
   );
 }

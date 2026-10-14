@@ -94,7 +94,7 @@ export function ProgramsSection({
   const adaHeader = Boolean(eyebrow || title || subtitle);
 
   return (
-    <section className="py-20 sm:py-28 bg-muted/40 border-y border-border">
+    <section className="muncul py-20 sm:py-28 bg-muted/40 border-y border-border">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 space-y-10">
         {adaHeader ? (
           <div className="text-center max-w-2xl mx-auto space-y-3">

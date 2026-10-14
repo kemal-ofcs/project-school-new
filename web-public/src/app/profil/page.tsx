@@ -1,9 +1,11 @@
 import type { Metadata } from "next";
+import { KepalaHalaman } from "@/components/KepalaHalaman";
 import { ProfilBelumLengkap } from "@/components/SiteChrome";
 import { StatusTidakTerbaca } from "@/components/StatusData";
 import { muatKontenHalaman } from "@/lib/server/content-data";
 import { muatProfilSekolah } from "@/lib/server/school-data";
 import { namaTampil } from "@/lib/services/school-profile";
+import { pecahButir } from "@/lib/teks";
 
 export const metadata: Metadata = {
   title: "Profil Sekolah",
@@ -46,111 +48,116 @@ export default async function HalamanProfil() {
     { label: profil.jabatanPimpinan ?? "Pimpinan", nilai: profil.namaPimpinan },
   ].filter((item) => item.nilai !== null);
 
+  const butirMisi = misi ? pecahButir(misi) : [];
+
   return (
-    <main className="mx-auto max-w-4xl px-6 py-14 space-y-12">
-      {/* Header Profil */}
-      <div className="border-b border-garis pb-6">
-        <p className="text-xs font-bold uppercase tracking-widest text-aksen">
-          Tentang Lembaga
-        </p>
-        <h1 className="mt-1 font-extrabold text-3xl sm:text-4xl tracking-tight text-teks-utama">
-          Profil {namaTampil(profil)}
-        </h1>
-      </div>
+    <main>
+      <KepalaHalaman
+        label="Tentang Lembaga"
+        judul={`Profil ${namaTampil(profil)}`}
+      />
 
-      {/* Sambutan Pimpinan */}
-      {sambutan ? (
-        <section className="rounded-3xl border border-garis bg-kartu p-6 sm:p-8 space-y-3 shadow-sm">
-          <p className="text-xs font-bold uppercase tracking-wider text-aksen">
-            Sambutan {profil.jabatanPimpinan || "Kepala Sekolah"}
-          </p>
-          <p className="text-sm sm:text-base leading-relaxed text-teks-utama italic whitespace-pre-line">
-            "{sambutan}"
-          </p>
-          {profil.namaPimpinan ? (
-            <p className="font-bold text-sm text-teks-utama pt-2">
-              — {profil.namaPimpinan}
+      <div className="mx-auto max-w-4xl px-6 py-12 sm:py-16 space-y-16">
+        {/* Visi — dari CMS saja; bagian yang belum diisi disembunyikan, versi
+            sebelumnya menambalnya dengan kalimat contoh yang sama di situs
+            setiap sekolah. Visi adalah satu-satunya blok navy di halaman ini:
+            ia pernyataan paling penting, jadi ia yang menjadi titik fokus. */}
+        {visi ? (
+          <section className="muncul rounded-2xl bg-primary px-6 py-10 sm:px-12 sm:py-14 text-primary-foreground">
+            <h2 className="text-sm font-semibold opacity-80">Visi Sekolah</h2>
+            <p className="mt-4 text-xl sm:text-2xl font-semibold leading-snug whitespace-pre-line text-balance">
+              {visi}
             </p>
-          ) : null}
-        </section>
-      ) : null}
+          </section>
+        ) : null}
 
-      {/* Visi & Misi — dari CMS saja. Kartu yang belum diisi disembunyikan;
-          versi sebelumnya menambalnya dengan kalimat contoh yang tampil sama
-          persis di situs setiap sekolah. */}
-      {visi || misi ? (
-        <section className="grid gap-8 sm:grid-cols-2">
-          {visi ? (
-            <div className="rounded-3xl border border-garis bg-kartu p-6 sm:p-8 space-y-3 shadow-sm">
-              <div className="flex items-center gap-2">
-                <span className="flex size-7 items-center justify-center rounded-xl bg-aksen/15 text-aksen font-bold text-sm">
-                  V
-                </span>
-                <h2 className="font-bold text-lg text-teks-utama">
-                  Visi Sekolah
-                </h2>
-              </div>
-              <p className="text-sm leading-relaxed text-teks-lembut whitespace-pre-line">
-                {visi}
+        {butirMisi.length > 0 ? (
+          <section className="muncul">
+            <h2 className="font-bold text-2xl text-foreground">Misi Sekolah</h2>
+            {butirMisi.length === 1 ? (
+              <p className="mt-6 leading-relaxed text-muted-foreground whitespace-pre-line">
+                {butirMisi[0]}
               </p>
-            </div>
-          ) : null}
+            ) : (
+              <ol className="mt-6 divide-y divide-border border-y border-border">
+                {butirMisi.map((butir, i) => (
+                  <li className="flex gap-5 py-5" key={`${i}-${butir}`}>
+                    <span className="w-8 shrink-0 font-extrabold text-2xl leading-none tabular-nums text-secondary">
+                      {String(i + 1).padStart(2, "0")}
+                    </span>
+                    <p className="leading-relaxed text-foreground">{butir}</p>
+                  </li>
+                ))}
+              </ol>
+            )}
+          </section>
+        ) : null}
 
-          {misi ? (
-            <div className="rounded-3xl border border-garis bg-kartu p-6 sm:p-8 space-y-3 shadow-sm">
-              <div className="flex items-center gap-2">
-                <span className="flex size-7 items-center justify-center rounded-xl bg-aksen/15 text-aksen font-bold text-sm">
-                  M
-                </span>
-                <h2 className="font-bold text-lg text-teks-utama">
-                  Misi Sekolah
-                </h2>
-              </div>
-              <div className="text-sm leading-relaxed text-teks-lembut whitespace-pre-line space-y-1">
-                {misi}
-              </div>
-            </div>
-          ) : null}
-        </section>
-      ) : null}
+        {/* Sambutan sengaja tanpa kotak: kutipan yang berdiri di latar
+            halaman membedakannya dari blok visi dan daftar misi di atasnya. */}
+        {sambutan ? (
+          <section className="muncul relative sm:pl-16">
+            <span
+              aria-hidden="true"
+              className="absolute -top-6 left-0 hidden select-none font-serif text-8xl leading-none text-primary/15 sm:block"
+            >
+              &ldquo;
+            </span>
+            <h2 className="text-sm font-semibold text-primary">
+              Sambutan {profil.jabatanPimpinan || "Kepala Sekolah"}
+            </h2>
+            <blockquote className="mt-4 text-lg sm:text-xl leading-relaxed text-foreground whitespace-pre-line">
+              {sambutan}
+            </blockquote>
+            {profil.namaPimpinan ? (
+              <p className="mt-6 font-bold text-foreground">
+                {profil.namaPimpinan}
+                {profil.jabatanPimpinan ? (
+                  <span className="block text-sm font-normal text-muted-foreground">
+                    {profil.jabatanPimpinan}
+                  </span>
+                ) : null}
+              </p>
+            ) : null}
+          </section>
+        ) : null}
 
-      {/* Sejarah Singkat */}
-      {sejarah ? (
-        <section className="rounded-3xl border border-garis bg-kartu p-6 sm:p-8 space-y-3 shadow-sm">
-          <h2 className="font-bold text-xl text-teks-utama">Sejarah Singkat</h2>
-          <p className="text-sm sm:text-base leading-relaxed text-teks-lembut whitespace-pre-line">
-            {sejarah}
-          </p>
-        </section>
-      ) : null}
+        {sejarah ? (
+          <section className="muncul grid gap-4 md:grid-cols-[12rem_1fr] md:gap-10">
+            <h2 className="font-bold text-2xl text-foreground">
+              Sejarah Singkat
+            </h2>
+            <p className="leading-relaxed text-muted-foreground whitespace-pre-line">
+              {sejarah}
+            </p>
+          </section>
+        ) : null}
 
-      {/* Identitas Resmi Sekolah */}
-      <section className="space-y-4">
-        <h2 className="font-bold text-xl text-teks-utama">
-          Identitas & Informasi Resmi
-        </h2>
-        {baris.length === 0 ? (
-          <div className="mt-4">
+        <section className="muncul space-y-6">
+          <h2 className="font-bold text-2xl text-foreground">
+            Identitas & Informasi Resmi
+          </h2>
+          {baris.length === 0 ? (
             <ProfilBelumLengkap />
-          </div>
-        ) : (
-          <dl className="rounded-2xl border border-garis bg-kartu divide-y divide-garis overflow-hidden">
-            {baris.map((item) => (
-              <div
-                className="grid grid-cols-1 sm:grid-cols-3 gap-2 px-6 py-4"
-                key={item.label}
-              >
-                <dt className="text-xs font-semibold uppercase tracking-wider text-teks-lembut">
-                  {item.label}
-                </dt>
-                <dd className="sm:col-span-2 text-sm font-medium text-teks-utama">
-                  {item.nilai}
-                </dd>
-              </div>
-            ))}
-          </dl>
-        )}
-      </section>
+          ) : (
+            <dl className="rounded-2xl border border-border bg-card divide-y divide-border overflow-hidden">
+              {baris.map((item) => (
+                <div
+                  className="grid grid-cols-1 sm:grid-cols-3 gap-1 sm:gap-4 px-6 py-4"
+                  key={item.label}
+                >
+                  <dt className="text-sm text-muted-foreground">
+                    {item.label}
+                  </dt>
+                  <dd className="sm:col-span-2 text-sm font-medium text-foreground wrap-break-word">
+                    {item.nilai}
+                  </dd>
+                </div>
+              ))}
+            </dl>
+          )}
+        </section>
+      </div>
     </main>
   );
 }

@@ -33,7 +33,7 @@ export function FaqSection({ konten = {} }: FaqSectionProps) {
   });
 
   return (
-    <section className="py-20 sm:py-28 bg-background">
+    <section className="muncul py-20 sm:py-28 bg-background">
       <div className="mx-auto max-w-4xl px-4 sm:px-6 lg:px-8 space-y-10">
         {adaHeader ? (
           <div className="text-center space-y-3">

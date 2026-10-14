@@ -54,7 +54,7 @@ export function TabsList({
     <div
       role="tablist"
       className={cn(
-        "inline-flex h-12 items-center justify-center rounded-xl bg-muted p-1 text-muted-foreground shadow-inner",
+        "inline-flex max-w-full min-h-12 items-stretch justify-center gap-1 rounded-xl bg-muted p-1 text-muted-foreground shadow-inner",
         className,
       )}
     >
@@ -83,7 +83,7 @@ export function TabsTrigger({
       aria-selected={isActive}
       onClick={() => ctx.setActiveTab(value)}
       className={cn(
-        "inline-flex items-center justify-center whitespace-nowrap rounded-lg px-4 py-2 font-semibold text-sm transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50",
+        "inline-flex min-h-11 items-center justify-center text-center text-balance rounded-lg px-4 py-2 font-semibold text-sm transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50",
         isActive ? "bg-card text-primary shadow-sm" : "hover:text-foreground",
         className,
       )}
