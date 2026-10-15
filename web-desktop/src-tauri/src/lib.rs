@@ -116,6 +116,7 @@ pub fn run() {
             desktop::commands::desktop_update_holiday_whitelist,
             desktop::commands::desktop_delete_holiday_whitelist,
             desktop::commands::desktop_create_holiday,
+            desktop::commands::desktop_create_holidays_bulk,
             desktop::commands::desktop_update_holiday,
             desktop::commands::desktop_delete_holiday,
             desktop::commands::desktop_get_alfa_settings,

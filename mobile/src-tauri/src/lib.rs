@@ -141,6 +141,7 @@ pub fn run() {
             mobile::commands::desktop_update_holiday_whitelist,
             mobile::commands::desktop_delete_holiday_whitelist,
             mobile::commands::desktop_create_holiday,
+            mobile::commands::desktop_create_holidays_bulk,
             mobile::commands::desktop_update_holiday,
             mobile::commands::desktop_delete_holiday,
             mobile::commands::desktop_get_alfa_settings,

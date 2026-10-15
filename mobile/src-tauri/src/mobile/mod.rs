@@ -23,6 +23,7 @@ pub mod tutup_buku;
 pub mod class_attendance;
 pub mod face_match;
 pub mod grades;
+pub mod hari_kerja;
 // Inventaris: SALINAN `desktop/inventory.rs` oleh sync-rust-modules.ts.
 pub mod inventory;
 pub mod konten_gambar;

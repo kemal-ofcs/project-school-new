@@ -108,6 +108,11 @@ impl PayrollCalculator {
     /// Menit lembur pada hari libur tetap dibuang; jam kerjanya dipertahankan.
     ///
     /// Mengembalikan `(menit reguler, menit lembur, menit hari libur)`.
+    /// Bila jenjang HARI_LIBUR belum diatur (tidak ada yang aktif), menit hari
+    /// libur dibayar seperti hari biasa: jam kerjanya reguler, sisanya lembur
+    /// HARI_KERJA. Tanpa ini indeksnya nol dan jam itu tidak dibayar sama
+    /// sekali, padahal maksudnya hanya "tidak ada bonus hari libur".
+    ///
     /// Cerminan `applyOvertimePolicy` di `payroll-calculator.ts`; keduanya
     /// diuji dengan vektor yang sama.
     pub fn apply_overtime_policy(
@@ -116,11 +121,18 @@ impl PayrollCalculator {
         holiday_total_minutes: i64,
         holiday_regular_minutes: i64,
         overtime_allowed: bool,
+        holiday_tiers_active: bool,
     ) -> (i64, i64, i64) {
-        if overtime_allowed {
-            (regular_minutes, overtime_minutes, holiday_total_minutes)
-        } else {
+        if !overtime_allowed {
             (regular_minutes + holiday_regular_minutes, 0, 0)
+        } else if !holiday_tiers_active {
+            (
+                regular_minutes + holiday_regular_minutes,
+                overtime_minutes + holiday_total_minutes - holiday_regular_minutes,
+                0,
+            )
+        } else {
+            (regular_minutes, overtime_minutes, holiday_total_minutes)
         }
     }
 
@@ -663,6 +675,37 @@ mod tests {
         (0, 0, 480, 360, false, 360, 0, 0),
     ];
 
+    /// Jenjang HARI_LIBUR belum diatur — WAJIB identik dengan
+    /// `VEKTOR_TANPA_JENJANG_LIBUR` di `payroll-calculator.test.ts`.
+    /// `(reguler, lembur, total hari libur, jam kerja hari libur, diizinkan)`.
+    const VEKTOR_TANPA_JENJANG_LIBUR: &[(i64, i64, i64, i64, bool, i64, i64, i64)] = &[
+        // Jam kerja hari libur jadi reguler, lemburnya jadi lembur biasa.
+        (9_600, 240, 480, 360, true, 9_960, 360, 0),
+        (0, 0, 480, 360, true, 360, 120, 0),
+        // Sakelar lembur mati tetap menang.
+        (9_600, 240, 480, 360, false, 9_960, 0, 0),
+    ];
+
+    #[test]
+    fn tanpa_jenjang_hari_libur_dibayar_seperti_hari_biasa() {
+        for (reguler, lembur, libur_total, libur_kerja, diizinkan, r, l, h) in
+            VEKTOR_TANPA_JENJANG_LIBUR
+        {
+            assert_eq!(
+                PayrollCalculator::apply_overtime_policy(
+                    *reguler,
+                    *lembur,
+                    *libur_total,
+                    *libur_kerja,
+                    *diizinkan,
+                    false
+                ),
+                (*r, *l, *h),
+                "({reguler}, {lembur}, {libur_total}, {libur_kerja}, diizinkan={diizinkan})"
+            );
+        }
+    }
+
     #[test]
     fn sakelar_lembur_memindahkan_jam_hari_libur_bukan_membuangnya() {
         for (reguler, lembur, libur_total, libur_kerja, diizinkan, r, l, h) in VEKTOR_LEMBUR {
@@ -672,7 +715,8 @@ mod tests {
                     *lembur,
                     *libur_total,
                     *libur_kerja,
-                    *diizinkan
+                    *diizinkan,
+                    true
                 ),
                 (*r, *l, *h),
                 "({reguler}, {lembur}, {libur_total}, {libur_kerja}, diizinkan={diizinkan})"

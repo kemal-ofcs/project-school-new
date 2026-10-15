@@ -1511,15 +1511,15 @@ pub async fn desktop_get_payroll_recap(
                 COALESCE(sc.ptkp_status, 'TK/0') AS ptkp_status,
                 COUNT(CASE WHEN ah.status_kehadiran IN ('Hadir', 'PRESENT') THEN 1 END) AS total_hadir,
                 COALESCE(SUM(ah.menit_terlambat), 0) AS total_terlambat_menit,
-                COALESCE(SUM(CASE WHEN hl.tanggal IS NULL THEN ah.jam_kerja ELSE 0 END), 0) AS total_jam_kerja_menit,
-                COALESCE(SUM(CASE WHEN hl.tanggal IS NULL THEN ah.lembur ELSE 0 END), 0) AS total_lembur_menit,
-                COALESCE(SUM(CASE WHEN hl.tanggal IS NOT NULL
+                COALESCE(SUM(CASE WHEN (hl.tanggal IS NOT NULL OR COALESCE(instr(COALESCE(NULLIF(TRIM(sh.hari_kerja), ''), '1,2,3,4,5,6,7'), replace(strftime('%w', ah.tanggal), '0', '7')), 1) = 0) THEN 0 ELSE ah.jam_kerja END), 0) AS total_jam_kerja_menit,
+                COALESCE(SUM(CASE WHEN (hl.tanggal IS NOT NULL OR COALESCE(instr(COALESCE(NULLIF(TRIM(sh.hari_kerja), ''), '1,2,3,4,5,6,7'), replace(strftime('%w', ah.tanggal), '0', '7')), 1) = 0) THEN 0 ELSE ah.lembur END), 0) AS total_lembur_menit,
+                COALESCE(SUM(CASE WHEN (hl.tanggal IS NOT NULL OR COALESCE(instr(COALESCE(NULLIF(TRIM(sh.hari_kerja), ''), '1,2,3,4,5,6,7'), replace(strftime('%w', ah.tanggal), '0', '7')), 1) = 0)
                     THEN COALESCE(ah.jam_kerja, 0) + COALESCE(ah.lembur, 0) ELSE 0 END), 0) AS total_libur_menit,
                 -- Jam kerja (tanpa lembur) yang jatuh pada tanggal libur. Hanya
                 -- dipakai ketika lembur seseorang dimatikan: menit ini pindah ke
                 -- jam reguler supaya hari itu tetap dibayar. Lihat
                 -- `apply_overtime_policy`.
-                COALESCE(SUM(CASE WHEN hl.tanggal IS NOT NULL
+                COALESCE(SUM(CASE WHEN (hl.tanggal IS NOT NULL OR COALESCE(instr(COALESCE(NULLIF(TRIM(sh.hari_kerja), ''), '1,2,3,4,5,6,7'), replace(strftime('%w', ah.tanggal), '0', '7')), 1) = 0)
                     THEN COALESCE(ah.jam_kerja, 0) ELSE 0 END), 0) AS total_libur_jam_kerja_menit
             FROM master_data md
             LEFT JOIN guru_data g ON g.id_guru = md.id_unik
@@ -1535,6 +1535,11 @@ pub async fn desktop_get_payroll_recap(
             -- join ini tidak pernah menggandakan baris, dan absensi lama otomatis
             -- ikut terhitung benar begitu admin melengkapi daftar hari liburnya.
             LEFT JOIN tbl_hari_libur hl ON hl.tanggal = ah.tanggal AND hl.status_aktif = 1
+            -- Libur mingguan: tanggal di luar hari kerja shift barisnya ikut
+            -- dihitung jam hari libur (PP 35/2021 menyamakan hari istirahat
+            -- mingguan dengan hari libur resmi untuk lembur). replace() mengubah
+            -- 0 (Minggu) dari strftime('%w') menjadi 7; hari_kerja kosong = 7 hari.
+            LEFT JOIN tbl_shift sh ON sh.id_shift = ah.id_shift
             WHERE md.status_aktif = 'Aktif'
               -- Siswa TIDAK digaji. Mereka hidup di `master_data` yang sama
               -- dengan guru dan karyawan, sehingga tanpa baris ini setiap siswa
@@ -1601,6 +1606,7 @@ pub async fn desktop_get_payroll_recap(
                     agg.libur_menit,
                     agg.libur_jam_kerja_menit,
                     overtime_allowed,
+                    !holiday_tiers.is_empty(),
                 );
 
             let reg_hours = Decimal::from(jam_kerja_menit) / Decimal::from(60);

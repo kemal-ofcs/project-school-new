@@ -29,6 +29,8 @@ const filesToSync = [
   "uks.rs",
   // Verifikasi wajah 1:1: aturan vonis wajib identik dengan Desktop dan TS.
   "face_match.rs",
+  // Hari kerja mingguan + hari libur massal: kembar `hari-kerja.ts`.
+  "hari_kerja.rs",
   "attendance_ledger.rs",
   "attendance_dashboard.rs",
   "wa_notification.rs",

@@ -40,6 +40,9 @@ const filesToCopy = [
   // UI inventaris: satu komponen untuk ketiga build. Hanya bergantung pada
   // kontrak `Modal` yang sama dan gateway tersinkron; pesan sukses/galat ditulis
   // di dalamnya karena `FeedbackBanner` kedua workspace berbeda props.
+  // Hari kerja shift dan hari libur massal (v50).
+  "components/shift/PilihHariKerja.tsx",
+  "components/holiday/LiburMassalDialog.tsx",
   "components/inventory/InventarisWorkspace.tsx",
   "components/inventory/PanelPemantauan.tsx",
   "components/inventory/gaya.ts",

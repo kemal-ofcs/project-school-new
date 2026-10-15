@@ -1986,7 +1986,8 @@ impl TursoClient {
                     offset_generate_alfa INTEGER DEFAULT 180,
                     buffer_shift_malam_menit INTEGER DEFAULT 120,
                     izinkan_multi_sesi INTEGER DEFAULT 0,
-                    shift_lanjutan_id INTEGER DEFAULT 0
+                    shift_lanjutan_id INTEGER DEFAULT 0,
+                    hari_kerja TEXT DEFAULT '1,2,3,4,5,6,7'
                 );"#,
                 vec![],
             ),
@@ -3741,7 +3742,8 @@ impl TursoClient {
                 (46, 'book-closing-decision', datetime('now')),
                 (47, 'wa-book-closing', datetime('now')),
                 (48, 'content-image', datetime('now')),
-                (49, 'pmb-dapodik', datetime('now'));"#,
+                (49, 'pmb-dapodik', datetime('now')),
+                (50, 'shift-work-days', datetime('now'));"#,
                 vec![],
             ),
         ];
@@ -3875,6 +3877,8 @@ impl TursoClient {
             ("app_role", "require_scan_ip_allowlist", "ALTER TABLE app_role ADD COLUMN require_scan_ip_allowlist INTEGER NOT NULL DEFAULT 0;"),
             ("tbl_shift", "izinkan_multi_sesi", "ALTER TABLE tbl_shift ADD COLUMN izinkan_multi_sesi INTEGER NOT NULL DEFAULT 0;"),
             ("tbl_shift", "shift_lanjutan_id", "ALTER TABLE tbl_shift ADD COLUMN shift_lanjutan_id INTEGER NOT NULL DEFAULT 0;"),
+            // Hari kerja mingguan shift (v50). Cermin `db-migrations.ts`.
+            ("tbl_shift", "hari_kerja", "ALTER TABLE tbl_shift ADD COLUMN hari_kerja TEXT DEFAULT '1,2,3,4,5,6,7';"),
             ("import_offline", "timestamp_input", "ALTER TABLE import_offline ADD COLUMN timestamp_input TEXT;"),
             ("import_offline", "id_unik", "ALTER TABLE import_offline ADD COLUMN id_unik TEXT;"),
             ("import_offline", "status_absen", "ALTER TABLE import_offline ADD COLUMN status_absen TEXT;"),
@@ -4210,6 +4214,11 @@ impl TursoClient {
             vec![],
         )
         .await?;
+        self.query_one(
+            "INSERT OR IGNORE INTO schema_migration (version, name, applied_at) VALUES (-2031, 'shift-work-days-v1', datetime('now'));",
+            vec![],
+        )
+        .await?;
 
         Ok(())
     }
@@ -4521,7 +4530,7 @@ impl TursoClient {
                 // Sentinel WAJIB dinaikkan setiap kali ensure_schema menambah
                 // tabel atau kolom — nilainya di sini dan pada INSERT di atas
                 // harus selalu sama.
-                "SELECT COUNT(*) AS total FROM schema_migration WHERE version = -2030;",
+                "SELECT COUNT(*) AS total FROM schema_migration WHERE version = -2031;",
                 vec![],
             )
             .await
@@ -9589,8 +9598,9 @@ async fn apply_event_to_turso(
                     batas_masuk_menit, toleransi_masuk_menit, jam_kerja_normal_menit,
                     istirahat_menit, batas_pulang_menit, offset_istirahat_mulai,
                     offset_generate_alfa, buffer_shift_malam_menit, izinkan_multi_sesi,
-                    shift_lanjutan_id
-                ) VALUES ((SELECT id_shift FROM tbl_shift WHERE kode_shift = ?), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    shift_lanjutan_id, hari_kerja
+                ) VALUES ((SELECT id_shift FROM tbl_shift WHERE kode_shift = ?), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
+                    COALESCE(?, '1,2,3,4,5,6,7'))
                 ON CONFLICT(id_shift) DO UPDATE SET
                     nama_shift = excluded.nama_shift,
                     jam_masuk = excluded.jam_masuk,
@@ -9605,8 +9615,17 @@ async fn apply_event_to_turso(
                     offset_generate_alfa = excluded.offset_generate_alfa,
                     buffer_shift_malam_menit = excluded.buffer_shift_malam_menit,
                     izinkan_multi_sesi = excluded.izinkan_multi_sesi,
-                    shift_lanjutan_id = excluded.shift_lanjutan_id;
+                    shift_lanjutan_id = excluded.shift_lanjutan_id,
+                    -- Perangkat sebelum v50 tidak mengirim hari_kerja: nilainya
+                    -- dipertahankan, bukan dikembalikan ke tujuh hari.
+                    hari_kerja = CASE WHEN ? IS NULL THEN tbl_shift.hari_kerja
+                                      ELSE excluded.hari_kerja END;
             "#;
+            let hari_kerja = row
+                .get("hari_kerja")
+                .and_then(Value::as_str)
+                .map(|teks| super::hari_kerja::parse_hari_kerja(Some(teks)))
+                .map(|hari| hari.iter().map(i64::to_string).collect::<Vec<_>>().join(","));
             turso
                 .query_one(
                     sql,
@@ -9666,6 +9685,8 @@ async fn apply_event_to_turso(
                             .get("shift_lanjutan_id")
                             .and_then(Value::as_i64)
                             .unwrap_or(0)),
+                        json!(hari_kerja),
+                        json!(hari_kerja),
                     ],
                 )
                 .await?;
@@ -16143,7 +16164,7 @@ mod tests {
             connection
                 .execute_batch(
                     "DROP TABLE riwayat_identitas_karyawan;
-                     DELETE FROM schema_migration WHERE version IN (-2017, -2018, -2019, -2020, -2021, -2022, -2023, -2024, -2025, -2026, -2027, -2028, -2029, -2030);",
+                     DELETE FROM schema_migration WHERE version IN (-2017, -2018, -2019, -2020, -2021, -2022, -2023, -2024, -2025, -2026, -2027, -2028, -2029, -2030, -2031);",
                 )
                 .expect("siapkan database lama");
 
@@ -16179,7 +16200,7 @@ mod tests {
             connection
                 .execute_batch(
                     "DROP TABLE inventory_unit;
-                     DELETE FROM schema_migration WHERE version IN (-2018, -2019, -2020, -2021, -2022, -2023, -2024, -2025, -2026, -2027, -2028, -2029, -2030);",
+                     DELETE FROM schema_migration WHERE version IN (-2018, -2019, -2020, -2021, -2022, -2023, -2024, -2025, -2026, -2027, -2028, -2029, -2030, -2031);",
                 )
                 .expect("siapkan database lama");
 
@@ -16216,7 +16237,7 @@ mod tests {
                 .execute_batch(
                     "DROP TABLE personil_wajah;
                      ALTER TABLE absensi_foto DROP COLUMN wajah_vonis;
-                     DELETE FROM schema_migration WHERE version IN (-2019, -2020, -2021, -2022, -2023, -2024, -2025, -2026, -2027, -2028, -2029, -2030);",
+                     DELETE FROM schema_migration WHERE version IN (-2019, -2020, -2021, -2022, -2023, -2024, -2025, -2026, -2027, -2028, -2029, -2030, -2031);",
                 )
                 .expect("siapkan database lama");
 
@@ -16255,7 +16276,7 @@ mod tests {
                     "DROP TABLE keu_akun;
                      DROP TABLE keu_jurnal;
                      DROP TABLE keu_jurnal_baris;
-                     DELETE FROM schema_migration WHERE version IN (-2020, -2021, -2022, -2023, -2024, -2025, -2026, -2027, -2028, -2029, -2030);",
+                     DELETE FROM schema_migration WHERE version IN (-2020, -2021, -2022, -2023, -2024, -2025, -2026, -2027, -2028, -2029, -2030, -2031);",
                 )
                 .expect("siapkan database lama");
 
@@ -16368,7 +16389,7 @@ mod tests {
                     "DROP TABLE keu_pinjaman;
                      DROP TABLE keu_pinjaman_mutasi;
                      DROP TABLE keu_pinjaman_tunda;
-                     DELETE FROM schema_migration WHERE version IN (-2021, -2022, -2023, -2024, -2025, -2026, -2027, -2028, -2029, -2030);",
+                     DELETE FROM schema_migration WHERE version IN (-2021, -2022, -2023, -2024, -2025, -2026, -2027, -2028, -2029, -2030, -2031);",
                 )
                 .expect("siapkan database lama");
 
@@ -16405,7 +16426,7 @@ mod tests {
                 .execute_batch(
                     "DROP TABLE keu_tagihan;
                      DROP TABLE keu_tagihan_batal;
-                     DELETE FROM schema_migration WHERE version IN (-2022, -2023, -2024, -2025, -2026, -2027, -2028, -2029, -2030);",
+                     DELETE FROM schema_migration WHERE version IN (-2022, -2023, -2024, -2025, -2026, -2027, -2028, -2029, -2030, -2031);",
                 )
                 .expect("siapkan database lama");
             client.ensure_schema_current().await.expect("skema mutakhir");
@@ -16443,7 +16464,7 @@ mod tests {
                      DROP TABLE keu_pembayaran;
                      DROP TABLE keu_pembayaran_alokasi;
                      DROP TABLE keu_pembayaran_batal;
-                     DELETE FROM schema_migration WHERE version IN (-2023, -2024, -2025, -2026, -2027, -2028, -2029, -2030);",
+                     DELETE FROM schema_migration WHERE version IN (-2023, -2024, -2025, -2026, -2027, -2028, -2029, -2030, -2031);",
                 )
                 .expect("siapkan database lama");
             client.ensure_schema_current().await.expect("skema mutakhir");
@@ -16479,7 +16500,7 @@ mod tests {
                 .execute_batch(
                     "DROP TABLE nilai_jenis;
                      ALTER TABLE nilai_penilaian DROP COLUMN id_jenis;
-                     DELETE FROM schema_migration WHERE version IN (-2024, -2025, -2026, -2027, -2028, -2029, -2030);",
+                     DELETE FROM schema_migration WHERE version IN (-2024, -2025, -2026, -2027, -2028, -2029, -2030, -2031);",
                 )
                 .expect("siapkan database lama");
             client.ensure_schema_current().await.expect("skema mutakhir");

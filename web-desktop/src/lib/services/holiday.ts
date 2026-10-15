@@ -2,6 +2,7 @@ import "server-only";
 
 import type { Client } from "@libsql/client";
 import { db, ensureDbInitialized } from "@/lib/db";
+import type { LiburMassal } from "@/lib/validations/hari-kerja";
 
 export interface HariLiburRecord {
   id_libur: number;
@@ -101,6 +102,37 @@ export async function tambahHariLibur(
   });
 
   return { sukses: true, id_libur: Number(res.lastInsertRowid) };
+}
+
+/**
+ * Banyak hari libur sekaligus (rentang tanggal, impor libur nasional), dalam
+ * satu batch. Tanggal yang sudah terdaftar dilewati, bukan ditimpa. Masukan
+ * sudah lolos `validateLiburMassal`. Cermin `create_holidays_bulk`.
+ */
+export async function tambahHariLiburMassal(
+  daftar: readonly LiburMassal[],
+  client?: Client,
+): Promise<{ sukses: true; dibuat: number; dilewati: string[] }> {
+  const targetDb = client ?? db;
+  if (!client) await ensureDbInitialized();
+  const hasil = await targetDb.batch(
+    daftar.map((libur) => ({
+      sql: `INSERT INTO tbl_hari_libur (tanggal, nama_libur, jenis_libur, keterangan, status_aktif)
+            SELECT ?1, ?2, ?3, ?4, 1
+            WHERE NOT EXISTS (SELECT 1 FROM tbl_hari_libur WHERE tanggal = ?1);`,
+      args: [
+        libur.tanggal,
+        libur.nama_libur,
+        libur.jenis_libur,
+        libur.keterangan,
+      ],
+    })),
+    "write",
+  );
+  const dilewati = daftar
+    .filter((_, i) => hasil[i].rowsAffected === 0)
+    .map((libur) => libur.tanggal);
+  return { sukses: true, dibuat: daftar.length - dilewati.length, dilewati };
 }
 
 export async function updateHariLibur(

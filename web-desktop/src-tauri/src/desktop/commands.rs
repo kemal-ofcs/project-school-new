@@ -1856,6 +1856,16 @@ pub fn desktop_create_holiday(
     operational::create_holiday(&state, &draft)
 }
 
+/// Simpan banyak hari libur sekaligus (rentang tanggal, impor libur nasional).
+#[tauri::command]
+pub fn desktop_create_holidays_bulk(
+    state: State<'_, DesktopState>,
+    entries: Value,
+) -> Result<Value, CommandError> {
+    require_permission(&state, "holidays.manage")?;
+    operational::create_holidays_bulk(&state, &entries)
+}
+
 #[tauri::command]
 pub fn desktop_update_holiday(
     state: State<'_, DesktopState>,

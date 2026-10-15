@@ -151,6 +151,8 @@ describe("dynamic RBAC migration", () => {
       48,
       // v49 — data DAPODIK pendaftar PMB.
       49,
+      // v50 — hari kerja mingguan shift (`tbl_shift.hari_kerja`).
+      50,
     ]);
 
     const sessionColumns = await client.execute(

@@ -107,6 +107,7 @@ const MOBILE_COMMANDS: &[&str] = &[
     "desktop_update_holiday_whitelist",
     "desktop_delete_holiday_whitelist",
     "desktop_create_holiday",
+    "desktop_create_holidays_bulk",
     "desktop_update_holiday",
     "desktop_delete_holiday",
     "desktop_get_alfa_settings",

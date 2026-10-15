@@ -716,6 +716,8 @@ pub fn list_shifts(state: &DesktopState) -> Result<Value, CommandError> {
                 "buffer_shift_malam_menit": row.get::<_, i64>(13)?,
                 "izinkan_multi_sesi": row.get::<_, Option<i64>>(14)?.unwrap_or(0),
                 "shift_lanjutan_id": row.get::<_, Option<i64>>(15)?.unwrap_or(0),
+                "hari_kerja": row.get::<_, Option<String>>(16)?
+                    .unwrap_or_else(|| super::hari_kerja::HARI_KERJA_SEMUA.to_owned()),
             }))
         })
         .map_err(|_| CommandError::internal())?;
@@ -727,17 +729,22 @@ pub fn list_shifts(state: &DesktopState) -> Result<Value, CommandError> {
 
 pub fn create_shift(state: &DesktopState, draft: &Value) -> Result<Value, CommandError> {
     validate_shift(draft)?;
+    let hari_kerja = shift_hari_kerja(draft)?
+        .unwrap_or_else(|| super::hari_kerja::HARI_KERJA_SEMUA.to_owned());
     let client_id = sync::ensure_client_id(state)?;
     let local_id = sync::new_local_id();
     let entity_key = format!("kode:{}", integer(draft, "kode_shift", 0));
     let mut payload = draft.as_object().cloned().unwrap_or_else(Map::new);
     payload.insert("local_id_shift".into(), Value::from(local_id));
+    // Draft membawa daftar angka; cloud dan perangkat lain hanya menerima
+    // teks kanonik.
+    payload.insert("hari_kerja".into(), Value::from(hari_kerja.clone()));
     let payload = Value::Object(payload);
     let mut connection = storage::database(&state.data_dir)?;
     let transaction = connection
         .transaction()
         .map_err(|_| CommandError::internal())?;
-    insert_shift(&transaction, local_id, draft)?;
+    insert_shift(&transaction, local_id, draft, &hari_kerja)?;
     sync::enqueue(
         &transaction,
         &client_id,
@@ -749,6 +756,17 @@ pub fn create_shift(state: &DesktopState, draft: &Value) -> Result<Value, Comman
     )?;
     transaction.commit().map_err(|_| CommandError::internal())?;
     Ok(json!({ "sukses": true, "id_shift": local_id }))
+}
+
+/// `hari_kerja` dari draft shift: `None` bila tidak dikirim, galat bila
+/// dikirim tetapi tidak sah. Cermin `parseDraft` di `api/shifts/route.ts`.
+fn shift_hari_kerja(draft: &Value) -> Result<Option<String>, CommandError> {
+    match draft.get("hari_kerja") {
+        None | Some(Value::Null) => Ok(None),
+        Some(nilai) => super::hari_kerja::validate_hari_kerja(nilai)
+            .map(Some)
+            .map_err(|pesan| CommandError::new("OPERATIONAL_VALIDATION_FAILED", pesan)),
+    }
 }
 
 fn validate_shift(draft: &Value) -> Result<(), CommandError> {
@@ -769,6 +787,7 @@ fn insert_shift(
     transaction: &rusqlite::Transaction<'_>,
     id: i64,
     draft: &Value,
+    hari_kerja: &str,
 ) -> Result<(), CommandError> {
     let start = text(draft, "jam_masuk");
     let end = text(draft, "jam_pulang");
@@ -819,8 +838,8 @@ fn insert_shift(
         awal_absen_menit, batas_masuk_menit, toleransi_masuk_menit,
         jam_kerja_normal_menit, istirahat_menit, batas_pulang_menit,
         offset_istirahat_mulai, offset_generate_alfa, buffer_shift_malam_menit,
-        izinkan_multi_sesi, shift_lanjutan_id
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+        izinkan_multi_sesi, shift_lanjutan_id, hari_kerja
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
       "#,
             params![
                 id,
@@ -839,6 +858,7 @@ fn insert_shift(
                 night_buffer,
                 multi_session,
                 continuation_shift,
+                hari_kerja,
             ],
         )
         .map_err(|error| {
@@ -852,6 +872,8 @@ fn insert_shift(
 
 pub fn update_shift(state: &DesktopState, id: i64, draft: &Value) -> Result<Value, CommandError> {
     validate_shift(draft)?;
+    // Tidak dikirim = tidak diubah, supaya pemanggil lama tidak menghapusnya.
+    let hari_kerja = shift_hari_kerja(draft)?;
     let client_id = sync::ensure_client_id(state)?;
     let mut connection = storage::database(&state.data_dir)?;
     let transaction = connection
@@ -908,7 +930,8 @@ pub fn update_shift(state: &DesktopState, id: i64, draft: &Value) -> Result<Valu
         awal_absen_menit = ?, batas_masuk_menit = ?, toleransi_masuk_menit = ?,
         jam_kerja_normal_menit = ?, istirahat_menit = ?, batas_pulang_menit = ?,
         offset_istirahat_mulai = ?, offset_generate_alfa = ?, buffer_shift_malam_menit = ?,
-        izinkan_multi_sesi = ?, shift_lanjutan_id = ?
+        izinkan_multi_sesi = ?, shift_lanjutan_id = ?,
+        hari_kerja = COALESCE(?, hari_kerja)
       WHERE id_shift = ?;
       "#,
             params![
@@ -926,6 +949,7 @@ pub fn update_shift(state: &DesktopState, id: i64, draft: &Value) -> Result<Valu
                 night_buffer,
                 multi_session,
                 continuation_shift,
+                hari_kerja,
                 id,
             ],
         )
@@ -938,7 +962,7 @@ pub fn update_shift(state: &DesktopState, id: i64, draft: &Value) -> Result<Valu
                awal_absen_menit, batas_masuk_menit, toleransi_masuk_menit,
                jam_kerja_normal_menit, istirahat_menit, batas_pulang_menit,
                offset_istirahat_mulai, offset_generate_alfa, buffer_shift_malam_menit,
-               izinkan_multi_sesi, shift_lanjutan_id
+               izinkan_multi_sesi, shift_lanjutan_id, hari_kerja
         FROM tbl_shift WHERE id_shift = ?;
         "#,
             [id],
@@ -960,6 +984,8 @@ pub fn update_shift(state: &DesktopState, id: i64, draft: &Value) -> Result<Valu
                     "buffer_shift_malam_menit": row.get::<_, i64>(13)?,
                     "izinkan_multi_sesi": row.get::<_, i64>(14)?,
                     "shift_lanjutan_id": row.get::<_, Option<i64>>(15)?.unwrap_or(0),
+                    "hari_kerja": row.get::<_, Option<String>>(16)?
+                        .unwrap_or_else(|| super::hari_kerja::HARI_KERJA_SEMUA.to_owned()),
                 }))
             },
         )
@@ -1679,6 +1705,62 @@ pub fn list_holidays(state: &DesktopState) -> Result<Value, CommandError> {
     ))
 }
 
+/// Banyak hari libur sekaligus: rentang tanggal dan impor libur nasional.
+/// Tanggal yang sudah terdaftar dilewati, bukan ditimpa, supaya libur yang
+/// sudah disunting admin tidak berubah. Cermin `tambahHariLiburMassal`.
+pub fn create_holidays_bulk(state: &DesktopState, entries: &Value) -> Result<Value, CommandError> {
+    let daftar = super::hari_kerja::validate_libur_massal(entries)
+        .map_err(|pesan| CommandError::new("VALIDATION_ERROR", pesan))?;
+    let client_id = sync::ensure_client_id(state)?;
+    let mut connection = storage::database(&state.data_dir)?;
+    let transaction = connection
+        .transaction()
+        .map_err(|_| CommandError::internal())?;
+    let mut dibuat = 0i64;
+    let mut dilewati: Vec<String> = Vec::new();
+    for libur in &daftar {
+        let ada = transaction
+            .query_row(
+                "SELECT 1 FROM tbl_hari_libur WHERE tanggal = ? LIMIT 1;",
+                [&libur.tanggal],
+                |_| Ok(()),
+            )
+            .optional()
+            .map_err(|_| CommandError::internal())?
+            .is_some();
+        if ada {
+            dilewati.push(libur.tanggal.clone());
+            continue;
+        }
+        transaction
+            .execute(
+                "INSERT INTO tbl_hari_libur (tanggal, nama_libur, jenis_libur, keterangan, status_aktif) VALUES (?, ?, ?, ?, 1);",
+                params![libur.tanggal, libur.nama_libur, libur.jenis_libur, libur.keterangan],
+            )
+            .map_err(|_| CommandError::internal())?;
+        let id_libur = transaction.last_insert_rowid();
+        sync::enqueue(
+            &transaction,
+            &client_id,
+            "holiday",
+            "create",
+            &id_libur.to_string(),
+            &json!({
+                "id_libur": id_libur,
+                "tanggal": libur.tanggal,
+                "nama_libur": libur.nama_libur,
+                "jenis_libur": libur.jenis_libur,
+                "keterangan": libur.keterangan,
+                "status_aktif": 1,
+            }),
+            None,
+        )?;
+        dibuat += 1;
+    }
+    transaction.commit().map_err(|_| CommandError::internal())?;
+    Ok(json!({ "sukses": true, "dibuat": dibuat, "dilewati": dilewati }))
+}
+
 pub fn create_holiday(state: &DesktopState, draft: &Value) -> Result<Value, CommandError> {
     let client_id = sync::ensure_client_id(state)?;
     let tanggal = text(draft, "tanggal");
@@ -2371,8 +2453,19 @@ pub fn generate_alfa_harian(
         )
         .unwrap_or(0);
 
+    // Siswa mengikuti Hari Sekolah unitnya, selain siswa mengikuti hari kerja
+    // shift. Predikat siswa dan pencocokan unit sama dengan `generateAlfaHarian`.
     let mut statement = transaction
-        .prepare("SELECT id_unik, nama, divisi, COALESCE(id_shift, 1) FROM master_data WHERE status_aktif = 'Aktif';")
+        .prepare(
+            "SELECT m.id_unik, m.nama, m.divisi, COALESCE(m.id_shift, 1),
+                    CASE WHEN LOWER(TRIM(COALESCE(m.jenis_personil, ''))) = 'siswa'
+                           OR EXISTS (SELECT 1 FROM siswa_data s WHERE s.id_siswa = m.id_unik)
+                         THEN 1 ELSE 0 END,
+                    (SELECT u.id_unit FROM akademik_unit u
+                      WHERE LOWER(TRIM(u.nama_unit)) = LOWER(TRIM(m.unit))
+                      ORDER BY u.id_unit LIMIT 1)
+             FROM master_data m WHERE m.status_aktif = 'Aktif';",
+        )
         .map_err(|_| CommandError::internal())?;
     let employees = statement
         .query_map([], |row| {
@@ -2381,12 +2474,25 @@ pub fn generate_alfa_harian(
                 row.get::<_, String>(1)?,
                 row.get::<_, String>(2)?,
                 row.get::<_, i64>(3)?,
+                row.get::<_, i64>(4)? == 1,
+                row.get::<_, Option<String>>(5)?,
             ))
         })
         .map_err(|_| CommandError::internal())?
         .collect::<Result<Vec<_>, _>>()
         .map_err(|_| CommandError::internal())?;
     drop(statement);
+    let hari_sekolah = super::nilai_akhir::parse_hari_sekolah(
+        transaction
+            .query_row(
+                "SELECT value FROM setting_gex_system WHERE key = ? LIMIT 1;",
+                [super::nilai_akhir::KUNCI_HARI_SEKOLAH],
+                |row| row.get::<_, String>(0),
+            )
+            .optional()
+            .map_err(|_| CommandError::internal())?
+            .as_deref(),
+    );
 
     let mut alfa_dibuat = 0;
     let mut sudah_ada = 0;
@@ -2414,8 +2520,8 @@ pub fn generate_alfa_harian(
         "Desember",
     ];
 
-    for (id_unik, nama, divisi, id_shift) in employees {
-        let shift_config: Option<(String, String, i64, i64, i64, i64)> = transaction
+    for (id_unik, nama, divisi, id_shift, adalah_siswa, id_unit_siswa) in employees {
+        let shift_config: Option<(String, String, i64, i64, i64, i64, Option<String>)> = transaction
             .query_row(
                 r#"
                 SELECT jam_masuk,
@@ -2423,7 +2529,8 @@ pub fn generate_alfa_harian(
                        COALESCE(offset_generate_alfa, 180),
                        COALESCE(jam_kerja_normal_menit, 0),
                        COALESCE(batas_pulang_menit, 240),
-                       COALESCE(buffer_shift_malam_menit, 120)
+                       COALESCE(buffer_shift_malam_menit, 120),
+                       hari_kerja
                 FROM tbl_shift WHERE id_shift = ?;
                 "#,
                 [id_shift],
@@ -2435,14 +2542,22 @@ pub fn generate_alfa_harian(
                         row.get(3)?,
                         row.get(4)?,
                         row.get(5)?,
+                        row.get(6)?,
                     ))
                 },
             )
             .optional()
             .unwrap_or(None);
 
-        let (jam_masuk, jam_pulang, offset_alfa, jam_kerja_normal, batas_pulang, buffer_malam) =
-            match shift_config {
+        let (
+            jam_masuk,
+            jam_pulang,
+            offset_alfa,
+            jam_kerja_normal,
+            batas_pulang,
+            buffer_malam,
+            hari_kerja_shift,
+        ) = match shift_config {
                 Some(cfg) => cfg,
                 None => {
                     // Shift karyawan hilang / tidak terbaca. Dulu dilewati diam-diam,
@@ -2506,39 +2621,28 @@ pub fn generate_alfa_harian(
             .optional()
             .unwrap_or(None)
             .unwrap_or(false);
-        if holiday_check {
-            // Hari libur tidak lagi berarti "tidak ada yang di-Alfa-kan".
-            //
-            // Sejak `hari_libur_whitelist` ada, sebagian orang justru
-            // DIJADWALKAN masuk pada tanggal libur — Satpam, Keamanan,
-            // Maintenance. Scanner sudah tahu siapa mereka; Generate Alfa
-            // dulu tidak, sehingga ketidakhadiran mereka pada hari itu tidak
-            // pernah dinilai sama sekali.
-            //
-            // Penilaiannya MEMAKAI ULANG `scanner::evaluate_holiday_scan`,
-            // bukan salinan aturan di sini. Cakupan whitelist disimpan sebagai
-            // `kode_shift` dan NAMA divisi, dengan `tanggal_libur` NULL berarti
-            // semua hari libur — aturan yang sudah dieja dua kali (Rust dan
-            // `holiday-whitelist.ts`) dan diuji dengan vektor yang sama. Ejaan
-            // ketiga hanya akan menambah tempat untuk drift.
-            //
-            // Daftar KOSONG tetap berarti MENOLAK, seperti di scanner: tidak
-            // ada yang dijadwalkan, jadi tidak ada yang di-Alfa-kan. Pemasangan
-            // yang belum memakai whitelist karena itu tidak berubah perilakunya
-            // sama sekali.
+        // Hari libur tidak berarti "tidak ada yang di-Alfa-kan": orang yang
+        // masuk `hari_libur_whitelist` (Satpam, Keamanan, Maintenance)
+        // DIJADWALKAN masuk pada tanggal libur. Penilaiannya memakai ulang
+        // `scanner::evaluate_holiday_scan`, aturan yang dieja kembar dengan
+        // `holiday-whitelist.ts`; daftar kosong tetap berarti tidak ada yang
+        // dijadwalkan.
+        let masuk_saat_libur = holiday_check && {
             let whitelist = super::scanner::load_holiday_whitelist(&transaction, &work_date)?;
             let kode_shift = super::scanner::load_kode_shift(&transaction, id_shift);
-            let dijadwalkan = super::scanner::evaluate_holiday_scan(
-                &whitelist,
-                &work_date,
-                &divisi,
-                kode_shift,
-            )
-            .is_some();
-            if !dijadwalkan {
-                libur += 1;
-                continue;
-            }
+            super::scanner::evaluate_holiday_scan(&whitelist, &work_date, &divisi, kode_shift)
+                .is_some()
+        };
+        // Libur mingguan dinilai lebih dulu: hari kerja shift, atau Hari
+        // Sekolah unit untuk siswa. Cermin `wajibMasuk` di `generateAlfaHarian`.
+        let hari_masuk: Vec<i64> = if adalah_siswa {
+            super::nilai_akhir::hari_sekolah_untuk(&hari_sekolah, id_unit_siswa.as_deref()).to_vec()
+        } else {
+            super::hari_kerja::parse_hari_kerja(hari_kerja_shift.as_deref())
+        };
+        if !super::hari_kerja::wajib_masuk(&work_date, &hari_masuk, holiday_check, masuk_saat_libur) {
+            libur += 1;
+            continue;
         }
 
         // Alfa baru boleh dibuat setelah jendela scan pulang benar-benar tertutup
@@ -3038,10 +3142,46 @@ pub fn get_attendance_audit(
     }
     drop(scan_statement);
 
+    // Hari kerja mingguan per shift dan Hari Sekolah siswa. Cermin
+    // `auditKualitasAbsensi`.
+    let mut hari_kerja_statement = connection
+        .prepare("SELECT id_shift, hari_kerja FROM tbl_shift;")
+        .map_err(|_| CommandError::internal())?;
+    let hari_kerja_shift: HashMap<i64, Vec<i64>> = hari_kerja_statement
+        .query_map([], |row| {
+            Ok((
+                row.get::<_, i64>(0)?,
+                super::hari_kerja::parse_hari_kerja(row.get::<_, Option<String>>(1)?.as_deref()),
+            ))
+        })
+        .map_err(|_| CommandError::internal())?
+        .collect::<Result<_, _>>()
+        .map_err(|_| CommandError::internal())?;
+    drop(hari_kerja_statement);
+    let hari_sekolah = super::nilai_akhir::parse_hari_sekolah(
+        connection
+            .query_row(
+                "SELECT value FROM setting_gex_system WHERE key = ? LIMIT 1;",
+                [super::nilai_akhir::KUNCI_HARI_SEKOLAH],
+                |row| row.get::<_, String>(0),
+            )
+            .optional()
+            .map_err(|_| CommandError::internal())?
+            .as_deref(),
+    );
+
     // ── Karyawan aktif ──────────────────────────────────────────────────────
+    // Predikat siswa dan unitnya sama dengan Generate Alfa.
     let mut emp_statement = connection
         .prepare(
-            "SELECT id_unik, nama, divisi, COALESCE(id_shift, 1) FROM master_data WHERE status_aktif = 'Aktif' ORDER BY nama;",
+            "SELECT m.id_unik, m.nama, m.divisi, COALESCE(m.id_shift, 1),
+                    CASE WHEN LOWER(TRIM(COALESCE(m.jenis_personil, ''))) = 'siswa'
+                           OR EXISTS (SELECT 1 FROM siswa_data s WHERE s.id_siswa = m.id_unik)
+                         THEN 1 ELSE 0 END,
+                    (SELECT u.id_unit FROM akademik_unit u
+                      WHERE LOWER(TRIM(u.nama_unit)) = LOWER(TRIM(m.unit))
+                      ORDER BY u.id_unit LIMIT 1)
+             FROM master_data m WHERE m.status_aktif = 'Aktif' ORDER BY m.nama;",
         )
         .map_err(|_| CommandError::internal())?;
     let employees = emp_statement
@@ -3051,6 +3191,8 @@ pub fn get_attendance_audit(
                 row.get::<_, String>(1)?,
                 row.get::<_, String>(2)?,
                 row.get::<_, i64>(3)?,
+                row.get::<_, i64>(4)? == 1,
+                row.get::<_, Option<String>>(5)?,
             ))
         })
         .map_err(|_| CommandError::internal())?
@@ -3078,7 +3220,7 @@ pub fn get_attendance_audit(
     let mut karyawan_bermasalah = 0i64;
     let mut temuan: Vec<TemuanAudit> = Vec::new();
 
-    for (id_unik, nama, divisi, id_shift) in employees {
+    for (id_unik, nama, divisi, id_shift, adalah_siswa, id_unit_siswa) in employees {
         let Some((
             nama_shift,
             jam_masuk_shift,
@@ -3126,8 +3268,17 @@ pub fn get_attendance_audit(
             fleksibel += 1;
         }
 
-        // Hari libur aktif: tidak ada kewajiban absen, jadi tidak dinilai.
-        if hari_libur.is_some() {
+        // Hari libur aktif, atau di luar hari kerja shift / Hari Sekolah
+        // siswa: tidak ada kewajiban absen, jadi tidak dinilai.
+        let hari_masuk: Vec<i64> = if adalah_siswa {
+            super::nilai_akhir::hari_sekolah_untuk(&hari_sekolah, id_unit_siswa.as_deref()).to_vec()
+        } else {
+            hari_kerja_shift
+                .get(&id_shift)
+                .cloned()
+                .unwrap_or_else(|| (1..=7).collect())
+        };
+        if !super::hari_kerja::wajib_masuk(&tanggal_target, &hari_masuk, hari_libur.is_some(), false) {
             continue;
         }
 
@@ -4061,7 +4212,7 @@ pub fn force_enqueue_settings(state: &DesktopState) -> Result<Value, CommandErro
                    awal_absen_menit, batas_masuk_menit, toleransi_masuk_menit,
                    jam_kerja_normal_menit, istirahat_menit, batas_pulang_menit,
                    offset_istirahat_mulai, offset_generate_alfa, buffer_shift_malam_menit,
-                   izinkan_multi_sesi, shift_lanjutan_id
+                   izinkan_multi_sesi, shift_lanjutan_id, hari_kerja
             FROM tbl_shift ORDER BY id_shift ASC;
             "#,
         )
@@ -4085,6 +4236,8 @@ pub fn force_enqueue_settings(state: &DesktopState) -> Result<Value, CommandErro
                 "buffer_shift_malam_menit": row.get::<_, i64>(13)?,
                 "izinkan_multi_sesi": row.get::<_, i64>(14)?,
                 "shift_lanjutan_id": row.get::<_, Option<i64>>(15)?.unwrap_or(0),
+                "hari_kerja": row.get::<_, Option<String>>(16)?
+                    .unwrap_or_else(|| super::hari_kerja::HARI_KERJA_SEMUA.to_owned()),
             }))
         })
         .map_err(|_| CommandError::internal())?
@@ -4445,6 +4598,52 @@ mod tests_generate_alfa_hari_libur {
             )
             .expect("count");
         assert_eq!(jumlah, 0, "daftar kosong berarti tidak ada yang dijadwalkan");
+    }
+
+    /// Libur mingguan tanpa satu pun baris `tbl_hari_libur`: karyawan
+    /// mengikuti hari kerja shift-nya, siswa mengikuti Hari Sekolah unitnya.
+    /// Kembar skenario `alfa-audit.test.ts`.
+    #[test]
+    fn libur_mingguan_mengikuti_hari_kerja_shift_dan_hari_sekolah() {
+        let (_dir, state) = fixture();
+        let conn = storage::database(&state.data_dir).expect("db");
+        conn.execute_batch(
+            r#"
+            INSERT INTO tbl_shift (id_shift, kode_shift, nama_shift, jam_masuk, jam_pulang,
+              jam_kerja_normal_menit, istirahat_menit, batas_pulang_menit,
+              buffer_shift_malam_menit, offset_generate_alfa, hari_kerja)
+            VALUES (1, 1, 'Kantor', '07:00', '15:00', 480, 60, 240, 120, 180, '1,2,3,4,5'),
+                   (2, 2, 'Jaga', '07:00', '15:00', 480, 60, 240, 120, 180, '1,2,3,4,5,6,7');
+
+            INSERT INTO akademik_unit (id_unit, nama_unit) VALUES ('u-sd', 'SD');
+
+            INSERT INTO master_data (id_unik, kode_karyawan, nama, divisi, id_shift, status_aktif, jenis_personil, unit, token_absensi, qr_code, status_qr)
+            VALUES ('EMP-STAF', 'K1', 'Staf TU',     'Tata Usaha', 1, 'Aktif', 'Pegawai', NULL, 'T1', 'EMP-STAF|T1', 'Generated'),
+                   ('EMP-SATPAM', 'K2', 'Satpam',      'Keamanan',   2, 'Aktif', 'Pegawai', NULL, 'T2', 'EMP-SATPAM|T2', 'Generated'),
+                   ('SIS-SD', 'K3', 'Siswa SD',    'Siswa',      2, 'Aktif', 'SISWA',   ' sd ', 'T3', 'SIS-SD|T3', 'Generated'),
+                   ('SIS-SMP', 'K4', 'Siswa SMP',   'Siswa',      2, 'Aktif', 'Siswa',   'SMP', 'T4', 'SIS-SMP|T4', 'Generated');
+
+            INSERT INTO setting_gex_system (key, value)
+            VALUES ('hari_sekolah', '{"bawaan":[1,2,3,4,5],"unit":{"u-sd":[1,2,3,4,5,6]}}');
+            "#,
+        )
+        .expect("seed");
+        sync::ensure_client_id(&state).expect("identitas klien");
+
+        // Sabtu 17 Oktober 2026, jauh setelah jendela scan pulang tertutup.
+        let ringkasan =
+            generate_alfa_harian(&state, Some("2026-10-17 23:30:00".to_string())).expect("alfa");
+        let alfa: Vec<String> = conn
+            .prepare("SELECT id_karyawan FROM absensi_harian WHERE tanggal = '2026-10-17' ORDER BY id_karyawan;")
+            .expect("prepare")
+            .query_map([], |row| row.get(0))
+            .expect("query")
+            .filter_map(Result::ok)
+            .collect();
+        // Siswa SD masuk Sabtu (Hari Sekolah unitnya), siswa SMP mengikuti
+        // bawaan Senin-Jumat walau shift-nya tujuh hari.
+        assert_eq!(alfa, vec!["EMP-SATPAM".to_string(), "SIS-SD".to_string()]);
+        assert_eq!(ringkasan["jumlahLibur"], 2);
     }
 }
 

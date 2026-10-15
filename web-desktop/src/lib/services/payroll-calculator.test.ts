@@ -79,6 +79,23 @@ const VEKTOR_LEMBUR: Array<
   [0, 0, 480, 360, false, 360, 0, 0],
 ];
 
+// Jenjang HARI_LIBUR belum diatur. Kembar `VEKTOR_TANPA_JENJANG_LIBUR` di
+// `payroll/engine.rs`.
+const VEKTOR_TANPA_JENJANG_LIBUR: [
+  number,
+  number,
+  number,
+  number,
+  boolean,
+  number,
+  number,
+  number,
+][] = [
+  [9600, 240, 480, 360, true, 9960, 360, 0],
+  [0, 0, 480, 360, true, 360, 120, 0],
+  [9600, 240, 480, 360, false, 9960, 0, 0],
+];
+
 describe("sakelar lembur", () => {
   test("memindahkan jam hari libur, bukan membuangnya", async () => {
     const { applyOvertimePolicy } = await import("./payroll-calculator");
@@ -93,7 +110,39 @@ describe("sakelar lembur", () => {
       h,
     ] of VEKTOR_LEMBUR) {
       expect(
-        applyOvertimePolicy(reguler, lembur, liburTotal, liburKerja, diizinkan),
+        applyOvertimePolicy(
+          reguler,
+          lembur,
+          liburTotal,
+          liburKerja,
+          diizinkan,
+          true,
+        ),
+      ).toEqual({ regular: r, overtime: l, holiday: h });
+    }
+  });
+
+  test("tanpa jenjang hari libur dibayar seperti hari biasa", async () => {
+    const { applyOvertimePolicy } = await import("./payroll-calculator");
+    for (const [
+      reguler,
+      lembur,
+      liburTotal,
+      liburKerja,
+      diizinkan,
+      r,
+      l,
+      h,
+    ] of VEKTOR_TANPA_JENJANG_LIBUR) {
+      expect(
+        applyOvertimePolicy(
+          reguler,
+          lembur,
+          liburTotal,
+          liburKerja,
+          diizinkan,
+          false,
+        ),
       ).toEqual({ regular: r, overtime: l, holiday: h });
     }
   });

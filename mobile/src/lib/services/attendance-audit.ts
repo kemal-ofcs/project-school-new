@@ -11,6 +11,12 @@ import {
   selisihHariKalender,
 } from "@/lib/attendance/time-policy";
 import { db, ensureDbInitialized } from "@/lib/db";
+import { parseHariKerja, wajibMasuk } from "@/lib/validations/hari-kerja";
+import {
+  hariSekolahUntuk,
+  KUNCI_HARI_SEKOLAH,
+  parseHariSekolah,
+} from "@/lib/validations/nilai-akhir";
 
 export type KeparahanTemuan = "tinggi" | "sedang" | "rendah" | "info";
 
@@ -97,6 +103,7 @@ interface BarisShift {
   batasPulangMenit: number;
   bufferShiftMalamMenit: number;
   jamKerjaNormalMenit: number;
+  hariKerja: number[];
 }
 
 interface BarisAbsensi {
@@ -151,7 +158,7 @@ export async function auditKualitasAbsensi(
   const shiftRes = await targetDb.execute(
     `SELECT id_shift, nama_shift, jam_masuk, jam_pulang, batas_masuk_menit,
             toleransi_masuk_menit, batas_pulang_menit, buffer_shift_malam_menit,
-            jam_kerja_normal_menit
+            jam_kerja_normal_menit, hari_kerja
      FROM tbl_shift;`,
   );
   const shifts = new Map<number, BarisShift>();
@@ -165,8 +172,18 @@ export async function auditKualitasAbsensi(
       batasPulangMenit: Number(row.batas_pulang_menit ?? 240),
       bufferShiftMalamMenit: Number(row.buffer_shift_malam_menit ?? 120),
       jamKerjaNormalMenit: Number(row.jam_kerja_normal_menit ?? 0),
+      hariKerja: parseHariKerja(
+        row.hari_kerja == null ? null : String(row.hari_kerja),
+      ),
     });
   }
+  const hariSekolahRes = await targetDb.execute({
+    sql: "SELECT value FROM setting_gex_system WHERE key = ? LIMIT 1;",
+    args: [KUNCI_HARI_SEKOLAH],
+  });
+  const hariSekolah = parseHariSekolah(
+    hariSekolahRes.rows[0] ? String(hariSekolahRes.rows[0].value ?? "") : null,
+  );
 
   // ── Pre-load absensi sesi NORMAL pada tanggal target ──────────────────────
   const absensiRes = await targetDb.execute({
@@ -212,8 +229,16 @@ export async function auditKualitasAbsensi(
     scanMasalah.set(id, entry);
   }
 
+  // Predikat siswa dan unitnya sama dengan Generate Alfa.
   const empRes = await targetDb.execute(
-    "SELECT id_unik, nama, divisi, id_shift FROM master_data WHERE status_aktif = 'Aktif' ORDER BY nama;",
+    `SELECT m.id_unik, m.nama, m.divisi, m.id_shift,
+            CASE WHEN LOWER(TRIM(COALESCE(m.jenis_personil, ''))) = 'siswa'
+                   OR EXISTS (SELECT 1 FROM siswa_data s WHERE s.id_siswa = m.id_unik)
+                 THEN 1 ELSE 0 END AS adalah_siswa,
+            (SELECT u.id_unit FROM akademik_unit u
+              WHERE LOWER(TRIM(u.nama_unit)) = LOWER(TRIM(m.unit))
+              ORDER BY u.id_unit LIMIT 1) AS id_unit_siswa
+     FROM master_data m WHERE m.status_aktif = 'Aktif' ORDER BY m.nama;`,
   );
 
   const ringkasan: RingkasanAuditAbsensi = {
@@ -281,8 +306,25 @@ export async function auditKualitasAbsensi(
       ringkasan.fleksibel++;
     }
 
-    // Hari libur aktif: tidak ada kewajiban absen, jadi tidak dinilai.
-    if (hariLibur !== null) continue;
+    // Hari libur aktif, atau di luar hari kerja shift / Hari Sekolah siswa:
+    // tidak ada kewajiban absen, jadi tidak dinilai.
+    const hariMasuk =
+      Number(row.adalah_siswa) === 1
+        ? hariSekolahUntuk(
+            hariSekolah,
+            row.id_unit_siswa == null ? null : String(row.id_unit_siswa),
+          )
+        : shift.hariKerja;
+    if (
+      !wajibMasuk({
+        tanggal: tanggalTarget,
+        hariMasuk,
+        libur: hariLibur !== null,
+        masukSaatLibur: false,
+      })
+    ) {
+      continue;
+    }
 
     ringkasan.wajibAbsen++;
 

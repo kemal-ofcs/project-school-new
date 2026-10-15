@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import type React from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { MobileAppShell } from "@/components/MobileAppShell";
+import { PilihHariKerja } from "@/components/shift/PilihHariKerja";
 import { Icon } from "@/components/ui/Icon";
 import { Modal } from "@/components/ui/Modal";
 import {
@@ -17,12 +18,13 @@ import { useAuth } from "@/lib/context/AuthContext";
 import {
   getDaftarShift,
   hapusShift,
-  type ShiftInput,
+  type ShiftDraft,
   tambahShift,
   updateShift,
 } from "@/lib/gateways/shift";
 import { subscribeSyncCompleted } from "@/lib/gateways/sync-status";
 import { useDebounce } from "@/lib/hooks/useDebounce";
+import { parseHariKerja, ringkasHariKerja } from "@/lib/validations/hari-kerja";
 import {
   firstValidationMessage,
   validateShiftDraft,
@@ -109,7 +111,7 @@ export default function MobileShiftPage() {
   const [isEditing, setIsEditing] = useState<boolean>(false);
   const [editId, setEditId] = useState<number | null>(null);
   const [saving, setSaving] = useState(false);
-  const [formData, setFormData] = useState<ShiftInput>({
+  const [formData, setFormData] = useState<ShiftDraft>({
     kode_shift: 1,
     nama_shift: "",
     jam_masuk: "07:00",
@@ -124,6 +126,7 @@ export default function MobileShiftPage() {
     offset_generate_alfa: 180,
     buffer_shift_malam_menit: 120,
     izinkan_multi_sesi: 0,
+    hari_kerja: [1, 2, 3, 4, 5, 6, 7],
   });
   const [alertMsg, setAlertMsg] = useState<string | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -181,9 +184,9 @@ export default function MobileShiftPage() {
     });
   }, [loadShifts]);
 
-  const updateFormField = <K extends keyof ShiftInput>(
+  const updateFormField = <K extends keyof ShiftDraft>(
     field: K,
-    value: ShiftInput[K],
+    value: ShiftDraft[K],
   ) => {
     setFormData((prev) => {
       const next = { ...prev, [field]: value };
@@ -303,6 +306,7 @@ export default function MobileShiftPage() {
       buffer_shift_malam_menit: 120,
       izinkan_multi_sesi: 0,
       shift_lanjutan_id: 0,
+      hari_kerja: [1, 2, 3, 4, 5, 6, 7],
     });
     setFormErrors({});
     setErrorMsg(null);
@@ -346,6 +350,9 @@ export default function MobileShiftPage() {
           ? 1
           : 0,
       shift_lanjutan_id: Number(row.shift_lanjutan_id || 0),
+      hari_kerja: parseHariKerja(
+        typeof row.hari_kerja === "string" ? row.hari_kerja : null,
+      ),
     });
     setFormErrors({});
     setErrorMsg(null);
@@ -637,6 +644,21 @@ export default function MobileShiftPage() {
 
                   {/* Parameters Grid */}
                   <div className="grid grid-cols-2 gap-2 text-[11px] text-slate-300">
+                    <div className="col-span-2 rounded-xl bg-slate-950/40 p-2 border border-white/5">
+                      <span className="text-slate-500 text-[10px] block">
+                        Hari Kerja:
+                      </span>
+                      <span className="font-semibold text-slate-200">
+                        {ringkasHariKerja(
+                          parseHariKerja(
+                            typeof shift.hari_kerja === "string"
+                              ? shift.hari_kerja
+                              : null,
+                          ),
+                        )}
+                      </span>
+                    </div>
+
                     <div className="rounded-xl bg-slate-950/40 p-2 border border-white/5">
                       <span className="text-slate-500 text-[10px] block">
                         Awal Absen:
@@ -1131,6 +1153,13 @@ export default function MobileShiftPage() {
                 </div>
               </div>
             </div>
+
+            <PilihHariKerja
+              value={formData.hari_kerja}
+              onChange={(hari) =>
+                setFormData((prev) => ({ ...prev, hari_kerja: hari }))
+              }
+            />
 
             {/* Bagian 4: Opsi Lanjutan (Multi-Sesi) */}
             <div className="rounded-2xl border border-white/10 bg-slate-950/70 p-3.5 space-y-2">

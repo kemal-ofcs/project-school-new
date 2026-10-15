@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { AppShell } from "@/components/AppShell";
 import { HolidayWhitelistPanel } from "@/components/HolidayWhitelistPanel";
+import { LiburMassalDialog } from "@/components/holiday/LiburMassalDialog";
 import { FeedbackBanner } from "@/components/ui/FeedbackBanner";
 import { Icon } from "@/components/ui/Icon";
 import { Modal } from "@/components/ui/Modal";
@@ -64,6 +65,7 @@ export default function HolidaysPage() {
   const [filterYear, setFilterYear] = useState<string>("all");
 
   const [modalOpen, setModalOpen] = useState(false);
+  const [massalOpen, setMassalOpen] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [draft, setDraft] = useState<HariLiburInput>(EMPTY_DRAFT);
   const [deleteTarget, setDeleteTarget] = useState<HariLiburRecord | null>(
@@ -278,17 +280,27 @@ export default function HolidaysPage() {
         <PageHeader
           eyebrow="Operasional & Kalender"
           title="Kalender & Manajemen Hari Libur"
-          description="Atur jadwal hari libur nasional, cuti bersama, dan hari non-kerja. Pada tanggal libur aktif, QR Scanner hanya melayani Shift/Divisi yang terdaftar di Whitelist di bawah, dan Generate Alfa otomatis dinonaktifkan sehingga yang libur tidak kena Alfa."
+          description="Atur hari libur nasional, cuti bersama, dan libur sekolah. Pada tanggal libur aktif, QR Scanner hanya melayani Shift/Divisi yang terdaftar di Whitelist di bawah, dan yang libur tidak kena Alfa. Libur mingguan seperti Sabtu dan Minggu tidak perlu diinput di sini: atur Hari Kerja di tiap shift, dan Hari Sekolah untuk siswa."
           actions={
             canManage ? (
-              <button
-                type="button"
-                onClick={handleOpenAdd}
-                className="flex items-center gap-2 rounded-xl bg-sky-700 px-4 py-2.5 text-sm font-bold text-white shadow-lg shadow-sky-500/20 transition hover:bg-sky-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300 active:scale-95"
-              >
-                <Icon name="calendar" className="size-4" />
-                <span>+ Tambah Hari Libur</span>
-              </button>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={() => setMassalOpen(true)}
+                  className="flex min-h-11 items-center gap-2 rounded-xl border border-sky-500/40 px-4 py-2.5 text-sm font-bold text-sky-200 transition hover:bg-sky-500/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300"
+                >
+                  <Icon name="calendar" className="size-4" />
+                  <span>Tambah Banyak Sekaligus</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={handleOpenAdd}
+                  className="flex items-center gap-2 rounded-xl bg-sky-700 px-4 py-2.5 text-sm font-bold text-white shadow-lg shadow-sky-500/20 transition hover:bg-sky-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300 active:scale-95"
+                >
+                  <Icon name="calendar" className="size-4" />
+                  <span>+ Tambah Hari Libur</span>
+                </button>
+              </div>
             ) : null
           }
         />
@@ -678,6 +690,24 @@ export default function HolidaysPage() {
               </div>
             </div>
           </Modal>
+        ) : null}
+
+        {massalOpen ? (
+          <LiburMassalDialog
+            tanggalTerdaftar={new Set(holidays.map((h) => h.tanggal))}
+            onClose={() => setMassalOpen(false)}
+            onSaved={(hasil) => {
+              setMassalOpen(false);
+              setFeedback({
+                tone: "success",
+                message:
+                  hasil.dilewati.length > 0
+                    ? `${hasil.dibuat} hari libur ditambahkan. ${hasil.dilewati.length} tanggal dilewati karena sudah terdaftar.`
+                    : `${hasil.dibuat} hari libur ditambahkan.`,
+              });
+              loadData();
+            }}
+          />
         ) : null}
 
         <HolidayWhitelistPanel canManage={canManage} />

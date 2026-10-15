@@ -60,6 +60,7 @@ const BOOK_CLOSING_DECISION_MIGRATION_VERSION = 46;
 const WA_BOOK_CLOSING_MIGRATION_VERSION = 47;
 const CONTENT_IMAGE_MIGRATION_VERSION = 48;
 const PMB_DAPODIK_MIGRATION_VERSION = 49;
+const SHIFT_WORK_DAYS_MIGRATION_VERSION = 50;
 
 /**
  * v21 — aturan jam scan baru: Jam Kerja Normal = (Jam Pulang − Jam Masuk) −
@@ -781,6 +782,12 @@ export async function runDatabaseMigrations(client: Client) {
   if (!(await hasColumn(client, "tbl_shift", "shift_lanjutan_id"))) {
     await client.execute(
       "ALTER TABLE tbl_shift ADD COLUMN shift_lanjutan_id INTEGER DEFAULT 0;",
+    );
+  }
+  // v50 — hari kerja mingguan shift. Cermin `ensure_column` di `turso.rs`.
+  if (!(await hasColumn(client, "tbl_shift", "hari_kerja"))) {
+    await client.execute(
+      "ALTER TABLE tbl_shift ADD COLUMN hari_kerja TEXT DEFAULT '1,2,3,4,5,6,7';",
     );
   }
   if (!(await hasColumn(client, "tbl_shift", "izinkan_multi_sesi"))) {
@@ -2025,6 +2032,12 @@ export async function runDatabaseMigrations(client: Client) {
     sql: `INSERT OR IGNORE INTO schema_migration (version, name, applied_at)
           VALUES (?, 'pmb-dapodik', ?);`,
     args: [PMB_DAPODIK_MIGRATION_VERSION, now],
+  });
+  // v50 — hari kerja mingguan shift (ALTER-nya ada di blok tbl_shift).
+  await client.execute({
+    sql: `INSERT OR IGNORE INTO schema_migration (version, name, applied_at)
+          VALUES (?, 'shift-work-days', ?);`,
+    args: [SHIFT_WORK_DAYS_MIGRATION_VERSION, now],
   });
 
   await client.execute(

@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import type { FormEvent } from "react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { HolidayWhitelistPanel } from "@/components/HolidayWhitelistPanel";
+import { LiburMassalDialog } from "@/components/holiday/LiburMassalDialog";
 import { MobileAppShell } from "@/components/MobileAppShell";
 import { FeedbackBanner } from "@/components/ui/FeedbackBanner";
 import { Icon } from "@/components/ui/Icon";
@@ -76,6 +77,7 @@ export default function MobileHolidaysPage() {
   const [filterYear, setFilterYear] = useState("all");
 
   const [modalOpen, setModalOpen] = useState(false);
+  const [massalOpen, setMassalOpen] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [draft, setDraft] = useState<HariLiburInput>({
     tanggal: "",
@@ -388,6 +390,20 @@ export default function MobileHolidaysPage() {
               Tambah Hari Libur
             </button>
           ) : null}
+          {canManage ? (
+            <button
+              type="button"
+              onClick={() => setMassalOpen(true)}
+              className="flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border border-sky-500/40 text-xs font-bold text-sky-200 transition hover:bg-sky-500/10 active:scale-95"
+            >
+              <Icon name="calendar" className="size-4" />
+              Tambah Banyak Sekaligus
+            </button>
+          ) : null}
+          <p className="px-1 text-[11px] leading-relaxed text-slate-400">
+            Sabtu dan Minggu tidak perlu diinput di sini: atur Hari Kerja di
+            tiap shift, dan Hari Sekolah untuk siswa.
+          </p>
         </div>
 
         {/* Daftar Hari Libur */}
@@ -497,6 +513,25 @@ export default function MobileHolidaysPage() {
             })
           )}
         </div>
+
+        {massalOpen ? (
+          <LiburMassalDialog
+            tanggalTerdaftar={new Set(holidays.map((h) => h.tanggal))}
+            onClose={() => setMassalOpen(false)}
+            onSaved={(hasil) => {
+              setMassalOpen(false);
+              triggerHaptic("success");
+              setFeedback({
+                type: "success",
+                message:
+                  hasil.dilewati.length > 0
+                    ? `${hasil.dibuat} hari libur ditambahkan. ${hasil.dilewati.length} tanggal dilewati karena sudah terdaftar.`
+                    : `${hasil.dibuat} hari libur ditambahkan.`,
+              });
+              loadData();
+            }}
+          />
+        ) : null}
 
         <HolidayWhitelistPanel canManage={canManage} />
       </div>

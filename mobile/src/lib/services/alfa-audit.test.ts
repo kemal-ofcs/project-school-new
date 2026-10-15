@@ -220,3 +220,79 @@ describe("Generate Alfa Harian & Setting Automation", () => {
     expect(audit.rows[0].status).toBe("Gagal");
   });
 });
+
+describe("Generate Alfa: libur mingguan dan whitelist", () => {
+  // Kembar `libur_mingguan_mengikuti_hari_kerja_shift_dan_hari_sekolah` di
+  // `operational.rs`.
+  test("karyawan ikut hari kerja shift, siswa ikut Hari Sekolah unit", async () => {
+    await saveAutoAlfaSetting(true);
+    await db.batch([
+      "DELETE FROM master_data;",
+      "DELETE FROM tbl_shift;",
+      "DELETE FROM akademik_unit;",
+      `INSERT INTO tbl_shift (id_shift, kode_shift, nama_shift, jam_masuk, jam_pulang,
+         jam_kerja_normal_menit, istirahat_menit, batas_pulang_menit,
+         buffer_shift_malam_menit, offset_generate_alfa, hari_kerja)
+       VALUES (1, 1, 'Kantor', '07:00', '15:00', 480, 60, 240, 120, 180, '1,2,3,4,5'),
+              (2, 2, 'Jaga', '07:00', '15:00', 480, 60, 240, 120, 180, '1,2,3,4,5,6,7');`,
+      "INSERT INTO akademik_unit (id_unit, nama_unit, created_at, updated_at) VALUES ('u-sd', 'SD', '2026-01-01', '2026-01-01');",
+      `INSERT INTO master_data (id_unik, kode_karyawan, nama, divisi, id_shift, status_aktif, jenis_personil, unit, token_absensi, qr_code, status_qr)
+       VALUES ('EMP-STAF', 'K1', 'Staf TU', 'Tata Usaha', 1, 'Aktif', 'Pegawai', NULL, 'T1', 'EMP-STAF|T1', 'Generated'),
+              ('EMP-SATPAM', 'K2', 'Satpam', 'Keamanan', 2, 'Aktif', 'Pegawai', NULL, 'T2', 'EMP-SATPAM|T2', 'Generated'),
+              ('SIS-SD', 'K3', 'Siswa SD', 'Siswa', 2, 'Aktif', 'SISWA', ' sd ', 'T3', 'SIS-SD|T3', 'Generated'),
+              ('SIS-SMP', 'K4', 'Siswa SMP', 'Siswa', 2, 'Aktif', 'Siswa', 'SMP', 'T4', 'SIS-SMP|T4', 'Generated');`,
+      `INSERT INTO setting_gex_system (key, value)
+       VALUES ('hari_sekolah', '{"bawaan":[1,2,3,4,5],"unit":{"u-sd":[1,2,3,4,5,6]}}')
+       ON CONFLICT(key) DO UPDATE SET value = excluded.value;`,
+    ]);
+    try {
+      // Sabtu 17 Oktober 2026, jauh setelah jendela scan pulang tertutup.
+      const res = await generateAlfaHarian(
+        new Date("2026-10-17T23:30:00+07:00"),
+      );
+      const rows = await db.execute(
+        "SELECT id_karyawan FROM absensi_harian WHERE tanggal = '2026-10-17' ORDER BY id_karyawan;",
+      );
+      expect(rows.rows.map((r) => String(r.id_karyawan))).toEqual([
+        "EMP-SATPAM",
+        "SIS-SD",
+      ]);
+      expect(res.jumlahLibur).toBe(2);
+    } finally {
+      await db.batch([
+        "DELETE FROM akademik_unit;",
+        "DELETE FROM setting_gex_system WHERE key = 'hari_sekolah';",
+      ]);
+    }
+  });
+
+  // Kembar `hari_libur_hanya_mengalfakan_yang_masuk_whitelist`. Sebelum ini
+  // jalur Web melewati semua orang pada tanggal libur.
+  test("tanggal libur hanya mengalfakan yang masuk whitelist", async () => {
+    await saveAutoAlfaSetting(true);
+    await db.batch([
+      "DELETE FROM master_data;",
+      `INSERT INTO master_data (id_unik, nama, divisi, id_shift, status_aktif)
+       VALUES ('EMP-SATPAM', 'Satpam Satu', 'Keamanan', 1, 'Aktif'),
+              ('EMP-GURU', 'Guru Satu', 'Akademik', 1, 'Aktif');`,
+      "INSERT INTO tbl_hari_libur (tanggal, nama_libur, status_aktif) VALUES ('2026-03-17', 'Hari Raya', 1);",
+      `INSERT INTO hari_libur_whitelist (id, scope_type, scope_value, tanggal_libur,
+         status_aktif, created_at, updated_at)
+       VALUES ('hlw-1', 'DIVISI', 'Keamanan', NULL, 1, '2026-01-01', '2026-01-01');`,
+    ]);
+    try {
+      const res = await generateAlfaHarian(
+        new Date("2026-03-17T23:30:00+07:00"),
+      );
+      const rows = await db.execute(
+        "SELECT id_karyawan FROM absensi_harian WHERE tanggal = '2026-03-17';",
+      );
+      expect(rows.rows.map((r) => String(r.id_karyawan))).toEqual([
+        "EMP-SATPAM",
+      ]);
+      expect(res.jumlahLibur).toBe(1);
+    } finally {
+      await db.execute("DELETE FROM hari_libur_whitelist;");
+    }
+  });
+});

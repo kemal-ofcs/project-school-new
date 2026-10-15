@@ -17,6 +17,16 @@ import {
   normalizeOperatorPhone,
 } from "@/lib/operators/contact";
 import { generateWaNotificationId } from "@/lib/services/wa-notification";
+import { parseHariKerja, wajibMasuk } from "@/lib/validations/hari-kerja";
+import {
+  evaluateHolidayScan,
+  type HolidayWhitelistEntry,
+} from "@/lib/validations/holiday-whitelist";
+import {
+  hariSekolahUntuk,
+  KUNCI_HARI_SEKOLAH,
+  parseHariSekolah,
+} from "@/lib/validations/nilai-akhir";
 import {
   composeWaMessage,
   parseAmbangAlfaDays,
@@ -34,7 +44,10 @@ export interface RingkasanAlfa {
   jumlahBelumWaktunya: number;
   jumlahFleksibel: number;
   jumlahNonaktif: number;
-  /** Karyawan yang dilewati karena tanggal kerjanya hari libur aktif. */
+  /**
+   * Dilewati karena tidak dijadwalkan masuk: tanggal libur aktif (tanpa
+   * whitelist), di luar hari kerja shift, atau di luar Hari Sekolah siswa.
+   */
   jumlahLibur: number;
   /** Karyawan yang dilewati karena shift-nya hilang / jam shift tidak terurai. */
   jumlahShiftTidakValid: number;
@@ -97,8 +110,17 @@ export async function generateAlfaHarian(
   );
   const jumlahNonaktif = Number(nonaktifRes.rows[0]?.count || 0);
 
+  // Siswa mengikuti Hari Sekolah unitnya, selain siswa mengikuti hari kerja
+  // shift. Predikat siswa dan pencocokan unit sama dengan `generate_alfa_harian`.
   const empRes = await targetDb.execute(
-    "SELECT * FROM master_data WHERE status_aktif = 'Aktif';",
+    `SELECT m.*,
+            CASE WHEN LOWER(TRIM(COALESCE(m.jenis_personil, ''))) = 'siswa'
+                   OR EXISTS (SELECT 1 FROM siswa_data s WHERE s.id_siswa = m.id_unik)
+                 THEN 1 ELSE 0 END AS adalah_siswa,
+            (SELECT u.id_unit FROM akademik_unit u
+              WHERE LOWER(TRIM(u.nama_unit)) = LOWER(TRIM(m.unit))
+              ORDER BY u.id_unit LIMIT 1) AS id_unit_siswa
+     FROM master_data m WHERE m.status_aktif = 'Aktif';`,
   );
 
   const monthNames = [
@@ -124,8 +146,9 @@ export async function generateAlfaHarian(
 
   // ── Pre-load semua shift ke Map (eliminasi N+1 per karyawan) ────────────
   const allShiftsRes = await targetDb.execute(
-    `SELECT id_shift, jam_masuk, jam_pulang, offset_generate_alfa,
-            jam_kerja_normal_menit, batas_pulang_menit, buffer_shift_malam_menit
+    `SELECT id_shift, kode_shift, jam_masuk, jam_pulang, offset_generate_alfa,
+            jam_kerja_normal_menit, batas_pulang_menit, buffer_shift_malam_menit,
+            hari_kerja
      FROM tbl_shift;`,
   );
   const shiftMap = new Map<number, Record<string, unknown>>();
@@ -139,6 +162,25 @@ export async function generateAlfaHarian(
   );
   const liburSet = new Set<string>(
     allLiburRes.rows.map((r) => String(r.tanggal).trim()),
+  );
+  const whitelistRes = await targetDb.execute(
+    `SELECT id, scope_type, scope_value, tanggal_libur, keterangan, status_aktif
+     FROM hari_libur_whitelist WHERE status_aktif = 1;`,
+  );
+  const whitelist: HolidayWhitelistEntry[] = whitelistRes.rows.map((r) => ({
+    id: String(r.id ?? ""),
+    scope_type: String(r.scope_type ?? ""),
+    scope_value: String(r.scope_value ?? ""),
+    tanggal_libur: r.tanggal_libur == null ? null : String(r.tanggal_libur),
+    keterangan: r.keterangan == null ? null : String(r.keterangan),
+    status_aktif: Number(r.status_aktif ?? 0),
+  }));
+  const hariSekolahRes = await targetDb.execute({
+    sql: "SELECT value FROM setting_gex_system WHERE key = ? LIMIT 1;",
+    args: [KUNCI_HARI_SEKOLAH],
+  });
+  const hariSekolah = parseHariSekolah(
+    hariSekolahRes.rows[0] ? String(hariSekolahRes.rows[0].value ?? "") : null,
   );
 
   let jumlahAlfaDibuat = 0;
@@ -226,8 +268,33 @@ export async function generateAlfaHarian(
       tanggalStr = `${prevDate.getFullYear()}-${String(prevDate.getMonth() + 1).padStart(2, "0")}-${String(prevDate.getDate()).padStart(2, "0")}`;
     }
 
-    // Cek apakah tanggal kerja ini adalah Hari Libur Aktif (dari Set, bukan query)
-    if (liburSet.has(tanggalStr)) {
+    // Dijadwalkan masuk? Libur mingguan lebih dulu (hari kerja shift atau
+    // Hari Sekolah siswa), lalu tanggal libur aktif: pada tanggal itu hanya
+    // yang masuk whitelist yang dinilai. Aturannya sama dengan Desktop
+    // (`generate_alfa_harian`); dulu jalur Web melewati whitelist sama sekali.
+    const libur = liburSet.has(tanggalStr);
+    const kodeShift = Number(shift.kode_shift);
+    const dijadwalkan = wajibMasuk({
+      tanggal: tanggalStr,
+      hariMasuk:
+        Number(emp.adalah_siswa) === 1
+          ? hariSekolahUntuk(
+              hariSekolah,
+              emp.id_unit_siswa == null ? null : String(emp.id_unit_siswa),
+            )
+          : parseHariKerja(
+              shift.hari_kerja == null ? null : String(shift.hari_kerja),
+            ),
+      libur,
+      masukSaatLibur:
+        libur &&
+        evaluateHolidayScan(whitelist, {
+          tanggal: tanggalStr,
+          divisi,
+          kodeShift: Number.isFinite(kodeShift) ? kodeShift : null,
+        }).allowed,
+    });
+    if (!dijadwalkan) {
       jumlahLibur++;
       continue;
     }

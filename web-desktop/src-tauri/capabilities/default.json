@@ -105,6 +105,7 @@
     "allow-desktop-update-holiday-whitelist",
     "allow-desktop-delete-holiday-whitelist",
     "allow-desktop-create-holiday",
+    "allow-desktop-create-holidays-bulk",
     "allow-desktop-update-holiday",
     "allow-desktop-delete-holiday",
     "allow-desktop-get-alfa-settings",
