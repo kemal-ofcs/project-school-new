@@ -626,6 +626,16 @@ export default function PmbPage() {
               </div>
             ) : null}
 
+            {bolehAngkat &&
+            ["Baru", "Berkas Lengkap", "Terverifikasi"].includes(
+              detail.pendaftar.status,
+            ) &&
+            !tolakUbahStatusPmb(detail.pendaftar.keadaan_bayar, "Diterima") ? (
+              <p className="text-slate-400 text-xs">
+                Ubah status ke Diterima untuk menjadikan pendaftar ini siswa.
+              </p>
+            ) : null}
+
             <div className="flex flex-wrap gap-2 pt-2">
               {bolehAngkat && detail.pendaftar.status === "Diterima" ? (
                 <button

@@ -607,6 +607,18 @@ export default function PmbMobilePage() {
             ) : null}
 
             <div className="space-y-2">
+              {bolehAngkat &&
+              ["Baru", "Berkas Lengkap", "Terverifikasi"].includes(
+                detail.pendaftar.status,
+              ) &&
+              !tolakUbahStatusPmb(
+                detail.pendaftar.keadaan_bayar,
+                "Diterima",
+              ) ? (
+                <p className="text-slate-400 text-xs">
+                  Ubah status ke Diterima untuk menjadikan pendaftar ini siswa.
+                </p>
+              ) : null}
               {bolehAngkat && detail.pendaftar.status === "Diterima" ? (
                 <button
                   className="w-full rounded-xl bg-emerald-500 px-3 py-2.5 font-semibold text-slate-950 text-xs"
