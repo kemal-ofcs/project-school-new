@@ -23,6 +23,7 @@ describe("CMS landing: koleksi dan perpindahan kunci lama", () => {
         "landing.stat_items",
         "landing.pilar_items",
         "landing.ekskul_items",
+        "landing.program_items",
         "landing.fasilitas_items",
         "landing.pmb_tahapan_items",
         "landing.faq_items",

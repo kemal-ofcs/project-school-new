@@ -15,6 +15,7 @@ import {
   fotoJurusan,
   koleksiEkskul,
   koleksiFasilitas,
+  koleksiProgram,
 } from "@/lib/services/landing-collections";
 
 export const metadata: Metadata = {
@@ -29,8 +30,8 @@ export const metadata: Metadata = {
  * - jurusan dari `akademik_jurusan`, tabel yang sama yang dipakai sekolah untuk
  *   menempatkan siswa ke rombel, supaya situs tidak pernah menyangkal jurusan
  *   yang sudah menerima siswa;
- * - kartu fasilitas dan ekstrakurikuler dari koleksi beranda, beserta fotonya,
- *   jadi admin mengisinya sekali;
+ * - kartu program sekolah, fasilitas, dan ekstrakurikuler dari koleksi
+ *   `landing.*_items` beserta fotonya, jadi admin mengisinya sekali;
  * - tiga ringkasan naratif dari menu Konten → Program & Fasilitas, sebagai
  *   pengantar tiap bagian.
  *
@@ -61,10 +62,13 @@ export default async function HalamanProgram() {
   const adaFasilitas = koleksiFasilitas(landing).length > 0;
   const ekskul = koleksiEkskul(landing);
   const adaFotoEkskul = ekskul.some((item) => item.foto);
+  const program = koleksiProgram(landing);
+  const adaFotoProgram = program.some((item) => item.foto);
 
   const kosongSemua =
     hasil.status === "ok" &&
     jurusan.length === 0 &&
+    program.length === 0 &&
     !adaFasilitas &&
     ekskul.length === 0 &&
     !ringkasanFasilitas &&
@@ -105,6 +109,27 @@ export default async function HalamanProgram() {
                   prodi={prodi}
                   foto={fotoPerJurusan[prodi.kode] ?? ""}
                   adaFoto={adaFotoJurusan}
+                />
+              ))}
+            </div>
+          </div>
+        </section>
+      ) : null}
+
+      {program.length > 0 ? (
+        <section className="muncul py-16 sm:py-20">
+          <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 space-y-10">
+            <KepalaBagian
+              judul={landing["landing.program_title"] || "Program Unggulan"}
+              teks={landing["landing.program_subtitle"]}
+            />
+            <div className="kartu-tengah sm:[--kolom:2] lg:[--kolom:3]">
+              {program.map((item, i) => (
+                <KartuEkskul
+                  key={`${i}-${item.title}`}
+                  item={item}
+                  indeks={i}
+                  adaFoto={adaFotoProgram}
                 />
               ))}
             </div>

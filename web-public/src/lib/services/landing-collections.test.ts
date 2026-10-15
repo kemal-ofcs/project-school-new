@@ -123,6 +123,7 @@ describe("koleksi dinamis landing page", () => {
       stat: "landing.stat_items",
       pilar: "landing.pilar_items",
       ekskul: "landing.ekskul_items",
+      program: "landing.program_items",
       fasilitas: "landing.fasilitas_items",
       pmbTahapan: "landing.pmb_tahapan_items",
       faq: "landing.faq_items",

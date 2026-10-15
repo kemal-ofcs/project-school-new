@@ -1,6 +1,6 @@
 /**
  * Koleksi berulang di landing page: statistik, pilar, ekstrakurikuler,
- * fasilitas, tahapan PMB, dan FAQ.
+ * program sekolah, fasilitas, tahapan PMB, dan FAQ.
  *
  * SUMBERNYA HANYA DATABASE. Situs publik tidak lagi membawa isi bawaan apa pun
  * untuk blok-blok ini: CMS-nya sudah punya CRUD, sehingga teks contoh yang
@@ -31,6 +31,7 @@ export const KUNCI_KOLEKSI = {
   stat: "landing.stat_items",
   pilar: "landing.pilar_items",
   ekskul: "landing.ekskul_items",
+  program: "landing.program_items",
   fasilitas: "landing.fasilitas_items",
   pmbTahapan: "landing.pmb_tahapan_items",
   faq: "landing.faq_items",
@@ -229,6 +230,15 @@ export const koleksiPilar = (konten: Konten): ItemPilar[] =>
 
 export const koleksiEkskul = (konten: Konten): ItemEkskul[] =>
   ambil(konten, KUNCI_KOLEKSI.ekskul, KUNCI_LAMA.ekskul, (item) => ({
+    title: teks(item.title),
+    category: teks(item.category),
+    desc: teks(item.desc),
+    foto: idFoto(item.foto),
+  }));
+
+/** Program sekolah: bentuk itemnya sama dengan ekskul, kartunya pun sama. */
+export const koleksiProgram = (konten: Konten): ItemEkskul[] =>
+  ambil(konten, KUNCI_KOLEKSI.program, null, (item) => ({
     title: teks(item.title),
     category: teks(item.category),
     desc: teks(item.desc),

@@ -348,6 +348,28 @@ export const LANDING_PAGE_SUBSECTIONS: CmsSubSectionConfig[] = [
     ],
   },
   {
+    id: "school_programs",
+    title: "Program Sekolah",
+    description:
+      "Program unggulan sekolah beserta fotonya, tampil di halaman Program. Tanpa satu program pun, bagian ini tidak ditampilkan.",
+    fields: [
+      {
+        key: "landing.program_title",
+        label: "Judul Bagian",
+        type: "text",
+        placeholder: "Program Unggulan",
+        description: 'Kosongkan untuk memakai judul "Program Unggulan".',
+      },
+      {
+        key: "landing.program_subtitle",
+        label: "Pengantar Bagian",
+        type: "textarea",
+        rows: 2,
+        placeholder: "Program pembinaan yang dijalankan sekolah.",
+      },
+    ],
+  },
+  {
     id: "facilities",
     title: "Fasilitas Kampus & Spesifikasi",
     description:
@@ -551,6 +573,20 @@ export const KOLEKSI_LANDING: Record<string, KoleksiLandingConfig> = {
       awalan: "ekskul",
       peta: { title: "title", category: "cat", desc: "desc" },
     },
+  },
+  // Bentuk item sama dengan ekskul supaya situs publik memakai kartu yang sama.
+  school_programs: {
+    kunci: "landing.program_items",
+    label: "Program Sekolah",
+    description:
+      "Program unggulan, misalnya tahfidz, kelas olimpiade, atau magang industri.",
+    maksItem: MAKS_ITEM_KOLEKSI_LANDING,
+    fields: [
+      { name: "title", label: "Nama Program" },
+      { name: "category", label: "Label Kecil (opsional)" },
+      { name: "desc", label: "Deskripsi", type: "textarea" },
+      { name: "foto", label: "Foto Program", type: "gambar" },
+    ],
   },
   facilities: {
     kunci: "landing.fasilitas_items",
