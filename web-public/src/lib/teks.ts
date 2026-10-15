@@ -9,3 +9,23 @@ export function pecahButir(teks: string): string[] {
     .map((baris) => baris.replace(/^\s*(?:\d+\s*[.)]|[-•*])\s*/, "").trim())
     .filter(Boolean);
 }
+
+/**
+ * Poin keunggulan dari CMS: satu butir per baris, ATAU satu paragraf bernomor
+ * ("1. A 2. B 3. C") seperti yang sering diketik di kotak deskripsi. Paragraf
+ * hanya dipecah bila nomornya berurutan mulai 1, supaya angka biasa di tengah
+ * kalimat ("setoran 3 Juz") tidak memotong poin.
+ */
+export function pecahPoin(teks: string): string[] {
+  const baris = pecahButir(teks);
+  if (baris.length !== 1) return baris;
+  // Teks asli, bukan `baris[0]`: `pecahButir` sudah membuang "1." di depannya.
+  const bagian = teks.trim().split(/\s+(?=\d{1,2}[.)]\s)/);
+  const nomorUrut = bagian.every(
+    (b, i) => Number.parseInt(b, 10) === i + 1 && /^\d{1,2}[.)]\s/.test(b),
+  );
+  if (bagian.length < 2 || !nomorUrut) return baris;
+  return bagian
+    .map((b) => b.replace(/^\d{1,2}[.)]\s*/, "").trim())
+    .filter(Boolean);
+}

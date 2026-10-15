@@ -1,7 +1,6 @@
 import {
   Award,
-  Cpu,
-  Globe,
+  CheckCircle2,
   GraduationCap,
   Quote,
   ShieldCheck,
@@ -12,12 +11,7 @@ import { KataMuncul } from "@/components/visual/KataMuncul";
 import { SpotlightCard } from "@/components/visual/SpotlightCard";
 import { koleksiPilar } from "@/lib/services/landing-collections";
 import type { SchoolProfile } from "@/lib/services/school-profile";
-
-/**
- * Ikon pilar diputar berdasarkan posisi. Ia komponen React sehingga tidak bisa
- * disimpan di database, dan pilar ke-N di luar empat pertama tetap butuh satu.
- */
-const IKON_PILAR = [Globe, GraduationCap, ShieldCheck, Cpu];
+import { pecahPoin } from "@/lib/teks";
 
 interface PillarsSectionProps {
   profil: SchoolProfile;
@@ -39,10 +33,7 @@ export function PillarsSection({ profil, konten = {} }: PillarsSectionProps) {
   const subtitle = konten["landing.pillars_subtitle"];
   const badgePill = konten["landing.pillars_badge"];
 
-  const pillarsData = koleksiPilar(konten).map((item, i) => ({
-    ...item,
-    icon: IKON_PILAR[i % IKON_PILAR.length],
-  }));
+  const pillarsData = koleksiPilar(konten);
 
   // Nama dan jabatan jatuh ke profil sekolah (data yang diisi sekolah sendiri
   // di Pengaturan), tidak pernah ke nama yang ditulis di kode.
@@ -97,39 +88,54 @@ export function PillarsSection({ profil, konten = {} }: PillarsSectionProps) {
           {pillarsData.length > 0 ? (
             <div className="pilar-daftar kartu-tengah sm:[--kolom:2] lg:[--kolom:4]">
               {pillarsData.map((item, i) => {
-                const Icon = item.icon;
+                const poin = pecahPoin(item.desc);
                 return (
                   <SpotlightCard
                     key={`${i}-${item.title}`}
                     className="rounded-2xl"
                     glowColor="rgba(0, 35, 111, 0.14)"
                   >
-                    <Card className="h-full flex flex-col justify-between p-6 transition-all duration-300 hover:shadow-xl hover:-translate-y-1 border-border/80 bg-card/90 backdrop-blur-xs">
-                      <div className="space-y-4">
-                        <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10 text-primary group-hover:bg-primary group-hover:text-primary-foreground transition-all duration-300 shadow-xs">
-                          <Icon className="h-6 w-6" />
-                        </div>
-                        <div className="space-y-2">
-                          <h3 className="font-bold text-lg text-foreground leading-snug group-hover:text-primary transition-colors">
+                    <Card className="h-full p-6 sm:p-8 border-border bg-card">
+                      {/* Nomor urut, bukan ikon: ikon yang diputar per posisi
+                          tidak ada hubungannya dengan isi pilar, sedangkan
+                          nomor amber sama dengan daftar misi di halaman Profil. */}
+                      <div className="flex items-start gap-4 sm:gap-5">
+                        <span
+                          aria-hidden="true"
+                          className="font-extrabold text-3xl sm:text-4xl leading-none tabular-nums text-secondary"
+                        >
+                          {String(i + 1).padStart(2, "0")}
+                        </span>
+                        <div className="min-w-0 space-y-1">
+                          <h3 className="font-bold text-lg sm:text-xl leading-snug text-foreground text-balance">
                             {item.title}
                           </h3>
-                          {item.desc ? (
-                            <p className="text-sm text-muted-foreground leading-relaxed">
-                              {item.desc}
+                          {item.tag ? (
+                            <p className="text-sm font-medium text-primary">
+                              {item.tag}
                             </p>
                           ) : null}
                         </div>
                       </div>
 
-                      {item.tag ? (
-                        <div className="pt-6">
-                          <Badge
-                            variant="outline"
-                            className="text-[11px] font-semibold border-secondary/30 text-secondary bg-secondary/5"
-                          >
-                            {item.tag}
-                          </Badge>
-                        </div>
+                      {poin.length > 1 ? (
+                        <ul className="mt-6 grid gap-x-6 gap-y-3 border-t border-border pt-6 sm:grid-cols-2">
+                          {poin.map((isi) => (
+                            <li className="flex gap-2.5" key={isi}>
+                              <CheckCircle2
+                                aria-hidden="true"
+                                className="mt-0.5 h-4 w-4 shrink-0 text-accent"
+                              />
+                              <span className="text-sm leading-relaxed text-muted-foreground">
+                                {isi}
+                              </span>
+                            </li>
+                          ))}
+                        </ul>
+                      ) : poin.length === 1 ? (
+                        <p className="mt-5 text-sm sm:text-base leading-relaxed text-muted-foreground">
+                          {poin[0]}
+                        </p>
                       ) : null}
                     </Card>
                   </SpotlightCard>

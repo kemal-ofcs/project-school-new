@@ -370,13 +370,17 @@ html[data-efek="desktop"] .kartu-tengah > [data-miring]:hover > :last-child {
 
 /* 4. Pilar disematkan: judul bagian diam di kiri selama pilar-pilarnya
       bergulir di kanan, dan pilar yang sedang di tengah layar menyala. */
+/* Pilar yang belum/sudah lewat tengah layar tetap terbaca (0,6), dan pilar
+   yang panjang menyala penuh sepanjang ia berada di tengah, bukan hanya
+   sesaat di titik 50%. */
 @keyframes pilar-sorot {
   0%,
   100% {
-    opacity: 0.35;
-    scale: 0.96;
+    opacity: 0.6;
+    scale: 0.98;
   }
-  50% {
+  35%,
+  65% {
     opacity: 1;
     scale: 1;
   }

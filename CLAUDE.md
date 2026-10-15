@@ -100,7 +100,7 @@ bun run tauri:ios:build
 
 `SPPG_BUILD_TARGET` / `NEXT_PUBLIC_SPPG_RUNTIME` (`web` | `desktop` | `mobile`) select the target at build/dev time — set by the scripts above, not manually.
 
-Quality-gate discipline: run `bun run check:quick` **once**, at the end, after a change is fully written — not repeatedly mid-edit.
+Quality-gate discipline: Claude does NOT run `bun run check` or `bun run check:quick` itself — their output floods the context. After a change is fully written, stop and tell the user to run the gate on their side (Antigravity skill `jalankan-check`), which writes the summary to `.claude/HASIL.md` (full log in `.claude/check.log`). Read `.claude/HASIL.md` only, never the log in full; use Grep on the log if a line must be found. Check the `Commit` and `Waktu` lines first: if they predate the change, the result is stale — say so instead of trusting it. Individual gates for a single iteration (e.g. `bun run audit:sql`) may still be run, redirected to a file.
 
 ## Architecture
 
@@ -198,7 +198,7 @@ Jam kerja pada tanggal libur dipisahkan sebagai **Jam Kerja Hari Libur** dan dih
 - Strict Zod schemas: Always use `.strict()`, never `.passthrough()`. Validate enums against CHECK constraints and validate nested objects recursively.
 - Tauri v2 IPC parameter naming: Rust `snake_case` maps to JS `camelCase` (e.g. `id_rombel: Option<String>` -> `{ idRombel }`). Passing `snake_case` in JS results in silent `None`.
 - Rust string slicing: Never use raw byte slicing `&id[4..10]`. Use UTF-8 safe character iterator `id.chars().skip(4).take(6).collect::<String>()`.
-- Full check verification: Always verify completion with `bun run check` (which includes cargo tests), not just `bun run check:quick`.
+- Full check verification: completion means a green `bun run check` (which includes cargo tests), not just `bun run check:quick` — as reported in `.claude/HASIL.md` by the user's run (see "Quality-gate discipline"). Claude must not claim "verified" without a fresh, passing HASIL.md.
 - Standar Tunggal Waktu Operasional & Tanggal Kanonik WIB: DILARANG menggunakan `date('now')` (UTC) atau `date('now','localtime')` untuk penentuan tanggal operasional, hari ini, filter presensi, rekonsiliasi, maupun snapshot. Antara pukul 00:00–07:00 WIB, query UTC menunjuk ke hari kemarin. Jam server/perangkat WAJIB menggunakan `date('now','+7 hours')` atau `datetime('now','+7 hours')` (mengikuti `current_jakarta_moment` di `scanner.rs`).
 - Agregasi Wajib Scan Gerbang Multi-Sesi & Sanitasi Jam Masuk: Tabel `absensi_harian` mengizinkan multi-sesi per tanggal (`izinkan_multi_sesi = 1`). Melakukan join langsung ke `absensi_harian` menggandakan baris siswa dan anomali. Setiap query yang membutuhkan status scan gerbang WAJIB melalui subquery agregasi tunggal (`GATE_SUMMARY_SUBQUERY` / `GROUP BY id_karyawan, tanggal`) dengan `MIN(NULLIF(TRIM(jam_masuk), ''))` dan sanitasi string kosong (`jam_masuk IS NOT NULL AND TRIM(jam_masuk) <> ''`).
 - Penolakan Ketat Status Presensi Kelas: Status kehadiran siswa pada presensi mapel terikat ketat pada 5 nilai kanonik: `Hadir`, `Izin`, `Sakit`, `Alfa`, `Dispensasi`. DILARANG mengubah nilai status asing atau error menjadi "Hadir" secara diam-diam (`_ => "Hadir"`). Nilai tak dikenal WAJIB ditolak dengan error validasi (`VALIDATION_ERROR` / HTTP 400).
@@ -281,3 +281,14 @@ For UI, copy, people, mobile layout, or code comments work, load the `antislop` 
 Root `DESIGN.md` is the brief for `web-public` (PMB portal) only. `web-desktop` and `mobile` have no DESIGN.md; their direction is the theme and 3D rules in this file.
 Before starting, ask the user when antislop applies: during the work, or after it is done.
 <!-- antislop:end -->
+
+## graphify
+
+This project has a knowledge graph at graphify-out/ with god nodes, community structure, and cross-file relationships.
+
+Rules:
+- When graphify-out/graph.json exists, run `graphify query "<question>"` before your first grep, search or source-file read for a codebase question, and put this rule in every subagent prompt that explores code. Read raw files only for lines the graph or an earlier read already located. Use `graphify path "<A>" "<B>"` for relationships and `graphify explain "<concept>"` for focused concepts. These return a scoped subgraph, usually much smaller than GRAPH_REPORT.md or raw grep output.
+- If graphify-out/wiki/index.md exists, use it for broad navigation instead of raw source browsing.
+- Read graphify-out/GRAPH_REPORT.md only for broad architecture review or when query/path/explain do not surface enough context.
+- After modifying code, run `graphify update .` to keep the graph current (AST-only, no API cost).
+- A committed graphify-out/graph.json is rewritten whole on every build, so a large diff to it in a pull request is expected. Do not flag it as churn or suggest skipping the graph rebuild or its hooks.
