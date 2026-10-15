@@ -142,7 +142,18 @@ export function SiteHeader({
           </Button>
 
           {/* Mobile Navigation Drawer */}
-          <MobileNav navigasi={NAVIGASI} telepon={profil.telepon} nama={nama} />
+          <MobileNav
+            navigasi={NAVIGASI}
+            telepon={profil.telepon}
+            nama={nama}
+            sosial={
+              <MediaSosial
+                className="justify-center"
+                konten={konten}
+                nama={nama}
+              />
+            }
+          />
         </div>
       </div>
     </header>
@@ -329,7 +340,7 @@ export function SiteFooter({
                   <p className="whitespace-pre-line">{jamLayanan}</p>
                 </div>
               ) : null}
-              <MediaSosial konten={konten} className="pt-2" />
+              <MediaSosial konten={konten} nama={nama} className="pt-2" />
             </div>
           </div>
         </div>

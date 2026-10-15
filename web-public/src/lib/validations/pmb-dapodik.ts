@@ -31,7 +31,6 @@ export const AGAMA = [
   "Hindu",
   "Budha",
   "Khonghucu",
-  "Kepercayaan kpd Tuhan YME",
 ] as const;
 
 export const JENIS_TINGGAL = [

@@ -27,9 +27,11 @@ interface MobileNavProps {
   navigasi: readonly NavItem[];
   telepon: string | null;
   nama: string;
+  /** Ikon media sosial, dirender `SiteHeader` di server. */
+  sosial?: React.ReactNode;
 }
 
-export function MobileNav({ navigasi, telepon, nama }: MobileNavProps) {
+export function MobileNav({ navigasi, telepon, nama, sosial }: MobileNavProps) {
   const [sheetOpen, setSheetOpen] = React.useState(false);
 
   return (
@@ -94,6 +96,7 @@ export function MobileNav({ navigasi, telepon, nama }: MobileNavProps) {
                 Daftar PMB Sekarang
               </Link>
             </Button>
+            {sosial}
             {telepon ? (
               <a
                 href={`tel:${telepon}`}

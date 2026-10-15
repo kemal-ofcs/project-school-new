@@ -149,7 +149,11 @@ export default async function HalamanKontak() {
               </div>
             ) : null}
 
-            <MediaSosial konten={konten} className="justify-center" />
+            <MediaSosial
+              className="justify-center"
+              konten={konten}
+              varian="label"
+            />
           </>
         )}
       </div>
