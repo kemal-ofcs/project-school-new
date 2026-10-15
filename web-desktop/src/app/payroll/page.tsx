@@ -198,6 +198,13 @@ export default function PayrollDashboardPage() {
                 <Icon name="history" className="w-4 h-4" />
                 Daftar Batch Runs
               </Link>
+              <Link
+                href="/payroll/rapel"
+                className="px-4 py-2 text-sm font-semibold rounded-lg bg-slate-800 text-slate-200 hover:bg-slate-700 transition flex items-center gap-2 border border-slate-700"
+              >
+                <Icon name="refresh" className="w-4 h-4" />
+                Rapel Gaji
+              </Link>
               {canManageConfig && (
                 <Link
                   href="/payroll/config"

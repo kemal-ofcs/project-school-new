@@ -255,6 +255,9 @@ pub struct PayrollRecapRow {
     /// Cicilan kasbon yang ikut dipotong; sudah termasuk di
     /// `est_total_deduction` dan mengurangi `est_net_salary`.
     pub est_kasbon: i64,
+    /// Rapel gaji yang ikut dibayar; sudah termasuk di `est_total_allowance`
+    /// dan karenanya di bruto, PPh 21, dan BPJS bulan ini.
+    pub est_rapel: i64,
 }
 
 /// Satu orang, dilihat dari sudut pandang penyaringan komponen payroll.

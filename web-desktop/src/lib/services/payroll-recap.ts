@@ -17,6 +17,7 @@ import {
   type TaughtSession,
   type TaxRule,
 } from "@/lib/services/payroll-calculator";
+import { rapelMenunggu } from "@/lib/services/payroll-rapel";
 import { rentangJamKe } from "@/lib/validations/class-attendance";
 import { komponenKasbon, potongKasbon } from "@/lib/validations/loan";
 import {
@@ -25,6 +26,10 @@ import {
   parseTeacherOvertimeSetting,
   TEACHER_OVERTIME_SETTING_KEY,
 } from "@/lib/validations/payroll-policy";
+import {
+  komponenRapel,
+  rincianRapelJson,
+} from "@/lib/validations/payroll-rapel";
 
 export interface PayrollRecapRow {
   id_karyawan: string;
@@ -74,6 +79,8 @@ export interface PayrollRecapRow {
   est_net_salary: number;
   /** Cicilan kasbon yang ikut dipotong; sudah termasuk di `est_total_deduction`. */
   est_kasbon: number;
+  /** Rapel yang ikut dibayar; sudah termasuk di `est_total_allowance` dan bruto. */
+  est_rapel: number;
   // Extra fields (not part of the Rust PayrollRecapRow response shape, but
   // needed by run creation to build payroll_items without recomputing).
   breakdown_snapshot: string;
@@ -280,6 +287,7 @@ export async function computePayrollRecap(
     jpRates,
     aggResult,
     kasbonAktif,
+    rapelAktif,
   ] = await Promise.all([
     loadOvertimeTiers(client, "HARI_KERJA"),
     // Jenjang lembur hari libur dikonfigurasi terpisah oleh user di menu
@@ -358,6 +366,9 @@ export async function computePayrollRecap(
     // Kasbon dipotong per proses gaji; penundaan dan bulan mulai potong dinilai
     // terhadap bulan awal periode. Cerminan `loan::pinjaman_aktif`.
     pinjamanAktif(client, periodStart.slice(0, 7)),
+    // Rapel yang belum dipegang proses gaji mana pun ikut dibayar sebagai
+    // tunjangan. Cerminan `rapel::rapel_menunggu`.
+    rapelMenunggu(client),
   ]);
 
   const teacherOvertime = parseTeacherOvertimeSetting(
@@ -441,10 +452,13 @@ export async function computePayrollRecap(
       total_hadir: Number(row.total_hadir || 0),
     };
     const {
-      allowance,
+      allowance: allowanceKomponen,
       deduction,
       breakdown: compBreakdown,
     } = calculateComponents(basicSalary, components, subject);
+    const rapel = rapelAktif.get(idKaryawan) ?? [];
+    const rapelTotal = rapel.reduce((n, item) => n + item.jumlah, 0);
+    const allowance = allowanceKomponen + rapelTotal;
 
     const gross = basicSalary + overtimeSalary + teaching.honor + allowance;
     const {
@@ -482,10 +496,15 @@ export async function computePayrollRecap(
       overtime_salary: overtimeSalary,
       teaching_jp: teaching.total_jp,
       teaching_salary: teaching.honor,
-      components: [...compBreakdown, ...komponenKasbon(kasbon.rincian)],
+      components: [
+        ...compBreakdown,
+        ...komponenRapel(rapel),
+        ...komponenKasbon(kasbon.rincian),
+      ],
       bpjs: bpjsBreakdown,
       tax: taxBreakdown,
       kasbon: kasbon.rincian,
+      rapel: rincianRapelJson(rapel),
       calculated_at: new Date().toISOString(),
     });
 
@@ -516,6 +535,7 @@ export async function computePayrollRecap(
       est_pph21: pph21Amount,
       est_net_salary: net,
       est_kasbon: kasbon.total,
+      est_rapel: rapelTotal,
       breakdown_snapshot: breakdownSnapshot,
       bpjs_company_total: bpjsCompany,
     };

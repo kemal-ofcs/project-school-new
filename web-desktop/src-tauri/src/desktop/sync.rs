@@ -19,7 +19,7 @@ use super::{
 /// `CURRENT_SCHEMA_VERSION` di `web-desktop/src/lib/db-schema.ts` setiap kali
 /// migrasi baru ditambahkan, karena keduanya membaca tabel `schema_migration`
 /// yang sama di Turso.
-pub const CLIENT_SCHEMA_VERSION: i64 = 50;
+pub const CLIENT_SCHEMA_VERSION: i64 = 51;
 
 /// Hanya `cloud > client` yang berbahaya; `cloud <= client` adalah kondisi normal.
 fn is_client_schema_outdated(cloud_version: i64) -> bool {
@@ -592,6 +592,36 @@ const SNAPSHOT_TABLES: &[SnapshotTable] = &[
         ],
         conflict_column: "id",
         entity_column: "id",
+        delete_missing: false,
+    },
+    // v51 — rapel gaji. Baris tidak pernah dihapus; pembatalan mengisi kolom
+    // `dibatalkan_*`, dan statusnya diturunkan dari proses gaji.
+    SnapshotTable {
+        payload_key: "payrollRapel",
+        domain: "payroll-rapel",
+        table: "payroll_rapel",
+        columns: &[
+            "id_rapel",
+            "id_karyawan",
+            "nama_karyawan",
+            "id_item_asal",
+            "id_run_asal",
+            "period_start",
+            "period_end",
+            "rate_lama",
+            "rate_baru",
+            "selisih_pokok",
+            "selisih_lembur",
+            "selisih_komponen",
+            "jumlah",
+            "dibuat_oleh",
+            "dibatalkan_oleh",
+            "dibatalkan_pada",
+            "alasan_batal",
+            "created_at",
+        ],
+        conflict_column: "id_rapel",
+        entity_column: "id_rapel",
         delete_missing: false,
     },
     SnapshotTable {
@@ -1441,6 +1471,8 @@ pub(crate) const CANONICAL_SYNC_ROUTES: &[(&str, &str)] = &[
     ("payroll", "salary-config"),
     ("payroll", "tax-rule"),
     ("payroll", "transition-status"),
+    ("payroll-rapel", "cancel"),
+    ("payroll-rapel", "save"),
     ("personnel-photo", "delete"),
     ("personnel-photo", "save"),
     ("setting", "update"),

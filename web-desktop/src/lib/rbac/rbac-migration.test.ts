@@ -153,6 +153,8 @@ describe("dynamic RBAC migration", () => {
       49,
       // v50 — hari kerja mingguan shift (`tbl_shift.hari_kerja`).
       50,
+      // v51 — rapel gaji (`payroll_rapel`).
+      51,
     ]);
 
     const sessionColumns = await client.execute(

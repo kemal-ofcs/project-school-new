@@ -57,6 +57,8 @@ const filesToCopy = [
   "components/keuangan/KeuanganWorkspace.tsx",
   // Kasbon (K2) dan pemilih akun kas/bank yang dipakai juga halaman payroll.
   "components/keuangan/KasbonWorkspace.tsx",
+  // Rapel gaji (v51): satu UI untuk Web/Desktop dan Mobile.
+  "components/payroll/RapelWorkspace.tsx",
   "components/keuangan/PilihAkunBayar.tsx",
   // Tagihan siswa (K3a).
   "components/keuangan/TagihanWorkspace.tsx",

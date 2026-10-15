@@ -423,6 +423,7 @@ For UI, copy, people, mobile layout, or code comments work, read `.agents/antisl
 - People: `.agents/skills/antislop-human/SKILL.md`
 - Mobile / responsive: `.agents/skills/antislop-layoutmobile/SKILL.md`
 - Code comments: `.agents/skills/antislop-code/SKILL.md`
+- Runner pra-check: skill `jalankan-antislop` (`.agents/skills/jalankan-antislop/SKILL.md`) atau workflow `/antislop` sebelum `/check`.
 Before starting, ask the user when antislop applies: during the work, or after it is done.
 <!-- antislop:end -->
 

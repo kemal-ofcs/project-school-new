@@ -56,7 +56,7 @@ describe("Schema Consistency & Zero-Drift Guard", () => {
         'keu_jenis_tagihan', 'keu_tarif_tagihan', 'keu_keringanan',
         'keu_tagihan', 'keu_tagihan_batal',
         'keu_seri_perangkat', 'keu_pembayaran', 'keu_pembayaran_alokasi', 'keu_pembayaran_batal',
-        'nilai_jenis', 'keu_tutup_buku', 'konten_gambar'
+        'nilai_jenis', 'keu_tutup_buku', 'konten_gambar', 'payroll_rapel'
       );
     `);
     const tableCount = Number(tablesRes.rows[0]?.count ?? 0);

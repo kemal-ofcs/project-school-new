@@ -29,6 +29,7 @@ pub mod loan;
 pub mod nilai_akhir;
 pub mod payroll;
 pub mod portability;
+pub mod rapel;
 pub mod teaching_journal;
 pub mod uks;
 pub mod wa_notification;

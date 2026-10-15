@@ -19,6 +19,7 @@ use super::models::{
 use crate::mobile::config::MobileState;
 use crate::mobile::loan;
 use crate::mobile::models::CommandError;
+use crate::mobile::rapel;
 use crate::mobile::storage;
 use crate::mobile::sync;
 
@@ -1493,6 +1494,9 @@ pub async fn desktop_get_payroll_recap(
     // dinilai terhadap bulan awal periode.
     let kasbon_aktif =
         loan::pinjaman_aktif(&conn, &period_start.chars().take(7).collect::<String>())?;
+    // Rapel yang belum dipegang proses gaji mana pun ikut dibayar di sini,
+    // sebagai tunjangan, dengan aturan yang sama dengan pembekuan di bawah.
+    let rapel_menunggu = rapel::rapel_menunggu(&conn)?;
 
     let mut stmt = conn
         .prepare(
@@ -1655,6 +1659,11 @@ pub async fn desktop_get_payroll_recap(
             };
             let (allowance, deduction, _) =
                 PayrollCalculator::calculate_components(basic_salary, &components, &subject);
+            let rapel_total: i64 = rapel_menunggu
+                .get(&agg.id_unik)
+                .map(|daftar| daftar.iter().map(|item| item.jumlah).sum())
+                .unwrap_or(0);
+            let allowance = allowance + Decimal::from(rapel_total);
 
             let gross = basic_salary + overtime_salary + teaching_salary + allowance;
             let (bpjs_emp, _, _) = PayrollCalculator::calculate_bpjs(gross, &bpjs_rules);
@@ -1713,6 +1722,7 @@ pub async fn desktop_get_payroll_recap(
                 est_pph21: pph21.to_i64().unwrap_or(0),
                 est_net_salary: net.to_i64().unwrap_or(0),
                 est_kasbon: kasbon,
+                est_rapel: rapel_total,
             });
         }
     }
@@ -1774,6 +1784,7 @@ pub async fn desktop_create_payroll_run(
     let bpjs_rules = load_bpjs_rules(&conn, &period_end)?;
     let kasbon_aktif =
         loan::pinjaman_aktif(&conn, &period_start.chars().take(7).collect::<String>())?;
+    let rapel_menunggu = rapel::rapel_menunggu(&conn)?;
 
     let tx = conn.transaction().map_err(|_| CommandError::internal())?;
 
@@ -1830,6 +1841,15 @@ pub async fn desktop_create_payroll_run(
         };
         let (allowance, deduction, mut comp_breakdown) =
             PayrollCalculator::calculate_components(basic_salary, &components, &subject);
+        // Rapel ikut tunjangan, sama dengan pratinjau. `breakdown.rapel` yang
+        // menandai rapel sudah dipegang proses gaji ini.
+        let rapel_ini = rapel_menunggu
+            .get(&row.id_karyawan)
+            .map(Vec::as_slice)
+            .unwrap_or(&[]);
+        let allowance =
+            allowance + Decimal::from(rapel_ini.iter().map(|item| item.jumlah).sum::<i64>());
+        comp_breakdown.extend(rapel::komponen_rapel(rapel_ini));
 
         let gross = basic_salary + overtime_salary + teaching_salary + allowance;
         let (bpjs_emp, bpjs_co, bpjs_breakdown) =
@@ -1867,6 +1887,7 @@ pub async fn desktop_create_payroll_run(
             "bpjs": bpjs_breakdown,
             "tax": tax_breakdown,
             "kasbon": loan::rincian_kasbon_json(&rincian_kasbon),
+            "rapel": rapel::rincian_rapel_json(rapel_ini),
             "calculated_at": now.clone()
         });
 

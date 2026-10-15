@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-desktop-payroll-rapel-cancel"
+description = "Enables the desktop_payroll_rapel_cancel command without any pre-configured scope."
+commands.allow = ["desktop_payroll_rapel_cancel"]
+
+[[permission]]
+identifier = "deny-desktop-payroll-rapel-cancel"
+description = "Denies the desktop_payroll_rapel_cancel command without any pre-configured scope."
+commands.deny = ["desktop_payroll_rapel_cancel"]

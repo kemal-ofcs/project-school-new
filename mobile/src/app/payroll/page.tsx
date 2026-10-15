@@ -342,6 +342,17 @@ Status: Estimasi Real-Time ${companyName}`;
               </span>
               <Icon name="chevron-right" className="size-4 text-slate-500" />
             </Link>
+            <Link
+              href="/payroll/rapel"
+              onClick={() => triggerHaptic("light")}
+              className="mt-2 flex min-h-11 items-center justify-between gap-2 rounded-xl border border-white/10 bg-slate-900/80 px-3 text-xs font-bold text-slate-200 transition active:scale-95"
+            >
+              <span className="flex items-center gap-2">
+                <Icon name="refresh" className="size-4 text-emerald-300" />
+                Rapel Gaji
+              </span>
+              <Icon name="chevron-right" className="size-4 text-slate-500" />
+            </Link>
             {canManagePayrollConfig ? (
               <Link
                 href="/payroll/config"

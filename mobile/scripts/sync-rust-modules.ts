@@ -16,6 +16,8 @@ const filesToSync = [
   "accounting.rs",
   // Kasbon karyawan (K2): potongan gaji wajib identik dengan Desktop dan TS.
   "loan.rs",
+  // Rapel gaji (v51): selisih tarif wajib identik dengan Desktop dan TS.
+  "rapel.rs",
   // Tagihan siswa (K3a): tarif dan keringanan wajib identik dengan Desktop dan TS.
   "billing.rs",
   "tutup_buku.rs",

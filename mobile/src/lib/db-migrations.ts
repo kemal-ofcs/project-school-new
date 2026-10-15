@@ -61,6 +61,7 @@ const WA_BOOK_CLOSING_MIGRATION_VERSION = 47;
 const CONTENT_IMAGE_MIGRATION_VERSION = 48;
 const PMB_DAPODIK_MIGRATION_VERSION = 49;
 const SHIFT_WORK_DAYS_MIGRATION_VERSION = 50;
+const PAYROLL_RAPEL_MIGRATION_VERSION = 51;
 
 /**
  * v21 — aturan jam scan baru: Jam Kerja Normal = (Jam Pulang − Jam Masuk) −
@@ -2038,6 +2039,43 @@ export async function runDatabaseMigrations(client: Client) {
     sql: `INSERT OR IGNORE INTO schema_migration (version, name, applied_at)
           VALUES (?, 'shift-work-days', ?);`,
     args: [SHIFT_WORK_DAYS_MIGRATION_VERSION, now],
+  });
+  // v51 — rapel gaji. Id deterministik `rpl-<slip>-<tarif baru>`, status
+  // diturunkan dari `dibatalkan_pada` dan `breakdown_snapshot.rapel` proses
+  // gaji. Tanpa UNIQUE selain PK. DDL WAJIB identik dengan `storage.rs` dan
+  // `turso.rs`.
+  await client.execute(`
+    CREATE TABLE IF NOT EXISTS payroll_rapel (
+      id_rapel TEXT PRIMARY KEY,
+      id_karyawan TEXT NOT NULL,
+      nama_karyawan TEXT NOT NULL,
+      id_item_asal TEXT NOT NULL,
+      id_run_asal TEXT NOT NULL,
+      period_start TEXT NOT NULL,
+      period_end TEXT NOT NULL,
+      rate_lama INTEGER NOT NULL CHECK (rate_lama >= 0),
+      rate_baru INTEGER NOT NULL CHECK (rate_baru >= 0),
+      selisih_pokok INTEGER NOT NULL,
+      selisih_lembur INTEGER NOT NULL,
+      selisih_komponen INTEGER NOT NULL,
+      jumlah INTEGER NOT NULL CHECK (jumlah > 0),
+      dibuat_oleh TEXT NOT NULL,
+      dibatalkan_oleh TEXT,
+      dibatalkan_pada TEXT,
+      alasan_batal TEXT,
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+  `);
+  await client.execute(
+    "CREATE INDEX IF NOT EXISTS idx_payroll_rapel_karyawan ON payroll_rapel(id_karyawan);",
+  );
+  await client.execute(
+    "CREATE INDEX IF NOT EXISTS idx_payroll_rapel_item ON payroll_rapel(id_item_asal);",
+  );
+  await client.execute({
+    sql: `INSERT OR IGNORE INTO schema_migration (version, name, applied_at)
+          VALUES (?, 'payroll-rapel', ?);`,
+    args: [PAYROLL_RAPEL_MIGRATION_VERSION, now],
   });
 
   await client.execute(

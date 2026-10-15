@@ -174,6 +174,11 @@ export const PERMISSION_CATALOG = [
     name: "Export Laporan & Slip Gaji",
     group: "Penggajian",
   },
+  {
+    key: "payroll.rapel.manage",
+    name: "Hitung & Setujui Rapel Gaji",
+    group: "Penggajian",
+  },
   { key: "academic.view", name: "Lihat Struktur Akademik", group: "Akademik" },
   {
     key: "academic.manage",
@@ -514,6 +519,8 @@ export const SENSITIVE_MUTATION_PERMISSIONS = new Set<PermissionKey>([
   // Menutup buku membuat setiap perangkat menolak pencatatan di periode itu,
   // dan memutuskan bentrokan tutup buku menentukan potret saldo resmi.
   "accounting.close",
+  // Menyetujui rapel berarti mengeluarkan uang sekolah di proses gaji berikutnya.
+  "payroll.rapel.manage",
 ]);
 
 export const SYSTEM_ROLE_KEYS = [

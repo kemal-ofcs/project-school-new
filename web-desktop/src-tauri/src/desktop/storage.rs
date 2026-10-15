@@ -1284,6 +1284,33 @@ pub fn initialize(path: &Path) -> Result<(), String> {
       CREATE INDEX IF NOT EXISTS idx_local_payroll_items_karyawan ON payroll_items(id_karyawan);
       CREATE INDEX IF NOT EXISTS idx_local_payroll_runs_status ON payroll_runs(status, period_start);
       CREATE INDEX IF NOT EXISTS idx_local_salary_configs_karyawan ON salary_configs(id_karyawan, effective_date DESC);
+      -- Rapel gaji (v51): selisih upah slip PAID karena tarif berubah
+      -- sesudahnya. Id deterministik `rpl-<slip>-<tarif baru>`; status
+      -- diturunkan dari `dibatalkan_pada` dan `breakdown_snapshot.rapel`
+      -- proses gaji. Tanpa UNIQUE selain PK. DDL WAJIB identik dengan
+      -- `turso.rs` dan `db-migrations.ts`.
+      CREATE TABLE IF NOT EXISTS payroll_rapel (
+        id_rapel TEXT PRIMARY KEY,
+        id_karyawan TEXT NOT NULL,
+        nama_karyawan TEXT NOT NULL,
+        id_item_asal TEXT NOT NULL,
+        id_run_asal TEXT NOT NULL,
+        period_start TEXT NOT NULL,
+        period_end TEXT NOT NULL,
+        rate_lama INTEGER NOT NULL CHECK (rate_lama >= 0),
+        rate_baru INTEGER NOT NULL CHECK (rate_baru >= 0),
+        selisih_pokok INTEGER NOT NULL,
+        selisih_lembur INTEGER NOT NULL,
+        selisih_komponen INTEGER NOT NULL,
+        jumlah INTEGER NOT NULL CHECK (jumlah > 0),
+        dibuat_oleh TEXT NOT NULL,
+        dibatalkan_oleh TEXT,
+        dibatalkan_pada TEXT,
+        alasan_batal TEXT,
+        created_at TEXT NOT NULL DEFAULT (datetime('now'))
+      );
+      CREATE INDEX IF NOT EXISTS idx_payroll_rapel_karyawan ON payroll_rapel(id_karyawan);
+      CREATE INDEX IF NOT EXISTS idx_payroll_rapel_item ON payroll_rapel(id_item_asal);
       CREATE TABLE IF NOT EXISTS akademik_tahun_ajaran (
         id_tahun_ajaran TEXT PRIMARY KEY,
         nama_tahun TEXT NOT NULL,
@@ -2051,6 +2078,8 @@ pub(crate) const CLOUD_MIRRORED_TABLES: &[&str] = &[
     "payroll_audit_logs",
     "payroll_items",
     "payroll_runs",
+    // v51 — rapel gaji, milik lembaga database asalnya.
+    "payroll_rapel",
     "payroll_components",
     "salary_configs",
     "overtime_tier_rules",

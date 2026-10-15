@@ -25,6 +25,8 @@ use super::{
     billing,
     // Payload kasbon dicek dengan enum yang sama dengan lokal.
     loan,
+    // Payload rapel gaji dicek dengan aturan yang sama dengan lokal.
+    rapel,
     // Jenis penilaian: bobot dan jenis bawaan dicek dengan aturan lokal.
     nilai_akhir,
     // Payload tutup buku dicek dengan aturan yang sama dengan lokal.
@@ -679,6 +681,7 @@ pub const ADMIN_DEFAULT_EXCLUDED_PERMISSIONS: &[&str] = &[
     "loan.approve",
     "billing.cancel",
     "accounting.close",
+    "payroll.rapel.manage",
 ];
 
 static SCHEMA_VERIFIED: std::sync::OnceLock<Mutex<HashSet<String>>> = std::sync::OnceLock::new();
@@ -947,6 +950,12 @@ const SNAPSHOT_SOURCES: &[SnapshotSource] = &[
         payload_key: "payrollAuditLogs",
         table: "payroll_audit_logs",
         sql: "SELECT * FROM payroll_audit_logs ORDER BY created_at;",
+    },
+    // ── v51: Rapel gaji ──
+    SnapshotSource {
+        payload_key: "payrollRapel",
+        table: "payroll_rapel",
+        sql: "SELECT * FROM payroll_rapel ORDER BY created_at, id_rapel\n-- batas: satu baris per slip yang tarifnya berubah sesudah dibayar, dibatasi personil kali bulan\n;",
     },
     // Whitelist hari libur ikut disinkronkan (`SNAPSHOT_TABLES` mendaftarkannya
     // dengan `delete_missing: true`), tetapi sempat tidak punya sumber di sini —
@@ -2825,6 +2834,7 @@ impl TursoClient {
                 ('payroll.run.disburse', 'Tandai Dibayar & Kunci Slip', 'Penggajian', 'Menandai batch payroll sebagai dibayar dan mengunci slip.', 1, 303),
                 ('payroll.config.manage', 'Kelola Aturan Penggajian', 'Penggajian', 'Mengatur rate gaji, lembur, PPh 21, dan BPJS.', 1, 310),
                 ('payroll.export', 'Ekspor Laporan & Slip Gaji', 'Penggajian', 'Mengunduh rekap penggajian dan slip gaji.', 1, 320),
+                ('payroll.rapel.manage', 'Hitung & Setujui Rapel Gaji', 'Penggajian', 'Menghitung selisih tarif atas slip yang sudah dibayar, menyetujui rapelnya, dan membatalkan rapel yang belum dibayar.', 1, 330),
                 ('academic.view', 'Lihat Struktur Akademik', 'Akademik', 'Melihat tahun ajaran, jurusan, rombel, dan mapel.', 1, 400),
                 ('academic.manage', 'Kelola Struktur Akademik', 'Akademik', 'Menambah, mengubah, dan menghapus struktur akademik.', 1, 401),
                 ('students.view', 'Lihat Data Siswa', 'Akademik', 'Melihat daftar dan profil siswa.', 1, 410),
@@ -3145,6 +3155,33 @@ impl TursoClient {
             Statement::new("CREATE INDEX IF NOT EXISTS idx_payroll_runs_periode ON payroll_runs(period_start, period_end, status);", vec![]),
             Statement::new("CREATE INDEX IF NOT EXISTS idx_payroll_items_run ON payroll_items(payroll_run_id);", vec![]),
             Statement::new("CREATE INDEX IF NOT EXISTS idx_payroll_items_karyawan ON payroll_items(id_karyawan);", vec![]),
+            // Rapel gaji (v51). DDL WAJIB identik dengan `storage.rs` dan
+            // `db-migrations.ts`.
+            Statement::new(
+                r#"CREATE TABLE IF NOT EXISTS payroll_rapel (
+                    id_rapel TEXT PRIMARY KEY,
+                    id_karyawan TEXT NOT NULL,
+                    nama_karyawan TEXT NOT NULL,
+                    id_item_asal TEXT NOT NULL,
+                    id_run_asal TEXT NOT NULL,
+                    period_start TEXT NOT NULL,
+                    period_end TEXT NOT NULL,
+                    rate_lama INTEGER NOT NULL CHECK (rate_lama >= 0),
+                    rate_baru INTEGER NOT NULL CHECK (rate_baru >= 0),
+                    selisih_pokok INTEGER NOT NULL,
+                    selisih_lembur INTEGER NOT NULL,
+                    selisih_komponen INTEGER NOT NULL,
+                    jumlah INTEGER NOT NULL CHECK (jumlah > 0),
+                    dibuat_oleh TEXT NOT NULL,
+                    dibatalkan_oleh TEXT,
+                    dibatalkan_pada TEXT,
+                    alasan_batal TEXT,
+                    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+                );"#,
+                vec![],
+            ),
+            Statement::new("CREATE INDEX IF NOT EXISTS idx_payroll_rapel_karyawan ON payroll_rapel(id_karyawan);", vec![]),
+            Statement::new("CREATE INDEX IF NOT EXISTS idx_payroll_rapel_item ON payroll_rapel(id_item_asal);", vec![]),
             Statement::new(
                 r#"CREATE TABLE IF NOT EXISTS akademik_tahun_ajaran (
                     id_tahun_ajaran TEXT PRIMARY KEY,
@@ -3749,7 +3786,8 @@ impl TursoClient {
                 (47, 'wa-book-closing', datetime('now')),
                 (48, 'content-image', datetime('now')),
                 (49, 'pmb-dapodik', datetime('now')),
-                (50, 'shift-work-days', datetime('now'));"#,
+                (50, 'shift-work-days', datetime('now')),
+                (51, 'payroll-rapel', datetime('now'));"#,
                 vec![],
             ),
         ];
@@ -4225,6 +4263,11 @@ impl TursoClient {
             vec![],
         )
         .await?;
+        self.query_one(
+            "INSERT OR IGNORE INTO schema_migration (version, name, applied_at) VALUES (-2032, 'payroll-rapel-v1', datetime('now'));",
+            vec![],
+        )
+        .await?;
 
         Ok(())
     }
@@ -4536,7 +4579,7 @@ impl TursoClient {
                 // Sentinel WAJIB dinaikkan setiap kali ensure_schema menambah
                 // tabel atau kolom — nilainya di sini dan pada INSERT di atas
                 // harus selalu sama.
-                "SELECT COUNT(*) AS total FROM schema_migration WHERE version = -2031;",
+                "SELECT COUNT(*) AS total FROM schema_migration WHERE version = -2032;",
                 vec![],
             )
             .await
@@ -8933,6 +8976,8 @@ fn canonical_sync_route(domain: &str, operation: &str) -> Option<(&'static str, 
         ("payroll", "delete") => ("payroll", "delete"),
         ("payroll", "create-run") => ("payroll", "create-run"),
         ("payroll", "transition-status") => ("payroll", "transition-status"),
+        ("payroll-rapel", "save") => ("payroll-rapel", "save"),
+        ("payroll-rapel", "cancel") => ("payroll-rapel", "cancel"),
         ("academic_year" | "academic-year", "create") => ("academic-year", "create"),
         ("academic_year" | "academic-year", "update") => ("academic-year", "update"),
         ("academic_year" | "academic-year", "delete") => ("academic-year", "delete"),
@@ -11190,6 +11235,16 @@ async fn apply_event_to_turso(
             }
             if let Some(audit) = payload.get("audit") {
                 insert_payroll_audit_log(turso, audit).await?;
+            }
+        }
+        ("payroll-rapel", "save") => {
+            if let Some(values) = rapel::cloud_rapel_values(payload, entity_key) {
+                turso.query_one(rapel::CLOUD_INSERT_RAPEL_SQL, values).await?;
+            }
+        }
+        ("payroll-rapel", "cancel") => {
+            if let Some(values) = rapel::cloud_cancel_values(payload, entity_key) {
+                turso.query_one(rapel::CLOUD_CANCEL_RAPEL_SQL, values).await?;
             }
         }
         ("academic-year", "create" | "update") => {
@@ -16170,7 +16225,7 @@ mod tests {
             connection
                 .execute_batch(
                     "DROP TABLE riwayat_identitas_karyawan;
-                     DELETE FROM schema_migration WHERE version IN (-2017, -2018, -2019, -2020, -2021, -2022, -2023, -2024, -2025, -2026, -2027, -2028, -2029, -2030, -2031);",
+                     DELETE FROM schema_migration WHERE version IN (-2017, -2018, -2019, -2020, -2021, -2022, -2023, -2024, -2025, -2026, -2027, -2028, -2029, -2030, -2031, -2032);",
                 )
                 .expect("siapkan database lama");
 
@@ -16206,7 +16261,7 @@ mod tests {
             connection
                 .execute_batch(
                     "DROP TABLE inventory_unit;
-                     DELETE FROM schema_migration WHERE version IN (-2018, -2019, -2020, -2021, -2022, -2023, -2024, -2025, -2026, -2027, -2028, -2029, -2030, -2031);",
+                     DELETE FROM schema_migration WHERE version IN (-2018, -2019, -2020, -2021, -2022, -2023, -2024, -2025, -2026, -2027, -2028, -2029, -2030, -2031, -2032);",
                 )
                 .expect("siapkan database lama");
 
@@ -16243,7 +16298,7 @@ mod tests {
                 .execute_batch(
                     "DROP TABLE personil_wajah;
                      ALTER TABLE absensi_foto DROP COLUMN wajah_vonis;
-                     DELETE FROM schema_migration WHERE version IN (-2019, -2020, -2021, -2022, -2023, -2024, -2025, -2026, -2027, -2028, -2029, -2030, -2031);",
+                     DELETE FROM schema_migration WHERE version IN (-2019, -2020, -2021, -2022, -2023, -2024, -2025, -2026, -2027, -2028, -2029, -2030, -2031, -2032);",
                 )
                 .expect("siapkan database lama");
 
@@ -16282,7 +16337,7 @@ mod tests {
                     "DROP TABLE keu_akun;
                      DROP TABLE keu_jurnal;
                      DROP TABLE keu_jurnal_baris;
-                     DELETE FROM schema_migration WHERE version IN (-2020, -2021, -2022, -2023, -2024, -2025, -2026, -2027, -2028, -2029, -2030, -2031);",
+                     DELETE FROM schema_migration WHERE version IN (-2020, -2021, -2022, -2023, -2024, -2025, -2026, -2027, -2028, -2029, -2030, -2031, -2032);",
                 )
                 .expect("siapkan database lama");
 
@@ -16395,7 +16450,7 @@ mod tests {
                     "DROP TABLE keu_pinjaman;
                      DROP TABLE keu_pinjaman_mutasi;
                      DROP TABLE keu_pinjaman_tunda;
-                     DELETE FROM schema_migration WHERE version IN (-2021, -2022, -2023, -2024, -2025, -2026, -2027, -2028, -2029, -2030, -2031);",
+                     DELETE FROM schema_migration WHERE version IN (-2021, -2022, -2023, -2024, -2025, -2026, -2027, -2028, -2029, -2030, -2031, -2032);",
                 )
                 .expect("siapkan database lama");
 
@@ -16432,7 +16487,7 @@ mod tests {
                 .execute_batch(
                     "DROP TABLE keu_tagihan;
                      DROP TABLE keu_tagihan_batal;
-                     DELETE FROM schema_migration WHERE version IN (-2022, -2023, -2024, -2025, -2026, -2027, -2028, -2029, -2030, -2031);",
+                     DELETE FROM schema_migration WHERE version IN (-2022, -2023, -2024, -2025, -2026, -2027, -2028, -2029, -2030, -2031, -2032);",
                 )
                 .expect("siapkan database lama");
             client.ensure_schema_current().await.expect("skema mutakhir");
@@ -16470,7 +16525,7 @@ mod tests {
                      DROP TABLE keu_pembayaran;
                      DROP TABLE keu_pembayaran_alokasi;
                      DROP TABLE keu_pembayaran_batal;
-                     DELETE FROM schema_migration WHERE version IN (-2023, -2024, -2025, -2026, -2027, -2028, -2029, -2030, -2031);",
+                     DELETE FROM schema_migration WHERE version IN (-2023, -2024, -2025, -2026, -2027, -2028, -2029, -2030, -2031, -2032);",
                 )
                 .expect("siapkan database lama");
             client.ensure_schema_current().await.expect("skema mutakhir");
@@ -16506,7 +16561,7 @@ mod tests {
                 .execute_batch(
                     "DROP TABLE nilai_jenis;
                      ALTER TABLE nilai_penilaian DROP COLUMN id_jenis;
-                     DELETE FROM schema_migration WHERE version IN (-2024, -2025, -2026, -2027, -2028, -2029, -2030, -2031);",
+                     DELETE FROM schema_migration WHERE version IN (-2024, -2025, -2026, -2027, -2028, -2029, -2030, -2031, -2032);",
                 )
                 .expect("siapkan database lama");
             client.ensure_schema_current().await.expect("skema mutakhir");

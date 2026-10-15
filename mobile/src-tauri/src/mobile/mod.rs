@@ -36,6 +36,8 @@ pub mod payroll;
 // Administrasi payroll: SALINAN `desktop/payroll/*` oleh sync-rust-modules.ts.
 pub mod payroll_admin;
 pub mod portability;
+// Rapel gaji (v51): SALINAN `desktop/rapel.rs` oleh sync-rust-modules.ts.
+pub mod rapel;
 pub mod share;
 pub mod teaching_journal;
 // Buku Kunjungan UKS: SALINAN `desktop/uks.rs` oleh sync-rust-modules.ts.

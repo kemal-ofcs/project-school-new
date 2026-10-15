@@ -11,7 +11,7 @@ use super::{
         CommandError, DesktopLoginResult, DesktopRuntimeStatus, DesktopSession, DesktopSyncStatus,
         OperatorUser, SessionMode,
     },
-    operational, portability,
+    operational, portability, rapel,
     scanner, secrets, storage, sync, teaching_journal, turso, uks, wa_notification,
 };
 
@@ -2989,6 +2989,47 @@ pub fn desktop_loan_undefer(
 ) -> Result<Value, CommandError> {
     require_permission(&state, "loan.manage")?;
     loan::undefer_loan(&state, &id_tunda)
+}
+
+/// Rapel gaji yang sudah disetujui beserta statusnya (menunggu, diproses,
+/// dibayar, dibatalkan).
+#[tauri::command]
+pub fn desktop_payroll_rapel_list(state: State<'_, DesktopState>) -> Result<Value, CommandError> {
+    require_permission(&state, "payroll.view")?;
+    rapel::list(&state)
+}
+
+/// Slip PAID dalam rentang bulan yang tarifnya berbeda dengan tarif yang
+/// sekarang berlaku untuk periodenya, beserta selisihnya.
+#[tauri::command]
+pub fn desktop_payroll_rapel_detect(
+    state: State<'_, DesktopState>,
+    dari: String,
+    sampai: String,
+) -> Result<Value, CommandError> {
+    require_permission(&state, "payroll.rapel.manage")?;
+    rapel::detect(&state, &dari, &sampai)
+}
+
+/// Menyetujui rapel yang dicentang. Izin sensitif: menyetujui rapel berarti
+/// mengeluarkan uang sekolah di proses gaji berikutnya.
+#[tauri::command]
+pub fn desktop_payroll_rapel_save(
+    state: State<'_, DesktopState>,
+    items: Vec<rapel::PilihanRapel>,
+) -> Result<Value, CommandError> {
+    let operator = require_permission(&state, "payroll.rapel.manage")?;
+    rapel::save(&state, &operator.username, items)
+}
+
+#[tauri::command]
+pub fn desktop_payroll_rapel_cancel(
+    state: State<'_, DesktopState>,
+    id_rapel: String,
+    alasan: String,
+) -> Result<Value, CommandError> {
+    let operator = require_permission(&state, "payroll.rapel.manage")?;
+    rapel::cancel(&state, &operator.username, &id_rapel, &alasan)
 }
 
 /// Jenis tagihan, tarif, serta pilihan unit/rombel/tahun ajaran untuk
