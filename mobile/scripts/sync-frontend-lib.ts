@@ -94,6 +94,8 @@ const filesToCopy = [
   "components/content/GambarKontenInput.tsx",
   "components/content/FotoJurusanEditor.tsx",
   "components/pmb/DataDapodikPmb.tsx",
+  // Blok pembayaran biaya pendaftaran PMB (v52), identik di kedua panel.
+  "components/pmb/PembayaranPmb.tsx",
   // Foto personil di daftar dan Detail. Hanya bergantung pada kontrak `Modal`
   // yang sama di kedua workspace (`isOpen`/`onClose`/`title`/`titleId`) dan
   // pada gateway foto yang ikut tersinkron, jadi tidak ada perilaku khusus

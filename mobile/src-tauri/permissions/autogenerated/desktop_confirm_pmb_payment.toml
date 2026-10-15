@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-desktop-confirm-pmb-payment"
+description = "Enables the desktop_confirm_pmb_payment command without any pre-configured scope."
+commands.allow = ["desktop_confirm_pmb_payment"]
+
+[[permission]]
+identifier = "deny-desktop-confirm-pmb-payment"
+description = "Denies the desktop_confirm_pmb_payment command without any pre-configured scope."
+commands.deny = ["desktop_confirm_pmb_payment"]

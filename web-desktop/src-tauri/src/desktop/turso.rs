@@ -3493,7 +3493,8 @@ impl TursoClient {
                     biaya_pendaftaran INTEGER NOT NULL DEFAULT 0,
                     is_aktif INTEGER NOT NULL DEFAULT 0 CHECK(is_aktif IN (0, 1)),
                     created_at TEXT NOT NULL,
-                    updated_at TEXT NOT NULL
+                    updated_at TEXT NOT NULL,
+                    lama_bayar_hari INTEGER NOT NULL DEFAULT 7 CHECK(lama_bayar_hari BETWEEN 1 AND 60)
                 );"#,
                 vec![],
             ),
@@ -3527,7 +3528,15 @@ impl TursoClient {
                     id_siswa TEXT,
                     created_at TEXT NOT NULL,
                     updated_at TEXT NOT NULL,
-                    data_dapodik TEXT
+                    data_dapodik TEXT,
+                    biaya_tagihan INTEGER NOT NULL DEFAULT 0,
+                    batas_bayar TEXT,
+                    dibayar_jumlah INTEGER,
+                    dibayar_tanggal TEXT,
+                    dibayar_metode TEXT CHECK(dibayar_metode IN ('tunai', 'transfer', 'qris', 'gateway')),
+                    dibayar_dicatat_oleh TEXT,
+                    dibayar_dicatat_at TEXT,
+                    pembayaran_batal_catatan TEXT
                 );"#,
                 vec![],
             ),
@@ -3781,7 +3790,8 @@ impl TursoClient {
                 (48, 'content-image', datetime('now')),
                 (49, 'pmb-dapodik', datetime('now')),
                 (50, 'shift-work-days', datetime('now')),
-                (51, 'payroll-rapel', datetime('now'));"#,
+                (51, 'payroll-rapel', datetime('now')),
+                (52, 'pmb-payment', datetime('now'));"#,
                 vec![],
             ),
         ];
@@ -3978,6 +3988,16 @@ impl TursoClient {
             ("keu_tutup_buku", "catatan_keputusan", "ALTER TABLE keu_tutup_buku ADD COLUMN catatan_keputusan TEXT;"),
             // Data DAPODIK pendaftar PMB (v49, JSON berversi, cloud-only).
             ("pmb_pendaftar", "data_dapodik", "ALTER TABLE pmb_pendaftar ADD COLUMN data_dapodik TEXT;"),
+            // Pembayaran biaya pendaftaran PMB (v52, cloud-only).
+            ("pmb_gelombang", "lama_bayar_hari", "ALTER TABLE pmb_gelombang ADD COLUMN lama_bayar_hari INTEGER NOT NULL DEFAULT 7 CHECK(lama_bayar_hari BETWEEN 1 AND 60);"),
+            ("pmb_pendaftar", "biaya_tagihan", "ALTER TABLE pmb_pendaftar ADD COLUMN biaya_tagihan INTEGER NOT NULL DEFAULT 0;"),
+            ("pmb_pendaftar", "batas_bayar", "ALTER TABLE pmb_pendaftar ADD COLUMN batas_bayar TEXT;"),
+            ("pmb_pendaftar", "dibayar_jumlah", "ALTER TABLE pmb_pendaftar ADD COLUMN dibayar_jumlah INTEGER;"),
+            ("pmb_pendaftar", "dibayar_tanggal", "ALTER TABLE pmb_pendaftar ADD COLUMN dibayar_tanggal TEXT;"),
+            ("pmb_pendaftar", "dibayar_metode", "ALTER TABLE pmb_pendaftar ADD COLUMN dibayar_metode TEXT CHECK(dibayar_metode IN ('tunai', 'transfer', 'qris', 'gateway'));"),
+            ("pmb_pendaftar", "dibayar_dicatat_oleh", "ALTER TABLE pmb_pendaftar ADD COLUMN dibayar_dicatat_oleh TEXT;"),
+            ("pmb_pendaftar", "dibayar_dicatat_at", "ALTER TABLE pmb_pendaftar ADD COLUMN dibayar_dicatat_at TEXT;"),
+            ("pmb_pendaftar", "pembayaran_batal_catatan", "ALTER TABLE pmb_pendaftar ADD COLUMN pembayaran_batal_catatan TEXT;"),
         ] {
             self.ensure_column(table, column, sql).await?;
         }
@@ -4259,6 +4279,11 @@ impl TursoClient {
         .await?;
         self.query_one(
             "INSERT OR IGNORE INTO schema_migration (version, name, applied_at) VALUES (-2032, 'payroll-rapel-v1', datetime('now'));",
+            vec![],
+        )
+        .await?;
+        self.query_one(
+            "INSERT OR IGNORE INTO schema_migration (version, name, applied_at) VALUES (-2033, 'pmb-payment-v1', datetime('now'));",
             vec![],
         )
         .await?;
@@ -4573,7 +4598,7 @@ impl TursoClient {
                 // Sentinel WAJIB dinaikkan setiap kali ensure_schema menambah
                 // tabel atau kolom — nilainya di sini dan pada INSERT di atas
                 // harus selalu sama.
-                "SELECT COUNT(*) AS total FROM schema_migration WHERE version = -2032;",
+                "SELECT COUNT(*) AS total FROM schema_migration WHERE version = -2033;",
                 vec![],
             )
             .await
@@ -7798,20 +7823,19 @@ impl TursoClient {
 
     pub async fn list_pmb_waves(&self) -> Result<Value, CommandError> {
         self.ensure_schema_current().await?;
-        let res = self
-            .query_one(
-                r#"SELECT g.id_gelombang, g.nama, g.tahun_ajaran, g.tanggal_buka,
-                          g.tanggal_tutup, g.kuota, g.biaya_pendaftaran, g.is_aktif,
-                          g.created_at, g.updated_at,
-                          (SELECT COUNT(*) FROM pmb_pendaftar p
-                            WHERE p.id_gelombang = g.id_gelombang
-                              AND p.status NOT IN ('Ditolak', 'Dibatalkan')) AS terpakai
-                     FROM pmb_gelombang g
-                 ORDER BY g.tanggal_buka DESC
-                    LIMIT 200;"#,
-                vec![],
-            )
-            .await?;
+        let sql = format!(
+            r#"SELECT g.id_gelombang, g.nama, g.tahun_ajaran, g.tanggal_buka,
+                      g.tanggal_tutup, g.kuota, g.biaya_pendaftaran, g.is_aktif,
+                      g.lama_bayar_hari, g.created_at, g.updated_at,
+                      (SELECT COUNT(*) FROM pmb_pendaftar p
+                        WHERE p.id_gelombang = g.id_gelombang
+                          AND {}) AS terpakai
+                 FROM pmb_gelombang g
+             ORDER BY g.tanggal_buka DESC
+                LIMIT 200;"#,
+            crate::desktop::pmb_bayar::SQL_MEMAKAN_KUOTA_PMB
+        );
+        let res = self.query_one(&sql, vec![]).await?;
         Ok(json!({ "items": res.to_objects() }))
     }
 
@@ -7857,6 +7881,15 @@ impl TursoClient {
                 .unwrap_or(false),
         );
 
+        // Klien lama tanpa isian ini mendapat bawaan kolomnya, 7 hari.
+        let lama_bayar_hari = draft.get("lamaBayarHari").and_then(Value::as_i64).unwrap_or(7);
+        if !(1..=60).contains(&lama_bayar_hari) {
+            return Err(CommandError::new(
+                "VALIDATION_ERROR",
+                "Lama waktu bayar harus 1 sampai 60 hari.",
+            ));
+        }
+
         let id = if id_masuk.is_empty() {
             new_pmb_id("gel")
         } else {
@@ -7866,8 +7899,8 @@ impl TursoClient {
         let mut statements = vec![Statement::new(
             r#"INSERT INTO pmb_gelombang (
                    id_gelombang, nama, tahun_ajaran, tanggal_buka, tanggal_tutup,
-                   kuota, biaya_pendaftaran, is_aktif, created_at, updated_at
-               ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))
+                   kuota, biaya_pendaftaran, is_aktif, lama_bayar_hari, created_at, updated_at
+               ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))
                ON CONFLICT(id_gelombang) DO UPDATE SET
                    nama = excluded.nama,
                    tahun_ajaran = excluded.tahun_ajaran,
@@ -7876,6 +7909,7 @@ impl TursoClient {
                    kuota = excluded.kuota,
                    biaya_pendaftaran = excluded.biaya_pendaftaran,
                    is_aktif = excluded.is_aktif,
+                   lama_bayar_hari = excluded.lama_bayar_hari,
                    updated_at = datetime('now');"#,
             vec![
                 json!(id),
@@ -7886,6 +7920,7 @@ impl TursoClient {
                 json!(kuota),
                 json!(biaya),
                 json!(aktif),
+                json!(lama_bayar_hari),
             ],
         )];
 
@@ -7951,6 +7986,7 @@ impl TursoClient {
         search: Option<&str>,
         limit: Option<i64>,
         dapodik: bool,
+        pembayaran: Option<&str>,
     ) -> Result<Value, CommandError> {
         self.ensure_schema_current().await?;
         // Kolom DAPODIK hanya untuk ekspor: daftar biasa dibuka panitia
@@ -7965,7 +8001,8 @@ impl TursoClient {
             SELECT p.id_pendaftar, p.nomor_pendaftaran, p.id_gelombang, p.nama_lengkap,
                    p.nisn, p.jenis_kelamin, p.asal_sekolah, p.pilihan_jurusan,
                    p.nama_wali, p.no_whatsapp_wali, p.status, p.id_siswa,
-                   p.created_at, p.updated_at,
+                   p.created_at, p.updated_at, p.biaya_tagihan, p.batas_bayar,
+                   {keadaan} AS keadaan_bayar,
                    {kolom_dapodik}
                    COALESCE(g.nama, '') AS nama_gelombang,
                    (SELECT COUNT(*) FROM pmb_berkas b
@@ -7973,7 +8010,8 @@ impl TursoClient {
               FROM pmb_pendaftar p
               LEFT JOIN pmb_gelombang g ON g.id_gelombang = p.id_gelombang
              WHERE 1=1
-            "#
+            "#,
+            keadaan = crate::desktop::pmb_bayar::SQL_KEADAAN_BAYAR_PMB
         );
         let mut args: Vec<Value> = Vec::new();
 
@@ -7985,6 +8023,14 @@ impl TursoClient {
             sql.push_str(" AND p.status = ?");
             args.push(json!(st.trim()));
         }
+        let pembayaran = pembayaran.map(str::trim).filter(|b| !b.is_empty() && *b != "Semua");
+        if let Some(bayar) = pembayaran {
+            sql.push_str(&format!(
+                " AND {} = ?",
+                crate::desktop::pmb_bayar::SQL_KEADAAN_BAYAR_PMB
+            ));
+            args.push(json!(bayar));
+        }
         if let Some(q) = search.filter(|s| !s.trim().is_empty()) {
             sql.push_str(
                 " AND (p.nama_lengkap LIKE ? OR p.nomor_pendaftaran LIKE ? OR p.nisn LIKE ? OR p.nama_wali LIKE ?)",
@@ -7995,7 +8041,12 @@ impl TursoClient {
             }
         }
 
-        sql.push_str(" ORDER BY p.created_at DESC");
+        // Yang paling dekat batasnya di atas: panitia menghubungi mereka lebih dulu.
+        sql.push_str(if pembayaran == Some("Menunggu Pembayaran") {
+            " ORDER BY p.batas_bayar ASC, p.created_at ASC"
+        } else {
+            " ORDER BY p.created_at DESC"
+        });
         let max_rows = limit.unwrap_or(100).clamp(1, 500);
         sql.push_str(&format!(" LIMIT {max_rows};"));
 
@@ -8006,15 +8057,17 @@ impl TursoClient {
     /// Detail satu pendaftar beserta DAFTAR berkasnya — tanpa isi berkasnya.
     pub async fn get_pmb_registrant(&self, id_pendaftar: &str) -> Result<Value, CommandError> {
         self.ensure_schema_current().await?;
+        let sql = format!(
+            r#"SELECT p.*, COALESCE(g.nama, '') AS nama_gelombang,
+                      {} AS keadaan_bayar
+                 FROM pmb_pendaftar p
+                 LEFT JOIN pmb_gelombang g ON g.id_gelombang = p.id_gelombang
+                WHERE p.id_pendaftar = ?
+                LIMIT 1;"#,
+            crate::desktop::pmb_bayar::SQL_KEADAAN_BAYAR_PMB
+        );
         let pendaftar = self
-            .query_one(
-                r#"SELECT p.*, COALESCE(g.nama, '') AS nama_gelombang
-                     FROM pmb_pendaftar p
-                     LEFT JOIN pmb_gelombang g ON g.id_gelombang = p.id_gelombang
-                    WHERE p.id_pendaftar = ?
-                    LIMIT 1;"#,
-                vec![json!(id_pendaftar)],
-            )
+            .query_one(&sql, vec![json!(id_pendaftar)])
             .await?
             .to_objects()
             .into_iter()
@@ -8091,6 +8144,11 @@ impl TursoClient {
             ));
         }
 
+        let sekarang = self.baca_keadaan_bayar_pmb(id_pendaftar).await?;
+        if let Some(pesan) = crate::desktop::pmb_bayar::tolak_ubah_status(&sekarang.keadaan, status) {
+            return Err(CommandError::new("VALIDATION_ERROR", &pesan));
+        }
+
         let terpengaruh = self
             .query_one(
                 r#"UPDATE pmb_pendaftar
@@ -8100,12 +8158,16 @@ impl TursoClient {
                           diverifikasi_at = datetime('now'),
                           updated_at = datetime('now')
                     WHERE id_pendaftar = ?
-                      AND status <> 'Terdaftar';"#,
+                      AND status <> 'Terdaftar'
+                      AND (? IN ('Baru', 'Ditolak', 'Dibatalkan')
+                           OR biaya_tagihan <= 0
+                           OR dibayar_dicatat_at IS NOT NULL);"#,
                 vec![
                     json!(status),
                     json!(catatan.map(str::trim).filter(|c| !c.is_empty())),
                     json!(operator),
                     json!(id_pendaftar),
+                    json!(status),
                 ],
             )
             .await?;
@@ -8177,6 +8239,195 @@ impl TursoClient {
         }
 
         Ok(json!({ "sukses": true }))
+    }
+
+    // ── Pembayaran biaya pendaftaran PMB (v52) ──
+    //
+    // Cerminan fungsi pembayaran di `services/pmb-admin.ts`. Keadaan dibaca
+    // lebih dulu untuk pesan yang tepat (`pmb_bayar::tolak_*`), lalu syaratnya
+    // diulang di klausa WHERE: dua panitia yang menekan bersamaan, hanya satu
+    // yang berhasil.
+
+    async fn baca_keadaan_bayar_pmb(
+        &self,
+        id_pendaftar: &str,
+    ) -> Result<KeadaanBayarPmbBaris, CommandError> {
+        self.ensure_schema_current().await?;
+        let sql = format!(
+            r#"SELECT p.status, p.biaya_tagihan,
+                      {keadaan} AS keadaan_bayar,
+                      date('now', '+7 hours') AS hari_ini,
+                      COALESCE(g.kuota, 0) AS kuota,
+                      (SELECT COUNT(*) FROM pmb_pendaftar p
+                        WHERE p.id_gelombang = g.id_gelombang
+                          AND {kuota}) AS terpakai
+                 FROM pmb_pendaftar p
+                 LEFT JOIN pmb_gelombang g ON g.id_gelombang = p.id_gelombang
+                WHERE p.id_pendaftar = ?
+                LIMIT 1;"#,
+            keadaan = crate::desktop::pmb_bayar::SQL_KEADAAN_BAYAR_PMB,
+            kuota = crate::desktop::pmb_bayar::SQL_MEMAKAN_KUOTA_PMB
+        );
+        let baris = self
+            .query_one(&sql, vec![json!(id_pendaftar)])
+            .await?
+            .to_objects()
+            .into_iter()
+            .next()
+            .ok_or_else(|| CommandError::new("NOT_FOUND", "Data pendaftar tidak ditemukan."))?;
+        let teks = |kunci: &str| {
+            baris
+                .get(kunci)
+                .and_then(Value::as_str)
+                .unwrap_or("")
+                .to_owned()
+        };
+        let angka = |kunci: &str| baris.get(kunci).and_then(Value::as_i64).unwrap_or(0);
+        let kuota = angka("kuota");
+        Ok(KeadaanBayarPmbBaris {
+            status: teks("status"),
+            keadaan: teks("keadaan_bayar"),
+            biaya_tagihan: angka("biaya_tagihan"),
+            hari_ini: teks("hari_ini"),
+            kuota_penuh: kuota > 0 && angka("terpakai") >= kuota,
+        })
+    }
+
+    pub async fn confirm_pmb_payment(
+        &self,
+        id_pendaftar: &str,
+        jumlah: i64,
+        tanggal: &str,
+        metode: &str,
+        operator: &str,
+    ) -> Result<Value, CommandError> {
+        if !crate::desktop::hari_kerja::tanggal_valid(tanggal) {
+            return Err(CommandError::new("VALIDATION_ERROR", "Tanggal bayar tidak valid."));
+        }
+        if !crate::desktop::pmb_bayar::METODE_BAYAR_PMB.contains(&metode) {
+            return Err(CommandError::new("VALIDATION_ERROR", "Metode bayar tidak dikenali."));
+        }
+        if jumlah <= 0 {
+            return Err(CommandError::new(
+                "VALIDATION_ERROR",
+                "Jumlah bayar harus lebih dari nol.",
+            ));
+        }
+        let sekarang = self.baca_keadaan_bayar_pmb(id_pendaftar).await?;
+        if let Some(pesan) = crate::desktop::pmb_bayar::tolak_konfirmasi_bayar(
+            &sekarang.keadaan_pendaftar(),
+            jumlah,
+            tanggal,
+        ) {
+            return Err(CommandError::new("VALIDATION_ERROR", &pesan));
+        }
+
+        let hasil = self
+            .query_one(
+                r#"UPDATE pmb_pendaftar
+                      SET dibayar_jumlah = ?,
+                          dibayar_tanggal = ?,
+                          dibayar_metode = ?,
+                          dibayar_dicatat_oleh = ?,
+                          dibayar_dicatat_at = datetime('now'),
+                          updated_at = datetime('now')
+                    WHERE id_pendaftar = ?
+                      AND biaya_tagihan > 0
+                      AND biaya_tagihan = ?
+                      AND dibayar_dicatat_at IS NULL
+                      AND batas_bayar >= date('now', '+7 hours')
+                      AND ? <= date('now', '+7 hours')
+                      AND status NOT IN ('Ditolak', 'Dibatalkan', 'Terdaftar');"#,
+                vec![
+                    json!(jumlah),
+                    json!(tanggal),
+                    json!(metode),
+                    json!(operator),
+                    json!(id_pendaftar),
+                    json!(jumlah),
+                    json!(tanggal),
+                ],
+            )
+            .await?;
+        pmb_bayar_terpengaruh(hasil.rows_affected)
+    }
+
+    /// Alasan disimpan bersama pencatat dan waktunya; pembatalan terakhir saja.
+    pub async fn cancel_pmb_payment(
+        &self,
+        id_pendaftar: &str,
+        alasan: &str,
+        operator: &str,
+    ) -> Result<Value, CommandError> {
+        let alasan = alasan.trim();
+        if !(5..=255).contains(&alasan.chars().count()) {
+            return Err(CommandError::new(
+                "VALIDATION_ERROR",
+                "Alasan pembatalan wajib 5 sampai 255 karakter.",
+            ));
+        }
+        let sekarang = self.baca_keadaan_bayar_pmb(id_pendaftar).await?;
+        if let Some(pesan) =
+            crate::desktop::pmb_bayar::tolak_batal_bayar(&sekarang.keadaan_pendaftar())
+        {
+            return Err(CommandError::new("VALIDATION_ERROR", &pesan));
+        }
+
+        let hasil = self
+            .query_one(
+                r#"UPDATE pmb_pendaftar
+                      SET dibayar_jumlah = NULL,
+                          dibayar_tanggal = NULL,
+                          dibayar_metode = NULL,
+                          dibayar_dicatat_oleh = NULL,
+                          dibayar_dicatat_at = NULL,
+                          pembayaran_batal_catatan = ? || ' ' || datetime('now', '+7 hours') || ': ' || ?,
+                          updated_at = datetime('now')
+                    WHERE id_pendaftar = ?
+                      AND dibayar_dicatat_at IS NOT NULL
+                      AND status = 'Baru';"#,
+                vec![json!(operator), json!(alasan), json!(id_pendaftar)],
+            )
+            .await?;
+        pmb_bayar_terpengaruh(hasil.rows_affected)
+    }
+
+    /// Perpanjang batas bayar. Pendaftar kedaluwarsa tidak memakan kuota, jadi
+    /// menghidupkannya kembali ditolak bila kuota sudah penuh.
+    ///
+    /// shortcut: kuota diperiksa sebelum UPDATE, jadi dua perpanjangan serentak
+    /// bisa melewati kuota satu orang; sama dengan pemeriksaan kuota situs publik.
+    pub async fn extend_pmb_payment_deadline(
+        &self,
+        id_pendaftar: &str,
+        batas_bayar: &str,
+    ) -> Result<Value, CommandError> {
+        if !crate::desktop::hari_kerja::tanggal_valid(batas_bayar) {
+            return Err(CommandError::new("VALIDATION_ERROR", "Batas bayar tidak valid."));
+        }
+        let sekarang = self.baca_keadaan_bayar_pmb(id_pendaftar).await?;
+        if let Some(pesan) = crate::desktop::pmb_bayar::tolak_perpanjang_bayar(
+            &sekarang.keadaan_pendaftar(),
+            sekarang.kuota_penuh,
+            batas_bayar,
+        ) {
+            return Err(CommandError::new("VALIDATION_ERROR", &pesan));
+        }
+
+        let hasil = self
+            .query_one(
+                r#"UPDATE pmb_pendaftar
+                      SET batas_bayar = ?,
+                          updated_at = datetime('now')
+                    WHERE id_pendaftar = ?
+                      AND biaya_tagihan > 0
+                      AND dibayar_dicatat_at IS NULL
+                      AND ? >= date('now', '+7 hours')
+                      AND status NOT IN ('Ditolak', 'Dibatalkan', 'Terdaftar');"#,
+                vec![json!(batas_bayar), json!(id_pendaftar), json!(batas_bayar)],
+            )
+            .await?;
+        pmb_bayar_terpengaruh(hasil.rows_affected)
     }
 
     // ── CMS Landing Page (Berita & Konten Publik) ───────────────────────────
@@ -8584,6 +8835,37 @@ fn teks_wajib(draft: &Value, kunci: &str, pesan: &str) -> Result<String, Command
 ///
 /// Bentuk yang sama dengan `new_payroll_id`, dan lahir dari kegagalan yang sama:
 /// id epoch-DETIK telanjang bertabrakan di dalam satu penyimpanan massal.
+/// Keadaan bayar seorang pendaftar PMB, dibaca `baca_keadaan_bayar_pmb`.
+struct KeadaanBayarPmbBaris {
+    status: String,
+    keadaan: String,
+    biaya_tagihan: i64,
+    hari_ini: String,
+    kuota_penuh: bool,
+}
+
+impl KeadaanBayarPmbBaris {
+    fn keadaan_pendaftar(&self) -> crate::desktop::pmb_bayar::KeadaanPendaftar<'_> {
+        crate::desktop::pmb_bayar::KeadaanPendaftar {
+            status: &self.status,
+            keadaan: &self.keadaan,
+            biaya_tagihan: self.biaya_tagihan,
+            hari_ini: &self.hari_ini,
+        }
+    }
+}
+
+/// UPDATE yang tidak mengenai baris berarti keadaannya berubah sejak dibaca.
+fn pmb_bayar_terpengaruh(rows_affected: u64) -> Result<Value, CommandError> {
+    if rows_affected == 0 {
+        return Err(CommandError::new(
+            "VALIDATION_ERROR",
+            "Data pendaftar baru saja berubah. Muat ulang lalu coba lagi.",
+        ));
+    }
+    Ok(json!({ "sukses": true }))
+}
+
 fn new_pmb_id(prefix: &str) -> String {
     let mut bytes = [0u8; 6];
     rand_core::RngCore::fill_bytes(&mut rand_core::OsRng, &mut bytes);
@@ -16219,7 +16501,7 @@ mod tests {
             connection
                 .execute_batch(
                     "DROP TABLE riwayat_identitas_karyawan;
-                     DELETE FROM schema_migration WHERE version IN (-2017, -2018, -2019, -2020, -2021, -2022, -2023, -2024, -2025, -2026, -2027, -2028, -2029, -2030, -2031, -2032);",
+                     DELETE FROM schema_migration WHERE version IN (-2017, -2018, -2019, -2020, -2021, -2022, -2023, -2024, -2025, -2026, -2027, -2028, -2029, -2030, -2031, -2032, -2033);",
                 )
                 .expect("siapkan database lama");
 
@@ -16255,7 +16537,7 @@ mod tests {
             connection
                 .execute_batch(
                     "DROP TABLE inventory_unit;
-                     DELETE FROM schema_migration WHERE version IN (-2018, -2019, -2020, -2021, -2022, -2023, -2024, -2025, -2026, -2027, -2028, -2029, -2030, -2031, -2032);",
+                     DELETE FROM schema_migration WHERE version IN (-2018, -2019, -2020, -2021, -2022, -2023, -2024, -2025, -2026, -2027, -2028, -2029, -2030, -2031, -2032, -2033);",
                 )
                 .expect("siapkan database lama");
 
@@ -16292,7 +16574,7 @@ mod tests {
                 .execute_batch(
                     "DROP TABLE personil_wajah;
                      ALTER TABLE absensi_foto DROP COLUMN wajah_vonis;
-                     DELETE FROM schema_migration WHERE version IN (-2019, -2020, -2021, -2022, -2023, -2024, -2025, -2026, -2027, -2028, -2029, -2030, -2031, -2032);",
+                     DELETE FROM schema_migration WHERE version IN (-2019, -2020, -2021, -2022, -2023, -2024, -2025, -2026, -2027, -2028, -2029, -2030, -2031, -2032, -2033);",
                 )
                 .expect("siapkan database lama");
 
@@ -16331,7 +16613,7 @@ mod tests {
                     "DROP TABLE keu_akun;
                      DROP TABLE keu_jurnal;
                      DROP TABLE keu_jurnal_baris;
-                     DELETE FROM schema_migration WHERE version IN (-2020, -2021, -2022, -2023, -2024, -2025, -2026, -2027, -2028, -2029, -2030, -2031, -2032);",
+                     DELETE FROM schema_migration WHERE version IN (-2020, -2021, -2022, -2023, -2024, -2025, -2026, -2027, -2028, -2029, -2030, -2031, -2032, -2033);",
                 )
                 .expect("siapkan database lama");
 
@@ -16444,7 +16726,7 @@ mod tests {
                     "DROP TABLE keu_pinjaman;
                      DROP TABLE keu_pinjaman_mutasi;
                      DROP TABLE keu_pinjaman_tunda;
-                     DELETE FROM schema_migration WHERE version IN (-2021, -2022, -2023, -2024, -2025, -2026, -2027, -2028, -2029, -2030, -2031, -2032);",
+                     DELETE FROM schema_migration WHERE version IN (-2021, -2022, -2023, -2024, -2025, -2026, -2027, -2028, -2029, -2030, -2031, -2032, -2033);",
                 )
                 .expect("siapkan database lama");
 
@@ -16481,7 +16763,7 @@ mod tests {
                 .execute_batch(
                     "DROP TABLE keu_tagihan;
                      DROP TABLE keu_tagihan_batal;
-                     DELETE FROM schema_migration WHERE version IN (-2022, -2023, -2024, -2025, -2026, -2027, -2028, -2029, -2030, -2031, -2032);",
+                     DELETE FROM schema_migration WHERE version IN (-2022, -2023, -2024, -2025, -2026, -2027, -2028, -2029, -2030, -2031, -2032, -2033);",
                 )
                 .expect("siapkan database lama");
             client.ensure_schema_current().await.expect("skema mutakhir");
@@ -16519,7 +16801,7 @@ mod tests {
                      DROP TABLE keu_pembayaran;
                      DROP TABLE keu_pembayaran_alokasi;
                      DROP TABLE keu_pembayaran_batal;
-                     DELETE FROM schema_migration WHERE version IN (-2023, -2024, -2025, -2026, -2027, -2028, -2029, -2030, -2031, -2032);",
+                     DELETE FROM schema_migration WHERE version IN (-2023, -2024, -2025, -2026, -2027, -2028, -2029, -2030, -2031, -2032, -2033);",
                 )
                 .expect("siapkan database lama");
             client.ensure_schema_current().await.expect("skema mutakhir");
@@ -16555,7 +16837,7 @@ mod tests {
                 .execute_batch(
                     "DROP TABLE nilai_jenis;
                      ALTER TABLE nilai_penilaian DROP COLUMN id_jenis;
-                     DELETE FROM schema_migration WHERE version IN (-2024, -2025, -2026, -2027, -2028, -2029, -2030, -2031, -2032);",
+                     DELETE FROM schema_migration WHERE version IN (-2024, -2025, -2026, -2027, -2028, -2029, -2030, -2031, -2032, -2033);",
                 )
                 .expect("siapkan database lama");
             client.ensure_schema_current().await.expect("skema mutakhir");

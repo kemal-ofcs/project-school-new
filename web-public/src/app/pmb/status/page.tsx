@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { getReadyPublicDatabase } from "@/lib/server/db";
+import { muatRekeningPmb } from "@/lib/server/pmb-data";
 import { pilihModeCekStatus } from "@/lib/server/pmb-status-mode";
 import { FormCekStatus } from "./FormCekStatus";
 
@@ -32,6 +33,7 @@ export default async function HalamanCekStatus() {
     // yang akan menjawab dengan pesan yang benar.
     console.error("[web-public] gagal menentukan mode cek status:", error);
   }
+  const rekening = await muatRekeningPmb();
   return (
     <main className="mx-auto max-w-2xl px-6 py-14">
       <h1 className="font-semibold text-3xl">Status Pendaftaran</h1>
@@ -42,7 +44,7 @@ export default async function HalamanCekStatus() {
       </p>
 
       <div className="mt-8">
-        <FormCekStatus mode={mode} />
+        <FormCekStatus mode={mode} rekening={rekening} />
       </div>
     </main>
   );

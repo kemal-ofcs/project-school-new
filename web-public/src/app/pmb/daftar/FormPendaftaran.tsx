@@ -9,6 +9,7 @@ import {
   useRef,
   useState,
 } from "react";
+import { InfoBayarPmb, type RekeningPmb } from "@/components/pmb/InfoBayarPmb";
 import {
   PMB_BERKAS_MAX_BYTE,
   PMB_JENIS_BERKAS,
@@ -60,8 +61,28 @@ const KUNCI_DRAF = "kos.pmb.draf";
 type Kiriman =
   | { keadaan: "kosong" }
   | { keadaan: "mengirim" }
-  | { keadaan: "berhasil"; nomor: string; gelombang: string }
+  | {
+      keadaan: "berhasil";
+      nomor: string;
+      gelombang: string;
+      biaya: number;
+      batasBayar: string | null;
+    }
   | { keadaan: "gagal"; pesan: string; rincian: string[] };
+
+/** Pesan untuk balasan yang bukan JSON, misalnya 413/502/504 dari proxy. */
+function pesanTanpaJson(status: number): string {
+  if (status === 413) {
+    return "Berkas terlalu besar untuk dikirim sekaligus. Kecilkan atau kurangi berkas, lalu coba lagi.";
+  }
+  if (status === 429) {
+    return "Terlalu banyak percobaan pendaftaran. Coba lagi beberapa menit lagi.";
+  }
+  if (status >= 500) {
+    return `Server sekolah sedang bermasalah (kode ${status}). Isian Anda masih tersimpan di halaman ini; coba kirim lagi beberapa saat lagi.`;
+  }
+  return `Pendaftaran gagal dikirim (kode ${status}).`;
+}
 
 const KELAS_ISIAN =
   "mt-1 w-full min-h-11 rounded-md border border-garis bg-latar px-3 py-2";
@@ -232,7 +253,13 @@ function OrangTua({
   );
 }
 
-export function FormPendaftaran({ jurusan }: { jurusan: string[] }) {
+export function FormPendaftaran({
+  jurusan,
+  rekening,
+}: {
+  jurusan: string[];
+  rekening: RekeningPmb;
+}) {
   const id = useId();
   const formRef = useRef<HTMLFormElement>(null);
   const [langkah, setLangkah] = useState(0);
@@ -409,6 +436,37 @@ export function FormPendaftaran({ jurusan }: { jurusan: string[] }) {
     }
   }
 
+  /**
+   * Isian di balik `detail[].field` (`dataDapodik.nik`, `noWhatsappWali`):
+   * label dan langkahnya dibaca dari elemen formulir itu sendiri, jadi tidak
+   * ada daftar padanan yang bisa tertinggal saat isian ditambah.
+   */
+  function isianGalat(field: string): {
+    label: string;
+    langkah: number | null;
+  } {
+    if (field.startsWith("berkas")) {
+      return { label: "Berkas", langkah: LANGKAH.length - 1 };
+    }
+    const elemen = formRef.current?.elements.namedItem(
+      field.split(".").pop() ?? "",
+    );
+    if (
+      !(
+        elemen instanceof HTMLInputElement ||
+        elemen instanceof HTMLSelectElement ||
+        elemen instanceof HTMLTextAreaElement
+      )
+    ) {
+      return { label: "", langkah: null };
+    }
+    const label = (elemen.labels?.[0]?.textContent ?? "")
+      .replace("(opsional)", "")
+      .trim();
+    const langkah = Number(elemen.closest("fieldset")?.dataset.langkah);
+    return { label, langkah: Number.isInteger(langkah) ? langkah : null };
+  }
+
   async function kirim(peristiwa: React.FormEvent<HTMLFormElement>) {
     peristiwa.preventDefault();
     if (isSubmittingRef.current) return;
@@ -461,14 +519,43 @@ export function FormPendaftaran({ jurusan }: { jurusan: string[] }) {
         }),
       });
 
-      const isi = await jawaban.json();
-      if (!jawaban.ok) {
-        const rincian = Array.isArray(isi?.detail)
-          ? isi.detail.map((d: { message?: string }) => String(d.message ?? ""))
+      // Dibaca sebagai teks dulu: proxy di depan server (Vercel, Caddy) bisa
+      // menjawab 413/502/504 tanpa JSON, dan `json()` yang gagal dulu tampil
+      // sebagai "tidak dapat menghubungi server" padahal server menjawab.
+      const teks = await jawaban.text();
+      let isi: {
+        message?: unknown;
+        detail?: unknown;
+        nomorPendaftaran?: unknown;
+        namaGelombang?: unknown;
+        biayaPendaftaran?: unknown;
+        batasBayar?: unknown;
+      } | null = null;
+      try {
+        isi = JSON.parse(teks);
+      } catch {
+        isi = null;
+      }
+      if (!jawaban.ok || !isi) {
+        const detail = Array.isArray(isi?.detail)
+          ? (isi.detail as { field?: unknown; message?: unknown }[])
           : [];
+        const rincian = detail.map((d) => {
+          const { label } = isianGalat(String(d.field ?? ""));
+          const pesan = String(d.message ?? "");
+          return label ? `${label}: ${pesan}` : pesan;
+        });
+        const langkahGalat = detail
+          .map((d) => isianGalat(String(d.field ?? "")).langkah)
+          .find((l) => l !== null);
+        if (langkahGalat !== undefined && langkahGalat !== null) {
+          setLangkah(langkahGalat);
+        }
         setKiriman({
           keadaan: "gagal",
-          pesan: String(isi?.message ?? "Pendaftaran gagal dikirim."),
+          pesan: isi?.message
+            ? String(isi.message)
+            : pesanTanpaJson(jawaban.status),
           rincian: rincian.filter(Boolean),
         });
         return;
@@ -483,6 +570,8 @@ export function FormPendaftaran({ jurusan }: { jurusan: string[] }) {
         keadaan: "berhasil",
         nomor: String(isi.nomorPendaftaran),
         gelombang: String(isi.namaGelombang ?? ""),
+        biaya: Number(isi.biayaPendaftaran ?? 0),
+        batasBayar: isi.batasBayar ? String(isi.batasBayar) : null,
       });
     } catch (error) {
       console.error("[web-public] pengiriman pendaftaran gagal:", error);
@@ -513,6 +602,12 @@ export function FormPendaftaran({ jurusan }: { jurusan: string[] }) {
             Gelombang: {kiriman.gelombang}
           </p>
         ) : null}
+        <InfoBayarPmb
+          batasBayar={kiriman.batasBayar}
+          biaya={kiriman.biaya}
+          keadaan={kiriman.biaya > 0 ? "Menunggu Pembayaran" : "Tanpa biaya"}
+          rekening={rekening}
+        />
         <p className="mt-5 text-sm">
           <Link className="text-aksen hover:underline" href="/pmb/status">
             Periksa status pendaftaran

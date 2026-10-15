@@ -34,7 +34,8 @@ async function siapkanDatabase() {
       biaya_pendaftaran INTEGER NOT NULL DEFAULT 0,
       is_aktif INTEGER NOT NULL DEFAULT 0 CHECK(is_aktif IN (0, 1)),
       created_at TEXT NOT NULL,
-      updated_at TEXT NOT NULL
+      updated_at TEXT NOT NULL,
+      lama_bayar_hari INTEGER NOT NULL DEFAULT 7 CHECK(lama_bayar_hari BETWEEN 1 AND 60)
     );
   `);
   await client.execute(`
@@ -62,7 +63,15 @@ async function siapkanDatabase() {
       id_siswa TEXT,
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL,
-      data_dapodik TEXT
+      data_dapodik TEXT,
+      biaya_tagihan INTEGER NOT NULL DEFAULT 0,
+      batas_bayar TEXT,
+      dibayar_jumlah INTEGER,
+      dibayar_tanggal TEXT,
+      dibayar_metode TEXT CHECK(dibayar_metode IN ('tunai', 'transfer', 'qris', 'gateway')),
+      dibayar_dicatat_oleh TEXT,
+      dibayar_dicatat_at TEXT,
+      pembayaran_batal_catatan TEXT
     );
   `);
   await client.execute(`
@@ -112,20 +121,24 @@ async function tambahGelombang(
     kuota?: number;
     buka?: string;
     tutup?: string;
+    biaya?: number;
+    lamaBayarHari?: number;
   } = {},
 ) {
   await client.execute({
     sql: `INSERT INTO pmb_gelombang (
             id_gelombang, nama, tahun_ajaran, tanggal_buka, tanggal_tutup,
-            kuota, biaya_pendaftaran, is_aktif, created_at, updated_at
-          ) VALUES (?, 'Gelombang 1', '2026/2027', ?, ?, ?, 0, ?,
+            kuota, biaya_pendaftaran, is_aktif, lama_bayar_hari, created_at, updated_at
+          ) VALUES (?, 'Gelombang 1', '2026/2027', ?, ?, ?, ?, ?, ?,
                     datetime('now'), datetime('now'));`,
     args: [
       opsi.id ?? "gel-1",
       opsi.buka ?? "2000-01-01",
       opsi.tutup ?? "2999-12-31",
       opsi.kuota ?? 0,
+      opsi.biaya ?? 0,
       opsi.aktif === false ? 0 : 1,
+      opsi.lamaBayarHari ?? 7,
     ],
   });
 }
@@ -480,5 +493,88 @@ describe("data DAPODIK pendaftar (v49)", () => {
       "SELECT COUNT(*) AS n FROM pmb_pendaftar;",
     );
     expect(Number(jumlah.rows[0]?.n)).toBe(0);
+  });
+});
+
+describe("biaya pendaftaran (v52)", () => {
+  const hariKe = async (client: Klien, hari: number) =>
+    String(
+      (
+        await client.execute({
+          sql: "SELECT date('now', '+7 hours', ? || ' days') AS t;",
+          args: [String(hari)],
+        })
+      ).rows[0]?.t,
+    );
+
+  test("gelombang berbiaya menyalin biaya dan menetapkan batas bayar WIB", async () => {
+    const client = await siapkanDatabase();
+    await tambahGelombang(client, { biaya: 150000, lamaBayarHari: 3 });
+    const hasil = await tulisPendaftaran(
+      client,
+      await gelombangTerbuka(client),
+      MASUKAN,
+    );
+
+    expect(hasil.biayaPendaftaran).toBe(150000);
+    expect(hasil.batasBayar).toBe(await hariKe(client, 3));
+    const status = await readStatusPendaftaran(client, {
+      nomorPendaftaran: hasil.nomorPendaftaran,
+      tanggalLahir: MASUKAN.tanggalLahir,
+    });
+    expect(status?.keadaanBayar).toBe("Menunggu Pembayaran");
+    expect(status?.biayaTagihan).toBe(150000);
+  });
+
+  test("gelombang tanpa biaya tidak punya batas bayar", async () => {
+    const client = await siapkanDatabase();
+    await tambahGelombang(client);
+    const hasil = await tulisPendaftaran(
+      client,
+      await gelombangTerbuka(client),
+      MASUKAN,
+    );
+    expect(hasil.batasBayar).toBeNull();
+    const status = await readStatusPendaftaran(client, {
+      nomorPendaftaran: hasil.nomorPendaftaran,
+      tanggalLahir: MASUKAN.tanggalLahir,
+    });
+    expect(status?.keadaanBayar).toBe("Tanpa biaya");
+  });
+
+  test("pendaftar kedaluwarsa melepas kuotanya, yang masih menunggu tidak", async () => {
+    const client = await siapkanDatabase();
+    await tambahGelombang(client, { kuota: 1, biaya: 100000 });
+    const gelombang = await gelombangTerbuka(client);
+    await tulisPendaftaran(client, gelombang, MASUKAN);
+
+    await expect(
+      tulisPendaftaran(client, gelombang, MASUKAN),
+    ).rejects.toBeInstanceOf(KuotaPenuhError);
+
+    await client.execute({
+      sql: "UPDATE pmb_pendaftar SET batas_bayar = ?;",
+      args: [await hariKe(client, -1)],
+    });
+    const kedua = await tulisPendaftaran(client, gelombang, MASUKAN);
+    expect(kedua.nomorPendaftaran).toBeTruthy();
+  });
+
+  test("database yang belum dimigrasi v52 dijawab belum siap", async () => {
+    const client = await siapkanDatabase();
+    await tambahGelombang(client);
+    await client.execute(
+      "ALTER TABLE pmb_pendaftar DROP COLUMN biaya_tagihan;",
+    );
+
+    await expect(
+      tulisPendaftaran(client, await gelombangTerbuka(client), MASUKAN),
+    ).rejects.toBeInstanceOf(SchemaNotReadyError);
+    await expect(
+      readStatusPendaftaran(client, {
+        nomorPendaftaran: "PMB-2026-AAAAAA",
+        tanggalLahir: MASUKAN.tanggalLahir,
+      }),
+    ).rejects.toBeInstanceOf(SchemaNotReadyError);
   });
 });

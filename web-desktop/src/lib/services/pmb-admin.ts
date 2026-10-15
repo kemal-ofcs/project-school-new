@@ -1,8 +1,18 @@
 import "server-only";
 
 import type { Client } from "@libsql/client";
+import {
+  type KeadaanPendaftarPmb,
+  SQL_KEADAAN_BAYAR_PMB,
+  SQL_MEMAKAN_KUOTA_PMB,
+  tolakBatalBayarPmb,
+  tolakKonfirmasiBayarPmb,
+  tolakPerpanjangBayarPmb,
+  tolakUbahStatusPmb,
+} from "@/lib/validations/pmb-pembayaran";
 import type {
   PmbFileContent,
+  PmbPaymentInput,
   PmbRegistrantDetail,
   PmbRegistrantFilter,
   PmbRegistrantItem,
@@ -70,10 +80,10 @@ export async function listPmbWaves(client: Client): Promise<PmbWave[]> {
   const res = await client.execute(
     `SELECT g.id_gelombang, g.nama, g.tahun_ajaran, g.tanggal_buka,
             g.tanggal_tutup, g.kuota, g.biaya_pendaftaran, g.is_aktif,
-            g.created_at, g.updated_at,
+            g.lama_bayar_hari, g.created_at, g.updated_at,
             (SELECT COUNT(*) FROM pmb_pendaftar p
               WHERE p.id_gelombang = g.id_gelombang
-                AND p.status NOT IN ('Ditolak', 'Dibatalkan')) AS terpakai
+                AND ${SQL_MEMAKAN_KUOTA_PMB}) AS terpakai
        FROM pmb_gelombang g
    ORDER BY g.tanggal_buka DESC
       LIMIT 200;`,
@@ -111,6 +121,15 @@ export async function savePmbWave(
     );
   }
 
+  const lamaBayarHari = Number(draft.lamaBayarHari);
+  if (
+    !Number.isInteger(lamaBayarHari) ||
+    lamaBayarHari < 1 ||
+    lamaBayarHari > 60
+  ) {
+    throw new PmbValidationError("Lama waktu bayar harus 1 sampai 60 hari.");
+  }
+
   const id = String(draft.idGelombang ?? "").trim() || buatIdPmb("gel");
   const aktif = draft.isAktif ? 1 : 0;
 
@@ -118,8 +137,8 @@ export async function savePmbWave(
     {
       sql: `INSERT INTO pmb_gelombang (
               id_gelombang, nama, tahun_ajaran, tanggal_buka, tanggal_tutup,
-              kuota, biaya_pendaftaran, is_aktif, created_at, updated_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))
+              kuota, biaya_pendaftaran, is_aktif, lama_bayar_hari, created_at, updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))
             ON CONFLICT(id_gelombang) DO UPDATE SET
               nama = excluded.nama,
               tahun_ajaran = excluded.tahun_ajaran,
@@ -128,6 +147,7 @@ export async function savePmbWave(
               kuota = excluded.kuota,
               biaya_pendaftaran = excluded.biaya_pendaftaran,
               is_aktif = excluded.is_aktif,
+              lama_bayar_hari = excluded.lama_bayar_hari,
               updated_at = datetime('now');`,
       args: [
         id,
@@ -138,6 +158,7 @@ export async function savePmbWave(
         Math.max(0, Number(draft.kuota ?? 0)),
         Math.max(0, Number(draft.biayaPendaftaran ?? 0)),
         aktif,
+        lamaBayarHari,
       ],
     },
   ];
@@ -196,7 +217,8 @@ export async function listPmbRegistrants(
     SELECT p.id_pendaftar, p.nomor_pendaftaran, p.id_gelombang, p.nama_lengkap,
            p.nisn, p.jenis_kelamin, p.asal_sekolah, p.pilihan_jurusan,
            p.nama_wali, p.no_whatsapp_wali, p.status, p.id_siswa,
-           p.created_at, p.updated_at,
+           p.created_at, p.updated_at, p.biaya_tagihan, p.batas_bayar,
+           ${SQL_KEADAAN_BAYAR_PMB} AS keadaan_bayar,
            ${filter.dapodik ? "p.tempat_lahir, p.tanggal_lahir, p.alamat, p.data_dapodik," : ""}
            COALESCE(g.nama, '') AS nama_gelombang,
            (SELECT COUNT(*) FROM pmb_berkas b
@@ -218,6 +240,12 @@ export async function listPmbRegistrants(
     args.push(status);
   }
 
+  const pembayaran = String(filter.pembayaran ?? "").trim();
+  if (pembayaran && pembayaran !== "Semua") {
+    query += ` AND ${SQL_KEADAAN_BAYAR_PMB} = ?`;
+    args.push(pembayaran);
+  }
+
   const search = String(filter.search ?? "").trim();
   if (search) {
     query +=
@@ -227,7 +255,11 @@ export async function listPmbRegistrants(
   }
 
   const limit = Math.min(500, Math.max(1, Number(filter.limit ?? 100)));
-  query += ` ORDER BY p.created_at DESC LIMIT ${limit};`;
+  // Yang paling dekat batasnya di atas: panitia menghubungi mereka lebih dulu.
+  query +=
+    pembayaran === "Menunggu Pembayaran"
+      ? ` ORDER BY p.batas_bayar ASC, p.created_at ASC LIMIT ${limit};`
+      : ` ORDER BY p.created_at DESC LIMIT ${limit};`;
 
   const res = await client.execute({ sql: query, args });
   return { items: res.rows as unknown as PmbRegistrantItem[] };
@@ -238,7 +270,8 @@ export async function getPmbRegistrant(
   idPendaftar: string,
 ): Promise<PmbRegistrantDetail> {
   const pendaftar = await client.execute({
-    sql: `SELECT p.*, COALESCE(g.nama, '') AS nama_gelombang
+    sql: `SELECT p.*, COALESCE(g.nama, '') AS nama_gelombang,
+                 ${SQL_KEADAAN_BAYAR_PMB} AS keadaan_bayar
             FROM pmb_pendaftar p
             LEFT JOIN pmb_gelombang g ON g.id_gelombang = p.id_gelombang
            WHERE p.id_pendaftar = ?
@@ -290,6 +323,10 @@ export async function updatePmbStatus(
     throw new PmbValidationError("Status pendaftar tidak dikenali.");
   }
 
+  const sekarang = await bacaKeadaanBayar(client, idPendaftar);
+  const tolak = tolakUbahStatusPmb(sekarang.keadaan, status);
+  if (tolak) throw new PmbValidationError(tolak);
+
   const hasil = await client.execute({
     sql: `UPDATE pmb_pendaftar
              SET status = ?,
@@ -298,8 +335,11 @@ export async function updatePmbStatus(
                  diverifikasi_at = datetime('now'),
                  updated_at = datetime('now')
            WHERE id_pendaftar = ?
-             AND status <> 'Terdaftar';`,
-    args: [status, catatan?.trim() || null, operator, idPendaftar],
+             AND status <> 'Terdaftar'
+             AND (? IN ('Baru', 'Ditolak', 'Dibatalkan')
+                  OR biaya_tagihan <= 0
+                  OR dibayar_dicatat_at IS NOT NULL);`,
+    args: [status, catatan?.trim() || null, operator, idPendaftar, status],
   });
 
   if (Number(hasil.rowsAffected ?? 0) === 0) {
@@ -359,5 +399,155 @@ export async function deletePmbRegistrant(
     throw new PmbValidationError(
       "Pendaftar tidak ditemukan, atau sudah menjadi siswa sehingga jejaknya dipertahankan.",
     );
+  }
+}
+
+// ── Pembayaran biaya pendaftaran (v52) ──────────────────────────────────────
+//
+// Cerminan metode `*_pmb_payment*` di `turso.rs`. Setiap aksi membaca keadaan
+// lebih dulu untuk pesan yang tepat (`tolak*Pmb`, vektor kembar dengan
+// `pmb_bayar.rs`), lalu mengulang syaratnya di klausa WHERE: dua panitia yang
+// menekan bersamaan, hanya satu yang berhasil.
+
+async function bacaKeadaanBayar(
+  client: Client,
+  idPendaftar: string,
+): Promise<KeadaanPendaftarPmb & { kuotaPenuh: boolean }> {
+  const res = await client.execute({
+    sql: `SELECT p.status, p.biaya_tagihan,
+                 ${SQL_KEADAAN_BAYAR_PMB} AS keadaan_bayar,
+                 date('now', '+7 hours') AS hari_ini,
+                 COALESCE(g.kuota, 0) AS kuota,
+                 (SELECT COUNT(*) FROM pmb_pendaftar p
+                   WHERE p.id_gelombang = g.id_gelombang
+                     AND ${SQL_MEMAKAN_KUOTA_PMB}) AS terpakai
+            FROM pmb_pendaftar p
+            LEFT JOIN pmb_gelombang g ON g.id_gelombang = p.id_gelombang
+           WHERE p.id_pendaftar = ?
+           LIMIT 1;`,
+    args: [idPendaftar],
+  });
+  const baris = res.rows[0];
+  if (!baris) throw new PmbNotFoundError("Data pendaftar tidak ditemukan.");
+  const kuota = Number(baris.kuota ?? 0);
+  return {
+    status: String(baris.status),
+    keadaan: String(baris.keadaan_bayar),
+    biayaTagihan: Number(baris.biaya_tagihan ?? 0),
+    hariIni: String(baris.hari_ini),
+    kuotaPenuh: kuota > 0 && Number(baris.terpakai ?? 0) >= kuota,
+  };
+}
+
+const PESAN_BERUBAH =
+  "Data pendaftar baru saja berubah. Muat ulang lalu coba lagi.";
+
+export async function confirmPmbPayment(
+  client: Client,
+  input: PmbPaymentInput,
+  operator: string,
+): Promise<void> {
+  const tolak = tolakKonfirmasiBayarPmb(
+    await bacaKeadaanBayar(client, input.idPendaftar),
+    input,
+  );
+  if (tolak) throw new PmbValidationError(tolak);
+
+  const hasil = await client.execute({
+    sql: `UPDATE pmb_pendaftar
+             SET dibayar_jumlah = ?,
+                 dibayar_tanggal = ?,
+                 dibayar_metode = ?,
+                 dibayar_dicatat_oleh = ?,
+                 dibayar_dicatat_at = datetime('now'),
+                 updated_at = datetime('now')
+           WHERE id_pendaftar = ?
+             AND biaya_tagihan > 0
+             AND biaya_tagihan = ?
+             AND dibayar_dicatat_at IS NULL
+             AND batas_bayar >= date('now', '+7 hours')
+             AND ? <= date('now', '+7 hours')
+             AND status NOT IN ('Ditolak', 'Dibatalkan', 'Terdaftar');`,
+    args: [
+      input.jumlah,
+      input.tanggal,
+      input.metode,
+      operator,
+      input.idPendaftar,
+      input.jumlah,
+      input.tanggal,
+    ],
+  });
+  if (Number(hasil.rowsAffected ?? 0) === 0) {
+    throw new PmbValidationError(PESAN_BERUBAH);
+  }
+}
+
+/** Alasan disimpan bersama pencatat dan waktunya; pembatalan terakhir saja. */
+export async function cancelPmbPayment(
+  client: Client,
+  idPendaftar: string,
+  alasan: string,
+  operator: string,
+): Promise<void> {
+  const bersih = alasan.trim();
+  if (bersih.length < 5 || bersih.length > 255) {
+    throw new PmbValidationError(
+      "Alasan pembatalan wajib 5 sampai 255 karakter.",
+    );
+  }
+  const tolak = tolakBatalBayarPmb(await bacaKeadaanBayar(client, idPendaftar));
+  if (tolak) throw new PmbValidationError(tolak);
+
+  const hasil = await client.execute({
+    sql: `UPDATE pmb_pendaftar
+             SET dibayar_jumlah = NULL,
+                 dibayar_tanggal = NULL,
+                 dibayar_metode = NULL,
+                 dibayar_dicatat_oleh = NULL,
+                 dibayar_dicatat_at = NULL,
+                 pembayaran_batal_catatan = ? || ' ' || datetime('now', '+7 hours') || ': ' || ?,
+                 updated_at = datetime('now')
+           WHERE id_pendaftar = ?
+             AND dibayar_dicatat_at IS NOT NULL
+             AND status = 'Baru';`,
+    args: [operator, bersih, idPendaftar],
+  });
+  if (Number(hasil.rowsAffected ?? 0) === 0) {
+    throw new PmbValidationError(PESAN_BERUBAH);
+  }
+}
+
+/**
+ * Perpanjang batas bayar. Pendaftar kedaluwarsa tidak memakan kuota, jadi
+ * menghidupkannya kembali ditolak bila kuota sudah penuh.
+ *
+ * shortcut: kuota diperiksa sebelum UPDATE, jadi dua perpanjangan serentak bisa
+ * melewati kuota satu orang; sama dengan pemeriksaan kuota di situs publik.
+ */
+export async function extendPmbPaymentDeadline(
+  client: Client,
+  idPendaftar: string,
+  batasBayar: string,
+): Promise<void> {
+  const tolak = tolakPerpanjangBayarPmb(
+    await bacaKeadaanBayar(client, idPendaftar),
+    batasBayar,
+  );
+  if (tolak) throw new PmbValidationError(tolak);
+
+  const hasil = await client.execute({
+    sql: `UPDATE pmb_pendaftar
+             SET batas_bayar = ?,
+                 updated_at = datetime('now')
+           WHERE id_pendaftar = ?
+             AND biaya_tagihan > 0
+             AND dibayar_dicatat_at IS NULL
+             AND ? >= date('now', '+7 hours')
+             AND status NOT IN ('Ditolak', 'Dibatalkan', 'Terdaftar');`,
+    args: [batasBayar, idPendaftar, batasBayar],
+  });
+  if (Number(hasil.rowsAffected ?? 0) === 0) {
+    throw new PmbValidationError(PESAN_BERUBAH);
   }
 }

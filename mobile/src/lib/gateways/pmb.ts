@@ -5,6 +5,7 @@ import { isDesktopRuntime } from "@/lib/runtime/app-runtime";
 import { invokeDesktop } from "@/lib/runtime/desktop-commands";
 import type {
   PmbFileContent,
+  PmbPaymentInput,
   PmbPromotionInput,
   PmbRegistrantDetail,
   PmbRegistrantFilter,
@@ -16,6 +17,7 @@ import type {
 export type {
   PmbFileContent,
   PmbFileMeta,
+  PmbPaymentInput,
   PmbPromotionInput,
   PmbRegistrantDetail,
   PmbRegistrantFilter,
@@ -94,6 +96,7 @@ export async function daftarPendaftarPmb(
         search: filter?.search ?? null,
         limit: filter?.limit ?? null,
         dapodik: filter?.dapodik ?? null,
+        pembayaran: filter?.pembayaran ?? null,
       },
     );
   }
@@ -148,6 +151,48 @@ export async function ubahStatusPendaftarPmb(input: {
     return;
   }
   await requestWebApi("/api/academic/pmb/registrants/status", "POST", input);
+}
+
+/** Catat pembayaran biaya pendaftaran yang diterima panitia. */
+export async function konfirmasiBayarPmb(
+  input: PmbPaymentInput,
+): Promise<void> {
+  if (isDesktopRuntime()) {
+    await invokeDesktop("desktop_confirm_pmb_payment", { ...input });
+    return;
+  }
+  await requestWebApi("/api/academic/pmb/registrants/payment", "POST", input);
+}
+
+/** Batalkan pembayaran yang salah dicatat; alasan wajib. */
+export async function batalBayarPmb(input: {
+  idPendaftar: string;
+  alasan: string;
+}): Promise<void> {
+  if (isDesktopRuntime()) {
+    await invokeDesktop("desktop_cancel_pmb_payment", { ...input });
+    return;
+  }
+  await requestWebApi(
+    "/api/academic/pmb/registrants/payment-cancel",
+    "POST",
+    input,
+  );
+}
+
+export async function perpanjangBatasBayarPmb(input: {
+  idPendaftar: string;
+  batasBayar: string;
+}): Promise<void> {
+  if (isDesktopRuntime()) {
+    await invokeDesktop("desktop_extend_pmb_payment_deadline", { ...input });
+    return;
+  }
+  await requestWebApi(
+    "/api/academic/pmb/registrants/payment-deadline",
+    "POST",
+    input,
+  );
 }
 
 export async function hapusPendaftarPmb(idPendaftar: string): Promise<void> {

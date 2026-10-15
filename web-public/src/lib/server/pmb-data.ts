@@ -1,6 +1,8 @@
 import "server-only";
 
 import { cache } from "react";
+import type { RekeningPmb } from "@/components/pmb/InfoBayarPmb";
+import { getPageContent } from "@/lib/server/content-data";
 import { getReadyPublicDatabase } from "@/lib/server/db";
 import { type HasilMuat, petakanKegagalan } from "@/lib/server/school-data";
 import { type GelombangAktif, readGelombangAktif } from "@/lib/services/pmb";
@@ -43,3 +45,22 @@ export async function muatGelombangAktif(): Promise<
 }
 
 export type { GelombangAktif };
+
+/**
+ * Rekening biaya pendaftaran dari CMS halaman `landing`. Gagal dibaca = kosong:
+ * blok bayar tetap tampil dengan instruksi bayar di loket.
+ */
+export async function muatRekeningPmb(): Promise<RekeningPmb> {
+  try {
+    const konten = await getPageContent("landing");
+    return {
+      bank: konten["landing.pmb_bayar_bank"],
+      nomor: konten["landing.pmb_bayar_rekening"],
+      atasNama: konten["landing.pmb_bayar_atas_nama"],
+      instruksi: konten["landing.pmb_bayar_instruksi"],
+    };
+  } catch (error) {
+    console.error("[web-public] gagal membaca rekening PMB:", error);
+    return {};
+  }
+}

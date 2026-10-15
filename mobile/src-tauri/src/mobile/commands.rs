@@ -4064,6 +4064,7 @@ pub async fn desktop_list_pmb_registrants(
     search: Option<String>,
     limit: Option<i64>,
     dapodik: Option<bool>,
+    pembayaran: Option<String>,
 ) -> Result<Value, CommandError> {
     require_permission(&state, "pmb.view")?;
     state
@@ -4074,6 +4075,7 @@ pub async fn desktop_list_pmb_registrants(
             search.as_deref(),
             limit,
             dapodik.unwrap_or(false),
+            pembayaran.as_deref(),
         )
         .await
 }
@@ -4118,6 +4120,50 @@ pub async fn desktop_update_pmb_status(
             catatan.as_deref(),
             &operator.username,
         )
+        .await
+}
+
+/// Mencatat pembayaran biaya pendaftaran PMB (Cloud-Only).
+#[tauri::command]
+pub async fn desktop_confirm_pmb_payment(
+    state: State<'_, MobileState>,
+    id_pendaftar: String,
+    jumlah: i64,
+    tanggal: String,
+    metode: String,
+) -> Result<Value, CommandError> {
+    let operator = require_permission(&state, "pmb.manage")?;
+    state
+        .get_turso_client()?
+        .confirm_pmb_payment(&id_pendaftar, jumlah, &tanggal, &metode, &operator.username)
+        .await
+}
+
+/// Membatalkan pembayaran PMB yang salah dicatat, dengan alasan (Cloud-Only).
+#[tauri::command]
+pub async fn desktop_cancel_pmb_payment(
+    state: State<'_, MobileState>,
+    id_pendaftar: String,
+    alasan: String,
+) -> Result<Value, CommandError> {
+    let operator = require_permission(&state, "pmb.manage")?;
+    state
+        .get_turso_client()?
+        .cancel_pmb_payment(&id_pendaftar, &alasan, &operator.username)
+        .await
+}
+
+/// Memperpanjang batas bayar biaya pendaftaran PMB (Cloud-Only).
+#[tauri::command]
+pub async fn desktop_extend_pmb_payment_deadline(
+    state: State<'_, MobileState>,
+    id_pendaftar: String,
+    batas_bayar: String,
+) -> Result<Value, CommandError> {
+    require_permission(&state, "pmb.manage")?;
+    state
+        .get_turso_client()?
+        .extend_pmb_payment_deadline(&id_pendaftar, &batas_bayar)
         .await
 }
 

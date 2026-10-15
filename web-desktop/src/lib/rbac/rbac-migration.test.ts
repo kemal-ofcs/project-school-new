@@ -155,6 +155,8 @@ describe("dynamic RBAC migration", () => {
       50,
       // v51 — rapel gaji (`payroll_rapel`).
       51,
+      // v52 — pembayaran biaya pendaftaran PMB.
+      52,
     ]);
 
     const sessionColumns = await client.execute(

@@ -189,6 +189,9 @@ pub fn run() {
             mobile::commands::desktop_get_pmb_registrant,
             mobile::commands::desktop_get_pmb_file,
             mobile::commands::desktop_update_pmb_status,
+            mobile::commands::desktop_confirm_pmb_payment,
+            mobile::commands::desktop_cancel_pmb_payment,
+            mobile::commands::desktop_extend_pmb_payment_deadline,
             mobile::commands::desktop_delete_pmb_registrant,
             mobile::commands::desktop_promote_pmb_registrant,
             // Tinjauan antrean WhatsApp: command khusus Mobile yang membaca CLOUD.

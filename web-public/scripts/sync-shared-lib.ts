@@ -76,6 +76,10 @@ const filesToCopy = [
   // wajib sama dengan yang dibaca tampilan dan ekspor panel admin.
   "lib/validations/pmb-dapodik.ts",
   "lib/validations/pmb-dapodik.test.ts",
+  // Keadaan bayar PMB (v52): ekspresi SQL kuota dan keadaan bayar wajib sama
+  // dengan yang dipakai panel admin.
+  "lib/validations/pmb-pembayaran.ts",
+  "lib/validations/pmb-pembayaran.test.ts",
   // Pemeriksa lisensi. Situs publik melayani database yang sama dengan
   // aplikasi admin, jadi ia wajib menilai lisensi yang sama dengan aturan yang
   // sama persis. Tesnya TIDAK ikut disalin: ia membangun skema lewat

@@ -62,6 +62,7 @@ const CONTENT_IMAGE_MIGRATION_VERSION = 48;
 const PMB_DAPODIK_MIGRATION_VERSION = 49;
 const SHIFT_WORK_DAYS_MIGRATION_VERSION = 50;
 const PAYROLL_RAPEL_MIGRATION_VERSION = 51;
+const PMB_PAYMENT_MIGRATION_VERSION = 52;
 
 /**
  * v21 — aturan jam scan baru: Jam Kerja Normal = (Jam Pulang − Jam Masuk) −
@@ -583,6 +584,53 @@ export async function runDatabaseMigrations(client: Client) {
       "pmb_pendaftar",
       "data_dapodik",
       "ALTER TABLE pmb_pendaftar ADD COLUMN data_dapodik TEXT;",
+    ],
+    // Pembayaran biaya pendaftaran PMB (v52). Cerminan `ensure_column` di
+    // `turso.rs`; keadaan bayar diturunkan, lihat `validations/pmb-pembayaran.ts`.
+    [
+      "pmb_gelombang",
+      "lama_bayar_hari",
+      "ALTER TABLE pmb_gelombang ADD COLUMN lama_bayar_hari INTEGER NOT NULL DEFAULT 7 CHECK(lama_bayar_hari BETWEEN 1 AND 60);",
+    ],
+    [
+      "pmb_pendaftar",
+      "biaya_tagihan",
+      "ALTER TABLE pmb_pendaftar ADD COLUMN biaya_tagihan INTEGER NOT NULL DEFAULT 0;",
+    ],
+    [
+      "pmb_pendaftar",
+      "batas_bayar",
+      "ALTER TABLE pmb_pendaftar ADD COLUMN batas_bayar TEXT;",
+    ],
+    [
+      "pmb_pendaftar",
+      "dibayar_jumlah",
+      "ALTER TABLE pmb_pendaftar ADD COLUMN dibayar_jumlah INTEGER;",
+    ],
+    [
+      "pmb_pendaftar",
+      "dibayar_tanggal",
+      "ALTER TABLE pmb_pendaftar ADD COLUMN dibayar_tanggal TEXT;",
+    ],
+    [
+      "pmb_pendaftar",
+      "dibayar_metode",
+      "ALTER TABLE pmb_pendaftar ADD COLUMN dibayar_metode TEXT CHECK(dibayar_metode IN ('tunai', 'transfer', 'qris', 'gateway'));",
+    ],
+    [
+      "pmb_pendaftar",
+      "dibayar_dicatat_oleh",
+      "ALTER TABLE pmb_pendaftar ADD COLUMN dibayar_dicatat_oleh TEXT;",
+    ],
+    [
+      "pmb_pendaftar",
+      "dibayar_dicatat_at",
+      "ALTER TABLE pmb_pendaftar ADD COLUMN dibayar_dicatat_at TEXT;",
+    ],
+    [
+      "pmb_pendaftar",
+      "pembayaran_batal_catatan",
+      "ALTER TABLE pmb_pendaftar ADD COLUMN pembayaran_batal_catatan TEXT;",
     ],
   ] as const) {
     if (
@@ -2077,6 +2125,12 @@ export async function runDatabaseMigrations(client: Client) {
           VALUES (?, 'payroll-rapel', ?);`,
     args: [PAYROLL_RAPEL_MIGRATION_VERSION, now],
   });
+  // v52 — pembayaran biaya pendaftaran PMB (ALTER-nya ada di daftar kolom di atas).
+  await client.execute({
+    sql: `INSERT OR IGNORE INTO schema_migration (version, name, applied_at)
+          VALUES (?, 'pmb-payment', ?);`,
+    args: [PMB_PAYMENT_MIGRATION_VERSION, now],
+  });
 
   await client.execute(
     "CREATE INDEX IF NOT EXISTS idx_jurnal_presensi ON jurnal_mengajar(id_presensi_mapel);",
@@ -2389,7 +2443,8 @@ export async function runDatabaseMigrations(client: Client) {
       biaya_pendaftaran INTEGER NOT NULL DEFAULT 0,
       is_aktif INTEGER NOT NULL DEFAULT 0 CHECK(is_aktif IN (0, 1)),
       created_at TEXT NOT NULL,
-      updated_at TEXT NOT NULL
+      updated_at TEXT NOT NULL,
+      lama_bayar_hari INTEGER NOT NULL DEFAULT 7 CHECK(lama_bayar_hari BETWEEN 1 AND 60)
     );
   `);
 
@@ -2426,7 +2481,15 @@ export async function runDatabaseMigrations(client: Client) {
       id_siswa TEXT,
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL,
-      data_dapodik TEXT
+      data_dapodik TEXT,
+      biaya_tagihan INTEGER NOT NULL DEFAULT 0,
+      batas_bayar TEXT,
+      dibayar_jumlah INTEGER,
+      dibayar_tanggal TEXT,
+      dibayar_metode TEXT CHECK(dibayar_metode IN ('tunai', 'transfer', 'qris', 'gateway')),
+      dibayar_dicatat_oleh TEXT,
+      dibayar_dicatat_at TEXT,
+      pembayaran_batal_catatan TEXT
     );
   `);
 

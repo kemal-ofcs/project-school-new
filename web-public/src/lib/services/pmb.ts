@@ -8,6 +8,10 @@ import {
   type MasukanPendaftaran,
   VERSI_DATA_DAPODIK,
 } from "@/lib/validations/pmb";
+import {
+  SQL_KEADAAN_BAYAR_PMB,
+  SQL_MEMAKAN_KUOTA_PMB,
+} from "@/lib/validations/pmb-pembayaran";
 
 /**
  * Penulisan dan pembacaan PMB.
@@ -72,6 +76,10 @@ export async function readGelombangAktif(
 export interface HasilPendaftaran {
   idPendaftar: string;
   nomorPendaftaran: string;
+  /** Salinan biaya gelombang; 0 = tanpa biaya. */
+  biayaPendaftaran: number;
+  /** `YYYY-MM-DD` WIB, `null` bila tanpa biaya. */
+  batasBayar: string | null;
 }
 
 export class GelombangTidakTerbukaError extends Error {
@@ -119,9 +127,9 @@ export async function tulisPendaftaran(
   if (gelombang.kuota > 0) {
     const terpakai = await client.execute({
       sql: `SELECT COUNT(*) AS total
-              FROM pmb_pendaftar
-             WHERE id_gelombang = ?
-               AND status NOT IN ('Ditolak', 'Dibatalkan');`,
+              FROM pmb_pendaftar p
+             WHERE p.id_gelombang = ?
+               AND ${SQL_MEMAKAN_KUOTA_PMB};`,
       args: [gelombang.id],
     });
     if (Number(terpakai.rows[0]?.total ?? 0) >= gelombang.kuota) {
@@ -129,15 +137,7 @@ export async function tulisPendaftaran(
     }
   }
 
-  // Kolom v49 lahir saat aplikasi admin memigrasi database. Situs publik tidak
-  // pernah mengubah skema sendiri, jadi database yang belum dimigrasi dijawab
-  // "belum siap" alih-alih membuang isian DAPODIK yang sudah diketik orang tua.
-  const kolom = await client.execute("PRAGMA table_info(pmb_pendaftar);");
-  if (!kolom.rows.some((baris) => baris.name === "data_dapodik")) {
-    throw new SchemaNotReadyError(
-      "kolom pmb_pendaftar.data_dapodik (v49) belum ada",
-    );
-  }
+  await pastikanKolomPmb(client);
 
   let terakhir: unknown = null;
 
@@ -151,9 +151,15 @@ export async function tulisPendaftaran(
                 id_pendaftar, nomor_pendaftaran, id_gelombang, nama_lengkap,
                 nisn, jenis_kelamin, tempat_lahir, tanggal_lahir, asal_sekolah,
                 alamat, nama_wali, no_whatsapp_wali, email_wali, pilihan_jurusan,
-                data_dapodik, status, created_at, updated_at
-              ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Baru',
-                        datetime('now'), datetime('now'));`,
+                data_dapodik, biaya_tagihan, batas_bayar, status,
+                created_at, updated_at
+              ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
+                        CASE WHEN ? > 0 THEN
+                          (SELECT date('now', '+7 hours', '+' || lama_bayar_hari || ' days')
+                             FROM pmb_gelombang WHERE id_gelombang = ?)
+                        END,
+                        'Baru', datetime('now'), datetime('now'))
+              RETURNING batas_bayar;`,
         args: [
           idPendaftar,
           nomorPendaftaran,
@@ -170,6 +176,9 @@ export async function tulisPendaftaran(
           masukan.emailWali ?? null,
           masukan.pilihanJurusan,
           JSON.stringify({ versi: VERSI_DATA_DAPODIK, ...masukan.dataDapodik }),
+          gelombang.biayaPendaftaran,
+          gelombang.biayaPendaftaran,
+          gelombang.id,
         ],
       },
       ...masukan.berkas.map((berkas, urutan) => ({
@@ -190,8 +199,14 @@ export async function tulisPendaftaran(
     ];
 
     try {
-      await client.batch(pernyataan, "write");
-      return { idPendaftar, nomorPendaftaran };
+      const [pendaftar] = await client.batch(pernyataan, "write");
+      const batas = pendaftar?.rows[0]?.batas_bayar;
+      return {
+        idPendaftar,
+        nomorPendaftaran,
+        biayaPendaftaran: gelombang.biayaPendaftaran,
+        batasBayar: batas ? String(batas) : null,
+      };
     } catch (error) {
       if (!bentrokNomorPendaftaran(error)) throw error;
       terakhir = error;
@@ -235,6 +250,31 @@ export interface StatusPendaftaran {
   namaGelombang: string;
   tanggalDaftar: string;
   jumlahBerkas: number;
+  biayaTagihan: number;
+  batasBayar: string | null;
+  dibayarTanggal: string | null;
+  /** Dihitung SQL dengan jam WIB (`SQL_KEADAAN_BAYAR_PMB`). */
+  keadaanBayar: string;
+}
+
+/**
+ * Kolom v49 dan v52 lahir saat aplikasi admin memigrasi database. Situs publik
+ * tidak pernah mengubah skema sendiri, jadi database yang belum dimigrasi
+ * dijawab "belum siap" alih-alih membuang isian yang sudah diketik orang tua.
+ */
+async function pastikanKolomPmb(client: Client): Promise<void> {
+  const kolom = await client.execute("PRAGMA table_info(pmb_pendaftar);");
+  const ada = new Set(kolom.rows.map((baris) => String(baris.name)));
+  if (!ada.has("data_dapodik")) {
+    throw new SchemaNotReadyError(
+      "kolom pmb_pendaftar.data_dapodik (v49) belum ada",
+    );
+  }
+  if (!ada.has("biaya_tagihan")) {
+    throw new SchemaNotReadyError(
+      "kolom pmb_pendaftar.biaya_tagihan (v52) belum ada",
+    );
+  }
 }
 
 /**
@@ -252,9 +292,12 @@ export async function readStatusPendaftaran(
   client: Client,
   masukan: MasukanCekStatus,
 ): Promise<StatusPendaftaran | null> {
+  await pastikanKolomPmb(client);
   const hasil = await client.execute({
     sql: `SELECT p.nomor_pendaftaran, p.nama_lengkap, p.status,
                  p.catatan_verifikator, p.created_at,
+                 p.biaya_tagihan, p.batas_bayar, p.dibayar_tanggal,
+                 ${SQL_KEADAAN_BAYAR_PMB} AS keadaan_bayar,
                  COALESCE(g.nama, '') AS nama_gelombang,
                  (SELECT COUNT(*) FROM pmb_berkas b
                    WHERE b.id_pendaftar = p.id_pendaftar) AS jumlah_berkas
@@ -277,6 +320,12 @@ export async function readStatusPendaftaran(
     namaGelombang: String(baris.nama_gelombang ?? ""),
     tanggalDaftar: String(baris.created_at),
     jumlahBerkas: Number(baris.jumlah_berkas ?? 0),
+    biayaTagihan: Number(baris.biaya_tagihan ?? 0),
+    batasBayar: baris.batas_bayar ? String(baris.batas_bayar) : null,
+    dibayarTanggal: baris.dibayar_tanggal
+      ? String(baris.dibayar_tanggal)
+      : null,
+    keadaanBayar: String(baris.keadaan_bayar),
   };
 }
 
@@ -319,9 +368,12 @@ export async function readStatusPendaftaranById(
   client: Client,
   idPendaftar: string,
 ): Promise<StatusPendaftaran | null> {
+  await pastikanKolomPmb(client);
   const hasil = await client.execute({
     sql: `SELECT p.nomor_pendaftaran, p.nama_lengkap, p.status,
                  p.catatan_verifikator, p.created_at,
+                 p.biaya_tagihan, p.batas_bayar, p.dibayar_tanggal,
+                 ${SQL_KEADAAN_BAYAR_PMB} AS keadaan_bayar,
                  COALESCE(g.nama, '') AS nama_gelombang,
                  (SELECT COUNT(*) FROM pmb_berkas b
                    WHERE b.id_pendaftar = p.id_pendaftar) AS jumlah_berkas
@@ -343,5 +395,11 @@ export async function readStatusPendaftaranById(
     namaGelombang: String(baris.nama_gelombang ?? ""),
     tanggalDaftar: String(baris.created_at),
     jumlahBerkas: Number(baris.jumlah_berkas ?? 0),
+    biayaTagihan: Number(baris.biaya_tagihan ?? 0),
+    batasBayar: baris.batas_bayar ? String(baris.batas_bayar) : null,
+    dibayarTanggal: baris.dibayar_tanggal
+      ? String(baris.dibayar_tanggal)
+      : null,
+    keadaanBayar: String(baris.keadaan_bayar),
   };
 }

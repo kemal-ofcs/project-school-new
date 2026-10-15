@@ -408,6 +408,38 @@ export const LANDING_PAGE_SUBSECTIONS: CmsSubSectionConfig[] = [
         description:
           "Hindari menulis jumlah langkah di sini — jumlahnya mengikuti isi daftar tahapan di bawah.",
       },
+      {
+        key: "landing.pmb_bayar_bank",
+        label: "Bank Tujuan Biaya Pendaftaran",
+        type: "text",
+        placeholder: "Bank BRI",
+        description:
+          "Tampil di layar sukses dan halaman cek status bila gelombang punya biaya pendaftaran.",
+      },
+      {
+        key: "landing.pmb_bayar_rekening",
+        label: "Nomor Rekening",
+        type: "text",
+        placeholder: "0123-01-000123-50-1",
+        description:
+          "Kosongkan bila pembayaran hanya di loket sekolah; blok rekening tidak akan tampil.",
+      },
+      {
+        key: "landing.pmb_bayar_atas_nama",
+        label: "Rekening Atas Nama",
+        type: "text",
+        placeholder: "Yayasan Pendidikan Contoh",
+      },
+      {
+        key: "landing.pmb_bayar_instruksi",
+        label: "Instruksi Pembayaran",
+        type: "textarea",
+        rows: 3,
+        placeholder:
+          "Bayar di loket TU (Senin–Jumat, 07.30–14.00) atau transfer. Tulis nomor pendaftaran di berita transfer.",
+        description:
+          "Kosongkan untuk memakai instruksi bawaan sesuai ada tidaknya nomor rekening.",
+      },
     ],
   },
   {

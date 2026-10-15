@@ -1,4 +1,5 @@
 import type { NextRequest } from "next/server";
+import { z } from "zod";
 import { requireWebPermission } from "@/lib/server/auth/authorize";
 import {
   ensureServerDatabaseInitialized,
@@ -16,9 +17,17 @@ import {
   markPmbRegistered,
   PmbValidationError,
 } from "@/lib/services/pmb-admin";
-import type { PmbPromotionInput } from "@/types/pmb";
 
 export const runtime = "nodejs";
+
+const bodySchema = z
+  .object({
+    idPendaftar: z.string().trim().min(1).max(80),
+    idRombel: z.string().max(80),
+    idShift: z.number().int().positive().nullish(),
+    angkatan: z.number().int().min(1900).max(2200).nullish(),
+  })
+  .strict();
 
 /**
  * Angkat pendaftar yang diterima menjadi siswa aktif.
@@ -48,7 +57,11 @@ export async function POST(request: NextRequest) {
     await requireWebPermission(request, "students.manage");
     await ensureServerDatabaseInitialized();
 
-    const input = await readJsonBody<PmbPromotionInput>(request);
+    const parsed = bodySchema.safeParse(await readJsonBody(request));
+    if (!parsed.success) {
+      throw new PmbValidationError("Permintaan angkat siswa tidak valid.");
+    }
+    const input = parsed.data;
     if (!String(input.idRombel ?? "").trim()) {
       throw new PmbValidationError(
         "Rombel tujuan wajib dipilih sebelum pendaftar diangkat menjadi siswa.",

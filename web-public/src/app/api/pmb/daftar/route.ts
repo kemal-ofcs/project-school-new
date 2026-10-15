@@ -85,6 +85,8 @@ export async function POST(request: Request) {
     return NextResponse.json({
       nomorPendaftaran: hasil.nomorPendaftaran,
       namaGelombang: gelombang.nama,
+      biayaPendaftaran: hasil.biayaPendaftaran,
+      batasBayar: hasil.batasBayar,
     });
   } catch (error) {
     return jawabKegagalan(error, "pendaftaran PMB");

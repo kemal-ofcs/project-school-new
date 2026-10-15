@@ -29,7 +29,9 @@ export interface KebijakanRateLimit {
 }
 
 export const KEBIJAKAN_DAFTAR_PMB: KebijakanRateLimit = {
-  maksPercobaan: 5,
+  // Satu WiFi sekolah atau meja pendaftaran berbagi satu IP; 5 memblokir
+  // pendaftar keenam dalam setengah jam.
+  maksPercobaan: 20,
   jendelaMenit: 30,
   blokirMenit: 30,
 };

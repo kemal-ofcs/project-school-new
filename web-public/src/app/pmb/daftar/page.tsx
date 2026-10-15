@@ -3,7 +3,7 @@ import { headers } from "next/headers";
 import Link from "next/link";
 import { StatusTidakTerbaca } from "@/components/StatusData";
 import { HEADER_LISENSI } from "@/lib/server/license-gate";
-import { muatGelombangAktif } from "@/lib/server/pmb-data";
+import { muatGelombangAktif, muatRekeningPmb } from "@/lib/server/pmb-data";
 import { muatProgramStudi } from "@/lib/server/school-data";
 import { FormPendaftaran } from "./FormPendaftaran";
 
@@ -52,9 +52,10 @@ export default async function HalamanDaftar() {
     );
   }
 
-  const [gelombang, program] = await Promise.all([
+  const [gelombang, program, rekening] = await Promise.all([
     muatGelombangAktif(),
     muatProgramStudi(),
+    muatRekeningPmb(),
   ]);
 
   if (gelombang.status !== "ok") {
@@ -110,7 +111,7 @@ export default async function HalamanDaftar() {
       </p>
 
       <div className="mt-10">
-        <FormPendaftaran jurusan={jurusan} />
+        <FormPendaftaran jurusan={jurusan} rekening={rekening} />
       </div>
     </main>
   );

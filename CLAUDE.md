@@ -89,7 +89,7 @@ Isi lengkap tiap domain ada di `.agents/skills/absensi-sppg-rules/references/`. 
 | Build release, `gen/android`, penyimpanan Android, WhatsApp, jalur data Mobile | `12-build-android-wa-mobile.md` | Release butuh `.env`; jangan sunting `gen/android` dengan tangan (pakai `patch-android-release.ts`); simpan berkas Android lewat SAF `android_fs_async()`; batal/antre WA di Mobile menulis ke CLOUD. |
 | Menambah atau membaca audit gate | `13-rasional-audit-gate.md` | Gate tidak boleh dilonggarkan atau diberi daftar pengecualian; perbaiki kode pemanggilnya. |
 | Inventaris, jurnal, kasbon, tagihan, kuitansi, nilai, e-Rapor, tutup buku | `14-keuangan-nilai-inventaris.md` | Saldo/stok/sisa TIDAK pernah disimpan, selalu diturunkan; buku append-only, koreksi = baris pembalik berid deterministik; cloud tidak pernah menolak karena stok atau tanggal; aturan dieja kembar Rust ↔ TS dengan vektor yang sama. |
-| Foto konten situs publik, formulir PMB | `15-konten-publik-pmb.md` | Foto konten hanya di tabel cloud-only `konten_gambar`; data DAPODIK tidak pernah disalin ke `siswa_data`. |
+| Foto konten situs publik, formulir PMB, pembayaran PMB | `15-konten-publik-pmb.md` | Foto konten hanya di tabel cloud-only `konten_gambar`; data DAPODIK tidak pernah disalin ke `siswa_data`; keadaan bayar PMB diturunkan dari kolom, tidak pernah menjadi nilai baru di CHECK `status`. |
 
 **Domain specifics worth knowing before touching attendance/payroll code:**
 - Overnight shifts (`jam_pulang < jam_masuk`): scan-out belongs to the next calendar day; duration = `(out_min + 1440) - in_min`.

@@ -1,6 +1,7 @@
 "use client";
 
 import { useId, useRef, useState } from "react";
+import { InfoBayarPmb, type RekeningPmb } from "@/components/pmb/InfoBayarPmb";
 
 interface StatusPendaftaran {
   nomorPendaftaran: string;
@@ -10,6 +11,10 @@ interface StatusPendaftaran {
   namaGelombang: string;
   tanggalDaftar: string;
   jumlahBerkas: number;
+  biayaTagihan: number;
+  batasBayar: string | null;
+  dibayarTanggal: string | null;
+  keadaanBayar: string;
 }
 
 type Keadaan =
@@ -20,7 +25,7 @@ type Keadaan =
 
 /** Penjelasan tiap status, supaya pendaftar tahu apa yang harus dilakukan. */
 const ARTI_STATUS: Record<string, string> = {
-  Baru: "Pendaftaran sudah masuk dan menunggu pemeriksaan berkas oleh panitia.",
+  Baru: "Pendaftaran sudah masuk. Bila ada biaya pendaftaran, berkas diperiksa panitia setelah biaya dibayar.",
   "Berkas Lengkap": "Berkas Anda lengkap dan sedang diverifikasi.",
   Terverifikasi: "Berkas sudah diverifikasi. Menunggu keputusan panitia.",
   Diterima:
@@ -32,7 +37,13 @@ const ARTI_STATUS: Record<string, string> = {
     "Anda sudah terdaftar sebagai siswa. Silakan hubungi sekolah bila ada pertanyaan.",
 };
 
-export function FormCekStatus({ mode }: { mode: "otp" | "tanggal_lahir" }) {
+export function FormCekStatus({
+  mode,
+  rekening,
+}: {
+  mode: "otp" | "tanggal_lahir";
+  rekening: RekeningPmb;
+}) {
   const id = useId();
   const [keadaan, setKeadaan] = useState<Keadaan>({ jenis: "kosong" });
   const [kodeTerkirim, setKodeTerkirim] = useState<string | null>(null);
@@ -241,6 +252,16 @@ export function FormCekStatus({ mode }: { mode: "otp" | "tanggal_lahir" }) {
             {ARTI_STATUS[keadaan.status.status] ??
               "Silakan hubungi sekolah untuk penjelasan status ini."}
           </p>
+
+          {["Ditolak", "Dibatalkan"].includes(keadaan.status.status) ? null : (
+            <InfoBayarPmb
+              batasBayar={keadaan.status.batasBayar}
+              biaya={keadaan.status.biayaTagihan}
+              dibayarTanggal={keadaan.status.dibayarTanggal}
+              keadaan={keadaan.status.keadaanBayar}
+              rekening={rekening}
+            />
+          )}
 
           {keadaan.status.catatanVerifikator ? (
             <div className="mt-5 rounded-md bg-latar-lembut p-4">

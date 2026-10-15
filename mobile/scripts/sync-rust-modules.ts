@@ -18,6 +18,8 @@ const filesToSync = [
   "loan.rs",
   // Rapel gaji (v51): selisih tarif wajib identik dengan Desktop dan TS.
   "rapel.rs",
+  // Pembayaran PMB (v52): keadaan bayar dan penolakan wajib identik dengan TS.
+  "pmb_bayar.rs",
   // Tagihan siswa (K3a): tarif dan keringanan wajib identik dengan Desktop dan TS.
   "billing.rs",
   "tutup_buku.rs",

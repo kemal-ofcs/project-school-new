@@ -7,6 +7,7 @@ import {
   DataDapodikDetail,
   TombolEksporDapodik,
 } from "@/components/pmb/DataDapodikPmb";
+import { PembayaranPmb } from "@/components/pmb/PembayaranPmb";
 import { FeedbackBanner } from "@/components/ui/FeedbackBanner";
 import { Modal } from "@/components/ui/Modal";
 import { PageHeader } from "@/components/ui/PageHeader";
@@ -28,7 +29,11 @@ import {
   ubahStatusPendaftarPmb,
 } from "@/lib/gateways/pmb";
 import { useConfirmDialog } from "@/lib/hooks/useConfirmDialog";
-import { PMB_STATUS_MANUAL } from "@/types/pmb";
+import {
+  rupiahPmb,
+  tolakUbahStatusPmb,
+} from "@/lib/validations/pmb-pembayaran";
+import { KEADAAN_BAYAR_PMB, PMB_STATUS_MANUAL } from "@/types/pmb";
 
 interface Rombel {
   id_rombel: string;
@@ -42,6 +47,7 @@ const GELOMBANG_KOSONG = {
   tanggalTutup: "",
   kuota: 0,
   biayaPendaftaran: 0,
+  lamaBayarHari: 7,
   isAktif: true,
 };
 
@@ -60,6 +66,7 @@ export default function PmbPage() {
 
   const [filterGelombang, setFilterGelombang] = useState("Semua");
   const [filterStatus, setFilterStatus] = useState("Semua");
+  const [filterBayar, setFilterBayar] = useState("Semua");
   const [pencarian, setPencarian] = useState("");
 
   const [detail, setDetail] = useState<PmbRegistrantDetail | null>(null);
@@ -89,6 +96,7 @@ export default function PmbPage() {
           id_gelombang: filterGelombang,
           status: filterStatus,
           search: pencarian || null,
+          pembayaran: filterBayar,
         }),
         daftarGelombangPmb(),
       ]);
@@ -108,7 +116,7 @@ export default function PmbPage() {
     } finally {
       setMemuat(false);
     }
-  }, [filterGelombang, filterStatus, pencarian]);
+  }, [filterGelombang, filterStatus, filterBayar, pencarian]);
 
   useEffect(() => {
     if (!authLoading && isAuthenticated) {
@@ -162,6 +170,14 @@ export default function PmbPage() {
       setGalat(error instanceof Error ? error.message : "Status gagal diubah.");
     } finally {
       isSubmittingRef.current = false;
+    }
+  }
+
+  async function setelahBayarBerubah(pesan: string) {
+    setKabar(pesan);
+    await muatData();
+    if (detail) {
+      setDetail(await getDetailPendaftarPmb(detail.pendaftar.id_pendaftar));
     }
   }
 
@@ -343,6 +359,12 @@ export default function PmbPage() {
                     Pendaftar: {item.terpakai ?? 0}
                     {item.kuota > 0 ? ` / ${item.kuota}` : ""}
                   </p>
+                  {item.biaya_pendaftaran > 0 ? (
+                    <p className="mt-1 text-slate-400 text-xs">
+                      Biaya Rp{rupiahPmb(item.biaya_pendaftaran)}, batas bayar{" "}
+                      {item.lama_bayar_hari} hari
+                    </p>
+                  ) : null}
                 </li>
               ))}
             </ul>
@@ -350,7 +372,7 @@ export default function PmbPage() {
         </section>
 
         <section className="rounded-xl border border-white/10 bg-slate-900/95 p-4">
-          <div className="grid gap-3 sm:grid-cols-3">
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
             <div>
               <label
                 className="block text-slate-400 text-xs"
@@ -397,6 +419,27 @@ export default function PmbPage() {
             <div>
               <label
                 className="block text-slate-400 text-xs"
+                htmlFor={`${id}-filter-bayar`}
+              >
+                Filter pembayaran
+              </label>
+              <select
+                className="mt-1 w-full rounded-lg border border-white/10 bg-slate-950 px-3 py-2 text-sm text-white"
+                id={`${id}-filter-bayar`}
+                onChange={(e) => setFilterBayar(e.target.value)}
+                value={filterBayar}
+              >
+                <option value="Semua">Semua pembayaran</option>
+                {KEADAAN_BAYAR_PMB.map((keadaan) => (
+                  <option key={keadaan} value={keadaan}>
+                    {keadaan}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label
+                className="block text-slate-400 text-xs"
                 htmlFor={`${id}-cari`}
               >
                 Cari nama / nomor pendaftaran
@@ -417,6 +460,7 @@ export default function PmbPage() {
                 id_gelombang: filterGelombang,
                 status: filterStatus,
                 search: pencarian || null,
+                pembayaran: filterBayar,
               }}
             />
           </div>
@@ -437,6 +481,7 @@ export default function PmbPage() {
                     <th className="py-2">Gelombang</th>
                     <th className="py-2">Berkas</th>
                     <th className="py-2">Status</th>
+                    <th className="py-2">Pembayaran</th>
                     <th className="py-2">Aksi</th>
                   </tr>
                 </thead>
@@ -457,6 +502,13 @@ export default function PmbPage() {
                         {item.jumlah_berkas}
                       </td>
                       <td className="py-2 text-slate-300">{item.status}</td>
+                      <td className="py-2 text-slate-400">
+                        {item.keadaan_bayar}
+                        {item.keadaan_bayar === "Menunggu Pembayaran" &&
+                        item.batas_bayar
+                          ? ` (s.d. ${item.batas_bayar})`
+                          : ""}
+                      </td>
                       <td className="py-2">
                         <button
                           className="rounded-md border border-white/15 px-2 py-1 text-xs text-white"
@@ -498,6 +550,12 @@ export default function PmbPage() {
               <dt className="text-slate-500">Status</dt>
               <dd>{detail.pendaftar.status}</dd>
             </dl>
+
+            <PembayaranPmb
+              bolehKelola={bolehKelola}
+              onBerubah={setelahBayarBerubah}
+              pendaftar={detail.pendaftar}
+            />
 
             <DataDapodikDetail pendaftar={detail.pendaftar} />
 
@@ -552,7 +610,14 @@ export default function PmbPage() {
                   }
                   value={detail.pendaftar.status}
                 >
-                  {PMB_STATUS_MANUAL.map((status) => (
+                  {PMB_STATUS_MANUAL.filter(
+                    (status) =>
+                      status === detail.pendaftar.status ||
+                      !tolakUbahStatusPmb(
+                        detail.pendaftar.keadaan_bayar,
+                        status,
+                      ),
+                  ).map((status) => (
                     <option key={status} value={status}>
                       {status}
                     </option>
@@ -805,6 +870,29 @@ export default function PmbPage() {
                 value={draftGelombang.biayaPendaftaran}
               />
             </div>
+          </div>
+          <div>
+            <label
+              className="block text-slate-400 text-xs"
+              htmlFor={`${id}-gel-lama-bayar`}
+            >
+              Lama waktu bayar (hari sejak mendaftar, 1–60)
+            </label>
+            <input
+              className="mt-1 w-full rounded-lg border border-white/10 bg-slate-950 px-3 py-2 text-white"
+              id={`${id}-gel-lama-bayar`}
+              max={60}
+              min={1}
+              onChange={(e) =>
+                setDraftGelombang((d) => ({
+                  ...d,
+                  lamaBayarHari: Number(e.target.value),
+                }))
+              }
+              required
+              type="number"
+              value={draftGelombang.lamaBayarHari}
+            />
           </div>
           <div className="flex items-center gap-2">
             <input

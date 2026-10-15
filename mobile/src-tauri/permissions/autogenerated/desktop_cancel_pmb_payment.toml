@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-desktop-cancel-pmb-payment"
+description = "Enables the desktop_cancel_pmb_payment command without any pre-configured scope."
+commands.allow = ["desktop_cancel_pmb_payment"]
+
+[[permission]]
+identifier = "deny-desktop-cancel-pmb-payment"
+description = "Denies the desktop_cancel_pmb_payment command without any pre-configured scope."
+commands.deny = ["desktop_cancel_pmb_payment"]
