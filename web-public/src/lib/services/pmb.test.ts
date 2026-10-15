@@ -159,9 +159,36 @@ const MASUKAN = {
   dataDapodik: dataDapodikSchema.parse({
     nik: "3273011705100001",
     agama: "Islam",
+    noAktaLahir: "AL001",
+    anakKe: "1",
+    jumlahSaudara: "1",
+    hpSiswa: "081200000001",
+    emailSiswa: "bagas@example.com",
+    rt: "1",
+    rw: "2",
     kelurahan: "Cibeunying",
     kecamatan: "Cimenyan",
-    ibuNama: "Sri Wahyuni",
+    kodePos: "40191",
+    jenisTinggal: "Bersama orang tua",
+    transportasi: "Jalan kaki",
+    jarakKm: "1",
+    noKk: "3273010101100001",
+    ...["ayah", "ibu", "wali"].reduce(
+      (isian, awalan) =>
+        Object.assign(isian, {
+          [`${awalan}Nama`]: awalan === "ayah" ? "Budi" : "Sri Wahyuni",
+          [`${awalan}TahunLahir`]: "1980",
+          [`${awalan}Pendidikan`]: "SMA / sederajat",
+          [`${awalan}Pekerjaan`]: "Buruh",
+          [`${awalan}Penghasilan`]: "Tidak Berpenghasilan",
+          [`${awalan}Nik`]: "3273010101800001",
+        }),
+      {} as Record<string, string>,
+    ),
+    kps: "Tidak",
+    kip: "Tidak",
+    beratKg: "45",
+    tinggiCm: "155",
   }),
 };
 

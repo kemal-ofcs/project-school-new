@@ -105,11 +105,11 @@ export const berkasPendaftaranSchema = z
 export const pendaftaranSchema = z
   .object({
     namaLengkap: teksWajib(120),
-    nisn: teksOpsional(20),
+    nisn: z.string().trim().min(1, "NISN wajib diisi.").max(20),
     jenisKelamin: z.enum(["L", "P"]),
     tempatLahir: teksWajib(80),
     tanggalLahir: tanggal,
-    asalSekolah: teksOpsional(120),
+    asalSekolah: z.string().trim().min(1, "Sekolah asal wajib diisi.").max(120),
     alamat: teksWajib(255),
     namaWali: teksWajib(120),
     noWhatsappWali: z
@@ -122,7 +122,7 @@ export const pendaftaranSchema = z
       .string()
       .trim()
       .max(120)
-      .email()
+      .email("Email wali tidak valid.")
       .optional()
       .nullable()
       .or(z.literal("").transform(() => null)),

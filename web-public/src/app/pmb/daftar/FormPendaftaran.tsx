@@ -193,13 +193,13 @@ function Pilihan({
 function OrangTua({
   awalan,
   judul,
-  namaWajib = false,
   aksi,
+  children,
 }: {
   awalan: "ayah" | "ibu" | "wali";
   judul: string;
-  namaWajib?: boolean;
   aksi?: ReactNode;
+  children?: ReactNode;
 }) {
   const tahunIni = new Date().getFullYear();
   return (
@@ -209,10 +209,10 @@ function OrangTua({
         {aksi}
       </div>
       <Isian
-        label={namaWajib ? "Nama ibu kandung" : "Nama"}
+        label={awalan === "ibu" ? "Nama ibu kandung" : "Nama"}
         maxLength={120}
         name={`${awalan}Nama`}
-        wajib={namaWajib}
+        wajib
       />
       <div className="grid gap-4 sm:grid-cols-2">
         <Isian
@@ -222,6 +222,7 @@ function OrangTua({
           min={1900}
           name={`${awalan}TahunLahir`}
           type="number"
+          wajib
         />
         <Isian
           inputMode="numeric"
@@ -230,25 +231,30 @@ function OrangTua({
           name={`${awalan}Nik`}
           pattern="\d{16}"
           title="16 angka sesuai KTP"
+          wajib
         />
       </div>
       <Pilihan
         daftar={JENJANG_PENDIDIKAN}
         label="Pendidikan terakhir"
         name={`${awalan}Pendidikan`}
+        wajib
       />
       <div className="grid gap-4 sm:grid-cols-2">
         <Pilihan
           daftar={PEKERJAAN}
           label="Pekerjaan"
           name={`${awalan}Pekerjaan`}
+          wajib
         />
         <Pilihan
           daftar={PENGHASILAN}
           label="Penghasilan per bulan"
           name={`${awalan}Penghasilan`}
+          wajib
         />
       </div>
+      {children}
     </div>
   );
 }
@@ -508,7 +514,7 @@ export function FormPendaftaran({
           tanggalLahir: ambil("tanggalLahir"),
           asalSekolah: ambil("asalSekolah"),
           alamat: ambil("alamat"),
-          namaWali: ambil("namaWali"),
+          namaWali: ambil("waliNama"),
           noWhatsappWali: ambil("noWhatsappWali"),
           emailWali: ambil("emailWali") || null,
           pilihanJurusan: ambil("pilihanJurusan"),
@@ -689,7 +695,13 @@ export function FormPendaftaran({
             title="16 angka sesuai Kartu Keluarga"
             wajib
           />
-          <Isian inputMode="numeric" label="NISN" maxLength={20} name="nisn" />
+          <Isian
+            inputMode="numeric"
+            label="NISN"
+            maxLength={20}
+            name="nisn"
+            wajib
+          />
         </div>
         <div className="grid gap-4 sm:grid-cols-2">
           <Isian label="Tempat lahir" maxLength={80} name="tempatLahir" wajib />
@@ -699,6 +711,7 @@ export function FormPendaftaran({
           label="No registrasi akta lahir"
           maxLength={40}
           name="noAktaLahir"
+          wajib
         />
         <div className="grid gap-4 sm:grid-cols-2">
           <Isian
@@ -708,6 +721,7 @@ export function FormPendaftaran({
             min={1}
             name="anakKe"
             type="number"
+            wajib
           />
           <Isian
             inputMode="numeric"
@@ -716,6 +730,7 @@ export function FormPendaftaran({
             min={0}
             name="jumlahSaudara"
             type="number"
+            wajib
           />
         </div>
         <Pilihan
@@ -725,17 +740,20 @@ export function FormPendaftaran({
           name="kebutuhanKhusus"
           wajib
         />
-        <Isian label="Sekolah asal" maxLength={120} name="asalSekolah" />
+        <Isian label="Sekolah asal" maxLength={120} name="asalSekolah" wajib />
         {jurusan.length > 0 ? (
           <div>
-            <Label htmlFor={`${id}-jurusan`}>Pilihan program keahlian</Label>
+            <Label htmlFor={`${id}-jurusan`} wajib>
+              Pilihan program keahlian
+            </Label>
             <select
               className={KELAS_ISIAN}
               defaultValue=""
               id={`${id}-jurusan`}
               name="pilihanJurusan"
+              required
             >
-              <option value="">Belum menentukan</option>
+              <option value="">Pilih</option>
               {jurusan.map((nama) => (
                 <option key={nama} value={nama}>
                   {nama}
@@ -750,12 +768,14 @@ export function FormPendaftaran({
             label="Nomor HP calon siswa"
             name="hpSiswa"
             type="tel"
+            wajib
           />
           <Isian
             label="Email calon siswa"
             maxLength={120}
             name="emailSiswa"
             type="email"
+            wajib
           />
         </div>
       </fieldset>
@@ -781,6 +801,7 @@ export function FormPendaftaran({
             maxLength={3}
             name="rt"
             pattern="\d{1,3}"
+            wajib
           />
           <Isian
             inputMode="numeric"
@@ -788,6 +809,7 @@ export function FormPendaftaran({
             maxLength={3}
             name="rw"
             pattern="\d{1,3}"
+            wajib
           />
           <div className="col-span-2">
             <Isian label="Dusun" maxLength={80} name="dusun" />
@@ -809,17 +831,20 @@ export function FormPendaftaran({
           name="kodePos"
           pattern="\d{5}"
           title="5 angka"
+          wajib
         />
         <div className="grid gap-4 sm:grid-cols-2">
           <Pilihan
             daftar={JENIS_TINGGAL}
             label="Tinggal bersama"
             name="jenisTinggal"
+            wajib
           />
           <Pilihan
             daftar={ALAT_TRANSPORTASI}
             label="Alat transportasi ke sekolah"
             name="transportasi"
+            wajib
           />
         </div>
         <Isian
@@ -830,6 +855,7 @@ export function FormPendaftaran({
           name="jarakKm"
           step="0.1"
           type="number"
+          wajib
         />
       </fieldset>
 
@@ -840,31 +866,6 @@ export function FormPendaftaran({
         hidden={langkah !== 2}
       >
         <legend className="sr-only">{LANGKAH[2]}</legend>
-        <div className="space-y-4">
-          <h3 className="font-semibold">Kontak yang dapat dihubungi sekolah</h3>
-          <Isian
-            label="Nama orang tua / wali"
-            maxLength={120}
-            name="namaWali"
-            wajib
-          />
-          <div className="grid gap-4 sm:grid-cols-2">
-            <Isian
-              bantuan="Contoh: 081200000000. Pemberitahuan pendaftaran dikirim ke nomor ini."
-              inputMode="tel"
-              label="Nomor WhatsApp"
-              name="noWhatsappWali"
-              type="tel"
-              wajib
-            />
-            <Isian
-              label="Email"
-              maxLength={120}
-              name="emailWali"
-              type="email"
-            />
-          </div>
-        </div>
         <Isian
           bantuan="16 angka di bagian atas Kartu Keluarga."
           inputMode="numeric"
@@ -873,9 +874,10 @@ export function FormPendaftaran({
           name="noKk"
           pattern="\d{16}"
           title="16 angka"
+          wajib
         />
         <OrangTua awalan="ayah" judul="Data ayah" />
-        <OrangTua awalan="ibu" judul="Data ibu" namaWajib />
+        <OrangTua awalan="ibu" judul="Data ibu" />
         <OrangTua
           aksi={
             <div className="flex gap-2">
@@ -897,7 +899,24 @@ export function FormPendaftaran({
           }
           awalan="wali"
           judul="Data wali"
-        />
+        >
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Isian
+              bantuan="Contoh: 081200000000. Pemberitahuan pendaftaran dikirim ke nomor ini."
+              inputMode="tel"
+              label="Nomor WhatsApp wali"
+              name="noWhatsappWali"
+              type="tel"
+              wajib
+            />
+            <Isian
+              label="Email wali"
+              maxLength={120}
+              name="emailWali"
+              type="email"
+            />
+          </div>
+        </OrangTua>
       </fieldset>
 
       <fieldset
@@ -934,7 +953,7 @@ export function FormPendaftaran({
         </div>
         <div className="space-y-4">
           <h3 className="font-semibold">Data kesehatan</h3>
-          <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
+          <div className="grid grid-cols-2 gap-4">
             <Isian
               inputMode="decimal"
               label="Berat badan (kg)"
@@ -943,6 +962,7 @@ export function FormPendaftaran({
               name="beratKg"
               step="0.1"
               type="number"
+              wajib
             />
             <Isian
               inputMode="decimal"
@@ -952,15 +972,7 @@ export function FormPendaftaran({
               name="tinggiCm"
               step="0.1"
               type="number"
-            />
-            <Isian
-              inputMode="decimal"
-              label="Lingkar kepala (cm)"
-              max={80}
-              min={20}
-              name="lingkarKepalaCm"
-              step="0.1"
-              type="number"
+              wajib
             />
           </div>
         </div>
@@ -1059,10 +1071,14 @@ export function FormPendaftaran({
         ) : (
           <span />
         )}
+        {/* `key` berbeda wajib: tanpa itu React memakai ulang tombol "Lanjut"
+            yang sedang diklik dan mengubahnya menjadi submit, sehingga klik
+            ke langkah terakhir langsung mengirim formulir. */}
         {terakhir ? (
           <button
             className="min-h-12 rounded-md bg-aksen px-5 font-medium text-aksen-teks disabled:opacity-60"
             disabled={mengirim}
+            key="kirim"
             type="submit"
           >
             {mengirim ? "Mengirim…" : "Kirim pendaftaran"}
@@ -1070,6 +1086,7 @@ export function FormPendaftaran({
         ) : (
           <button
             className="min-h-12 rounded-md bg-aksen px-5 font-medium text-aksen-teks"
+            key="lanjut"
             onClick={lanjut}
             type="button"
           >

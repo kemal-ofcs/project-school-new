@@ -137,30 +137,36 @@ const teks = (maks: number) =>
   );
 const teksWajib = (maks: number, pesan: string) =>
   z.string({ error: pesan }).trim().min(1, pesan).max(maks);
-const pilihan = <T extends readonly [string, ...string[]]>(daftar: T) =>
-  z.preprocess(kosongJadiNull, z.enum(daftar).nullable().default(null));
+// Isian lain selain yang memakai `teks` wajib diisi (keputusan User
+// 2026-10-16): kosong ditolak dengan pesan isiannya, bukan disimpan null.
+const pilihan = <T extends readonly [string, ...string[]]>(
+  daftar: T,
+  pesan: string,
+) => z.preprocess(kosongJadiNull, z.enum(daftar, { error: pesan }));
 const digit = (min: number, maks: number, pesan: string) =>
   z.preprocess(
     kosongJadiNull,
     z
-      .string()
+      .string({ error: pesan })
       .trim()
-      .regex(new RegExp(`^\\d{${min},${maks}}$`), pesan)
-      .nullable()
-      .default(null),
+      .regex(new RegExp(`^\\d{${min},${maks}}$`), pesan),
   );
 const angka = (min: number, maks: number, pesan: string) =>
-  z.preprocess((nilai) => {
-    const bersih = kosongJadiNull(nilai);
-    if (typeof bersih === "string") return Number(bersih.replace(",", "."));
-    return bersih;
-  }, z.number(pesan).min(min, pesan).max(maks, pesan).nullable().default(null));
+  z.preprocess(
+    (nilai) => {
+      const bersih = kosongJadiNull(nilai);
+      if (typeof bersih === "string") return Number(bersih.replace(",", "."));
+      return bersih;
+    },
+    z.number(pesan).min(min, pesan).max(maks, pesan),
+  );
 const yaTidak = z.preprocess(
   (nilai) =>
     nilai === "Ya" ? true : nilai === "Tidak" || nilai === "" ? false : nilai,
   z.boolean().default(false),
 );
-const tahunLahir = angka(1900, 2100, "Tahun lahir tidak valid.");
+const tahunLahir = (siapa: string) =>
+  angka(1900, 2100, `Tahun lahir ${siapa} wajib diisi dengan benar.`);
 
 export const dataDapodikSchema = z
   .object({
@@ -170,7 +176,7 @@ export const dataDapodikSchema = z
       .trim()
       .regex(/^\d{16}$/, "NIK calon siswa harus 16 angka."),
     agama: z.enum(AGAMA, { error: "Pilih agama calon siswa." }),
-    noAktaLahir: teks(40),
+    noAktaLahir: teksWajib(40, "No registrasi akta lahir wajib diisi."),
     kebutuhanKhusus: z.preprocess(
       (nilai) => kosongJadiNull(nilai) ?? "Tidak ada",
       z.enum(KEBUTUHAN_KHUSUS),
@@ -180,20 +186,14 @@ export const dataDapodikSchema = z
     hpSiswa: z.preprocess(
       kosongJadiNull,
       z
-        .string()
+        .string({ error: "Nomor HP calon siswa wajib diisi." })
         .trim()
         .refine(isValidOperatorPhone, "Nomor HP calon siswa tidak valid.")
-        .transform(normalizeOperatorPhone)
-        .nullable()
-        .default(null),
+        .transform(normalizeOperatorPhone),
     ),
     emailSiswa: z.preprocess(
       kosongJadiNull,
-      z
-        .email("Email calon siswa tidak valid.")
-        .max(120)
-        .nullable()
-        .default(null),
+      z.email("Email calon siswa wajib diisi dengan benar.").max(120),
     ),
 
     // Alamat (jalan disimpan di kolom `alamat` yang sudah ada)
@@ -203,29 +203,29 @@ export const dataDapodikSchema = z
     kelurahan: teksWajib(80, "Kelurahan/desa wajib diisi."),
     kecamatan: teksWajib(80, "Kecamatan wajib diisi."),
     kodePos: digit(5, 5, "Kode pos harus 5 angka."),
-    jenisTinggal: pilihan(JENIS_TINGGAL),
-    transportasi: pilihan(ALAT_TRANSPORTASI),
+    jenisTinggal: pilihan(JENIS_TINGGAL, "Pilih tinggal bersama siapa."),
+    transportasi: pilihan(ALAT_TRANSPORTASI, "Pilih alat transportasi."),
     jarakKm: angka(0, 500, "Jarak ke sekolah harus 0 sampai 500 km."),
 
     // Keluarga
     noKk: digit(16, 16, "Nomor KK harus 16 angka."),
-    ayahNama: teks(120),
-    ayahTahunLahir: tahunLahir,
-    ayahPendidikan: pilihan(JENJANG_PENDIDIKAN),
-    ayahPekerjaan: pilihan(PEKERJAAN),
-    ayahPenghasilan: pilihan(PENGHASILAN),
+    ayahNama: teksWajib(120, "Nama ayah wajib diisi."),
+    ayahTahunLahir: tahunLahir("ayah"),
+    ayahPendidikan: pilihan(JENJANG_PENDIDIKAN, "Pilih pendidikan ayah."),
+    ayahPekerjaan: pilihan(PEKERJAAN, "Pilih pekerjaan ayah."),
+    ayahPenghasilan: pilihan(PENGHASILAN, "Pilih penghasilan ayah."),
     ayahNik: digit(16, 16, "NIK ayah harus 16 angka."),
     ibuNama: teksWajib(120, "Nama ibu kandung wajib diisi."),
-    ibuTahunLahir: tahunLahir,
-    ibuPendidikan: pilihan(JENJANG_PENDIDIKAN),
-    ibuPekerjaan: pilihan(PEKERJAAN),
-    ibuPenghasilan: pilihan(PENGHASILAN),
+    ibuTahunLahir: tahunLahir("ibu"),
+    ibuPendidikan: pilihan(JENJANG_PENDIDIKAN, "Pilih pendidikan ibu."),
+    ibuPekerjaan: pilihan(PEKERJAAN, "Pilih pekerjaan ibu."),
+    ibuPenghasilan: pilihan(PENGHASILAN, "Pilih penghasilan ibu."),
     ibuNik: digit(16, 16, "NIK ibu harus 16 angka."),
-    waliNama: teks(120),
-    waliTahunLahir: tahunLahir,
-    waliPendidikan: pilihan(JENJANG_PENDIDIKAN),
-    waliPekerjaan: pilihan(PEKERJAAN),
-    waliPenghasilan: pilihan(PENGHASILAN),
+    waliNama: teksWajib(120, "Nama wali wajib diisi."),
+    waliTahunLahir: tahunLahir("wali"),
+    waliPendidikan: pilihan(JENJANG_PENDIDIKAN, "Pilih pendidikan wali."),
+    waliPekerjaan: pilihan(PEKERJAAN, "Pilih pekerjaan wali."),
+    waliPenghasilan: pilihan(PENGHASILAN, "Pilih penghasilan wali."),
     waliNik: digit(16, 16, "NIK wali harus 16 angka."),
 
     // Bantuan
@@ -239,7 +239,6 @@ export const dataDapodikSchema = z
     // Periodik
     beratKg: angka(1, 200, "Berat badan harus 1 sampai 200 kg."),
     tinggiCm: angka(30, 250, "Tinggi badan harus 30 sampai 250 cm."),
-    lingkarKepalaCm: angka(20, 80, "Lingkar kepala harus 20 sampai 80 cm."),
   })
   .strict();
 
@@ -251,10 +250,18 @@ export const KUNCI_DATA_DAPODIK = Object.keys(
   dataDapodikSchema.shape,
 ) as (keyof DataDapodik)[];
 
-/** Baca kolom `data_dapodik`. Rusak atau kosong = `null`, bukan galat. */
-export function uraiDataDapodik(
-  json: string | null | undefined,
-): (Partial<DataDapodik> & { versi?: number }) | null {
+/**
+ * Baca kolom `data_dapodik`. Rusak atau kosong = `null`, bukan galat.
+ *
+ * `lingkarKepalaCm` dihapus dari formulir 2026-10-16; pendaftar lama masih
+ * membawanya dan tetap diekspor ke kolom DAPODIK-nya.
+ */
+export function uraiDataDapodik(json: string | null | undefined):
+  | (Partial<DataDapodik> & {
+      versi?: number;
+      lingkarKepalaCm?: number | null;
+    })
+  | null {
   if (!json) return null;
   try {
     const mentah = JSON.parse(json);

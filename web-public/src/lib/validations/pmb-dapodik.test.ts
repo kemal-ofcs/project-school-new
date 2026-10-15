@@ -53,42 +53,66 @@ const ISIAN_CONTOH = {
   noKks: "",
   beratKg: "60",
   tinggiCm: "150",
-  lingkarKepalaCm: "",
+};
+
+// Baris asli di atas mengosongkan tiga isian yang kini wajib di formulir.
+const ISIAN_LENGKAP = {
+  ...ISIAN_CONTOH,
+  emailSiswa: "devina@example.com",
+  noKk: "3216060101070001",
+  waliNik: "3216061408850004",
 };
 
 describe("dataDapodikSchema", () => {
   test("isian contoh lolos dan dinormalkan", () => {
-    const hasil = dataDapodikSchema.parse(ISIAN_CONTOH);
+    const hasil = dataDapodikSchema.parse(ISIAN_LENGKAP);
     expect(hasil.anakKe).toBe(1);
     expect(hasil.jarakKm).toBe(0);
     expect(hasil.hpSiswa).toBe("+6289653357571");
-    expect(hasil.emailSiswa).toBeNull();
+    expect(hasil.dusun).toBeNull();
     expect(hasil.kps).toBe(false);
-    expect(hasil.lingkarKepalaCm).toBeNull();
     expect(Object.keys(hasil)).toEqual(KUNCI_DATA_DAPODIK);
+    expect(KUNCI_DATA_DAPODIK).not.toContain("lingkarKepalaCm");
   });
 
   test("isian wajib dan pilihan asing ditolak", () => {
     const tanpaWajib = dataDapodikSchema.safeParse({
-      ...ISIAN_CONTOH,
+      ...ISIAN_LENGKAP,
       nik: "123",
       ibuNama: "",
       kelurahan: " ",
+      rt: "",
+      ayahPekerjaan: "",
+      waliTahunLahir: "",
+      tinggiCm: "",
+      emailSiswa: "",
     });
     expect(tanpaWajib.success).toBe(false);
     const pesan = tanpaWajib.error?.issues.map((i) => i.message) ?? [];
     expect(pesan).toContain("NIK calon siswa harus 16 angka.");
     expect(pesan).toContain("Nama ibu kandung wajib diisi.");
     expect(pesan).toContain("Kelurahan/desa wajib diisi.");
+    expect(pesan).toContain("RT berupa angka (maksimal 3).");
+    expect(pesan).toContain("Pilih pekerjaan ayah.");
+    expect(pesan).toContain("Tahun lahir wali wajib diisi dengan benar.");
+    expect(pesan).toContain("Tinggi badan harus 30 sampai 250 cm.");
+    expect(pesan).toContain("Email calon siswa wajib diisi dengan benar.");
 
+    // Isian contoh asli (email, No KK, NIK wali kosong) kini ditolak.
+    expect(dataDapodikSchema.safeParse(ISIAN_CONTOH).success).toBe(false);
     expect(
-      dataDapodikSchema.safeParse({ ...ISIAN_CONTOH, agama: "islam" }).success,
+      dataDapodikSchema.safeParse({ ...ISIAN_LENGKAP, agama: "islam" }).success,
     ).toBe(false);
     expect(
-      dataDapodikSchema.safeParse({ ...ISIAN_CONTOH, rt: "0002" }).success,
+      dataDapodikSchema.safeParse({ ...ISIAN_LENGKAP, rt: "0002" }).success,
     ).toBe(false);
     expect(
-      dataDapodikSchema.safeParse({ ...ISIAN_CONTOH, kunciAsing: "x" }).success,
+      dataDapodikSchema.safeParse({ ...ISIAN_LENGKAP, kunciAsing: "x" })
+        .success,
+    ).toBe(false);
+    expect(
+      dataDapodikSchema.safeParse({ ...ISIAN_LENGKAP, lingkarKepalaCm: "50" })
+        .success,
     ).toBe(false);
   });
 });
@@ -113,7 +137,14 @@ describe("ekspor format DAPODIK", () => {
   });
 
   test("baris contoh sama dengan baris DAPODIK aslinya", () => {
-    const data = dataDapodikSchema.parse(ISIAN_CONTOH);
+    // Tiga isian yang kosong di berkas asli dikosongkan lagi supaya barisnya
+    // tetap bisa dibandingkan dengan baris DAPODIK aslinya.
+    const data = {
+      ...dataDapodikSchema.parse(ISIAN_LENGKAP),
+      emailSiswa: null,
+      noKk: null,
+      waliNik: null,
+    };
     const baris = barisEksporDapodik(
       {
         nomor_pendaftaran: "PMB-2026-ACDEFG",

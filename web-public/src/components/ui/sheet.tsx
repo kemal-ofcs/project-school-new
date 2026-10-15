@@ -2,6 +2,7 @@
 
 import { X } from "lucide-react";
 import * as React from "react";
+import { createPortal } from "react-dom";
 import { cn } from "@/lib/utils";
 
 interface SheetContextType {
@@ -83,7 +84,10 @@ export function SheetContent({
   const ctx = React.useContext(SheetContext);
   if (!ctx || !ctx.open) return null;
 
-  return (
+  // Lewat portal: header situs ber-`backdrop-filter`, dan ancestor seperti itu
+  // menjadi containing block bagi `fixed`, sehingga panel terkurung setinggi
+  // header dan tampak transparan.
+  return createPortal(
     <div className="fixed inset-0 z-50 flex">
       {/* Backdrop */}
       <div
@@ -116,7 +120,8 @@ export function SheetContent({
         </button>
         {children}
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
 
