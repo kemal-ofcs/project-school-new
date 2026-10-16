@@ -800,9 +800,9 @@ pub fn kejadian_dari_riwayat(riwayat: &[Value]) -> Vec<KejadianTutup> {
         .iter()
         .filter_map(|baris| {
             let kejadian = if baris["status"] == "Menunggu" {
-                "menunggu"
+                KEJADIAN_TUTUP[0]
             } else if baris["status"] == "Aktif" && baris["perlu_ditinjau"] == true {
-                "berubah"
+                KEJADIAN_TUTUP[1]
             } else {
                 return None;
             };
