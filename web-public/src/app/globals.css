@@ -139,6 +139,7 @@ html[data-theme="dark"] {
   --font-sans:
     var(--font-sans), "Plus Jakarta Sans", ui-sans-serif, system-ui,
     -apple-system, sans-serif;
+  --font-serif: var(--font-judul), Georgia, "Times New Roman", serif;
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);
@@ -354,11 +355,8 @@ html[data-efek="desktop"] [data-miring] > :last-child {
 }
 
 /* 6. Kartu sebaris: yang disorot sedikit membesar, sisanya meredup, supaya
-      mata tertuju pada satu kartu. Pilar dikecualikan: urutannya sudah
-      diatur efek sorot gulir di bawah. */
-html[data-efek="desktop"] .kartu-tengah:not(.pilar-daftar):has(
-    > [data-miring]:hover
-  )
+      mata tertuju pada satu kartu. */
+html[data-efek="desktop"] .kartu-tengah:has(> [data-miring]:hover)
   > [data-miring]:not(:hover)
   > :last-child {
   opacity: 0.55;
@@ -368,48 +366,21 @@ html[data-efek="desktop"] .kartu-tengah > [data-miring]:hover > :last-child {
   scale: 1.02;
 }
 
-/* 4. Pilar disematkan: judul bagian diam di kiri selama pilar-pilarnya
-      bergulir di kanan, dan pilar yang sedang di tengah layar menyala. */
-/* Pilar yang belum/sudah lewat tengah layar tetap terbaca (0,6), dan pilar
-   yang panjang menyala penuh sepanjang ia berada di tengah, bukan hanya
-   sesaat di titik 50%. */
-@keyframes pilar-sorot {
-  0%,
-  100% {
-    opacity: 0.6;
-    scale: 0.98;
-  }
-  35%,
-  65% {
-    opacity: 1;
-    scale: 1;
+/* 4. Kartu statistik hero mengapung pelan supaya terbaca sebagai lapisan di
+      atas foto, bukan bagian foto. Hanya desktop: gerbang `data-efek` sudah
+      menyaring "kurangi gerakan" dan hemat data. Memakai `translate` supaya
+      tidak bentrok dengan `transform` animasi keluar hero. */
+@keyframes mengapung {
+  50% {
+    translate: 0 -10px;
   }
 }
-html[data-efek="desktop"] .pilar-lekat {
-  display: grid;
-  grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
-  gap: 4rem;
-  align-items: start;
+html[data-efek="desktop"] .mengapung {
+  animation: mengapung 6s ease-in-out infinite;
 }
-html[data-efek="desktop"] .pilar-lekat > * {
-  margin-block: 0;
-}
-html[data-efek="desktop"] .pilar-kepala {
-  position: sticky;
-  top: 30vh;
-  flex-direction: column;
-  align-items: flex-start;
-}
-html[data-efek="desktop"] .pilar-daftar {
-  --kolom: 1;
-  gap: 2rem;
-}
-@supports (animation-timeline: view()) {
-  html[data-efek="desktop"] .pilar-daftar > * {
-    animation: pilar-sorot linear both;
-    animation-timeline: view();
-    animation-range: cover 15% cover 85%;
-  }
+/* Kartu kedua berlawanan fase, supaya keduanya tidak naik-turun serempak. */
+html[data-efek="desktop"] .mengapung + .mengapung {
+  animation-delay: -3s;
 }
 
 /* 5. Transisi antarhalaman: header tetap diam, judul halaman melayang ke

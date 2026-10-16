@@ -83,13 +83,11 @@ export function PmbCountdown({ tanggalTutup }: PmbCountdownProps) {
   const pad = (n: number) => String(n).padStart(2, "0");
 
   return (
-    <div className="inline-flex items-center gap-1.5 rounded-full bg-secondary/20 px-3 py-1 text-[11px] font-bold text-secondary-container border border-secondary-container/30 backdrop-blur-md shadow-xs">
-      <span className="relative flex h-2 w-2">
-        <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-secondary-container opacity-75" />
-        <span className="relative inline-flex h-2 w-2 rounded-full bg-secondary-container" />
-      </span>
+    // Hero kini berlatar terang: `secondary` (amber tua) yang terbaca di sana,
+    // bukan `secondary-container` yang dulu dipakai di atas navy.
+    <div className="inline-flex items-center gap-1.5 rounded-full border border-secondary/30 bg-secondary/10 px-3 py-1 text-[11px] font-bold text-secondary">
       <span>Tersisa:</span>
-      <span className="font-mono font-extrabold text-white">
+      <span className="font-mono font-extrabold tabular-nums">
         {timeRemaining.days > 0 ? `${timeRemaining.days}h ` : ""}
         {pad(timeRemaining.hours)}j : {pad(timeRemaining.minutes)}m :{" "}
         {pad(timeRemaining.seconds)}d

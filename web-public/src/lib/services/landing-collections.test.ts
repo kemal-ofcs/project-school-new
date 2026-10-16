@@ -5,12 +5,13 @@ import {
   KUNCI_LAMA,
   koleksiFaq,
   koleksiFasilitas,
-  koleksiPilar,
+  koleksiProgram,
   koleksiStat,
   koleksiTahapanPmb,
   MAKS_ITEM_KOLEKSI,
   uraiKoleksi,
   uraiSpecs,
+  uraiTagar,
 } from "./landing-collections";
 
 describe("koleksi dinamis landing page", () => {
@@ -21,7 +22,6 @@ describe("koleksi dinamis landing page", () => {
    */
   test("tanpa isi di database, setiap koleksi kosong — tidak ada teks contoh", () => {
     expect(koleksiStat({})).toEqual([]);
-    expect(koleksiPilar({})).toEqual([]);
     expect(koleksiFasilitas({})).toEqual([]);
     expect(koleksiTahapanPmb({})).toEqual([]);
     expect(koleksiFaq({})).toEqual([]);
@@ -51,13 +51,13 @@ describe("koleksi dinamis landing page", () => {
 
   test("baris yang ditambahkan lalu tidak diisi tidak ditampilkan", () => {
     const konten = {
-      [KUNCI_KOLEKSI.pilar]: JSON.stringify([
-        { title: "Pilar A", desc: "", tag: "" },
-        { title: "  ", desc: "", tag: "" },
+      [KUNCI_KOLEKSI.stat]: JSON.stringify([
+        { label: "Akreditasi", value: "", sub: "" },
+        { label: "  ", value: "", sub: "" },
       ]),
     };
-    expect(koleksiPilar(konten)).toEqual([
-      { title: "Pilar A", desc: "", tag: "" },
+    expect(koleksiStat(konten)).toEqual([
+      { label: "Akreditasi", value: "", sub: "" },
     ]);
   });
 
@@ -68,23 +68,23 @@ describe("koleksi dinamis landing page", () => {
    */
   test("kunci bernomor lama dibaca ketika koleksinya belum ada", () => {
     const konten = {
-      "landing.pilar1_title": "Pilar Lama",
-      "landing.pilar1_tag": "Tag Lama",
-      "landing.pilar3_desc": "Nomor boleh berlubang",
+      "landing.stat1_label": "Stat Lama",
+      "landing.stat1_sub": "Sub Lama",
+      "landing.stat3_value": "Nomor boleh berlubang",
     };
-    expect(koleksiPilar(konten)).toEqual([
-      { title: "Pilar Lama", desc: "", tag: "Tag Lama" },
-      { title: "", desc: "Nomor boleh berlubang", tag: "" },
+    expect(koleksiStat(konten)).toEqual([
+      { label: "Stat Lama", value: "", sub: "Sub Lama" },
+      { label: "", value: "Nomor boleh berlubang", sub: "" },
     ]);
   });
 
   test("koleksi yang ada menang atas kunci bernomor lama", () => {
     const konten = {
-      "landing.pilar1_title": "Pilar Lama",
-      [KUNCI_KOLEKSI.pilar]: '[{"title":"Pilar Baru","desc":"D","tag":"T"}]',
+      "landing.stat1_label": "Stat Lama",
+      [KUNCI_KOLEKSI.stat]: '[{"label":"Stat Baru","value":"A","sub":"S"}]',
     };
-    expect(koleksiPilar(konten)).toEqual([
-      { title: "Pilar Baru", desc: "D", tag: "T" },
+    expect(koleksiStat(konten)).toEqual([
+      { label: "Stat Baru", value: "A", sub: "S" },
     ]);
   });
 
@@ -121,12 +121,48 @@ describe("koleksi dinamis landing page", () => {
     // Berubah di satu sisi saja = koleksinya terbaca kosong tanpa pesan galat.
     expect(KUNCI_KOLEKSI).toEqual({
       stat: "landing.stat_items",
-      pilar: "landing.pilar_items",
       ekskul: "landing.ekskul_items",
       program: "landing.program_items",
       fasilitas: "landing.fasilitas_items",
       pmbTahapan: "landing.pmb_tahapan_items",
       faq: "landing.faq_items",
     });
+  });
+});
+
+describe("kartu program di slider beranda", () => {
+  test("tagar dipisah koma, `#` yang ikut diketik dibuang, dan tidak dobel", () => {
+    expect(uraiTagar(" #Tahfidz, Ukhuwah ,, ##Ukhuwah, ")).toEqual([
+      "Tahfidz",
+      "Ukhuwah",
+    ]);
+    expect(uraiTagar(undefined)).toEqual([]);
+  });
+
+  test("program membaca subjudul dan tagar; item lama tanpa keduanya tetap terbaca", () => {
+    const konten = {
+      [KUNCI_KOLEKSI.program]: JSON.stringify([
+        { title: "MABIT", subtitle: "Malam Bina Iman", tags: "Kemandirian" },
+        { title: "Market Day", category: "Wirausaha" },
+      ]),
+    };
+    expect(koleksiProgram(konten)).toEqual([
+      {
+        title: "MABIT",
+        subtitle: "Malam Bina Iman",
+        category: "",
+        desc: "",
+        tags: ["Kemandirian"],
+        foto: "",
+      },
+      {
+        title: "Market Day",
+        subtitle: "",
+        category: "Wirausaha",
+        desc: "",
+        tags: [],
+        foto: "",
+      },
+    ]);
   });
 });

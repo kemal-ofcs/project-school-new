@@ -53,9 +53,11 @@ export function SiteHeader({
   return (
     <header
       data-kepala-situs
-      className="sticky top-0 z-40 w-full border-b border-border bg-background/90 backdrop-blur-xl shadow-xs transition-colors duration-300 pt-safe"
+      className="sticky top-0 z-40 w-full px-3 pt-[max(0.75rem,env(safe-area-inset-top))] sm:px-4"
     >
-      <div className="mx-auto flex h-18 max-w-7xl items-center justify-between gap-4 px-4 sm:px-6 lg:px-8">
+      {/* Satu-satunya permukaan kaca di situs: header melayang di atas foto
+          dan kartu yang bergulir di bawahnya, jadi isinya tetap terbaca. */}
+      <div className="mx-auto flex h-16 max-w-6xl items-center justify-between gap-3 rounded-full border border-border bg-background/85 pl-3 pr-2 shadow-lg shadow-primary/5 backdrop-blur-md transition-colors duration-300 sm:pl-5 sm:pr-3">
         {/* Brand & Identity */}
         <Link
           className="flex items-center gap-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-lg p-1"
@@ -113,18 +115,9 @@ export function SiteHeader({
 
         {/* Action Controls */}
         <div className="flex items-center gap-2 sm:gap-3">
-          {/* Hotline Quick Link (Desktop) */}
-          {profil.telepon ? (
-            <a
-              href={`tel:${profil.telepon}`}
-              className="hidden xl:flex items-center gap-1.5 rounded-full bg-muted px-3.5 py-1.5 text-xs font-semibold text-foreground hover:text-primary transition-colors"
-              title="Hubungi Hotline Sekolah"
-            >
-              <Phone className="h-3.5 w-3.5 text-secondary" />
-              <span>{profil.telepon}</span>
-            </a>
-          ) : null}
-
+          {/* Nomor telepon tidak di sini: pil header selebar 6xl tidak muat
+              menampung nama, enam tautan, dan nomor sekaligus. Nomornya ada di
+              footer, menu HP, dan tombol WhatsApp melayang. */}
           {/* Dark / Light Mode Switch */}
           <ThemeToggle />
 
@@ -133,7 +126,7 @@ export function SiteHeader({
             asChild
             variant="secondary"
             size="default"
-            className="hidden sm:inline-flex"
+            className="hidden rounded-full sm:inline-flex"
           >
             <Link href="/pmb">
               <UserCheck className="h-4 w-4" />

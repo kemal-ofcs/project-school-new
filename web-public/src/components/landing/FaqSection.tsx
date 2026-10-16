@@ -1,6 +1,6 @@
 "use client";
 
-import { HelpCircle, Search, X } from "lucide-react";
+import { Search, X } from "lucide-react";
 import * as React from "react";
 import {
   Accordion,
@@ -39,13 +39,10 @@ export function FaqSection({ konten = {} }: FaqSectionProps) {
         {adaHeader ? (
           <div className="text-center space-y-3">
             {eyebrow ? (
-              <div className="inline-flex items-center gap-1.5 text-xs font-bold uppercase tracking-widest text-secondary">
-                <HelpCircle className="h-3.5 w-3.5" />
-                <span>{eyebrow}</span>
-              </div>
+              <p className="text-sm font-semibold text-secondary">{eyebrow}</p>
             ) : null}
             {title ? (
-              <h2 className="font-bold text-2xl sm:text-4xl text-foreground tracking-tight">
+              <h2 className="font-serif text-3xl font-bold tracking-tight text-primary text-balance md:text-5xl">
                 <KataMuncul teks={title} />
               </h2>
             ) : null}

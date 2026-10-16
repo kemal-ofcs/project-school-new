@@ -1,24 +1,25 @@
 import {
   ArrowRight,
-  Calendar,
   CheckCircle,
   Clock,
   FileText,
+  MessageCircle,
   Upload,
   UserCheck,
 } from "lucide-react";
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
 import { KataMuncul } from "@/components/visual/KataMuncul";
-import { SpotlightCard } from "@/components/visual/SpotlightCard";
 import { koleksiTahapanPmb } from "@/lib/services/landing-collections";
 import type { GelombangAktif } from "@/lib/services/pmb";
+import { tautanWhatsApp } from "@/lib/teks";
+import { PESAN_WA_PMB } from "./StickyActionMobile";
 
 interface PmbOverviewSectionProps {
   gelombangAktif: GelombangAktif | null;
   konten?: Record<string, string>;
+  nomorTelepon?: string | null;
 }
 
 /**
@@ -38,7 +39,9 @@ const IKON_TAHAPAN = [FileText, Upload, UserCheck, CheckCircle];
 export function PmbOverviewSection({
   gelombangAktif,
   konten = {},
+  nomorTelepon,
 }: PmbOverviewSectionProps) {
+  const waUrl = tautanWhatsApp(nomorTelepon, PESAN_WA_PMB);
   const eyebrow = konten["landing.pmb_eyebrow"];
   const title = konten["landing.pmb_title"];
   const subtitle = konten["landing.pmb_subtitle"];
@@ -58,18 +61,15 @@ export function PmbOverviewSection({
         {adaHeader ? (
           <div className="text-center max-w-2xl mx-auto space-y-3">
             {eyebrow ? (
-              <div className="inline-flex items-center gap-1.5 text-xs font-bold uppercase tracking-widest text-secondary">
-                <Calendar className="h-3.5 w-3.5" />
-                <span>{eyebrow}</span>
-              </div>
+              <p className="text-sm font-semibold text-secondary">{eyebrow}</p>
             ) : null}
             {title ? (
-              <h2 className="font-bold text-2xl sm:text-4xl text-foreground tracking-tight">
+              <h2 className="font-serif text-3xl font-bold tracking-tight text-primary text-balance md:text-5xl">
                 <KataMuncul teks={title} />
               </h2>
             ) : null}
             {subtitle ? (
-              <p className="text-sm sm:text-base text-muted-foreground leading-relaxed">
+              <p className="text-base leading-relaxed text-muted-foreground md:text-lg">
                 {subtitle}
               </p>
             ) : null}
@@ -78,18 +78,18 @@ export function PmbOverviewSection({
 
         {/* Banner Gelombang Aktif */}
         {gelombangAktif ? (
-          <div className="rounded-2xl border border-secondary-container bg-card p-6 sm:p-8 shadow-md">
+          <div className="rounded-3xl border-2 border-accent bg-card p-6 shadow-xl sm:p-8">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
               <div className="space-y-2">
                 <div className="flex items-center gap-2">
-                  <Badge variant="warning" className="text-xs uppercase">
-                    GELOMBANG DIBUKA
+                  <Badge variant="success" className="text-xs uppercase">
+                    Gelombang aktif
                   </Badge>
                   <span className="text-xs text-muted-foreground">
                     Tahun Ajaran {gelombangAktif.tahunAjaran}
                   </span>
                 </div>
-                <h3 className="font-bold text-xl sm:text-2xl text-foreground">
+                <h3 className="font-serif text-2xl font-bold text-foreground sm:text-3xl">
                   {gelombangAktif.nama}
                 </h3>
                 <p className="text-sm text-muted-foreground flex items-center gap-2">
@@ -163,65 +163,86 @@ export function PmbOverviewSection({
               </h3>
             ) : null}
 
-            <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4 relative">
+            {/* Garis penghubung: tegak di HP (langkah bertumpuk), mendatar di
+                desktop (langkah sebaris). Jumlah langkah mengikuti CMS. */}
+            <ol className="grid gap-8 lg:auto-cols-fr lg:grid-flow-col lg:gap-6">
               {tahapan.map((item, idx) => {
                 const Icon = item.icon;
                 return (
-                  <SpotlightCard key={item.step} className="h-full">
-                    <Card className="relative flex flex-col justify-between h-full p-6 bg-card border-border shadow-xs hover:shadow-md transition-shadow">
-                      <div className="space-y-4">
-                        <div className="flex items-center justify-between">
-                          <span className="flex h-9 w-9 items-center justify-center rounded-full bg-primary font-bold text-sm text-primary-foreground shadow-sm ring-4 ring-primary/10">
-                            {item.step}
-                          </span>
-                          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-muted text-primary">
-                            <Icon className="h-5 w-5" />
-                          </div>
-                        </div>
-
-                        <div className="space-y-1.5">
-                          <h4 className="font-bold text-base text-foreground">
-                            {item.title}
-                          </h4>
-                          {item.desc ? (
-                            <p className="text-xs text-muted-foreground leading-relaxed">
-                              {item.desc}
-                            </p>
-                          ) : null}
-                        </div>
+                  <li
+                    key={item.step}
+                    className="relative flex gap-4 lg:flex-col lg:gap-5"
+                  >
+                    {idx < tahapan.length - 1 ? (
+                      <span
+                        aria-hidden="true"
+                        className="absolute left-[19px] top-12 -bottom-8 w-0.5 bg-primary/20 lg:left-14 lg:-right-6 lg:top-5 lg:bottom-auto lg:h-0.5 lg:w-auto"
+                      />
+                    ) : null}
+                    <span className="relative z-10 flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary text-sm font-bold text-primary-foreground ring-4 ring-muted">
+                      {item.step}
+                    </span>
+                    <div className="min-w-0 flex-1 space-y-1.5 rounded-2xl border border-border bg-card p-5">
+                      <div className="flex items-center gap-2 text-primary">
+                        <Icon aria-hidden="true" className="h-4 w-4" />
+                        <h4 className="font-bold text-base text-foreground">
+                          {item.title}
+                        </h4>
                       </div>
-
-                      {/* Indikator Langkah Berikutnya (Desktop) */}
-                      {idx < tahapan.length - 1 ? (
-                        <div className="hidden lg:block absolute -right-3 top-1/2 -translate-y-1/2 z-10 p-1 rounded-full bg-muted border border-border text-muted-foreground shadow-xs">
-                          <ArrowRight className="h-3 w-3" />
-                        </div>
+                      {item.desc ? (
+                        <p className="text-sm leading-relaxed text-muted-foreground">
+                          {item.desc}
+                        </p>
                       ) : null}
-                    </Card>
-                  </SpotlightCard>
+                    </div>
+                  </li>
                 );
               })}
-            </div>
+            </ol>
           </div>
         ) : null}
 
-        {/* Informasi Bantuan & Cek Status Mandiri */}
-        <div className="rounded-xl border border-border bg-card p-6 flex flex-col sm:flex-row items-center justify-between gap-4">
-          <div className="space-y-1 text-center sm:text-left">
-            <h4 className="font-bold text-base text-foreground">
-              Sudah Pernah Mendaftar Sebelumnya?
-            </h4>
-            <p className="text-xs text-muted-foreground">
-              Periksa perkembangan verifikasi berkas atau jadwal tes Anda secara
-              mandiri menggunakan Nomor Pendaftaran.
-            </p>
+        {/* Penutup: navy tetap (bukan token `primary` yang menjadi terang
+            di mode gelap), supaya tombolnya selalu kontras. */}
+        <div className="rounded-3xl bg-[#00236f] p-8 text-white sm:p-10">
+          <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
+            <div className="max-w-xl space-y-2">
+              <h3 className="font-serif text-2xl font-bold sm:text-3xl">
+                Masih ada yang ingin ditanyakan?
+              </h3>
+              <p className="text-sm leading-relaxed text-white/85 sm:text-base">
+                Panitia menjawab pertanyaan seputar jadwal, berkas, dan biaya
+                pendaftaran.
+              </p>
+              <Link
+                href="/pmb/status"
+                className="inline-flex min-h-11 items-center gap-1 text-sm font-semibold text-secondary-container underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-secondary-container rounded"
+              >
+                Sudah mendaftar? Cek status pendaftaran
+              </Link>
+            </div>
+            <div className="flex w-full flex-col gap-3 sm:w-auto sm:flex-row">
+              {waUrl ? (
+                <a
+                  href={waUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex h-12 items-center justify-center gap-2 rounded-full bg-white px-6 text-sm font-bold text-[#00236f] transition-opacity hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-secondary-container"
+                >
+                  <MessageCircle aria-hidden="true" className="h-4 w-4" />
+                  Tanya Panitia di WhatsApp
+                </a>
+              ) : null}
+              <Link
+                href={gelombangAktif ? "/pmb/daftar" : "/kontak"}
+                className="inline-flex h-12 items-center justify-center rounded-full bg-secondary-container px-6 text-sm font-bold text-secondary-container-foreground transition-opacity hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
+              >
+                {gelombangAktif
+                  ? "Isi Formulir Online"
+                  : "Lihat Kontak Sekolah"}
+              </Link>
+            </div>
           </div>
-          <Button asChild variant="outline" size="default">
-            <Link href="/pmb/status">
-              <span>Halaman Cek Status</span>
-              <ArrowRight className="h-4 w-4 ml-1" />
-            </Link>
-          </Button>
         </div>
       </div>
     </section>

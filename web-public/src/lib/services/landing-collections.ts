@@ -1,6 +1,6 @@
 /**
- * Koleksi berulang di landing page: statistik, pilar, ekstrakurikuler,
- * program sekolah, fasilitas, tahapan PMB, dan FAQ.
+ * Koleksi berulang di landing page: statistik, ekstrakurikuler, program
+ * sekolah, fasilitas, tahapan PMB, dan FAQ.
  *
  * SUMBERNYA HANYA DATABASE. Situs publik tidak lagi membawa isi bawaan apa pun
  * untuk blok-blok ini: CMS-nya sudah punya CRUD, sehingga teks contoh yang
@@ -11,7 +11,7 @@
  * Aturan pembacaannya dua lapis:
  *
  *   1. Kunci koleksi berisi array yang tidak kosong → dipakai.
- *   2. Tidak ada → kunci bernomor lama (`landing.pilar1_title`, …).
+ *   2. Tidak ada → kunci bernomor lama (`landing.stat1_label`, …).
  *
  * Lapis kedua MEMBACA DATABASE, bukan teks bawaan: pemasangan yang mengisi
  * konten lewat panel versi sebelumnya menyimpannya di kunci bernomor, dan
@@ -29,7 +29,6 @@ export const MAKS_ITEM_KOLEKSI = 24;
 
 export const KUNCI_KOLEKSI = {
   stat: "landing.stat_items",
-  pilar: "landing.pilar_items",
   ekskul: "landing.ekskul_items",
   program: "landing.program_items",
   fasilitas: "landing.fasilitas_items",
@@ -111,18 +110,27 @@ export function uraiSpecs(nilai: unknown): string[] {
 }
 
 /**
- * Peta kunci bernomor lama → nama field koleksi. Hanya empat blok pertama yang
- * pernah punya kunci bernomor; FAQ dan tahapan PMB lahir langsung sebagai
- * koleksi, jadi keduanya tidak punya lapis kedua.
+ * Tagar kartu program, ditulis dipisah koma ("Tahfidz, Ukhuwah"). Tanda `#`
+ * yang ikut diketik dibuang karena kartunya menambahkannya sendiri.
+ */
+export function uraiTagar(nilai: unknown): string[] {
+  const hasil = teks(nilai)
+    .split(",")
+    .map((tagar) => tagar.trim().replace(/^#+/, "").trim())
+    .filter(Boolean);
+  return [...new Set(hasil)];
+}
+
+/**
+ * Peta kunci bernomor lama → nama field koleksi. Hanya blok statistik,
+ * ekstrakurikuler, dan fasilitas yang pernah punya kunci bernomor; FAQ dan
+ * tahapan PMB lahir langsung sebagai koleksi, jadi keduanya tidak punya lapis
+ * kedua.
  */
 export const KUNCI_LAMA = {
   stat: {
     awalan: "stat",
     peta: { label: "label", value: "value", sub: "sub" },
-  },
-  pilar: {
-    awalan: "pilar",
-    peta: { title: "title", desc: "desc", tag: "tag" },
   },
   ekskul: {
     awalan: "ekskul",
@@ -186,11 +194,6 @@ export interface ItemStat {
   value: string;
   sub: string;
 }
-export interface ItemPilar {
-  title: string;
-  desc: string;
-  tag: string;
-}
 export interface ItemEkskul {
   title: string;
   category: string;
@@ -221,13 +224,6 @@ export const koleksiStat = (konten: Konten): ItemStat[] =>
     sub: teks(item.sub),
   }));
 
-export const koleksiPilar = (konten: Konten): ItemPilar[] =>
-  ambil(konten, KUNCI_KOLEKSI.pilar, KUNCI_LAMA.pilar, (item) => ({
-    title: teks(item.title),
-    desc: teks(item.desc),
-    tag: teks(item.tag),
-  }));
-
 export const koleksiEkskul = (konten: Konten): ItemEkskul[] =>
   ambil(konten, KUNCI_KOLEKSI.ekskul, KUNCI_LAMA.ekskul, (item) => ({
     title: teks(item.title),
@@ -236,12 +232,22 @@ export const koleksiEkskul = (konten: Konten): ItemEkskul[] =>
     foto: idFoto(item.foto),
   }));
 
-/** Program sekolah: bentuk itemnya sama dengan ekskul, kartunya pun sama. */
-export const koleksiProgram = (konten: Konten): ItemEkskul[] =>
+/**
+ * Program sekolah: field ekskul ditambah subjudul dan tagar untuk kartu
+ * slider di beranda. Halaman Program tetap memakai kartu ekskul.
+ */
+export interface ItemProgram extends ItemEkskul {
+  subtitle: string;
+  tags: string[];
+}
+
+export const koleksiProgram = (konten: Konten): ItemProgram[] =>
   ambil(konten, KUNCI_KOLEKSI.program, null, (item) => ({
     title: teks(item.title),
+    subtitle: teks(item.subtitle),
     category: teks(item.category),
     desc: teks(item.desc),
+    tags: uraiTagar(item.tags),
     foto: idFoto(item.foto),
   }));
 

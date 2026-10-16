@@ -60,7 +60,7 @@ Skala huruf desktop diperkecil secara proporsional agar tidak memakan ruang vert
 | Token Mobile | Font Size | Line Height | Letter Spacing | Weight | Penggunaan Kontekstual di Ponsel |
 | :--- | :--- | :--- | :--- | :--- | :--- |
 | **`font-headline-lg-mobile`** | 32px (2.0rem) | 38px (1.2) | -0.015em | 800 (Bold) | Judul Utama Hero Section Mobile |
-| **`font-headline-md-mobile`** | 24px (1.5rem) | 32px (1.3) | -0.01em | 700 (Bold) | Judul Section (Pilar, Program, Biaya PMB) |
+| **`font-headline-md-mobile`** | 24px (1.5rem) | 32px (1.3) | -0.01em | 700 (Bold) | Judul Section (Program, Fasilitas, PMB) |
 | **`font-headline-sm-mobile`** | 18px (1.125rem)| 26px (1.4) | 0 | 600 (Semibold)| Angka Statistik Quick Stats (2x2 Grid) |
 | **`font-title-md-mobile`** | 16px (1.0rem) | 24px (1.5) | 0 | 600 (Semibold)| Judul Kartu Jurusan, Label Form Input |
 | **`font-body-md-mobile`** | 15px (0.9375rem)| 22px (1.5) | 0 | 400 (Regular) | Teks Konten Paragraf, Deskripsi Singkat |
@@ -81,7 +81,7 @@ Skala huruf desktop diperkecil secara proporsional agar tidak memakan ruang vert
 
 | ID Layar | Komponen Kunci di Ponsel | Optimasi Mobile UX |
 | :--- | :--- | :--- |
-| **SCR-M01: Beranda** | Header ringkas (64px) + Banner Urgensi PMB (36px) + Hero Ringkas + Grid 2x2 Statistik + Kartu 4 Pilar Vertikal + Horizontal Scroll Fasilitas + Accordion FAQ + Sticky Bottom Action Bar. | Menghadirkan informasi esensial tanpa membuat pengguna lelah scrolling (*prevent infinite scroll fatigue*). |
+| **SCR-M01: Beranda** | Header pil (64px) + Hero (lencana gelombang, judul, 2 tombol, foto + stat) + Slider Program & Kegiatan + Sambutan & Visi-Misi + Bento Fasilitas + Ekstrakurikuler + Alur PMB bergaris tegak + Accordion FAQ + Sticky Bottom Action Bar. | Menghadirkan informasi esensial tanpa membuat pengguna lelah scrolling (*prevent infinite scroll fatigue*). |
 | **SCR-M02: Program Keahlian** | Daftar kartu jurusan vertikal bertumpuk. Setiap kartu memiliki badge akreditasi, ikon bidang, deskripsi ringkas, dan tombol "Detail Jurusan" yang membuka **Bottom Sheet**. | Memudahkan perbandingan jurusan tanpa berpindah halaman web (*zero page refresh*). |
 | **SCR-M03: Informasi PMB** | Stepper alur pendaftaran 4 langkah vertikal dengan garis penghubung visual (`vertical connecting line`). Menampilkan kartu jadwal gelombang aktif dan kalkulator estimasi biaya. | Memberikan kepastian biaya pendaftaran di layar kecil secara transparan. |
 | **SCR-M04: Form Pendaftaran PMB** | Formulir *single-column* berurutan. Keyboard virtual dioptimalkan: `inputMode="numeric"` untuk NISN dan WhatsApp, serta tombol pemicu upload berkas kamera native ponsel. | Mencegah kesalahan ketik dan mempercepat proses pengisian berkas pendaftaran. |
@@ -121,70 +121,43 @@ Skala huruf desktop diperkecil secara proporsional agar tidak memakan ruang vert
 
 ### 6.1 SCR-M01: Beranda Mobile (Wireframe Vertikal)
 
+Urutan section mengikuti blueprint beranda (bagian 12). Setiap blok yang datanya kosong di CMS tidak dirender.
+
 ```
 ┌────────────────────────────────────────┐
-│ [LOGO] SMA GLOBAL MANDIRI   [Mode][Menu]│ (Header 64px, pt-safe)
+│ ( [LOGO] Nama Sekolah    [Mode][Menu] )│ (Header pil melayang 64px, top 12px, pt-safe)
 ├────────────────────────────────────────┤
-│ ⚡ PMB Gelombang 1 Early Bird (Sisa 18h)│ (Urgency Strip 36px)
+│ HERO                                   │
+│   ● Pendaftaran Gelombang 1 dibuka     │ (Hanya bila ada gelombang aktif)
+│   Judul serif dari CMS                 │
+│   Subjudul dari CMS                    │
+│   [ Daftar PMB Sekarang ]              │ (h-14, w-full, rounded-full)
+│   [ Lihat Program Sekolah ]            │ (h-14, w-full, outline)
+│   ┌──────────────────────────────────┐ │
+│   │ Foto hero 4:3   [Stat 2]         │ │ (2 stat CMS pertama menempel di foto,
+│   │ [Stat 1]                         │ │  diam, tanpa animasi di HP)
+│   └──────────────────────────────────┘ │
 ├────────────────────────────────────────┤
-│ HERO SECTION                           │
-│   [Badge: Akreditasi A BAN-SM]         │
-│   Wujudkan Generasi Pemimpin Cerdas    │
-│   & Berdaya Saing Global               │
-│                                        │
-│   Pendidikan holistik berstandar       │
-│   internasional dengan ekosistem       │
-│   digital terpadu.                     │
-│                                        │
-│   [ Tombol: Daftar PMB Sekarang ]      │ (h-12, w-full, Amber)
-│   [ Tombol: Unduh Brosur (PDF)  ]      │ (h-11, w-full, Ghost)
-│                                        │
-│   QUICK STATS GRID (2 Kolom x 2 Baris) │
-│   ┌──────────────────┬─────────────────┐
-│   │ Akreditasi A     │ Lulus PTN/LN    │
-│   │ 98 / 100         │ 98.4% Masuk Top │
-│   ├──────────────────┼─────────────────┤
-│   │ Prestasi 2024    │ Komunitas Siswa │
-│   │ 150+ Juara       │ 1.250+ Siswa    │
-│   └──────────────────┴─────────────────┘
+│ PROGRAM & KEGIATAN (Slider Geser)      │
+│   [Kartu 310x440] [Kartu mengintip ->  │ (Embla, touch-swipe, panah 48px)
 ├────────────────────────────────────────┤
-│ 4 PILAR KEUNGGULAN (Stack Kartu)       │
-│   ┌────────────────────────────────────┐
-│   │ [Icon] Kurikulum Cambridge         │
-│   │ Sinergi Kurikulum Merdeka & IGCSE  │
-│   └────────────────────────────────────┘
-│   ┌────────────────────────────────────┐
-│   │ [Icon] Pendidik Magister 90%+      │
-│   │ Rasio Guru dan Siswa 1:12          │
-│   └────────────────────────────────────┘
-│   ┌────────────────────────────────────┐
-│   │ [Icon] Karakter & Kepemimpinan     │
-│   │ Mentoring Akhlak & Spiritual       │
-│   └────────────────────────────────────┘
-│   ┌────────────────────────────────────┐
-│   │ [Icon] Lab AI & Smart Classroom    │
-│   │ Fasilitas High-Tech Digital Hub    │
-│   └────────────────────────────────────┘
+│ SAMBUTAN PIMPINAN (kutipan + lipatan)  │
+│ VISI (kartu navy)  •  MISI (01, 02 …)  │
 ├────────────────────────────────────────┤
-│ SAMBUTAN KEPALA SEKOLAH                │
-│   [Foto Pimpinan Tengah 96x96 px]      │
-│   "Mempersiapkan insan mulia..."       │
-│   — Dr. H. Bambang, M.Pd. (Kepsek)     │
+│ FASILITAS (Bento, 1 kolom di HP)       │
 ├────────────────────────────────────────┤
-│ FASILITAS KAMPUS (Horizontal Carousel) │
-│   <[Card Lab AI] [Card Sport] [Card] ->│ (Snap-X Scroll)
+│ JURUSAN (bila ada) & EKSTRAKURIKULER   │
 ├────────────────────────────────────────┤
-│ FAQ PMB (Accordion Vertikal)           │
-│   ▼ Syarat Pendaftaran?                │
-│   ► Apakah Tersedia Beasiswa?          │
-│   ► Alur Tes Masuk?                    │
+│ PMB: Gelombang aktif • Alur (garis     │
+│ tegak) • Banner navy (WA + Formulir)   │
 ├────────────────────────────────────────┤
-│ FOOTER RINGKAS (Alamat & Hak Cipta)    │
-│   (pb-24 untuk memberi ruang bagi FAB) │
+│ FAQ (Accordion)                        │
+├────────────────────────────────────────┤
+│ FOOTER (pb-24 untuk memberi ruang bar) │
 └────────────────────────────────────────┘
 ┌────────────────────────────────────────┐
-│ [💬 WhatsApp PMB] │ [📋 Daftar PMB Sekarang] │ (STICKY BOTTOM BAR 68px, pb-safe)
-└────────────────────────────────────────┘
+│ [💬 WhatsApp PMB] │ [📋 Daftar PMB Sekarang] │ (STICKY BOTTOM BAR 68px, pb-safe;
+└────────────────────────────────────────┘   tombol WA hilang bila nomor sekolah kosong)
 ```
 
 ---
@@ -293,6 +266,8 @@ Mematuhi pedoman **W3C Mobile Accessibility Guidelines** dan standar **Apple iOS
 8. [UI State Management Matrix](#8-ui-state-management-matrix)
 9. [Responsive Behaviour & Breakpoint Architecture](#9-responsive-behaviour--breakpoint-architecture)
 10. [Accessibility (a11y) & Keyboard Navigation](#10-accessibility-a11y--keyboard-navigation)
+11. [Desktop Enhancement (Dial Motion 3)](#11-desktop-enhancement-dial-motion-3)
+12. [Blueprint Beranda (2026-10-16)](#12-blueprint-beranda-2026-10-16)
 
 ---
 
@@ -356,11 +331,9 @@ Format token dirancang 100% kompatibel dengan **Tailwind CSS v4** (`@theme inlin
 | **Ring / Focus** | `--ring` | `#00236f` | `#90a8ff` | Outline fokus aksesibilitas keyboard (*visible focus indicator*). |
 
 ### 3.2 Skala Tipografi (Typography Hierarchy)
-- **Font Family Utama:** `Inter`, `ui-sans-serif`, `system-ui`, `-apple-system`, `sans-serif`.
-- **Alasan Pemilihan `Inter`:**
-  - *Karakter Huruf Tinggi (High x-height) & Open Counters:* Sangat mudah dibaca pada resolusi layar rendah atau perangkat smartphone murah.
-  - *Tabular Numbers (`tnum`):* Angka memiliki lebar seragam, esensial untuk penyusunan tabel biaya PMB, kalender tanggal, countdown timer gelombang, dan jam absensi gerbang.
-  - *Bebas Lisensi & Ringan:* Variabel font modern yang mendukung performa Core Web Vitals (LCP < 1.2s).
+- **Font isi & UI:** `Plus Jakarta Sans` (`--font-sans`), dimuat `next/font/google` di `layout.tsx`. Huruf terbuka dan x-height tinggi, terbaca di layar HP murah; angka `tabular-nums` dipakai untuk countdown dan nomor langkah.
+- **Font judul:** `Playfair Display` 600/700 (`--font-judul`, utilitas `font-serif`). Dipakai untuk judul hero, judul section, judul kartu foto, kutipan sambutan, dan angka statistik. Serif editorial memberi kesan berwibawa seperti dokumen resmi sekolah; teks isi tetap sans demi keterbacaan.
+- **Skala judul beranda:** hero `text-4xl md:text-6xl font-bold leading-[1.15]`; judul section `text-3xl md:text-5xl font-bold text-primary`; judul kartu foto `text-2xl`–`text-3xl text-white`.
 
 | Token Tipografi | Ukuran (Font Size) | Line Height | Letter Spacing | Font Weight | Penggunaan Kontekstual |
 | :--- | :--- | :--- | :--- | :--- | :--- |
@@ -390,14 +363,17 @@ Format token dirancang 100% kompatibel dengan **Tailwind CSS v4** (`@theme inlin
   - `rounded-sm`: 4px (badge kecil, input checkbox)
   - `rounded-md`: 6px (input text, select dropdown, button standar)
   - `rounded-lg`: 8px (button CTA besar, card kontainer)
-  - `rounded-xl`: 12px (feature card, pilar highlight, dialog modal)
+  - `rounded-xl`: 12px (feature card, dialog modal)
   - `rounded-2xl`: 16px (hero banner container, sambutan pimpinan)
-  - `rounded-full`: 9999px (pill badge, switch tema, floating helpdesk)
+  - `rounded-3xl`: 24px (kartu sambutan, visi, misi, ekstrakurikuler, banner penutup PMB)
+  - `rounded-[28px]`: kartu foto penuh (slider program, bento fasilitas, bingkai foto hero)
+  - `rounded-full`: 9999px (header pil, tombol CTA beranda, pill badge, switch tema, floating helpdesk)
 - **Elevation & Shadows:**
   - `shadow-sm`: `0 1px 2px 0 rgba(0, 0, 0, 0.05)` — Card statis, button default
   - `shadow-md`: `0 4px 6px -1px rgba(15, 23, 42, 0.08), 0 2px 4px -2px rgba(15, 23, 42, 0.04)` — Hover state card jurusan
   - `shadow-lg`: `0 10px 15px -3px rgba(15, 23, 42, 0.1), 0 4px 6px -4px rgba(15, 23, 42, 0.05)` — Floating action WhatsApp, sticky header
   - `shadow-xl`: `0 20px 25px -5px rgba(0, 35, 111, 0.15)` — Hero CTA button, dialog modal popup
+  - Kartu foto: `0 10px 30px -10px rgba(0,35,111,0.25)`, saat disorot `0 24px 48px -12px rgba(0,35,111,0.35)`; bingkai foto hero `0 24px 48px -12px rgba(0,35,111,0.28)`. Bayangan bernada navy, bukan hitam, supaya menyatu dengan palet.
 
 ---
 
@@ -490,66 +466,7 @@ Format token dirancang 100% kompatibel dengan **Tailwind CSS v4** (`@theme inlin
 
 ### 6.1 SCR-01: Beranda (Desktop Grid 1280px)
 
-```
-┌────────────────────────────────────────────────────────────────────────────────────────┐
-│ [LOGO] SMA GLOBAL MANDIRI  [NPSN]      Profil  Program  Fasilitas  Biaya PMB  FAQ   [Mode][Daftar PMB] │ (Header 80px)
-├────────────────────────────────────────────────────────────────────────────────────────┤
-│ [ALERT BANNER] 🔥 PMB 2025/2026 Gelombang 1 Early Bird — Diskon DPP 25% • Sisa 18 Hari │ (40px)
-├────────────────────────────────────────────────────────────────────────────────────────┤
-│ HERO SECTION (Background Subtil Arsitektur Kampus + Dark Blue Gradient Scrim)         │
-│                                                                                        │
-│   [Badge: Akreditasi A Unggul BAN-SM]                                                 │
-│   Wujudkan Generasi Pemimpin Cerdas,                                                  │
-│   Berkarakter & Berdaya Saing Global                                                  │
-│                                                                                        │
-│   Pendidikan holistik berbasis Kurikulum Merdeka terintegrasi standar Cambridge       │
-│   International dengan penguatan karakter religius dan ekosistem digital terpadu.      │
-│                                                                                        │
-│   [CTA: Daftar PMB Sekarang] (Amber)    [CTA Sekunder: Unduh Brosur PDF] (Ghost White)│
-│                                                                                        │
-│   ┌──────────────────┬──────────────────┬──────────────────┬──────────────────────┐    │
-│   │ Akreditasi A     │ Lulusan PTN/LN   │ Prestasi 2024    │ Komunitas Siswa      │    │
-│   │ 98 / 100         │ 98.4% Masuk Top  │ 150+ Juara       │ 1.250+ Siswa Aktif   │    │
-│   │ BAN-SM Unggul    │ UI, ITB, Monash  │ Nasional & Dunia │ Jaringan Global      │    │
-│   └──────────────────┴──────────────────┴──────────────────┴──────────────────────┘    │
-├────────────────────────────────────────────────────────────────────────────────────────┤
-│ 4 PILAR KEUNGGULAN INSTITUSI (Grid 4 Kolom)                                            │
-│                                                                                        │
-│   ┌──────────────────┬──────────────────┬──────────────────┬──────────────────────┐    │
-│   │ [Icon: Globe]    │ [Icon: Award]    │ [Icon: Shield]   │ [Icon: Cpu]          │    │
-│   │ Kurikulum        │ Pendidik         │ Pembinaan        │ Smart Campus         │    │
-│   │ Cambridge        │ Magister 90%+    │ Karakter & Akhlak│ & Lab AI Modern      │    │
-│   └──────────────────┴──────────────────┴──────────────────┴──────────────────────┘    │
-│                                                                                        │
-│   SAMBUTAN KEPALA SEKOLAH (Card Khusus Horizontal 2 Kolom)                             │
-│   ┌───────────────────────┬────────────────────────────────────────────────────────┐   │
-│   │ [Foto Resmi Pimpinan] │ "Pendidikan bukan sekadar mengisi wadah, melainkan    │   │
-│   │ Dr. H. Bambang, M.Pd. │ menyalakan api keingintahuan dan integritas moral..." │   │
-│   │ Kepala Sekolah        │ [Tanda Tangan Digital / Sambutan Lengkap ->]           │   │
-│   └───────────────────────┴────────────────────────────────────────────────────────┘   │
-├────────────────────────────────────────────────────────────────────────────────────────┤
-│ PROGRAM KEAHLIAN / JURUSAN & EKSTRAKURIKULER (Interaktif via Tabs shadcn/ui)           │
-│   [ Tab: Program Pilihan Jurusan ]      [ Tab: Ekstrakurikuler Unggulan ]              │
-│   ┌──────────────────────────────┬──────────────────────────────┬──────────────────┐   │
-│   │ MIPA Unggulan Cambridge      │ IPS Global & Entrepreneur    │ Rekayasa AI/STEM │   │
-│   │ Biologi, Fisika, Matematika  │ Riset Sosial, Bahasa, Bisnis │ Coding, Robotika │   │
-│   │ [Pelajari Detail Jurusan ->] │ [Pelajari Detail Jurusan ->] │ [Detail ->]      │   │
-│   └──────────────────────────────┴──────────────────────────────┴──────────────────┘   │
-├────────────────────────────────────────────────────────────────────────────────────────┤
-│ FASILITAS UNGGULAN & GALERI KAMPUS (Grid 3 Kolom dengan Modal Preview)                 │
-│   ┌──────────────────────────────┬──────────────────────────────┬──────────────────┐   │
-│   │ [Foto: Smart Classroom]      │ [Foto: Lab Robotika & AI]    │ [Sport Center]   │   │
-│   │ Interactive Board & AC       │ 40 Unit Workstation Core i9  │ Lap. Futsal/Basket│  │
-│   └──────────────────────────────┴──────────────────────────────┴──────────────────┘   │
-├────────────────────────────────────────────────────────────────────────────────────────┤
-│ TRANSPARANSI BIAYA & ALUR PENDAFTARAN PMB (Tabel Komparasi & 4 Langkah Berurutan)     │
-│   Langkah 1: Formulir Online ──> Langkah 2: Berkas ──> Langkah 3: Tes ──> Langkah 4: DU│
-├────────────────────────────────────────────────────────────────────────────────────────┤
-│ FAQ ACCORDION (Pertanyaan Sering Ditanyakan seputar PMB, Beasiswa, & Asrama)          │
-├────────────────────────────────────────────────────────────────────────────────────────┤
-│ FOOTER 4 KOLOM (Identitas Institusi, Navigasi Cepat, Legalitas Akreditasi, Kontak)     │
-└────────────────────────────────────────────────────────────────────────────────────────┘
-```
+Tata letak per section beranda ada di **bagian 12. Blueprint Beranda**. Ringkasnya, dari atas: header pil melayang → hero dua kolom (7/5) → slider program & kegiatan → sambutan + visi-misi → bento fasilitas → jurusan & ekstrakurikuler → PMB (gelombang, alur bergaris, banner navy) → FAQ → footer.
 
 ---
 
@@ -637,14 +554,14 @@ Mobile (< 640px) ───> Tablet (640px - 1023px) ───> Desktop (1024px -
 
 ### 9.1 Transformasi Elemen Desktop ke Layar Lebih Kecil
 1. **Navigasi Header:**
-   - *Desktop (>= 1024px):* Menu bar horizontal lengkap dengan nomor telepon hotline dan tombol CTA PMB.
+   - *Desktop (>= 1024px):* Pil melayang `max-w-6xl` berisi logo, enam tautan, sakelar tema, dan tombol CTA PMB. Nomor telepon tidak di header karena tidak muat; ada di footer, menu HP, dan tombol WhatsApp.
    - *Tablet / Mobile (< 1024px):* Menu terlipat ke dalam tombol burger yang memicu slide-over drawer (`Sheet` Radix UI).
 2. **Hero Section:**
-   - *Desktop:* Headline display 56px, 2 tombol aksi berdampingan, quick stats memanjang dalam grid 4 kolom.
-   - *Tablet:* Headline 40px, quick stats grid 2x2.
-3. **Pilar Keunggulan:**
-   - *Desktop:* Grid 4 kolom horizontal sejajar.
-   - *Tablet:* Grid 2x2.
+   - *Desktop:* Grid 12 kolom: teks 7 kolom, foto 5 kolom (4:5) dengan dua kartu stat menjulur keluar bingkai.
+   - *Tablet / HP:* Satu kolom, foto 4:3 di bawah tombol, kartu stat di dalam bingkai foto.
+3. **Bento Fasilitas:**
+   - *Desktop:* 4 kolom, fasilitas pertama 2x2, kedua 2x1, sisanya 1x1.
+   - *Tablet:* 2 kolom, dua fasilitas pertama selebar penuh. *HP:* 1 kolom.
 4. **Tabel Transparansi Biaya:**
    - *Desktop:* Tabel perbandingan multi-kolom penuh dengan rincian biaya pendaftaran, DPP, dan SPP bulanan.
    - *Tablet:* Tabel dengan horizontal scroll container yang mulus (`overflow-x-auto`).
@@ -699,11 +616,45 @@ Bila lolos, `<html data-efek="desktop">` dipasang dan modul JS efek dimuat lewat
 1. **Hero berlapis:** foto/latar bergeser berlawanan arah mouse, isi searah, lalu isi menyusut dan memudar saat hero digulir keluar.
 2. **Judul muncul per kata** (`KataMuncul`): judul layar pertama sekali saat dibuka, judul bagian mengikuti guliran.
 3. **Kartu miring 3D** mengikuti kursor (maksimal 6 derajat) dengan cahaya sorot di dalam kartu.
-4. **Pilar disematkan:** judul bagian pilar diam di kiri selama pilar bergulir di kanan; pilar di tengah layar menyala. Hanya bila bagian punya judul dan minimal 3 pilar.
+4. **Kartu statistik hero mengapung** (`.mengapung`): naik-turun 10px dalam 6 detik, kartu kedua berlawanan fase. Efek pilar disematkan dihapus bersama section pilar (2026-10-16).
 5. **Transisi antarhalaman** (View Transitions API): header diam, judul halaman melayang ke posisi barunya. Browser tanpa API ini pindah halaman biasa.
 6. **Fokus kartu sebaris:** kartu yang disorot sedikit membesar, sisanya meredup.
 
 ### 11.3 Batasan
 - **Tanpa WebGL/3D** (Spline, Three.js). Foto sekolah asli lebih meyakinkan dan tidak memanaskan laptop tua.
-- Larangan teks berputar, partikel acak, dan animasi yang berulang tanpa henti tetap berlaku di desktop.
+- Larangan teks berputar, partikel acak, dan animasi yang berulang tanpa henti tetap berlaku di desktop. Satu-satunya pengecualian adalah kartu statistik hero yang mengapung (keputusan pemilik produk, 2026-10-16), dan itu pun hanya di balik gerbang `data-efek`.
 - Efek berbasis guliran memakai *scroll-driven animations* CSS; browser tanpa dukungan menampilkan konten utuh tanpa efek, tidak pernah tersembunyi.
+
+---
+
+## 12. BLUEPRINT BERANDA (2026-10-16)
+
+Diturunkan dari blueprint desain beranda baru yang disetujui pemilik produk, disesuaikan dengan keputusannya: **palet tetap navy/amber/emerald** (bagian 3.1), **tanpa ornamen geometris Islami dan tekstur titik**, **satu foto per item** (galeri lengkap lewat tautan "Lihat foto lainnya"), dan **tanpa Framer Motion** (gerak memakai CSS yang sudah ada).
+
+`Dial: ENERGY 2 / RHYTHM 3 / MOTION 2` (desktop MOTION 3 lewat bagian 11).
+
+### 12.1 Prinsip
+1. **Kartu menonjol dari kanvas:** latar `--background` yang tidak putih murni membuat kartu putih dan kartu foto terbaca sebagai lapisan.
+2. **Bercerita lewat foto kegiatan:** program dan fasilitas tampil sebagai kartu foto penuh dengan scrim navy, bukan kartu teks berikon.
+3. **Ramah jempol:** slider bisa digeser dengan sentuhan, semua target sentuh minimal 44px, CTA pendaftaran di zona jempol (sticky bar).
+4. **Teks di atas foto selalu navy tetap** (`#00236f` / scrim `#00153f`), bukan token `primary`, karena `primary` berubah terang di mode gelap.
+
+### 12.2 Section
+| # | Section | Komponen | Sumber data | Catatan |
+| :--- | :--- | :--- | :--- | :--- |
+| 01 | Header pil melayang | `SiteHeader` | profil sekolah | Satu-satunya permukaan kaca (`backdrop-blur-md`). |
+| 02 | Hero dua kolom | `HeroSection` | `landing.hero_*`, `landing.stat_items`, gelombang aktif | Titik hijau hanya bila gelombang benar-benar dibuka. Dua stat pertama menjadi kartu di sudut foto; tanpa foto, kolom kanan hilang. |
+| 03 | Program & Kegiatan | `KegiatanSlider` | `landing.program_title/subtitle`, `landing.program_items` (`title`, `subtitle`, `category`, `desc`, `tags`, `foto`) | Embla `dragFree`, `align: start`; kartu 310/350 × 440px; lencana kategori kiri atas; maksimal 2 tagar; "Lihat Detail" membuka dialog berisi foto, deskripsi, semua tagar, dan tautan galeri. Titik posisi hanya penanda, bukan tombol. |
+| 04 | Sambutan + Visi-Misi | `SambutanVisiSection` | `landing.sambutan_*`, `profil.visi`, `profil.misi` | Isi sambutan dilipat di `<details>` bila ada kutipan. Misi dipecah per baris (`pecahButir`), bernomor 01, 02, … dalam grid 2 kolom. |
+| 05 | Fasilitas bento | `FacilitiesSection` | `landing.fasilitas_items` | Urutan CMS menentukan ukuran: pertama terbesar. Kartu dengan deskripsi/spesifikasi membuka dialog. |
+| 06 | Jurusan & Ekstrakurikuler | `ProgramsSection` | `akademik_jurusan`, `landing.ekskul_items` | Jurusan hanya bila ada. Kartu ekskul: foto 16:10, garis amber-navy di dasar kartu memanjang saat disorot. Saring kategori bila lebih dari satu kategori. |
+| 07 | PMB | `PmbOverviewSection` | gelombang aktif, `landing.pmb_*` | Gelombang aktif berbingkai `border-2 border-accent`. Alur bergaris penghubung (tegak di HP, mendatar di desktop), jumlah langkah mengikuti CMS. Banner navy: WhatsApp panitia (hanya bila nomor sekolah terisi) + formulir. |
+| 08 | FAQ | `FaqSection` | `landing.faq_items` | Tidak berubah. |
+
+### 12.3 Yang sengaja tidak dibuat
+- Badge nama singkat di kanan atas kartu program (isinya sama dengan judul kartu).
+- Multi-foto per program dan mini progress bar ala Instagram Story.
+- Foto kepala sekolah berbingkai emas: CMS belum punya field foto pimpinan, jadi tetap memakai bingkai ikon.
+- Skill pills pada kartu ekstrakurikuler: koleksi ekskul tidak punya field tagar.
+- Aksen warna pada kata kunci judul hero: judul berasal dari CMS sebagai teks biasa.
+

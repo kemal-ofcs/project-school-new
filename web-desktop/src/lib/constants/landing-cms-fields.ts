@@ -241,37 +241,10 @@ export const LANDING_PAGE_SUBSECTIONS: CmsSubSectionConfig[] = [
   },
   {
     id: "pillars_leader",
-    title: "Pilar Keunggulan & Sambutan Pimpinan",
+    title: "Sambutan Pimpinan",
     description:
-      "Pilar pendidikan institusi dan kartu sambutan pimpinan. Sambutan baru tampil bila kutipan atau isinya diisi.",
+      "Kartu sambutan pimpinan di beranda, tampil bersama visi dan misi dari tab Profil. Sambutan baru tampil bila kutipan atau isinya diisi.",
     fields: [
-      {
-        key: "landing.pillars_eyebrow",
-        label: "Eyebrow Bagian",
-        type: "text",
-        placeholder: "Keunggulan Institusi",
-      },
-      {
-        key: "landing.pillars_title",
-        label: "Judul Bagian Pilar",
-        type: "text",
-        placeholder: "4 Pilar Pendidikan Masa Depan",
-      },
-      {
-        key: "landing.pillars_subtitle",
-        label: "Subjudul Bagian Pilar",
-        type: "textarea",
-        rows: 2,
-        placeholder:
-          "Kami memadukan ketangguhan moral spiritual, kurikulum berstandar internasional, serta ekosistem pembelajaran modern untuk melahirkan inovator muda yang berakhlak mulia.",
-      },
-      {
-        key: "landing.pillars_badge",
-        label: "Badge Kanan (Sertifikasi/Akreditasi Kampus)",
-        type: "text",
-        placeholder: "Green & Digital Eco-Campus Bersertifikasi",
-      },
-      // Sambutan Pimpinan
       {
         key: "landing.sambutan_nama",
         label: "Sambutan — Nama Pimpinan / Tokoh",
@@ -351,7 +324,7 @@ export const LANDING_PAGE_SUBSECTIONS: CmsSubSectionConfig[] = [
     id: "school_programs",
     title: "Program Sekolah",
     description:
-      "Program unggulan sekolah beserta fotonya, tampil di halaman Program. Tanpa satu program pun, bagian ini tidak ditampilkan.",
+      "Program unggulan sekolah beserta fotonya, tampil sebagai slider di beranda dan sebagai kartu di halaman Program. Tanpa satu program pun, bagian ini tidak ditampilkan.",
     fields: [
       {
         key: "landing.program_title",
@@ -517,8 +490,9 @@ export interface KoleksiLandingConfig {
     multiline?: boolean;
   }[];
   /**
-   * Kunci bernomor versi lama (`landing.pilar1_title`, …). Hanya empat blok
-   * pertama yang pernah memakainya; FAQ dan tahapan PMB lahir sebagai koleksi.
+   * Kunci bernomor versi lama (`landing.stat1_label`, …). Hanya statistik,
+   * ekstrakurikuler, dan fasilitas yang pernah memakainya; FAQ dan tahapan PMB
+   * lahir sebagai koleksi.
    */
   lama?: { awalan: string; peta: Record<string, string> };
 }
@@ -542,21 +516,6 @@ export const KOLEKSI_LANDING: Record<string, KoleksiLandingConfig> = {
       peta: { label: "label", value: "value", sub: "sub" },
     },
   },
-  pillars_leader: {
-    kunci: "landing.pilar_items",
-    label: "Pilar Keunggulan",
-    description: "Kartu pilar pendidikan. Jumlahnya bebas.",
-    maksItem: MAKS_ITEM_KOLEKSI_LANDING,
-    fields: [
-      { name: "title", label: "Judul Pilar" },
-      { name: "desc", label: "Deskripsi", type: "textarea" },
-      { name: "tag", label: "Label Kecil (tag)" },
-    ],
-    lama: {
-      awalan: "pilar",
-      peta: { title: "title", desc: "desc", tag: "tag" },
-    },
-  },
   extracurricular: {
     kunci: "landing.ekskul_items",
     label: "Ekstrakurikuler",
@@ -574,7 +533,7 @@ export const KOLEKSI_LANDING: Record<string, KoleksiLandingConfig> = {
       peta: { title: "title", category: "cat", desc: "desc" },
     },
   },
-  // Bentuk item sama dengan ekskul supaya situs publik memakai kartu yang sama.
+  // Field ekskul ditambah subjudul dan tagar untuk kartu slider beranda.
   school_programs: {
     kunci: "landing.program_items",
     label: "Program Sekolah",
@@ -583,8 +542,18 @@ export const KOLEKSI_LANDING: Record<string, KoleksiLandingConfig> = {
     maksItem: MAKS_ITEM_KOLEKSI_LANDING,
     fields: [
       { name: "title", label: "Nama Program" },
+      {
+        name: "subtitle",
+        label: "Subjudul (opsional)",
+        placeholder: "Malam Bina Iman dan Takwa",
+      },
       { name: "category", label: "Label Kecil (opsional)" },
       { name: "desc", label: "Deskripsi", type: "textarea" },
+      {
+        name: "tags",
+        label: "Tagar (opsional, pisahkan dengan koma)",
+        placeholder: "Kemandirian, Ukhuwah",
+      },
       { name: "foto", label: "Foto Program", type: "gambar" },
     ],
   },

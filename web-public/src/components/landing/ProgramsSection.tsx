@@ -6,21 +6,18 @@ import {
   Code2,
   FlaskConical,
   GraduationCap,
-  Layers,
   Mic,
   Palette,
-  Search,
   Trophy,
-  X,
 } from "lucide-react";
 import Link from "next/link";
 import * as React from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { KataMuncul } from "@/components/visual/KataMuncul";
 import { SpotlightCard } from "@/components/visual/SpotlightCard";
+import { srcGambarKonten } from "@/lib/services/gambar-konten";
 import {
   fotoJurusan,
   type ItemEkskul,
@@ -41,12 +38,16 @@ interface ProgramsSectionProps {
   galeri?: TautanGaleriData | null;
 }
 
+/**
+ * Jurusan (dari database akademik) dan ekstrakurikuler (dari CMS) dalam satu
+ * section. Sekolah tanpa jurusan (SMP, SD) hanya melihat ekstrakurikuler,
+ * tanpa judul kecil "Jurusan" yang kosong.
+ */
 export function ProgramsSection({
   programStudi,
   konten = {},
   galeri = null,
 }: ProgramsSectionProps) {
-  const [kataKunci, setKataKunci] = React.useState("");
   const [kategoriEkskul, setKategoriEkskul] = React.useState("Semua");
 
   const eyebrow = konten["landing.ekskul_eyebrow"];
@@ -62,201 +63,115 @@ export function ProgramsSection({
 
   const adaFotoEkskul = ekskulList.some((item) => item.foto);
 
-  // Ekstrak kategori unik untuk filter chips
   const daftarKategori = React.useMemo(() => {
     const setKat = new Set<string>();
-    ekskulList.forEach((e) => {
+    for (const e of ekskulList) {
       if (e.category?.trim()) setKat.add(e.category.trim());
-    });
+    }
     return ["Semua", ...Array.from(setKat)];
   }, [ekskulList]);
 
-  // Filter program studi berdasarkan kata kunci
-  const prodiTerfilter = React.useMemo(() => {
-    const q = kataKunci.trim().toLowerCase();
-    if (!q) return programStudi;
-    return programStudi.filter(
-      (p) =>
-        p.nama.toLowerCase().includes(q) ||
-        p.kode?.toLowerCase().includes(q) ||
-        p.deskripsi?.toLowerCase().includes(q),
-    );
-  }, [programStudi, kataKunci]);
-
-  // Filter ekskul berdasarkan kata kunci dan kategori
-  const ekskulTerfilter = React.useMemo(() => {
-    const q = kataKunci.trim().toLowerCase();
-    return ekskulList.filter((e) => {
-      const matchKat =
-        kategoriEkskul === "Semua" ||
-        e.category?.trim().toLowerCase() === kategoriEkskul.toLowerCase();
-      if (!matchKat) return false;
-      if (!q) return true;
-      return (
-        e.title.toLowerCase().includes(q) ||
-        e.desc?.toLowerCase().includes(q) ||
-        e.category?.toLowerCase().includes(q)
-      );
-    });
-  }, [ekskulList, kataKunci, kategoriEkskul]);
+  const ekskulTerfilter =
+    kategoriEkskul === "Semua"
+      ? ekskulList
+      : ekskulList.filter(
+          (e) =>
+            e.category?.trim().toLowerCase() === kategoriEkskul.toLowerCase(),
+        );
 
   const adaJurusan = programStudi.length > 0;
   const adaEkskul = ekskulList.length > 0;
   if (!adaJurusan && !adaEkskul) return null;
   const adaHeader = Boolean(eyebrow || title || subtitle);
+  const keduanya = adaJurusan && adaEkskul;
 
   return (
-    <section className="muncul py-20 sm:py-28 bg-muted/40 border-y border-border">
-      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 space-y-10">
+    <section className="muncul bg-background py-20 sm:py-28">
+      <div className="mx-auto max-w-7xl space-y-12 px-4 sm:px-6 lg:px-8">
         {adaHeader ? (
-          <div className="text-center max-w-2xl mx-auto space-y-3">
+          <div className="max-w-2xl space-y-3">
             {eyebrow ? (
-              <div className="inline-flex items-center gap-1.5 text-xs font-bold uppercase tracking-widest text-secondary">
-                <Layers className="h-3.5 w-3.5" />
-                <span>{eyebrow}</span>
-              </div>
+              <p className="text-sm font-semibold text-secondary">{eyebrow}</p>
             ) : null}
             {title ? (
-              <h2 className="font-bold text-2xl sm:text-4xl text-foreground tracking-tight">
+              <h2 className="font-serif text-3xl font-bold tracking-tight text-primary text-balance md:text-5xl">
                 <KataMuncul teks={title} />
               </h2>
             ) : null}
             {subtitle ? (
-              <p className="text-sm sm:text-base text-muted-foreground leading-relaxed">
+              <p className="text-base leading-relaxed text-muted-foreground md:text-lg">
                 {subtitle}
               </p>
             ) : null}
           </div>
         ) : null}
 
-        {/* Tab hanya bila keduanya ada. Sekolah tanpa jurusan (SMP, SD)
-            tidak melihat tab "Jurusan (0)" yang kosong. */}
-        <Tabs
-          defaultValue={adaJurusan ? "jurusan" : "ekskul"}
-          className="w-full space-y-6"
-        >
-          <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
-            {adaJurusan && adaEkskul ? (
-              <TabsList>
-                <TabsTrigger value="jurusan">
-                  Jurusan ({programStudi.length})
-                </TabsTrigger>
-                <TabsTrigger value="ekskul">
-                  Ekstrakurikuler ({ekskulList.length})
-                </TabsTrigger>
-              </TabsList>
-            ) : (
-              <span />
-            )}
-
-            {/* Pencarian Cepat */}
-            <div className="relative w-full sm:w-72">
-              <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
-              <input
-                type="text"
-                value={kataKunci}
-                onChange={(e) => setKataKunci(e.target.value)}
-                placeholder={
-                  adaJurusan
-                    ? "Cari jurusan atau ekskul..."
-                    : "Cari ekstrakurikuler..."
-                }
-                aria-label={
-                  adaJurusan
-                    ? "Cari jurusan atau ekstrakurikuler"
-                    : "Cari ekstrakurikuler"
-                }
-                className="w-full h-10 pl-9 pr-8 rounded-xl border border-border bg-card text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/40 transition-shadow"
-              />
-              {kataKunci ? (
-                <button
-                  type="button"
-                  onClick={() => setKataKunci("")}
-                  aria-label="Hapus pencarian"
-                  className="absolute right-2.5 top-1/2 -translate-y-1/2 p-1 text-muted-foreground hover:text-foreground transition-colors"
-                >
-                  <X className="h-3.5 w-3.5" />
-                </button>
-              ) : null}
+        {adaJurusan ? (
+          <div className="space-y-6">
+            {keduanya ? (
+              <h3 className="font-serif text-2xl font-bold text-foreground">
+                Jurusan
+              </h3>
+            ) : null}
+            <div className="kartu-tengah md:[--kolom:2] lg:[--kolom:3]">
+              {programStudi.map((prodi) => (
+                <KartuJurusan
+                  key={prodi.kode || prodi.nama}
+                  prodi={prodi}
+                  foto={fotoPerJurusan[prodi.kode] ?? ""}
+                  adaFoto={adaFotoJurusan}
+                />
+              ))}
             </div>
           </div>
+        ) : null}
 
-          {/* Tab 1: Program Keahlian (Dari DB) */}
-          <TabsContent value="jurusan" className="space-y-6">
-            {programStudi.length === 0 ? (
-              <div className="rounded-xl border border-dashed border-border p-12 text-center text-sm text-muted-foreground bg-card">
-                Belum ada jurusan aktif yang terdaftar di database.
-              </div>
-            ) : prodiTerfilter.length === 0 ? (
-              <div className="rounded-xl border border-dashed border-border p-10 text-center space-y-3 bg-card">
+        {adaEkskul ? (
+          <div className="space-y-6">
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+              {keduanya ? (
+                <h3 className="font-serif text-2xl font-bold text-foreground">
+                  Ekstrakurikuler
+                </h3>
+              ) : (
+                <span />
+              )}
+              {daftarKategori.length > 2 ? (
+                <fieldset className="flex flex-wrap gap-2">
+                  <legend className="sr-only">
+                    Saring ekstrakurikuler menurut kategori
+                  </legend>
+                  {daftarKategori.map((kat) => (
+                    <button
+                      key={kat}
+                      type="button"
+                      aria-pressed={kategoriEkskul === kat}
+                      onClick={() => setKategoriEkskul(kat)}
+                      className={`min-h-11 rounded-full px-4 text-xs font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
+                        kategoriEkskul === kat
+                          ? "bg-primary text-primary-foreground"
+                          : "border border-border bg-card text-muted-foreground hover:bg-muted hover:text-foreground"
+                      }`}
+                    >
+                      {kat}
+                    </button>
+                  ))}
+                </fieldset>
+              ) : null}
+            </div>
+
+            {ekskulTerfilter.length === 0 ? (
+              <div className="space-y-3 rounded-2xl border border-dashed border-border bg-card p-10 text-center">
                 <p className="text-sm text-muted-foreground">
-                  Tidak ada jurusan yang cocok dengan pencarian &quot;
-                  {kataKunci}&quot;.
+                  Belum ada ekstrakurikuler di kategori {kategoriEkskul}.
                 </p>
                 <Button
                   type="button"
                   variant="outline"
                   size="sm"
-                  onClick={() => setKataKunci("")}
+                  onClick={() => setKategoriEkskul("Semua")}
                 >
-                  Reset Pencarian
-                </Button>
-              </div>
-            ) : (
-              <div className="kartu-tengah md:[--kolom:2] lg:[--kolom:3]">
-                {prodiTerfilter.map((prodi) => (
-                  <KartuJurusan
-                    key={prodi.kode || prodi.nama}
-                    prodi={prodi}
-                    foto={fotoPerJurusan[prodi.kode] ?? ""}
-                    adaFoto={adaFotoJurusan}
-                  />
-                ))}
-              </div>
-            )}
-          </TabsContent>
-
-          {/* Tab 2: Ekstrakurikuler */}
-          <TabsContent value="ekskul" className="space-y-6">
-            {/* Filter Chips Kategori */}
-            {daftarKategori.length > 2 ? (
-              <div className="flex flex-wrap gap-2 pt-1">
-                {daftarKategori.map((kat) => (
-                  <button
-                    key={kat}
-                    type="button"
-                    onClick={() => setKategoriEkskul(kat)}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
-                      kategoriEkskul === kat
-                        ? "bg-secondary text-secondary-foreground shadow-xs"
-                        : "bg-card border border-border text-muted-foreground hover:text-foreground hover:bg-muted"
-                    }`}
-                  >
-                    {kat}
-                  </button>
-                ))}
-              </div>
-            ) : null}
-
-            {ekskulList.length === 0 ? (
-              <div className="rounded-xl border border-dashed border-border p-12 text-center text-sm text-muted-foreground bg-card">
-                Belum ada kegiatan ekstrakurikuler yang ditampilkan.
-              </div>
-            ) : ekskulTerfilter.length === 0 ? (
-              <div className="rounded-xl border border-dashed border-border p-10 text-center space-y-3 bg-card">
-                <p className="text-sm text-muted-foreground">
-                  Tidak ada ekstrakurikuler yang cocok dengan kriteria filter.
-                </p>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => {
-                    setKataKunci("");
-                    setKategoriEkskul("Semua");
-                  }}
-                >
-                  Reset Filter
+                  Tampilkan semua
                 </Button>
               </div>
             ) : (
@@ -272,8 +187,8 @@ export function ProgramsSection({
               </div>
             )}
             <TautanGaleri tautan={galeri} />
-          </TabsContent>
-        </Tabs>
+          </div>
+        ) : null}
       </div>
     </section>
   );
@@ -341,9 +256,11 @@ export function KartuJurusan({
 }
 
 /**
- * Kartu satu kegiatan ekstrakurikuler. Ikonnya dipilih dari `indeks` di dalam
- * komponen ini, bukan dikirim sebagai prop: halaman server tidak bisa
- * mengirim komponen React ke komponen klien.
+ * Kartu satu kegiatan: foto 16:10 di atas, teks di permukaan kartu di bawah.
+ * Ikonnya dipilih dari `indeks` di dalam komponen ini, bukan dikirim sebagai
+ * prop: halaman server tidak bisa mengirim komponen React ke komponen klien.
+ * Garis di dasar kartu memanjang saat disorot, menandai kartu yang sedang
+ * dibaca tanpa menggeser tata letaknya.
  */
 export function KartuEkskul({
   item,
@@ -355,38 +272,65 @@ export function KartuEkskul({
   adaFoto: boolean;
 }) {
   const Icon = IKON_EKSKUL[indeks % IKON_EKSKUL.length];
+  const src = srcGambarKonten(item.foto);
   return (
-    <SpotlightCard className="h-full">
-      <Card className="group flex flex-col justify-between h-full overflow-hidden p-6 transition-colors duration-300 hover:border-primary/40 bg-card border-border">
-        <div className="space-y-3">
-          <FotoKartu
-            id={item.foto}
-            alt={item.title}
-            ikon={adaFoto ? <Icon className="h-12 w-12" /> : undefined}
-          />
-          <div className="flex items-center justify-between">
-            {adaFoto ? (
-              <span />
+    <SpotlightCard className="h-full rounded-3xl">
+      <article className="group relative flex h-full flex-col overflow-hidden rounded-3xl border border-border bg-card shadow-[0_10px_30px_-10px_rgba(0,35,111,0.08)]">
+        {adaFoto ? (
+          <div className="relative aspect-16/10 overflow-hidden bg-muted">
+            {src ? (
+              // biome-ignore lint/performance/noImgElement: foto dari database, dilayani rute ber-cache sendiri
+              <img
+                src={src}
+                alt={item.title}
+                width={1600}
+                height={1000}
+                loading="lazy"
+                decoding="async"
+                className="h-full w-full object-cover transition-transform duration-700 ease-out group-hover:scale-105"
+              />
             ) : (
-              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-secondary/15 text-secondary">
-                <Icon className="h-5 w-5" />
+              <div
+                aria-hidden="true"
+                className="flex h-full items-center justify-center text-primary/40"
+              >
+                <Icon className="h-12 w-12" />
               </div>
             )}
             {item.category ? (
-              <Badge variant="outline" className="text-[11px]">
+              <span className="absolute left-4 top-4 rounded-full bg-[#00236f]/90 px-3 py-1 text-[11px] font-bold uppercase tracking-wider text-white">
                 {item.category}
-              </Badge>
+              </span>
             ) : null}
           </div>
-
-          <h3 className="font-bold text-base text-foreground">{item.title}</h3>
+        ) : null}
+        <div className="flex flex-1 flex-col gap-2 p-6">
+          {!adaFoto ? (
+            <div className="mb-2 flex items-center justify-between gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-secondary/15 text-secondary">
+                <Icon aria-hidden="true" className="h-5 w-5" />
+              </div>
+              {item.category ? (
+                <Badge variant="outline" className="text-[11px]">
+                  {item.category}
+                </Badge>
+              ) : null}
+            </div>
+          ) : null}
+          <h3 className="font-serif text-xl font-bold text-foreground">
+            {item.title}
+          </h3>
           {item.desc ? (
-            <p className="text-xs sm:text-sm text-muted-foreground leading-relaxed">
+            <p className="text-sm leading-relaxed text-muted-foreground">
               {item.desc}
             </p>
           ) : null}
         </div>
-      </Card>
+        <span
+          aria-hidden="true"
+          className="absolute bottom-0 left-0 h-1 w-0 bg-linear-to-r from-secondary to-primary transition-all duration-500 group-hover:w-full"
+        />
+      </article>
     </SpotlightCard>
   );
 }

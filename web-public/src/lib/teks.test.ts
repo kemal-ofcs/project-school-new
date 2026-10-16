@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { pecahButir, pecahPoin } from "./teks";
+import { pecahButir, pecahPoin, tautanWhatsApp } from "./teks";
 
 test("pecahButir membuang nomor/poin dan baris kosong", () => {
   expect(
@@ -29,4 +29,15 @@ test("pecahPoin memecah paragraf bernomor dari CMS", () => {
   ]);
   expect(pecahPoin("Satu kalimat biasa.")).toEqual(["Satu kalimat biasa."]);
   expect(pecahPoin("")).toEqual([]);
+});
+
+test("tautanWhatsApp mengubah 0 di depan menjadi 62 dan menolak nomor kosong", () => {
+  expect(tautanWhatsApp("0812-3456-7890", "Halo")).toBe(
+    "https://wa.me/6281234567890?text=Halo",
+  );
+  expect(tautanWhatsApp("+62 812 3456 7890", "a b")).toBe(
+    "https://wa.me/6281234567890?text=a%20b",
+  );
+  expect(tautanWhatsApp(null, "Halo")).toBeNull();
+  expect(tautanWhatsApp("123", "Halo")).toBeNull();
 });

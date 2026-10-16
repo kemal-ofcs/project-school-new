@@ -29,3 +29,19 @@ export function pecahPoin(teks: string): string[] {
     .map((b) => b.replace(/^\d{1,2}[.)]\s*/, "").trim())
     .filter(Boolean);
 }
+
+/**
+ * Tautan `wa.me` dari nomor telepon profil sekolah (`0812…`, `+62 812…`).
+ * `null` bila nomornya kosong atau terlalu pendek untuk nomor sungguhan:
+ * tombol WhatsApp disembunyikan, tidak diarahkan ke nomor contoh milik orang
+ * lain.
+ */
+export function tautanWhatsApp(
+  nomor: string | null | undefined,
+  pesan: string,
+): string | null {
+  const angka = (nomor ?? "").replace(/\D/g, "");
+  if (angka.length < 8) return null;
+  const internasional = angka.startsWith("0") ? `62${angka.slice(1)}` : angka;
+  return `https://wa.me/${internasional}?text=${encodeURIComponent(pesan)}`;
+}

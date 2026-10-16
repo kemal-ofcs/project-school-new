@@ -13,7 +13,6 @@ import {
 import * as React from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
 import {
   Dialog,
   DialogContent,
@@ -22,9 +21,9 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { KataMuncul } from "@/components/visual/KataMuncul";
-import { SpotlightCard } from "@/components/visual/SpotlightCard";
+import { srcGambarKonten } from "@/lib/services/gambar-konten";
 import { koleksiFasilitas } from "@/lib/services/landing-collections";
-import { FotoKartu, TautanGaleri, type TautanGaleriData } from "./FotoKartu";
+import { TautanGaleri, type TautanGaleriData } from "./FotoKartu";
 
 /**
  * Ikon fasilitas diputar berdasarkan posisi. Ia komponen React sehingga tidak
@@ -67,7 +66,6 @@ export function FacilitiesSection({
   // dipanggil berubah begitu fasilitas pertama diisi dan React menjatuhkan
   // seluruh halaman depan.
   if (facilitiesList.length === 0) return null;
-  const adaFoto = facilitiesList.some((item) => item.foto);
   const adaHeader = Boolean(eyebrow || title || subtitle);
 
   return (
@@ -78,13 +76,10 @@ export function FacilitiesSection({
         ) : adaHeader ? (
           <div className="text-center max-w-2xl mx-auto space-y-3">
             {eyebrow ? (
-              <div className="inline-flex items-center gap-1.5 text-xs font-bold uppercase tracking-widest text-secondary">
-                <Building2 className="h-3.5 w-3.5" />
-                <span>{eyebrow}</span>
-              </div>
+              <p className="text-sm font-semibold text-secondary">{eyebrow}</p>
             ) : null}
             {title ? (
-              <h2 className="font-bold text-2xl sm:text-4xl text-foreground tracking-tight">
+              <h2 className="font-serif text-3xl font-bold tracking-tight text-primary text-balance md:text-5xl">
                 <KataMuncul teks={title} />
               </h2>
             ) : null}
@@ -96,87 +91,82 @@ export function FacilitiesSection({
           </div>
         ) : null}
 
-        {/* Facilities Grid */}
-        <div className="kartu-tengah sm:[--kolom:2] lg:[--kolom:3]">
+        {/* Bento: fasilitas pertama (biasanya gedung utama) paling besar,
+            yang kedua melebar, sisanya kotak biasa. Urutannya diatur sekolah
+            di CMS, jadi sekolah yang memilih mana yang paling ditonjolkan. */}
+        <div className="grid grid-flow-dense auto-rows-62.5 grid-cols-1 gap-5 sm:grid-cols-2 md:grid-cols-4">
           {facilitiesList.map((item, i) => {
             const Icon = item.icon;
-            return (
-              <SpotlightCard key={`${i}-${item.name}`} className="h-full">
-                <Card className="group flex flex-col justify-between h-full overflow-hidden p-6 transition-colors duration-300 hover:border-primary/40 bg-card border-border">
-                  <div className="space-y-4">
-                    <FotoKartu
-                      id={item.foto}
-                      alt={item.name}
-                      ikon={
-                        adaFoto ? <Icon className="h-12 w-12" /> : undefined
-                      }
-                    />
-                    <div className="flex items-center justify-between">
-                      {adaFoto ? (
-                        <span />
-                      ) : (
-                        <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10 text-primary group-hover:bg-primary group-hover:text-primary-foreground transition-colors">
-                          <Icon className="h-6 w-6" />
-                        </div>
-                      )}
-                      {item.tag ? (
-                        <Badge variant="outline" className="text-[11px]">
-                          {item.tag}
-                        </Badge>
-                      ) : null}
-                    </div>
-
-                    <div className="space-y-2">
-                      <h3 className="font-bold text-lg text-foreground group-hover:text-primary transition-colors">
-                        {item.name}
-                      </h3>
-                      {item.shortDesc ? (
-                        <p className="text-sm text-muted-foreground leading-relaxed line-clamp-3">
-                          {item.shortDesc}
-                        </p>
-                      ) : null}
-                    </div>
-
-                    {/* Preview Spesifikasi Singkat di Kartu */}
-                    {item.specs.length > 0 ? (
-                      <div className="flex flex-wrap gap-1.5 pt-2">
-                        {item.specs.slice(0, 2).map((spec) => (
-                          <span
-                            key={spec}
-                            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[11px] font-medium bg-muted text-muted-foreground"
-                          >
-                            <CheckCircle2 className="h-3 w-3 text-secondary shrink-0" />
-                            <span className="truncate max-w-[160px]">
-                              {spec}
-                            </span>
-                          </span>
-                        ))}
-                        {item.specs.length > 2 ? (
-                          <span className="inline-flex items-center px-2 py-1 rounded-md text-[11px] font-medium text-muted-foreground">
-                            +{item.specs.length - 2} lainnya
-                          </span>
-                        ) : null}
-                      </div>
-                    ) : null}
-                  </div>
-
-                  {/* Tombol spesifikasi lengkap */}
-                  {item.specs.length > 0 ? (
-                    <div className="pt-5 mt-4 border-t border-border/60">
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="default"
-                        className="w-full justify-between h-11 text-sm font-semibold text-primary hover:bg-primary/10"
-                        onClick={() => setSelectedFacility(item)}
-                      >
-                        <span>Lihat Spesifikasi Lengkap</span>
-                        <Eye className="h-4 w-4" />
-                      </Button>
-                    </div>
+            const src = srcGambarKonten(item.foto);
+            const besar = i === 0;
+            const ukuran = besar
+              ? "sm:col-span-2 md:row-span-2"
+              : i === 1
+                ? "sm:col-span-2"
+                : "";
+            const adaRincian = Boolean(item.shortDesc || item.specs.length > 0);
+            const isi = (
+              <>
+                {src ? (
+                  // biome-ignore lint/performance/noImgElement: foto dari database, dilayani rute ber-cache sendiri
+                  <img
+                    src={src}
+                    alt=""
+                    loading="lazy"
+                    decoding="async"
+                    className="absolute inset-0 h-full w-full object-cover transition-transform duration-700 ease-out group-hover:scale-105"
+                  />
+                ) : (
+                  <Icon
+                    aria-hidden="true"
+                    className="absolute right-6 top-6 h-14 w-14 text-white/20"
+                  />
+                )}
+                <div
+                  aria-hidden="true"
+                  className="absolute inset-0 bg-linear-to-t from-[#00153f] via-[#00153f]/60 via-35% to-transparent"
+                />
+                {item.tag ? (
+                  <span className="absolute left-5 top-5 rounded-full bg-[#00236f]/90 px-3 py-1 text-[11px] font-bold uppercase tracking-wider text-white">
+                    {item.tag}
+                  </span>
+                ) : null}
+                <div className="absolute inset-x-0 bottom-0 p-5 text-left sm:p-6">
+                  <h3
+                    className={`font-serif font-bold leading-snug text-white ${
+                      besar ? "text-2xl md:text-3xl" : "text-xl"
+                    }`}
+                  >
+                    {item.name}
+                  </h3>
+                  {besar && item.shortDesc ? (
+                    <p className="mt-2 max-w-md text-sm leading-relaxed text-white/85 line-clamp-2">
+                      {item.shortDesc}
+                    </p>
                   ) : null}
-                </Card>
-              </SpotlightCard>
+                  {adaRincian ? (
+                    <span className="mt-3 inline-flex items-center gap-1 text-xs font-semibold text-secondary-container">
+                      Lihat rincian
+                      <Eye aria-hidden="true" className="h-3.5 w-3.5" />
+                    </span>
+                  ) : null}
+                </div>
+              </>
+            );
+            const kelas = `group relative overflow-hidden rounded-[28px] bg-[#00236f] shadow-[0_10px_30px_-10px_rgba(0,35,111,0.25)] ${ukuran}`;
+            return adaRincian ? (
+              <button
+                key={`${i}-${item.name}`}
+                type="button"
+                onClick={() => setSelectedFacility(item)}
+                className={`${kelas} focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2`}
+              >
+                {isi}
+              </button>
+            ) : (
+              <div key={`${i}-${item.name}`} className={kelas}>
+                {isi}
+              </div>
             );
           })}
         </div>
@@ -191,8 +181,19 @@ export function FacilitiesSection({
           }}
         >
           {selectedFacility ? (
-            <DialogContent className="sm:max-w-md">
-              <DialogHeader>
+            <DialogContent className="max-h-[90dvh] overflow-y-auto sm:max-w-md">
+              {srcGambarKonten(selectedFacility.foto) ? (
+                <div className="-mx-6 -mt-6 mb-5 aspect-video overflow-hidden rounded-t-2xl bg-muted">
+                  {/* biome-ignore lint/performance/noImgElement: foto dari database, dilayani rute ber-cache sendiri */}
+                  <img
+                    src={srcGambarKonten(selectedFacility.foto) ?? ""}
+                    alt={selectedFacility.name}
+                    decoding="async"
+                    className="h-full w-full object-cover"
+                  />
+                </div>
+              ) : null}
+              <DialogHeader className="pr-8">
                 {selectedFacility.tag ? (
                   <div className="flex items-center gap-2 text-xs font-bold text-secondary uppercase tracking-wider">
                     <Badge variant="outline">{selectedFacility.tag}</Badge>
@@ -206,19 +207,21 @@ export function FacilitiesSection({
                 </DialogDescription>
               </DialogHeader>
 
-              <div className="space-y-3 py-3 border-t border-border mt-3">
-                <h4 className="font-semibold text-xs text-foreground uppercase tracking-wider">
-                  Fitur & Spesifikasi:
-                </h4>
-                <ul className="space-y-2 text-sm text-muted-foreground">
-                  {selectedFacility.specs.map((spec) => (
-                    <li key={spec} className="flex items-start gap-2">
-                      <CheckCircle2 className="h-4 w-4 shrink-0 text-accent mt-0.5" />
-                      <span>{spec}</span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
+              {selectedFacility.specs.length > 0 ? (
+                <div className="space-y-3 py-3 border-t border-border mt-3">
+                  <h4 className="font-semibold text-xs text-foreground uppercase tracking-wider">
+                    Fitur & Spesifikasi:
+                  </h4>
+                  <ul className="space-y-2 text-sm text-muted-foreground">
+                    {selectedFacility.specs.map((spec) => (
+                      <li key={spec} className="flex items-start gap-2">
+                        <CheckCircle2 className="h-4 w-4 shrink-0 text-accent mt-0.5" />
+                        <span>{spec}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ) : null}
 
               <div className="pt-4 border-t border-border flex justify-end">
                 <Button

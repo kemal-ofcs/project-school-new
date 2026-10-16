@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Plus_Jakarta_Sans } from "next/font/google";
+import { Playfair_Display, Plus_Jakarta_Sans } from "next/font/google";
 import { SiteFooter, SiteHeader } from "@/components/SiteChrome";
 import { EfekDesktop } from "@/components/visual/EfekDesktop";
 import { SKRIP_GERBANG_EFEK } from "@/components/visual/gerbang-efek";
@@ -11,6 +11,15 @@ import "./globals.css";
 const plusJakartaSans = Plus_Jakarta_Sans({
   subsets: ["latin"],
   variable: "--font-sans",
+  display: "swap",
+});
+
+// Judul section: serif editorial supaya beranda terasa berwibawa seperti
+// buku induk sekolah; teks isi tetap Plus Jakarta Sans demi keterbacaan.
+const playfair = Playfair_Display({
+  subsets: ["latin"],
+  weight: ["600", "700"],
+  variable: "--font-judul",
   display: "swap",
 });
 
@@ -94,7 +103,7 @@ export default async function RootLayout({
         />
       </head>
       <body
-        className={`${plusJakartaSans.variable} font-sans flex min-h-dvh flex-col`}
+        className={`${plusJakartaSans.variable} ${playfair.variable} font-sans flex min-h-dvh flex-col`}
       >
         <SiteHeader profil={profil} konten={kontenSitus} />
         <div className="flex-1">{children}</div>

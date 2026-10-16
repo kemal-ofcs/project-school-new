@@ -21,7 +21,6 @@ describe("CMS landing: koleksi dan perpindahan kunci lama", () => {
     ).toEqual(
       [
         "landing.stat_items",
-        "landing.pilar_items",
         "landing.ekskul_items",
         "landing.program_items",
         "landing.fasilitas_items",
@@ -49,7 +48,7 @@ describe("CMS landing: koleksi dan perpindahan kunci lama", () => {
     );
     expect(
       semua.filter((k) =>
-        /^landing\.(stat|pilar|ekskul|fasilitas)\d+_/.test(k),
+        /^landing\.(stat|ekskul|fasilitas)\d+_/.test(k),
       ),
     ).toEqual([]);
   });
@@ -61,14 +60,14 @@ describe("CMS landing: koleksi dan perpindahan kunci lama", () => {
    */
   test("repeater diisi dari kunci bernomor lama bila koleksinya kosong", () => {
     const hasil = muatKoleksiLanding({
-      "landing.pilar1_title": "Pilar Lama",
-      "landing.pilar1_tag": "Tag",
+      "landing.stat1_label": "Stat Lama",
+      "landing.stat1_sub": "Sub",
       "landing.ekskul2_cat": "Olahraga",
       "landing.fasilitas1_name": "Lab",
       "landing.fasilitas1_specs": "Spek A\n\n  Spek B ",
     });
-    expect(hasil["landing.pilar_items"]).toEqual([
-      { title: "Pilar Lama", tag: "Tag" },
+    expect(hasil["landing.stat_items"]).toEqual([
+      { label: "Stat Lama", sub: "Sub" },
     ]);
     // Ejaan kunci lama `_cat` dipetakan ke field koleksi `category`.
     expect(hasil["landing.ekskul_items"]).toEqual([{ category: "Olahraga" }]);
@@ -81,10 +80,10 @@ describe("CMS landing: koleksi dan perpindahan kunci lama", () => {
 
   test("koleksi yang sudah ada menang atas kunci lama", () => {
     const hasil = muatKoleksiLanding({
-      "landing.pilar_items": '[{"title":"Baru"}]',
-      "landing.pilar1_title": "Lama",
+      "landing.stat_items": '[{"label":"Baru"}]',
+      "landing.stat1_label": "Lama",
     });
-    expect(hasil["landing.pilar_items"]).toEqual([{ title: "Baru" }]);
+    expect(hasil["landing.stat_items"]).toEqual([{ label: "Baru" }]);
   });
 
   test("JSON rusak menjadi koleksi kosong, bukan galat", () => {
@@ -100,19 +99,19 @@ describe("CMS landing: koleksi dan perpindahan kunci lama", () => {
    */
   test("menyimpan mengosongkan kunci lama dan menyerialisasi koleksi", () => {
     const konten = {
-      "landing.pilar1_title": "Lama",
-      "landing.pilar2_desc": "Lama juga",
-      "landing.pillars_title": "Judul tetap",
+      "landing.stat1_label": "Lama",
+      "landing.stat2_value": "Lama juga",
+      "landing.hero_title": "Judul tetap",
     };
     const siap = siapkanSimpanLanding(konten, {
-      "landing.pilar_items": [{ title: "Baru", desc: "", tag: "" }],
+      "landing.stat_items": [{ label: "Baru", value: "", sub: "" }],
     });
-    expect(siap["landing.pilar1_title"]).toBe("");
-    expect(siap["landing.pilar2_desc"]).toBe("");
+    expect(siap["landing.stat1_label"]).toBe("");
+    expect(siap["landing.stat2_value"]).toBe("");
     // Field teks tunggal tidak disentuh.
-    expect(siap["landing.pillars_title"]).toBe("Judul tetap");
-    expect(JSON.parse(siap["landing.pilar_items"])).toEqual([
-      { title: "Baru", desc: "", tag: "" },
+    expect(siap["landing.hero_title"]).toBe("Judul tetap");
+    expect(JSON.parse(siap["landing.stat_items"])).toEqual([
+      { label: "Baru", value: "", sub: "" },
     ]);
   });
 
@@ -120,7 +119,7 @@ describe("CMS landing: koleksi dan perpindahan kunci lama", () => {
     const siap = siapkanSimpanLanding({}, { "landing.faq_items": [] });
     expect(siap["landing.faq_items"]).toBe("");
     // Kunci lama yang tidak pernah dimuat tidak dibuatkan baris kosong.
-    expect("landing.pilar1_title" in siap).toBe(false);
+    expect("landing.stat1_label" in siap).toBe(false);
   });
 
   /**
