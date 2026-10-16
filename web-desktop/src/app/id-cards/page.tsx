@@ -478,6 +478,13 @@ export default function IdCardsPage() {
     return filteredRows.every((r) => selectedIds.has(String(r.id_unik)));
   }, [filteredRows, selectedIds]);
 
+  // Pilihan bisa menyimpan id yang sudah tersaring keluar (cari/filter/muat ulang);
+  // tombol cetak hanya menghitung yang masih tampil agar tidak diam saat diklik.
+  const selectedRows = useMemo(
+    () => filteredRows.filter((r) => selectedIds.has(String(r.id_unik))),
+    [filteredRows, selectedIds],
+  );
+
   const toggleSelectAll = () => {
     if (isAllSelected) {
       setSelectedIds(new Set());
@@ -797,9 +804,8 @@ export default function IdCardsPage() {
 
   // Open Print Modal for Multiple Selected Employees
   const handleOpenPrintBatch = () => {
-    const targets = rows.filter((r) => selectedIds.has(String(r.id_unik)));
-    if (targets.length === 0) return;
-    setPrintTargetRows(targets);
+    if (selectedRows.length === 0) return;
+    setPrintTargetRows(selectedRows);
     setPrintModalOpen(true);
   };
 
@@ -1399,7 +1405,7 @@ export default function IdCardsPage() {
                 </span>
               </button>
 
-              {selectedIds.size > 0 ? (
+              {selectedRows.length > 0 ? (
                 <div className="ml-auto flex items-center gap-2">
                   <button
                     type="button"
@@ -1408,7 +1414,7 @@ export default function IdCardsPage() {
                     className="min-h-10 rounded-xl bg-sky-400 px-4 text-xs font-black text-slate-950 shadow-md hover:bg-sky-300 disabled:opacity-50 inline-flex items-center gap-2"
                   >
                     <Icon name="scanner" className="size-3.5" />
-                    <span>Cetak Pilihan ({selectedIds.size})</span>
+                    <span>Cetak Pilihan ({selectedRows.length})</span>
                   </button>
                   <button
                     type="button"
