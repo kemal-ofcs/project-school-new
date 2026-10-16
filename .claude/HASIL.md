@@ -1,32 +1,38 @@
 # HASIL.md — hasil `bun run check`
 
-- Waktu: 16 Oktober 2026, 06:20 WIB
-- Commit: 48edf85 (+ 9 berkas berubah, belum commit)
+- Waktu: 2026-10-16 15:39:55 WIB
+- Commit: 87bb4ec (+ 9 berkas berubah, belum commit)
 - Perintah: `bun run check` (root)
 - Exit code: 0
 - Status: **LULUS**
 - Log penuh: `.claude/check.log`
 
 ## Gate yang gagal
+
 | Gate | Status |
 | :--- | :--- |
-| audit:schema | lulus |
-| audit:contract | lulus |
-| audit:sql | lulus |
-| audit:ui-guard | lulus |
-| audit:a11y | lulus |
-| audit:page-guard | lulus |
-| audit:dialog | lulus |
-| audit:route-guard | lulus |
-| audit:confirm | lulus |
-| audit:silent-catch | lulus |
-| audit:list-bound | lulus |
-| web-desktop (lint, typecheck, test, cargo test) | lulus |
-| mobile (lint, typecheck, test, cargo test) | lulus |
-| web-public (lint, typecheck, test) | lulus |
+| `schema-audit.ts` | lulus |
+| `audit-sync-contract.ts` | lulus |
+| `audit-sql.ts` | lulus |
+| `audit-ui-guard.ts` | lulus |
+| `audit-a11y.ts` | lulus |
+| `audit-page-guard.ts` | lulus |
+| `audit-dialog.ts` | lulus |
+| `audit-route-guard.ts` | lulus |
+| `audit-confirm.ts` | lulus |
+| `audit-silent-catch.ts` | lulus |
+| `audit-list-bound.ts` | lulus |
+| `web-desktop:lint` | lulus |
+| `web-desktop:typecheck` | lulus |
+| `web-desktop:test` | lulus |
+| `web-desktop:test:rust` | lulus |
+| `mobile` | lulus |
+| `web-public` | lulus |
 
 ## Galat (maks 10, urutan kemunculan)
-Tidak ada galat.
+
+*(tidak ada galat)*
 
 ## Catatan
-Seluruh 11 gerbang audit root, linter Biome, typecheck TypeScript, Bun test, dan 877 test Rust (437 web-desktop + 440 mobile) lulus 100%.
+
+- Seluruh gate lulus tanpa error (11 skrip audit root, web-desktop lint/typecheck/unit test/cargo test, mobile check, dan web-public check).

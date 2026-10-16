@@ -47,9 +47,7 @@ describe("CMS landing: koleksi dan perpindahan kunci lama", () => {
       s.fields.map((f) => f.key),
     );
     expect(
-      semua.filter((k) =>
-        /^landing\.(stat|ekskul|fasilitas)\d+_/.test(k),
-      ),
+      semua.filter((k) => /^landing\.(stat|ekskul|fasilitas)\d+_/.test(k)),
     ).toEqual([]);
   });
 

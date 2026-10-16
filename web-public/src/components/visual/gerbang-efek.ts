@@ -1,5 +1,5 @@
 /**
- * Syarat efek desktop (keputusan User): layar minimal 1024px, mouse, tidak
+ * Syarat efek desktop (keputusan User): layar minimal 900px, mouse, tidak
  * memilih "kurangi gerakan", dan tidak dalam mode hemat data. HP tidak pernah
  * memenuhi syarat ini, sehingga modul efeknya tidak pernah diunduh di sana.
  *
@@ -9,7 +9,7 @@
  * perubahan ukuran jendela.
  */
 export const KUERI_EFEK_DESKTOP =
-  "(min-width: 1024px) and (hover: hover) and (pointer: fine) and (prefers-reduced-motion: no-preference)";
+  "(min-width: 900px) and (hover: hover) and (pointer: fine) and (prefers-reduced-motion: no-preference)";
 
 export function efekDesktopBoleh(): boolean {
   const koneksi = (

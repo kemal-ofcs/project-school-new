@@ -81,7 +81,7 @@ Skala huruf desktop diperkecil secara proporsional agar tidak memakan ruang vert
 
 | ID Layar | Komponen Kunci di Ponsel | Optimasi Mobile UX |
 | :--- | :--- | :--- |
-| **SCR-M01: Beranda** | Header pil (64px) + Hero (lencana gelombang, judul, 2 tombol, foto + stat) + Slider Program & Kegiatan + Sambutan & Visi-Misi + Bento Fasilitas + Ekstrakurikuler + Alur PMB bergaris tegak + Accordion FAQ + Sticky Bottom Action Bar. | Menghadirkan informasi esensial tanpa membuat pengguna lelah scrolling (*prevent infinite scroll fatigue*). |
+| **SCR-M01: Beranda** | Header pil (64px) + Hero berlatar foto (lencana gelombang, judul, 2 tombol, grid stat) + Slider Program & Kegiatan + Sambutan & Visi-Misi + Bento Fasilitas + Ekstrakurikuler + Alur PMB bergaris tegak + Accordion FAQ + Sticky Bottom Action Bar. | Menghadirkan informasi esensial tanpa membuat pengguna lelah scrolling (*prevent infinite scroll fatigue*). |
 | **SCR-M02: Program Keahlian** | Daftar kartu jurusan vertikal bertumpuk. Setiap kartu memiliki badge akreditasi, ikon bidang, deskripsi ringkas, dan tombol "Detail Jurusan" yang membuka **Bottom Sheet**. | Memudahkan perbandingan jurusan tanpa berpindah halaman web (*zero page refresh*). |
 | **SCR-M03: Informasi PMB** | Stepper alur pendaftaran 4 langkah vertikal dengan garis penghubung visual (`vertical connecting line`). Menampilkan kartu jadwal gelombang aktif dan kalkulator estimasi biaya. | Memberikan kepastian biaya pendaftaran di layar kecil secara transparan. |
 | **SCR-M04: Form Pendaftaran PMB** | Formulir *single-column* berurutan. Keyboard virtual dioptimalkan: `inputMode="numeric"` untuk NISN dan WhatsApp, serta tombol pemicu upload berkas kamera native ponsel. | Mencegah kesalahan ketik dan mempercepat proses pengisian berkas pendaftaran. |
@@ -127,16 +127,14 @@ Urutan section mengikuti blueprint beranda (bagian 12). Setiap blok yang datanya
 ┌────────────────────────────────────────┐
 │ ( [LOGO] Nama Sekolah    [Mode][Menu] )│ (Header pil melayang 64px, top 12px, pt-safe)
 ├────────────────────────────────────────┤
-│ HERO                                   │
+│ HERO (foto latar + lapisan navy)       │
 │   ● Pendaftaran Gelombang 1 dibuka     │ (Hanya bila ada gelombang aktif)
 │   Judul serif dari CMS                 │
 │   Subjudul dari CMS                    │
-│   [ Daftar PMB Sekarang ]              │ (h-14, w-full, rounded-full)
-│   [ Lihat Program Sekolah ]            │ (h-14, w-full, outline)
-│   ┌──────────────────────────────────┐ │
-│   │ Foto hero 4:3   [Stat 2]         │ │ (2 stat CMS pertama menempel di foto,
-│   │ [Stat 1]                         │ │  diam, tanpa animasi di HP)
-│   └──────────────────────────────────┘ │
+│   [ Daftar PMB Sekarang ]              │ (h-14, w-full, rounded-full, amber)
+│   [ Lihat Program Sekolah ]            │ (h-14, w-full, outline putih)
+│   [Stat 1] [Stat 2]                    │ (Grid 2 kolom dari CMS)
+│   [Stat 3] [Stat 4]                    │
 ├────────────────────────────────────────┤
 │ PROGRAM & KEGIATAN (Slider Geser)      │
 │   [Kartu 310x440] [Kartu mengintip ->  │ (Embla, touch-swipe, panah 48px)
@@ -366,14 +364,14 @@ Format token dirancang 100% kompatibel dengan **Tailwind CSS v4** (`@theme inlin
   - `rounded-xl`: 12px (feature card, dialog modal)
   - `rounded-2xl`: 16px (hero banner container, sambutan pimpinan)
   - `rounded-3xl`: 24px (kartu sambutan, visi, misi, ekstrakurikuler, banner penutup PMB)
-  - `rounded-[28px]`: kartu foto penuh (slider program, bento fasilitas, bingkai foto hero)
+  - `rounded-[28px]`: kartu foto penuh (slider program, bento fasilitas)
   - `rounded-full`: 9999px (header pil, tombol CTA beranda, pill badge, switch tema, floating helpdesk)
 - **Elevation & Shadows:**
   - `shadow-sm`: `0 1px 2px 0 rgba(0, 0, 0, 0.05)` — Card statis, button default
   - `shadow-md`: `0 4px 6px -1px rgba(15, 23, 42, 0.08), 0 2px 4px -2px rgba(15, 23, 42, 0.04)` — Hover state card jurusan
   - `shadow-lg`: `0 10px 15px -3px rgba(15, 23, 42, 0.1), 0 4px 6px -4px rgba(15, 23, 42, 0.05)` — Floating action WhatsApp, sticky header
   - `shadow-xl`: `0 20px 25px -5px rgba(0, 35, 111, 0.15)` — Hero CTA button, dialog modal popup
-  - Kartu foto: `0 10px 30px -10px rgba(0,35,111,0.25)`, saat disorot `0 24px 48px -12px rgba(0,35,111,0.35)`; bingkai foto hero `0 24px 48px -12px rgba(0,35,111,0.28)`. Bayangan bernada navy, bukan hitam, supaya menyatu dengan palet.
+  - Kartu foto: `0 10px 30px -10px rgba(0,35,111,0.25)`, saat disorot `0 24px 48px -12px rgba(0,35,111,0.35)`. Bayangan bernada navy, bukan hitam, supaya menyatu dengan palet.
 
 ---
 
@@ -466,7 +464,7 @@ Format token dirancang 100% kompatibel dengan **Tailwind CSS v4** (`@theme inlin
 
 ### 6.1 SCR-01: Beranda (Desktop Grid 1280px)
 
-Tata letak per section beranda ada di **bagian 12. Blueprint Beranda**. Ringkasnya, dari atas: header pil melayang → hero dua kolom (7/5) → slider program & kegiatan → sambutan + visi-misi → bento fasilitas → jurusan & ekstrakurikuler → PMB (gelombang, alur bergaris, banner navy) → FAQ → footer.
+Tata letak per section beranda ada di **bagian 12. Blueprint Beranda**. Ringkasnya, dari atas: header pil melayang → hero berlatar foto → slider program & kegiatan → sambutan + visi-misi → bento fasilitas → jurusan & ekstrakurikuler → PMB (gelombang, alur bergaris, banner navy) → FAQ → footer.
 
 ---
 
@@ -557,8 +555,8 @@ Mobile (< 640px) ───> Tablet (640px - 1023px) ───> Desktop (1024px -
    - *Desktop (>= 1024px):* Pil melayang `max-w-6xl` berisi logo, enam tautan, sakelar tema, dan tombol CTA PMB. Nomor telepon tidak di header karena tidak muat; ada di footer, menu HP, dan tombol WhatsApp.
    - *Tablet / Mobile (< 1024px):* Menu terlipat ke dalam tombol burger yang memicu slide-over drawer (`Sheet` Radix UI).
 2. **Hero Section:**
-   - *Desktop:* Grid 12 kolom: teks 7 kolom, foto 5 kolom (4:5) dengan dua kartu stat menjulur keluar bingkai.
-   - *Tablet / HP:* Satu kolom, foto 4:3 di bawah tombol, kartu stat di dalam bingkai foto.
+   - *Desktop:* Foto memenuhi latar dengan lapisan navy yang memudar ke kanan; teks di kiri (`max-w-3xl`), stat grid 4 kolom di bawah tombol.
+   - *Tablet / HP:* Lapisan navy lebih rata (teks memenuhi lebar layar), stat grid 2 kolom.
 3. **Bento Fasilitas:**
    - *Desktop:* 4 kolom, fasilitas pertama 2x2, kedua 2x1, sisanya 1x1.
    - *Tablet:* 2 kolom, dua fasilitas pertama selebar penuh. *HP:* 1 kolom.
@@ -605,7 +603,7 @@ Seluruh dokumen di atas tetap menjadi dasar untuk SEMUA perangkat. Desktop menda
 
 ### 11.1 Syarat Aktif
 Efek hanya hidup bila keempat syarat ini terpenuhi, diperiksa skrip kecil di `<head>` sebelum halaman tergambar (`gerbang-efek.ts`) lalu dipantau ulang saat jendela berubah (`EfekDesktop.tsx`):
-- layar minimal **1024px**,
+- layar minimal **900px** (diturunkan dari 1024px pada 2026-10-16 supaya laptop dengan skala tampilan Windows 125–150% tetap mendapat efek),
 - **mouse** (`hover: hover` dan `pointer: fine`),
 - pengguna **tidak** memilih "kurangi gerakan" (`prefers-reduced-motion`),
 - **tidak** dalam mode hemat data (`Save-Data`).
@@ -616,13 +614,13 @@ Bila lolos, `<html data-efek="desktop">` dipasang dan modul JS efek dimuat lewat
 1. **Hero berlapis:** foto/latar bergeser berlawanan arah mouse, isi searah, lalu isi menyusut dan memudar saat hero digulir keluar.
 2. **Judul muncul per kata** (`KataMuncul`): judul layar pertama sekali saat dibuka, judul bagian mengikuti guliran.
 3. **Kartu miring 3D** mengikuti kursor (maksimal 6 derajat) dengan cahaya sorot di dalam kartu.
-4. **Kartu statistik hero mengapung** (`.mengapung`): naik-turun 10px dalam 6 detik, kartu kedua berlawanan fase. Efek pilar disematkan dihapus bersama section pilar (2026-10-16).
+4. ~~Pilar disematkan~~: dihapus bersama section pilar (2026-10-16).
 5. **Transisi antarhalaman** (View Transitions API): header diam, judul halaman melayang ke posisi barunya. Browser tanpa API ini pindah halaman biasa.
 6. **Fokus kartu sebaris:** kartu yang disorot sedikit membesar, sisanya meredup.
 
 ### 11.3 Batasan
 - **Tanpa WebGL/3D** (Spline, Three.js). Foto sekolah asli lebih meyakinkan dan tidak memanaskan laptop tua.
-- Larangan teks berputar, partikel acak, dan animasi yang berulang tanpa henti tetap berlaku di desktop. Satu-satunya pengecualian adalah kartu statistik hero yang mengapung (keputusan pemilik produk, 2026-10-16), dan itu pun hanya di balik gerbang `data-efek`.
+- Larangan teks berputar, partikel acak, dan animasi yang berulang tanpa henti tetap berlaku di desktop.
 - Efek berbasis guliran memakai *scroll-driven animations* CSS; browser tanpa dukungan menampilkan konten utuh tanpa efek, tidak pernah tersembunyi.
 
 ---
@@ -643,7 +641,7 @@ Diturunkan dari blueprint desain beranda baru yang disetujui pemilik produk, dis
 | # | Section | Komponen | Sumber data | Catatan |
 | :--- | :--- | :--- | :--- | :--- |
 | 01 | Header pil melayang | `SiteHeader` | profil sekolah | Satu-satunya permukaan kaca (`backdrop-blur-md`). |
-| 02 | Hero dua kolom | `HeroSection` | `landing.hero_*`, `landing.stat_items`, gelombang aktif | Titik hijau hanya bila gelombang benar-benar dibuka. Dua stat pertama menjadi kartu di sudut foto; tanpa foto, kolom kanan hilang. |
+| 02 | Hero berlatar foto | `HeroSection` | `landing.hero_*`, `landing.stat_items`, gelombang aktif | Foto di latar dengan lapisan navy tetap (`#00153f`), tanpa foto navy polos. Titik amber hanya bila gelombang benar-benar dibuka. Blueprint meminta hero dua kolom dengan kartu melayang; pemilik produk memilih foto latar (2026-10-16). |
 | 03 | Program & Kegiatan | `KegiatanSlider` | `landing.program_title/subtitle`, `landing.program_items` (`title`, `subtitle`, `category`, `desc`, `tags`, `foto`) | Embla `dragFree`, `align: start`; kartu 310/350 × 440px; lencana kategori kiri atas; maksimal 2 tagar; "Lihat Detail" membuka dialog berisi foto, deskripsi, semua tagar, dan tautan galeri. Titik posisi hanya penanda, bukan tombol. |
 | 04 | Sambutan + Visi-Misi | `SambutanVisiSection` | `landing.sambutan_*`, `profil.visi`, `profil.misi` | Isi sambutan dilipat di `<details>` bila ada kutipan. Misi dipecah per baris (`pecahButir`), bernomor 01, 02, … dalam grid 2 kolom. |
 | 05 | Fasilitas bento | `FacilitiesSection` | `landing.fasilitas_items` | Urutan CMS menentukan ukuran: pertama terbesar. Kartu dengan deskripsi/spesifikasi membuka dialog. |

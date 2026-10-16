@@ -265,7 +265,7 @@ body {
 /*
  * ── Efek desktop ─────────────────────────────────────────────────────────
  * Semua aturan di bawah hanya berlaku pada `html[data-efek="desktop"]`, yang
- * dipasang skrip gerbang di `<head>` (lihat `gerbang-efek.ts`): layar >= 1024px,
+ * dipasang skrip gerbang di `<head>` (lihat `gerbang-efek.ts`): layar >= 900px,
  * mouse, tidak memilih "kurangi gerakan", tidak hemat data. HP tidak pernah
  * mendapat atribut itu, jadi tampilannya tetap seperti versi ringan.
  */
@@ -364,23 +364,6 @@ html[data-efek="desktop"] .kartu-tengah:has(> [data-miring]:hover)
 }
 html[data-efek="desktop"] .kartu-tengah > [data-miring]:hover > :last-child {
   scale: 1.02;
-}
-
-/* 4. Kartu statistik hero mengapung pelan supaya terbaca sebagai lapisan di
-      atas foto, bukan bagian foto. Hanya desktop: gerbang `data-efek` sudah
-      menyaring "kurangi gerakan" dan hemat data. Memakai `translate` supaya
-      tidak bentrok dengan `transform` animasi keluar hero. */
-@keyframes mengapung {
-  50% {
-    translate: 0 -10px;
-  }
-}
-html[data-efek="desktop"] .mengapung {
-  animation: mengapung 6s ease-in-out infinite;
-}
-/* Kartu kedua berlawanan fase, supaya keduanya tidak naik-turun serempak. */
-html[data-efek="desktop"] .mengapung + .mengapung {
-  animation-delay: -3s;
 }
 
 /* 5. Transisi antarhalaman: header tetap diam, judul halaman melayang ke

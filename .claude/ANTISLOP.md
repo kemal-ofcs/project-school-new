@@ -1,20 +1,19 @@
 # ANTISLOP.md — hasil antislop
 
-- Waktu: 2026-10-16 06:13 WIB
-- Commit: 48edf85 (+ 7 berkas berubah, belum commit)
+- Waktu: 2026-10-16 15:28:09 WIB
+- Commit: 87bb4ec (+ 5 berkas berubah, belum commit)
 - Berkas disunting: 0
 
 ## Disunting
-- Tidak ada — teks antarmuka CMS, rendering halaman program, dan komentar kode sudah bersih, natural, dan bebas slop.
+*(tidak ada berkas yang perlu disunting)*
 
 ## Dilewati
-- `web-desktop/src/lib/constants/landing-cms-fields.ts` — konfigurasi CMS dan teks label ringkas, informatif, tanpa em dash atau buzzwords
-- `web-public/src/app/program/page.tsx` — layout responsif, komentar arsitektur halaman jelas, teks UI bersih
-- `web-public/src/lib/services/landing-collections.ts` — helper koleksi program singkat dan tepat sasaran
-- `mobile/src/lib/constants/landing-cms-fields.ts` — salinan mobile turunan (identik dengan web-desktop)
-- `web-desktop/src/lib/constants/landing-cms-fields.test.ts` — berkas pengujian unit
-- `mobile/src/lib/constants/landing-cms-fields.test.ts` — berkas pengujian unit dan salinan mobile
-- `web-public/src/lib/services/landing-collections.test.ts` — berkas pengujian unit
+- `.claude/HASIL.md`, `.claude/check.log` — berkas log dan metadata pemeriksaan agent
+- `DESIGN.md` — dokumen blueprint desain, bukan implementasi kode/UI
+- `web-public/src/app/globals.css` — komentar bersih menjelaskan ambang batas resolusi gerbang efek
+- `web-public/src/components/visual/gerbang-efek.ts` — dokumentasi fungsional syarat evaluasi media query
+- `web-public/src/components/visual/PmbCountdown.tsx` — teks UI singkat dan catatan kontras latar navy
+- `web-public/src/components/landing/HeroSection.tsx` — teks UI kontekstual, tombol spesifik, komentar memuat alasan arsitektur
 
 ## Perlu tindakan
-
+*(tidak ada)*
