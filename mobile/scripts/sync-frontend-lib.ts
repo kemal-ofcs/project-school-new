@@ -114,6 +114,10 @@ const filesToCopy = [
   // `lib/validations` yang tersinkron; dialog yang berbeda antar build akan
   // menampilkan pratinjau yang tidak sama dengan pesan yang benar terkirim.
   "components/notifikasi-wa/WaTemplateDialog.tsx",
+  // Pemilih personil halaman Operasional: cari, pilih banyak, pilih sekelas.
+  // Hanya bergantung pada gateway tersinkron.
+  "components/operational/PilihPersonil.tsx",
+  "components/operational/aturanPilihPersonil.ts",
 ];
 
 for (const file of filesToCopy) {

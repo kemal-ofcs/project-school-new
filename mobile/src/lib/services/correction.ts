@@ -84,7 +84,7 @@ export async function prosesKoreksiAdmin(input: KoreksiInput) {
   if (empRes.rows.length === 0) {
     return {
       sukses: false,
-      pesan: `Gagal: Karyawan dengan ID '${input.id_karyawan}' tidak ditemukan.`,
+      pesan: `Gagal: Personil dengan ID '${input.id_karyawan}' tidak ditemukan.`,
     };
   }
 
@@ -104,7 +104,7 @@ export async function prosesKoreksiAdmin(input: KoreksiInput) {
   if (backup && String(backup.id_karyawan_asal) === idUnik) {
     return {
       sukses: false,
-      pesan: `Gagal: Karyawan '${nama}' sedang digantikan oleh karyawan lain pada tanggal ${date}. (ID Backup: ${backup.id_backup})`,
+      pesan: `Gagal: Personil '${nama}' sedang digantikan oleh personil lain pada tanggal ${date}. (ID Backup: ${backup.id_backup})`,
     };
   }
 

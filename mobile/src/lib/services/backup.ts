@@ -34,7 +34,7 @@ export async function buatPenugasanBackup(input: PenugasanBackupInput) {
   if (asalRes.rows.length === 0) {
     return {
       sukses: false,
-      pesan: `Gagal: Karyawan asal '${input.id_karyawan_asal}' tidak ditemukan atau non-aktif.`,
+      pesan: `Gagal: Personil asal '${input.id_karyawan_asal}' tidak ditemukan atau non-aktif.`,
     };
   }
 
@@ -46,7 +46,7 @@ export async function buatPenugasanBackup(input: PenugasanBackupInput) {
   if (penggantiRes.rows.length === 0) {
     return {
       sukses: false,
-      pesan: `Gagal: Karyawan pengganti '${input.id_karyawan_pengganti}' tidak ditemukan atau non-aktif.`,
+      pesan: `Gagal: Personil pengganti '${input.id_karyawan_pengganti}' tidak ditemukan atau non-aktif.`,
     };
   }
 
@@ -57,7 +57,7 @@ export async function buatPenugasanBackup(input: PenugasanBackupInput) {
     return {
       sukses: false,
       pesan:
-        "Gagal: Karyawan asal dan karyawan pengganti tidak boleh orang yang sama.",
+        "Gagal: Personil asal dan personil pengganti tidak boleh orang yang sama.",
     };
   }
 

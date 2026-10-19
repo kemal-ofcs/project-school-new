@@ -572,7 +572,7 @@ pub fn create_correction(
         )
         .optional()
         .map_err(|_| CommandError::internal())?
-        .ok_or_else(|| CommandError::new("OPERATIONAL_NOT_FOUND", "Karyawan tidak ditemukan."))?;
+        .ok_or_else(|| CommandError::new("OPERATIONAL_NOT_FOUND", "Personil tidak ditemukan."))?;
     let (employee_id, name, division, normal_shift) = employee;
 
     let backup: Option<(String, String, String, i64)> = transaction
@@ -587,7 +587,7 @@ pub fn create_correction(
     if backup.as_ref().is_some_and(|b| b.1 == employee_id) {
         return Err(CommandError::new(
             "OPERATIONAL_CONFLICT",
-            "Koreksi ditolak: Karyawan sedang digantikan oleh karyawan lain.",
+            "Koreksi ditolak: Personil sedang digantikan oleh personil lain.",
         ));
     }
 
@@ -1325,14 +1325,14 @@ pub fn create_backup(
         transaction.query_row(
             "SELECT id_unik, nama, divisi, id_shift FROM master_data WHERE (id_unik = ? OR kode_karyawan = ?) AND status_aktif = 'Aktif' LIMIT 1;",
             params![key, key], |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?)),
-        ).optional().map_err(|_| CommandError::internal())?.ok_or_else(|| CommandError::new("OPERATIONAL_NOT_FOUND", "Karyawan tidak ditemukan atau nonaktif."))
+        ).optional().map_err(|_| CommandError::internal())?.ok_or_else(|| CommandError::new("OPERATIONAL_NOT_FOUND", "Personil tidak ditemukan atau nonaktif."))
     };
     let original = employee(original_key)?;
     let replacement = employee(replacement_key)?;
     if original.0 == replacement.0 {
         return Err(CommandError::new(
             "OPERATIONAL_VALIDATION_FAILED",
-            "Karyawan asal dan pengganti tidak boleh sama.",
+            "Personil asal dan pengganti tidak boleh sama.",
         ));
     }
     let now: String = transaction
@@ -1541,7 +1541,7 @@ pub fn import_offline(
                 )
                 .optional()
                 .map_err(|_| CommandError::internal())?
-                .ok_or_else(|| CommandError::new("OPERATIONAL_NOT_FOUND", "Karyawan tidak ditemukan atau nonaktif."))?;
+                .ok_or_else(|| CommandError::new("OPERATIONAL_NOT_FOUND", "Personil tidak ditemukan atau nonaktif."))?;
             let (id, default_name, default_division, normal_shift) = employee;
             let name = if text(row, "nama").is_empty() {
                 default_name

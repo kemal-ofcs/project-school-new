@@ -109,7 +109,7 @@ async function processRow(
   });
   const employee = employeeResult.rows[0];
   if (!employee || String(employee.status_aktif) !== "Aktif")
-    return fail("Karyawan tidak ditemukan atau nonaktif.");
+    return fail("Personil tidak ditemukan atau nonaktif.");
   const id = String(employee.id_unik);
   const name = row.nama?.trim() || String(employee.nama);
   const division = row.divisi?.trim() || String(employee.divisi);
