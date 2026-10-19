@@ -3,8 +3,22 @@
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { MobileAppShell } from "@/components/MobileAppShell";
+import {
+  jalankanBerurutan,
+  ringkasHasil,
+} from "@/components/operational/aturanPilihPersonil";
 import { PersonnelPhotoField } from "@/components/PersonnelPhotoField";
+import {
+  alihkanSatu,
+  alihkanSemuaTampil,
+  type KolomMassal,
+  terapkanKolomMassal,
+} from "@/components/personnel/aturanUbahMassal";
 import { PersonnelAvatar } from "@/components/personnel/PersonnelAvatar";
+import {
+  type TerapkanMassal,
+  UbahMassal,
+} from "@/components/personnel/UbahMassal";
 import { FeedbackBanner } from "@/components/ui/FeedbackBanner";
 import { Icon } from "@/components/ui/Icon";
 import { Modal } from "@/components/ui/Modal";
@@ -41,6 +55,7 @@ import { useHydrated } from "@/lib/hooks/useHydrated";
 import { useStatusFotoPersonil } from "@/lib/hooks/useStatusFotoPersonil";
 import { normalizeOperatorPhone } from "@/lib/operators/contact";
 import {
+  draftSiswaDariBaris,
   opsiFilterUnit,
   STATUS_SISWA,
   shiftLabel,
@@ -99,6 +114,7 @@ export default function SiswaMobilePage() {
   const [filterRombel, setFilterRombel] = useState("");
   const [filterStatus, setFilterStatus] = useState("");
   const [filterUnit, setFilterUnit] = useState("");
+  const [terpilih, setTerpilih] = useState<string[]>([]);
 
   const [detail, setDetail] = useState<Record<string, unknown> | null>(null);
   const [qrPng, setQrPng] = useState<string | null>(null);
@@ -237,25 +253,104 @@ export default function SiswaMobilePage() {
   }, []);
 
   const handleEdit = useCallback((item: Record<string, unknown>) => {
-    setForm({
-      id_siswa: String(item.id_siswa ?? ""),
-      kode_karyawan: item.kode_karyawan ? String(item.kode_karyawan) : "",
-      nama_lengkap: String(item.nama_lengkap ?? ""),
-      nis: String(item.nis ?? ""),
-      nisn: String(item.nisn ?? ""),
-      jenis_kelamin: item.jenis_kelamin === "P" ? "P" : "L",
-      id_rombel: String(item.id_rombel ?? ""),
-      nama_wali: String(item.nama_wali ?? ""),
-      no_whatsapp_wali: String(item.no_whatsapp_wali ?? ""),
-      alamat: String(item.alamat ?? ""),
-      angkatan: Number(item.angkatan ?? new Date().getFullYear()),
-      status: String(item.status ?? "Aktif"),
-      id_shift: item.id_shift ? Number(item.id_shift) : undefined,
-      unit: String(item.unit ?? ""),
-    });
+    setForm(draftSiswaDariBaris(item));
     setIsEditing(true);
     setFormOpen(true);
   }, []);
+
+  const kolomMassal = useMemo<KolomMassal[]>(
+    () => [
+      {
+        key: "id_rombel",
+        label: "Kelas / Rombel",
+        opsi: rombel.map((r) => ({
+          value: String(r.id_rombel),
+          label: String(r.nama_rombel),
+        })),
+      },
+      {
+        key: "status",
+        label: "Status",
+        opsi: STATUS_SISWA.map((status) => ({ value: status, label: status })),
+      },
+      {
+        key: "unit",
+        label: "Unit",
+        opsi: unitList.map((u) => ({
+          value: String(u.nama_unit),
+          label: String(u.nama_unit),
+        })),
+      },
+      ...(shifts.length > 0
+        ? [
+            {
+              key: "id_shift",
+              label: "Shift",
+              jenis: "angka" as const,
+              opsi: shifts.map((shift) => ({
+                value: String(shift.id_shift),
+                label: shiftLabel(shift),
+              })),
+            },
+          ]
+        : []),
+      { key: "angkatan", label: "Angkatan", jenis: "angka" },
+    ],
+    [rombel, unitList, shifts],
+  );
+
+  const namaSiswa = (id: string) =>
+    String(
+      siswa.find((item) => String(item.id_siswa) === id)?.nama_lengkap || id,
+    );
+
+  const handleUbahMassal: TerapkanMassal = async (kolom, nilai, onProgres) => {
+    if (!canManage || isSubmittingRef.current) return;
+    isSubmittingRef.current = true;
+    setBulkWorking(true);
+    setErrorMsg(null);
+    setSuccessMsg(null);
+    try {
+      const hasil = await jalankanBerurutan(
+        terpilih,
+        async (id) => {
+          const item = siswa.find((row) => String(row.id_siswa) === id);
+          if (!item) return { sukses: false, pesan: "tidak ada di daftar" };
+          await simpanSiswa(
+            {
+              ...terapkanKolomMassal(draftSiswaDariBaris(item), kolom, nilai),
+              is_edit: true,
+            },
+            { tundaSinkronisasi: true },
+          );
+          return { sukses: true, pesan: "" };
+        },
+        onProgres,
+      );
+      let catatanSinkron = "";
+      if (hasil.berhasil.length > 0) {
+        try {
+          await syncNow();
+        } catch (err) {
+          catatanSinkron = ` Data tersimpan; sinkronisasi otomatis akan dicoba (${
+            err instanceof Error ? err.message : "gagal menghubungi database"
+          }).`;
+        }
+      }
+      const ringkasan = `Ubah ${kolom.label}: ${ringkasHasil(hasil, namaSiswa)}${catatanSinkron}`;
+      if (hasil.gagal.length > 0) setErrorMsg(ringkasan);
+      else setSuccessMsg(ringkasan);
+      triggerHaptic(hasil.gagal.length > 0 ? "error" : "success");
+      // Yang gagal tetap terpilih supaya bisa langsung dicoba lagi.
+      setTerpilih(hasil.gagal.map((item) => item.id));
+      await loadData();
+    } catch (err) {
+      setErrorMsg(err instanceof Error ? err.message : "Ubah massal gagal.");
+    } finally {
+      isSubmittingRef.current = false;
+      setBulkWorking(false);
+    }
+  };
 
   const handleSubmit = useCallback(async () => {
     if (!canManage || isSubmittingRef.current) return;
@@ -628,6 +723,35 @@ export default function SiswaMobilePage() {
         </select>
       </div>
 
+      {canManage ? (
+        <div className="mb-3">
+          <UbahMassal
+            id="massal-siswa"
+            terpilih={terpilih}
+            namaDari={namaSiswa}
+            satuan="peserta didik"
+            kolom={kolomMassal}
+            onTerapkan={handleUbahMassal}
+            onKosongkan={() => setTerpilih([])}
+            sibuk={bulkWorking}
+          />
+        </div>
+      ) : null}
+
+      {canManage && !loading && filtered.length > 0 ? (
+        <label className="mb-3 flex min-h-11 items-center gap-3 rounded-xl border border-white/10 bg-slate-900/60 px-3.5 text-xs font-semibold text-slate-300">
+          <input
+            type="checkbox"
+            className="size-4 accent-sky-400"
+            checked={idTampil.every((id) => terpilih.includes(id))}
+            onChange={() =>
+              setTerpilih((prev) => alihkanSemuaTampil(prev, idTampil))
+            }
+          />
+          Pilih semua yang tampil ({filtered.length}) untuk diubah sekaligus
+        </label>
+      ) : null}
+
       {loading ? (
         <div className="flex flex-col gap-3">
           {[1, 2, 3].map((i) => (
@@ -657,6 +781,17 @@ export default function SiswaMobilePage() {
                 className="rounded-2xl border border-white/10 bg-slate-900/60 p-3.5"
               >
                 <div className="flex items-start gap-3">
+                  {canManage ? (
+                    <input
+                      type="checkbox"
+                      aria-label={`Pilih ${String(item.nama_lengkap)}`}
+                      className="mt-3 size-5 shrink-0 accent-sky-400"
+                      checked={terpilih.includes(id)}
+                      onChange={() =>
+                        setTerpilih((prev) => alihkanSatu(prev, id))
+                      }
+                    />
+                  ) : null}
                   <PersonnelAvatar
                     idUnik={id}
                     nama={String(item.nama_lengkap ?? "")}

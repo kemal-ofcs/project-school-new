@@ -118,6 +118,9 @@ const filesToCopy = [
   // Hanya bergantung pada gateway tersinkron.
   "components/operational/PilihPersonil.tsx",
   "components/operational/aturanPilihPersonil.ts",
+  // Bilah "Ubah massal" halaman Karyawan, Guru, dan Siswa.
+  "components/personnel/UbahMassal.tsx",
+  "components/personnel/aturanUbahMassal.ts",
 ];
 
 for (const file of filesToCopy) {

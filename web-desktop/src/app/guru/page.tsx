@@ -4,8 +4,22 @@ import Image from "next/image";
 import { redirect } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AppShell } from "@/components/AppShell";
+import {
+  jalankanBerurutan,
+  ringkasHasil,
+} from "@/components/operational/aturanPilihPersonil";
 import { PersonnelPhotoField } from "@/components/PersonnelPhotoField";
+import {
+  alihkanSatu,
+  alihkanSemuaTampil,
+  type KolomMassal,
+  terapkanKolomMassal,
+} from "@/components/personnel/aturanUbahMassal";
 import { PersonnelAvatar } from "@/components/personnel/PersonnelAvatar";
+import {
+  type TerapkanMassal,
+  UbahMassal,
+} from "@/components/personnel/UbahMassal";
 import { FeedbackBanner } from "@/components/ui/FeedbackBanner";
 import { Icon } from "@/components/ui/Icon";
 import { Modal } from "@/components/ui/Modal";
@@ -33,7 +47,9 @@ import {
 import { useConfirmDialog } from "@/lib/hooks/useConfirmDialog";
 import { useStatusFotoPersonil } from "@/lib/hooks/useStatusFotoPersonil";
 import {
+  draftGuruDariBaris,
   opsiFilterUnit,
+  STATUS_KEPEGAWAIAN_GURU,
   shiftLabel,
   TANPA_UNIT,
 } from "@/lib/validations/personnel";
@@ -53,6 +69,7 @@ export default function GuruPage() {
   const [filterStatus, setFilterStatus] = useState("");
   const [filterKepegawaian, setFilterKepegawaian] = useState("");
   const [filterUnit, setFilterUnit] = useState("");
+  const [terpilih, setTerpilih] = useState<string[]>([]);
 
   const [feedback, setFeedback] = useState<{
     tone: "success" | "error" | "warning";
@@ -201,26 +218,104 @@ export default function GuruPage() {
 
   const handleOpenEdit = (item: Record<string, unknown>) => {
     setIsEditing(true);
-    setFormData({
-      id_guru: String(item.id_guru),
-      nama: String(item.nama),
-      kode_karyawan: item.kode_karyawan ? String(item.kode_karyawan) : "",
-      nip: item.nip ? String(item.nip) : "",
-      nuptk: item.nuptk ? String(item.nuptk) : "",
-      gelar: item.gelar ? String(item.gelar) : "",
-      spesialisasi_mapel: item.spesialisasi_mapel
-        ? String(item.spesialisasi_mapel)
-        : "",
-      status_kepegawaian: item.status_kepegawaian
-        ? String(item.status_kepegawaian)
-        : "Honorer",
-      no_hp: item.no_hp ? String(item.no_hp) : "",
-      lp: item.lp ? String(item.lp) : "L",
-      id_shift: Number(item.id_shift || 1),
-      status_aktif: item.status_aktif ? String(item.status_aktif) : "Aktif",
-      unit: item.unit ? String(item.unit) : "",
-    });
+    setFormData(draftGuruDariBaris(item));
     setShowModal(true);
+  };
+
+  const kolomMassal = useMemo<KolomMassal[]>(
+    () => [
+      {
+        key: "status_aktif",
+        label: "Status aktif",
+        opsi: [
+          { value: "Aktif", label: "Aktif" },
+          { value: "Nonaktif", label: "Nonaktif" },
+        ],
+      },
+      {
+        key: "status_kepegawaian",
+        label: "Status kepegawaian",
+        opsi: STATUS_KEPEGAWAIAN_GURU.map((status) => ({
+          value: status,
+          label: status,
+        })),
+      },
+      {
+        key: "unit",
+        label: "Unit",
+        opsi: unitList.map((u) => ({
+          value: String(u.nama_unit),
+          label: String(u.nama_unit),
+        })),
+      },
+      ...(shiftList.length > 0
+        ? [
+            {
+              key: "id_shift",
+              label: "Shift",
+              jenis: "angka" as const,
+              opsi: shiftList.map((shift) => ({
+                value: String(shift.id_shift),
+                label: shiftLabel(shift),
+              })),
+            },
+          ]
+        : []),
+    ],
+    [unitList, shiftList],
+  );
+
+  const namaGuru = (id: string) =>
+    String(guruList.find((item) => String(item.id_guru) === id)?.nama || id);
+
+  const handleUbahMassal: TerapkanMassal = async (kolom, nilai, onProgres) => {
+    if (!canManage || isSubmittingRef.current) return;
+    isSubmittingRef.current = true;
+    setBulkWorking(true);
+    setFeedback(null);
+    try {
+      const hasil = await jalankanBerurutan(
+        terpilih,
+        async (id) => {
+          const item = guruList.find((row) => String(row.id_guru) === id);
+          if (!item) return { sukses: false, pesan: "tidak ada di daftar" };
+          await simpanGuru(
+            {
+              ...terapkanKolomMassal(draftGuruDariBaris(item), kolom, nilai),
+              is_edit: true,
+            },
+            { tundaSinkronisasi: true },
+          );
+          return { sukses: true, pesan: "" };
+        },
+        onProgres,
+      );
+      let catatanSinkron = "";
+      if (hasil.berhasil.length > 0) {
+        try {
+          await syncNow();
+        } catch (err) {
+          catatanSinkron = ` Data sudah tersimpan di perangkat ini; sinkronisasi akan dicoba otomatis (${
+            err instanceof Error ? err.message : "gagal menghubungi database"
+          }).`;
+        }
+      }
+      setFeedback({
+        tone: hasil.gagal.length > 0 || catatanSinkron ? "warning" : "success",
+        message: `Ubah ${kolom.label}: ${ringkasHasil(hasil, namaGuru)}${catatanSinkron}`,
+      });
+      // Yang gagal tetap terpilih supaya bisa langsung dicoba lagi.
+      setTerpilih(hasil.gagal.map((item) => item.id));
+      await loadData();
+    } catch (err) {
+      setFeedback({
+        tone: "error",
+        message: err instanceof Error ? err.message : "Ubah massal gagal.",
+      });
+    } finally {
+      isSubmittingRef.current = false;
+      setBulkWorking(false);
+    }
   };
 
   const handleDelete = async (id: string) => {
@@ -580,12 +675,51 @@ export default function GuruPage() {
           </div>
         </div>
 
+        {canManage ? (
+          <p className="text-xs text-slate-400">
+            Centang beberapa guru untuk mengubah satu kolom sekaligus. Untuk
+            mengubah banyak kolom, pakai Export Excel, ubah di Excel, lalu
+            Import Excel: baris dengan id_guru yang sudah ada akan diperbarui.
+          </p>
+        ) : null}
+
+        {canManage ? (
+          <UbahMassal
+            id="massal-guru"
+            terpilih={terpilih}
+            namaDari={namaGuru}
+            satuan="guru"
+            kolom={kolomMassal}
+            onTerapkan={handleUbahMassal}
+            onKosongkan={() => setTerpilih([])}
+            sibuk={bulkWorking}
+          />
+        ) : null}
+
         {/* Directory Table */}
         <div className="overflow-hidden rounded-2xl border border-white/10 bg-slate-900/60 shadow-xl backdrop-blur-xl">
           <div className="overflow-x-auto">
             <table className="w-full text-left text-sm text-slate-200">
               <thead className="border-b border-white/10 bg-white/[0.03] text-xs uppercase tracking-wider text-slate-400">
                 <tr>
+                  {canManage ? (
+                    <th className="w-12 px-4 py-4">
+                      <input
+                        type="checkbox"
+                        aria-label="Pilih semua guru yang tampil"
+                        className="size-4 accent-sky-400"
+                        checked={
+                          idGuruTampil.length > 0 &&
+                          idGuruTampil.every((id) => terpilih.includes(id))
+                        }
+                        onChange={() =>
+                          setTerpilih((prev) =>
+                            alihkanSemuaTampil(prev, idGuruTampil),
+                          )
+                        }
+                      />
+                    </th>
+                  ) : null}
                   <th className="px-6 py-4">Foto</th>
                   <th className="px-6 py-4">Guru / Tenaga Pengajar</th>
                   <th className="px-6 py-4">NIP / NUPTK</th>
@@ -600,7 +734,7 @@ export default function GuruPage() {
                 {loading ? (
                   <tr>
                     <td
-                      colSpan={8}
+                      colSpan={canManage ? 9 : 8}
                       className="px-6 py-8 text-center text-slate-400"
                     >
                       Memuat direktori guru...
@@ -609,7 +743,7 @@ export default function GuruPage() {
                 ) : filteredTeachers.length === 0 ? (
                   <tr>
                     <td
-                      colSpan={8}
+                      colSpan={canManage ? 9 : 8}
                       className="px-6 py-8 text-center text-slate-400"
                     >
                       Tidak ada data guru yang cocok dengan filter pencarian.
@@ -622,6 +756,19 @@ export default function GuruPage() {
                     const isAktif = String(item.status_aktif) === "Aktif";
                     return (
                       <tr key={id} className="transition hover:bg-white/[0.02]">
+                        {canManage ? (
+                          <td className="w-12 px-4 py-4">
+                            <input
+                              type="checkbox"
+                              aria-label={`Pilih ${String(item.nama)}`}
+                              className="size-4 accent-sky-400"
+                              checked={terpilih.includes(id)}
+                              onChange={() =>
+                                setTerpilih((prev) => alihkanSatu(prev, id))
+                              }
+                            />
+                          </td>
+                        ) : null}
                         <td className="px-6 py-4">
                           <PersonnelAvatar
                             idUnik={id}

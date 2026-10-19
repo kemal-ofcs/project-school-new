@@ -7,6 +7,20 @@ import { EmployeeCard } from "@/components/karyawan/EmployeeCard";
 import { EmployeeDetailModal } from "@/components/karyawan/EmployeeDetailModal";
 import { EmployeeFormModal } from "@/components/karyawan/EmployeeFormModal";
 import { MobileAppShell } from "@/components/MobileAppShell";
+import {
+  jalankanBerurutan,
+  ringkasHasil,
+} from "@/components/operational/aturanPilihPersonil";
+import {
+  alihkanSatu,
+  alihkanSemuaTampil,
+  type KolomMassal,
+  terapkanKolomMassal,
+} from "@/components/personnel/aturanUbahMassal";
+import {
+  type TerapkanMassal,
+  UbahMassal,
+} from "@/components/personnel/UbahMassal";
 import { FeedbackBanner } from "@/components/ui/FeedbackBanner";
 import { Icon } from "@/components/ui/Icon";
 import { canAccessArea, hasPermission } from "@/lib/auth/access";
@@ -17,13 +31,23 @@ import {
   getDaftarKaryawan,
   type KaryawanInput,
   toggleStatusKaryawan,
+  updateKaryawan,
 } from "@/lib/gateways/employee";
 import { getDaftarShift } from "@/lib/gateways/shift";
 import { subscribeSyncCompleted } from "@/lib/gateways/sync-status";
 import { useDebounce } from "@/lib/hooks/useDebounce";
 import { useHydrated } from "@/lib/hooks/useHydrated";
 import { useStatusFotoPersonil } from "@/lib/hooks/useStatusFotoPersonil";
-import { opsiFilterUnit, TANPA_UNIT } from "@/lib/validations/personnel";
+import {
+  draftKaryawanDariBaris,
+  opsiFilterUnit,
+  shiftLabel,
+  TANPA_UNIT,
+} from "@/lib/validations/personnel";
+import {
+  firstValidationMessage,
+  validateEmployeeDraft,
+} from "@/lib/validations/stabilization";
 
 type FilterStatus = "" | "Aktif" | "Nonaktif";
 type FilterBackup = "" | "BACKUP" | "NORMAL";
@@ -75,6 +99,8 @@ export default function KaryawanPage() {
 
   // ─── Busy Guard ─────────────────────────────────────────────────────────────
   const isSubmittingRef = useRef(false);
+  const [terpilih, setTerpilih] = useState<string[]>([]);
+  const [bulkEditing, setBulkEditing] = useState(false);
 
   // ─── Auth Guard ─────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -217,23 +243,7 @@ export default function KaryawanPage() {
   const handleEditRequest = useCallback(
     (emp: Record<string, unknown>) => {
       if (!canManage) return;
-      const initData: KaryawanInput = {
-        id_unik: String(emp.id_unik ?? ""),
-        kode_karyawan: String(emp.kode_karyawan ?? ""),
-        nama: String(emp.nama ?? ""),
-        divisi: String(emp.divisi ?? "Operational"),
-        jabatan_status: String(emp.jabatan_status ?? "Staff"),
-        no_hp: String(emp.no_hp ?? ""),
-        lp: (emp.lp as "L" | "P") ?? "L",
-        id_shift: Number(emp.id_shift ?? 1),
-        status_aktif: (emp.status_aktif as "Aktif" | "Nonaktif") ?? "Aktif",
-        tanggal_daftar: String(emp.tanggal_daftar ?? ""),
-        catatan: String(emp.catatan ?? ""),
-        jenis_personil: String(emp.jenis_personil ?? "Pegawai"),
-        tanggal_mulai_aktif: String(emp.tanggal_mulai_aktif ?? ""),
-        tanggal_selesai_aktif: String(emp.tanggal_selesai_aktif ?? ""),
-        unit: String(emp.unit ?? ""),
-      };
+      const initData: KaryawanInput = draftKaryawanDariBaris(emp);
       setFormMode("edit");
       setFormInitialData(initData);
       setDetailOpen(false);
@@ -241,6 +251,95 @@ export default function KaryawanPage() {
     },
     [canManage],
   );
+
+  // ─── Ubah massal ───────────────────────────────────────────────────────────
+  const kolomMassal = useMemo<KolomMassal[]>(
+    () => [
+      { key: "divisi", label: "Divisi", jenis: "teks" },
+      { key: "jabatan_status", label: "Jabatan", jenis: "teks" },
+      {
+        key: "unit",
+        label: "Unit",
+        opsi: units.map((u) => ({
+          value: String(u.nama_unit),
+          label: String(u.nama_unit),
+        })),
+      },
+      {
+        key: "id_shift",
+        label: "Shift",
+        jenis: "angka",
+        opsi: shifts.map((shift) => ({
+          value: String(shift.id_shift),
+          label: shiftLabel(shift),
+        })),
+      },
+      {
+        key: "status_aktif",
+        label: "Status aktif",
+        opsi: [
+          { value: "Aktif", label: "Aktif" },
+          { value: "Nonaktif", label: "Nonaktif" },
+        ],
+      },
+      { key: "tanggal_mulai_aktif", label: "Mulai aktif", jenis: "tanggal" },
+      {
+        key: "tanggal_selesai_aktif",
+        label: "Selesai aktif",
+        jenis: "tanggal",
+      },
+    ],
+    [units, shifts],
+  );
+
+  const namaKaryawan = (id: string) =>
+    String(employees.find((emp) => String(emp.id_unik) === id)?.nama || id);
+
+  const handleUbahMassal: TerapkanMassal = async (kolom, nilai, onProgres) => {
+    if (!canManage || isSubmittingRef.current) return;
+    isSubmittingRef.current = true;
+    setBulkEditing(true);
+    setErrorMsg(null);
+    setSuccessMsg(null);
+    try {
+      const hasil = await jalankanBerurutan(
+        terpilih,
+        async (id) => {
+          const emp = employees.find((row) => String(row.id_unik) === id);
+          if (!emp) return { sukses: false, pesan: "tidak ada di daftar" };
+          if (kolom.key === "status_aktif") {
+            // Jalur yang sama dengan tombol Aktif/Nonaktif per karyawan.
+            await toggleStatusKaryawan(id, nilai as "Aktif" | "Nonaktif");
+            return { sukses: true, pesan: "" };
+          }
+          const draft = terapkanKolomMassal(
+            draftKaryawanDariBaris(emp),
+            kolom,
+            nilai,
+          );
+          const galat = validateEmployeeDraft(draft);
+          if (Object.keys(galat).length > 0) {
+            return { sukses: false, pesan: firstValidationMessage(galat) };
+          }
+          await updateKaryawan(id, draft);
+          return { sukses: true, pesan: "" };
+        },
+        onProgres,
+      );
+      const ringkasan = `Ubah ${kolom.label}: ${ringkasHasil(hasil, namaKaryawan)}`;
+      if (hasil.gagal.length > 0) setErrorMsg(ringkasan);
+      else setSuccessMsg(ringkasan);
+      triggerHaptic(hasil.gagal.length > 0 ? "error" : "success");
+      // Yang gagal tetap terpilih supaya bisa langsung dicoba lagi.
+      setTerpilih(hasil.gagal.map((item) => item.id));
+      await loadData(true);
+    } catch (err) {
+      setErrorMsg(err instanceof Error ? err.message : "Ubah massal gagal.");
+    } finally {
+      isSubmittingRef.current = false;
+      setBulkEditing(false);
+    }
+  };
 
   // ─── Handler: Tambah Karyawan Baru ─────────────────────────────────────────
   const handleAddNew = () => {
@@ -444,6 +543,36 @@ export default function KaryawanPage() {
         />
       ) : null}
 
+      {canManage ? (
+        <div className="mb-3">
+          <UbahMassal
+            id="massal-karyawan"
+            terpilih={terpilih}
+            namaDari={namaKaryawan}
+            satuan="karyawan"
+            kolom={kolomMassal}
+            onTerapkan={handleUbahMassal}
+            onKosongkan={() => setTerpilih([])}
+            sibuk={bulkEditing}
+          />
+        </div>
+      ) : null}
+
+      {canManage && !loading && filteredEmployees.length > 0 ? (
+        <label className="mb-3 flex min-h-11 items-center gap-3 rounded-xl border border-white/10 bg-slate-900/60 px-3.5 text-xs font-semibold text-slate-300">
+          <input
+            type="checkbox"
+            className="size-4 accent-sky-400"
+            checked={idKaryawanTampil.every((id) => terpilih.includes(id))}
+            onChange={() =>
+              setTerpilih((prev) => alihkanSemuaTampil(prev, idKaryawanTampil))
+            }
+          />
+          Pilih semua yang tampil ({filteredEmployees.length}) untuk diubah
+          sekaligus
+        </label>
+      ) : null}
+
       {/* ── Daftar Karyawan ── */}
       {loading ? (
         /* Skeleton Loading */
@@ -492,15 +621,32 @@ export default function KaryawanPage() {
       ) : (
         /* Daftar Kartu Karyawan */
         <div className="flex flex-col gap-3">
-          {filteredEmployees.map((emp) => (
-            <EmployeeCard
-              key={String(emp.id_unik ?? Math.random())}
-              employee={emp}
-              canManage={canManage}
-              onOpenDetail={handleOpenDetail}
-              punyaFoto={punyaFoto.has(String(emp.id_unik ?? ""))}
-            />
-          ))}
+          {filteredEmployees.map((emp) => {
+            const id = String(emp.id_unik ?? "");
+            const kartu = (
+              <EmployeeCard
+                key={id}
+                employee={emp}
+                canManage={canManage}
+                onOpenDetail={handleOpenDetail}
+                punyaFoto={punyaFoto.has(id)}
+              />
+            );
+            return canManage ? (
+              <div key={id} className="flex items-start gap-2">
+                <input
+                  type="checkbox"
+                  aria-label={`Pilih ${String(emp.nama || id)}`}
+                  className="mt-5 size-5 shrink-0 accent-sky-400"
+                  checked={terpilih.includes(id)}
+                  onChange={() => setTerpilih((prev) => alihkanSatu(prev, id))}
+                />
+                <div className="min-w-0 flex-1">{kartu}</div>
+              </div>
+            ) : (
+              <div key={id}>{kartu}</div>
+            );
+          })}
         </div>
       )}
 

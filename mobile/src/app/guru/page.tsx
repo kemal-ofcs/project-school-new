@@ -3,8 +3,22 @@
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { MobileAppShell } from "@/components/MobileAppShell";
+import {
+  jalankanBerurutan,
+  ringkasHasil,
+} from "@/components/operational/aturanPilihPersonil";
 import { PersonnelPhotoField } from "@/components/PersonnelPhotoField";
+import {
+  alihkanSatu,
+  alihkanSemuaTampil,
+  type KolomMassal,
+  terapkanKolomMassal,
+} from "@/components/personnel/aturanUbahMassal";
 import { PersonnelAvatar } from "@/components/personnel/PersonnelAvatar";
+import {
+  type TerapkanMassal,
+  UbahMassal,
+} from "@/components/personnel/UbahMassal";
 import { FeedbackBanner } from "@/components/ui/FeedbackBanner";
 import { Icon } from "@/components/ui/Icon";
 import { Modal } from "@/components/ui/Modal";
@@ -34,6 +48,7 @@ import { useDebounce } from "@/lib/hooks/useDebounce";
 import { useHydrated } from "@/lib/hooks/useHydrated";
 import { useStatusFotoPersonil } from "@/lib/hooks/useStatusFotoPersonil";
 import {
+  draftGuruDariBaris,
   opsiFilterUnit,
   STATUS_KEPEGAWAIAN_GURU as STATUS_KEPEGAWAIAN,
   shiftLabel,
@@ -86,6 +101,7 @@ export default function GuruMobilePage() {
   const debouncedSearch = useDebounce(search, 200);
   const [filterStatus, setFilterStatus] = useState("");
   const [filterUnit, setFilterUnit] = useState("");
+  const [terpilih, setTerpilih] = useState<string[]>([]);
 
   const [detail, setDetail] = useState<Record<string, unknown> | null>(null);
   const [qrPng, setQrPng] = useState<string | null>(null);
@@ -207,24 +223,104 @@ export default function GuruMobilePage() {
   }, []);
 
   const handleEdit = useCallback((item: Record<string, unknown>) => {
-    setForm({
-      id_guru: String(item.id_guru ?? ""),
-      nama: String(item.nama ?? ""),
-      kode_karyawan: String(item.kode_karyawan ?? ""),
-      nip: String(item.nip ?? ""),
-      nuptk: String(item.nuptk ?? ""),
-      gelar: String(item.gelar ?? ""),
-      spesialisasi_mapel: String(item.spesialisasi_mapel ?? ""),
-      status_kepegawaian: String(item.status_kepegawaian ?? "Honorer"),
-      no_hp: String(item.no_hp ?? ""),
-      lp: String(item.lp ?? "L"),
-      id_shift: Number(item.id_shift ?? 1),
-      status_aktif: String(item.status_aktif ?? "Aktif"),
-      unit: String(item.unit ?? ""),
-    });
+    setForm(draftGuruDariBaris(item));
     setIsEditing(true);
     setFormOpen(true);
   }, []);
+
+  const kolomMassal = useMemo<KolomMassal[]>(
+    () => [
+      {
+        key: "status_aktif",
+        label: "Status aktif",
+        opsi: [
+          { value: "Aktif", label: "Aktif" },
+          { value: "Nonaktif", label: "Nonaktif" },
+        ],
+      },
+      {
+        key: "status_kepegawaian",
+        label: "Status kepegawaian",
+        opsi: STATUS_KEPEGAWAIAN.map((status) => ({
+          value: status,
+          label: status,
+        })),
+      },
+      {
+        key: "unit",
+        label: "Unit",
+        opsi: unitList.map((u) => ({
+          value: String(u.nama_unit),
+          label: String(u.nama_unit),
+        })),
+      },
+      ...(shifts.length > 0
+        ? [
+            {
+              key: "id_shift",
+              label: "Shift",
+              jenis: "angka" as const,
+              opsi: shifts.map((shift) => ({
+                value: String(shift.id_shift),
+                label: shiftLabel(shift),
+              })),
+            },
+          ]
+        : []),
+    ],
+    [unitList, shifts],
+  );
+
+  const namaGuru = (id: string) =>
+    String(guru.find((item) => String(item.id_guru) === id)?.nama || id);
+
+  const handleUbahMassal: TerapkanMassal = async (kolom, nilai, onProgres) => {
+    if (!canManage || isSubmittingRef.current) return;
+    isSubmittingRef.current = true;
+    setBulkWorking(true);
+    setErrorMsg(null);
+    setSuccessMsg(null);
+    try {
+      const hasil = await jalankanBerurutan(
+        terpilih,
+        async (id) => {
+          const item = guru.find((row) => String(row.id_guru) === id);
+          if (!item) return { sukses: false, pesan: "tidak ada di daftar" };
+          await simpanGuru(
+            {
+              ...terapkanKolomMassal(draftGuruDariBaris(item), kolom, nilai),
+              is_edit: true,
+            },
+            { tundaSinkronisasi: true },
+          );
+          return { sukses: true, pesan: "" };
+        },
+        onProgres,
+      );
+      let catatanSinkron = "";
+      if (hasil.berhasil.length > 0) {
+        try {
+          await syncNow();
+        } catch (err) {
+          catatanSinkron = ` Data tersimpan; sinkronisasi otomatis akan dicoba (${
+            err instanceof Error ? err.message : "gagal menghubungi database"
+          }).`;
+        }
+      }
+      const ringkasan = `Ubah ${kolom.label}: ${ringkasHasil(hasil, namaGuru)}${catatanSinkron}`;
+      if (hasil.gagal.length > 0) setErrorMsg(ringkasan);
+      else setSuccessMsg(ringkasan);
+      triggerHaptic(hasil.gagal.length > 0 ? "error" : "success");
+      // Yang gagal tetap terpilih supaya bisa langsung dicoba lagi.
+      setTerpilih(hasil.gagal.map((item) => item.id));
+      await loadData();
+    } catch (err) {
+      setErrorMsg(err instanceof Error ? err.message : "Ubah massal gagal.");
+    } finally {
+      isSubmittingRef.current = false;
+      setBulkWorking(false);
+    }
+  };
 
   const handleSubmit = useCallback(async () => {
     if (!canManage || isSubmittingRef.current) return;
@@ -501,6 +597,35 @@ export default function GuruMobilePage() {
         </select>
       </div>
 
+      {canManage ? (
+        <div className="mb-3">
+          <UbahMassal
+            id="massal-guru"
+            terpilih={terpilih}
+            namaDari={namaGuru}
+            satuan="guru"
+            kolom={kolomMassal}
+            onTerapkan={handleUbahMassal}
+            onKosongkan={() => setTerpilih([])}
+            sibuk={bulkWorking}
+          />
+        </div>
+      ) : null}
+
+      {canManage && !loading && filtered.length > 0 ? (
+        <label className="mb-3 flex min-h-11 items-center gap-3 rounded-xl border border-white/10 bg-slate-900/60 px-3.5 text-xs font-semibold text-slate-300">
+          <input
+            type="checkbox"
+            className="size-4 accent-sky-400"
+            checked={idTampil.every((id) => terpilih.includes(id))}
+            onChange={() =>
+              setTerpilih((prev) => alihkanSemuaTampil(prev, idTampil))
+            }
+          />
+          Pilih semua yang tampil ({filtered.length}) untuk diubah sekaligus
+        </label>
+      ) : null}
+
       {loading ? (
         <div className="flex flex-col gap-3">
           {[1, 2, 3].map((i) => (
@@ -524,6 +649,17 @@ export default function GuruMobilePage() {
                 className="rounded-2xl border border-white/10 bg-slate-900/60 p-3.5"
               >
                 <div className="flex items-start gap-3">
+                  {canManage ? (
+                    <input
+                      type="checkbox"
+                      aria-label={`Pilih ${String(item.nama)}`}
+                      className="mt-3 size-5 shrink-0 accent-sky-400"
+                      checked={terpilih.includes(id)}
+                      onChange={() =>
+                        setTerpilih((prev) => alihkanSatu(prev, id))
+                      }
+                    />
+                  ) : null}
                   <PersonnelAvatar
                     idUnik={id}
                     nama={String(item.nama ?? "")}

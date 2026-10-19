@@ -74,6 +74,7 @@ export interface HasilBerurutan {
 export async function jalankanBerurutan(
   ids: string[],
   aksi: (id: string) => Promise<{ sukses: boolean; pesan: string }>,
+  onProgres?: (selesai: number) => void,
 ): Promise<HasilBerurutan> {
   const hasil: HasilBerurutan = { berhasil: [], gagal: [] };
   for (const id of ids) {
@@ -87,6 +88,7 @@ export async function jalankanBerurutan(
         pesan: error instanceof Error ? error.message : "Gagal diproses.",
       });
     }
+    onProgres?.(hasil.berhasil.length + hasil.gagal.length);
   }
   return hasil;
 }

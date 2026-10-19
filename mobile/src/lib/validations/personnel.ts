@@ -1,3 +1,7 @@
+import type { KaryawanInput } from "@/lib/gateways/employee";
+import type { SiswaInput } from "@/lib/gateways/student";
+import type { GuruInput } from "@/lib/gateways/teacher";
+
 /**
  * Nilai kanonik data guru & siswa yang dipakai formulir Web/Desktop, Mobile,
  * dan impor Excel sekaligus.
@@ -128,4 +132,76 @@ export function opsiFilterKelas(
       id,
       label: tingkat ? `Kelas ${tingkat} - ${nama}` : nama,
     }));
+}
+
+/**
+ * Draft edit dari satu baris daftar. Dipakai form Edit satu orang DAN Ubah
+ * massal: `simpanSiswa`, `simpanGuru`, dan `update_employee` (Rust) menimpa
+ * setiap kolom, jadi draft yang kehilangan satu field mengosongkannya.
+ */
+export function draftSiswaDariBaris(item: Record<string, unknown>): SiswaInput {
+  return {
+    id_siswa: String(item.id_siswa),
+    kode_karyawan: item.kode_karyawan ? String(item.kode_karyawan) : "",
+    nama_lengkap: String(item.nama_lengkap),
+    nis: item.nis ? String(item.nis) : "",
+    nisn: item.nisn ? String(item.nisn) : "",
+    jenis_kelamin: item.jenis_kelamin === "P" ? "P" : "L",
+    id_rombel: String(item.id_rombel),
+    nama_wali: item.nama_wali ? String(item.nama_wali) : "",
+    no_whatsapp_wali: item.no_whatsapp_wali
+      ? String(item.no_whatsapp_wali)
+      : "",
+    alamat: item.alamat ? String(item.alamat) : "",
+    angkatan: Number(item.angkatan || new Date().getFullYear()),
+    status: item.status ? String(item.status) : "Aktif",
+    id_shift: item.id_shift ? Number(item.id_shift) : undefined,
+    unit: item.unit ? String(item.unit) : "",
+  };
+}
+
+/** Lihat `draftSiswaDariBaris`. */
+export function draftGuruDariBaris(item: Record<string, unknown>): GuruInput {
+  return {
+    id_guru: String(item.id_guru),
+    nama: String(item.nama),
+    kode_karyawan: item.kode_karyawan ? String(item.kode_karyawan) : "",
+    nip: item.nip ? String(item.nip) : "",
+    nuptk: item.nuptk ? String(item.nuptk) : "",
+    gelar: item.gelar ? String(item.gelar) : "",
+    spesialisasi_mapel: item.spesialisasi_mapel
+      ? String(item.spesialisasi_mapel)
+      : "",
+    status_kepegawaian: item.status_kepegawaian
+      ? String(item.status_kepegawaian)
+      : "Honorer",
+    no_hp: item.no_hp ? String(item.no_hp) : "",
+    lp: item.lp ? String(item.lp) : "L",
+    id_shift: Number(item.id_shift || 1),
+    status_aktif: item.status_aktif ? String(item.status_aktif) : "Aktif",
+    unit: item.unit ? String(item.unit) : "",
+  };
+}
+
+/** Lihat `draftSiswaDariBaris`. */
+export function draftKaryawanDariBaris(
+  row: Record<string, unknown>,
+): KaryawanInput {
+  return {
+    id_unik: String(row.id_unik),
+    kode_karyawan: String(row.kode_karyawan || ""),
+    nama: String(row.nama || ""),
+    divisi: String(row.divisi || "Operational"),
+    jabatan_status: String(row.jabatan_status || "Staff"),
+    no_hp: String(row.no_hp || ""),
+    lp: (row.lp as "L" | "P") || "L",
+    id_shift: Number(row.id_shift || 1),
+    status_aktif: (row.status_aktif as "Aktif" | "Nonaktif") || "Aktif",
+    tanggal_daftar: String(row.tanggal_daftar || ""),
+    catatan: String(row.catatan || ""),
+    jenis_personil: String(row.jenis_personil || "Pegawai"),
+    tanggal_mulai_aktif: String(row.tanggal_mulai_aktif || ""),
+    tanggal_selesai_aktif: String(row.tanggal_selesai_aktif || ""),
+    unit: String(row.unit || ""),
+  };
 }

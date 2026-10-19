@@ -6,9 +6,23 @@ import { redirect } from "next/navigation";
 import type React from "react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AppShell } from "@/components/AppShell";
+import {
+  jalankanBerurutan,
+  ringkasHasil,
+} from "@/components/operational/aturanPilihPersonil";
 import { PersonnelPhotoField } from "@/components/PersonnelPhotoField";
+import {
+  alihkanSatu,
+  alihkanSemuaTampil,
+  type KolomMassal,
+  terapkanKolomMassal,
+} from "@/components/personnel/aturanUbahMassal";
 import { PersonnelAvatar } from "@/components/personnel/PersonnelAvatar";
 import { PersonnelPortrait } from "@/components/personnel/PersonnelPortrait";
+import {
+  type TerapkanMassal,
+  UbahMassal,
+} from "@/components/personnel/UbahMassal";
 import { FeedbackBanner } from "@/components/ui/FeedbackBanner";
 import { Icon } from "@/components/ui/Icon";
 import { Modal } from "@/components/ui/Modal";
@@ -40,7 +54,12 @@ import { subscribeSyncCompleted } from "@/lib/gateways/sync-status";
 import { useHydrated } from "@/lib/hooks/useHydrated";
 import { useStatusFotoPersonil } from "@/lib/hooks/useStatusFotoPersonil";
 import { formatDisplayDate } from "@/lib/utils/date-display";
-import { opsiFilterUnit, TANPA_UNIT } from "@/lib/validations/personnel";
+import {
+  draftKaryawanDariBaris,
+  opsiFilterUnit,
+  shiftLabel,
+  TANPA_UNIT,
+} from "@/lib/validations/personnel";
 import {
   createEmployeeIdentifiers,
   firstValidationMessage,
@@ -64,6 +83,7 @@ export default function KaryawanPage() {
   const [filterBackup, setFilterBackup] = useState<string>("");
   const [filterDivisi, setFilterDivisi] = useState<string>("");
   const [filterUnit, setFilterUnit] = useState<string>("");
+  const [terpilih, setTerpilih] = useState<string[]>([]);
   const importInputRef = useRef<HTMLInputElement>(null);
   const isSubmittingRef = useRef<boolean>(false);
 
@@ -233,26 +253,97 @@ export default function KaryawanPage() {
     setIsEditing(true);
     const id = String(row.id_unik);
     setEditId(id);
-    setFormData({
-      id_unik: id,
-      kode_karyawan: String(row.kode_karyawan || ""),
-      nama: String(row.nama || ""),
-      divisi: String(row.divisi || "Operational"),
-      jabatan_status: String(row.jabatan_status || "Staff"),
-      no_hp: String(row.no_hp || ""),
-      lp: (row.lp as "L" | "P") || "L",
-      id_shift: Number(row.id_shift || 1),
-      status_aktif: (row.status_aktif as "Aktif" | "Nonaktif") || "Aktif",
-      tanggal_daftar: String(row.tanggal_daftar || ""),
-      catatan: String(row.catatan || ""),
-      jenis_personil: String(row.jenis_personil || "Pegawai"),
-      tanggal_mulai_aktif: String(row.tanggal_mulai_aktif || ""),
-      tanggal_selesai_aktif: String(row.tanggal_selesai_aktif || ""),
-      unit: String(row.unit || ""),
-    });
+    setFormData(draftKaryawanDariBaris(row));
     setFormErrors({});
     setErrorMsg(null);
     setShowModal(true);
+  };
+
+  const kolomMassal = useMemo<KolomMassal[]>(
+    () => [
+      { key: "divisi", label: "Divisi", jenis: "teks" },
+      { key: "jabatan_status", label: "Jabatan", jenis: "teks" },
+      {
+        key: "unit",
+        label: "Unit",
+        opsi: unitList.map((u) => ({
+          value: String(u.nama_unit),
+          label: String(u.nama_unit),
+        })),
+      },
+      {
+        key: "id_shift",
+        label: "Shift",
+        jenis: "angka",
+        opsi: shiftList.map((shift) => ({
+          value: String(shift.id_shift),
+          label: shiftLabel(shift),
+        })),
+      },
+      {
+        key: "status_aktif",
+        label: "Status aktif",
+        opsi: [
+          { value: "Aktif", label: "Aktif" },
+          { value: "Nonaktif", label: "Nonaktif" },
+        ],
+      },
+      { key: "tanggal_mulai_aktif", label: "Mulai aktif", jenis: "tanggal" },
+      {
+        key: "tanggal_selesai_aktif",
+        label: "Selesai aktif",
+        jenis: "tanggal",
+      },
+    ],
+    [unitList, shiftList],
+  );
+
+  const namaKaryawan = (id: string) =>
+    String(karyawanList.find((row) => String(row.id_unik) === id)?.nama || id);
+
+  const handleUbahMassal: TerapkanMassal = async (kolom, nilai, onProgres) => {
+    if (!canManage || isSubmittingRef.current) return;
+    isSubmittingRef.current = true;
+    setBulkWorking(true);
+    setAlertMsg(null);
+    setErrorMsg(null);
+    try {
+      const hasil = await jalankanBerurutan(
+        terpilih,
+        async (id) => {
+          const row = karyawanList.find((item) => String(item.id_unik) === id);
+          if (!row) return { sukses: false, pesan: "tidak ada di daftar" };
+          if (kolom.key === "status_aktif") {
+            // Jalur yang sama dengan tombol Aktif/Nonaktif per baris.
+            await toggleStatusKaryawan(id, nilai as "Aktif" | "Nonaktif");
+            return { sukses: true, pesan: "" };
+          }
+          const draft = terapkanKolomMassal(
+            draftKaryawanDariBaris(row),
+            kolom,
+            nilai,
+          );
+          const galat = validateEmployeeDraft(draft);
+          if (Object.keys(galat).length > 0) {
+            return { sukses: false, pesan: firstValidationMessage(galat) };
+          }
+          await updateKaryawan(id, draft);
+          return { sukses: true, pesan: "" };
+        },
+        onProgres,
+      );
+      const ringkasan = `Ubah ${kolom.label}: ${ringkasHasil(hasil, namaKaryawan)}`;
+      if (hasil.gagal.length > 0) setErrorMsg(ringkasan);
+      else setAlertMsg(ringkasan);
+      // Yang gagal tetap terpilih supaya bisa langsung dicoba lagi.
+      setTerpilih(hasil.gagal.map((item) => item.id));
+      await loadData();
+    } catch (err: unknown) {
+      setErrorMsg(err instanceof Error ? err.message : "Ubah massal gagal.");
+    } finally {
+      isSubmittingRef.current = false;
+      setBulkWorking(false);
+    }
   };
 
   const handleFormSubmit = async (e: React.FormEvent) => {
@@ -618,6 +709,19 @@ export default function KaryawanPage() {
         </div>
       </form>
 
+      {canManage ? (
+        <UbahMassal
+          id="massal-karyawan"
+          terpilih={terpilih}
+          namaDari={namaKaryawan}
+          satuan="karyawan"
+          kolom={kolomMassal}
+          onTerapkan={handleUbahMassal}
+          onKosongkan={() => setTerpilih([])}
+          sibuk={bulkWorking}
+        />
+      ) : null}
+
       {/* Main Full 14-Column Table Container */}
       <div className="bg-slate-900 border border-slate-800 rounded-3xl overflow-hidden shadow-2xl">
         <div className="flex items-center justify-between border-b border-slate-800 px-5 py-3 text-xs font-mono text-slate-400 bg-slate-950/40">
@@ -645,6 +749,24 @@ export default function KaryawanPage() {
             <table className="w-full min-w-[1950px] text-left text-xs font-mono border-collapse">
               <thead className="bg-slate-950 text-slate-400 sticky top-0 z-20 border-b border-slate-800 shadow-md">
                 <tr>
+                  {canManage ? (
+                    <th className="w-10 p-3.5 bg-slate-950">
+                      <input
+                        type="checkbox"
+                        aria-label="Pilih semua karyawan yang tampil"
+                        className="size-4 accent-sky-400"
+                        checked={
+                          idKaryawanTampil.length > 0 &&
+                          idKaryawanTampil.every((id) => terpilih.includes(id))
+                        }
+                        onChange={() =>
+                          setTerpilih((prev) =>
+                            alihkanSemuaTampil(prev, idKaryawanTampil),
+                          )
+                        }
+                      />
+                    </th>
+                  ) : null}
                   <th className="p-3.5 bg-slate-950">Foto</th>
                   <th className="p-3.5 bg-slate-950">ID Unik / NIK</th>
                   <th className="p-3.5 bg-slate-950">Kode</th>
@@ -671,7 +793,7 @@ export default function KaryawanPage() {
                 {karyawanTampil.length === 0 ? (
                   <tr>
                     <td
-                      colSpan={18}
+                      colSpan={canManage ? 19 : 18}
                       className="p-12 text-center text-slate-500"
                     >
                       Tidak ada data karyawan yang sesuai dengan filter.
@@ -683,6 +805,21 @@ export default function KaryawanPage() {
                       key={String(row.id_unik)}
                       className="hover:bg-slate-800/40 transition"
                     >
+                      {canManage ? (
+                        <td className="w-10 p-3.5">
+                          <input
+                            type="checkbox"
+                            aria-label={`Pilih ${String(row.nama || row.id_unik)}`}
+                            className="size-4 accent-sky-400"
+                            checked={terpilih.includes(String(row.id_unik))}
+                            onChange={() =>
+                              setTerpilih((prev) =>
+                                alihkanSatu(prev, String(row.id_unik)),
+                              )
+                            }
+                          />
+                        </td>
+                      ) : null}
                       <td className="p-3.5">
                         <PersonnelAvatar
                           idUnik={String(row.id_unik)}
