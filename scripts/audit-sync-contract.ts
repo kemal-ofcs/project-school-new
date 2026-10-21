@@ -437,6 +437,35 @@ if (triples.length === 0) {
   notes.push(`${triples.length} tabel snapshot konsisten di kedua workspace.`);
 }
 
+// ── 2b. Gerbang versi skema ─────────────────────────────────────────────────
+// Klien menolak push bila MAX(version) `schema_migration` di cloud melebihi
+// `CLIENT_SCHEMA_VERSION`. Migrasi Web menulis `CURRENT_SCHEMA_VERSION` ke
+// sana, jadi angka yang tertinggal membuat Desktop/Mobile berhenti mengirim
+// data begitu Web bermigrasi. v53 dan v54 sempat lolos dengan klien di 52.
+{
+  const serverVersion = Number(
+    read("web-desktop/src/lib/db-schema.ts").match(
+      /CURRENT_SCHEMA_VERSION\s*=\s*(\d+)/,
+    )?.[1] ?? Number.NaN,
+  );
+  for (const [label, source] of [
+    ["Desktop", desktopSync],
+    ["Mobile", mobileSync],
+  ] as const) {
+    const clientVersion = Number(
+      source.match(/CLIENT_SCHEMA_VERSION:\s*i64\s*=\s*(\d+)/)?.[1] ??
+        Number.NaN,
+    );
+    if (Number.isNaN(serverVersion) || Number.isNaN(clientVersion)) {
+      fail(`Versi skema ${label} tidak terbaca dari db-schema.ts / sync.rs.`);
+    } else if (clientVersion !== serverVersion) {
+      fail(
+        `CLIENT_SCHEMA_VERSION ${label} = ${clientVersion}, CURRENT_SCHEMA_VERSION = ${serverVersion}.`,
+      );
+    }
+  }
+}
+
 // ── 3. Pendaftaran command Tauri ────────────────────────────────────────────
 // Sebuah command hidup di empat tempat: definisinya, `invoke_handler`,
 // `build.rs`, dan berkas capability. Melewatkan salah satunya membuat build

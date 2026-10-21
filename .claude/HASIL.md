@@ -1,7 +1,7 @@
 # HASIL.md — hasil `bun run check`
 
-- Waktu: 2026-10-21 18:45 WIB
-- Commit: e3af2a4 (+ 51 berkas berubah, belum commit)
+- Waktu: 2026-10-21 22:20 WIB
+- Commit: 2addaad (+ 52 berkas berubah, belum commit)
 - Perintah: `bun run check` (root)
 - Exit code: 0
 - Status: **LULUS**
@@ -26,11 +26,11 @@
 | web-desktop / lint (`biome check`) | lulus |
 | web-desktop / typecheck (`tsc`) | lulus |
 | web-desktop / test (`bun test`) | lulus |
-| web-desktop / test:rust (`cargo test`) | lulus (438 passed) |
+| web-desktop / test:rust (`cargo test`) | lulus (441 passed) |
 | mobile / lint (`biome check`) | lulus |
 | mobile / typecheck (`tsc`) | lulus |
 | mobile / test (`bun test`) | lulus |
-| mobile / test:rust (`cargo test`) | lulus (441 passed) |
+| mobile / test:rust (`cargo test`) | lulus (444 passed) |
 | web-public / lint (`biome check`) | lulus |
 | web-public / typecheck (`tsc`) | lulus |
 | web-public / test (`bun test`) | lulus |

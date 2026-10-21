@@ -235,6 +235,8 @@ export interface ObatKunjungan {
   nama_barang: string;
   jumlah: number;
   satuan: string;
+  /** Jumlah obat ini tersimpan ×100 (lihat `SKALA_DESIMAL`). */
+  desimal: boolean;
   tanggal: string;
   dibatalkan: boolean;
 }

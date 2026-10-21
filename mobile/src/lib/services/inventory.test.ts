@@ -275,7 +275,7 @@ describe("service inventaris Web", () => {
         tipe: "Habis Pakai",
         satuan: "rim",
       }),
-    ).rejects.toThrow("Satuan dan pengaturan kedaluwarsa");
+    ).rejects.toThrow("Satuan, desimal, dan pengaturan kedaluwarsa");
   });
 
   // Skenario kembar dengan `automatic_codes_are_sequential_per_prefix`.
@@ -867,5 +867,58 @@ describe("hapus permanen kolom tambahan Web", () => {
       "Kolom ini sudah dihapus.",
     );
     await saveColumn(client, { nama: "Merek", tipe: "Teks" });
+  });
+});
+
+// Kembar `decimal_items_lock_after_history_and_round_procurement_value` di inventory.rs.
+describe("barang desimal Web", () => {
+  test("terkunci sejak mutasi pertama, nilai pengadaan dibulatkan per baris", async () => {
+    const simpan = (extra: Record<string, unknown>) =>
+      saveItem(client, {
+        nama_barang: "Beras",
+        tipe: "Habis Pakai",
+        satuan: "kg",
+        tempat_utama: "Gudang",
+        desimal: true,
+        ...extra,
+      });
+    const { id_barang: idBarang } = await simpan({});
+    await simpan({ id_barang: idBarang, desimal: false });
+    await simpan({ id_barang: idBarang, desimal: true });
+
+    for (const [jumlah, harga] of [
+      [1025, 12_345],
+      [5, 10],
+    ] as const) {
+      await recordMutation(client, "admin", {
+        id_barang: idBarang,
+        jenis: "Masuk",
+        alasan: "Pengadaan",
+        jumlah,
+        tempat_tujuan: "Gudang",
+        harga_satuan: harga,
+      });
+    }
+    const hari = await client.execute(
+      "SELECT date('now', '+7 hours') AS hari;",
+    );
+    const rekap = await procurement(
+      client,
+      "2000-01-01",
+      String(hari.rows[0]?.hari),
+    );
+    expect(rekap.total_nilai).toBe(126_537);
+    expect(rekap.baris[0]?.desimal).toBe(true);
+
+    const barang = (await listInventory(client)).barang[0];
+    expect(barang?.stok_total).toBe(1030);
+    expect(barang?.desimal).toBe(true);
+    expect(barang?.punya_mutasi).toBe(true);
+    await expect(
+      simpan({ id_barang: idBarang, desimal: false }),
+    ).rejects.toThrow("Satuan, desimal, dan pengaturan kedaluwarsa");
+    await expect(simpan({ tipe: "Aset" })).rejects.toThrow(
+      "Jumlah desimal hanya untuk barang Habis Pakai.",
+    );
   });
 });

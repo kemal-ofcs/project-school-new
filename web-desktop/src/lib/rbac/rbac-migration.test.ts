@@ -161,6 +161,8 @@ describe("dynamic RBAC migration", () => {
       53,
       // v54 — hapus permanen kolom tambahan (`inventory_kolom.dihapus_pada`).
       54,
+      // v55 — jumlah desimal per barang (`inventory_barang.desimal`).
+      55,
     ]);
 
     const sessionColumns = await client.execute(

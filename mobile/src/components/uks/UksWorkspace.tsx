@@ -9,8 +9,10 @@ import {
   useState,
 } from "react";
 import {
+  angka,
   hariIniWib,
   INPUT,
+  isianJumlah,
   LABEL,
   pesanGalat,
   TOMBOL_BAHAYA,
@@ -34,6 +36,7 @@ import {
   type ObatKunjungan,
   simpanKunjunganUks,
 } from "@/lib/gateways/uks";
+import { jumlahDariKetikan } from "@/lib/validations/inventory";
 import { formatSejakSync } from "@/lib/validations/uks";
 
 /**
@@ -652,7 +655,8 @@ function Rincian({ kunjungan }: { kunjungan: KunjunganUks }) {
             <ul>
               {obat.map((item) => (
                 <li key={item.id_mutasi}>
-                  {item.nama_barang} {item.jumlah} {item.satuan}
+                  {item.nama_barang} {angka(item.jumlah, item.desimal)}{" "}
+                  {item.satuan}
                   {item.dibatalkan ? " (dibatalkan)" : ""}
                 </li>
               ))}
@@ -762,7 +766,7 @@ function BarisObat({
                     {p.tanggal_expired
                       ? ` · kedaluwarsa ${p.tanggal_expired}`
                       : ""}{" "}
-                    (sisa {p.saldo})
+                    (sisa {angka(p.saldo, barang?.desimal ?? false)})
                   </option>
                 ))}
               </select>
@@ -773,10 +777,7 @@ function BarisObat({
               </label>
               <input
                 id={`uks-obat-jumlah-${index}`}
-                type="number"
-                min={1}
-                step={1}
-                inputMode="numeric"
+                {...isianJumlah(barang?.desimal ?? false)}
                 value={item.jumlah}
                 onChange={(e) => ubah(item.kunci, { jumlah: e.target.value })}
                 className={INPUT}
@@ -838,7 +839,8 @@ function obatDariBaris(
         tempat: posisi?.tempat ?? "",
         kondisi: posisi?.kondisi ?? null,
         id_batch: posisi?.id_batch ?? null,
-        jumlah: Number(b.jumlah),
+        // Ketikan yang bukan angka menjadi 0 dan ditolak validasi obat.
+        jumlah: jumlahDariKetikan(b.jumlah, barang?.desimal ?? false) ?? 0,
       };
     });
 }

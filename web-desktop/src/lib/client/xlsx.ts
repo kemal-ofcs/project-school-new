@@ -238,6 +238,16 @@ function colLetterToIndex(colStr: string): number {
 }
 
 /**
+ * Sel bertipe Angka sungguhan: bisa dijumlah di Excel dan tampil mengikuti
+ * bahasa Excel pembacanya. Opt-in, karena nilai lain sengaja ditulis sebagai
+ * teks: NIK atau nomor HP yang kebetulan berupa angka akan kehilangan nol
+ * depannya bila menjadi sel Angka.
+ */
+export class AngkaExcel {
+  constructor(readonly nilai: number) {}
+}
+
+/**
  * Rakit berkas `.xlsx` satu sheet dari judul kolom dan baris nilai.
  *
  * Baris dikirim sebagai larik sejajar `headers`, bukan objek ber-kunci judul:
@@ -268,6 +278,10 @@ export function createXlsxBuffer(
     headers.forEach((_, colIdx) => {
       const cellRef = `${columnLetter(colIdx)}${rowNum}`;
       const rawVal = row[colIdx];
+      if (rawVal instanceof AngkaExcel && Number.isFinite(rawVal.nilai)) {
+        sheetXml += `<c r="${cellRef}"><v>${rawVal.nilai}</v></c>`;
+        return;
+      }
       const val = rawVal === null || rawVal === undefined ? "" : String(rawVal);
       sheetXml += `<c r="${cellRef}" t="inlineStr"><is><t>${escapeXml(val)}</t></is></c>`;
     });

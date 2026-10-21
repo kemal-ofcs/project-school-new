@@ -22,6 +22,8 @@ import {
   type BarangDraft,
   type BarangInventaris,
   barangDraftSchema,
+  jumlahDariKetikan,
+  jumlahDariSelAngka,
   KONDISI_BARANG,
   type KolomInventaris,
   type MutasiDraft,
@@ -48,6 +50,7 @@ export const INVENTARIS_WORKBOOK_HEADERS = [
   "Tipe",
   "Satuan",
   "Bisa kedaluwarsa",
+  "Desimal",
   "Stok minimum",
   "Tempat utama",
   "Catatan",
@@ -64,6 +67,8 @@ export interface BarisImporBarang {
   baru: boolean;
   /** Barang lama yang barisnya membawa saldo: diabaikan, dilaporkan. */
   saldoDiabaikan: boolean;
+  /** Barang bermutasi yang kolom Desimal-nya berbeda: dipertahankan, dilaporkan. */
+  desimalDiabaikan: boolean;
 }
 
 function pilihan<T extends string>(
@@ -73,14 +78,30 @@ function pilihan<T extends string>(
   return daftar.find((item) => asciiLower(item) === asciiLower(raw));
 }
 
-function bilangan(raw: string, kolom: string, baris: number): number {
+/**
+ * Jumlah stok tersimpan (×100 untuk barang desimal). Ketikan berformat
+ * Indonesia: `10.000` dan `10.000,00` diterima; `10,22` hanya untuk barang
+ * desimal. Sel Angka Excel bertitik desimal dan tidak pernah bertitik ribuan.
+ */
+function bilangan(
+  raw: string,
+  kolom: string,
+  baris: number,
+  selAngka: boolean,
+  desimal: boolean,
+): number {
   if (!raw) return 0;
-  if (!/^\d+$/.test(raw)) {
-    throw new Error(
-      `Baris ${baris}: ${kolom} '${raw}' harus bilangan bulat 0 atau lebih.`,
-    );
-  }
-  return Number(raw);
+  const nilai = selAngka
+    ? jumlahDariSelAngka(raw, desimal)
+    : jumlahDariKetikan(raw, desimal);
+  if (nilai !== null) return nilai;
+  throw new Error(
+    desimal
+      ? `Baris ${baris}: ${kolom} '${raw}' harus angka 0 atau lebih dengan paling banyak 2 angka di belakang koma, misalnya 2,5.`
+      : /^[\d.,]+$/.test(raw)
+        ? `Baris ${baris}: ${kolom} '${raw}' harus bilangan bulat. Untuk barang yang ditimbang atau diukur, isi kolom Desimal dengan Ya.`
+        : `Baris ${baris}: ${kolom} '${raw}' harus bilangan bulat 0 atau lebih.`,
+  );
 }
 
 function kunciJudul(judul: string): string {
@@ -121,7 +142,8 @@ export function parseInventarisRows(
 ): ImportRow<BarisImporBarang>[] {
   const judul = rows[0] ?? [];
   const val = workbookColumns(judul, ["nama barang"]);
-  const adaKolom = new Set(judul.map((h) => h.toLowerCase().trim()));
+  const judulKecil = judul.map((h) => h.toLowerCase().trim());
+  const adaKolom = new Set(judulKecil);
   const kolomDiFile: { kolom: KolomInventaris; indeks: number }[] = [];
   for (const item of kolom.filter((k) => k.is_aktif)) {
     const indeks = judul.findIndex(
@@ -155,6 +177,9 @@ export function parseInventarisRows(
   rows.slice(1).forEach((row, index) => {
     const baris = index + 2;
     if (row.every((cell) => !cell.trim())) return;
+    // `lastIndexOf`: judul ganda dibaca dari kolom terakhir, sama seperti `val`.
+    const selAngkaDi = (judulKolom: string) =>
+      Boolean(selAngka[index + 1]?.[judulKecil.lastIndexOf(judulKolom)]);
 
     const kode = teksIdentitas(val(row, "kode"), "Kode", baris);
     let lama: BarangInventaris | undefined;
@@ -194,6 +219,24 @@ export function parseInventarisRows(
         `Baris ${baris}: Bisa kedaluwarsa '${expiredMentah}' harus Ya atau Tidak.`,
       );
     }
+    const desimalMentah = kol(
+      "desimal",
+      lama ? (lama.desimal ? "Ya" : "Tidak") : "",
+    );
+    const desimalFile = asciiLower(desimalMentah);
+    if (desimalFile !== "" && desimalFile !== "ya" && desimalFile !== "tidak") {
+      throw new Error(
+        `Baris ${baris}: Desimal '${desimalMentah}' harus Ya atau Tidak.`,
+      );
+    }
+    // Mengubah desimal barang bermutasi akan mengubah arti setiap jumlah
+    // yang sudah tercatat (×100), jadi nilai lamanya dipertahankan.
+    const desimalDiabaikan = Boolean(
+      lama?.punya_mutasi && (desimalFile === "ya") !== lama.desimal,
+    );
+    const desimal = desimalDiabaikan
+      ? Boolean(lama?.desimal)
+      : desimalFile === "ya";
 
     const barang: BarangDraft = {
       id_barang: lama?.id_barang ?? null,
@@ -203,11 +246,16 @@ export function parseInventarisRows(
       tipe,
       satuan: kol("satuan", lama?.satuan),
       bisa_expired: expired === "ya",
-      stok_minimum: bilangan(
-        kol("stok minimum", lama ? String(lama.stok_minimum) : ""),
-        "Stok minimum",
-        baris,
-      ),
+      desimal,
+      stok_minimum: adaKolom.has("stok minimum")
+        ? bilangan(
+            val(row, "stok minimum"),
+            "Stok minimum",
+            baris,
+            selAngkaDi("stok minimum"),
+            desimal,
+          )
+        : (lama?.stok_minimum ?? 0),
       tempat_utama: kol("tempat utama", lama?.tempat_utama),
       catatan: kol("catatan", lama?.catatan),
       status_aktif: lama?.status_aktif ?? true,
@@ -238,7 +286,13 @@ export function parseInventarisRows(
     if (!cekAtribut.ok) throw new Error(`Baris ${baris}: ${cekAtribut.error}`);
     barang.atribut = cekAtribut.value;
 
-    const jumlah = bilangan(val(row, "saldo awal"), "Saldo awal", baris);
+    const jumlah = bilangan(
+      val(row, "saldo awal"),
+      "Saldo awal",
+      baris,
+      selAngkaDi("saldo awal"),
+      desimal,
+    );
     let saldo: MutasiDraft | null = null;
     if (jumlah > 0 && !lama) {
       const kondisiMentah = val(row, "kondisi");
@@ -281,6 +335,7 @@ export function parseInventarisRows(
         saldo,
         baru: !lama,
         saldoDiabaikan: jumlah > 0 && Boolean(lama),
+        desimalDiabaikan,
       },
     });
   });

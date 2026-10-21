@@ -774,7 +774,8 @@ pub fn visit_medicines(state: &DesktopState, id_kunjungan: &str) -> Result<Value
     let mut statement = connection
         .prepare(
             "SELECT m.id_mutasi, b.nama_barang, m.jumlah, b.satuan, m.tanggal,
-                    EXISTS(SELECT 1 FROM inventory_mutasi x WHERE x.id_mutasi = 'batal-' || m.id_mutasi) AS dibatalkan
+                    EXISTS(SELECT 1 FROM inventory_mutasi x WHERE x.id_mutasi = 'batal-' || m.id_mutasi) AS dibatalkan,
+                    b.desimal
              FROM inventory_mutasi m
              JOIN inventory_barang b ON b.id_barang = m.id_barang
              WHERE m.id_ref = ? AND m.alasan = 'Pemakaian'
@@ -791,6 +792,7 @@ pub fn visit_medicines(state: &DesktopState, id_kunjungan: &str) -> Result<Value
                 "satuan": row.get::<_, String>(3)?,
                 "tanggal": row.get::<_, String>(4)?,
                 "dibatalkan": row.get::<_, i64>(5)? == 1,
+                "desimal": row.get::<_, i64>(6)? == 1,
             }))
         })
         .map_err(|_| CommandError::internal())?

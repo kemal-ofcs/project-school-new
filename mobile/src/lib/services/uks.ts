@@ -312,7 +312,8 @@ export async function visitMedicines(
 ): Promise<{ obat: ObatKunjungan[] }> {
   const result = await client.execute({
     sql: `SELECT m.id_mutasi, b.nama_barang, m.jumlah, b.satuan, m.tanggal,
-                 EXISTS(SELECT 1 FROM inventory_mutasi x WHERE x.id_mutasi = 'batal-' || m.id_mutasi) AS dibatalkan
+                 EXISTS(SELECT 1 FROM inventory_mutasi x WHERE x.id_mutasi = 'batal-' || m.id_mutasi) AS dibatalkan,
+                 b.desimal
           FROM inventory_mutasi m
           JOIN inventory_barang b ON b.id_barang = m.id_barang
           WHERE m.id_ref = ? AND m.alasan = 'Pemakaian'
@@ -328,6 +329,7 @@ export async function visitMedicines(
       satuan: String(row.satuan),
       tanggal: String(row.tanggal),
       dibatalkan: Number(row.dibatalkan) === 1,
+      desimal: Number(row.desimal) === 1,
     })),
   };
 }

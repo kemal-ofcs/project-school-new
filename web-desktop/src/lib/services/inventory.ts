@@ -70,6 +70,15 @@ import {
 
 type Executor = Pick<Client | Transaction, "execute">;
 
+/**
+ * Nilai satu mutasi dalam rupiah. Harga satuan selalu per 1 satuan, jadi
+ * barang desimal dibagi 100 dan dibulatkan ke rupiah terdekat per baris.
+ * Cermin `NILAI_MUTASI_SQL` di `inventory.rs`.
+ */
+const NILAI_MUTASI_SQL = `CASE WHEN b.desimal = 1
+        THEN (m.jumlah * COALESCE(m.harga_satuan, 0) + 50) / 100
+        ELSE m.jumlah * COALESCE(m.harga_satuan, 0) END`;
+
 function newHexId(prefix: string): string {
   return `${prefix}${randomUUID().replaceAll("-", "")}`;
 }
@@ -362,9 +371,12 @@ export async function listInventory(client: Client): Promise<DaftarInventaris> {
 
   const barangResult = await client.execute(
     `SELECT id_barang, kode_barang, nama_barang, kategori, tipe, satuan, bisa_expired,
-            stok_minimum, tempat_utama, catatan, status_aktif, atribut
+            stok_minimum, tempat_utama, catatan, status_aktif, atribut, desimal,
+            EXISTS(SELECT 1 FROM inventory_mutasi m WHERE m.id_barang = inventory_barang.id_barang) AS punya_mutasi
      FROM inventory_barang
-     ORDER BY status_aktif DESC, nama_barang COLLATE NOCASE;`,
+     ORDER BY status_aktif DESC, nama_barang COLLATE NOCASE
+     -- batas: satu baris per barang; EXISTS hanya memeriksa ada tidaknya mutasi
+     ;`,
   );
   const barang: BarangInventaris[] = barangResult.rows.map((row) => {
     const posisi = posisiPerBarang.get(String(row.id_barang)) ?? [];
@@ -379,6 +391,8 @@ export async function listInventory(client: Client): Promise<DaftarInventaris> {
       tipe: String(row.tipe) as TipeBarang,
       satuan: String(row.satuan),
       bisa_expired: Number(row.bisa_expired) === 1,
+      desimal: Number(row.desimal) === 1,
+      punya_mutasi: Number(row.punya_mutasi) === 1,
       stok_minimum: Number(row.stok_minimum),
       tempat_utama: text(row.tempat_utama),
       catatan: text(row.catatan),
@@ -494,14 +508,16 @@ export async function saveItem(
     let idBarang = requestedId ?? newHexId("brg-");
     if (requestedId) {
       const existing = await tx.execute({
-        sql: "SELECT satuan, bisa_expired FROM inventory_barang WHERE id_barang = ?;",
+        sql: "SELECT satuan, bisa_expired, desimal FROM inventory_barang WHERE id_barang = ?;",
         args: [requestedId],
       });
       const row = existing.rows[0];
       if (!row) throw new Error("Barang tidak ditemukan.");
+      // Desimal mengubah arti setiap jumlah yang sudah tercatat (×100).
       const berubah =
         String(row.satuan) !== valid.satuan ||
-        (Number(row.bisa_expired) === 1) !== valid.bisa_expired;
+        (Number(row.bisa_expired) === 1) !== valid.bisa_expired ||
+        (Number(row.desimal) === 1) !== valid.desimal;
       if (berubah) {
         const history = await tx.execute({
           sql: "SELECT EXISTS(SELECT 1 FROM inventory_mutasi WHERE id_barang = ? LIMIT 1) AS ada;",
@@ -509,7 +525,7 @@ export async function saveItem(
         });
         if (Number(history.rows[0]?.ada) === 1) {
           throw new Error(
-            "Satuan dan pengaturan kedaluwarsa tidak bisa diubah setelah barang punya riwayat mutasi.",
+            "Satuan, desimal, dan pengaturan kedaluwarsa tidak bisa diubah setelah barang punya riwayat mutasi.",
           );
         }
       }
@@ -544,8 +560,9 @@ export async function saveItem(
     await tx.execute({
       sql: `INSERT INTO inventory_barang (
               id_barang, kode_barang, nama_barang, kategori, tipe, satuan, bisa_expired,
-              stok_minimum, tempat_utama, catatan, status_aktif, created_at, updated_at, atribut
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'), ?)
+              stok_minimum, tempat_utama, catatan, status_aktif, created_at, updated_at, atribut,
+              desimal
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'), ?, ?)
             ON CONFLICT(id_barang) DO UPDATE SET
               kode_barang = excluded.kode_barang,
               nama_barang = excluded.nama_barang,
@@ -558,7 +575,8 @@ export async function saveItem(
               catatan = excluded.catatan,
               status_aktif = excluded.status_aktif,
               updated_at = excluded.updated_at,
-              atribut = excluded.atribut;`,
+              atribut = excluded.atribut,
+              desimal = excluded.desimal;`,
       args: [
         idBarang,
         kode,
@@ -574,6 +592,7 @@ export async function saveItem(
         Object.keys(atribut.value).length > 0
           ? JSON.stringify(atribut.value)
           : null,
+        valid.desimal ? 1 : 0,
       ],
     });
     return { sukses: true as const, id_barang: idBarang, kode_barang: kode };
@@ -1158,7 +1177,7 @@ export async function listLoans(client: Client): Promise<DaftarPinjaman> {
                           AND NOT EXISTS (SELECT 1 FROM inventory_mutasi rb
                                           WHERE rb.id_mutasi = 'batal-' || r.id_mutasi)), 0) AS kembali,
               CAST(julianday(date('now', '+7 hours')) - julianday(p.tanggal) AS INTEGER) AS lama_hari,
-              p.created_at
+              p.created_at, b.desimal
        FROM inventory_mutasi p
        JOIN inventory_barang b ON b.id_barang = p.id_barang
        WHERE p.alasan = 'Peminjaman'
@@ -1173,6 +1192,7 @@ export async function listLoans(client: Client): Promise<DaftarPinjaman> {
     nama_barang: String(row.nama_barang),
     kode_barang: String(row.kode_barang),
     satuan: String(row.satuan),
+    desimal: Number(row.desimal) === 1,
     tipe: String(row.tipe) as TipeBarang,
     tanggal: String(row.tanggal),
     jumlah: Number(row.jumlah),
@@ -1347,7 +1367,8 @@ export async function documentInventaris(
   const result = await client.execute({
     sql: `SELECT m.id_mutasi, m.tanggal, m.alasan, m.jumlah, m.tempat_asal, m.kondisi_asal,
                  m.tempat_tujuan, m.kondisi_tujuan, bm.tanggal_expired, m.penerima_nama,
-                 m.keperluan, m.catatan, m.dicatat_oleh, b.nama_barang, b.kode_barang, b.satuan
+                 m.keperluan, m.catatan, m.dicatat_oleh, b.nama_barang, b.kode_barang, b.satuan,
+                 b.desimal
           FROM inventory_mutasi m
           JOIN inventory_barang b ON b.id_barang = m.id_barang
           LEFT JOIN inventory_mutasi bm ON bm.id_mutasi = m.id_batch
@@ -1382,6 +1403,7 @@ export async function documentInventaris(
       nama_barang: String(item.nama_barang),
       kode_barang: String(item.kode_barang),
       satuan: String(item.satuan),
+      desimal: Number(item.desimal) === 1,
     });
   }
   return {
@@ -1439,7 +1461,7 @@ export async function procurement(
   const result = await client.execute({
     sql: `SELECT m.tanggal, b.kode_barang, b.nama_barang, b.satuan, m.alasan, m.jumlah,
                  m.harga_satuan, COALESCE(m.sumber_dana, '') AS sumber_dana, m.nomor_dokumen,
-                 m.tempat_tujuan, m.jumlah * COALESCE(m.harga_satuan, 0) AS nilai
+                 m.tempat_tujuan, ${NILAI_MUTASI_SQL} AS nilai, b.desimal
           FROM inventory_mutasi m
           JOIN inventory_barang b ON b.id_barang = m.id_barang
           WHERE m.jenis = 'Masuk' AND m.alasan IN ('Pengadaan', 'Hibah', 'Saldo Awal')
@@ -1461,6 +1483,7 @@ export async function procurement(
     nomor_dokumen: text(row.nomor_dokumen),
     tempat_tujuan: text(row.tempat_tujuan),
     nilai: Number(row.nilai),
+    desimal: Number(row.desimal) === 1,
   }));
   const baris = semua.slice(0, MAKS_BARIS_PENGADAAN);
   const rekap = rekapSumberDana(

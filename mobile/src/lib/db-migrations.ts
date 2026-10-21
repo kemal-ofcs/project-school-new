@@ -65,6 +65,7 @@ const PAYROLL_RAPEL_MIGRATION_VERSION = 51;
 const PMB_PAYMENT_MIGRATION_VERSION = 52;
 const INVENTORY_COLUMN_MIGRATION_VERSION = 53;
 const INVENTORY_COLUMN_DELETE_MIGRATION_VERSION = 54;
+const INVENTORY_DECIMAL_MIGRATION_VERSION = 55;
 
 /**
  * v21 — aturan jam scan baru: Jam Kerja Normal = (Jam Pulang − Jam Masuk) −
@@ -646,6 +647,12 @@ export async function runDatabaseMigrations(client: Client) {
       "inventory_kolom",
       "dihapus_pada",
       "ALTER TABLE inventory_kolom ADD COLUMN dihapus_pada TEXT;",
+    ],
+    // Jumlah desimal per barang (v55): 1 = setiap jumlah disimpan ×100.
+    [
+      "inventory_barang",
+      "desimal",
+      "ALTER TABLE inventory_barang ADD COLUMN desimal INTEGER NOT NULL DEFAULT 0 CHECK (desimal IN (0, 1));",
     ],
   ] as const) {
     if (
@@ -1594,7 +1601,8 @@ export async function runDatabaseMigrations(client: Client) {
       status_aktif INTEGER NOT NULL DEFAULT 1 CHECK (status_aktif IN (0, 1)),
       created_at TEXT NOT NULL DEFAULT (datetime('now')),
       updated_at TEXT NOT NULL DEFAULT (datetime('now')),
-      atribut TEXT
+      atribut TEXT,
+      desimal INTEGER NOT NULL DEFAULT 0 CHECK (desimal IN (0, 1))
     );
   `);
   await client.execute(`
@@ -2171,6 +2179,12 @@ export async function runDatabaseMigrations(client: Client) {
     sql: `INSERT OR IGNORE INTO schema_migration (version, name, applied_at)
           VALUES (?, 'inventory-column-delete', ?);`,
     args: [INVENTORY_COLUMN_DELETE_MIGRATION_VERSION, now],
+  });
+  // v55 — jumlah desimal per barang (ALTER-nya ada di daftar kolom di atas).
+  await client.execute({
+    sql: `INSERT OR IGNORE INTO schema_migration (version, name, applied_at)
+          VALUES (?, 'inventory-decimal', ?);`,
+    args: [INVENTORY_DECIMAL_MIGRATION_VERSION, now],
   });
 
   await client.execute(

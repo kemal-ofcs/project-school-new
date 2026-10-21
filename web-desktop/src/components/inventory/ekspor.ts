@@ -1,11 +1,13 @@
 import type { DownloadResult } from "@/lib/client/download";
-import { readWorkbookTable, saveWorkbook } from "@/lib/client/xlsx";
+import { AngkaExcel, readWorkbookTable, saveWorkbook } from "@/lib/client/xlsx";
 import {
   type BarangInventaris,
   type DaftarInventaris,
   formatAngka,
+  formatJumlah,
   type KartuStok,
   type RekapPengadaan,
+  SKALA_DESIMAL,
 } from "@/lib/validations/inventory";
 import {
   type BarisImporBarang,
@@ -40,6 +42,11 @@ function isiKolomTambahan(
   );
 }
 
+/** Jumlah tersimpan sebagai sel Angka dalam satuan barangnya: 1025 → 10,25. */
+function jumlahExcel(nilai: number, desimal: boolean): AngkaExcel {
+  return new AngkaExcel(desimal ? nilai / SKALA_DESIMAL : nilai);
+}
+
 function judulKolomTambahan(data: DaftarInventaris): string[] {
   return data.kolom
     .filter((kolom) => kolom.is_aktif)
@@ -72,7 +79,7 @@ export function eksporRekapStok(
       Tempat: posisi.tempat,
       Kondisi: posisi.kondisi,
       Kedaluwarsa: posisi.tanggal_expired ?? "",
-      Saldo: posisi.saldo,
+      Saldo: jumlahExcel(posisi.saldo, barang.desimal),
     })),
   );
   return saveWorkbook({
@@ -97,7 +104,9 @@ export function unduhTemplateBarang(
     Tipe: barang.tipe,
     Satuan: barang.satuan,
     "Bisa kedaluwarsa": barang.bisa_expired ? "Ya" : "Tidak",
-    "Stok minimum": barang.stok_minimum,
+    Desimal: barang.desimal ? "Ya" : "Tidak",
+    // Teks berformat Indonesia, dibaca impor apa adanya: 1.000 atau 2,5.
+    "Stok minimum": formatJumlah(barang.stok_minimum, barang.desimal),
     "Tempat utama": barang.tempat_utama ?? "",
     Catatan: barang.catatan ?? "",
     ...isiKolomTambahan(data, barang),
@@ -158,7 +167,7 @@ export function eksporKartuStok(
     {
       Tanggal: `Sebelum ${dari}`,
       Alasan: "Saldo awal",
-      Saldo: kartu.saldo_awal,
+      Saldo: jumlahExcel(kartu.saldo_awal, barang.desimal),
     },
     ...kartu.baris.map((baris) => ({
       Tanggal: baris.tanggal,
@@ -168,9 +177,9 @@ export function eksporKartuStok(
       Ke: baris.tempat_tujuan ?? "",
       Penerima: baris.penerima_nama ?? "",
       Keperluan: baris.keperluan ?? "",
-      Masuk: baris.masuk || "",
-      Keluar: baris.keluar || "",
-      Saldo: baris.saldo,
+      Masuk: baris.masuk ? jumlahExcel(baris.masuk, barang.desimal) : "",
+      Keluar: baris.keluar ? jumlahExcel(baris.keluar, barang.desimal) : "",
+      Saldo: jumlahExcel(baris.saldo, barang.desimal),
       "Nomor dokumen": baris.nomor_dokumen ?? "",
       "Dicatat oleh": baris.dicatat_oleh,
       Status: baris.dibatalkan ? "Dibatalkan" : "",
@@ -209,10 +218,11 @@ export function eksporPengadaan(
     Kode: baris.kode_barang,
     "Nama barang": baris.nama_barang,
     Alasan: baris.alasan,
-    Jumlah: baris.jumlah,
+    Jumlah: jumlahExcel(baris.jumlah, baris.desimal),
     Satuan: baris.satuan,
-    "Harga satuan": baris.harga_satuan ?? "",
-    Nilai: baris.harga_satuan === null ? "" : baris.nilai,
+    "Harga satuan":
+      baris.harga_satuan === null ? "" : new AngkaExcel(baris.harga_satuan),
+    Nilai: baris.harga_satuan === null ? "" : new AngkaExcel(baris.nilai),
     "Nomor dokumen": baris.nomor_dokumen ?? "",
     "Disimpan di": baris.tempat_tujuan ?? "",
   }));
@@ -220,12 +230,15 @@ export function eksporPengadaan(
   for (const item of rekap.rekap) {
     rows.push({
       "Sumber dana": `Total ${item.sumber_dana}`,
-      Nilai: item.nilai,
+      Nilai: new AngkaExcel(item.nilai),
       "Nomor dokumen":
         item.tanpa_harga > 0 ? `${item.tanpa_harga} baris tanpa harga` : "",
     });
   }
-  rows.push({ "Sumber dana": "Total keseluruhan", Nilai: rekap.total_nilai });
+  rows.push({
+    "Sumber dana": "Total keseluruhan",
+    Nilai: new AngkaExcel(rekap.total_nilai),
+  });
   return saveWorkbook({
     headers,
     rows,

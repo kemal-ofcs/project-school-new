@@ -679,7 +679,8 @@ pub fn initialize(path: &Path) -> Result<(), String> {
         status_aktif INTEGER NOT NULL DEFAULT 1 CHECK (status_aktif IN (0, 1)),
         created_at TEXT NOT NULL DEFAULT (datetime('now')),
         updated_at TEXT NOT NULL DEFAULT (datetime('now')),
-        atribut TEXT
+        atribut TEXT,
+        desimal INTEGER NOT NULL DEFAULT 0 CHECK (desimal IN (0, 1))
       );
       -- Append-only. Pembatalan adalah baris kebalikan berid 'batal-' || id_ref.
       CREATE TABLE IF NOT EXISTS inventory_mutasi (
@@ -1823,6 +1824,13 @@ pub fn initialize(path: &Path) -> Result<(), String> {
         "inventory_kolom",
         "dihapus_pada",
         "ALTER TABLE inventory_kolom ADD COLUMN dihapus_pada TEXT;",
+    )?;
+    // Jumlah desimal per barang (v55): 1 = setiap jumlah disimpan ×100.
+    ensure_column(
+        &connection,
+        "inventory_barang",
+        "desimal",
+        "ALTER TABLE inventory_barang ADD COLUMN desimal INTEGER NOT NULL DEFAULT 0 CHECK (desimal IN (0, 1));",
     )?;
 
     // Shift tujuan sesi lanjutan. 0 = belum ditentukan, sehingga pemasangan

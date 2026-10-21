@@ -17,6 +17,8 @@ function barang(isi: Partial<BarangInventaris>): BarangInventaris {
     tipe: "Habis Pakai",
     satuan: "pcs",
     bisa_expired: false,
+    desimal: false,
+    punya_mutasi: true,
     stok_minimum: 5,
     tempat_utama: "Gudang",
     catatan: "Lama",
@@ -61,6 +63,128 @@ describe("parseInventarisRows", () => {
       tempat_tujuan: "Gudang",
       kondisi_tujuan: "Baik",
     });
+  });
+
+  test("saldo awal berformat Indonesia harus bulat; sel Angka bertitik desimal", () => {
+    const baru = (saldo: string, selAngka: boolean[][] = []) =>
+      parseInventarisRows(
+        sheet({
+          "Nama barang": "Beras",
+          Tipe: "Habis Pakai",
+          Satuan: "gram",
+          "Tempat utama": "Gudang",
+          "Saldo awal": saldo,
+          "Stok minimum": "1.000",
+        }),
+        [],
+        HARI_INI,
+        [],
+        selAngka,
+      )[0].draft;
+    expect(baru("10.000").saldo?.jumlah).toBe(10000);
+    expect(baru("10.000,00").saldo?.jumlah).toBe(10000);
+    expect(baru("1.000.000").saldo?.jumlah).toBe(1000000);
+    expect(baru("15,0").saldo?.jumlah).toBe(15);
+    expect(baru("10.000").barang.stok_minimum).toBe(1000);
+    expect(() => baru("10,22")).toThrow("isi kolom Desimal dengan Ya");
+    expect(() => baru("10.22")).toThrow("Saldo awal '10.22'");
+    expect(() => baru("1.0000")).toThrow("Saldo awal '1.0000'");
+    // Sel Angka Excel 10.5 berarti sepuluh setengah, bukan 105.
+    const kolomSaldo = INVENTARIS_WORKBOOK_HEADERS.indexOf("Saldo awal");
+    const sel = [
+      [],
+      Array.from({ length: kolomSaldo + 1 }, (_, i) => i === kolomSaldo),
+    ];
+    expect(() => baru("10.500", sel)).toThrow("Saldo awal '10.500'");
+    expect(baru("10500", sel).saldo?.jumlah).toBe(10500);
+  });
+
+  test("kolom Desimal: koma diterima, Aset ditolak, barang bermutasi dipertahankan", () => {
+    const [row] = parseInventarisRows(
+      sheet({
+        "Nama barang": "Beras",
+        Tipe: "Habis Pakai",
+        Satuan: "kg",
+        Desimal: "ya",
+        "Tempat utama": "Gudang",
+        "Stok minimum": "2,5",
+        "Saldo awal": "1.250,75",
+      }),
+      [],
+      HARI_INI,
+    );
+    expect(row.draft.barang.desimal).toBe(true);
+    expect(row.draft.barang.stok_minimum).toBe(250);
+    expect(row.draft.saldo?.jumlah).toBe(125075);
+    expect(() =>
+      parseInventarisRows(
+        sheet({
+          "Nama barang": "Laptop",
+          Tipe: "Aset",
+          Satuan: "unit",
+          Desimal: "Ya",
+        }),
+        [],
+        HARI_INI,
+      ),
+    ).toThrow("Baris 2: Jumlah desimal hanya untuk barang Habis Pakai.");
+    expect(() =>
+      parseInventarisRows(
+        sheet({
+          "Nama barang": "Beras",
+          Tipe: "Habis Pakai",
+          Satuan: "kg",
+          Desimal: "Kadang",
+        }),
+        [],
+        HARI_INI,
+      ),
+    ).toThrow("Desimal 'Kadang' harus Ya atau Tidak.");
+    expect(() =>
+      parseInventarisRows(
+        sheet({
+          "Nama barang": "Beras",
+          Tipe: "Habis Pakai",
+          Satuan: "kg",
+          Desimal: "Ya",
+          "Saldo awal": "1,255",
+        }),
+        [],
+        HARI_INI,
+      ),
+    ).toThrow("paling banyak 2 angka di belakang koma");
+
+    // Barang lama bermutasi: Desimal di file berbeda → nilai lama dipertahankan.
+    const [lama] = parseInventarisRows(
+      sheet({
+        Kode: "INV-0001",
+        "Nama barang": "Spidol",
+        Tipe: "Habis Pakai",
+        Satuan: "pcs",
+        Desimal: "Ya",
+        "Stok minimum": "7",
+      }),
+      [barang({})],
+      HARI_INI,
+    );
+    expect(lama.draft.desimalDiabaikan).toBe(true);
+    expect(lama.draft.barang.desimal).toBe(false);
+    expect(lama.draft.barang.stok_minimum).toBe(7);
+    // Belum bermutasi: boleh diubah.
+    const [bebas] = parseInventarisRows(
+      sheet({
+        Kode: "INV-0001",
+        "Nama barang": "Spidol",
+        Tipe: "Habis Pakai",
+        Satuan: "pcs",
+        Desimal: "Ya",
+        "Stok minimum": "7",
+      }),
+      [barang({ punya_mutasi: false })],
+      HARI_INI,
+    );
+    expect(bebas.draft.desimalDiabaikan).toBe(false);
+    expect(bebas.draft.barang.stok_minimum).toBe(700);
   });
 
   test("kode yang sudah ada mengubah barang itu dan tidak menambah stok", () => {

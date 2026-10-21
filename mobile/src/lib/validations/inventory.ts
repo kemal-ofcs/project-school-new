@@ -46,8 +46,18 @@ export const ALASAN_FORMULIR = [
   "Distribusi",
   "Perubahan Kondisi",
 ] as const;
-export const MAKS_JUMLAH = 1_000_000;
+export const MAKS_JUMLAH = 1_000_000_000;
 export const MAKS_HARGA_SATUAN = 1_000_000_000_000;
+/** Jumlah × harga satuan harus muat di INTEGER SQLite: lewat dari ini SQLite
+ * mengubahnya menjadi pecahan dan laporan pengadaan gagal dibaca. */
+export const MAKS_NILAI_MUTASI = 1_000_000_000_000_000_000;
+/**
+ * Barang `desimal` menyimpan setiap jumlahnya ×100: 10,25 kg = 1025. Kontrak
+ * TS ↔ Rust tetap bilangan bulat; hanya UI dan Excel yang mengonversi lewat
+ * `jumlahDariKetikan` dan `formatJumlah`; Rust hanya membaginya di
+ * `NILAI_MUTASI_SQL`.
+ */
+export const SKALA_DESIMAL = 100;
 export const MAKS_PANJANG_TEMPAT = 80;
 export const MAKS_BARIS_KARTU_STOK = 1000;
 export const MAKS_BARIS_OPNAME = 500;
@@ -303,6 +313,8 @@ export const barangDraftSchema = z
     tipe: z.string().default(""),
     satuan: z.string().default(""),
     bisa_expired: z.boolean().default(false),
+    /** Jumlah 2 angka di belakang koma, disimpan ×`SKALA_DESIMAL`. Hanya Habis Pakai. */
+    desimal: z.boolean().default(false),
     stok_minimum: z.number().int().default(0),
     tempat_utama: z.string().nullish(),
     catatan: z.string().nullish(),
@@ -322,6 +334,7 @@ export interface BarangValid {
   tipe: TipeBarang;
   satuan: string;
   bisa_expired: boolean;
+  desimal: boolean;
   stok_minimum: number;
   tempat_utama: string | null;
   catatan: string | null;
@@ -348,6 +361,13 @@ export function validateBarang(draft: BarangDraftParsed): Hasil<BarangValid> {
   if (!(TIPE_BARANG as readonly string[]).includes(draft.tipe)) {
     return { ok: false, error: "Tipe barang tidak dikenal." };
   }
+  // Aset dilacak per unit berlabel, jadi jumlahnya selalu bulat.
+  if (draft.desimal && draft.tipe !== "Habis Pakai") {
+    return {
+      ok: false,
+      error: "Jumlah desimal hanya untuk barang Habis Pakai.",
+    };
+  }
   const satuan = draft.satuan.trim();
   if (!satuan) return { ok: false, error: "Satuan wajib diisi." };
   if (panjang(satuan) > 20) {
@@ -373,6 +393,7 @@ export function validateBarang(draft: BarangDraftParsed): Hasil<BarangValid> {
       tipe: draft.tipe as TipeBarang,
       satuan,
       bisa_expired: draft.bisa_expired,
+      desimal: draft.desimal,
       stok_minimum: draft.stok_minimum,
       tempat_utama,
       catatan,
@@ -495,7 +516,9 @@ function susunMutasi(
     throw new GalatValidasi("Alasan tidak berlaku untuk jenis mutasi ini.");
   }
   if (draft.jumlah < 1 || draft.jumlah > MAKS_JUMLAH) {
-    throw new GalatValidasi("Jumlah harus bilangan bulat 1 sampai 1.000.000.");
+    throw new GalatValidasi(
+      "Jumlah harus bilangan bulat 1 sampai 1.000.000.000.",
+    );
   }
   const tanggal = bersih(draft.tanggal) ?? hariIni;
   if (!isValidDate(tanggal)) throw new GalatValidasi("Tanggal tidak valid.");
@@ -624,6 +647,11 @@ function susunMutasi(
       if (draft.harga_satuan < 0 || draft.harga_satuan > MAKS_HARGA_SATUAN) {
         throw new GalatValidasi("Harga satuan tidak valid.");
       }
+      if (draft.jumlah * draft.harga_satuan > MAKS_NILAI_MUTASI) {
+        throw new GalatValidasi(
+          "Nilai mutasi (jumlah × harga satuan) terlalu besar.",
+        );
+      }
       valid.harga_satuan = draft.harga_satuan;
     }
     valid.sumber_dana = bersih(draft.sumber_dana);
@@ -704,7 +732,7 @@ export function validateOpname(draft: OpnameDraftParsed): Hasil<OpnameValid> {
       return { ok: false, error: "Kondisi barang tidak dikenal." };
     }
     if (item.fisik < 0 || item.fisik > MAKS_JUMLAH) {
-      return { ok: false, error: "Jumlah fisik harus 0 sampai 1.000.000." };
+      return { ok: false, error: "Jumlah fisik harus 0 sampai 1.000.000.000." };
     }
     const id_batch = bersih(item.id_batch);
     if (
@@ -805,6 +833,10 @@ export interface BarangInventaris {
   tipe: TipeBarang;
   satuan: string;
   bisa_expired: boolean;
+  /** Setiap jumlah barang ini (saldo, stok minimum, mutasi) bernilai ×100. */
+  desimal: boolean;
+  /** Satuan, desimal, dan kedaluwarsa terkunci sejak mutasi pertama. */
+  punya_mutasi: boolean;
   stok_minimum: number;
   tempat_utama: string | null;
   catatan: string | null;
@@ -878,6 +910,7 @@ export interface PinjamanAktif {
   nama_barang: string;
   kode_barang: string;
   satuan: string;
+  desimal: boolean;
   tipe: TipeBarang;
   tanggal: string;
   jumlah: number;
@@ -927,6 +960,7 @@ export interface BarisDokumen {
   nama_barang: string;
   kode_barang: string;
   satuan: string;
+  desimal: boolean;
 }
 
 export interface DokumenInventaris {
@@ -954,6 +988,7 @@ export interface BarisPengadaan {
   kode_barang: string;
   nama_barang: string;
   satuan: string;
+  desimal: boolean;
   alasan: string;
   jumlah: number;
   harga_satuan: number | null;
@@ -1103,7 +1138,9 @@ export function aksiPindaiOpname(
     return {
       jenis: "hitung",
       kunci: baik.kunci,
-      fisik: baik.dipindai ? (Number(baik.fisik) || 0) + 1 : 1,
+      fisik: baik.dipindai
+        ? (jumlahDariKetikan(baik.fisik, false) ?? 0) + 1
+        : 1,
     };
   }
   const pertama = milik[0];
@@ -1404,4 +1441,64 @@ export function bacaAtribut(raw: unknown): Record<string, string> {
   } catch {
     return {};
   }
+}
+
+// ── Jumlah desimal ──────────────────────────────────────────────────────────
+
+function jumlahDari(
+  bulat: string,
+  pecahan: string,
+  desimal: boolean,
+): number | null {
+  if (!desimal) return /^0*$/.test(pecahan) ? Number(bulat) : null;
+  if (pecahan.length > 2) return null;
+  return Number(bulat) * SKALA_DESIMAL + Number(pecahan.padEnd(2, "0"));
+}
+
+/**
+ * Ketikan berformat Indonesia (titik = ribuan, koma = desimal) menjadi jumlah
+ * tersimpan. Barang desimal: `254,5` = 25450. Barang biasa hanya menerima
+ * pecahan nol (`10.000,00`). Null = bukan jumlah yang sah; batasnya diperiksa
+ * validasi mutasi seperti biasa.
+ */
+export function jumlahDariKetikan(
+  teks: string,
+  desimal: boolean,
+): number | null {
+  const cocok = /^(\d{1,3}(?:\.\d{3})+|\d+)(?:,(\d+))?$/.exec(teks.trim());
+  if (!cocok) return null;
+  return jumlahDari(
+    (cocok[1] as string).replaceAll(".", ""),
+    cocok[2] ?? "",
+    desimal,
+  );
+}
+
+/**
+ * Sel Angka Excel: titik adalah desimal, dan sisa pembulatan biner Excel
+ * (`10.250000000000002`) sudah dirapikan `angkaDariSelAngka`.
+ */
+export function jumlahDariSelAngka(
+  raw: string,
+  desimal: boolean,
+): number | null {
+  const kanonik = angkaDariSelAngka(raw);
+  if (kanonik === null) return null;
+  const [bulat, pecahan = ""] = kanonik.split(".");
+  return jumlahDari(bulat as string, pecahan, desimal);
+}
+
+/**
+ * Jumlah tersimpan untuk dibaca orang, dan bisa diketik ulang apa adanya:
+ * 1000000 → "1.000.000"; barang desimal 25450 → "254,50", 25000 → "250".
+ */
+export function formatJumlah(nilai: number, desimal: boolean): string {
+  if (!desimal) return formatAngka(String(nilai));
+  const mutlak = Math.abs(nilai);
+  const bulat = Math.floor(mutlak / SKALA_DESIMAL);
+  const sisa = mutlak % SKALA_DESIMAL;
+  const teks = formatAngka(
+    sisa ? `${bulat}.${String(sisa).padStart(2, "0")}` : String(bulat),
+  );
+  return nilai < 0 ? `-${teks}` : teks;
 }

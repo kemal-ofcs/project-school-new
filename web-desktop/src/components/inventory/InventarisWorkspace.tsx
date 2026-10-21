@@ -55,8 +55,11 @@ import {
   unduhTemplateBarang,
 } from "./ekspor";
 import {
+  angka,
+  bacaJumlah,
   hariIniWib,
   INPUT,
+  isianJumlah,
   LABEL,
   pesanGalat,
   TOMBOL_BAHAYA,
@@ -131,11 +134,15 @@ function awalBulan(tanggal: string): string {
   return `${tanggal.slice(0, 8)}01`;
 }
 
-function labelPosisi(posisi: PosisiStok, satuan: string): string {
+function labelPosisi(
+  posisi: PosisiStok,
+  satuan: string,
+  desimal: boolean,
+): string {
   const bagian = [posisi.tempat, posisi.kondisi];
   if (posisi.tanggal_expired)
     bagian.push(`kedaluwarsa ${posisi.tanggal_expired}`);
-  return `${bagian.join(" · ")} (sisa ${posisi.saldo} ${satuan})`;
+  return `${bagian.join(" · ")} (sisa ${angka(posisi.saldo, desimal)} ${satuan})`;
 }
 
 /**
@@ -262,6 +269,9 @@ export function InventarisWorkspace({
       const saldoDiabaikan = baris.filter(
         (item) => item.draft.saldoDiabaikan,
       ).length;
+      const desimalDiabaikan = baris.filter(
+        (item) => item.draft.desimalDiabaikan,
+      ).length;
       const pesan = [describeImportReport(report, "barang")];
       if (judulAsing.length > 0) {
         pesan.push(
@@ -276,6 +286,11 @@ export function InventarisWorkspace({
       if (saldoDiabaikan > 0) {
         pesan.push(
           `Saldo awal ${saldoDiabaikan} barang yang sudah ada diabaikan; tambah stoknya lewat Catat Mutasi.`,
+        );
+      }
+      if (desimalDiabaikan > 0) {
+        pesan.push(
+          `Kolom Desimal ${desimalDiabaikan} barang tidak diubah karena barangnya sudah punya riwayat mutasi.`,
         );
       }
       setFeedback({
@@ -853,19 +868,20 @@ function DaftarBarang({
                             : "text-slate-100"
                         }`}
                       >
-                        {barang.stok_baik}
+                        {angka(barang.stok_baik, barang.desimal)}
                       </span>{" "}
                       <span className="text-sm text-slate-400">
                         {barang.satuan} baik
                       </span>
                       {rusak !== 0 ? (
                         <span className="block text-xs text-amber-300">
-                          {rusak} {barang.satuan} rusak
+                          {angka(rusak, barang.desimal)} {barang.satuan} rusak
                         </span>
                       ) : null}
                       {barang.stok_menipis ? (
                         <span className="block text-xs font-medium text-amber-300">
-                          di bawah minimum {barang.stok_minimum}
+                          di bawah minimum{" "}
+                          {angka(barang.stok_minimum, barang.desimal)}
                         </span>
                       ) : null}
                     </p>
@@ -988,7 +1004,8 @@ function DaftarBarang({
                                 : "text-slate-100"
                             }`}
                           >
-                            {posisi.saldo} {barang.satuan}
+                            {angka(posisi.saldo, barang.desimal)}{" "}
+                            {barang.satuan}
                             {posisi.saldo < 0 ? " (perlu opname)" : ""}
                           </span>
                           {canManage && posisi.kode_unit ? (
@@ -1045,9 +1062,13 @@ function FormBarang({
   const [kategori, setKategori] = useState(barang?.kategori ?? "");
   const [tempatUtama, setTempatUtama] = useState(barang?.tempat_utama ?? "");
   const [stokMinimum, setStokMinimum] = useState(
-    String(barang?.stok_minimum ?? 0),
+    barang ? angka(barang.stok_minimum, barang.desimal) : "0",
   );
   const [bisaExpired, setBisaExpired] = useState(barang?.bisa_expired ?? false);
+  const [desimal, setDesimal] = useState(barang?.desimal ?? false);
+  // Mengubahnya setelah ada mutasi akan mengubah arti setiap jumlah tercatat.
+  const desimalTerkunci = barang?.punya_mutasi ?? false;
+  const pakaiDesimal = desimal && tipe === "Habis Pakai";
   const [catatan, setCatatan] = useState(barang?.catatan ?? "");
   const [aktif, setAktif] = useState(barang?.status_aktif ?? true);
   const kolomAktif = data.kolom.filter((kolom) => kolom.is_aktif);
@@ -1088,6 +1109,13 @@ function FormBarang({
         atribut[kolom.id_kolom] = isi;
       }
     }
+    let minimum: number;
+    try {
+      minimum = bacaJumlah(stokMinimum || "0", pakaiDesimal, "Stok minimum");
+    } catch (error) {
+      setGalat(pesanGalat(error, "Stok minimum tidak valid."));
+      return;
+    }
     isSubmittingRef.current = true;
     setMenyimpan(true);
     setGalat(null);
@@ -1101,7 +1129,8 @@ function FormBarang({
         tipe,
         satuan,
         bisa_expired: bisaExpired,
-        stok_minimum: Number(stokMinimum) || 0,
+        desimal: pakaiDesimal,
+        stok_minimum: minimum,
         tempat_utama: tempatUtama,
         catatan,
         status_aktif: aktif,
@@ -1250,10 +1279,7 @@ function FormBarang({
             </label>
             <input
               id="inv-stok-minimum"
-              type="number"
-              min={0}
-              step={1}
-              inputMode="numeric"
+              {...isianJumlah(pakaiDesimal)}
               value={stokMinimum}
               onChange={(e) => setStokMinimum(e.target.value)}
               className={INPUT}
@@ -1275,6 +1301,27 @@ function FormBarang({
             </span>
           </span>
         </label>
+        {tipe === "Habis Pakai" ? (
+          <label className="flex min-h-11 items-start gap-2 text-sm text-slate-200">
+            <input
+              type="checkbox"
+              checked={desimal}
+              disabled={desimalTerkunci}
+              onChange={(e) => setDesimal(e.target.checked)}
+              className="mt-1 h-4 w-4"
+            />
+            <span>
+              Jumlah boleh berkoma
+              <span className="block text-xs text-slate-400">
+                Untuk barang yang ditimbang atau diukur, misalnya 2,5 kg atau
+                0,75 liter. Paling banyak 2 angka di belakang koma.
+                {desimalTerkunci
+                  ? " Barang ini sudah punya riwayat mutasi, jadi pilihannya terkunci."
+                  : " Tidak bisa diubah lagi setelah barang punya riwayat mutasi."}
+              </span>
+            </span>
+          </label>
+        ) : null}
         {kolomAktif.length > 0 ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             {kolomAktif.map((kolom) => (
@@ -1695,7 +1742,9 @@ function FormMutasi({
     setMenyimpan(true);
     try {
       const aset = barang.tipe === "Aset";
-      const jumlahCatat = pakaiUnit ? unitDipilih.length : Number(jumlah);
+      const jumlahCatat = pakaiUnit
+        ? unitDipilih.length
+        : bacaJumlah(jumlah, barang.desimal);
       await catatMutasiInventaris({
         id_barang: barang.id_barang,
         jenis,
@@ -1734,7 +1783,7 @@ function FormMutasi({
       });
       reset();
       await onSelesai(
-        `${jenis} ${jumlahCatat} ${barang.satuan} ${barang.nama_barang} tercatat.`,
+        `${jenis} ${angka(jumlahCatat, barang.desimal)} ${barang.satuan} ${barang.nama_barang} tercatat.`,
       );
     } catch (error) {
       onGalat(pesanGalat(error, "Mutasi tidak bisa disimpan."));
@@ -1842,12 +1891,8 @@ function FormMutasi({
             </label>
             <input
               id="inv-jumlah"
-              type="number"
+              {...isianJumlah(barang?.desimal ?? false)}
               required
-              min={1}
-              max={dilacak || perUnit ? 200 : undefined}
-              step={1}
-              inputMode="numeric"
               value={jumlah}
               onChange={(e) => setJumlah(e.target.value)}
               className={INPUT}
@@ -1991,7 +2036,7 @@ function FormMutasi({
                     key={`${posisi.tempat}|${posisi.kondisi}|${posisi.id_batch ?? ""}`}
                     value={String(index)}
                   >
-                    {labelPosisi(posisi, barang.satuan)}
+                    {labelPosisi(posisi, barang.satuan, barang.desimal)}
                   </option>
                 ))}
               </select>
@@ -2077,7 +2122,8 @@ function FormMutasi({
             </div>
             <div>
               <label htmlFor="inv-harga" className={LABEL}>
-                Harga satuan (Rp)
+                Harga satuan (Rp{barang?.desimal ? ` per ${barang.satuan}` : ""}
+                )
               </label>
               <input
                 id="inv-harga"
@@ -2449,7 +2495,7 @@ function PanelKartuStok({
             <span className="text-slate-300">Saldo sebelum {dari}</span>
             <span className="flex flex-wrap items-center gap-3">
               <span className="font-semibold text-slate-100">
-                {kartu.saldo_awal} {barang.satuan}
+                {angka(kartu.saldo_awal, barang.desimal)} {barang.satuan}
               </span>
               <button
                 type="button"
@@ -2501,13 +2547,17 @@ function PanelKartuStok({
                   </div>
                   <div className="flex shrink-0 flex-wrap items-center gap-3 sm:justify-end text-sm">
                     {baris.masuk > 0 ? (
-                      <span className="text-emerald-300">+{baris.masuk}</span>
+                      <span className="text-emerald-300">
+                        +{angka(baris.masuk, barang.desimal)}
+                      </span>
                     ) : null}
                     {baris.keluar > 0 ? (
-                      <span className="text-rose-300">-{baris.keluar}</span>
+                      <span className="text-rose-300">
+                        -{angka(baris.keluar, barang.desimal)}
+                      </span>
                     ) : null}
                     <span className="min-w-16 text-right font-semibold text-slate-100">
-                      {baris.saldo} {barang.satuan}
+                      {angka(baris.saldo, barang.desimal)} {barang.satuan}
                     </span>
                     {bisaCetak &&
                     !baris.dibatalkan &&
