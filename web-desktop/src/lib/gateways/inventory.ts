@@ -104,6 +104,21 @@ export async function simpanKolomInventaris(
   return requestWebApi("/api/inventory/column", "POST", { draft });
 }
 
+/** Hapus permanen kolom tambahan beserta isinya di semua barang. */
+export async function hapusKolomInventaris(
+  idKolom: string,
+): Promise<{ sukses: boolean; barang_dibersihkan: number }> {
+  if (isDesktopRuntime()) {
+    const result = await invokeDesktop<{
+      sukses: boolean;
+      barang_dibersihkan: number;
+    }>("desktop_inventory_delete_column", { idKolom });
+    kickDesktopSync();
+    return result;
+  }
+  return requestWebApi("/api/inventory/column/delete", "POST", { idKolom });
+}
+
 export async function catatMutasiInventaris(
   draft: MutasiDraft,
 ): Promise<{ sukses: boolean; id_mutasi: string }> {

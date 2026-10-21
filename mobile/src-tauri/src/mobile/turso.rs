@@ -676,6 +676,7 @@ pub const ADMIN_DEFAULT_EXCLUDED_PERMISSIONS: &[&str] = &[
     "students.reset_wali_password",
     "content.delete",
     "inventory.adjust",
+    "inventory.column.delete",
     "uks.delete",
     "accounting.reverse",
     "loan.approve",
@@ -2285,7 +2286,8 @@ impl TursoClient {
                     tipe TEXT NOT NULL CHECK (tipe IN ('Teks', 'Angka')),
                     is_aktif INTEGER NOT NULL DEFAULT 1 CHECK (is_aktif IN (0, 1)),
                     created_at TEXT NOT NULL DEFAULT (datetime('now')),
-                    updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+                    updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+                    dihapus_pada TEXT
                 );"#,
                 vec![],
             ),
@@ -2895,6 +2897,7 @@ impl TursoClient {
                 ('inventory.manage', 'Kelola Master Barang', 'Sarpras', 'Menambah dan mengubah data barang inventaris.', 1, 1001),
                 ('inventory.record', 'Catat Barang Masuk, Keluar & Pindah', 'Sarpras', 'Mencatat barang masuk, pemakaian, dan perpindahan tempat atau kondisi.', 1, 1002),
                 ('inventory.adjust', 'Koreksi & Batalkan Mutasi Inventaris', 'Sarpras', 'Membatalkan mutasi, stock opname, dan menghapus stok rusak, hilang, atau kedaluwarsa.', 1, 1003),
+                ('inventory.column.delete', 'Hapus Permanen Kolom Tambahan', 'Sarpras', 'Menghapus kolom tambahan barang beserta seluruh isinya secara permanen.', 1, 1004),
                 ('uks.view', 'Lihat Buku Kunjungan UKS', 'UKS', 'Melihat riwayat dan rekap kunjungan UKS, termasuk keluhan siswa.', 1, 1100),
                 ('uks.record', 'Catat Kunjungan UKS & Obat', 'UKS', 'Mencatat dan menutup kunjungan UKS serta mengeluarkan obat untuknya.', 1, 1101),
                 ('uks.delete', 'Hapus Kunjungan UKS', 'UKS', 'Menghapus catatan kunjungan UKS.', 1, 1102),
@@ -4026,6 +4029,8 @@ impl TursoClient {
             ("pmb_pendaftar", "pembayaran_batal_catatan", "ALTER TABLE pmb_pendaftar ADD COLUMN pembayaran_batal_catatan TEXT;"),
             // Isi kolom tambahan barang (v53, JSON berkunci id_kolom).
             ("inventory_barang", "atribut", "ALTER TABLE inventory_barang ADD COLUMN atribut TEXT;"),
+            // Hapus permanen kolom tambahan (v54).
+            ("inventory_kolom", "dihapus_pada", "ALTER TABLE inventory_kolom ADD COLUMN dihapus_pada TEXT;"),
         ] {
             self.ensure_column(table, column, sql).await?;
         }
@@ -4317,6 +4322,11 @@ impl TursoClient {
         .await?;
         self.query_one(
             "INSERT OR IGNORE INTO schema_migration (version, name, applied_at) VALUES (-2034, 'inventory-column-v1', datetime('now'));",
+            vec![],
+        )
+        .await?;
+        self.query_one(
+            "INSERT OR IGNORE INTO schema_migration (version, name, applied_at) VALUES (-2035, 'inventory-column-delete-v1', datetime('now'));",
             vec![],
         )
         .await?;
@@ -4631,7 +4641,7 @@ impl TursoClient {
                 // Sentinel WAJIB dinaikkan setiap kali ensure_schema menambah
                 // tabel atau kolom — nilainya di sini dan pada INSERT di atas
                 // harus selalu sama.
-                "SELECT COUNT(*) AS total FROM schema_migration WHERE version = -2034;",
+                "SELECT COUNT(*) AS total FROM schema_migration WHERE version = -2035;",
                 vec![],
             )
             .await
@@ -16542,7 +16552,7 @@ mod tests {
             connection
                 .execute_batch(
                     "DROP TABLE riwayat_identitas_karyawan;
-                     DELETE FROM schema_migration WHERE version IN (-2017, -2018, -2019, -2020, -2021, -2022, -2023, -2024, -2025, -2026, -2027, -2028, -2029, -2030, -2031, -2032, -2033, -2034);",
+                     DELETE FROM schema_migration WHERE version IN (-2017, -2018, -2019, -2020, -2021, -2022, -2023, -2024, -2025, -2026, -2027, -2028, -2029, -2030, -2031, -2032, -2033, -2034, -2035);",
                 )
                 .expect("siapkan database lama");
 
@@ -16578,7 +16588,7 @@ mod tests {
             connection
                 .execute_batch(
                     "DROP TABLE inventory_unit;
-                     DELETE FROM schema_migration WHERE version IN (-2018, -2019, -2020, -2021, -2022, -2023, -2024, -2025, -2026, -2027, -2028, -2029, -2030, -2031, -2032, -2033, -2034);",
+                     DELETE FROM schema_migration WHERE version IN (-2018, -2019, -2020, -2021, -2022, -2023, -2024, -2025, -2026, -2027, -2028, -2029, -2030, -2031, -2032, -2033, -2034, -2035);",
                 )
                 .expect("siapkan database lama");
 
@@ -16615,7 +16625,7 @@ mod tests {
                 .execute_batch(
                     "DROP TABLE personil_wajah;
                      ALTER TABLE absensi_foto DROP COLUMN wajah_vonis;
-                     DELETE FROM schema_migration WHERE version IN (-2019, -2020, -2021, -2022, -2023, -2024, -2025, -2026, -2027, -2028, -2029, -2030, -2031, -2032, -2033, -2034);",
+                     DELETE FROM schema_migration WHERE version IN (-2019, -2020, -2021, -2022, -2023, -2024, -2025, -2026, -2027, -2028, -2029, -2030, -2031, -2032, -2033, -2034, -2035);",
                 )
                 .expect("siapkan database lama");
 
@@ -16654,7 +16664,7 @@ mod tests {
                     "DROP TABLE keu_akun;
                      DROP TABLE keu_jurnal;
                      DROP TABLE keu_jurnal_baris;
-                     DELETE FROM schema_migration WHERE version IN (-2020, -2021, -2022, -2023, -2024, -2025, -2026, -2027, -2028, -2029, -2030, -2031, -2032, -2033, -2034);",
+                     DELETE FROM schema_migration WHERE version IN (-2020, -2021, -2022, -2023, -2024, -2025, -2026, -2027, -2028, -2029, -2030, -2031, -2032, -2033, -2034, -2035);",
                 )
                 .expect("siapkan database lama");
 
@@ -16767,7 +16777,7 @@ mod tests {
                     "DROP TABLE keu_pinjaman;
                      DROP TABLE keu_pinjaman_mutasi;
                      DROP TABLE keu_pinjaman_tunda;
-                     DELETE FROM schema_migration WHERE version IN (-2021, -2022, -2023, -2024, -2025, -2026, -2027, -2028, -2029, -2030, -2031, -2032, -2033, -2034);",
+                     DELETE FROM schema_migration WHERE version IN (-2021, -2022, -2023, -2024, -2025, -2026, -2027, -2028, -2029, -2030, -2031, -2032, -2033, -2034, -2035);",
                 )
                 .expect("siapkan database lama");
 
@@ -16804,7 +16814,7 @@ mod tests {
                 .execute_batch(
                     "DROP TABLE keu_tagihan;
                      DROP TABLE keu_tagihan_batal;
-                     DELETE FROM schema_migration WHERE version IN (-2022, -2023, -2024, -2025, -2026, -2027, -2028, -2029, -2030, -2031, -2032, -2033, -2034);",
+                     DELETE FROM schema_migration WHERE version IN (-2022, -2023, -2024, -2025, -2026, -2027, -2028, -2029, -2030, -2031, -2032, -2033, -2034, -2035);",
                 )
                 .expect("siapkan database lama");
             client.ensure_schema_current().await.expect("skema mutakhir");
@@ -16842,7 +16852,7 @@ mod tests {
                      DROP TABLE keu_pembayaran;
                      DROP TABLE keu_pembayaran_alokasi;
                      DROP TABLE keu_pembayaran_batal;
-                     DELETE FROM schema_migration WHERE version IN (-2023, -2024, -2025, -2026, -2027, -2028, -2029, -2030, -2031, -2032, -2033, -2034);",
+                     DELETE FROM schema_migration WHERE version IN (-2023, -2024, -2025, -2026, -2027, -2028, -2029, -2030, -2031, -2032, -2033, -2034, -2035);",
                 )
                 .expect("siapkan database lama");
             client.ensure_schema_current().await.expect("skema mutakhir");
@@ -16878,7 +16888,7 @@ mod tests {
                 .execute_batch(
                     "DROP TABLE nilai_jenis;
                      ALTER TABLE nilai_penilaian DROP COLUMN id_jenis;
-                     DELETE FROM schema_migration WHERE version IN (-2024, -2025, -2026, -2027, -2028, -2029, -2030, -2031, -2032, -2033, -2034);",
+                     DELETE FROM schema_migration WHERE version IN (-2024, -2025, -2026, -2027, -2028, -2029, -2030, -2031, -2032, -2033, -2034, -2035);",
                 )
                 .expect("siapkan database lama");
             client.ensure_schema_current().await.expect("skema mutakhir");

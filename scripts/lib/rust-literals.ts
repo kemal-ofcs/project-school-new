@@ -30,168 +30,168 @@
  */
 
 export interface LiteralRust {
-	/** Badan literal; escape `\n`, `\t`, `\"`, `\\` sudah dipulihkan. */
-	isi: string;
-	/** Posisi karakter pembuka literal di dalam sumber aslinya. */
-	index: number;
-	/** Literal mentah `r#"…"#`, yang di Rust tidak mengenal escape. */
-	mentah: boolean;
+  /** Badan literal; escape `\n`, `\t`, `\"`, `\\` sudah dipulihkan. */
+  isi: string;
+  /** Posisi karakter pembuka literal di dalam sumber aslinya. */
+  index: number;
+  /** Literal mentah `r#"…"#`, yang di Rust tidak mengenal escape. */
+  mentah: boolean;
 }
 
 export interface OpsiPetikRust {
-	/**
-	 * Buang literal yang berada di dalam `#[cfg(test)]`.
-	 *
-	 * Berbeda dari TypeScript yang menaruh tesnya di berkas `*.test.ts`
-	 * tersendiri, tes Rust hidup di berkas yang sama dengan kode produksi.
-	 * `audit-list-bound` menyalakannya karena query di dalam tes hanya
-	 * menegaskan isi fixture berisi segelintir baris, dan menuduhnya berarti
-	 * menuduh kode yang benar. `audit-sql` MEMBIARKANNYA MATI: mem-`prepare`
-	 * SQL milik tes tetap berguna, dan mematikannya akan mengurangi cakupan
-	 * yang sudah dimiliki gerbang itu hari ini.
-	 */
-	tanpaModulTes?: boolean;
+  /**
+   * Buang literal yang berada di dalam `#[cfg(test)]`.
+   *
+   * Berbeda dari TypeScript yang menaruh tesnya di berkas `*.test.ts`
+   * tersendiri, tes Rust hidup di berkas yang sama dengan kode produksi.
+   * `audit-list-bound` menyalakannya karena query di dalam tes hanya
+   * menegaskan isi fixture berisi segelintir baris, dan menuduhnya berarti
+   * menuduh kode yang benar. `audit-sql` MEMBIARKANNYA MATI: mem-`prepare`
+   * SQL milik tes tetap berguna, dan mematikannya akan mengurangi cakupan
+   * yang sudah dimiliki gerbang itu hari ini.
+   */
+  tanpaModulTes?: boolean;
 }
 
 /** Pulihkan escape Rust yang relevan untuk SQL. */
 function lepasEscape(teks: string): string {
-	return teks.replace(/\\(["'\\nrt0])/g, (_, ch: string) => {
-		if (ch === "n") return "\n";
-		if (ch === "r") return "\r";
-		if (ch === "t") return "\t";
-		if (ch === "0") return "\0";
-		return ch;
-	});
+  return teks.replace(/\\(["'\\nrt0])/g, (_, ch: string) => {
+    if (ch === "n") return "\n";
+    if (ch === "r") return "\r";
+    if (ch === "t") return "\t";
+    if (ch === "0") return "\0";
+    return ch;
+  });
 }
 
 export function petikRust(
-	sumber: string,
-	opsi: OpsiPetikRust = {},
+  sumber: string,
+  opsi: OpsiPetikRust = {},
 ): LiteralRust[] {
-	const hasil: LiteralRust[] = [];
-	const kurung: Array<{ pos: number; buka: boolean }> = [];
-	const cfgTes: number[] = [];
-	const n = sumber.length;
-	let i = 0;
+  const hasil: LiteralRust[] = [];
+  const kurung: Array<{ pos: number; buka: boolean }> = [];
+  const cfgTes: number[] = [];
+  const n = sumber.length;
+  let i = 0;
 
-	while (i < n) {
-		const c = sumber[i];
+  while (i < n) {
+    const c = sumber[i];
 
-		if (c === "/" && sumber[i + 1] === "/") {
-			while (i < n && sumber[i] !== "\n") i++;
-			continue;
-		}
-		if (c === "#" && sumber.startsWith("#[cfg(test)]", i)) {
-			cfgTes.push(i);
-			i += "#[cfg(test)]".length;
-			continue;
-		}
-		// Komentar blok Rust boleh bersarang.
-		if (c === "/" && sumber[i + 1] === "*") {
-			let dalam = 1;
-			i += 2;
-			while (i < n && dalam > 0) {
-				if (sumber[i] === "/" && sumber[i + 1] === "*") {
-					dalam++;
-					i += 2;
-				} else if (sumber[i] === "*" && sumber[i + 1] === "/") {
-					dalam--;
-					i += 2;
-				} else i++;
-			}
-			continue;
-		}
-		// Raw string: r"…", r#"…"#, r##"…"##, dan seterusnya.
-		if (c === "r") {
-			let j = i + 1;
-			let pagar = 0;
-			while (sumber[j] === "#") {
-				pagar++;
-				j++;
-			}
-			if (sumber[j] === '"') {
-				const mulai = j + 1;
-				const tutup = `"${"#".repeat(pagar)}`;
-				const akhir = sumber.indexOf(tutup, mulai);
-				if (akhir !== -1) {
-					hasil.push({
-						isi: sumber.slice(mulai, akhir),
-						index: i,
-						mentah: true,
-					});
-					i = akhir + tutup.length;
-					continue;
-				}
-			}
-		}
-		// Literal char: '"' dan '\\' ikut, tetapi lifetime `'a` tidak.
-		if (c === "'") {
-			if (sumber[i + 1] === "\\") {
-				let j = i + 2;
-				while (j < n && sumber[j] !== "'") j++;
-				i = j + 1;
-				continue;
-			}
-			if (sumber[i + 2] === "'") {
-				i += 3;
-				continue;
-			}
-		}
-		if (c === '"') {
-			const mulai = i + 1;
-			let j = mulai;
-			while (j < n) {
-				if (sumber[j] === "\\") {
-					j += 2;
-					continue;
-				}
-				if (sumber[j] === '"') break;
-				j++;
-			}
-			if (j < n) {
-				hasil.push({
-					isi: lepasEscape(sumber.slice(mulai, j)),
-					index: i,
-					mentah: false,
-				});
-				i = j + 1;
-				continue;
-			}
-			break;
-		}
-		if (c === "{" || c === "}") kurung.push({ pos: i, buka: c === "{" });
-		i++;
-	}
+    if (c === "/" && sumber[i + 1] === "/") {
+      while (i < n && sumber[i] !== "\n") i++;
+      continue;
+    }
+    if (c === "#" && sumber.startsWith("#[cfg(test)]", i)) {
+      cfgTes.push(i);
+      i += "#[cfg(test)]".length;
+      continue;
+    }
+    // Komentar blok Rust boleh bersarang.
+    if (c === "/" && sumber[i + 1] === "*") {
+      let dalam = 1;
+      i += 2;
+      while (i < n && dalam > 0) {
+        if (sumber[i] === "/" && sumber[i + 1] === "*") {
+          dalam++;
+          i += 2;
+        } else if (sumber[i] === "*" && sumber[i + 1] === "/") {
+          dalam--;
+          i += 2;
+        } else i++;
+      }
+      continue;
+    }
+    // Raw string: r"…", r#"…"#, r##"…"##, dan seterusnya.
+    if (c === "r") {
+      let j = i + 1;
+      let pagar = 0;
+      while (sumber[j] === "#") {
+        pagar++;
+        j++;
+      }
+      if (sumber[j] === '"') {
+        const mulai = j + 1;
+        const tutup = `"${"#".repeat(pagar)}`;
+        const akhir = sumber.indexOf(tutup, mulai);
+        if (akhir !== -1) {
+          hasil.push({
+            isi: sumber.slice(mulai, akhir),
+            index: i,
+            mentah: true,
+          });
+          i = akhir + tutup.length;
+          continue;
+        }
+      }
+    }
+    // Literal char: '"' dan '\\' ikut, tetapi lifetime `'a` tidak.
+    if (c === "'") {
+      if (sumber[i + 1] === "\\") {
+        let j = i + 2;
+        while (j < n && sumber[j] !== "'") j++;
+        i = j + 1;
+        continue;
+      }
+      if (sumber[i + 2] === "'") {
+        i += 3;
+        continue;
+      }
+    }
+    if (c === '"') {
+      const mulai = i + 1;
+      let j = mulai;
+      while (j < n) {
+        if (sumber[j] === "\\") {
+          j += 2;
+          continue;
+        }
+        if (sumber[j] === '"') break;
+        j++;
+      }
+      if (j < n) {
+        hasil.push({
+          isi: lepasEscape(sumber.slice(mulai, j)),
+          index: i,
+          mentah: false,
+        });
+        i = j + 1;
+        continue;
+      }
+      break;
+    }
+    if (c === "{" || c === "}") kurung.push({ pos: i, buka: c === "{" });
+    i++;
+  }
 
-	if (!opsi.tanpaModulTes) return hasil;
+  if (!opsi.tanpaModulTes) return hasil;
 
-	// Rentang tiap modul/fungsi `#[cfg(test)]`: dari kurung buka pertama
-	// sesudahnya sampai pasangannya. Kurung di dalam string dan komentar tidak
-	// pernah masuk daftar ini karena keduanya sudah dilewati di atas.
-	//
-	// Pencocokan kurung, BUKAN "semua yang ada sesudah `#[cfg(test)]` adalah
-	// tes". Jalan pintas itu salah di repo ini: `scanner.rs` dan
-	// `attendance_dashboard.rs` sama-sama memuat kode PRODUKSI sesudah modul
-	// tesnya, sehingga menyembunyikannya justru menggali lubang cakupan baru.
-	const rentangTes: Array<[number, number]> = [];
-	for (const awal of cfgTes) {
-		const mulaiIdx = kurung.findIndex((k) => k.pos > awal && k.buka);
-		if (mulaiIdx === -1) continue;
-		let dalam = 0;
-		for (let k = mulaiIdx; k < kurung.length; k++) {
-			dalam += kurung[k]?.buka ? 1 : -1;
-			if (dalam === 0) {
-				rentangTes.push([
-					kurung[mulaiIdx]?.pos ?? 0,
-					kurung[k]?.pos ?? sumber.length,
-				]);
-				break;
-			}
-		}
-	}
+  // Rentang tiap modul/fungsi `#[cfg(test)]`: dari kurung buka pertama
+  // sesudahnya sampai pasangannya. Kurung di dalam string dan komentar tidak
+  // pernah masuk daftar ini karena keduanya sudah dilewati di atas.
+  //
+  // Pencocokan kurung, BUKAN "semua yang ada sesudah `#[cfg(test)]` adalah
+  // tes". Jalan pintas itu salah di repo ini: `scanner.rs` dan
+  // `attendance_dashboard.rs` sama-sama memuat kode PRODUKSI sesudah modul
+  // tesnya, sehingga menyembunyikannya justru menggali lubang cakupan baru.
+  const rentangTes: Array<[number, number]> = [];
+  for (const awal of cfgTes) {
+    const mulaiIdx = kurung.findIndex((k) => k.pos > awal && k.buka);
+    if (mulaiIdx === -1) continue;
+    let dalam = 0;
+    for (let k = mulaiIdx; k < kurung.length; k++) {
+      dalam += kurung[k]?.buka ? 1 : -1;
+      if (dalam === 0) {
+        rentangTes.push([
+          kurung[mulaiIdx]?.pos ?? 0,
+          kurung[k]?.pos ?? sumber.length,
+        ]);
+        break;
+      }
+    }
+  }
 
-	return hasil.filter(
-		(literal) =>
-			!rentangTes.some(([a, b]) => literal.index > a && literal.index < b),
-	);
+  return hasil.filter(
+    (literal) =>
+      !rentangTes.some(([a, b]) => literal.index > a && literal.index < b),
+  );
 }

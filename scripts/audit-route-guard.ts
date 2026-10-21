@@ -35,28 +35,29 @@ const rootDir = path.resolve(import.meta.dir, "..");
 // permintaan bukan lapisan tambahan di sana — ia satu-satunya yang ada sebelum
 // rate limit.
 const API_DIRS = [
-	path.join(rootDir, "web-desktop/src/app/api"),
-	path.join(rootDir, "web-public/src/app/api"),
+  path.join(rootDir, "web-desktop/src/app/api"),
+  path.join(rootDir, "web-public/src/app/api"),
 ];
 
-const METODE_MUTASI = /export\s+(?:async\s+)?function\s+(POST|PUT|PATCH|DELETE)\b/;
+const METODE_MUTASI =
+  /export\s+(?:async\s+)?function\s+(POST|PUT|PATCH|DELETE)\b/;
 // Menuntut PANGGILAN, bukan sekadar penyebutan nama. Baris impor pun memuat
 // nama itu, sehingga pemeriksaan yang hanya mencari identifiernya akan
 // meloloskan berkas yang panggilannya sudah dihapus tetapi impornya tertinggal.
 const PENJAGA = /\b(assert|is)SameOriginMutation\s*\(\s*request\s*\)/;
 
 function heading(text: string) {
-	console.log(`\n${"─".repeat(70)}\n${text}\n${"─".repeat(70)}`);
+  console.log(`\n${"─".repeat(70)}\n${text}\n${"─".repeat(70)}`);
 }
 
 function kumpulkanRoute(direktori: string, hasil: string[] = []): string[] {
-	if (!fs.existsSync(direktori)) return hasil;
-	for (const entri of fs.readdirSync(direktori, { withFileTypes: true })) {
-		const penuh = path.join(direktori, entri.name);
-		if (entri.isDirectory()) kumpulkanRoute(penuh, hasil);
-		else if (entri.name === "route.ts") hasil.push(penuh);
-	}
-	return hasil;
+  if (!fs.existsSync(direktori)) return hasil;
+  for (const entri of fs.readdirSync(direktori, { withFileTypes: true })) {
+    const penuh = path.join(direktori, entri.name);
+    if (entri.isDirectory()) kumpulkanRoute(penuh, hasil);
+    else if (entri.name === "route.ts") hasil.push(penuh);
+  }
+  return hasil;
 }
 
 heading("Audit Asal Permintaan — setiap endpoint membatasi pemanggilnya");
@@ -66,17 +67,17 @@ let terjaga = 0;
 const pelanggaran: string[] = [];
 
 for (const berkasAbsolut of API_DIRS.flatMap((dir) => kumpulkanRoute(dir))) {
-	const sumber = fs.readFileSync(berkasAbsolut, "utf8");
-	if (!METODE_MUTASI.test(sumber)) continue;
+  const sumber = fs.readFileSync(berkasAbsolut, "utf8");
+  if (!METODE_MUTASI.test(sumber)) continue;
 
-	total++;
-	if (PENJAGA.test(sumber)) {
-		terjaga++;
-		continue;
-	}
-	pelanggaran.push(
-		path.relative(rootDir, berkasAbsolut).split(path.sep).join("/"),
-	);
+  total++;
+  if (PENJAGA.test(sumber)) {
+    terjaga++;
+    continue;
+  }
+  pelanggaran.push(
+    path.relative(rootDir, berkasAbsolut).split(path.sep).join("/"),
+  );
 }
 
 console.log(`  Route endpoint : ${total}`);
@@ -84,13 +85,13 @@ console.log(`  Terjaga        : ${terjaga}`);
 console.log(`  Melanggar      : ${pelanggaran.length}`);
 
 if (pelanggaran.length > 0) {
-	heading("Pelanggaran");
-	for (const berkas of pelanggaran) console.log(`  ❌ ${berkas}`);
-	console.error(
-		`\n❌ ${pelanggaran.length} endpoint tanpa pembatasan asal permintaan.\n` +
-			"   Panggil `assertSameOriginMutation(request)` di awal handler-nya,\n" +
-			"   atau `isSameOriginMutation(request)` bila ingin membalas sendiri.\n",
-	);
-	process.exit(1);
+  heading("Pelanggaran");
+  for (const berkas of pelanggaran) console.log(`  ❌ ${berkas}`);
+  console.error(
+    `\n❌ ${pelanggaran.length} endpoint tanpa pembatasan asal permintaan.\n` +
+      "   Panggil `assertSameOriginMutation(request)` di awal handler-nya,\n" +
+      "   atau `isSameOriginMutation(request)` bila ingin membalas sendiri.\n",
+  );
+  process.exit(1);
 }
 console.log("\n🎉 Setiap endpoint membatasi asal permintaannya.\n");

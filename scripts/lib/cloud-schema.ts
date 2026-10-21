@@ -26,7 +26,7 @@ export type TableSchema = Map<string, Set<string>>;
  * tidak bisa mem-`prepare` query stok sama sekali.
  */
 const DDL_PREFIX =
-	/^\s*(CREATE\s+TABLE|CREATE\s+INDEX|CREATE\s+UNIQUE\s+INDEX|CREATE\s+VIEW|ALTER\s+TABLE)\b/i;
+  /^\s*(CREATE\s+TABLE|CREATE\s+INDEX|CREATE\s+UNIQUE\s+INDEX|CREATE\s+VIEW|ALTER\s+TABLE)\b/i;
 
 /** Batch yang memuat DDL di tengahnya, misalnya diawali `PRAGMA`. */
 const DDL_ANYWHERE = /\b(CREATE\s+TABLE|ALTER\s+TABLE)\b/i;
@@ -50,18 +50,18 @@ const RUST_TEMPLATE_PLACEHOLDER = /\{\s*\w+\s*\}/;
  * memastikan keduanya keluar sesuai posisi aslinya di berkas.
  */
 function extractStringLiterals(source: string): string[] {
-	const literals: string[] = [];
-	const pattern = /r#"([\s\S]*?)"#|"((?:[^"\\\n]|\\.)*)"/g;
+  const literals: string[] = [];
+  const pattern = /r#"([\s\S]*?)"#|"((?:[^"\\\n]|\\.)*)"/g;
 
-	for (const match of source.matchAll(pattern)) {
-		if (match[1] !== undefined) {
-			literals.push(match[1]);
-		} else if (match[2] !== undefined) {
-			literals.push(match[2].replace(/\\"/g, '"'));
-		}
-	}
+  for (const match of source.matchAll(pattern)) {
+    if (match[1] !== undefined) {
+      literals.push(match[1]);
+    } else if (match[2] !== undefined) {
+      literals.push(match[2].replace(/\\"/g, '"'));
+    }
+  }
 
-	return literals;
+  return literals;
 }
 
 /**
@@ -72,44 +72,44 @@ function extractStringLiterals(source: string): string[] {
  * sebenarnya tidak pernah dibuat.
  */
 function sliceRegion(
-	source: string,
-	startMarker: string,
-	endMarkers: string | readonly string[],
+  source: string,
+  startMarker: string,
+  endMarkers: string | readonly string[],
 ) {
-	const start = source.indexOf(startMarker);
-	if (start === -1) {
-		throw new Error(`Penanda awal tidak ditemukan: ${startMarker}`);
-	}
+  const start = source.indexOf(startMarker);
+  if (start === -1) {
+    throw new Error(`Penanda awal tidak ditemukan: ${startMarker}`);
+  }
 
-	// Fungsi yang mengikuti sebuah wilayah berbeda antar basis kode — template
-	// tidak memiliki setiap fungsi penyembuh yang ada di aplikasi turunannya.
-	// Kandidat pertama yang ditemukan dipakai, sehingga menambah atau menghapus
-	// fungsi yang tidak berkaitan tidak merusak ekstraksi.
-	const candidates = typeof endMarkers === "string" ? [endMarkers] : endMarkers;
-	let end = -1;
-	for (const marker of candidates) {
-		const found = source.indexOf(marker, start + startMarker.length);
-		if (found !== -1 && (end === -1 || found < end)) end = found;
-	}
-	if (end === -1) {
-		throw new Error(
-			`Penanda akhir tidak ditemukan (dicoba: ${candidates.join(", ")})`,
-		);
-	}
-	return source.slice(start, end);
+  // Fungsi yang mengikuti sebuah wilayah berbeda antar basis kode — template
+  // tidak memiliki setiap fungsi penyembuh yang ada di aplikasi turunannya.
+  // Kandidat pertama yang ditemukan dipakai, sehingga menambah atau menghapus
+  // fungsi yang tidak berkaitan tidak merusak ekstraksi.
+  const candidates = typeof endMarkers === "string" ? [endMarkers] : endMarkers;
+  let end = -1;
+  for (const marker of candidates) {
+    const found = source.indexOf(marker, start + startMarker.length);
+    if (found !== -1 && (end === -1 || found < end)) end = found;
+  }
+  if (end === -1) {
+    throw new Error(
+      `Penanda akhir tidak ditemukan (dicoba: ${candidates.join(", ")})`,
+    );
+  }
+  return source.slice(start, end);
 }
 
 function collectDdlFromRegion(region: string, allowBatch = false): string[] {
-	const statements: string[] = [];
-	for (const literal of extractStringLiterals(region)) {
-		const isDdl = allowBatch
-			? DDL_PREFIX.test(literal) || DDL_ANYWHERE.test(literal)
-			: DDL_PREFIX.test(literal);
-		if (!isDdl) continue;
-		if (RUST_TEMPLATE_PLACEHOLDER.test(literal)) continue;
-		statements.push(literal.trim());
-	}
-	return statements;
+  const statements: string[] = [];
+  for (const literal of extractStringLiterals(region)) {
+    const isDdl = allowBatch
+      ? DDL_PREFIX.test(literal) || DDL_ANYWHERE.test(literal)
+      : DDL_PREFIX.test(literal);
+    if (!isDdl) continue;
+    if (RUST_TEMPLATE_PLACEHOLDER.test(literal)) continue;
+    statements.push(literal.trim());
+  }
+  return statements;
 }
 
 /**
@@ -122,29 +122,29 @@ function collectDdlFromRegion(region: string, allowBatch = false): string[] {
  * already exists". Definisinya diperiksa terpisah lewat `collectRepairDdl`.
  */
 export function collectCloudDdl(tursoSource: string): string[] {
-	const statements = [
-		...collectDdlFromRegion(
-			sliceRegion(tursoSource, "pub async fn ensure_schema(", [
-				"async fn repair_web_owned_tables(",
-				"async fn ensure_sync_pulse(",
-			]),
-		),
-		...collectDdlFromRegion(
-			sliceRegion(tursoSource, "async fn ensure_sync_pulse(", [
-				"async fn heal_schema(",
-				"async fn ensure_schema_current(",
-			]),
-		),
-	];
+  const statements = [
+    ...collectDdlFromRegion(
+      sliceRegion(tursoSource, "pub async fn ensure_schema(", [
+        "async fn repair_web_owned_tables(",
+        "async fn ensure_sync_pulse(",
+      ]),
+    ),
+    ...collectDdlFromRegion(
+      sliceRegion(tursoSource, "async fn ensure_sync_pulse(", [
+        "async fn heal_schema(",
+        "async fn ensure_schema_current(",
+      ]),
+    ),
+  ];
 
-	if (statements.length === 0) {
-		throw new Error(
-			"Tidak ada satu pun statement DDL yang terbaca dari ensure_schema(). " +
-				"Bentuk sumbernya kemungkinan berubah — perbarui ekstraktor ini.",
-		);
-	}
+  if (statements.length === 0) {
+    throw new Error(
+      "Tidak ada satu pun statement DDL yang terbaca dari ensure_schema(). " +
+        "Bentuk sumbernya kemungkinan berubah — perbarui ekstraktor ini.",
+    );
+  }
 
-	return statements;
+  return statements;
 }
 
 /**
@@ -157,12 +157,12 @@ export function collectCloudDdl(tursoSource: string): string[] {
  * dan database yang dipulihkan akan punya bentuk yang berlainan.
  */
 export function collectRepairDdl(tursoSource: string): string[] {
-	return collectDdlFromRegion(
-		sliceRegion(tursoSource, "async fn repair_web_owned_tables(", [
-			"async fn purge_legacy_rate_rows(",
-			"async fn ensure_sync_pulse(",
-		]),
-	);
+  return collectDdlFromRegion(
+    sliceRegion(tursoSource, "async fn repair_web_owned_tables(", [
+      "async fn purge_legacy_rate_rows(",
+      "async fn ensure_sync_pulse(",
+    ]),
+  );
 }
 
 /**
@@ -174,22 +174,22 @@ export function collectRepairDdl(tursoSource: string): string[] {
  * jauh lebih aman daripada memecah teks SQL pada tanda titik koma.
  */
 export function collectLocalDdl(storageSource: string): string[] {
-	const statements = collectDdlFromRegion(
-		sliceRegion(
-			storageSource,
-			"pub fn initialize(",
-			"pub fn reset_cloud_linked_data(",
-		),
-		true,
-	);
+  const statements = collectDdlFromRegion(
+    sliceRegion(
+      storageSource,
+      "pub fn initialize(",
+      "pub fn reset_cloud_linked_data(",
+    ),
+    true,
+  );
 
-	if (statements.length === 0) {
-		throw new Error(
-			"Tidak ada satu pun statement DDL yang terbaca dari storage.rs::initialize().",
-		);
-	}
+  if (statements.length === 0) {
+    throw new Error(
+      "Tidak ada satu pun statement DDL yang terbaca dari storage.rs::initialize().",
+    );
+  }
 
-	return statements;
+  return statements;
 }
 
 /**
@@ -202,106 +202,106 @@ export function collectLocalDdl(storageSource: string): string[] {
  * sama persis — parser DDL kedua akan menjadi sumber drift baru.
  */
 export function openDatabaseFromDdl(
-	statements: string[],
-	label: string,
-	/**
-	 * Izinkan sebuah tabel didefinisikan ulang oleh set DDL berikutnya.
-	 *
-	 * HANYA untuk pemanggil yang sengaja MENGGABUNGKAN beberapa lapisan DDL
-	 * sekaligus (`audit:sql` menumpuk lokal + cloud + perbaikan supaya tabel
-	 * cloud-only ikut terbentuk). Beberapa tabel milik Web ditulis dengan
-	 * `CREATE TABLE` polos, sehingga tumpang tindihnya pasti terjadi dan bukan
-	 * pertanda drift.
-	 *
-	 * `audit:schema` memeriksa tiap lapisan SENDIRI-SENDIRI dan wajib tetap
-	 * menolak tabel ganda — jangan pernah menyalakan opsi ini di sana, karena
-	 * justru bentrokan itulah drift yang dicarinya.
-	 */
-	izinkanTabelGanda = false,
+  statements: string[],
+  label: string,
+  /**
+   * Izinkan sebuah tabel didefinisikan ulang oleh set DDL berikutnya.
+   *
+   * HANYA untuk pemanggil yang sengaja MENGGABUNGKAN beberapa lapisan DDL
+   * sekaligus (`audit:sql` menumpuk lokal + cloud + perbaikan supaya tabel
+   * cloud-only ikut terbentuk). Beberapa tabel milik Web ditulis dengan
+   * `CREATE TABLE` polos, sehingga tumpang tindihnya pasti terjadi dan bukan
+   * pertanda drift.
+   *
+   * `audit:schema` memeriksa tiap lapisan SENDIRI-SENDIRI dan wajib tetap
+   * menolak tabel ganda — jangan pernah menyalakan opsi ini di sana, karena
+   * justru bentrokan itulah drift yang dicarinya.
+   */
+  izinkanTabelGanda = false,
 ): Database {
-	const db = new Database(":memory:");
-	const failures: string[] = [];
+  const db = new Database(":memory:");
+  const failures: string[] = [];
 
-	for (const statement of statements) {
-		try {
-			db.run(statement);
-		} catch (error) {
-			const message = error instanceof Error ? error.message : String(error);
-			// `ADD COLUMN` untuk kolom yang sudah lahir dari `CREATE TABLE` ditolak
-			// SQLite. Itu bukan kesalahan: di produksi `ensure_column` memeriksa
-			// keberadaan kolom lebih dulu dan melewatinya.
-			if (/duplicate column name/i.test(message)) continue;
-			if (izinkanTabelGanda && /already exists/i.test(message)) continue;
-			const preview = statement.slice(0, 110).replace(/\s+/g, " ");
-			failures.push(`${message}\n        SQL: ${preview}…`);
-		}
-	}
+  for (const statement of statements) {
+    try {
+      db.run(statement);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      // `ADD COLUMN` untuk kolom yang sudah lahir dari `CREATE TABLE` ditolak
+      // SQLite. Itu bukan kesalahan: di produksi `ensure_column` memeriksa
+      // keberadaan kolom lebih dulu dan melewatinya.
+      if (/duplicate column name/i.test(message)) continue;
+      if (izinkanTabelGanda && /already exists/i.test(message)) continue;
+      const preview = statement.slice(0, 110).replace(/\s+/g, " ");
+      failures.push(`${message}\n        SQL: ${preview}…`);
+    }
+  }
 
-	if (failures.length > 0) {
-		db.close();
-		throw new Error(
-			`DDL ${label} gagal dijalankan di SQLite:\n      - ${failures.join("\n      - ")}`,
-		);
-	}
+  if (failures.length > 0) {
+    db.close();
+    throw new Error(
+      `DDL ${label} gagal dijalankan di SQLite:\n      - ${failures.join("\n      - ")}`,
+    );
+  }
 
-	return db;
+  return db;
 }
 
 /** Bangun struktur skema dengan benar-benar menjalankan DDL-nya. */
 export function buildSchemaFromDdl(
-	statements: string[],
-	label: string,
+  statements: string[],
+  label: string,
 ): TableSchema {
-	const db = openDatabaseFromDdl(statements, label);
-	const schema = readSchema(db);
-	db.close();
-	return schema;
+  const db = openDatabaseFromDdl(statements, label);
+  const schema = readSchema(db);
+  db.close();
+  return schema;
 }
 
 export function buildCloudSchema(tursoSource: string): TableSchema {
-	return buildSchemaFromDdl(collectCloudDdl(tursoSource), "cloud (turso.rs)");
+  return buildSchemaFromDdl(collectCloudDdl(tursoSource), "cloud (turso.rs)");
 }
 
 export function buildRepairSchema(tursoSource: string): TableSchema {
-	return buildSchemaFromDdl(collectRepairDdl(tursoSource), "repair (turso.rs)");
+  return buildSchemaFromDdl(collectRepairDdl(tursoSource), "repair (turso.rs)");
 }
 
 export function buildLocalSchema(storageSource: string): TableSchema {
-	return buildSchemaFromDdl(
-		collectLocalDdl(storageSource),
-		"lokal (storage.rs)",
-	);
+  return buildSchemaFromDdl(
+    collectLocalDdl(storageSource),
+    "lokal (storage.rs)",
+  );
 }
 
 /** Baca tabel dan kolom sebuah database lewat PRAGMA. */
 export function readSchema(db: Database): TableSchema {
-	const tables = db
-		.query(
-			"SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%' ORDER BY name;",
-		)
-		.all() as { name: string }[];
+  const tables = db
+    .query(
+      "SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%' ORDER BY name;",
+    )
+    .all() as { name: string }[];
 
-	const schema: TableSchema = new Map();
-	for (const table of tables) {
-		const columns = db.query(`PRAGMA table_info("${table.name}");`).all() as {
-			name: string;
-		}[];
-		schema.set(table.name, new Set(columns.map((column) => column.name)));
-	}
-	return schema;
+  const schema: TableSchema = new Map();
+  for (const table of tables) {
+    const columns = db.query(`PRAGMA table_info("${table.name}");`).all() as {
+      name: string;
+    }[];
+    schema.set(table.name, new Set(columns.map((column) => column.name)));
+  }
+  return schema;
 }
 
 /** Ubah JSON {tabel: [kolom]} menjadi struktur skema. */
 export function schemaFromJson(raw: Record<string, string[]>): TableSchema {
-	return new Map(
-		Object.entries(raw).map(([table, columns]) => [table, new Set(columns)]),
-	);
+  return new Map(
+    Object.entries(raw).map(([table, columns]) => [table, new Set(columns)]),
+  );
 }
 
 export interface SchemaDiff {
-	missingTables: string[];
-	extraTables: string[];
-	columnDiffs: { table: string; missing: string[]; extra: string[] }[];
+  missingTables: string[];
+  extraTables: string[];
+  columnDiffs: { table: string; missing: string[]; extra: string[] }[];
 }
 
 /**
@@ -314,43 +314,43 @@ export interface SchemaDiff {
  * memang dimiliki kedua sisi.
  */
 export function diffSchema(
-	expected: TableSchema,
-	actual: TableSchema,
-	onlyTables?: Set<string>,
+  expected: TableSchema,
+  actual: TableSchema,
+  onlyTables?: Set<string>,
 ): SchemaDiff {
-	const relevant = (name: string) => !onlyTables || onlyTables.has(name);
+  const relevant = (name: string) => !onlyTables || onlyTables.has(name);
 
-	const missingTables = [...expected.keys()]
-		.filter((table) => relevant(table) && !actual.has(table))
-		.sort();
-	const extraTables = [...actual.keys()]
-		.filter((table) => relevant(table) && !expected.has(table))
-		.sort();
+  const missingTables = [...expected.keys()]
+    .filter((table) => relevant(table) && !actual.has(table))
+    .sort();
+  const extraTables = [...actual.keys()]
+    .filter((table) => relevant(table) && !expected.has(table))
+    .sort();
 
-	const columnDiffs: SchemaDiff["columnDiffs"] = [];
-	for (const [table, expectedColumns] of expected) {
-		if (!relevant(table)) continue;
-		const actualColumns = actual.get(table);
-		if (!actualColumns) continue;
+  const columnDiffs: SchemaDiff["columnDiffs"] = [];
+  for (const [table, expectedColumns] of expected) {
+    if (!relevant(table)) continue;
+    const actualColumns = actual.get(table);
+    if (!actualColumns) continue;
 
-		const missing = [...expectedColumns]
-			.filter((column) => !actualColumns.has(column))
-			.sort();
-		const extra = [...actualColumns]
-			.filter((column) => !expectedColumns.has(column))
-			.sort();
-		if (missing.length > 0 || extra.length > 0) {
-			columnDiffs.push({ table, missing, extra });
-		}
-	}
+    const missing = [...expectedColumns]
+      .filter((column) => !actualColumns.has(column))
+      .sort();
+    const extra = [...actualColumns]
+      .filter((column) => !expectedColumns.has(column))
+      .sort();
+    if (missing.length > 0 || extra.length > 0) {
+      columnDiffs.push({ table, missing, extra });
+    }
+  }
 
-	return { missingTables, extraTables, columnDiffs };
+  return { missingTables, extraTables, columnDiffs };
 }
 
 export function isDiffClean(diff: SchemaDiff): boolean {
-	return (
-		diff.missingTables.length === 0 &&
-		diff.extraTables.length === 0 &&
-		diff.columnDiffs.length === 0
-	);
+  return (
+    diff.missingTables.length === 0 &&
+    diff.extraTables.length === 0 &&
+    diff.columnDiffs.length === 0
+  );
 }

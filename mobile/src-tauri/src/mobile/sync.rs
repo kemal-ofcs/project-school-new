@@ -1049,6 +1049,7 @@ const SNAPSHOT_TABLES: &[SnapshotTable] = &[
             "is_aktif",
             "created_at",
             "updated_at",
+            "dihapus_pada",
         ],
         conflict_column: "id_kolom",
         entity_column: "id_kolom",

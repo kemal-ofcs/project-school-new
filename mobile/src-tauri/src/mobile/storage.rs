@@ -750,7 +750,8 @@ pub fn initialize(path: &Path) -> Result<(), String> {
         tipe TEXT NOT NULL CHECK (tipe IN ('Teks', 'Angka')),
         is_aktif INTEGER NOT NULL DEFAULT 1 CHECK (is_aktif IN (0, 1)),
         created_at TEXT NOT NULL DEFAULT (datetime('now')),
-        updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+        updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+        dihapus_pada TEXT
       );
       -- Vektor wajah terdaftar untuk verifikasi 1:1 saat scan (v38). Ikut
       -- SNAPSHOT_TABLES supaya terminal offline tetap bisa memeriksa; isinya
@@ -1815,6 +1816,13 @@ pub fn initialize(path: &Path) -> Result<(), String> {
         "inventory_barang",
         "atribut",
         "ALTER TABLE inventory_barang ADD COLUMN atribut TEXT;",
+    )?;
+    // Hapus permanen kolom tambahan (v54). NULL = belum dihapus.
+    ensure_column(
+        &connection,
+        "inventory_kolom",
+        "dihapus_pada",
+        "ALTER TABLE inventory_kolom ADD COLUMN dihapus_pada TEXT;",
     )?;
 
     // Shift tujuan sesi lanjutan. 0 = belum ditentukan, sehingga pemasangan

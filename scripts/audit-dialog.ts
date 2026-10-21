@@ -71,7 +71,10 @@ for (const ws of WORKSPACES) {
       temuan.push({
         berkas,
         baris: sumber.slice(0, m.index).split("\n").length,
-        petunjuk: [punyaJudul ? "judul" : null, punyaTutup ? "tombol tutup" : null]
+        petunjuk: [
+          punyaJudul ? "judul" : null,
+          punyaTutup ? "tombol tutup" : null,
+        ]
           .filter(Boolean)
           .join(" + "),
       });
@@ -96,4 +99,6 @@ if (temuan.length > 0) {
   );
   process.exit(1);
 }
-console.log("\n🎉 Setiap permukaan dialog memakai <Modal> atau <dialog> native.\n");
+console.log(
+  "\n🎉 Setiap permukaan dialog memakai <Modal> atau <dialog> native.\n",
+);

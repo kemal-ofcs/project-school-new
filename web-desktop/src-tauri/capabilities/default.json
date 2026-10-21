@@ -258,6 +258,7 @@
     "allow-desktop-inventory-save-item",
     "allow-desktop-inventory-save-code-prefixes",
     "allow-desktop-inventory-save-column",
+    "allow-desktop-inventory-delete-column",
     "allow-desktop-inventory-record-mutation",
     "allow-desktop-inventory-loans",
     "allow-desktop-uks-list",

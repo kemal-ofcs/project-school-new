@@ -480,6 +480,8 @@ pub struct KolomInfo {
     pub id_kolom: String,
     pub nama: String,
     pub tipe: String,
+    /// Dihapus permanen: isinya dibuang setiap kali barang disimpan.
+    pub dihapus: bool,
 }
 
 /// Cermin `validateKolom`. Murni: nama kembar, tipe yang terkunci, dan batas
@@ -536,8 +538,9 @@ pub fn is_angka_kanonik(value: &str) -> bool {
     bulat_sah && pecahan_sah
 }
 
-/// Cermin `validateAtribut`. Isi kosong dibuang; kunci yang belum dikenal
-/// perangkat ini (definisinya belum tertarik) tetap disimpan sebagai teks.
+/// Cermin `validateAtribut`. Isi kosong dan isi kolom yang sudah dihapus
+/// dibuang; kunci yang belum dikenal perangkat ini (definisinya belum tertarik)
+/// tetap disimpan sebagai teks.
 pub fn validate_atribut(
     atribut: &BTreeMap<String, String>,
     kolom: &[KolomInfo],
@@ -552,6 +555,9 @@ pub fn validate_atribut(
             continue;
         }
         let definisi = kolom.iter().find(|item| &item.id_kolom == kunci);
+        if definisi.is_some_and(|item| item.dihapus) {
+            continue;
+        }
         match definisi {
             Some(item) if item.tipe == "Angka" => {
                 if !is_angka_kanonik(isi) {
@@ -1078,8 +1084,10 @@ pub fn save_code_prefixes(
 /// offline hanya bisa terlihat di sini, karena DB sengaja tanpa UNIQUE.
 const LIST_KOLOM_SQL: &str = "SELECT k.id_kolom, k.nama, k.tipe, k.is_aktif,
         EXISTS(SELECT 1 FROM inventory_kolom lain
-               WHERE LOWER(lain.nama) = LOWER(k.nama) AND lain.id_kolom <> k.id_kolom) AS ganda
+               WHERE LOWER(lain.nama) = LOWER(k.nama) AND lain.id_kolom <> k.id_kolom
+                 AND lain.dihapus_pada IS NULL) AS ganda
      FROM inventory_kolom k
+     WHERE k.dihapus_pada IS NULL
      ORDER BY k.created_at, k.id_kolom
      -- batas: kolom aktif dibatasi MAKS_KOLOM_AKTIF saat menyimpan
      ;";
@@ -1106,7 +1114,7 @@ fn list_kolom(connection: &Connection) -> Result<Vec<Value>, CommandError> {
 
 fn read_kolom_info(connection: &Connection) -> Result<Vec<KolomInfo>, CommandError> {
     let mut statement = connection
-        .prepare("SELECT id_kolom, nama, tipe FROM inventory_kolom;")
+        .prepare("SELECT id_kolom, nama, tipe, dihapus_pada IS NOT NULL FROM inventory_kolom;")
         .map_err(|_| CommandError::internal())?;
     let rows = statement
         .query_map([], |row| {
@@ -1114,6 +1122,7 @@ fn read_kolom_info(connection: &Connection) -> Result<Vec<KolomInfo>, CommandErr
                 id_kolom: row.get(0)?,
                 nama: row.get(1)?,
                 tipe: row.get(2)?,
+                dihapus: row.get(3)?,
             })
         })
         .map_err(|_| CommandError::internal())?
@@ -1138,17 +1147,21 @@ pub fn save_column(state: &DesktopState, draft: Value) -> Result<Value, CommandE
 
     let requested_id = clean(&draft.id_kolom);
     let existing: Option<(String, i64)> = match requested_id.as_deref() {
-        Some(id) => Some(
-            transaction
+        Some(id) => {
+            let (tipe, aktif, dihapus): (String, i64, bool) = transaction
                 .query_row(
-                    "SELECT tipe, is_aktif FROM inventory_kolom WHERE id_kolom = ?;",
+                    "SELECT tipe, is_aktif, dihapus_pada IS NOT NULL FROM inventory_kolom WHERE id_kolom = ?;",
                     params![id],
-                    |row| Ok((row.get(0)?, row.get(1)?)),
+                    |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
                 )
                 .optional()
                 .map_err(|_| CommandError::internal())?
-                .ok_or_else(|| invalid("Kolom tidak ditemukan."))?,
-        ),
+                .ok_or_else(|| invalid("Kolom tidak ditemukan."))?;
+            if dihapus {
+                return Err(invalid("Kolom ini sudah dihapus."));
+            }
+            Some((tipe, aktif))
+        }
         None => None,
     };
     let id_kolom = requested_id.unwrap_or_else(|| new_hex_id("kol-"));
@@ -1162,7 +1175,8 @@ pub fn save_column(state: &DesktopState, draft: Value) -> Result<Value, CommandE
     let nama_dipakai: bool = transaction
         .query_row(
             "SELECT EXISTS(SELECT 1 FROM inventory_kolom
-                           WHERE LOWER(nama) = LOWER(?) AND id_kolom <> ?);",
+                           WHERE LOWER(nama) = LOWER(?) AND id_kolom <> ?
+                             AND dihapus_pada IS NULL);",
             params![valid.nama, id_kolom],
             |row| row.get(0),
         )
@@ -1195,9 +1209,19 @@ pub fn save_column(state: &DesktopState, draft: Value) -> Result<Value, CommandE
             params![id_kolom, valid.nama, valid.tipe, valid.is_aktif as i64],
         )
         .map_err(|_| CommandError::internal())?;
+    enqueue_kolom(&transaction, &client_id, &id_kolom)?;
+    transaction.commit().map_err(|_| CommandError::internal())?;
+    Ok(json!({ "sukses": true, "id_kolom": id_kolom }))
+}
+
+fn enqueue_kolom(
+    transaction: &Transaction<'_>,
+    client_id: &str,
+    id_kolom: &str,
+) -> Result<(), CommandError> {
     let payload = transaction
         .query_row(
-            "SELECT id_kolom, nama, tipe, is_aktif, created_at, updated_at
+            "SELECT id_kolom, nama, tipe, is_aktif, created_at, updated_at, dihapus_pada
              FROM inventory_kolom WHERE id_kolom = ?;",
             params![id_kolom],
             |row| {
@@ -1208,21 +1232,101 @@ pub fn save_column(state: &DesktopState, draft: Value) -> Result<Value, CommandE
                     "is_aktif": row.get::<_, i64>(3)?,
                     "created_at": row.get::<_, String>(4)?,
                     "updated_at": row.get::<_, String>(5)?,
+                    "dihapus_pada": row.get::<_, Option<String>>(6)?,
                 }))
             },
         )
         .map_err(|_| CommandError::internal())?;
     sync::enqueue(
-        &transaction,
-        &client_id,
+        transaction,
+        client_id,
         "inventory-column",
         "save",
-        &id_kolom,
+        id_kolom,
         &payload,
         None,
     )?;
+    Ok(())
+}
+
+/// Hapus permanen kolom tambahan. Barisnya tetap ada bertanda `dihapus_pada`
+/// (baris yang benar-benar dibuang tidak pernah sampai ke perangkat lain,
+/// karena snapshot ini `delete_missing: false`), sedangkan isinya dibuang dari
+/// setiap barang di transaksi yang sama. Isi yang masih terkirim dari
+/// perangkat yang belum sinkron dibuang `validate_atribut` saat barang itu
+/// disimpan lagi.
+pub fn delete_column(state: &DesktopState, id_kolom: &str) -> Result<Value, CommandError> {
+    let id_kolom = id_kolom.trim();
+    if !is_id_kolom(id_kolom) {
+        return Err(invalid("Kolom tidak ditemukan."));
+    }
+    let client_id = sync::ensure_client_id(state)?;
+    let mut connection = storage::database(&state.data_dir)?;
+    let transaction = connection
+        .transaction()
+        .map_err(|_| CommandError::internal())?;
+
+    let dihapus: bool = transaction
+        .query_row(
+            "SELECT dihapus_pada IS NOT NULL FROM inventory_kolom WHERE id_kolom = ?;",
+            params![id_kolom],
+            |row| row.get(0),
+        )
+        .optional()
+        .map_err(|_| CommandError::internal())?
+        .ok_or_else(|| invalid("Kolom tidak ditemukan."))?;
+    if dihapus {
+        return Err(invalid("Kolom ini sudah dihapus."));
+    }
+    transaction
+        .execute(
+            "UPDATE inventory_kolom
+             SET dihapus_pada = datetime('now'), is_aktif = 0, updated_at = datetime('now')
+             WHERE id_kolom = ?;",
+            params![id_kolom],
+        )
+        .map_err(|_| CommandError::internal())?;
+    enqueue_kolom(&transaction, &client_id, id_kolom)?;
+
+    // `id_kolom` sudah lolos `is_id_kolom` (huruf heksadesimal), jadi aman
+    // disusun menjadi path JSON.
+    let path = format!("$.\"{id_kolom}\"");
+    let barang: Vec<String> = transaction
+        .prepare(
+            "SELECT id_barang FROM inventory_barang
+             WHERE json_valid(atribut) AND json_extract(atribut, ?) IS NOT NULL
+             -- batas: hanya barang yang memegang isi kolom ini; ditulis ulang semua dalam satu transaksi
+             ;",
+        )
+        .and_then(|mut statement| {
+            statement
+                .query_map(params![path], |row| row.get(0))?
+                .collect::<Result<_, _>>()
+        })
+        .map_err(|_| CommandError::internal())?;
+    for id_barang in &barang {
+        transaction
+            .execute(
+                "UPDATE inventory_barang
+                 SET atribut = NULLIF(json_remove(atribut, ?), '{}'), updated_at = datetime('now')
+                 WHERE id_barang = ?;",
+                params![path, id_barang],
+            )
+            .map_err(|_| CommandError::internal())?;
+        let payload =
+            barang_json(&transaction, id_barang)?.ok_or_else(CommandError::internal)?;
+        sync::enqueue(
+            &transaction,
+            &client_id,
+            "inventory-item",
+            "save",
+            id_barang,
+            &payload,
+            None,
+        )?;
+    }
     transaction.commit().map_err(|_| CommandError::internal())?;
-    Ok(json!({ "sukses": true, "id_kolom": id_kolom }))
+    Ok(json!({ "sukses": true, "barang_dibersihkan": barang.len() }))
 }
 
 fn wib_today(connection: &Connection) -> String {
@@ -3145,15 +3249,21 @@ pub fn cloud_column_values(row: &Value, entity_key: &str) -> Option<Vec<Value>> 
         json!(aktif),
         json!(payload_text(row, "created_at")),
         json!(payload_text(row, "updated_at")),
+        json!(payload_text(row, "dihapus_pada")),
     ])
 }
 
+/// Sekali dihapus tetap dihapus: perangkat yang belum sinkron lalu mengganti
+/// nama atau mengaktifkan kolom itu tidak bisa menghidupkannya lagi.
 pub const CLOUD_UPSERT_COLUMN_SQL: &str = "INSERT INTO inventory_kolom (
-        id_kolom, nama, tipe, is_aktif, created_at, updated_at
-    ) VALUES (?, ?, ?, ?, COALESCE(?, datetime('now')), COALESCE(?, datetime('now')))
+        id_kolom, nama, tipe, is_aktif, created_at, updated_at, dihapus_pada
+    ) VALUES (?, ?, ?, ?, COALESCE(?, datetime('now')), COALESCE(?, datetime('now')), ?)
     ON CONFLICT(id_kolom) DO UPDATE SET
         nama = excluded.nama,
-        is_aktif = excluded.is_aktif,
+        is_aktif = CASE
+            WHEN COALESCE(inventory_kolom.dihapus_pada, excluded.dihapus_pada) IS NULL
+            THEN excluded.is_aktif ELSE 0 END,
+        dihapus_pada = COALESCE(inventory_kolom.dihapus_pada, excluded.dihapus_pada),
         updated_at = excluded.updated_at;";
 
 /// Nilai kolom `inventory_mutasi` dari payload event. Cloud TIDAK memeriksa
@@ -3526,11 +3636,19 @@ mod tests {
                 id_kolom: "kol-a1".into(),
                 nama: "Merek".into(),
                 tipe: "Teks".into(),
+                dihapus: false,
             },
             KolomInfo {
                 id_kolom: "kol-b2".into(),
                 nama: "Berat".into(),
                 tipe: "Angka".into(),
+                dihapus: false,
+            },
+            KolomInfo {
+                id_kolom: "kol-c3".into(),
+                nama: "Warna".into(),
+                tipe: "Angka".into(),
+                dihapus: true,
             },
         ];
         let peta = |value: Value| -> BTreeMap<String, String> {
@@ -3542,6 +3660,8 @@ mod tests {
                 Ok(json!({"kol-a1":"Pilot","kol-b2":"2.5","kol-ff":"dari perangkat lain"})),
             ),
             (json!({"kol-a1":"   "}), Ok(json!({}))),
+            // Kolom yang dihapus: isinya dibuang, tidak divalidasi.
+            (json!({"kol-a1":"Pilot","kol-c3":"bukan angka"}), Ok(json!({"kol-a1":"Pilot"}))),
             (json!({"kol-b2":"2,5"}), Err("Isi kolom Berat harus angka.")),
             (
                 json!({"kol-a1":"x".repeat(201)}),
@@ -4652,6 +4772,61 @@ mod tests {
         // "gudang" mengikuti ejaan "Gudang" milik tempat_utama barang.
         let list = list_inventory(&state).unwrap();
         assert_eq!(list["tempat"], json!(["Gudang"]));
+    }
+
+    #[test]
+    fn delete_column_purges_values_and_cannot_be_revived() {
+        let (_directory, state) = setup_state();
+        let kolom = save_column(&state, json!({"nama": "Merek", "tipe": "Teks"})).unwrap();
+        let id_kolom = kolom["id_kolom"].as_str().unwrap().to_owned();
+        let id_barang = insert_item(&state, "Aset", false);
+        let barang = barang_json(&storage::database(&state.data_dir).unwrap(), &id_barang)
+            .unwrap()
+            .unwrap();
+        let mut draft = json!({
+            "id_barang": id_barang,
+            "kode_barang": barang["kode_barang"],
+            "nama_barang": barang["nama_barang"],
+            "tipe": barang["tipe"],
+            "satuan": barang["satuan"],
+            "atribut": { id_kolom.as_str(): "Pilot" },
+        });
+        save_item(&state, draft.clone()).unwrap();
+
+        let hasil = delete_column(&state, &id_kolom).unwrap();
+        assert_eq!(hasil["barang_dibersihkan"], 1);
+        let connection = storage::database(&state.data_dir).unwrap();
+        let atribut: Option<String> = connection
+            .query_row(
+                "SELECT atribut FROM inventory_barang WHERE id_barang = ?;",
+                params![id_barang],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(atribut, None);
+        assert!(list_kolom(&connection).unwrap().is_empty());
+
+        // Isi lama yang masih terkirim dari perangkat lain dibuang saat disimpan.
+        draft["atribut"] = json!({ id_kolom.as_str(): "Pilot" });
+        save_item(&state, draft).unwrap();
+        let atribut: Option<String> = connection
+            .query_row(
+                "SELECT atribut FROM inventory_barang WHERE id_barang = ?;",
+                params![id_barang],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(atribut, None);
+
+        let error = save_column(
+            &state,
+            json!({"id_kolom": id_kolom, "nama": "Merek", "tipe": "Teks"}),
+        )
+        .unwrap_err();
+        assert_eq!(error.message, "Kolom ini sudah dihapus.");
+        // Namanya boleh dipakai lagi oleh kolom baru.
+        save_column(&state, json!({"nama": "Merek", "tipe": "Teks"})).unwrap();
+        assert!(delete_column(&state, &id_kolom).is_err());
     }
 
     #[test]

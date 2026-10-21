@@ -3,25 +3,43 @@
 import { type FormEvent, useState } from "react";
 import { Modal } from "@/components/ui/Modal";
 import {
+  type BarangInventaris,
+  hapusKolomInventaris,
   type KolomInventaris,
   simpanKolomInventaris,
 } from "@/lib/gateways/inventory";
-import { MAKS_KOLOM_AKTIF, TIPE_KOLOM } from "@/lib/validations/inventory";
-import { INPUT, LABEL, pesanGalat, TOMBOL_KEDUA, TOMBOL_UTAMA } from "./gaya";
+import {
+  KONFIRMASI_HAPUS_KOLOM,
+  MAKS_KOLOM_AKTIF,
+  TIPE_KOLOM,
+} from "@/lib/validations/inventory";
+import {
+  INPUT,
+  LABEL,
+  pesanGalat,
+  TOMBOL_BAHAYA,
+  TOMBOL_KEDUA,
+  TOMBOL_UTAMA,
+} from "./gaya";
 
 type Pesan = { tone: "success" | "error"; text: string } | null;
 
 /**
- * Kolom tambahan barang: tambah, ganti nama, nonaktifkan. Tidak ada hapus:
- * isi kolom nonaktif tetap tersimpan dan kembali bila kolomnya diaktifkan.
+ * Kolom tambahan barang: tambah, ganti nama, nonaktifkan, hapus permanen.
+ * Nonaktif menyimpan isinya; hapus permanen membuangnya dari semua barang dan
+ * menuntut izin sensitif `inventory.column.delete`.
  */
 export function DialogKolomTambahan({
   kolom,
+  barang,
+  bolehHapus,
   isSubmittingRef,
   onClose,
   onChanged,
 }: {
   kolom: KolomInventaris[];
+  barang: BarangInventaris[];
+  bolehHapus: boolean;
   isSubmittingRef: { current: boolean };
   onClose: () => void;
   onChanged: () => Promise<void>;
@@ -54,6 +72,27 @@ export function DialogKolomTambahan({
     }
   };
 
+  const hapus = async (item: KolomInventaris) => {
+    if (isSubmittingRef.current) return;
+    isSubmittingRef.current = true;
+    setPesan(null);
+    try {
+      const hasil = await hapusKolomInventaris(item.id_kolom);
+      await onChanged();
+      setPesan({
+        tone: "success",
+        text: `Kolom ${item.nama} dihapus permanen. Isinya dibuang dari ${hasil.barang_dibersihkan} barang.`,
+      });
+    } catch (error) {
+      setPesan({
+        tone: "error",
+        text: pesanGalat(error, "Kolom tidak bisa dihapus."),
+      });
+    } finally {
+      isSubmittingRef.current = false;
+    }
+  };
+
   const tambah = async (event: FormEvent) => {
     event.preventDefault();
     const ok = await simpan(
@@ -75,6 +114,9 @@ export function DialogKolomTambahan({
           Kolom tambahan muncul di formulir barang, rincian, dan berkas Excel.
           Menonaktifkan kolom menyembunyikannya tanpa menghapus isinya. Tipe
           tidak bisa diubah setelah kolom dibuat.
+          {bolehHapus
+            ? " Menghapus kolom membuang isinya dari semua barang dan tidak bisa dikembalikan."
+            : ""}
         </p>
         {kolom.length === 0 ? (
           <p className="text-sm text-slate-400">Belum ada kolom tambahan.</p>
@@ -84,7 +126,12 @@ export function DialogKolomTambahan({
               <BarisKolom
                 key={`${item.id_kolom}:${item.nama}`}
                 kolom={item}
+                jumlahTerisi={
+                  barang.filter((isi) => isi.atribut[item.id_kolom]).length
+                }
+                bolehHapus={bolehHapus}
                 onSimpan={simpan}
+                onHapus={() => hapus(item)}
               />
             ))}
           </ul>
@@ -156,16 +203,25 @@ export function DialogKolomTambahan({
 
 function BarisKolom({
   kolom,
+  jumlahTerisi,
+  bolehHapus,
   onSimpan,
+  onHapus,
 }: {
   kolom: KolomInventaris;
+  jumlahTerisi: number;
+  bolehHapus: boolean;
   onSimpan: (
     draft: Parameters<typeof simpanKolomInventaris>[0],
     berhasil: string,
   ) => Promise<boolean>;
+  onHapus: () => Promise<void>;
 }) {
   const [nama, setNama] = useState(kolom.nama);
+  const [konfirmasi, setKonfirmasi] = useState(false);
+  const [ketikan, setKetikan] = useState("");
   const idInput = `inv-kolom-${kolom.id_kolom}`;
+  const idKetik = `inv-kolom-hapus-${kolom.id_kolom}`;
   const draft = { id_kolom: kolom.id_kolom, tipe: kolom.tipe };
 
   return (
@@ -210,7 +266,60 @@ function BarisKolom({
         >
           {kolom.is_aktif ? "Nonaktifkan" : "Aktifkan"}
         </button>
+        {bolehHapus && !konfirmasi ? (
+          <button
+            type="button"
+            onClick={() => setKonfirmasi(true)}
+            className={TOMBOL_BAHAYA}
+          >
+            Hapus
+          </button>
+        ) : null}
       </div>
+      {konfirmasi ? (
+        <div className="space-y-2 rounded-lg border border-rose-500/30 bg-rose-500/20 p-3 text-sm text-rose-100">
+          <p className="font-semibold">Hapus kolom {kolom.nama} permanen?</p>
+          <p>
+            {jumlahTerisi > 0
+              ? `Isi kolom ini di ${jumlahTerisi} barang akan dihapus dan tidak bisa dikembalikan.`
+              : "Belum ada barang yang mengisi kolom ini. Kolomnya tidak bisa dikembalikan setelah dihapus."}{" "}
+            Kalau masih ragu, pilih Nonaktifkan: kolomnya tersembunyi tetapi
+            isinya tetap tersimpan.
+          </p>
+          <div>
+            <label htmlFor={idKetik} className={LABEL}>
+              Ketik {KONFIRMASI_HAPUS_KOLOM} untuk melanjutkan
+            </label>
+            <input
+              id={idKetik}
+              value={ketikan}
+              autoComplete="off"
+              onChange={(e) => setKetikan(e.target.value)}
+              className={INPUT}
+            />
+          </div>
+          <div className="flex flex-wrap justify-end gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                setKonfirmasi(false);
+                setKetikan("");
+              }}
+              className={TOMBOL_KEDUA}
+            >
+              Batal
+            </button>
+            <button
+              type="button"
+              disabled={ketikan.trim() !== KONFIRMASI_HAPUS_KOLOM}
+              onClick={() => void onHapus()}
+              className={TOMBOL_BAHAYA}
+            >
+              Hapus permanen
+            </button>
+          </div>
+        </div>
+      ) : null}
       {kolom.nama_ganda ? (
         <p className="text-xs font-medium text-amber-300">
           Nama ini juga dipakai kolom lain. Ganti salah satunya supaya impor

@@ -25,6 +25,7 @@ const {
   recordOpname,
   registerUnits,
   saveCodePrefixes,
+  deleteColumn,
   saveColumn,
   saveItem,
   saveUnit,
@@ -820,5 +821,51 @@ describe("kolom tambahan Web", () => {
     ).toEqual({
       [berat]: "2.5",
     });
+  });
+});
+
+describe("hapus permanen kolom tambahan Web", () => {
+  test("isi dibuang dari barang, nama bisa dipakai lagi, tidak bisa dihidupkan", async () => {
+    const { id_kolom } = await saveColumn(client, {
+      nama: "Merek",
+      tipe: "Teks",
+    });
+    const draft = {
+      nama_barang: "Spidol",
+      tipe: "Habis Pakai",
+      satuan: "pcs",
+      atribut: { [id_kolom]: "Pilot" },
+    };
+    const { id_barang } = await saveItem(client, draft);
+    await saveItem(client, {
+      nama_barang: "Kapur",
+      tipe: "Habis Pakai",
+      satuan: "pcs",
+    });
+
+    expect(await deleteColumn(client, id_kolom)).toEqual({
+      sukses: true,
+      barang_dibersihkan: 1,
+    });
+    const daftar = await listInventory(client);
+    expect(daftar.kolom).toEqual([]);
+    expect(
+      daftar.barang.find((item) => item.id_barang === id_barang)?.atribut,
+    ).toEqual({});
+
+    // Isi lama dari perangkat yang belum sinkron dibuang saat disimpan.
+    await saveItem(client, { ...draft, id_barang });
+    const ulang = await listInventory(client);
+    expect(
+      ulang.barang.find((item) => item.id_barang === id_barang)?.atribut,
+    ).toEqual({});
+
+    await expect(
+      saveColumn(client, { id_kolom, nama: "Merek", tipe: "Teks" }),
+    ).rejects.toThrow("Kolom ini sudah dihapus.");
+    await expect(deleteColumn(client, id_kolom)).rejects.toThrow(
+      "Kolom ini sudah dihapus.",
+    );
+    await saveColumn(client, { nama: "Merek", tipe: "Teks" });
   });
 });

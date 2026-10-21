@@ -60,19 +60,19 @@ const DIALOG_SISTEM = /(^|[^.\w$])(confirm|alert|prompt)\s*\(/gm;
  * itu sendiri — dan audit yang menuduh kode benar akan dimatikan orang.
  */
 function terikatLokal(sumber: string, nama: string): boolean {
-	const pola = [
-		new RegExp(`\\b(?:const|let|var|function)\\s+${nama}\\b`),
-		new RegExp(`\\bimport\\s+[^;]*\\b${nama}\\b[^;]*from`),
-		new RegExp(`\\b${nama}\\s*[:=]\\s*(?:async\\s*)?\\(`),
-		new RegExp(`\\{[^}]*\\b${nama}\\b[^}]*\\}\\s*=`),
-	];
-	return pola.some((p) => p.test(sumber));
+  const pola = [
+    new RegExp(`\\b(?:const|let|var|function)\\s+${nama}\\b`),
+    new RegExp(`\\bimport\\s+[^;]*\\b${nama}\\b[^;]*from`),
+    new RegExp(`\\b${nama}\\s*[:=]\\s*(?:async\\s*)?\\(`),
+    new RegExp(`\\{[^}]*\\b${nama}\\b[^}]*\\}\\s*=`),
+  ];
+  return pola.some((p) => p.test(sumber));
 }
 
 interface Pelanggaran {
-	berkas: string;
-	baris: number;
-	cuplikan: string;
+  berkas: string;
+  baris: number;
+  cuplikan: string;
 }
 
 /**
@@ -88,29 +88,31 @@ interface Pelanggaran {
  * yang dilaporkan tetap menunjuk posisi aslinya di berkas.
  */
 function tanpaKomentar(sumber: string): string {
-	return sumber
-		.replace(/\/\*[\s\S]*?\*\//g, (cocok) => cocok.replace(/[^\n]/g, " "))
-		.replace(/(^|[^:])\/\/[^\n]*/g, (cocok, awalan: string) =>
-			awalan + cocok.slice(awalan.length).replace(/./g, " "),
-		);
+  return sumber
+    .replace(/\/\*[\s\S]*?\*\//g, (cocok) => cocok.replace(/[^\n]/g, " "))
+    .replace(
+      /(^|[^:])\/\/[^\n]*/g,
+      (cocok, awalan: string) =>
+        awalan + cocok.slice(awalan.length).replace(/./g, " "),
+    );
 }
 
 function heading(text: string) {
-	console.log(`\n${"─".repeat(70)}\n${text}\n${"─".repeat(70)}`);
+  console.log(`\n${"─".repeat(70)}\n${text}\n${"─".repeat(70)}`);
 }
 
 function kumpulkanTsx(direktori: string, hasil: string[] = []): string[] {
-	if (!fs.existsSync(direktori)) return hasil;
-	for (const entri of fs.readdirSync(direktori, { withFileTypes: true })) {
-		const penuh = path.join(direktori, entri.name);
-		if (entri.isDirectory()) {
-			if (entri.name === "node_modules") continue;
-			kumpulkanTsx(penuh, hasil);
-		} else if (entri.name.endsWith(".tsx") || entri.name.endsWith(".ts")) {
-			hasil.push(penuh);
-		}
-	}
-	return hasil;
+  if (!fs.existsSync(direktori)) return hasil;
+  for (const entri of fs.readdirSync(direktori, { withFileTypes: true })) {
+    const penuh = path.join(direktori, entri.name);
+    if (entri.isDirectory()) {
+      if (entri.name === "node_modules") continue;
+      kumpulkanTsx(penuh, hasil);
+    } else if (entri.name.endsWith(".tsx") || entri.name.endsWith(".ts")) {
+      hasil.push(penuh);
+    }
+  }
+  return hasil;
 }
 
 heading("Audit Dialog Sistem — konfirmasi memakai antarmuka aplikasi");
@@ -119,56 +121,54 @@ const pelanggaran: Pelanggaran[] = [];
 let diperiksa = 0;
 
 for (const workspace of WORKSPACES) {
-	for (const direktori of ["src/app", "src/components"]) {
-		for (const berkasAbsolut of kumpulkanTsx(
-			path.join(rootDir, workspace, direktori),
-		)) {
-			diperiksa++;
-			const sumber = tanpaKomentar(fs.readFileSync(berkasAbsolut, "utf8"));
-			const berkas = path
-				.relative(rootDir, berkasAbsolut)
-				.split(path.sep)
-				.join("/");
+  for (const direktori of ["src/app", "src/components"]) {
+    for (const berkasAbsolut of kumpulkanTsx(
+      path.join(rootDir, workspace, direktori),
+    )) {
+      diperiksa++;
+      const sumber = tanpaKomentar(fs.readFileSync(berkasAbsolut, "utf8"));
+      const berkas = path
+        .relative(rootDir, berkasAbsolut)
+        .split(path.sep)
+        .join("/");
 
-			for (const cocok of sumber.matchAll(DIALOG_SISTEM)) {
-				if (cocok.index === undefined) continue;
-				const nama = cocok[2] as string;
-				// `window.confirm(` selalu dialog sistem. `confirm(` telanjang
-				// hanya dikecualikan bila berkasnya memang mengikat nama itu.
-				const eksplisit = sumber
-					.slice(Math.max(0, cocok.index - 7), cocok.index + 8)
-					.includes(`window.${nama}`);
-				if (!eksplisit && terikatLokal(sumber, nama)) continue;
+      for (const cocok of sumber.matchAll(DIALOG_SISTEM)) {
+        if (cocok.index === undefined) continue;
+        const nama = cocok[2] as string;
+        // `window.confirm(` selalu dialog sistem. `confirm(` telanjang
+        // hanya dikecualikan bila berkasnya memang mengikat nama itu.
+        const eksplisit = sumber
+          .slice(Math.max(0, cocok.index - 7), cocok.index + 8)
+          .includes(`window.${nama}`);
+        if (!eksplisit && terikatLokal(sumber, nama)) continue;
 
-				const mulai = cocok.index + (cocok[1]?.length ?? 0);
-				pelanggaran.push({
-					berkas,
-					baris: sumber.slice(0, mulai).split("\n").length,
-					cuplikan: sumber
-						.slice(mulai, mulai + 80)
-						.split("\n")[0] as string,
-				});
-			}
-		}
-	}
+        const mulai = cocok.index + (cocok[1]?.length ?? 0);
+        pelanggaran.push({
+          berkas,
+          baris: sumber.slice(0, mulai).split("\n").length,
+          cuplikan: sumber.slice(mulai, mulai + 80).split("\n")[0] as string,
+        });
+      }
+    }
+  }
 }
 
 console.log(`  Berkas diperiksa : ${diperiksa}`);
 console.log(`  Dialog sistem    : ${pelanggaran.length}`);
 
 if (pelanggaran.length > 0) {
-	heading("Pelanggaran");
-	for (const { berkas, baris, cuplikan } of pelanggaran) {
-		console.log(`  ❌ ${berkas}:${baris}`);
-		console.log(`     ${cuplikan}`);
-	}
-	console.error(
-		`\n❌ ${pelanggaran.length} dialog sistem di antarmuka.\n` +
-			"   Pakai `useConfirmDialog` dari @/lib/hooks/useConfirmDialog — ia\n" +
-			"   memisahkan apa yang HILANG dari apa yang TETAP ADA, dan tampil sama\n" +
-			"   di Desktop maupun WebView Android.\n",
-	);
-	process.exit(1);
+  heading("Pelanggaran");
+  for (const { berkas, baris, cuplikan } of pelanggaran) {
+    console.log(`  ❌ ${berkas}:${baris}`);
+    console.log(`     ${cuplikan}`);
+  }
+  console.error(
+    `\n❌ ${pelanggaran.length} dialog sistem di antarmuka.\n` +
+      "   Pakai `useConfirmDialog` dari @/lib/hooks/useConfirmDialog — ia\n" +
+      "   memisahkan apa yang HILANG dari apa yang TETAP ADA, dan tampil sama\n" +
+      "   di Desktop maupun WebView Android.\n",
+  );
+  process.exit(1);
 }
 console.log("\n🎉 Tidak ada dialog sistem di antarmuka.\n");
 

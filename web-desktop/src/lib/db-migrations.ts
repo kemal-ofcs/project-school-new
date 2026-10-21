@@ -64,6 +64,7 @@ const SHIFT_WORK_DAYS_MIGRATION_VERSION = 50;
 const PAYROLL_RAPEL_MIGRATION_VERSION = 51;
 const PMB_PAYMENT_MIGRATION_VERSION = 52;
 const INVENTORY_COLUMN_MIGRATION_VERSION = 53;
+const INVENTORY_COLUMN_DELETE_MIGRATION_VERSION = 54;
 
 /**
  * v21 — aturan jam scan baru: Jam Kerja Normal = (Jam Pulang − Jam Masuk) −
@@ -639,6 +640,12 @@ export async function runDatabaseMigrations(client: Client) {
       "inventory_barang",
       "atribut",
       "ALTER TABLE inventory_barang ADD COLUMN atribut TEXT;",
+    ],
+    // Hapus permanen kolom tambahan (v54). NULL = belum dihapus.
+    [
+      "inventory_kolom",
+      "dihapus_pada",
+      "ALTER TABLE inventory_kolom ADD COLUMN dihapus_pada TEXT;",
     ],
   ] as const) {
     if (
@@ -2150,13 +2157,20 @@ export async function runDatabaseMigrations(client: Client) {
       tipe TEXT NOT NULL CHECK (tipe IN ('Teks', 'Angka')),
       is_aktif INTEGER NOT NULL DEFAULT 1 CHECK (is_aktif IN (0, 1)),
       created_at TEXT NOT NULL DEFAULT (datetime('now')),
-      updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+      updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+      dihapus_pada TEXT
     );
   `);
   await client.execute({
     sql: `INSERT OR IGNORE INTO schema_migration (version, name, applied_at)
           VALUES (?, 'inventory-column', ?);`,
     args: [INVENTORY_COLUMN_MIGRATION_VERSION, now],
+  });
+  // v54 — hapus permanen kolom tambahan (ALTER-nya ada di daftar kolom di atas).
+  await client.execute({
+    sql: `INSERT OR IGNORE INTO schema_migration (version, name, applied_at)
+          VALUES (?, 'inventory-column-delete', ?);`,
+    args: [INVENTORY_COLUMN_DELETE_MIGRATION_VERSION, now],
   });
 
   await client.execute(

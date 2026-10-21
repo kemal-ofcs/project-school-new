@@ -529,6 +529,8 @@ export function InventarisWorkspace({
       {aturKolom && data ? (
         <DialogKolomTambahan
           kolom={data.kolom}
+          barang={data.barang}
+          bolehHapus={hasPermission(user, "inventory.column.delete")}
           isSubmittingRef={isSubmittingRef}
           onClose={() => setAturKolom(false)}
           onChanged={muat}

@@ -21,6 +21,7 @@ import {
   type KartuStok,
   KODE_PREFIX_SETTING_KEY,
   type KolomInventaris,
+  type KolomUntukAtribut,
   type KondisiBarang,
   type KopSekolah,
   kolomDraftSchema,
@@ -127,8 +128,10 @@ async function listKolom(client: Executor): Promise<KolomInventaris[]> {
   const result = await client.execute(
     `SELECT k.id_kolom, k.nama, k.tipe, k.is_aktif,
             EXISTS(SELECT 1 FROM inventory_kolom lain
-                   WHERE LOWER(lain.nama) = LOWER(k.nama) AND lain.id_kolom <> k.id_kolom) AS ganda
+                   WHERE LOWER(lain.nama) = LOWER(k.nama) AND lain.id_kolom <> k.id_kolom
+                     AND lain.dihapus_pada IS NULL) AS ganda
      FROM inventory_kolom k
+     WHERE k.dihapus_pada IS NULL
      ORDER BY k.created_at, k.id_kolom
      -- batas: kolom aktif dibatasi MAKS_KOLOM_AKTIF saat menyimpan
      ;`,
@@ -139,6 +142,21 @@ async function listKolom(client: Executor): Promise<KolomInventaris[]> {
     tipe: String(row.tipe) as TipeKolom,
     is_aktif: Number(row.is_aktif) === 1,
     nama_ganda: Number(row.ganda) === 1,
+  }));
+}
+
+/** Cermin `read_kolom_info`: termasuk kolom yang dihapus, untuk membuang isinya. */
+async function kolomUntukAtribut(
+  client: Executor,
+): Promise<KolomUntukAtribut[]> {
+  const result = await client.execute(
+    "SELECT id_kolom, nama, tipe, dihapus_pada IS NOT NULL AS dihapus FROM inventory_kolom;",
+  );
+  return result.rows.map((row) => ({
+    id_kolom: String(row.id_kolom),
+    nama: String(row.nama),
+    tipe: String(row.tipe) as TipeKolom,
+    dihapus: Number(row.dihapus) === 1,
   }));
 }
 
@@ -158,11 +176,13 @@ export async function saveColumn(
     let sudahAktif = false;
     if (requestedId) {
       const existing = await tx.execute({
-        sql: "SELECT tipe, is_aktif FROM inventory_kolom WHERE id_kolom = ?;",
+        sql: "SELECT tipe, is_aktif, dihapus_pada FROM inventory_kolom WHERE id_kolom = ?;",
         args: [requestedId],
       });
       const row = existing.rows[0];
       if (!row) throw new Error("Kolom tidak ditemukan.");
+      if (row.dihapus_pada !== null)
+        throw new Error("Kolom ini sudah dihapus.");
       if (String(row.tipe) !== valid.tipe) {
         throw new Error("Tipe kolom tidak bisa diubah setelah dibuat.");
       }
@@ -172,7 +192,8 @@ export async function saveColumn(
 
     const dipakai = await tx.execute({
       sql: `SELECT EXISTS(SELECT 1 FROM inventory_kolom
-                          WHERE LOWER(nama) = LOWER(?) AND id_kolom <> ?) AS ada;`,
+                          WHERE LOWER(nama) = LOWER(?) AND id_kolom <> ?
+                            AND dihapus_pada IS NULL) AS ada;`,
       args: [valid.nama, idKolom],
     });
     if (Number(dipakai.rows[0]?.ada) === 1) {
@@ -198,6 +219,47 @@ export async function saveColumn(
       args: [idKolom, valid.nama, valid.tipe, valid.is_aktif ? 1 : 0],
     });
     return { sukses: true as const, id_kolom: idKolom };
+  });
+}
+
+/**
+ * Cermin `delete_column`: tandai `dihapus_pada`, lalu buang isinya dari setiap
+ * barang di transaksi yang sama.
+ */
+export async function deleteColumn(
+  client: Client,
+  rawId: unknown,
+): Promise<{ sukses: true; barang_dibersihkan: number }> {
+  const idKolom = typeof rawId === "string" ? rawId.trim() : "";
+  if (!/^kol-[0-9a-f]{1,32}$/.test(idKolom)) {
+    throw new Error("Kolom tidak ditemukan.");
+  }
+  return withTransaction(client, async (tx) => {
+    const existing = await tx.execute({
+      sql: "SELECT dihapus_pada FROM inventory_kolom WHERE id_kolom = ?;",
+      args: [idKolom],
+    });
+    const row = existing.rows[0];
+    if (!row) throw new Error("Kolom tidak ditemukan.");
+    if (row.dihapus_pada !== null) throw new Error("Kolom ini sudah dihapus.");
+    await tx.execute({
+      sql: `UPDATE inventory_kolom
+            SET dihapus_pada = datetime('now'), is_aktif = 0, updated_at = datetime('now')
+            WHERE id_kolom = ?;`,
+      args: [idKolom],
+    });
+    // `idKolom` sudah lolos pola heksadesimal, jadi aman disusun menjadi path JSON.
+    const path = `$."${idKolom}"`;
+    const dibersihkan = await tx.execute({
+      sql: `UPDATE inventory_barang
+            SET atribut = NULLIF(json_remove(atribut, ?), '{}'), updated_at = datetime('now')
+            WHERE json_valid(atribut) AND json_extract(atribut, ?) IS NOT NULL;`,
+      args: [path, path],
+    });
+    return {
+      sukses: true as const,
+      barang_dibersihkan: dibersihkan.rowsAffected,
+    };
   });
 }
 
@@ -473,7 +535,10 @@ export async function saveItem(
       kode = await nextItemCode(tx, prefix, idBarang);
     }
     const tempatUtama = await canonicalTempat(tx, valid.tempat_utama);
-    const atribut = validateAtribut(parsed.data.atribut, await listKolom(tx));
+    const atribut = validateAtribut(
+      parsed.data.atribut,
+      await kolomUntukAtribut(tx),
+    );
     if (!atribut.ok) throw new Error(atribut.error);
 
     await tx.execute({

@@ -42,33 +42,30 @@ import path from "node:path";
 const rootDir = path.resolve(import.meta.dir, "..");
 const WORKSPACES = ["web-desktop", "mobile"];
 
-/** Predikat otorisasi yang diakui. */
-const PREDIKAT = /\b(canAccessArea|hasPermission|isSuperadmin)\b/g;
-
 /** Panggilan navigasi yang membuat sebuah pemeriksaan menjadi penjaga. */
 const NAVIGASI = /\b(redirect|router\.push|router\.replace)\s*\(/;
 
 interface Pelanggaran {
-	berkas: string;
-	alasan: string;
+  berkas: string;
+  alasan: string;
 }
 
 function heading(text: string) {
-	console.log(`\n${"─".repeat(70)}\n${text}\n${"─".repeat(70)}`);
+  console.log(`\n${"─".repeat(70)}\n${text}\n${"─".repeat(70)}`);
 }
 
 function kumpulkanTsx(direktori: string, hasil: string[] = []): string[] {
-	if (!fs.existsSync(direktori)) return hasil;
-	for (const entri of fs.readdirSync(direktori, { withFileTypes: true })) {
-		const penuh = path.join(direktori, entri.name);
-		if (entri.isDirectory()) {
-			if (entri.name === "node_modules") continue;
-			kumpulkanTsx(penuh, hasil);
-		} else if (entri.name.endsWith(".tsx")) {
-			hasil.push(penuh);
-		}
-	}
-	return hasil;
+  if (!fs.existsSync(direktori)) return hasil;
+  for (const entri of fs.readdirSync(direktori, { withFileTypes: true })) {
+    const penuh = path.join(direktori, entri.name);
+    if (entri.isDirectory()) {
+      if (entri.name === "node_modules") continue;
+      kumpulkanTsx(penuh, hasil);
+    } else if (entri.name.endsWith(".tsx")) {
+      hasil.push(penuh);
+    }
+  }
+  return hasil;
 }
 
 /**
@@ -79,12 +76,12 @@ function kumpulkanTsx(direktori: string, hasil: string[] = []): string[] {
  * adalah cabang atas `!isAuthenticated` yang navigasinya menuju `/login`.
  */
 function mengakuPrivat(sumber: string): boolean {
-	for (const cocok of sumber.matchAll(/!\s*isAuthenticated/g)) {
-		if (cocok.index === undefined) continue;
-		const cabang = sumber.slice(cocok.index, cocok.index + 240);
-		if (/["'`]\/login["'`]/.test(cabang) && NAVIGASI.test(cabang)) return true;
-	}
-	return false;
+  for (const cocok of sumber.matchAll(/!\s*isAuthenticated/g)) {
+    if (cocok.index === undefined) continue;
+    const cabang = sumber.slice(cocok.index, cocok.index + 240);
+    if (/["'`]\/login["'`]/.test(cabang) && NAVIGASI.test(cabang)) return true;
+  }
+  return false;
 }
 
 /**
@@ -96,7 +93,7 @@ function mengakuPrivat(sumber: string): boolean {
  * sifatnya sendiri, bukan lewat daftar pengecualian.
  */
 function memuatDataDomain(sumber: string): boolean {
-	return /from\s+["']@\/lib\/gateways\//.test(sumber);
+  return /from\s+["']@\/lib\/gateways\//.test(sumber);
 }
 
 /**
@@ -115,38 +112,38 @@ function memuatDataDomain(sumber: string): boolean {
  * `hasPermission` hanya untuk menyalakan tombol sementara datanya tetap termuat.
  */
 function punyaPenjagaOtorisasi(sumber: string): boolean {
-	// Nama variabel yang MENAMPUNG hasil pemeriksaan izin.
-	const penanda = [
-		...sumber.matchAll(
-			/\bconst\s+([A-Za-z_$][\w$]*)\s*=\s*(?:canAccessArea|hasPermission)\s*\(/g,
-		),
-	].map((cocok) => cocok[1] as string);
+  // Nama variabel yang MENAMPUNG hasil pemeriksaan izin.
+  const penanda = [
+    ...sumber.matchAll(
+      /\bconst\s+([A-Za-z_$][\w$]*)\s*=\s*(?:canAccessArea|hasPermission)\s*\(/g,
+    ),
+  ].map((cocok) => cocok[1] as string);
 
-	// Penjaga WAJIB berbentuk sebuah kondisi `if`, bukan sekadar penyebutan.
-	//
-	// Versi pertama audit ini hanya mencari predikat di dekat sebuah navigasi,
-	// dan itu meloloskan `mobile/settings/page.tsx`: di sana `user?.isSuperadmin`
-	// muncul di dalam DEPENDENCY ARRAY sebuah `useEffect`, tujuh baris di atas
-	// `router.replace("/login")` milik tombol keluar. Dua hal yang sama sekali
-	// tidak berhubungan terbaca sebagai penjaga.
-	for (const cocok of sumber.matchAll(/\bif\s*\(/g)) {
-		if (cocok.index === undefined) continue;
-		const bukaKurung = cocok.index + cocok[0].length - 1;
-		const tutupKurung = penutupKurung(sumber, bukaKurung);
-		if (tutupKurung === -1) continue;
+  // Penjaga WAJIB berbentuk sebuah kondisi `if`, bukan sekadar penyebutan.
+  //
+  // Versi pertama audit ini hanya mencari predikat di dekat sebuah navigasi,
+  // dan itu meloloskan `mobile/settings/page.tsx`: di sana `user?.isSuperadmin`
+  // muncul di dalam DEPENDENCY ARRAY sebuah `useEffect`, tujuh baris di atas
+  // `router.replace("/login")` milik tombol keluar. Dua hal yang sama sekali
+  // tidak berhubungan terbaca sebagai penjaga.
+  for (const cocok of sumber.matchAll(/\bif\s*\(/g)) {
+    if (cocok.index === undefined) continue;
+    const bukaKurung = cocok.index + cocok[0].length - 1;
+    const tutupKurung = penutupKurung(sumber, bukaKurung);
+    if (tutupKurung === -1) continue;
 
-		const kondisi = sumber.slice(bukaKurung, tutupKurung + 1);
-		const menguji =
-			/\b(canAccessArea|hasPermission|isSuperadmin)\b/.test(kondisi) ||
-			penanda.some((nama) => new RegExp(`\\b${nama}\\b`).test(kondisi));
-		if (!menguji) continue;
+    const kondisi = sumber.slice(bukaKurung, tutupKurung + 1);
+    const menguji =
+      /\b(canAccessArea|hasPermission|isSuperadmin)\b/.test(kondisi) ||
+      penanda.some((nama) => new RegExp(`\\b${nama}\\b`).test(kondisi));
+    if (!menguji) continue;
 
-		// Badan cabangnya harus benar-benar memulangkan pengguna.
-		const badan = sumber.slice(tutupKurung + 1, tutupKurung + 220);
-		if (NAVIGASI.test(badan)) return true;
-	}
+    // Badan cabangnya harus benar-benar memulangkan pengguna.
+    const badan = sumber.slice(tutupKurung + 1, tutupKurung + 220);
+    if (NAVIGASI.test(badan)) return true;
+  }
 
-	return false;
+  return false;
 }
 
 /**
@@ -169,26 +166,28 @@ function punyaPenjagaOtorisasi(sumber: string): boolean {
 const AMBANG_HUB = 3;
 
 function adalahHub(sumber: string): boolean {
-	const area = new Set(
-		[...sumber.matchAll(/canAccessArea\(\s*user\s*,\s*["']([a-z_]+)["']\s*\)/g)].map(
-			(cocok) => cocok[1] as string,
-		),
-	);
-	return area.size >= AMBANG_HUB;
+  const area = new Set(
+    [
+      ...sumber.matchAll(
+        /canAccessArea\(\s*user\s*,\s*["']([a-z_]+)["']\s*\)/g,
+      ),
+    ].map((cocok) => cocok[1] as string),
+  );
+  return area.size >= AMBANG_HUB;
 }
 
 /** Indeks kurung tutup yang cocok untuk kurung buka di `buka`. */
 function penutupKurung(sumber: string, buka: number): number {
-	let kedalaman = 0;
-	for (let i = buka; i < sumber.length; i++) {
-		const karakter = sumber[i];
-		if (karakter === "(") kedalaman++;
-		else if (karakter === ")") {
-			kedalaman--;
-			if (kedalaman === 0) return i;
-		}
-	}
-	return -1;
+  let kedalaman = 0;
+  for (let i = buka; i < sumber.length; i++) {
+    const karakter = sumber[i];
+    if (karakter === "(") kedalaman++;
+    else if (karakter === ")") {
+      kedalaman--;
+      if (kedalaman === 0) return i;
+    }
+  }
+  return -1;
 }
 
 heading("Audit Penjaga Halaman — otorisasi, bukan sekadar autentikasi");
@@ -199,34 +198,34 @@ const pelanggaran: Pelanggaran[] = [];
 const hub: string[] = [];
 
 for (const workspace of WORKSPACES) {
-	for (const berkasAbsolut of kumpulkanTsx(
-		path.join(rootDir, workspace, "src/app"),
-	)) {
-		const sumber = fs.readFileSync(berkasAbsolut, "utf8");
-		if (!mengakuPrivat(sumber)) continue;
-		if (!memuatDataDomain(sumber)) continue;
+  for (const berkasAbsolut of kumpulkanTsx(
+    path.join(rootDir, workspace, "src/app"),
+  )) {
+    const sumber = fs.readFileSync(berkasAbsolut, "utf8");
+    if (!mengakuPrivat(sumber)) continue;
+    if (!memuatDataDomain(sumber)) continue;
 
-		privat++;
-		const berkas = path
-			.relative(rootDir, berkasAbsolut)
-			.split(path.sep)
-			.join("/");
+    privat++;
+    const berkas = path
+      .relative(rootDir, berkasAbsolut)
+      .split(path.sep)
+      .join("/");
 
-		if (adalahHub(sumber)) {
-			hub.push(berkas);
-			continue;
-		}
+    if (adalahHub(sumber)) {
+      hub.push(berkas);
+      continue;
+    }
 
-		if (punyaPenjagaOtorisasi(sumber)) {
-			terjaga++;
-			continue;
-		}
-		pelanggaran.push({
-			berkas,
-			alasan:
-				"mengalihkan yang belum login, tetapi tidak menolak yang tidak berhak",
-		});
-	}
+    if (punyaPenjagaOtorisasi(sumber)) {
+      terjaga++;
+      continue;
+    }
+    pelanggaran.push({
+      berkas,
+      alasan:
+        "mengalihkan yang belum login, tetapi tidak menolak yang tidak berhak",
+    });
+  }
 }
 
 console.log(`  Halaman privat  : ${privat}`);
@@ -235,25 +234,25 @@ console.log(`  Hub navigasi    : ${hub.length} (otorisasinya per-kartu)`);
 console.log(`  Melanggar       : ${pelanggaran.length}`);
 
 if (pelanggaran.length > 0) {
-	heading("Pelanggaran");
-	for (const { berkas, alasan } of pelanggaran) {
-		console.log(`  ❌ ${berkas}`);
-		console.log(`     ${alasan}`);
-	}
+  heading("Pelanggaran");
+  for (const { berkas, alasan } of pelanggaran) {
+    console.log(`  ❌ ${berkas}`);
+    console.log(`     ${alasan}`);
+  }
 }
 
 heading("Ringkasan");
 if (pelanggaran.length === 0) {
-	console.log(
-		"🎉 Setiap halaman yang mengaku privat juga menolak pengguna tak berhak.\n",
-	);
+  console.log(
+    "🎉 Setiap halaman yang mengaku privat juga menolak pengguna tak berhak.\n",
+  );
 } else {
-	console.error(
-		`❌ ${pelanggaran.length} halaman privat tanpa penjaga otorisasi.\n` +
-			"   Tambahkan pemeriksaan `canAccessArea(user, \"<area>\")` yang cabangnya\n" +
-			"   memanggil `redirect(\"/forbidden\")` (web-desktop) atau\n" +
-			"   `router.replace(\"/dashboard\")` (mobile — static export tidak punya\n" +
-			"   rute /forbidden).\n",
-	);
-	process.exit(1);
+  console.error(
+    `❌ ${pelanggaran.length} halaman privat tanpa penjaga otorisasi.\n` +
+      '   Tambahkan pemeriksaan `canAccessArea(user, "<area>")` yang cabangnya\n' +
+      '   memanggil `redirect("/forbidden")` (web-desktop) atau\n' +
+      '   `router.replace("/dashboard")` (mobile — static export tidak punya\n' +
+      "   rute /forbidden).\n",
+  );
+  process.exit(1);
 }

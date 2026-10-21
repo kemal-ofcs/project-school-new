@@ -1263,6 +1263,9 @@ export const kolomDraftSchema = z
 
 export type KolomDraft = z.input<typeof kolomDraftSchema>;
 
+/** Teks yang wajib diketik sebelum kolom dihapus permanen. */
+export const KONFIRMASI_HAPUS_KOLOM = "Hapus Permanen";
+
 /**
  * Cermin `validate_kolom`. Murni: nama kembar, tipe yang terkunci, dan batas
  * kolom aktif diperiksa service karena butuh database.
@@ -1337,13 +1340,23 @@ export function formatAngka(kanonik: string): string {
   return pecahan ? `${berkelompok},${pecahan}` : berkelompok;
 }
 
+/** Definisi kolom yang dibutuhkan `validateAtribut`. */
+export type KolomUntukAtribut = Pick<
+  KolomInventaris,
+  "id_kolom" | "nama" | "tipe"
+> & {
+  /** Dihapus permanen: isinya dibuang setiap kali barang disimpan. */
+  dihapus?: boolean;
+};
+
 /**
- * Cermin `validate_atribut`. Isi kosong dibuang. Kunci yang belum dikenal
- * perangkat ini (definisinya belum tertarik) tetap disimpan sebagai teks.
+ * Cermin `validate_atribut`. Isi kosong dan isi kolom yang sudah dihapus
+ * dibuang. Kunci yang belum dikenal perangkat ini (definisinya belum tertarik)
+ * tetap disimpan sebagai teks.
  */
 export function validateAtribut(
   atribut: Record<string, string>,
-  kolom: readonly Pick<KolomInventaris, "id_kolom" | "nama" | "tipe">[],
+  kolom: readonly KolomUntukAtribut[],
 ): Hasil<Record<string, string>> {
   const hasil: Record<string, string> = {};
   for (const kunci of Object.keys(atribut).sort()) {
@@ -1353,6 +1366,7 @@ export function validateAtribut(
     const isi = atribut[kunci].trim();
     if (!isi) continue;
     const definisi = kolom.find((item) => item.id_kolom === kunci);
+    if (definisi?.dihapus) continue;
     if (definisi?.tipe === "Angka") {
       if (!isAngkaKanonik(isi)) {
         return {

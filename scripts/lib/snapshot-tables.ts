@@ -9,9 +9,9 @@
  */
 
 export interface SnapshotTableSpec {
-	payloadKey: string;
-	table: string;
-	columns: string[];
+  payloadKey: string;
+  table: string;
+  columns: string[];
 }
 
 /**
@@ -21,36 +21,36 @@ export interface SnapshotTableSpec {
  * dipelihara manusia — daftar kedua persis cara drift dimulai.
  */
 export function parseSnapshotTables(syncSource: string): SnapshotTableSpec[] {
-	const start = syncSource.indexOf("const SNAPSHOT_TABLES");
-	if (start === -1) {
-		throw new Error("SNAPSHOT_TABLES tidak ditemukan di sync.rs");
-	}
-	const end = syncSource.indexOf("\n];", start);
-	if (end === -1) {
-		throw new Error("Akhir SNAPSHOT_TABLES tidak ditemukan di sync.rs");
-	}
+  const start = syncSource.indexOf("const SNAPSHOT_TABLES");
+  if (start === -1) {
+    throw new Error("SNAPSHOT_TABLES tidak ditemukan di sync.rs");
+  }
+  const end = syncSource.indexOf("\n];", start);
+  if (end === -1) {
+    throw new Error("Akhir SNAPSHOT_TABLES tidak ditemukan di sync.rs");
+  }
 
-	const block = syncSource.slice(start, end);
-	const specs: SnapshotTableSpec[] = [];
+  const block = syncSource.slice(start, end);
+  const specs: SnapshotTableSpec[] = [];
 
-	for (const chunk of block.split("SnapshotTable {").slice(1)) {
-		const payloadKey = chunk.match(/payload_key:\s*"([^"]+)"/)?.[1];
-		const table = chunk.match(/table:\s*"([^"]+)"/)?.[1];
-		const columnsBlock = chunk.match(/columns:\s*&\[([\s\S]*?)\]/)?.[1];
+  for (const chunk of block.split("SnapshotTable {").slice(1)) {
+    const payloadKey = chunk.match(/payload_key:\s*"([^"]+)"/)?.[1];
+    const table = chunk.match(/table:\s*"([^"]+)"/)?.[1];
+    const columnsBlock = chunk.match(/columns:\s*&\[([\s\S]*?)\]/)?.[1];
 
-		if (!payloadKey || !table || columnsBlock === undefined) continue;
+    if (!payloadKey || !table || columnsBlock === undefined) continue;
 
-		const columns = [...columnsBlock.matchAll(/"([^"]+)"/g)].map(
-			(match) => match[1],
-		);
-		specs.push({ payloadKey, table, columns });
-	}
+    const columns = [...columnsBlock.matchAll(/"([^"]+)"/g)].map(
+      (match) => match[1],
+    );
+    specs.push({ payloadKey, table, columns });
+  }
 
-	if (specs.length === 0) {
-		throw new Error(
-			"Tidak ada satu pun entri SNAPSHOT_TABLES yang terbaca — bentuk sumbernya berubah.",
-		);
-	}
+  if (specs.length === 0) {
+    throw new Error(
+      "Tidak ada satu pun entri SNAPSHOT_TABLES yang terbaca — bentuk sumbernya berubah.",
+    );
+  }
 
-	return specs;
+  return specs;
 }

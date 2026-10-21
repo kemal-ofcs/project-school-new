@@ -987,6 +987,7 @@ const VEKTOR_ANGKA: [string, boolean][] = [
 const KOLOM_UJI = [
   { id_kolom: "kol-a1", nama: "Merek", tipe: "Teks" as const },
   { id_kolom: "kol-b2", nama: "Berat", tipe: "Angka" as const },
+  { id_kolom: "kol-c3", nama: "Warna", tipe: "Angka" as const, dihapus: true },
 ];
 
 const VEKTOR_ATRIBUT: [
@@ -998,6 +999,8 @@ const VEKTOR_ATRIBUT: [
     { "kol-a1": "Pilot", "kol-b2": "2.5", "kol-ff": "dari perangkat lain" },
   ],
   [{ "kol-a1": "   " }, {}],
+  // Kolom yang dihapus: isinya dibuang, tidak divalidasi.
+  [{ "kol-a1": "Pilot", "kol-c3": "bukan angka" }, { "kol-a1": "Pilot" }],
   [{ "kol-b2": "2,5" }, "Isi kolom Berat harus angka."],
   [{ "kol-a1": "x".repeat(201) }, "Isi kolom Merek maksimal 200 karakter."],
   [{ "kol-ff": "x".repeat(201) }, "Isi kolom tambahan maksimal 200 karakter."],

@@ -16,14 +16,14 @@
 import fs from "node:fs";
 import path from "node:path";
 import {
-	buildCloudSchema,
-	buildLocalSchema,
-	buildRepairSchema,
-	diffSchema,
-	isDiffClean,
-	type SchemaDiff,
-	schemaFromJson,
-	type TableSchema,
+  buildCloudSchema,
+  buildLocalSchema,
+  buildRepairSchema,
+  diffSchema,
+  isDiffClean,
+  type SchemaDiff,
+  schemaFromJson,
+  type TableSchema,
 } from "./lib/cloud-schema";
 import { parseSnapshotTables } from "./lib/snapshot-tables";
 
@@ -47,98 +47,102 @@ const rootDir = path.resolve(import.meta.dir, "..");
  * `AFTER INSERT` pada tabel append-only untuk tarik inkremental. Alasannya
  * sama: tidak pernah ditulis aplikasi.
  */
-const CLOUD_ONLY_IN_RUST = new Set(["sync_pulse", "sync_tombstone", "sync_append_log"]);
+const CLOUD_ONLY_IN_RUST = new Set([
+  "sync_pulse",
+  "sync_tombstone",
+  "sync_append_log",
+]);
 
 let failures = 0;
 let warnings = 0;
 
 function heading(text: string) {
-	console.log(`\n${"─".repeat(70)}\n${text}\n${"─".repeat(70)}`);
+  console.log(`\n${"─".repeat(70)}\n${text}\n${"─".repeat(70)}`);
 }
 
 function renderDiff(diff: SchemaDiff, leftLabel: string, rightLabel: string) {
-	for (const table of diff.missingTables) {
-		console.log(
-			`    • tabel '${table}' ada di ${leftLabel}, TIDAK ada di ${rightLabel}`,
-		);
-	}
-	for (const table of diff.extraTables) {
-		console.log(
-			`    • tabel '${table}' ada di ${rightLabel}, TIDAK ada di ${leftLabel}`,
-		);
-	}
-	for (const entry of diff.columnDiffs) {
-		if (entry.missing.length > 0) {
-			console.log(
-				`    • ${entry.table}: kolom [${entry.missing.join(", ")}] ada di ${leftLabel}, hilang di ${rightLabel}`,
-			);
-		}
-		if (entry.extra.length > 0) {
-			console.log(
-				`    • ${entry.table}: kolom [${entry.extra.join(", ")}] ada di ${rightLabel}, hilang di ${leftLabel}`,
-			);
-		}
-	}
+  for (const table of diff.missingTables) {
+    console.log(
+      `    • tabel '${table}' ada di ${leftLabel}, TIDAK ada di ${rightLabel}`,
+    );
+  }
+  for (const table of diff.extraTables) {
+    console.log(
+      `    • tabel '${table}' ada di ${rightLabel}, TIDAK ada di ${leftLabel}`,
+    );
+  }
+  for (const entry of diff.columnDiffs) {
+    if (entry.missing.length > 0) {
+      console.log(
+        `    • ${entry.table}: kolom [${entry.missing.join(", ")}] ada di ${leftLabel}, hilang di ${rightLabel}`,
+      );
+    }
+    if (entry.extra.length > 0) {
+      console.log(
+        `    • ${entry.table}: kolom [${entry.extra.join(", ")}] ada di ${rightLabel}, hilang di ${leftLabel}`,
+      );
+    }
+  }
 }
 
 function check(
-	name: string,
-	diff: SchemaDiff,
-	leftLabel: string,
-	rightLabel: string,
-	severity: "fatal" | "warning" = "fatal",
+  name: string,
+  diff: SchemaDiff,
+  leftLabel: string,
+  rightLabel: string,
+  severity: "fatal" | "warning" = "fatal",
 ) {
-	if (isDiffClean(diff)) {
-		console.log(`  ✅ ${name}`);
-		return;
-	}
-	if (severity === "fatal") {
-		failures++;
-		console.log(`  ❌ ${name}`);
-	} else {
-		warnings++;
-		console.log(`  ⚠️  ${name}`);
-	}
-	renderDiff(diff, leftLabel, rightLabel);
+  if (isDiffClean(diff)) {
+    console.log(`  ✅ ${name}`);
+    return;
+  }
+  if (severity === "fatal") {
+    failures++;
+    console.log(`  ❌ ${name}`);
+  } else {
+    warnings++;
+    console.log(`  ⚠️  ${name}`);
+  }
+  renderDiff(diff, leftLabel, rightLabel);
 }
 
 function readSource(relativePath: string): string {
-	const fullPath = path.join(rootDir, relativePath);
-	if (!fs.existsSync(fullPath)) {
-		throw new Error(`Berkas sumber tidak ditemukan: ${relativePath}`);
-	}
-	return fs.readFileSync(fullPath, "utf8");
+  const fullPath = path.join(rootDir, relativePath);
+  if (!fs.existsSync(fullPath)) {
+    throw new Error(`Berkas sumber tidak ditemukan: ${relativePath}`);
+  }
+  return fs.readFileSync(fullPath, "utf8");
 }
 
 /** Bangun skema jalur Web dengan benar-benar menjalankan `initDatabaseSchema`. */
 async function buildWebSchema(): Promise<TableSchema> {
-	const process_ = Bun.spawnSync({
-		cmd: ["bun", "scripts/dump-web-schema.ts"],
-		cwd: path.join(rootDir, "web-desktop"),
-		stdout: "pipe",
-		stderr: "pipe",
-	});
+  const process_ = Bun.spawnSync({
+    cmd: ["bun", "scripts/dump-web-schema.ts"],
+    cwd: path.join(rootDir, "web-desktop"),
+    stdout: "pipe",
+    stderr: "pipe",
+  });
 
-	if (process_.exitCode !== 0) {
-		throw new Error(
-			`dump-web-schema.ts gagal:\n${process_.stderr.toString().trim()}`,
-		);
-	}
+  if (process_.exitCode !== 0) {
+    throw new Error(
+      `dump-web-schema.ts gagal:\n${process_.stderr.toString().trim()}`,
+    );
+  }
 
-	return schemaFromJson(JSON.parse(process_.stdout.toString()));
+  return schemaFromJson(JSON.parse(process_.stdout.toString()));
 }
 
 console.log(
-	"══════════════════════════════════════════════════════════════════════",
+  "══════════════════════════════════════════════════════════════════════",
 );
 console.log("   Audit Konsistensi Skema 4-Layer");
 console.log(
-	"══════════════════════════════════════════════════════════════════════",
+  "══════════════════════════════════════════════════════════════════════",
 );
 
 const desktopTurso = readSource("web-desktop/src-tauri/src/desktop/turso.rs");
 const desktopStorage = readSource(
-	"web-desktop/src-tauri/src/desktop/storage.rs",
+  "web-desktop/src-tauri/src/desktop/storage.rs",
 );
 const desktopSync = readSource("web-desktop/src-tauri/src/desktop/sync.rs");
 const mobileTurso = readSource("mobile/src-tauri/src/mobile/turso.rs");
@@ -151,7 +155,7 @@ const localMobile = buildLocalSchema(mobileStorage);
 const web = await buildWebSchema();
 
 console.log(
-	`\n📦 Skema terbangun — cloud Rust: ${cloudDesktop.size} tabel · lokal Rust: ${localDesktop.size} tabel · Web: ${web.size} tabel`,
+  `\n📦 Skema terbangun — cloud Rust: ${cloudDesktop.size} tabel · lokal Rust: ${localDesktop.size} tabel · Web: ${web.size} tabel`,
 );
 
 // ── 1. Rust cloud vs Web ────────────────────────────────────────────────────
@@ -160,18 +164,18 @@ console.log(
 // sini akan merusak permanen sisi mana pun yang tidak sempat membuat tabelnya.
 heading("1. Jalur provisioning Rust (turso.rs) vs jalur Web (db-schema.ts)");
 const cloudWithoutRustOnly: TableSchema = new Map(
-	[...cloudDesktop].filter(([table]) => !CLOUD_ONLY_IN_RUST.has(table)),
+  [...cloudDesktop].filter(([table]) => !CLOUD_ONLY_IN_RUST.has(table)),
 );
 check(
-	"Tabel dan kolom cloud identik di kedua jalur provisioning",
-	diffSchema(cloudWithoutRustOnly, web),
-	"Rust",
-	"Web",
+  "Tabel dan kolom cloud identik di kedua jalur provisioning",
+  diffSchema(cloudWithoutRustOnly, web),
+  "Rust",
+  "Web",
 );
 for (const table of CLOUD_ONLY_IN_RUST) {
-	console.log(
-		`  ℹ️  '${table}' sengaja hanya dibuat jalur Rust (lihat CLOUD_ONLY_IN_RUST).`,
-	);
+  console.log(
+    `  ℹ️  '${table}' sengaja hanya dibuat jalur Rust (lihat CLOUD_ONLY_IN_RUST).`,
+  );
 }
 
 // ── 2. Definisi repair vs definisi utama ────────────────────────────────────
@@ -181,10 +185,10 @@ for (const table of CLOUD_ONLY_IN_RUST) {
 heading("2. repair_web_owned_tables vs ensure_schema");
 const repairSchema = buildRepairSchema(desktopTurso);
 check(
-	"Definisi tabel milik Web sama di jalur pembuatan dan jalur perbaikan",
-	diffSchema(repairSchema, cloudDesktop, new Set(repairSchema.keys())),
-	"repair",
-	"ensure_schema",
+  "Definisi tabel milik Web sama di jalur pembuatan dan jalur perbaikan",
+  diffSchema(repairSchema, cloudDesktop, new Set(repairSchema.keys())),
+  "repair",
+  "ensure_schema",
 );
 
 // ── 3. Paritas Desktop ↔ Mobile ─────────────────────────────────────────────
@@ -192,16 +196,16 @@ check(
 // apa pun berarti script sync belum dijalankan, atau berkasnya disunting tangan.
 heading("3. Paritas salinan Mobile terhadap Desktop");
 check(
-	"Skema cloud Desktop = skema cloud Mobile",
-	diffSchema(cloudDesktop, cloudMobile),
-	"Desktop",
-	"Mobile",
+  "Skema cloud Desktop = skema cloud Mobile",
+  diffSchema(cloudDesktop, cloudMobile),
+  "Desktop",
+  "Mobile",
 );
 check(
-	"Skema SQLite lokal Desktop = skema SQLite lokal Mobile",
-	diffSchema(localDesktop, localMobile),
-	"Desktop",
-	"Mobile",
+  "Skema SQLite lokal Desktop = skema SQLite lokal Mobile",
+  diffSchema(localDesktop, localMobile),
+  "Desktop",
+  "Mobile",
 );
 
 // ── 4. Kolom yang benar-benar disinkronkan ──────────────────────────────────
@@ -215,35 +219,35 @@ let syncedColumnCount = 0;
 let syncIssues = 0;
 
 for (const spec of snapshotTables) {
-	const localColumns = localDesktop.get(spec.table);
-	const cloudColumns = cloudDesktop.get(spec.table);
-	const problems: string[] = [];
+  const localColumns = localDesktop.get(spec.table);
+  const cloudColumns = cloudDesktop.get(spec.table);
+  const problems: string[] = [];
 
-	if (!localColumns) problems.push("tabel tidak ada di storage.rs");
-	if (!cloudColumns) problems.push("tabel tidak ada di turso.rs");
+  if (!localColumns) problems.push("tabel tidak ada di storage.rs");
+  if (!cloudColumns) problems.push("tabel tidak ada di turso.rs");
 
-	for (const column of spec.columns) {
-		syncedColumnCount++;
-		if (localColumns && !localColumns.has(column)) {
-			problems.push(`kolom '${column}' hilang di storage.rs`);
-		}
-		if (cloudColumns && !cloudColumns.has(column)) {
-			problems.push(`kolom '${column}' hilang di turso.rs`);
-		}
-	}
+  for (const column of spec.columns) {
+    syncedColumnCount++;
+    if (localColumns && !localColumns.has(column)) {
+      problems.push(`kolom '${column}' hilang di storage.rs`);
+    }
+    if (cloudColumns && !cloudColumns.has(column)) {
+      problems.push(`kolom '${column}' hilang di turso.rs`);
+    }
+  }
 
-	if (problems.length > 0) {
-		syncIssues++;
-		failures++;
-		console.log(`  ❌ ${spec.payloadKey} → ${spec.table}`);
-		for (const problem of problems) console.log(`    • ${problem}`);
-	}
+  if (problems.length > 0) {
+    syncIssues++;
+    failures++;
+    console.log(`  ❌ ${spec.payloadKey} → ${spec.table}`);
+    for (const problem of problems) console.log(`    • ${problem}`);
+  }
 }
 
 if (syncIssues === 0) {
-	console.log(
-		`  ✅ ${syncedColumnCount} kolom pada ${snapshotTables.length} tabel snapshot hadir di kedua sisi`,
-	);
+  console.log(
+    `  ✅ ${syncedColumnCount} kolom pada ${snapshotTables.length} tabel snapshot hadir di kedua sisi`,
+  );
 }
 
 // ── 5. Drift di luar jalur sync ─────────────────────────────────────────────
@@ -252,14 +256,14 @@ if (syncIssues === 0) {
 // dan disengaja, bukan ditemukan bertahun-tahun kemudian.
 heading("5. Selisih lokal ↔ cloud di luar kolom yang disinkronkan");
 const sharedTables = new Set(
-	[...localDesktop.keys()].filter((table) => cloudDesktop.has(table)),
+  [...localDesktop.keys()].filter((table) => cloudDesktop.has(table)),
 );
 check(
-	"Tabel yang ada di kedua sisi punya kolom yang sama",
-	diffSchema(localDesktop, cloudDesktop, sharedTables),
-	"storage.rs",
-	"turso.rs",
-	"warning",
+  "Tabel yang ada di kedua sisi punya kolom yang sama",
+  diffSchema(localDesktop, cloudDesktop, sharedTables),
+  "storage.rs",
+  "turso.rs",
+  "warning",
 );
 
 // ── 6. Kelengkapan daftar isDatabaseSchemaReady ─────────────────────────────
@@ -277,63 +281,63 @@ const schemaTs = readSource("web-desktop/src/lib/db-schema.ts");
  * Keduanya diterima supaya audit ini tidak memaksa satu gaya penulisan.
  */
 function readRequiredTables(source: string): string[] {
-	const named = source.match(/REQUIRED_TABLES = \[([\s\S]*?)\] as const;/);
-	if (named) {
-		return [...named[1].matchAll(/"([a-z_]+)"/g)].map(
-			(match) => match[1] as string,
-		);
-	}
+  const named = source.match(/REQUIRED_TABLES = \[([\s\S]*?)\] as const;/);
+  if (named) {
+    return [...named[1].matchAll(/"([a-z_]+)"/g)].map(
+      (match) => match[1] as string,
+    );
+  }
 
-	const inline = source.match(
-		/WHERE type = 'table' AND name IN \(([\s\S]*?)\)\s*\)/,
-	);
-	return inline
-		? [...inline[1].matchAll(/'([a-z_]+)'/g)].map((match) => match[1] as string)
-		: [];
+  const inline = source.match(
+    /WHERE type = 'table' AND name IN \(([\s\S]*?)\)\s*\)/,
+  );
+  return inline
+    ? [...inline[1].matchAll(/'([a-z_]+)'/g)].map((match) => match[1] as string)
+    : [];
 }
 
 const requiredTables = readRequiredTables(schemaTs);
 
 if (requiredTables.length === 0) {
-	failures++;
-	console.log("  ❌ Daftar tabel di isDatabaseSchemaReady tidak terbaca.");
+  failures++;
+  console.log("  ❌ Daftar tabel di isDatabaseSchemaReady tidak terbaca.");
 } else {
-	const notInRust = requiredTables.filter((table) => !cloudDesktop.has(table));
-	const notInWeb = requiredTables.filter((table) => !web.has(table));
+  const notInRust = requiredTables.filter((table) => !cloudDesktop.has(table));
+  const notInWeb = requiredTables.filter((table) => !web.has(table));
 
-	if (notInRust.length === 0 && notInWeb.length === 0) {
-		console.log(
-			`  ✅ ${requiredTables.length} tabel wajib dibuat oleh kedua jalur`,
-		);
-	} else {
-		failures++;
-		console.log(`  ❌ Tabel wajib tidak terbentuk`);
-		if (notInRust.length > 0)
-			console.log(`    • tidak dibuat turso.rs: ${notInRust.join(", ")}`);
-		if (notInWeb.length > 0)
-			console.log(`    • tidak dibuat jalur Web: ${notInWeb.join(", ")}`);
-	}
+  if (notInRust.length === 0 && notInWeb.length === 0) {
+    console.log(
+      `  ✅ ${requiredTables.length} tabel wajib dibuat oleh kedua jalur`,
+    );
+  } else {
+    failures++;
+    console.log(`  ❌ Tabel wajib tidak terbentuk`);
+    if (notInRust.length > 0)
+      console.log(`    • tidak dibuat turso.rs: ${notInRust.join(", ")}`);
+    if (notInWeb.length > 0)
+      console.log(`    • tidak dibuat jalur Web: ${notInWeb.join(", ")}`);
+  }
 
-	const declaredCount = Number(
-		schemaTs.match(/REQUIRED_TABLE_COUNT\s*=\s*(\d+)/)?.[1] ?? 0,
-	);
-	const derivedCount =
-		/REQUIRED_TABLE_COUNT\s*=\s*REQUIRED_TABLES\.length/.test(schemaTs);
+  const declaredCount = Number(
+    schemaTs.match(/REQUIRED_TABLE_COUNT\s*=\s*(\d+)/)?.[1] ?? 0,
+  );
+  const derivedCount =
+    /REQUIRED_TABLE_COUNT\s*=\s*REQUIRED_TABLES\.length/.test(schemaTs);
 
-	if (derivedCount) {
-		console.log(
-			"  ✅ REQUIRED_TABLE_COUNT diturunkan dari panjang daftarnya — tidak mungkin berselisih",
-		);
-	} else if (declaredCount !== requiredTables.length) {
-		failures++;
-		console.log(
-			`  ❌ REQUIRED_TABLE_COUNT = ${declaredCount} tetapi daftarnya berisi ${requiredTables.length} tabel`,
-		);
-	} else {
-		console.log(
-			`  ✅ REQUIRED_TABLE_COUNT cocok dengan panjang daftarnya (${declaredCount})`,
-		);
-	}
+  if (derivedCount) {
+    console.log(
+      "  ✅ REQUIRED_TABLE_COUNT diturunkan dari panjang daftarnya — tidak mungkin berselisih",
+    );
+  } else if (declaredCount !== requiredTables.length) {
+    failures++;
+    console.log(
+      `  ❌ REQUIRED_TABLE_COUNT = ${declaredCount} tetapi daftarnya berisi ${requiredTables.length} tabel`,
+    );
+  } else {
+    console.log(
+      `  ✅ REQUIRED_TABLE_COUNT cocok dengan panjang daftarnya (${declaredCount})`,
+    );
+  }
 }
 
 // ── 7. Handler domain di turso.rs ───────────────────────────────────────────
@@ -345,39 +349,39 @@ heading("7. Handler domain masih terdaftar di turso.rs");
 // Perbarui daftar ini setiap kali sebuah domain baru ditambahkan — ia
 // memastikan handler-nya tidak pernah terhapus diam-diam dari `turso.rs`.
 const expectedDomains: [string, string][] = [
-	["employee", "master_data"],
-	["shift", "tbl_shift"],
-	["holiday", "tbl_hari_libur"],
-	["setting", "setting_gex_system"],
-	["attendance", "absensi_harian"],
-	["academic-year", "akademik_tahun_ajaran"],
-	["academic-department", "akademik_jurusan"],
-	["academic-class", "akademik_rombel"],
-	["academic-subject", "akademik_mapel"],
-	["academic-assignment", "akademik_guru_mapel"],
-	["teacher", "guru_data"],
-	["student", "siswa_data"],
-	["class-attendance", "presensi_mapel"],
-	["class-attendance-detail", "presensi_mapel_detail"],
-	["teaching-journal", "jurnal_mengajar"],
-	["attendance-ledger", "leger_kehadiran"],
-	["wa-notification", "notifikasi_wa"],
+  ["employee", "master_data"],
+  ["shift", "tbl_shift"],
+  ["holiday", "tbl_hari_libur"],
+  ["setting", "setting_gex_system"],
+  ["attendance", "absensi_harian"],
+  ["academic-year", "akademik_tahun_ajaran"],
+  ["academic-department", "akademik_jurusan"],
+  ["academic-class", "akademik_rombel"],
+  ["academic-subject", "akademik_mapel"],
+  ["academic-assignment", "akademik_guru_mapel"],
+  ["teacher", "guru_data"],
+  ["student", "siswa_data"],
+  ["class-attendance", "presensi_mapel"],
+  ["class-attendance-detail", "presensi_mapel_detail"],
+  ["teaching-journal", "jurnal_mengajar"],
+  ["attendance-ledger", "leger_kehadiran"],
+  ["wa-notification", "notifikasi_wa"],
 ];
 
 const missingDomains = expectedDomains.filter(
-	([first, second]) =>
-		!desktopTurso.includes(`"${first}"`) &&
-		!desktopTurso.includes(`"${second}"`),
+  ([first, second]) =>
+    !desktopTurso.includes(`"${first}"`) &&
+    !desktopTurso.includes(`"${second}"`),
 );
 
 if (missingDomains.length === 0) {
-	console.log(`  ✅ ${expectedDomains.length} handler domain masih terdaftar`);
+  console.log(`  ✅ ${expectedDomains.length} handler domain masih terdaftar`);
 } else {
-	failures++;
-	console.log("  ❌ Handler domain hilang dari turso.rs");
-	for (const [first, second] of missingDomains) {
-		console.log(`    • '${first}' / '${second}'`);
-	}
+  failures++;
+  console.log("  ❌ Handler domain hilang dari turso.rs");
+  for (const [first, second] of missingDomains) {
+    console.log(`    • '${first}' / '${second}'`);
+  }
 }
 
 // ── 8. Seam transport tidak boleh mengarang SQL sendiri ─────────────────────
@@ -390,70 +394,70 @@ heading("8. Modul transport hanya memindahkan SQL, tidak mengarangnya");
 
 /** Buang blok `#[cfg(test)]` — kode uji memang boleh membuat tabelnya sendiri. */
 function productionCode(source: string): string {
-	const testIndex = source.indexOf("#[cfg(test)]");
-	return testIndex === -1 ? source : source.slice(0, testIndex);
+  const testIndex = source.indexOf("#[cfg(test)]");
+  return testIndex === -1 ? source : source.slice(0, testIndex);
 }
 
 const transportModules = [
-	"web-desktop/src-tauri/src/desktop/sql_backend.rs",
-	"mobile/src-tauri/src/mobile/sql_backend.rs",
+  "web-desktop/src-tauri/src/desktop/sql_backend.rs",
+  "mobile/src-tauri/src/mobile/sql_backend.rs",
 ];
 
 let transportViolations = 0;
 let transportChecked = 0;
 for (const relativePath of transportModules) {
-	// Seam transport datang pada tahap berikutnya. Audit yang gagal karena
-	// sesuatu yang memang belum dibangun mengajari orang untuk mengabaikannya,
-	// jadi ketidakhadirannya dilaporkan sebagai catatan — bukan pelanggaran.
-	if (!fs.existsSync(path.join(rootDir, relativePath))) {
-		console.log(`  ℹ️   belum ada di template — dilewati.`);
-		continue;
-	}
-	transportChecked++;
-	const code = productionCode(readSource(relativePath));
-	const problems: string[] = [];
+  // Seam transport datang pada tahap berikutnya. Audit yang gagal karena
+  // sesuatu yang memang belum dibangun mengajari orang untuk mengabaikannya,
+  // jadi ketidakhadirannya dilaporkan sebagai catatan — bukan pelanggaran.
+  if (!fs.existsSync(path.join(rootDir, relativePath))) {
+    console.log(`  ℹ️   belum ada di template — dilewati.`);
+    continue;
+  }
+  transportChecked++;
+  const code = productionCode(readSource(relativePath));
+  const problems: string[] = [];
 
-	if (/\bCREATE\s+TABLE\b/i.test(code)) {
-		problems.push(
-			"memuat CREATE TABLE — DDL hanya boleh lahir dari ensure_schema()",
-		);
-	}
-	if (code.includes("Statement::new")) {
-		problems.push(
-			"menyusun Statement sendiri — transport hanya boleh meneruskannya",
-		);
-	}
-	if (/DatabaseProvider::/.test(code)) {
-		problems.push(
-			"bercabang pada provider — pilihan transport ditentukan pemanggil, bukan di sini",
-		);
-	}
+  if (/\bCREATE\s+TABLE\b/i.test(code)) {
+    problems.push(
+      "memuat CREATE TABLE — DDL hanya boleh lahir dari ensure_schema()",
+    );
+  }
+  if (code.includes("Statement::new")) {
+    problems.push(
+      "menyusun Statement sendiri — transport hanya boleh meneruskannya",
+    );
+  }
+  if (/DatabaseProvider::/.test(code)) {
+    problems.push(
+      "bercabang pada provider — pilihan transport ditentukan pemanggil, bukan di sini",
+    );
+  }
 
-	if (problems.length > 0) {
-		transportViolations++;
-		failures++;
-		console.log(`  ❌ ${relativePath}`);
-		for (const problem of problems) console.log(`    • ${problem}`);
-	}
+  if (problems.length > 0) {
+    transportViolations++;
+    failures++;
+    console.log(`  ❌ ${relativePath}`);
+    for (const problem of problems) console.log(`    • ${problem}`);
+  }
 }
 
 if (transportViolations === 0 && transportChecked > 0) {
-	console.log(
-		`  ✅ ${transportChecked} modul transport bersih dari DDL dan penyusunan Statement`,
-	);
+  console.log(
+    `  ✅ ${transportChecked} modul transport bersih dari DDL dan penyusunan Statement`,
+  );
 }
 
 // ── Ringkasan ───────────────────────────────────────────────────────────────
 heading("Hasil");
 if (failures === 0) {
-	console.log(
-		warnings === 0
-			? "🎉 Seluruh lapisan skema konsisten.\n"
-			: `✅ Tidak ada pelanggaran fatal. ${warnings} peringatan di atas perlu ditinjau.\n`,
-	);
+  console.log(
+    warnings === 0
+      ? "🎉 Seluruh lapisan skema konsisten.\n"
+      : `✅ Tidak ada pelanggaran fatal. ${warnings} peringatan di atas perlu ditinjau.\n`,
+  );
 } else {
-	console.error(
-		`❌ ${failures} pelanggaran skema ditemukan${warnings > 0 ? `, ditambah ${warnings} peringatan` : ""}.\n`,
-	);
-	process.exit(1);
+  console.error(
+    `❌ ${failures} pelanggaran skema ditemukan${warnings > 0 ? `, ditambah ${warnings} peringatan` : ""}.\n`,
+  );
+  process.exit(1);
 }

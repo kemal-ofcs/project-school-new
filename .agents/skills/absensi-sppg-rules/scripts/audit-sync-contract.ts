@@ -1,4 +1,4 @@
-import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { resolve } from "node:path";
 
 const projectRoot = resolve(import.meta.dir, "../../../..");
@@ -210,9 +210,11 @@ function snapshotBlock(source: string) {
 
 function snapshotTriples(source: string) {
   const block = snapshotBlock(source);
-  return [...block.matchAll(/payload_key:\s*"([^"]+)"[\s\S]*?domain:\s*"([^"]+)"[\s\S]*?table:\s*"([^"]+)"/g)].map(
-    (match) => `${match[1]}|${match[2]}|${match[3]}`,
-  );
+  return [
+    ...block.matchAll(
+      /payload_key:\s*"([^"]+)"[\s\S]*?domain:\s*"([^"]+)"[\s\S]*?table:\s*"([^"]+)"/g,
+    ),
+  ].map((match) => `${match[1]}|${match[2]}|${match[3]}`);
 }
 
 function snapshotDefinitions(source: string) {
@@ -227,8 +229,9 @@ function snapshotDefinitions(source: string) {
         table: definition.match(/table:\s*"([^"]+)"/)?.[1] ?? "",
         columns: [
           ...(
-            definition.match(/columns:\s*&\[([\s\S]*?)\],\s*conflict_column/)?.[1] ??
-            ""
+            definition.match(
+              /columns:\s*&\[([\s\S]*?)\],\s*conflict_column/,
+            )?.[1] ?? ""
           ).matchAll(/"([^"]+)"/g),
         ].map((column) => column[1]),
       };
@@ -239,7 +242,9 @@ function snapshotDefinitions(source: string) {
 function ddlColumns(source: string, table: string) {
   const escaped = table.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   const body = source.match(
-    new RegExp(`CREATE TABLE IF NOT EXISTS\\s+${escaped}\\s*\\(([\\s\\S]*?)\\);`),
+    new RegExp(
+      `CREATE TABLE IF NOT EXISTS\\s+${escaped}\\s*\\(([\\s\\S]*?)\\);`,
+    ),
   )?.[1];
   if (!body) return [];
   return body
@@ -408,15 +413,24 @@ const desktopDbSchema = read("web-desktop/src/lib/db-schema.ts");
 const desktopConfig = read("web-desktop/src-tauri/src/desktop/config.rs");
 const mobileConfig = read("mobile/src-tauri/src/mobile/config.rs");
 
-sameSet("Route kanonik Rust desktop", canonicalRoutes(desktopSync), expectedRoutes);
-sameSet("Route kanonik Rust mobile", canonicalRoutes(mobileSync), expectedRoutes);
+sameSet(
+  "Route kanonik Rust desktop",
+  canonicalRoutes(desktopSync),
+  expectedRoutes,
+);
+sameSet(
+  "Route kanonik Rust mobile",
+  canonicalRoutes(mobileSync),
+  expectedRoutes,
+);
 
 for (const [label, routes] of [
   ["Validator TypeScript desktop", schemaRoutes(desktopSchema)],
   ["Validator TypeScript mobile", schemaRoutes(mobileSchema)],
 ] as const) {
   const missing = expectedRoutes.filter((route) => !routes.includes(route));
-  if (missing.length > 0) fail(`${label} kehilangan route: ${missing.join(", ")}`);
+  if (missing.length > 0)
+    fail(`${label} kehilangan route: ${missing.join(", ")}`);
 }
 
 sameSet(
@@ -454,7 +468,8 @@ for (const route of mobileProduced) {
   }
 }
 for (const route of [...desktopProduced, ...mobileProduced]) {
-  if (!expectedRoutes.includes(route)) fail(`Producer memakai route non-kanonik: ${route}`);
+  if (!expectedRoutes.includes(route))
+    fail(`Producer memakai route non-kanonik: ${route}`);
 }
 
 for (const [label, syncSource, storageSource, cloudSource] of [
@@ -532,7 +547,8 @@ for (const [label, syncSource, storageSource, cloudSource] of [
 // Version gate hanya berguna kalau semua sisi menyebut angka yang sama.
 {
   const serverVersion = Number(
-    desktopDbSchema.match(/CURRENT_SCHEMA_VERSION\s*=\s*(\d+)/)?.[1] ?? Number.NaN,
+    desktopDbSchema.match(/CURRENT_SCHEMA_VERSION\s*=\s*(\d+)/)?.[1] ??
+      Number.NaN,
   );
   if (Number.isNaN(serverVersion)) {
     fail("CURRENT_SCHEMA_VERSION tidak dapat dibaca dari db-schema.ts.");
@@ -542,7 +558,8 @@ for (const [label, syncSource, storageSource, cloudSource] of [
     ["mobile", mobileSync],
   ] as const) {
     const clientVersion = Number(
-      source.match(/CLIENT_SCHEMA_VERSION:\s*i64\s*=\s*(\d+)/)?.[1] ?? Number.NaN,
+      source.match(/CLIENT_SCHEMA_VERSION:\s*i64\s*=\s*(\d+)/)?.[1] ??
+        Number.NaN,
     );
     if (Number.isNaN(clientVersion)) {
       fail(`CLIENT_SCHEMA_VERSION tidak ditemukan pada sync.rs ${label}.`);
@@ -614,11 +631,15 @@ for (const [label, source] of [
     "SELECT MAX(id) FROM sync_changelog",
     "Data server berubah setelah snapshot lokal dibuat.",
   ]) {
-    if (!source.includes(marker)) fail(`Guard Turso ${label} hilang: ${marker}`);
+    if (!source.includes(marker))
+      fail(`Guard Turso ${label} hilang: ${marker}`);
   }
   const defaultPassword = source.indexOf('password: "admin123"');
   const testModule = source.indexOf("#[cfg(test)]");
-  if (defaultPassword >= 0 && (testModule < 0 || defaultPassword < testModule)) {
+  if (
+    defaultPassword >= 0 &&
+    (testModule < 0 || defaultPassword < testModule)
+  ) {
     fail(`Kredensial default runtime ditemukan pada Turso ${label}.`);
   }
 }
@@ -630,7 +651,8 @@ for (const [label, source] of [
   const releaseNone = source.match(
     /#\[cfg\(not\(debug_assertions\)\)\][\s\S]*?BUILD_TURSO_DATABASE_URL:[^=]+= None;[\s\S]*?#\[cfg\(not\(debug_assertions\)\)\][\s\S]*?BUILD_TURSO_AUTH_TOKEN:[^=]+= None;/,
   );
-  if (!releaseNone) fail(`Release ${label} masih dapat mengompilasi token Turso.`);
+  if (!releaseNone)
+    fail(`Release ${label} masih dapat mengompilasi token Turso.`);
 }
 
 for (const [label, source] of [
@@ -662,8 +684,8 @@ for (const relativePath of [
 }
 
 for (const workspace of ["web-desktop", "mobile"]) {
-  const sourceFiles = walk(resolve(projectRoot, workspace, "src")).filter((path) =>
-    /\.(?:ts|tsx)$/.test(path),
+  const sourceFiles = walk(resolve(projectRoot, workspace, "src")).filter(
+    (path) => /\.(?:ts|tsx)$/.test(path),
   );
   for (const path of sourceFiles) {
     if (path.includes(".test.")) continue;
@@ -727,7 +749,9 @@ function cloudSchemaOf(source: string) {
 }
 
 {
-  const rustCloud = cloudSchemaOf(read("web-desktop/src-tauri/src/desktop/turso.rs"));
+  const rustCloud = cloudSchemaOf(
+    read("web-desktop/src-tauri/src/desktop/turso.rs"),
+  );
   const webCloud = cloudSchemaOf(
     `${read("web-desktop/src/lib/db-schema.ts")}\n${read("web-desktop/src/lib/db-migrations.ts")}`,
   );
@@ -767,7 +791,9 @@ function cloudSchemaOf(source: string) {
   }
   for (const table of expectedRustOnlyCloudTables) {
     if (webCloud[table]) {
-      fail(`Daftar tabel khusus Rust basi: '${table}' kini juga dibuat jalur Web.`);
+      fail(
+        `Daftar tabel khusus Rust basi: '${table}' kini juga dibuat jalur Web.`,
+      );
     }
   }
 
@@ -780,9 +806,13 @@ function cloudSchemaOf(source: string) {
     /WHERE type = 'table' AND name IN \(([\s\S]*?)\)\s*\)\s*AS table_count/,
   )?.[1];
   if (!requiredList) {
-    fail("Daftar tabel isDatabaseSchemaReady tidak dapat diparsing dari db-schema.ts.");
+    fail(
+      "Daftar tabel isDatabaseSchemaReady tidak dapat diparsing dari db-schema.ts.",
+    );
   } else {
-    const requiredTables = [...requiredList.matchAll(/'(\w+)'/g)].map((m) => m[1]);
+    const requiredTables = [...requiredList.matchAll(/'(\w+)'/g)].map(
+      (m) => m[1],
+    );
     const declaredCount = Number(
       schemaSource.match(/REQUIRED_TABLE_COUNT = (\d+)/)?.[1] ?? 0,
     );
@@ -796,7 +826,9 @@ function cloudSchemaOf(source: string) {
       ["mobile", "mobile/src-tauri/src/mobile/turso.rs"],
     ] as const) {
       const created = new Set(
-        [...read(path).matchAll(/CREATE TABLE IF NOT EXISTS\s+(\w+)/g)].map((m) => m[1]),
+        [...read(path).matchAll(/CREATE TABLE IF NOT EXISTS\s+(\w+)/g)].map(
+          (m) => m[1],
+        ),
       );
       const missing = requiredTables.filter((table) => !created.has(table));
       if (missing.length) {
@@ -817,10 +849,14 @@ function cloudSchemaOf(source: string) {
 // Salah format tidak memunculkan error — nilainya hanya diam-diam terbaca
 // kosong di sisi penerima.
 {
-  const isSnake = (value: string) => /^[a-z][a-z0-9]*(_[a-z0-9]+)*$/.test(value);
-  const isKebab = (value: string) => /^[a-z][a-z0-9]*(-[a-z0-9]+)*$/.test(value);
+  const isSnake = (value: string) =>
+    /^[a-z][a-z0-9]*(_[a-z0-9]+)*$/.test(value);
+  const isKebab = (value: string) =>
+    /^[a-z][a-z0-9]*(-[a-z0-9]+)*$/.test(value);
   const isCamel = (value: string) =>
-    /^[a-z][a-zA-Z0-9]*$/.test(value) && !value.includes("_") && !value.includes("-");
+    /^[a-z][a-zA-Z0-9]*$/.test(value) &&
+    !value.includes("_") &&
+    !value.includes("-");
 
   for (const [label, source] of [
     ["desktop", desktopSync],
@@ -829,14 +865,25 @@ function cloudSchemaOf(source: string) {
     for (const definition of source.matchAll(
       /SnapshotTable \{\s*payload_key: "([^"]+)",\s*domain: "([^"]+)",\s*table: "([^"]+)",\s*columns: &\[([\s\S]*?)\],\s*conflict_column: "([^"]+)",\s*entity_column: "([^"]+)"/g,
     )) {
-      const [, payloadKey, domain, table, columnBlock, conflictColumn, entityColumn] = definition;
+      const [
+        ,
+        payloadKey,
+        domain,
+        table,
+        columnBlock,
+        conflictColumn,
+        entityColumn,
+      ] = definition;
       if (!isCamel(payloadKey)) {
-        fail(`payload_key ${label} bukan camelCase: "${payloadKey}" (tabel ${table}).`);
+        fail(
+          `payload_key ${label} bukan camelCase: "${payloadKey}" (tabel ${table}).`,
+        );
       }
       if (!isKebab(domain)) {
         fail(`domain ${label} bukan kebab-case: "${domain}" (tabel ${table}).`);
       }
-      if (!isSnake(table)) fail(`Nama tabel ${label} bukan snake_case: "${table}".`);
+      if (!isSnake(table))
+        fail(`Nama tabel ${label} bukan snake_case: "${table}".`);
       const columns = [...columnBlock.matchAll(/"([^"]+)"/g)].map((m) => m[1]);
       for (const column of columns) {
         if (!isSnake(column)) {
@@ -847,16 +894,21 @@ function cloudSchemaOf(source: string) {
       // sini membuat SQL upsert gagal saat runtime, bukan saat build.
       for (const key of conflictColumn.split(",").map((part) => part.trim())) {
         if (!columns.includes(key)) {
-          fail(`conflict_column "${key}" tidak ada pada daftar columns ${label} ${table}.`);
+          fail(
+            `conflict_column "${key}" tidak ada pada daftar columns ${label} ${table}.`,
+          );
         }
       }
       if (!columns.includes(entityColumn)) {
-        fail(`entity_column "${entityColumn}" tidak ada pada daftar columns ${label} ${table}.`);
+        fail(
+          `entity_column "${entityColumn}" tidak ada pada daftar columns ${label} ${table}.`,
+        );
       }
     }
     for (const route of canonicalRoutes(source)) {
       const [domain, operation] = route.split("/");
-      if (!isKebab(domain)) fail(`Domain route ${label} bukan kebab-case: "${domain}".`);
+      if (!isKebab(domain))
+        fail(`Domain route ${label} bukan kebab-case: "${domain}".`);
       if (!isKebab(operation)) {
         fail(`Operation route ${label} bukan kebab-case: "${operation}".`);
       }
@@ -897,7 +949,11 @@ function cloudSchemaOf(source: string) {
     const seeded = [...seedBlock.matchAll(/\('([a-z][a-z0-9._]*)',/g)]
       .map((match) => match[1])
       .sort();
-    sameSet(`Seed permission ${label} vs PERMISSION_CATALOG`, seeded, catalogKeys);
+    sameSet(
+      `Seed permission ${label} vs PERMISSION_CATALOG`,
+      seeded,
+      catalogKeys,
+    );
   }
 }
 
@@ -990,7 +1046,9 @@ function parseDdl(source: string): Record<string, ParsedTable> {
       }
       if (upper.startsWith("UNIQUE")) {
         table.tableUnique.push(
-          (text.match(/\(([^)]*)\)/)?.[1] ?? "").split(",").map((s) => s.trim()),
+          (text.match(/\(([^)]*)\)/)?.[1] ?? "")
+            .split(",")
+            .map((s) => s.trim()),
         );
         continue;
       }
@@ -1014,8 +1072,12 @@ function parseDdl(source: string): Record<string, ParsedTable> {
 }
 
 {
-  const localDdl = parseDdl(read("web-desktop/src-tauri/src/desktop/storage.rs"));
-  const cloudRustDdl = parseDdl(read("web-desktop/src-tauri/src/desktop/turso.rs"));
+  const localDdl = parseDdl(
+    read("web-desktop/src-tauri/src/desktop/storage.rs"),
+  );
+  const cloudRustDdl = parseDdl(
+    read("web-desktop/src-tauri/src/desktop/turso.rs"),
+  );
   const cloudWebDdl = parseDdl(
     `${read("web-desktop/src/lib/db-schema.ts")}\n${read("web-desktop/src/lib/db-migrations.ts")}`,
   );
@@ -1029,7 +1091,12 @@ function parseDdl(source: string): Record<string, ParsedTable> {
       const rustColumn = rust.columns[column];
       const webColumn = web.columns[column];
       if (!webColumn) continue; // ditangani pemeriksaan kolom satu sisi di atas
-      for (const property of ["notNull", "unique", "primaryKey", "hasDefault"] as const) {
+      for (const property of [
+        "notNull",
+        "unique",
+        "primaryKey",
+        "hasDefault",
+      ] as const) {
         if (rustColumn[property] !== webColumn[property]) {
           fail(
             `Constraint cloud '${table}.${column}.${property}' berbeda: turso.rs=${rustColumn[property]}, db-migrations.ts=${webColumn[property]}. ` +
@@ -1071,7 +1138,11 @@ function parseDdl(source: string): Record<string, ParsedTable> {
             "Satu baris cloud yang melanggar akan menggagalkan seluruh apply snapshot.",
         );
       }
-      if (localColumn.notNull && !cloudColumn.notNull && !localColumn.hasDefault) {
+      if (
+        localColumn.notNull &&
+        !cloudColumn.notNull &&
+        !localColumn.hasDefault
+      ) {
         fail(
           `SQLite lokal lebih ketat daripada cloud pada '${table}.${column}': lokal NOT NULL tanpa DEFAULT, cloud mengizinkan NULL.`,
         );
@@ -1118,7 +1189,9 @@ for (const [workspace, rootModule] of [
       }
     }
     if (!source.includes("payroll_seed::")) {
-      fail(`${workspace}/${file} tidak memakai payroll_seed sebagai sumber tarif default.`);
+      fail(
+        `${workspace}/${file} tidak memakai payroll_seed sebagai sumber tarif default.`,
+      );
     }
   }
 }
@@ -1151,7 +1224,9 @@ for (const [workspace, rootModule] of [
     fail(`generate_handler! ${workspace} tidak dapat diparsing.`);
     continue;
   }
-  const registered = registeredPaths.map((path) => path.split("::").at(-1) as string);
+  const registered = registeredPaths.map(
+    (path) => path.split("::").at(-1) as string,
+  );
 
   // 1. Setiap entri generate_handler! harus benar-benar ada fungsinya.
   for (const path of registeredPaths) {
@@ -1288,7 +1363,13 @@ for (const [workspace, rootModule] of [
       if (!gatewayRegionsByFile.has(gatewayFile)) continue;
       const imported = importMatch[1]
         .split(",")
-        .map((entry) => entry.trim().replace(/^type\s+/, "").split(/\s+as\s+/)[0])
+        .map(
+          (entry) =>
+            entry
+              .trim()
+              .replace(/^type\s+/, "")
+              .split(/\s+as\s+/)[0],
+        )
         .filter((entry) => /^[A-Za-z_]\w*$/.test(entry));
       for (const name of imported) {
         for (const command of reachableCommands(gatewayFile, name, new Set())) {
@@ -1322,7 +1403,9 @@ for (const [workspace, rootModule] of [
         permissions?: unknown;
       };
       if (!Array.isArray(parsed.permissions)) {
-        fail(`capabilities/default.json ${workspace}: "permissions" bukan array.`);
+        fail(
+          `capabilities/default.json ${workspace}: "permissions" bukan array.`,
+        );
       } else {
         allowed = new Set(
           parsed.permissions.filter(
@@ -1402,7 +1485,9 @@ if (errors.length > 0) {
 
 notes.push(`${expectedRoutes.length} route kanonik konsisten.`);
 notes.push(`${expectedSnapshotTriples.length} tabel snapshot konsisten.`);
-notes.push("Bootstrap, atomic receipt, entity-key, dan empty-cloud guard terdeteksi.");
+notes.push(
+  "Bootstrap, atomic receipt, entity-key, dan empty-cloud guard terdeteksi.",
+);
 notes.push(commandNotes.trim());
 console.log("AUDIT SYNC CONTRACT: LULUS");
 for (const note of notes) console.log(`- ${note}`);
