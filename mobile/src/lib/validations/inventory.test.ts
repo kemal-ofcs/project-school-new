@@ -1,17 +1,23 @@
 import { describe, expect, test } from "bun:test";
 import {
   aksiPindaiOpname,
+  angkaDariKetikan,
+  angkaDariSelAngka,
   type BarangInfo,
+  bacaAtribut,
   bacaLabelInventaris,
   barangDraftSchema,
+  formatAngka,
   formatKodeBarang,
   formatKodeUnit,
   type IzinInventaris,
+  isAngkaKanonik,
   isiLabelInventaris,
   isValidDate,
   izinUntukAlasan,
   type JenisBeritaAcara,
   jenisBeritaAcara,
+  kolomDraftSchema,
   mutasiDraftSchema,
   nomorKodeBerikutnya,
   normalizeKodePrefix,
@@ -25,8 +31,10 @@ import {
   susunPembatalan,
   validasiUnit,
   validasiUnitEdit,
+  validateAtribut,
   validateBarang,
   validateKodePrefixes,
+  validateKolom,
   validateMutasi,
   validateOpname,
 } from "./inventory";
@@ -942,5 +950,139 @@ describe("registri aset per unit", () => {
       galat("Pendaftaran unit tidak bisa dibatalkan."),
     );
     expect(susunPembatalan(asal("Pindah")).ok).toBe(true);
+  });
+});
+
+// Vektor kembar dengan `kolom_tambahan_vectors` di `inventory.rs`.
+const VEKTOR_KOLOM: [Record<string, unknown>, string | null][] = [
+  [{ nama: "  Merek   Barang ", tipe: "Teks" }, null],
+  [{ nama: "Berat", tipe: "Angka", is_aktif: false }, null],
+  [{ nama: "   ", tipe: "Teks" }, "Nama kolom wajib diisi."],
+  [{ nama: "M".repeat(41), tipe: "Teks" }, "Nama kolom maksimal 40 karakter."],
+  [
+    { nama: "nama BARANG", tipe: "Teks" },
+    "Nama kolom sudah dipakai kolom bawaan.",
+  ],
+  [{ nama: "Saldo", tipe: "Angka" }, "Nama kolom sudah dipakai kolom bawaan."],
+  [{ nama: "Warna", tipe: "Tanggal" }, "Tipe kolom tidak dikenal."],
+];
+
+const VEKTOR_ANGKA: [string, boolean][] = [
+  ["0", true],
+  ["7", true],
+  ["1250.5", true],
+  ["0.0001", true],
+  ["999999999999", true],
+  ["1000000000000", false],
+  ["007", false],
+  ["2.50", false],
+  ["0.00001", false],
+  ["1.", false],
+  [".5", false],
+  ["-1", false],
+  ["1,5", false],
+  ["", false],
+];
+
+const KOLOM_UJI = [
+  { id_kolom: "kol-a1", nama: "Merek", tipe: "Teks" as const },
+  { id_kolom: "kol-b2", nama: "Berat", tipe: "Angka" as const },
+];
+
+const VEKTOR_ATRIBUT: [
+  Record<string, string>,
+  Record<string, string> | string,
+][] = [
+  [
+    { "kol-b2": "2.5", "kol-a1": "  Pilot ", "kol-ff": "dari perangkat lain" },
+    { "kol-a1": "Pilot", "kol-b2": "2.5", "kol-ff": "dari perangkat lain" },
+  ],
+  [{ "kol-a1": "   " }, {}],
+  [{ "kol-b2": "2,5" }, "Isi kolom Berat harus angka."],
+  [{ "kol-a1": "x".repeat(201) }, "Isi kolom Merek maksimal 200 karakter."],
+  [{ "kol-ff": "x".repeat(201) }, "Isi kolom tambahan maksimal 200 karakter."],
+  [{ merek: "Pilot" }, "Kolom tambahan tidak valid."],
+];
+
+describe("kolom tambahan (vektor kembar inventory.rs)", () => {
+  test("validateKolom", () => {
+    for (const [raw, expected] of VEKTOR_KOLOM) {
+      const result = validateKolom(kolomDraftSchema.parse(raw));
+      if (expected === null) {
+        expect(result.ok).toBe(true);
+      } else {
+        expect(result).toEqual({ ok: false, error: expected });
+      }
+    }
+    expect(
+      validateKolom(
+        kolomDraftSchema.parse({ nama: " Merek   Barang ", tipe: "Teks" }),
+      ),
+    ).toEqual({
+      ok: true,
+      value: { nama: "Merek Barang", tipe: "Teks", is_aktif: true },
+    });
+  });
+
+  test("isAngkaKanonik", () => {
+    for (const [value, expected] of VEKTOR_ANGKA) {
+      expect(isAngkaKanonik(value)).toBe(expected);
+    }
+  });
+
+  test("validateAtribut", () => {
+    for (const [raw, expected] of VEKTOR_ATRIBUT) {
+      const result = validateAtribut(raw, KOLOM_UJI);
+      if (typeof expected === "string") {
+        expect(result).toEqual({ ok: false, error: expected });
+      } else {
+        expect(result).toEqual({ ok: true, value: expected });
+      }
+    }
+    const banyak = Object.fromEntries(
+      Array.from({ length: 101 }, (_, i) => [`kol-${i.toString(16)}`, "x"]),
+    );
+    expect(validateAtribut(banyak, [])).toEqual({
+      ok: false,
+      error: "Kolom tambahan terlalu banyak.",
+    });
+  });
+});
+
+describe("angka kolom tambahan", () => {
+  test("ketikan berformat Indonesia", () => {
+    const vektor: [string, string | null][] = [
+      ["2,5", "2.5"],
+      ["1.000", "1000"],
+      ["1.250,75", "1250.75"],
+      [" 12 ", "12"],
+      ["0,50", "0.5"],
+      ["2.5", null],
+      ["1.00", null],
+      ["1,2,3", null],
+      ["1,23456", null],
+      ["-3", null],
+      ["abc", null],
+    ];
+    for (const [raw, expected] of vektor) {
+      expect(angkaDariKetikan(raw)).toBe(expected);
+    }
+  });
+
+  test("sel Angka Excel bertitik desimal", () => {
+    expect(angkaDariSelAngka("1.234")).toBe("1.234");
+    expect(angkaDariSelAngka("1000")).toBe("1000");
+    expect(angkaDariSelAngka("0.30000000000000004")).toBe("0.3");
+    expect(angkaDariSelAngka("1E-3")).toBe("0.001");
+    expect(angkaDariSelAngka("-1")).toBeNull();
+  });
+
+  test("formatAngka dan bacaAtribut", () => {
+    expect(formatAngka("1250.5")).toBe("1.250,5");
+    expect(formatAngka("1234567")).toBe("1.234.567");
+    expect(formatAngka("12")).toBe("12");
+    expect(bacaAtribut('{"kol-a":"x","kol-b":3}')).toEqual({ "kol-a": "x" });
+    expect(bacaAtribut("bukan json")).toEqual({});
+    expect(bacaAtribut(null)).toEqual({});
   });
 });

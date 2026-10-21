@@ -679,7 +679,8 @@ pub fn initialize(path: &Path) -> Result<(), String> {
         catatan TEXT,
         status_aktif INTEGER NOT NULL DEFAULT 1 CHECK (status_aktif IN (0, 1)),
         created_at TEXT NOT NULL DEFAULT (datetime('now')),
-        updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+        updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+        atribut TEXT
       );
       -- Append-only. Pembatalan adalah baris kebalikan berid 'batal-' || id_ref.
       CREATE TABLE IF NOT EXISTS inventory_mutasi (
@@ -741,6 +742,17 @@ pub fn initialize(path: &Path) -> Result<(), String> {
         updated_at TEXT NOT NULL DEFAULT (datetime('now'))
       );
       CREATE INDEX IF NOT EXISTS idx_inventory_unit_barang ON inventory_unit(id_barang);
+      -- Definisi kolom tambahan barang (v53). Isinya di `inventory_barang.atribut`
+      -- (JSON berkunci id_kolom); hapus = nonaktif. DDL WAJIB identik dengan
+      -- `turso.rs` dan `db-migrations.ts`.
+      CREATE TABLE IF NOT EXISTS inventory_kolom (
+        id_kolom TEXT PRIMARY KEY,
+        nama TEXT NOT NULL,
+        tipe TEXT NOT NULL CHECK (tipe IN ('Teks', 'Angka')),
+        is_aktif INTEGER NOT NULL DEFAULT 1 CHECK (is_aktif IN (0, 1)),
+        created_at TEXT NOT NULL DEFAULT (datetime('now')),
+        updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+      );
       -- Vektor wajah terdaftar untuk verifikasi 1:1 saat scan (v38). Ikut
       -- SNAPSHOT_TABLES supaya terminal offline tetap bisa memeriksa; isinya
       -- int8 base64 (±1,4 KB per orang), bukan foto. DDL WAJIB identik dengan
@@ -1858,6 +1870,15 @@ pub fn initialize(path: &Path) -> Result<(), String> {
         ensure_column(&connection, "absensi_foto", column, sql)?;
     }
 
+    // Isi kolom tambahan barang (v53, JSON berkunci id_kolom). NULL = belum
+    // ada isi, sama dengan `{}`.
+    ensure_column(
+        &connection,
+        "inventory_barang",
+        "atribut",
+        "ALTER TABLE inventory_barang ADD COLUMN atribut TEXT;",
+    )?;
+
     // Shift tujuan sesi lanjutan. 0 = belum ditentukan, sehingga pemasangan
     // lama yang hanya menyalakan izinkan_multi_sesi tetap memakai pencocokan
     // jendela otomatis seperti sebelumnya.
@@ -2049,6 +2070,7 @@ pub(crate) const CLOUD_MIRRORED_TABLES: &[&str] = &[
     "inventory_barang",
     "inventory_mutasi",
     "inventory_unit",
+    "inventory_kolom",
     "personil_wajah",
     // v39 — akuntansi. Ikut dibuang saat pindah database: pembukuan milik
     // lembaga database asalnya.

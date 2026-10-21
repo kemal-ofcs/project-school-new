@@ -348,6 +348,7 @@ pub fn run() {
             mobile::commands::desktop_inventory_recipients,
             mobile::commands::desktop_inventory_save_item,
             mobile::commands::desktop_inventory_save_code_prefixes,
+            mobile::commands::desktop_inventory_save_column,
             mobile::commands::desktop_inventory_record_mutation,
             mobile::commands::desktop_inventory_loans,
             mobile::commands::desktop_uks_list,

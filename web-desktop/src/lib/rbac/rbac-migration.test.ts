@@ -157,6 +157,8 @@ describe("dynamic RBAC migration", () => {
       51,
       // v52 — pembayaran biaya pendaftaran PMB.
       52,
+      // v53 — kolom tambahan barang inventaris (`inventory_kolom`).
+      53,
     ]);
 
     const sessionColumns = await client.execute(

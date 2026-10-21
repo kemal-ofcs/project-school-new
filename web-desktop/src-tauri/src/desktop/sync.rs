@@ -970,6 +970,7 @@ const SNAPSHOT_TABLES: &[SnapshotTable] = &[
             "status_aktif",
             "created_at",
             "updated_at",
+            "atribut",
         ],
         conflict_column: "id_barang",
         entity_column: "id_barang",
@@ -1027,6 +1028,25 @@ const SNAPSHOT_TABLES: &[SnapshotTable] = &[
         ],
         conflict_column: "id_unit",
         entity_column: "id_unit",
+        delete_missing: false,
+    },
+    // ── v53: Kolom tambahan barang ──
+    //
+    // Hapus = nonaktif, jadi ketiadaan baris tidak pernah berarti "dihapus".
+    SnapshotTable {
+        payload_key: "inventoryColumns",
+        domain: "inventory-column",
+        table: "inventory_kolom",
+        columns: &[
+            "id_kolom",
+            "nama",
+            "tipe",
+            "is_aktif",
+            "created_at",
+            "updated_at",
+        ],
+        conflict_column: "id_kolom",
+        entity_column: "id_kolom",
         delete_missing: false,
     },
     // â”€â”€ v38: Vektor wajah terdaftar (verifikasi 1:1 saat scan) â”€â”€
@@ -1437,6 +1457,7 @@ pub(crate) const CANONICAL_SYNC_ROUTES: &[(&str, &str)] = &[
     ("inventory-item", "save"),
     ("inventory-mutation", "create"),
     ("inventory-unit", "save"),
+    ("inventory-column", "save"),
     ("accounting-account", "save"),
     ("accounting-journal", "post"),
     ("loan", "save"),

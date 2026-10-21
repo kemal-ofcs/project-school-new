@@ -25,6 +25,7 @@ const {
   recordOpname,
   registerUnits,
   saveCodePrefixes,
+  saveColumn,
   saveItem,
   saveUnit,
   stockCard,
@@ -47,6 +48,7 @@ beforeEach(async () => {
       "DELETE FROM inventory_mutasi;",
       "DELETE FROM inventory_barang;",
       "DELETE FROM inventory_unit;",
+      "DELETE FROM inventory_kolom;",
       "DELETE FROM setting_gex_system WHERE key = 'inventory_kode_prefix';",
     ],
     "write",
@@ -747,5 +749,76 @@ describe("registri aset per unit Web", () => {
     await expect(registerUnits(client, "admin", habis)).rejects.toThrow(
       "Hanya aset tanpa kedaluwarsa yang bisa dicatat per unit.",
     );
+  });
+});
+
+describe("kolom tambahan Web", () => {
+  test("nama unik, tipe terkunci, batas kolom aktif", async () => {
+    const { id_kolom } = await saveColumn(client, {
+      nama: "Merek",
+      tipe: "Teks",
+    });
+    expect(id_kolom).toMatch(/^kol-[0-9a-f]{32}$/);
+    await expect(
+      saveColumn(client, { nama: " merek ", tipe: "Teks" }),
+    ).rejects.toThrow("Nama kolom sudah dipakai kolom lain.");
+    await expect(
+      saveColumn(client, { id_kolom, nama: "Merek", tipe: "Angka" }),
+    ).rejects.toThrow("Tipe kolom tidak bisa diubah setelah dibuat.");
+    await saveColumn(client, {
+      id_kolom,
+      nama: "Merk",
+      tipe: "Teks",
+      is_aktif: false,
+    });
+
+    for (let i = 0; i < 20; i += 1) {
+      await saveColumn(client, { nama: `Kolom ${i}`, tipe: "Teks" });
+    }
+    // Kolom nonaktif tidak bisa diaktifkan lagi saat 20 kolom sudah aktif.
+    await expect(
+      saveColumn(client, {
+        id_kolom,
+        nama: "Merk",
+        tipe: "Teks",
+        is_aktif: true,
+      }),
+    ).rejects.toThrow("Maksimal 20 kolom tambahan aktif.");
+    const daftar = await listInventory(client);
+    expect(daftar.kolom).toHaveLength(21);
+    // `created_at` berpresisi detik: kolom yang dibuat bersamaan urut id acak.
+    expect(
+      daftar.kolom.find((item) => item.id_kolom === id_kolom),
+    ).toMatchObject({
+      nama: "Merk",
+      is_aktif: false,
+    });
+  });
+
+  test("isi kolom tersimpan, divalidasi tipenya, dan kosong dibuang", async () => {
+    const { id_kolom: berat } = await saveColumn(client, {
+      nama: "Berat",
+      tipe: "Angka",
+    });
+    await expect(
+      saveItem(client, {
+        nama_barang: "Karung",
+        tipe: "Aset",
+        satuan: "unit",
+        atribut: { [berat]: "2,5" },
+      }),
+    ).rejects.toThrow("Isi kolom Berat harus angka.");
+    const { id_barang } = await saveItem(client, {
+      nama_barang: "Karung",
+      tipe: "Aset",
+      satuan: "unit",
+      atribut: { [berat]: "2.5", "kol-ff": "  " },
+    });
+    const daftar = await listInventory(client);
+    expect(
+      daftar.barang.find((item) => item.id_barang === id_barang)?.atribut,
+    ).toEqual({
+      [berat]: "2.5",
+    });
   });
 });

@@ -9,6 +9,7 @@ import type {
   DaftarPinjaman,
   DokumenInventaris,
   KartuStok,
+  KolomDraft,
   MutasiDraft,
   OpnameDraft,
   PenerimaInventaris,
@@ -25,6 +26,8 @@ export type {
   DaftarPinjaman,
   DokumenInventaris,
   KartuStok,
+  KolomDraft,
+  KolomInventaris,
   MutasiDraft,
   OpnameDraft,
   PenerimaInventaris,
@@ -84,6 +87,21 @@ export async function simpanAwalanKodeInventaris(
     return result;
   }
   return requestWebApi("/api/inventory/code-prefixes", "POST", { prefixes });
+}
+
+/** Tambah, ganti nama, atau nonaktifkan kolom tambahan barang. */
+export async function simpanKolomInventaris(
+  draft: KolomDraft,
+): Promise<{ sukses: boolean; id_kolom: string }> {
+  if (isDesktopRuntime()) {
+    const result = await invokeDesktop<{ sukses: boolean; id_kolom: string }>(
+      "desktop_inventory_save_column",
+      { draft },
+    );
+    kickDesktopSync();
+    return result;
+  }
+  return requestWebApi("/api/inventory/column", "POST", { draft });
 }
 
 export async function catatMutasiInventaris(

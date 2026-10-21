@@ -1,0 +1,288 @@
+/**
+ * Validasi impor Excel barang inventaris: murni, tanpa DOM, supaya bisa diuji.
+ *
+ * Setiap baris disimpan lewat `simpanBarangInventaris` dan, untuk barang baru
+ * bersaldo, `catatMutasiInventaris` Masuk "Saldo Awal", jalur yang SAMA
+ * dengan formulir, jadi tidak ada command atau rute sync kedua. Seperti impor
+ * personil, satu sel cacat menolak SELURUH berkas; penolakan backend dicatat
+ * per baris.
+ *
+ * Kode yang cocok dengan barang yang sudah ada mengubah barang itu dan tidak
+ * pernah menambah stok: stok diturunkan dari mutasi, jadi mengimpor ulang
+ * berkas yang sama akan menghitung saldonya dua kali. Kolom yang tidak ada di
+ * baris judul mempertahankan nilai lama; kolom yang ada tapi kosong
+ * mengosongkannya. Aturan yang sama berlaku untuk kolom tambahan yang aktif,
+ * dicocokkan lewat namanya; isi kolom yang nonaktif tidak pernah disentuh.
+ */
+
+import {
+  angkaDariKetikan,
+  angkaDariSelAngka,
+  asciiLower,
+  type BarangDraft,
+  type BarangInventaris,
+  barangDraftSchema,
+  KONDISI_BARANG,
+  type KolomInventaris,
+  type MutasiDraft,
+  mutasiDraftSchema,
+  normalizeTempat,
+  TIPE_BARANG,
+  validateAtribut,
+  validateBarang,
+  validateMutasi,
+} from "./inventory";
+import {
+  type ImportRow,
+  tanggalExcel,
+  teksIdentitas,
+  workbookColumns,
+} from "./personnel-import";
+
+export const MAX_INVENTARIS_IMPORT_ROWS = 1000;
+
+export const INVENTARIS_WORKBOOK_HEADERS = [
+  "Kode",
+  "Nama barang",
+  "Kategori",
+  "Tipe",
+  "Satuan",
+  "Bisa kedaluwarsa",
+  "Stok minimum",
+  "Tempat utama",
+  "Catatan",
+  "Saldo awal",
+  "Tempat saldo",
+  "Kondisi",
+  "Tanggal kedaluwarsa",
+] as const;
+
+export interface BarisImporBarang {
+  barang: BarangDraft;
+  /** Saldo awal barang baru; `id_barang` diisi setelah barangnya tersimpan. */
+  saldo: MutasiDraft | null;
+  baru: boolean;
+  /** Barang lama yang barisnya membawa saldo: diabaikan, dilaporkan. */
+  saldoDiabaikan: boolean;
+}
+
+function pilihan<T extends string>(
+  daftar: readonly T[],
+  raw: string,
+): T | undefined {
+  return daftar.find((item) => asciiLower(item) === asciiLower(raw));
+}
+
+function bilangan(raw: string, kolom: string, baris: number): number {
+  if (!raw) return 0;
+  if (!/^\d+$/.test(raw)) {
+    throw new Error(
+      `Baris ${baris}: ${kolom} '${raw}' harus bilangan bulat 0 atau lebih.`,
+    );
+  }
+  return Number(raw);
+}
+
+function kunciJudul(judul: string): string {
+  return asciiLower(normalizeTempat(judul));
+}
+
+/**
+ * Judul di baris pertama yang bukan kolom bawaan maupun kolom tambahan aktif,
+ * misalnya kolom "No" buatan sendiri atau nama kolom yang sudah diganti.
+ * Isinya diabaikan dan dilaporkan, tidak menolak berkas.
+ */
+export function judulAsing(
+  judul: readonly string[],
+  kolom: readonly KolomInventaris[],
+): string[] {
+  const dikenal = new Set([
+    ...INVENTARIS_WORKBOOK_HEADERS.map(kunciJudul),
+    ...kolom
+      .filter((item) => item.is_aktif)
+      .map((item) => kunciJudul(item.nama)),
+  ]);
+  return judul
+    .map((item) => normalizeTempat(item))
+    .filter((item) => item && !dikenal.has(kunciJudul(item)));
+}
+
+/**
+ * `selAngka` menandai sel Excel bertipe Angka (lihat `readWorkbookTable`):
+ * isinya bertitik desimal, sedangkan sel lain dibaca sebagai ketikan
+ * berformat Indonesia.
+ */
+export function parseInventarisRows(
+  rows: string[][],
+  daftar: readonly BarangInventaris[],
+  hariIni: string,
+  kolom: readonly KolomInventaris[] = [],
+  selAngka: readonly (readonly boolean[])[] = [],
+): ImportRow<BarisImporBarang>[] {
+  const judul = rows[0] ?? [];
+  const val = workbookColumns(judul, ["nama barang"]);
+  const adaKolom = new Set(judul.map((h) => h.toLowerCase().trim()));
+  const kolomDiFile: { kolom: KolomInventaris; indeks: number }[] = [];
+  for (const item of kolom.filter((k) => k.is_aktif)) {
+    const indeks = judul.findIndex(
+      (h) => kunciJudul(h) === kunciJudul(item.nama),
+    );
+    if (indeks < 0) continue;
+    if (kolomDiFile.some((ada) => ada.indeks === indeks)) {
+      throw new Error(
+        `Kolom tambahan '${item.nama}' ada dua. Ganti nama salah satunya, lalu impor lagi.`,
+      );
+    }
+    kolomDiFile.push({ kolom: item, indeks });
+  }
+  if (rows.length < 2) {
+    throw new Error("Tidak ada data barang yang ditemukan di file.");
+  }
+  if (rows.length - 1 > MAX_INVENTARIS_IMPORT_ROWS) {
+    throw new Error(
+      `Maksimal ${MAX_INVENTARIS_IMPORT_ROWS} barang per file. Pecah berkasnya menjadi beberapa file.`,
+    );
+  }
+
+  const perKode = new Map<string, BarangInventaris[]>();
+  for (const barang of daftar) {
+    const k = asciiLower(barang.kode_barang.trim());
+    perKode.set(k, [...(perKode.get(k) ?? []), barang]);
+  }
+  const kodeDiFile = new Set<string>();
+  const hasil: ImportRow<BarisImporBarang>[] = [];
+
+  rows.slice(1).forEach((row, index) => {
+    const baris = index + 2;
+    if (row.every((cell) => !cell.trim())) return;
+
+    const kode = teksIdentitas(val(row, "kode"), "Kode", baris);
+    let lama: BarangInventaris | undefined;
+    if (kode) {
+      const k = asciiLower(kode);
+      if (kodeDiFile.has(k)) {
+        throw new Error(
+          `Baris ${baris}: Kode '${kode}' muncul dua kali di file.`,
+        );
+      }
+      kodeDiFile.add(k);
+      const cocok = perKode.get(k) ?? [];
+      if (cocok.length > 1) {
+        throw new Error(
+          `Baris ${baris}: Kode '${kode}' dipakai ${cocok.length} barang. Ganti kode barang yang ganda di daftar barang, lalu impor lagi.`,
+        );
+      }
+      lama = cocok[0];
+    }
+    const kol = (kolom: string, nilaiLama: string | null | undefined) =>
+      adaKolom.has(kolom) ? val(row, kolom) : (nilaiLama ?? "");
+
+    const tipeMentah = kol("tipe", lama?.tipe);
+    const tipe = pilihan(TIPE_BARANG, tipeMentah);
+    if (!tipe) {
+      throw new Error(
+        `Baris ${baris}: Tipe '${tipeMentah}' harus Aset atau Habis Pakai.`,
+      );
+    }
+    const expiredMentah = kol(
+      "bisa kedaluwarsa",
+      lama ? (lama.bisa_expired ? "Ya" : "Tidak") : "",
+    );
+    const expired = asciiLower(expiredMentah);
+    if (expired !== "" && expired !== "ya" && expired !== "tidak") {
+      throw new Error(
+        `Baris ${baris}: Bisa kedaluwarsa '${expiredMentah}' harus Ya atau Tidak.`,
+      );
+    }
+
+    const barang: BarangDraft = {
+      id_barang: lama?.id_barang ?? null,
+      kode_barang: kode || null,
+      nama_barang: kol("nama barang", lama?.nama_barang),
+      kategori: kol("kategori", lama?.kategori),
+      tipe,
+      satuan: kol("satuan", lama?.satuan),
+      bisa_expired: expired === "ya",
+      stok_minimum: bilangan(
+        kol("stok minimum", lama ? String(lama.stok_minimum) : ""),
+        "Stok minimum",
+        baris,
+      ),
+      tempat_utama: kol("tempat utama", lama?.tempat_utama),
+      catatan: kol("catatan", lama?.catatan),
+      status_aktif: lama?.status_aktif ?? true,
+    };
+    const cekBarang = validateBarang(barangDraftSchema.parse(barang));
+    if (!cekBarang.ok) throw new Error(`Baris ${baris}: ${cekBarang.error}`);
+
+    const atribut: Record<string, string> = { ...(lama?.atribut ?? {}) };
+    for (const { kolom: item, indeks } of kolomDiFile) {
+      const isi = (row[indeks] ?? "").trim();
+      if (!isi) {
+        delete atribut[item.id_kolom];
+      } else if (item.tipe === "Angka") {
+        const angka = selAngka[index + 1]?.[indeks]
+          ? angkaDariSelAngka(isi)
+          : angkaDariKetikan(isi);
+        if (angka === null) {
+          throw new Error(
+            `Baris ${baris}: ${item.nama} '${isi}' bukan angka. Pakai koma untuk desimal, misalnya 2,5.`,
+          );
+        }
+        atribut[item.id_kolom] = angka;
+      } else {
+        atribut[item.id_kolom] = isi;
+      }
+    }
+    const cekAtribut = validateAtribut(atribut, kolom);
+    if (!cekAtribut.ok) throw new Error(`Baris ${baris}: ${cekAtribut.error}`);
+    barang.atribut = cekAtribut.value;
+
+    const jumlah = bilangan(val(row, "saldo awal"), "Saldo awal", baris);
+    let saldo: MutasiDraft | null = null;
+    if (jumlah > 0 && !lama) {
+      const kondisiMentah = val(row, "kondisi");
+      const kondisi = kondisiMentah
+        ? pilihan(KONDISI_BARANG, kondisiMentah)
+        : "Baik";
+      if (!kondisi) {
+        throw new Error(
+          `Baris ${baris}: Kondisi '${kondisiMentah}' harus ${KONDISI_BARANG.join(", ")}.`,
+        );
+      }
+      saldo = {
+        id_barang: "",
+        jenis: "Masuk",
+        alasan: "Saldo Awal",
+        jumlah,
+        tempat_tujuan: val(row, "tempat saldo") || barang.tempat_utama,
+        kondisi_tujuan: kondisi,
+        tanggal_expired:
+          tanggalExcel(
+            val(row, "tanggal kedaluwarsa"),
+            "Tanggal kedaluwarsa",
+            baris,
+          ) ?? null,
+      };
+      const cekSaldo = validateMutasi(
+        mutasiDraftSchema.parse(saldo),
+        { tipe, bisa_expired: cekBarang.value.bisa_expired },
+        hariIni,
+      );
+      if (!cekSaldo.ok) {
+        throw new Error(`Baris ${baris}: saldo awal: ${cekSaldo.error}`);
+      }
+    }
+
+    hasil.push({
+      baris,
+      draft: {
+        barang,
+        saldo,
+        baru: !lama,
+        saldoDiabaikan: jumlah > 0 && Boolean(lama),
+      },
+    });
+  });
+  return hasil;
+}

@@ -8,6 +8,7 @@ import {
   type BarangInventaris,
   type BarisDokumen,
   type BarisPengadaan,
+  bacaAtribut,
   barangDraftSchema,
   type DaftarInventaris,
   type DaftarPinjaman,
@@ -19,12 +20,15 @@ import {
   jenisBeritaAcara,
   type KartuStok,
   KODE_PREFIX_SETTING_KEY,
+  type KolomInventaris,
   type KondisiBarang,
   type KopSekolah,
+  kolomDraftSchema,
   MAKS_BARIS_DOKUMEN,
   MAKS_BARIS_KARTU_STOK,
   MAKS_BARIS_PENGADAAN,
   MAKS_BARIS_PINJAMAN,
+  MAKS_KOLOM_AKTIF,
   MAKS_UNIT_DAFTAR,
   type MutasiAsal,
   type MutasiDraftParsed,
@@ -45,11 +49,14 @@ import {
   stokMenipis,
   susunPembatalan,
   type TipeBarang,
+  type TipeKolom,
   unitDraftSchema,
   validasiUnit,
   validasiUnitEdit,
+  validateAtribut,
   validateBarang,
   validateKodePrefixes,
+  validateKolom,
   validateMutasi,
   validateOpname,
 } from "@/lib/validations/inventory";
@@ -113,6 +120,85 @@ export async function saveCodePrefixes(
     args: [KODE_PREFIX_SETTING_KEY, JSON.stringify(checked.value)],
   });
   return { sukses: true, kode_prefix: checked.value };
+}
+
+/** Cermin `list_kolom`: urut waktu dibuat, nama kembar ditandai. */
+async function listKolom(client: Executor): Promise<KolomInventaris[]> {
+  const result = await client.execute(
+    `SELECT k.id_kolom, k.nama, k.tipe, k.is_aktif,
+            EXISTS(SELECT 1 FROM inventory_kolom lain
+                   WHERE LOWER(lain.nama) = LOWER(k.nama) AND lain.id_kolom <> k.id_kolom) AS ganda
+     FROM inventory_kolom k
+     ORDER BY k.created_at, k.id_kolom
+     -- batas: kolom aktif dibatasi MAKS_KOLOM_AKTIF saat menyimpan
+     ;`,
+  );
+  return result.rows.map((row) => ({
+    id_kolom: String(row.id_kolom),
+    nama: String(row.nama),
+    tipe: String(row.tipe) as TipeKolom,
+    is_aktif: Number(row.is_aktif) === 1,
+    nama_ganda: Number(row.ganda) === 1,
+  }));
+}
+
+/** Cermin `save_column`. */
+export async function saveColumn(
+  client: Client,
+  rawDraft: unknown,
+): Promise<{ sukses: true; id_kolom: string }> {
+  const parsed = kolomDraftSchema.safeParse(rawDraft);
+  if (!parsed.success) throw new Error("Data kolom tidak valid.");
+  const checked = validateKolom(parsed.data);
+  if (!checked.ok) throw new Error(checked.error);
+  const valid = checked.value;
+
+  return withTransaction(client, async (tx) => {
+    const requestedId = parsed.data.id_kolom?.trim() || null;
+    let sudahAktif = false;
+    if (requestedId) {
+      const existing = await tx.execute({
+        sql: "SELECT tipe, is_aktif FROM inventory_kolom WHERE id_kolom = ?;",
+        args: [requestedId],
+      });
+      const row = existing.rows[0];
+      if (!row) throw new Error("Kolom tidak ditemukan.");
+      if (String(row.tipe) !== valid.tipe) {
+        throw new Error("Tipe kolom tidak bisa diubah setelah dibuat.");
+      }
+      sudahAktif = Number(row.is_aktif) === 1;
+    }
+    const idKolom = requestedId ?? newHexId("kol-");
+
+    const dipakai = await tx.execute({
+      sql: `SELECT EXISTS(SELECT 1 FROM inventory_kolom
+                          WHERE LOWER(nama) = LOWER(?) AND id_kolom <> ?) AS ada;`,
+      args: [valid.nama, idKolom],
+    });
+    if (Number(dipakai.rows[0]?.ada) === 1) {
+      throw new Error("Nama kolom sudah dipakai kolom lain.");
+    }
+    if (valid.is_aktif && !sudahAktif) {
+      const aktif = await tx.execute({
+        sql: "SELECT COUNT(*) AS jumlah FROM inventory_kolom WHERE is_aktif = 1 AND id_kolom <> ?;",
+        args: [idKolom],
+      });
+      if (Number(aktif.rows[0]?.jumlah) >= MAKS_KOLOM_AKTIF) {
+        throw new Error("Maksimal 20 kolom tambahan aktif.");
+      }
+    }
+
+    await tx.execute({
+      sql: `INSERT INTO inventory_kolom (id_kolom, nama, tipe, is_aktif, created_at, updated_at)
+            VALUES (?, ?, ?, ?, datetime('now'), datetime('now'))
+            ON CONFLICT(id_kolom) DO UPDATE SET
+              nama = excluded.nama,
+              is_aktif = excluded.is_aktif,
+              updated_at = excluded.updated_at;`,
+      args: [idKolom, valid.nama, valid.tipe, valid.is_aktif ? 1 : 0],
+    });
+    return { sukses: true as const, id_kolom: idKolom };
+  });
 }
 
 async function wibToday(client: Executor): Promise<string> {
@@ -214,7 +300,7 @@ export async function listInventory(client: Client): Promise<DaftarInventaris> {
 
   const barangResult = await client.execute(
     `SELECT id_barang, kode_barang, nama_barang, kategori, tipe, satuan, bisa_expired,
-            stok_minimum, tempat_utama, catatan, status_aktif
+            stok_minimum, tempat_utama, catatan, status_aktif, atribut
      FROM inventory_barang
      ORDER BY status_aktif DESC, nama_barang COLLATE NOCASE;`,
   );
@@ -241,6 +327,7 @@ export async function listInventory(client: Client): Promise<DaftarInventaris> {
       stok_menipis: stokMenipis(stokBaik, Number(row.stok_minimum)),
       posisi,
       dilacak_unit: dilacak.has(String(row.id_barang)),
+      atribut: bacaAtribut(row.atribut),
     };
   });
 
@@ -281,6 +368,7 @@ export async function listInventory(client: Client): Promise<DaftarInventaris> {
     tempat,
     kategori,
     kode_prefix: await readKodePrefixes(client),
+    kolom: await listKolom(client),
     hari_ini: await wibToday(client),
     nama_sekolah: (await kopSekolah(client)).nama ?? null,
   };
@@ -385,12 +473,14 @@ export async function saveItem(
       kode = await nextItemCode(tx, prefix, idBarang);
     }
     const tempatUtama = await canonicalTempat(tx, valid.tempat_utama);
+    const atribut = validateAtribut(parsed.data.atribut, await listKolom(tx));
+    if (!atribut.ok) throw new Error(atribut.error);
 
     await tx.execute({
       sql: `INSERT INTO inventory_barang (
               id_barang, kode_barang, nama_barang, kategori, tipe, satuan, bisa_expired,
-              stok_minimum, tempat_utama, catatan, status_aktif, created_at, updated_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))
+              stok_minimum, tempat_utama, catatan, status_aktif, created_at, updated_at, atribut
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'), ?)
             ON CONFLICT(id_barang) DO UPDATE SET
               kode_barang = excluded.kode_barang,
               nama_barang = excluded.nama_barang,
@@ -402,7 +492,8 @@ export async function saveItem(
               tempat_utama = excluded.tempat_utama,
               catatan = excluded.catatan,
               status_aktif = excluded.status_aktif,
-              updated_at = excluded.updated_at;`,
+              updated_at = excluded.updated_at,
+              atribut = excluded.atribut;`,
       args: [
         idBarang,
         kode,
@@ -415,6 +506,9 @@ export async function saveItem(
         tempatUtama,
         valid.catatan,
         valid.status_aktif ? 1 : 0,
+        Object.keys(atribut.value).length > 0
+          ? JSON.stringify(atribut.value)
+          : null,
       ],
     });
     return { sukses: true as const, id_barang: idBarang, kode_barang: kode };

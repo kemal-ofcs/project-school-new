@@ -315,11 +315,24 @@ export function createXlsxBuffer(
  * Baris kosong dibuang; baris pertama adalah judul kolom.
  */
 export async function readWorkbookRows(file: File): Promise<string[][]> {
+  return (await readWorkbookTable(file)).rows;
+}
+
+/**
+ * Seperti `readWorkbookRows`, ditambah penanda sel bertipe Angka. Isi sel
+ * Angka selalu bertitik desimal (`1.234` = satu koma dua tiga empat) apa pun
+ * pengaturan regional Excel, sedangkan sel Teks dan CSV berisi ketikan apa
+ * adanya; tanpa penanda ini keduanya tidak bisa dibedakan.
+ */
+export async function readWorkbookTable(
+  file: File,
+): Promise<{ rows: string[][]; selAngka: boolean[][] }> {
   if (file.size > MAX_WORKBOOK_BYTES) {
     throw new Error("Ukuran file Excel maksimal 10 MB.");
   }
 
   const rows: string[][] = [];
+  const selAngka: boolean[][] = [];
 
   if (file.name.toLowerCase().endsWith(".csv")) {
     // "CSV UTF-8" dari Excel diawali BOM: tanpa dibuang, judul kolom pertama
@@ -354,9 +367,10 @@ export async function readWorkbookRows(file: File): Promise<string[][]> {
       row.push(cell.trim());
       if (row.some((c) => c !== "")) {
         rows.push(row);
+        selAngka.push(row.map(() => false));
       }
     }
-    return rows;
+    return { rows, selAngka };
   }
 
   const buffer = await file.arrayBuffer();
@@ -393,6 +407,7 @@ export async function readWorkbookRows(file: File): Promise<string[][]> {
 
   rowElements.forEach((rowEl) => {
     const rowCells: string[] = [];
+    const rowAngka: boolean[] = [];
     const cElements = rowEl.querySelectorAll("c");
 
     cElements.forEach((cEl) => {
@@ -404,6 +419,7 @@ export async function readWorkbookRows(file: File): Promise<string[][]> {
 
       while (rowCells.length < colIdx) {
         rowCells.push("");
+        rowAngka.push(false);
       }
 
       const type = cEl.getAttribute("t");
@@ -422,14 +438,17 @@ export async function readWorkbookRows(file: File): Promise<string[][]> {
       }
 
       rowCells[colIdx] = val;
+      // Tanpa atribut `t` atau `t="n"` = sel Angka.
+      rowAngka[colIdx] = (type === null || type === "n") && val !== "";
     });
 
     if (rowCells.some((c) => c !== "")) {
       rows.push(rowCells);
+      selAngka.push(rowAngka);
     }
   });
 
-  return rows;
+  return { rows, selAngka };
 }
 
 /** Tulis satu sheet lalu serahkan ke dialog simpan milik platform. */

@@ -63,6 +63,7 @@ const PMB_DAPODIK_MIGRATION_VERSION = 49;
 const SHIFT_WORK_DAYS_MIGRATION_VERSION = 50;
 const PAYROLL_RAPEL_MIGRATION_VERSION = 51;
 const PMB_PAYMENT_MIGRATION_VERSION = 52;
+const INVENTORY_COLUMN_MIGRATION_VERSION = 53;
 
 /**
  * v21 — aturan jam scan baru: Jam Kerja Normal = (Jam Pulang − Jam Masuk) −
@@ -631,6 +632,13 @@ export async function runDatabaseMigrations(client: Client) {
       "pmb_pendaftar",
       "pembayaran_batal_catatan",
       "ALTER TABLE pmb_pendaftar ADD COLUMN pembayaran_batal_catatan TEXT;",
+    ],
+    // Isi kolom tambahan barang (v53). Cerminan `ensure_column` di `turso.rs`
+    // dan `storage.rs`; JSON berkunci id_kolom.
+    [
+      "inventory_barang",
+      "atribut",
+      "ALTER TABLE inventory_barang ADD COLUMN atribut TEXT;",
     ],
   ] as const) {
     if (
@@ -1578,7 +1586,8 @@ export async function runDatabaseMigrations(client: Client) {
       catatan TEXT,
       status_aktif INTEGER NOT NULL DEFAULT 1 CHECK (status_aktif IN (0, 1)),
       created_at TEXT NOT NULL DEFAULT (datetime('now')),
-      updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+      updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+      atribut TEXT
     );
   `);
   await client.execute(`
@@ -2130,6 +2139,24 @@ export async function runDatabaseMigrations(client: Client) {
     sql: `INSERT OR IGNORE INTO schema_migration (version, name, applied_at)
           VALUES (?, 'pmb-payment', ?);`,
     args: [PMB_PAYMENT_MIGRATION_VERSION, now],
+  });
+  // v53 — kolom tambahan barang inventaris. Isinya di `inventory_barang.atribut`
+  // (ALTER-nya ada di daftar kolom di atas). DDL WAJIB identik dengan
+  // `storage.rs` dan `turso.rs`.
+  await client.execute(`
+    CREATE TABLE IF NOT EXISTS inventory_kolom (
+      id_kolom TEXT PRIMARY KEY,
+      nama TEXT NOT NULL,
+      tipe TEXT NOT NULL CHECK (tipe IN ('Teks', 'Angka')),
+      is_aktif INTEGER NOT NULL DEFAULT 1 CHECK (is_aktif IN (0, 1)),
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+  `);
+  await client.execute({
+    sql: `INSERT OR IGNORE INTO schema_migration (version, name, applied_at)
+          VALUES (?, 'inventory-column', ?);`,
+    args: [INVENTORY_COLUMN_MIGRATION_VERSION, now],
   });
 
   await client.execute(

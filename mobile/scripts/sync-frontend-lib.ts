@@ -52,6 +52,8 @@ const filesToCopy = [
   "components/inventory/LabelQr.tsx",
   // Registri aset per unit: daftarkan unit dan ubah nomor seri.
   "components/inventory/UnitAset.tsx",
+  // Kolom tambahan barang (v53): tambah, ganti nama, nonaktifkan.
+  "components/inventory/KolomTambahan.tsx",
   // Pembukuan (K1): satu UI untuk kedua build, bergantung pada `Modal` dan
   // gaya `components/inventory/gaya.ts` yang juga disalin.
   "components/keuangan/KeuanganWorkspace.tsx",

@@ -1,25 +1,19 @@
 # ANTISLOP.md — hasil antislop
 
-- Waktu: 2026-10-19 11:23:00 WIB
-- Commit: 7d2ccb6 (+ 16 berkas berubah, belum commit)
-- Berkas disunting: 0
+- Waktu: 2026-10-21 18:08 WIB
+- Commit: e3af2a4 (+ 51 berkas berubah, belum commit)
+- Berkas disunting: 2
 
 ## Disunting
-*(tidak ada berkas yang perlu disunting, komentar kode dan teks UI baru sudah bersih dan ringkas)*
+- `web-desktop/src/lib/validations/inventory-import.ts` — komentar & teks UI — hapus karakter em dash pada komentar dan pesan galat saldo awal
+- `web-desktop/src/components/inventory/KolomTambahan.tsx` — teks UI — perjelas label input penyuntingan nama kolom ("Nama kolom")
 
 ## Dilewati
-- `web-desktop/src/components/personnel/aturanUbahMassal.test.ts` — Berkas tes unit
-- `mobile/scripts/sync-frontend-lib.ts` — Skrip konfigurasi sinkronisasi
-- `mobile/src/lib/validations/personnel.ts` — Salinan Mobile dari `web-desktop/src/lib/validations/personnel.ts`
-- `mobile/src/components/operational/aturanPilihPersonil.ts` — Salinan Mobile dari `web-desktop/src/components/operational/aturanPilihPersonil.ts`
-- `mobile/src/components/personnel/UbahMassal.tsx` — Salinan Mobile dari `web-desktop/src/components/personnel/UbahMassal.tsx`
-- `mobile/src/components/personnel/aturanUbahMassal.ts` — Salinan Mobile dari `web-desktop/src/components/personnel/aturanUbahMassal.ts`
-- `web-desktop/src/components/personnel/UbahMassal.tsx` — Teks UI, label tombol, dan aria-label sudah spesifik dan ringkas
-- `web-desktop/src/components/personnel/aturanUbahMassal.ts` — Komentar memuat kontrak data; teks pesan validasi diuji dalam test
-- `web-desktop/src/lib/validations/personnel.ts` — Komentar fungsional menjelaskan perilaku penimpaan kolom draft
-- `web-desktop/src/components/operational/aturanPilihPersonil.ts` — Tambahan callback progres murni tanpa komentar slop
-- `web-desktop/src/app/guru/page.tsx`, `web-desktop/src/app/siswa/page.tsx`, `web-desktop/src/app/karyawan/page.tsx` — Teks UI dan umpan balik sudah berbahasa Indonesia natural tanpa em dash atau buzzword
-- `mobile/src/app/guru/page.tsx`, `mobile/src/app/siswa/page.tsx`, `mobile/src/app/karyawan/page.tsx` — Teks UI mobile spesifik dan bersih
+- `.agents/**` — direktori konfigurasi dan referensi agent
+- `*.json`, `*.toml`, build scripts — berkas konfigurasi dan skrip build
+- `*.test.ts` dan modul tes Rust — berkas pengujian dan fixture data
+- `mobile/**` — salinan turunan dari web-desktop yang dihasilkan skrip sync
+- Berkas `web-desktop` lainnya — komentar dan teks UI sudah ringkas dan sesuai standar tanpa AI slop
 
 ## Perlu tindakan
-*(tidak ada)*
+Jalankan `bun run sync:mobile` untuk menyinkronkan perubahan ke workspace mobile.
