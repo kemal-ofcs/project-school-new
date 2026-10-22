@@ -242,9 +242,11 @@ export async function deleteAcademicUnit(id: string) {
 export async function getAcademicDepartments() {
   await ensureDbInitialized();
   const res = await db.execute(`
-    SELECT id_jurusan, kode_jurusan, nama_jurusan, deskripsi, is_aktif
-    FROM akademik_jurusan
-    ORDER BY kode_jurusan ASC;
+    SELECT j.id_jurusan, j.kode_jurusan, j.nama_jurusan, j.deskripsi, j.is_aktif,
+           j.id_unit, u.nama_unit
+    FROM akademik_jurusan j
+    LEFT JOIN akademik_unit u ON u.id_unit = j.id_unit
+    ORDER BY j.kode_jurusan ASC;
   `);
   return res.rows;
 }
@@ -255,9 +257,24 @@ export async function saveAcademicDepartment(draft: {
   nama_jurusan: string;
   deskripsi?: string | null;
   is_aktif?: number;
+  id_unit?: string | null;
 }) {
   await ensureDbInitialized();
   const id = draft.id_jurusan || `jur_${crypto.randomUUID().replace(/-/g, "")}`;
+  // Unit pemilik jurusan (v58); kosong = berlaku di semua unit.
+  const idUnit = String(draft.id_unit ?? "").trim() || null;
+  if (idUnit) {
+    const unit = await db.execute({
+      sql: "SELECT 1 FROM akademik_unit WHERE id_unit = ? LIMIT 1;",
+      args: [idUnit],
+    });
+    if (unit.rows.length === 0) {
+      throw new ApiRequestError(
+        "Unit jurusan tidak ditemukan. Muat ulang daftar unit.",
+        400,
+      );
+    }
+  }
   await assertUniqueValue({
     table: "akademik_jurusan",
     column: "kode_jurusan",
@@ -270,13 +287,14 @@ export async function saveAcademicDepartment(draft: {
 
   await db.execute({
     sql: `
-      INSERT INTO akademik_jurusan (id_jurusan, kode_jurusan, nama_jurusan, deskripsi, is_aktif)
-      VALUES (?, ?, ?, ?, ?)
+      INSERT INTO akademik_jurusan (id_jurusan, kode_jurusan, nama_jurusan, deskripsi, is_aktif, id_unit)
+      VALUES (?, ?, ?, ?, ?, ?)
       ON CONFLICT(id_jurusan) DO UPDATE SET
         kode_jurusan = excluded.kode_jurusan,
         nama_jurusan = excluded.nama_jurusan,
         deskripsi = excluded.deskripsi,
-        is_aktif = excluded.is_aktif;
+        is_aktif = excluded.is_aktif,
+        id_unit = excluded.id_unit;
     `,
     args: [
       id,
@@ -284,6 +302,7 @@ export async function saveAcademicDepartment(draft: {
       draft.nama_jurusan,
       draft.deskripsi || null,
       isAktif,
+      idUnit,
     ],
   });
 

@@ -260,6 +260,7 @@ export default function AkademikMobilePage() {
         nama_jurusan: "",
         deskripsi: "",
         is_aktif: 1,
+        id_unit: "",
       },
       rombel: {
         kind: "rombel",
@@ -323,6 +324,7 @@ export default function AkademikMobilePage() {
         nama_jurusan: String(item.nama_jurusan ?? ""),
         deskripsi: item.deskripsi ? String(item.deskripsi) : "",
         is_aktif: Number(item.is_aktif ?? 1) === 1 ? 1 : 0,
+        id_unit: item.id_unit ? String(item.id_unit) : "",
       });
     } else if (kind === "rombel") {
       setDraft({
@@ -881,9 +883,11 @@ export default function AkademikMobilePage() {
                   <RowCard
                     key={id}
                     title={String(item.nama_jurusan)}
-                    subtitle={`${String(item.kode_jurusan)}${
-                      item.deskripsi ? ` · ${String(item.deskripsi)}` : ""
-                    }`}
+                    subtitle={`${String(item.kode_jurusan)} · ${
+                      item.id_unit
+                        ? String(item.nama_unit || "Unit tidak ditemukan")
+                        : "Semua unit"
+                    }${item.deskripsi ? ` · ${String(item.deskripsi)}` : ""}`}
                     inactive={Number(item.is_aktif ?? 1) === 0}
                     actions={
                       canManage ? (

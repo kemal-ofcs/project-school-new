@@ -34,6 +34,7 @@ pub mod loan;
 pub mod nilai_akhir;
 pub mod payroll;
 pub mod pmb_bayar;
+pub mod siswa_dapodik;
 // Administrasi payroll: SALINAN `desktop/payroll/*` oleh sync-rust-modules.ts.
 pub mod payroll_admin;
 pub mod portability;

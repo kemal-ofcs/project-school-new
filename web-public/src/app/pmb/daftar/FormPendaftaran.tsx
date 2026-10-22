@@ -11,6 +11,8 @@ import {
 } from "react";
 import { InfoBayarPmb, type RekeningPmb } from "@/components/pmb/InfoBayarPmb";
 import {
+  jurusanUntukUnit,
+  type PilihanPmb,
   PMB_BERKAS_MAX_BYTE,
   PMB_JENIS_BERKAS,
   PMB_MIME_BERKAS,
@@ -260,10 +262,10 @@ function OrangTua({
 }
 
 export function FormPendaftaran({
-  jurusan,
+  pilihan,
   rekening,
 }: {
-  jurusan: string[];
+  pilihan: PilihanPmb;
   rekening: RekeningPmb;
 }) {
   const id = useId();
@@ -273,6 +275,11 @@ export function FormPendaftaran({
   const [berkas, setBerkas] = useState<BerkasTerpilih[]>([]);
   const [kiriman, setKiriman] = useState<Kiriman>({ keadaan: "kosong" });
   const [galatBerkas, setGalatBerkas] = useState<string | null>(null);
+  // Terkendali karena daftar program bergantung pada unit (v58); nilainya
+  // tetap terbaca `FormData` lewat atribut `name`.
+  const [unit, setUnit] = useState("");
+  const [program, setProgram] = useState("");
+  const jurusan = jurusanUntukUnit(pilihan, unit || null);
 
   /**
    * Penjaga klik ganda.
@@ -301,6 +308,8 @@ export function FormPendaftaran({
           if (elemen.type !== "file") elemen.value = String(nilai);
         }
       }
+      setUnit(String(draf.pilihanUnit ?? ""));
+      setProgram(String(draf.pilihanJurusan ?? ""));
     } catch {
       // Penyimpanan diblokir atau draf rusak: formulir tetap bisa diisi.
     }
@@ -518,6 +527,7 @@ export function FormPendaftaran({
           noWhatsappWali: ambil("noWhatsappWali"),
           emailWali: ambil("emailWali") || null,
           pilihanJurusan: ambil("pilihanJurusan"),
+          pilihanUnit: ambil("pilihanUnit") || null,
           berkas,
           dataDapodik: Object.fromEntries(
             KUNCI_DATA_DAPODIK.map((kunci) => [kunci, ambil(kunci)]),
@@ -741,6 +751,31 @@ export function FormPendaftaran({
           wajib
         />
         <Isian label="Sekolah asal" maxLength={120} name="asalSekolah" wajib />
+        {pilihan.unit.length > 0 ? (
+          <div>
+            <Label htmlFor={`${id}-unit`} wajib>
+              Unit tujuan
+            </Label>
+            <select
+              className={KELAS_ISIAN}
+              id={`${id}-unit`}
+              name="pilihanUnit"
+              onChange={(peristiwa) => {
+                setUnit(peristiwa.target.value);
+                setProgram("");
+              }}
+              required
+              value={unit}
+            >
+              <option value="">Pilih</option>
+              {pilihan.unit.map((u) => (
+                <option key={u.idUnit} value={u.nama}>
+                  {u.nama}
+                </option>
+              ))}
+            </select>
+          </div>
+        ) : null}
         {jurusan.length > 0 ? (
           <div>
             <Label htmlFor={`${id}-jurusan`} wajib>
@@ -748,10 +783,11 @@ export function FormPendaftaran({
             </Label>
             <select
               className={KELAS_ISIAN}
-              defaultValue=""
               id={`${id}-jurusan`}
               name="pilihanJurusan"
+              onChange={(peristiwa) => setProgram(peristiwa.target.value)}
               required
+              value={program}
             >
               <option value="">Pilih</option>
               {jurusan.map((nama) => (

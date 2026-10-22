@@ -5,7 +5,12 @@ import type { RekeningPmb } from "@/components/pmb/InfoBayarPmb";
 import { getPageContent } from "@/lib/server/content-data";
 import { getReadyPublicDatabase } from "@/lib/server/db";
 import { type HasilMuat, petakanKegagalan } from "@/lib/server/school-data";
-import { type GelombangAktif, readGelombangAktif } from "@/lib/services/pmb";
+import {
+  type GelombangAktif,
+  readGelombangAktif,
+  readPilihanPmb,
+} from "@/lib/services/pmb";
+import type { PilihanPmb } from "@/lib/validations/pmb";
 
 /**
  * Pembungkus koneksi untuk pembaca PMB.
@@ -45,6 +50,23 @@ export async function muatGelombangAktif(): Promise<
 }
 
 export type { GelombangAktif };
+
+/**
+ * Unit dan program keahlian untuk formulir (v58). Gagal dibaca = halaman
+ * tidak bisa dipakai: server menuntut unit dan program yang sama saat kirim,
+ * jadi formulir tanpa pilihan itu hanya akan ditolak di langkah terakhir.
+ */
+export async function muatPilihanPmb(): Promise<HasilMuat<PilihanPmb>> {
+  try {
+    return {
+      status: "ok",
+      data: await readPilihanPmb(await getReadyPublicDatabase()),
+    };
+  } catch (error) {
+    console.error("[web-public] gagal membaca unit dan program PMB:", error);
+    return petakanKegagalan(error);
+  }
+}
 
 /**
  * Rekening biaya pendaftaran dari CMS halaman `landing`. Gagal dibaca = kosong:

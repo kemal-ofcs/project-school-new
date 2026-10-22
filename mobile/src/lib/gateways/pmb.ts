@@ -224,6 +224,7 @@ export async function jadikanSiswaDariPmb(
         idRombel: input.idRombel,
         idShift: input.idShift ?? null,
         angkatan: input.angkatan ?? null,
+        unit: input.unit ?? null,
       },
     );
   }

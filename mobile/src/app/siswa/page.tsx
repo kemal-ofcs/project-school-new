@@ -19,6 +19,12 @@ import {
   type TerapkanMassal,
   UbahMassal,
 } from "@/components/personnel/UbahMassal";
+import {
+  LencanaDapodik,
+  ModalDapodikSiswa,
+  TombolEksporDapodikSiswa,
+  useDapodikSiswa,
+} from "@/components/siswa/DapodikSiswa";
 import { FeedbackBanner } from "@/components/ui/FeedbackBanner";
 import { Icon } from "@/components/ui/Icon";
 import { Modal } from "@/components/ui/Modal";
@@ -96,6 +102,13 @@ export default function SiswaMobilePage() {
   const canView = canAccessArea(user, "siswa");
   const canManage = hasPermission(user, "students.manage");
   const canResetWali = hasPermission(user, "students.reset_wali_password");
+  // Data DAPODIK memuat NIK dan penghasilan orang tua: izin PMB, bukan izin siswa.
+  const canLihatDapodik = hasPermission(user, "pmb.view");
+  const canUbahDapodik = canManage && hasPermission(user, "pmb.manage");
+  const [dapodikSiswa, setDapodikSiswa] = useState<Record<
+    string,
+    unknown
+  > | null>(null);
 
   const [siswa, setSiswa] = useState<Record<string, unknown>[]>([]);
   const [rombel, setRombel] = useState<Record<string, unknown>[]>([]);
@@ -227,6 +240,7 @@ export default function SiswaMobilePage() {
   );
   const { punyaFoto, muatUlang: muatUlangStatusFoto } =
     useStatusFotoPersonil(idTampil);
+  const dapodik = useDapodikSiswa(idTampil, canLihatDapodik);
   // Foto yang dipilih saat Tambah, disimpan setelah siswanya tercipta.
   const [fotoBaru, setFotoBaru] = useState<string | null>(null);
 
@@ -648,6 +662,29 @@ export default function SiswaMobilePage() {
         ) : null}
       </div>
 
+      {canLihatDapodik ? (
+        <div className="mb-3 flex flex-wrap items-center gap-2">
+          <TombolEksporDapodikSiswa
+            className="min-h-10 rounded-xl border border-sky-500/40 bg-slate-800 px-3 text-xs font-semibold text-sky-300 active:scale-95 disabled:opacity-50"
+            onSelesai={({ tone, message }) =>
+              tone === "success" ? setSuccessMsg(message) : setErrorMsg(message)
+            }
+            siswa={
+              terpilih.length > 0
+                ? siswa.filter((item) =>
+                    terpilih.includes(String(item.id_siswa)),
+                  )
+                : filtered
+            }
+          />
+          {dapodik.galat ? (
+            <p className="text-[11px] text-amber-300">
+              Data DAPODIK belum bisa dimuat: {dapodik.galat}
+            </p>
+          ) : null}
+        </div>
+      ) : null}
+
       {errorMsg ? (
         <FeedbackBanner
           type="error"
@@ -805,6 +842,12 @@ export default function SiswaMobilePage() {
                       NIS {String(item.nis || "-")} &middot;{" "}
                       {String(item.nama_rombel || "-")}
                     </p>
+                    {canLihatDapodik ? (
+                      <LencanaDapodik
+                        baris={dapodik.peta.get(id)}
+                        onBuka={() => setDapodikSiswa(item)}
+                      />
+                    ) : null}
                     <div className="mt-2 flex flex-wrap items-center gap-1.5">
                       {item.unit ? (
                         <span className="rounded-lg border border-violet-500/20 bg-violet-500/10 px-2 py-0.5 text-[10px] font-bold text-violet-300">
@@ -1251,6 +1294,19 @@ export default function SiswaMobilePage() {
             ) : null}
           </div>
         </Modal>
+      ) : null}
+      {dapodikSiswa ? (
+        <ModalDapodikSiswa
+          baris={dapodik.peta.get(String(dapodikSiswa.id_siswa))}
+          bisaUbah={canUbahDapodik}
+          onClose={() => setDapodikSiswa(null)}
+          onTersimpan={(message) => {
+            void dapodik.muatUlang(String(dapodikSiswa.id_siswa));
+            setDapodikSiswa(null);
+            setSuccessMsg(message);
+          }}
+          siswa={dapodikSiswa}
+        />
       ) : null}
     </MobileAppShell>
   );

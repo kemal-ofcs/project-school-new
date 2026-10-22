@@ -127,6 +127,9 @@ export const pendaftaranSchema = z
       .nullable()
       .or(z.literal("").transform(() => null)),
     pilihanJurusan: teksOpsional(80),
+    // Nama unit tujuan (v58). Kecocokannya dengan unit dan jurusan aktif
+    // diperiksa `tolakPilihanPmb` terhadap database, bukan di skema ini.
+    pilihanUnit: teksOpsional(80).optional().default(null),
     // Maksimal enam berkas: satu per jenis. Batasnya ada karena satu permintaan
     // membawa seluruh berkasnya sekaligus, dan tanpa batas sebuah permintaan
     // tunggal bisa membawa puluhan megabyte base64.
@@ -138,6 +141,60 @@ export const pendaftaranSchema = z
   .strict();
 
 export type MasukanPendaftaran = z.infer<typeof pendaftaranSchema>;
+
+/** Unit aktif dan jurusan aktif untuk formulir (v58). */
+export interface PilihanPmb {
+  unit: { idUnit: string; nama: string }[];
+  /** `idUnit` null = jurusan berlaku di semua unit. */
+  jurusan: { nama: string; idUnit: string | null }[];
+}
+
+/**
+ * Program keahlian yang ditawarkan untuk unit terpilih. Selama sekolah punya
+ * unit aktif dan belum ada yang dipilih, tidak ada program yang ditawarkan.
+ */
+export function jurusanUntukUnit(
+  pilihan: PilihanPmb,
+  namaUnit: string | null,
+): string[] {
+  const unit = pilihan.unit.find((u) => u.nama === namaUnit);
+  if (pilihan.unit.length > 0 && !unit) return [];
+  return pilihan.jurusan
+    .filter((j) => !j.idUnit || j.idUnit === unit?.idUnit)
+    .map((j) => j.nama);
+}
+
+/**
+ * Penolakan pilihan unit dan program keahlian; `null` = sah. Unit wajib bila
+ * sekolah punya unit aktif, program wajib bila unit itu punya jurusan, dan
+ * nilai di luar daftar ditolak.
+ */
+export function tolakPilihanPmb(
+  pilihan: PilihanPmb,
+  pilihanUnit: string | null,
+  pilihanJurusan: string | null,
+): { field: "pilihanUnit" | "pilihanJurusan"; message: string } | null {
+  if (pilihan.unit.length > 0 && !pilihanUnit) {
+    return { field: "pilihanUnit", message: "Pilih unit tujuan." };
+  }
+  if (pilihanUnit && !pilihan.unit.some((u) => u.nama === pilihanUnit)) {
+    return {
+      field: "pilihanUnit",
+      message: "Unit tujuan tidak tersedia. Muat ulang halaman ini.",
+    };
+  }
+  const tersedia = jurusanUntukUnit(pilihan, pilihanUnit);
+  if (tersedia.length > 0 && !pilihanJurusan) {
+    return { field: "pilihanJurusan", message: "Pilih program keahlian." };
+  }
+  if (pilihanJurusan && !tersedia.includes(pilihanJurusan)) {
+    return {
+      field: "pilihanJurusan",
+      message: "Program keahlian ini tidak tersedia untuk unit yang dipilih.",
+    };
+  }
+  return null;
+}
 
 export const cekStatusSchema = z
   .object({

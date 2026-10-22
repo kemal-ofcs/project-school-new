@@ -98,6 +98,8 @@ const filesToCopy = [
   "components/content/GambarKontenInput.tsx",
   "components/content/FotoJurusanEditor.tsx",
   "components/pmb/DataDapodikPmb.tsx",
+  // Data DAPODIK per siswa di halaman Siswa (v57): modal isian, lencana, ekspor.
+  "components/siswa/DapodikSiswa.tsx",
   // Blok pembayaran biaya pendaftaran PMB (v52), identik di kedua panel.
   "components/pmb/PembayaranPmb.tsx",
   // Foto personil di daftar dan Detail. Hanya bergantung pada kontrak `Modal`

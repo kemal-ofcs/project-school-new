@@ -65,6 +65,8 @@ export type AcademicDraft =
       nama_jurusan: string;
       deskripsi: string;
       is_aktif: number;
+      /** "" = berlaku di semua unit (v58). */
+      id_unit: string;
     }
   | {
       kind: "rombel";
@@ -171,6 +173,7 @@ export function toAcademicInput(
           nama_jurusan: draft.nama_jurusan.trim(),
           deskripsi: draft.deskripsi.trim() || null,
           is_aktif: draft.is_aktif,
+          id_unit: draft.id_unit || null,
         },
       };
     }
@@ -596,6 +599,28 @@ export function AkademikFormFields({
               }
               className={INPUT}
             />
+          </div>
+          <div>
+            <label htmlFor="ak-jur-unit" className={LABEL}>
+              Unit
+            </label>
+            <select
+              id="ak-jur-unit"
+              value={draft.id_unit}
+              onChange={(e) => onChange({ ...draft, id_unit: e.target.value })}
+              className={INPUT}
+            >
+              <option value="">Semua unit</option>
+              {(options.unit ?? []).map((u) => (
+                <option key={String(u.id_unit)} value={String(u.id_unit)}>
+                  {String(u.nama_unit)}
+                </option>
+              ))}
+            </select>
+            <p className="mt-1 text-[11px] text-slate-400">
+              Formulir PMB hanya menawarkan jurusan ini kepada pendaftar unit
+              tersebut.
+            </p>
           </div>
           {draft.id ? (
             <ActiveToggle

@@ -1306,7 +1306,8 @@ pub fn initialize(path: &Path) -> Result<(), String> {
         kode_jurusan TEXT NOT NULL,
         nama_jurusan TEXT NOT NULL,
         deskripsi TEXT,
-        is_aktif INTEGER NOT NULL DEFAULT 1 CHECK (is_aktif IN (0, 1))
+        is_aktif INTEGER NOT NULL DEFAULT 1 CHECK (is_aktif IN (0, 1)),
+        id_unit TEXT
       );
       CREATE TABLE IF NOT EXISTS akademik_rombel (
         id_rombel TEXT PRIMARY KEY,
@@ -1640,7 +1641,8 @@ pub fn initialize(path: &Path) -> Result<(), String> {
             kode_jurusan TEXT NOT NULL,
             nama_jurusan TEXT NOT NULL,
             deskripsi TEXT,
-            is_aktif INTEGER NOT NULL DEFAULT 1 CHECK (is_aktif IN (0, 1))
+            is_aktif INTEGER NOT NULL DEFAULT 1 CHECK (is_aktif IN (0, 1)),
+            id_unit TEXT
         );",
         "id_jurusan, kode_jurusan, nama_jurusan, deskripsi, is_aktif",
         &[],
@@ -1841,6 +1843,14 @@ pub fn initialize(path: &Path) -> Result<(), String> {
         "inventory_barang",
         "desimal",
         "ALTER TABLE inventory_barang ADD COLUMN desimal INTEGER NOT NULL DEFAULT 0 CHECK (desimal IN (0, 1));",
+    )?;
+    // Unit pemilik jurusan (v58). SETELAH `rebuild_without_unique` di atas,
+    // yang menyalin daftar kolom eksplisit; NULL = berlaku di semua unit.
+    ensure_column(
+        &connection,
+        "akademik_jurusan",
+        "id_unit",
+        "ALTER TABLE akademik_jurusan ADD COLUMN id_unit TEXT;",
     )?;
 
     // Shift tujuan sesi lanjutan. 0 = belum ditentukan, sehingga pemasangan

@@ -13,7 +13,7 @@ import { Modal } from "@/components/ui/Modal";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { canAccessArea, hasPermission } from "@/lib/auth/access";
 import { useAuth } from "@/lib/context/AuthContext";
-import { getDaftarRombel } from "@/lib/gateways/academic";
+import { getDaftarRombel, getDaftarUnit } from "@/lib/gateways/academic";
 import {
   daftarGelombangPmb,
   daftarPendaftarPmb,
@@ -63,6 +63,8 @@ export default function PmbPage() {
   const [gelombang, setGelombang] = useState<PmbWave[]>([]);
   const [pendaftar, setPendaftar] = useState<PmbRegistrantItem[]>([]);
   const [rombel, setRombel] = useState<Rombel[]>([]);
+  // Nama unit aktif untuk modal promosi; unit siswa disimpan sebagai nama.
+  const [daftarUnit, setDaftarUnit] = useState<string[]>([]);
 
   const [filterGelombang, setFilterGelombang] = useState("Semua");
   const [filterStatus, setFilterStatus] = useState("Semua");
@@ -133,6 +135,18 @@ export default function PmbPage() {
           // menjatuhkan seluruh halaman verifikasi, tetapi juga tidak didiamkan:
           // modal promosi akan mengatakan daftarnya kosong.
           console.error("[pmb] gagal memuat daftar rombel:", error);
+        });
+      getDaftarUnit()
+        .then((hasil) =>
+          setDaftarUnit(
+            hasil
+              .filter((u) => Number(u.status_aktif ?? 1) === 1)
+              .map((u) => String(u.nama_unit)),
+          ),
+        )
+        .catch((error) => {
+          // Sama dengan rombel: modal promosi tetap bisa dipakai tanpa unit.
+          console.error("[pmb] gagal memuat daftar unit:", error);
         });
     }
   }, [authLoading, isAuthenticated]);
@@ -227,11 +241,13 @@ export default function PmbPage() {
       const data = new FormData(peristiwa.currentTarget);
       const idRombel = String(data.get("idRombel") ?? "").trim();
       const angkatan = Number(data.get("angkatan") ?? 0);
+      const unit = String(data.get("unit") ?? "").trim();
 
       await jadikanSiswaDariPmb({
         idPendaftar: modalPromosi.id_pendaftar,
         idRombel,
         angkatan: angkatan || null,
+        unit: unit || null,
       });
       setKabar(
         `${modalPromosi.nama_lengkap} kini terdaftar sebagai siswa aktif.`,
@@ -479,6 +495,7 @@ export default function PmbPage() {
                     <th className="py-2">Nomor</th>
                     <th className="py-2">Nama</th>
                     <th className="py-2">Gelombang</th>
+                    <th className="py-2">Unit</th>
                     <th className="py-2">Berkas</th>
                     <th className="py-2">Status</th>
                     <th className="py-2">Pembayaran</th>
@@ -497,6 +514,9 @@ export default function PmbPage() {
                       <td className="py-2 text-white">{item.nama_lengkap}</td>
                       <td className="py-2 text-slate-400">
                         {item.nama_gelombang}
+                      </td>
+                      <td className="py-2 text-slate-400">
+                        {item.pilihan_unit || "—"}
                       </td>
                       <td className="py-2 text-slate-400">
                         {item.jumlah_berkas}
@@ -543,6 +563,10 @@ export default function PmbPage() {
               <dd>{detail.pendaftar.nisn || "—"}</dd>
               <dt className="text-slate-500">Asal sekolah</dt>
               <dd>{detail.pendaftar.asal_sekolah || "—"}</dd>
+              <dt className="text-slate-500">Unit tujuan</dt>
+              <dd>{detail.pendaftar.pilihan_unit || "—"}</dd>
+              <dt className="text-slate-500">Program keahlian</dt>
+              <dd>{detail.pendaftar.pilihan_jurusan || "—"}</dd>
               <dt className="text-slate-500">Wali</dt>
               <dd>{detail.pendaftar.nama_wali}</dd>
               <dt className="text-slate-500">WhatsApp wali</dt>
@@ -720,6 +744,41 @@ export default function PmbPage() {
               <p className="mt-1 text-amber-300 text-xs">
                 Daftar rombel belum termuat. Pastikan jaringan tersedia lalu
                 buka ulang jendela ini.
+              </p>
+            ) : null}
+          </div>
+          <div>
+            <label
+              className="block text-slate-400 text-xs"
+              htmlFor={`${id}-unit`}
+            >
+              Unit
+            </label>
+            <select
+              className="mt-1 w-full rounded-lg border border-white/10 bg-slate-950 px-3 py-2 text-white"
+              defaultValue={
+                modalPromosi?.pilihan_unit &&
+                daftarUnit.includes(modalPromosi.pilihan_unit)
+                  ? modalPromosi.pilihan_unit
+                  : ""
+              }
+              id={`${id}-unit`}
+              key={`${modalPromosi?.id_pendaftar ?? ""}-${daftarUnit.length}`}
+              name="unit"
+            >
+              <option value="">Tanpa unit</option>
+              {daftarUnit.map((nama) => (
+                <option key={nama} value={nama}>
+                  {nama}
+                </option>
+              ))}
+            </select>
+            {modalPromosi?.pilihan_unit &&
+            daftarUnit.length > 0 &&
+            !daftarUnit.includes(modalPromosi.pilihan_unit) ? (
+              <p className="mt-1 text-amber-300 text-xs">
+                Pendaftar memilih unit "{modalPromosi.pilihan_unit}", yang tidak
+                ada lagi di daftar unit aktif. Pilih unitnya di sini.
               </p>
             ) : null}
           </div>

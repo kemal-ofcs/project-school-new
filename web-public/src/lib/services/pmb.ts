@@ -6,6 +6,7 @@ import {
   buatNomorPendaftaran,
   type MasukanCekStatus,
   type MasukanPendaftaran,
+  type PilihanPmb,
   VERSI_DATA_DAPODIK,
 } from "@/lib/validations/pmb";
 import {
@@ -151,9 +152,9 @@ export async function tulisPendaftaran(
                 id_pendaftar, nomor_pendaftaran, id_gelombang, nama_lengkap,
                 nisn, jenis_kelamin, tempat_lahir, tanggal_lahir, asal_sekolah,
                 alamat, nama_wali, no_whatsapp_wali, email_wali, pilihan_jurusan,
-                data_dapodik, biaya_tagihan, batas_bayar, status,
+                pilihan_unit, data_dapodik, biaya_tagihan, batas_bayar, status,
                 created_at, updated_at
-              ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
+              ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
                         CASE WHEN ? > 0 THEN
                           (SELECT date('now', '+7 hours', '+' || lama_bayar_hari || ' days')
                              FROM pmb_gelombang WHERE id_gelombang = ?)
@@ -175,6 +176,7 @@ export async function tulisPendaftaran(
           masukan.noWhatsappWali,
           masukan.emailWali ?? null,
           masukan.pilihanJurusan,
+          masukan.pilihanUnit ?? null,
           JSON.stringify({ versi: VERSI_DATA_DAPODIK, ...masukan.dataDapodik }),
           gelombang.biayaPendaftaran,
           gelombang.biayaPendaftaran,
@@ -275,6 +277,48 @@ async function pastikanKolomPmb(client: Client): Promise<void> {
       "kolom pmb_pendaftar.biaya_tagihan (v52) belum ada",
     );
   }
+  if (!ada.has("pilihan_unit")) {
+    throw new SchemaNotReadyError(
+      "kolom pmb_pendaftar.pilihan_unit (v58) belum ada",
+    );
+  }
+}
+
+/**
+ * Unit aktif (urutan tab Unit) dan jurusan aktif beserta unitnya (v58).
+ * Database yang belum dimigrasi dijawab "belum siap", sama dengan
+ * `pastikanKolomPmb`.
+ */
+export async function readPilihanPmb(client: Client): Promise<PilihanPmb> {
+  const kolom = await client.execute("PRAGMA table_info(akademik_jurusan);");
+  if (!kolom.rows.some((baris) => String(baris.name) === "id_unit")) {
+    throw new SchemaNotReadyError(
+      "kolom akademik_jurusan.id_unit (v58) belum ada",
+    );
+  }
+  const [unit, jurusan] = await client.batch(
+    [
+      `SELECT id_unit, nama_unit FROM akademik_unit
+        WHERE status_aktif = 1
+        ORDER BY urutan ASC, nama_unit ASC
+        LIMIT 50;`,
+      `SELECT nama_jurusan, id_unit FROM akademik_jurusan
+        WHERE is_aktif = 1
+        ORDER BY nama_jurusan ASC
+        LIMIT 100;`,
+    ],
+    "read",
+  );
+  return {
+    unit: unit.rows.map((baris) => ({
+      idUnit: String(baris.id_unit),
+      nama: String(baris.nama_unit ?? "").trim(),
+    })),
+    jurusan: jurusan.rows.map((baris) => ({
+      nama: String(baris.nama_jurusan ?? "").trim(),
+      idUnit: baris.id_unit ? String(baris.id_unit) : null,
+    })),
+  };
 }
 
 /**

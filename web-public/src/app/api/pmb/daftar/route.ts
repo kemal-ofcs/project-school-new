@@ -11,6 +11,7 @@ import {
   GelombangTidakTerbukaError,
   KuotaPenuhError,
   readGelombangAktif,
+  readPilihanPmb,
   tulisPendaftaran,
 } from "@/lib/services/pmb";
 import {
@@ -19,7 +20,7 @@ import {
   kunciRateLimit,
   periksaRateLimit,
 } from "@/lib/services/rate-limit";
-import { pendaftaranSchema } from "@/lib/validations/pmb";
+import { pendaftaranSchema, tolakPilihanPmb } from "@/lib/validations/pmb";
 
 /**
  * Terima satu pendaftaran PMB.
@@ -79,6 +80,22 @@ export async function POST(request: Request) {
 
     const gelombang = await readGelombangAktif(client);
     if (!gelombang) throw new GelombangTidakTerbukaError();
+
+    const tolak = tolakPilihanPmb(
+      await readPilihanPmb(client),
+      parsed.data.pilihanUnit,
+      parsed.data.pilihanJurusan,
+    );
+    if (tolak) {
+      return NextResponse.json(
+        {
+          error: "VALIDATION_ERROR",
+          message: tolak.message,
+          detail: [tolak],
+        },
+        { status: 400 },
+      );
+    }
 
     const hasil = await tulisPendaftaran(client, gelombang, parsed.data);
 

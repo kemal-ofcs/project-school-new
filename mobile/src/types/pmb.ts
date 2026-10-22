@@ -88,6 +88,8 @@ export interface PmbRegistrantItem {
   jenis_kelamin: string | null;
   asal_sekolah: string | null;
   pilihan_jurusan: string | null;
+  /** Nama unit tujuan (v58), sama dengan `master_data.unit`. */
+  pilihan_unit: string | null;
   nama_wali: string;
   no_whatsapp_wali: string;
   status: PmbStatus;
@@ -168,4 +170,6 @@ export interface PmbPromotionInput {
   idRombel: string;
   idShift?: number | null;
   angkatan?: number | null;
+  /** Nama unit siswa; diisi dari `pilihan_unit` pendaftar, bisa diganti panitia. */
+  unit?: string | null;
 }

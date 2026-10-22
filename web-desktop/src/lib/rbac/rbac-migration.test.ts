@@ -165,6 +165,10 @@ describe("dynamic RBAC migration", () => {
       55,
       // v56 — email guru dan karyawan (`master_data.email`).
       56,
+      // v57 — data DAPODIK per siswa (`siswa_dapodik`, cloud-only).
+      57,
+      // v58 — unit tujuan PMB dan unit pemilik jurusan.
+      58,
     ]);
 
     const sessionColumns = await client.execute(

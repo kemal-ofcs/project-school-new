@@ -16,7 +16,8 @@ import {
  * Data ini SENGAJA tidak ikut ke `siswa_data` saat pendaftar diangkat menjadi
  * siswa: tabel itu tersalin ke setiap perangkat, termasuk terminal pemindai,
  * sedangkan NIK, No KK, dan penghasilan orang tua tidak boleh berada di sana.
- * Barisnya tetap terhubung ke siswanya lewat `pmb_pendaftar.id_siswa`.
+ * Salinannya masuk ke tabel cloud-only `siswa_dapodik` (v57, lihat
+ * `siswa-dapodik.ts`), tempat admin mengubahnya dari halaman Siswa.
  */
 
 export const VERSI_DATA_DAPODIK = 1;
@@ -132,10 +133,19 @@ const kosongJadiNull = (nilai: unknown) =>
 const teks = (maks: number) =>
   z.preprocess(
     kosongJadiNull,
-    z.string().trim().max(maks).nullable().default(null),
+    z
+      .string()
+      .trim()
+      .max(maks, `Maksimal ${maks} karakter.`)
+      .nullable()
+      .default(null),
   );
 const teksWajib = (maks: number, pesan: string) =>
-  z.string({ error: pesan }).trim().min(1, pesan).max(maks);
+  z
+    .string({ error: pesan })
+    .trim()
+    .min(1, pesan)
+    .max(maks, `Maksimal ${maks} karakter.`);
 // Isian lain selain yang memakai `teks` wajib diisi (keputusan User
 // 2026-10-16): kosong ditolak dengan pesan isiannya, bukan disimpan null.
 const pilihan = <T extends readonly [string, ...string[]]>(
@@ -285,6 +295,9 @@ export interface PendaftarEkspor {
   asal_sekolah: string | null;
   status: string;
   data_dapodik: string | null;
+  /** Diisi ekspor dari halaman Siswa; ekspor PMB membiarkannya kosong. */
+  nipd?: string | null;
+  rombel?: string | null;
 }
 
 const ORANG_TUA = [
@@ -402,7 +415,7 @@ export function barisEksporDapodik(
   return [
     String(nomor),
     pendaftar.nama_lengkap,
-    "",
+    teksSel(pendaftar.nipd),
     teksSel(pendaftar.jenis_kelamin),
     teksSel(pendaftar.nisn),
     teksSel(pendaftar.tempat_lahir),
@@ -427,7 +440,7 @@ export function barisEksporDapodik(
     ...orangTua("ayah"),
     ...orangTua("ibu"),
     ...orangTua("wali"),
-    "",
+    teksSel(pendaftar.rombel),
     "",
     "",
     yaTidakSel(d.kip),

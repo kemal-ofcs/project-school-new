@@ -50,6 +50,7 @@ export function JurusanPanel({
               <th className="px-6 py-4">Kode</th>
               <th className="px-6 py-4">Nama Jurusan</th>
               <th className="px-6 py-4">Deskripsi</th>
+              <th className="px-6 py-4">Unit</th>
               <th className="px-6 py-4">Status</th>
               <th className="px-6 py-4 text-right">Aksi</th>
             </tr>
@@ -58,7 +59,7 @@ export function JurusanPanel({
             {loading ? (
               <tr>
                 <td
-                  colSpan={5}
+                  colSpan={6}
                   className="px-6 py-8 text-center text-slate-400"
                 >
                   Memuat data jurusan...
@@ -67,7 +68,7 @@ export function JurusanPanel({
             ) : jurusanList.length === 0 ? (
               <tr>
                 <td
-                  colSpan={5}
+                  colSpan={6}
                   className="px-6 py-8 text-center text-slate-400"
                 >
                   Belum ada data program keahlian/jurusan.
@@ -86,6 +87,11 @@ export function JurusanPanel({
                     </td>
                     <td className="px-6 py-4 text-xs text-slate-400 max-w-xs truncate">
                       {String(item.deskripsi || "-")}
+                    </td>
+                    <td className="px-6 py-4 text-xs text-slate-300">
+                      {item.id_unit
+                        ? String(item.nama_unit || "Unit tidak ditemukan")
+                        : "Semua unit"}
                     </td>
                     <td className="px-6 py-4">
                       {Number(item.is_aktif) === 1 ? (
@@ -112,6 +118,9 @@ export function JurusanPanel({
                                   ? String(item.deskripsi)
                                   : "",
                                 is_aktif: Number(item.is_aktif),
+                                id_unit: item.id_unit
+                                  ? String(item.id_unit)
+                                  : null,
                               });
                               setModalType("jurusan");
                             }}

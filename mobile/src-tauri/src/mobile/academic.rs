@@ -663,9 +663,11 @@ pub fn list_academic_departments(state: &MobileState) -> Result<Value, CommandEr
     let mut stmt = conn
         .prepare(
             r#"
-            SELECT id_jurusan, kode_jurusan, nama_jurusan, deskripsi, is_aktif
-            FROM akademik_jurusan
-            ORDER BY kode_jurusan ASC;
+            SELECT j.id_jurusan, j.kode_jurusan, j.nama_jurusan, j.deskripsi, j.is_aktif,
+                   j.id_unit, u.nama_unit
+            FROM akademik_jurusan j
+            LEFT JOIN akademik_unit u ON u.id_unit = j.id_unit
+            ORDER BY j.kode_jurusan ASC;
             "#,
         )
         .map_err(|_| CommandError::internal())?;
@@ -678,6 +680,8 @@ pub fn list_academic_departments(state: &MobileState) -> Result<Value, CommandEr
                 "nama_jurusan": row.get::<_, String>(2)?,
                 "deskripsi": row.get::<_, Option<String>>(3)?,
                 "is_aktif": row.get::<_, i64>(4)?,
+                "id_unit": row.get::<_, Option<String>>(5)?,
+                "nama_unit": row.get::<_, Option<String>>(6)?,
             }))
         })
         .map_err(|_| CommandError::internal())?
@@ -705,12 +709,29 @@ pub fn save_academic_department(
     let nama = text(draft, "nama_jurusan");
     let deskripsi = optional_text(draft, "deskripsi");
     let is_aktif = integer(draft, "is_aktif", 1);
+    // Unit pemilik jurusan (v58); kosong = berlaku di semua unit.
+    let id_unit = optional_text(draft, "id_unit");
 
     if kode.is_empty() || nama.is_empty() {
         return Err(CommandError::new(
             "VALIDATION_ERROR",
             "Kode jurusan dan nama jurusan wajib diisi.",
         ));
+    }
+    if let Some(unit) = id_unit.as_deref() {
+        let ada: bool = tx
+            .query_row(
+                "SELECT EXISTS(SELECT 1 FROM akademik_unit WHERE id_unit = ?1);",
+                params![unit],
+                |row| row.get(0),
+            )
+            .map_err(|_| CommandError::internal())?;
+        if !ada {
+            return Err(CommandError::new(
+                "VALIDATION_ERROR",
+                "Unit jurusan tidak ditemukan. Muat ulang daftar unit.",
+            ));
+        }
     }
 
     assert_unique_value(
@@ -725,15 +746,16 @@ pub fn save_academic_department(
 
     tx.execute(
         r#"
-        INSERT INTO akademik_jurusan (id_jurusan, kode_jurusan, nama_jurusan, deskripsi, is_aktif)
-        VALUES (?1, ?2, ?3, ?4, ?5)
+        INSERT INTO akademik_jurusan (id_jurusan, kode_jurusan, nama_jurusan, deskripsi, is_aktif, id_unit)
+        VALUES (?1, ?2, ?3, ?4, ?5, ?6)
         ON CONFLICT(id_jurusan) DO UPDATE SET
             kode_jurusan = excluded.kode_jurusan,
             nama_jurusan = excluded.nama_jurusan,
             deskripsi = excluded.deskripsi,
-            is_aktif = excluded.is_aktif;
+            is_aktif = excluded.is_aktif,
+            id_unit = excluded.id_unit;
         "#,
-        params![id, kode, nama, deskripsi, is_aktif],
+        params![id, kode, nama, deskripsi, is_aktif, id_unit],
     )
     .map_err(|e| CommandError::new("DB_ERROR", format!("Gagal menyimpan jurusan: {e}")))?;
 
@@ -745,6 +767,7 @@ pub fn save_academic_department(
         "nama_jurusan": nama,
         "deskripsi": deskripsi,
         "is_aktif": is_aktif,
+        "id_unit": id_unit,
     });
 
     sync::enqueue(
@@ -3204,5 +3227,42 @@ mod tests {
         );
         // Offline: salinan lokal apa adanya.
         assert_eq!(merge_photo_status(&local, &pending, None), local);
+    }
+
+    /// v58: unit pemilik jurusan tersimpan, ikut ke outbox, dan unit yang
+    /// tidak ada ditolak sebelum menulis apa pun.
+    #[test]
+    fn jurusan_menyimpan_unit_dan_menolak_unit_asing() {
+        let (_directory, state) = fixture();
+        let unit = save_academic_unit(&state, &json!({ "nama_unit": "SMK" }))
+            .expect("unit tersimpan");
+        let id_unit = unit["id_unit"].as_str().expect("id unit").to_owned();
+
+        let galat = save_academic_department(
+            &state,
+            &json!({ "kode_jurusan": "TKJ", "nama_jurusan": "TKJ", "id_unit": "tidak-ada" }),
+        )
+        .expect_err("unit asing ditolak");
+        assert_eq!(galat.code, "VALIDATION_ERROR");
+
+        save_academic_department(
+            &state,
+            &json!({ "kode_jurusan": "TKJ", "nama_jurusan": "Teknik", "id_unit": id_unit }),
+        )
+        .expect("jurusan tersimpan");
+        let daftar = list_academic_departments(&state).expect("daftar jurusan");
+        assert_eq!(daftar[0]["id_unit"], json!(id_unit));
+        assert_eq!(daftar[0]["nama_unit"], json!("SMK"));
+
+        let conn = storage::database(&state.data_dir).expect("database");
+        let payload: String = conn
+            .query_row(
+                "SELECT payload_json FROM desktop_sync_outbox WHERE domain = 'academic-department';",
+                [],
+                |row| row.get(0),
+            )
+            .expect("event outbox");
+        let payload: Value = serde_json::from_str(&payload).expect("payload json");
+        assert_eq!(payload["id_unit"], json!(id_unit));
     }
 }

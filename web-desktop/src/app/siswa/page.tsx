@@ -20,6 +20,12 @@ import {
   type TerapkanMassal,
   UbahMassal,
 } from "@/components/personnel/UbahMassal";
+import {
+  LencanaDapodik,
+  ModalDapodikSiswa,
+  TombolEksporDapodikSiswa,
+  useDapodikSiswa,
+} from "@/components/siswa/DapodikSiswa";
 import { FeedbackBanner } from "@/components/ui/FeedbackBanner";
 import { Icon } from "@/components/ui/Icon";
 import { Modal } from "@/components/ui/Modal";
@@ -69,6 +75,13 @@ export default function SiswaPage() {
   const { user, isAuthenticated, isLoading: authLoading } = useAuth();
   const canManage = hasPermission(user, "students.manage");
   const canResetWali = hasPermission(user, "students.reset_wali_password");
+  // Data DAPODIK memuat NIK dan penghasilan orang tua: izin PMB, bukan izin siswa.
+  const canLihatDapodik = hasPermission(user, "pmb.view");
+  const canUbahDapodik = canManage && hasPermission(user, "pmb.manage");
+  const [dapodikSiswa, setDapodikSiswa] = useState<Record<
+    string,
+    unknown
+  > | null>(null);
 
   const [siswaList, setSiswaList] = useState<Record<string, unknown>[]>([]);
   const [rombelList, setRombelList] = useState<Record<string, unknown>[]>([]);
@@ -235,6 +248,7 @@ export default function SiswaPage() {
   );
   const { punyaFoto, muatUlang: muatUlangStatusFoto } =
     useStatusFotoPersonil(idSiswaTampil);
+  const dapodik = useDapodikSiswa(idSiswaTampil, canLihatDapodik);
   // Foto yang dipilih di form Tambah, disimpan setelah siswanya tercipta.
   const [fotoBaru, setFotoBaru] = useState<string | null>(null);
 
@@ -749,80 +763,98 @@ export default function SiswaPage() {
           eyebrow="Kesiswaan"
           title="Peserta Didik"
           description="Direktori peserta didik, rombel/kelas, kontak wali, dan penerbitan token QR."
-          actions={
-            <div className="flex flex-wrap items-center gap-2">
-              <button
-                type="button"
-                onClick={() => void loadData()}
-                className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-4 py-2 text-sm font-semibold text-slate-200 transition hover:bg-white/10"
-              >
-                <Icon name="refresh" className="size-4" />
-                <span>Muat Ulang</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => void handleExport()}
-                className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-sky-500/40 bg-slate-800 px-4 py-2 text-sm font-semibold text-sky-300 transition hover:bg-slate-700"
-              >
-                <Icon name="download" className="size-4" />
-                <span>Export Excel</span>
-              </button>
-              {canManage ? (
-                <>
-                  <input
-                    aria-label="Berkas Excel untuk impor peserta didik"
-                    ref={importInputRef}
-                    type="file"
-                    accept=".xlsx,.csv"
-                    className="hidden"
-                    onChange={(event) => {
-                      const file = event.target.files?.[0];
-                      if (file) void handleImport(file);
-                    }}
-                  />
-                  <button
-                    type="button"
-                    disabled={bulkWorking}
-                    onClick={() => importInputRef.current?.click()}
-                    className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-emerald-500/40 bg-slate-800 px-4 py-2 text-sm font-semibold text-emerald-300 transition hover:bg-slate-700 disabled:opacity-50"
-                  >
-                    <Icon name="upload" className="size-4" />
-                    <span>{bulkWorking ? "Memproses…" : "Import Excel"}</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => void handleDownloadTemplate()}
-                    className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-white/10 bg-slate-800 px-4 py-2 text-sm font-semibold text-slate-300 transition hover:bg-slate-700"
-                  >
-                    <Icon name="document" className="size-4" />
-                    <span>Template</span>
-                  </button>
-                </>
-              ) : null}
-              {canResetWali ? (
-                <button
-                  type="button"
-                  onClick={() => void handleOpenBulkSlips()}
-                  className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-sky-500/40 bg-slate-800 px-4 py-2 text-sm font-semibold text-sky-300 transition hover:bg-slate-700"
-                  title="Lihat status dan cetak slip kata sandi portal wali murid"
-                >
-                  <Icon name="lock" className="size-4" />
-                  <span>Akun Wali & Cetak Slip</span>
-                </button>
-              ) : null}
-              {canManage ? (
-                <button
-                  type="button"
-                  onClick={handleOpenAdd}
-                  className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-sky-500 px-4 py-2 text-sm font-bold text-slate-950 shadow-lg shadow-sky-500/20 transition hover:bg-sky-400"
-                >
-                  <Icon name="add" className="size-4" />
-                  <span>Tambah Peserta Didik</span>
-                </button>
-              ) : null}
-            </div>
-          }
         />
+        {/* Di luar `PageHeader`: di baris yang sama, deretan tombol ini
+            menjepit judul dan deskripsi menjadi satu kata per baris. */}
+        <div className="-mt-2 flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={() => void loadData()}
+            className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-4 py-2 text-sm font-semibold text-slate-200 transition hover:bg-white/10"
+          >
+            <Icon name="refresh" className="size-4" />
+            <span>Muat Ulang</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => void handleExport()}
+            className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-sky-500/40 bg-slate-800 px-4 py-2 text-sm font-semibold text-sky-300 transition hover:bg-slate-700"
+          >
+            <Icon name="download" className="size-4" />
+            <span>Export Excel</span>
+          </button>
+          {canLihatDapodik ? (
+            <TombolEksporDapodikSiswa
+              className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-sky-500/40 bg-slate-800 px-4 py-2 text-sm font-semibold text-sky-300 transition hover:bg-slate-700 disabled:opacity-50"
+              onSelesai={setFeedback}
+              siswa={
+                terpilih.length > 0
+                  ? siswaList.filter((item) =>
+                      terpilih.includes(String(item.id_siswa)),
+                    )
+                  : filteredStudents
+              }
+            />
+          ) : null}
+          {canManage ? (
+            <>
+              <input
+                aria-label="Berkas Excel untuk impor peserta didik"
+                ref={importInputRef}
+                type="file"
+                accept=".xlsx,.csv"
+                className="hidden"
+                onChange={(event) => {
+                  const file = event.target.files?.[0];
+                  if (file) void handleImport(file);
+                }}
+              />
+              <button
+                type="button"
+                disabled={bulkWorking}
+                onClick={() => importInputRef.current?.click()}
+                className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-emerald-500/40 bg-slate-800 px-4 py-2 text-sm font-semibold text-emerald-300 transition hover:bg-slate-700 disabled:opacity-50"
+              >
+                <Icon name="upload" className="size-4" />
+                <span>{bulkWorking ? "Memproses…" : "Import Excel"}</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => void handleDownloadTemplate()}
+                className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-white/10 bg-slate-800 px-4 py-2 text-sm font-semibold text-slate-300 transition hover:bg-slate-700"
+              >
+                <Icon name="document" className="size-4" />
+                <span>Template</span>
+              </button>
+            </>
+          ) : null}
+          {canResetWali ? (
+            <button
+              type="button"
+              onClick={() => void handleOpenBulkSlips()}
+              className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-sky-500/40 bg-slate-800 px-4 py-2 text-sm font-semibold text-sky-300 transition hover:bg-slate-700"
+              title="Lihat status dan cetak slip kata sandi portal wali murid"
+            >
+              <Icon name="lock" className="size-4" />
+              <span>Akun Wali & Cetak Slip</span>
+            </button>
+          ) : null}
+          {canManage ? (
+            <button
+              type="button"
+              onClick={handleOpenAdd}
+              className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-sky-500 px-4 py-2 text-sm font-bold text-slate-950 shadow-lg shadow-sky-500/20 transition hover:bg-sky-400"
+            >
+              <Icon name="add" className="size-4" />
+              <span>Tambah Peserta Didik</span>
+            </button>
+          ) : null}
+        </div>
+        {canLihatDapodik && dapodik.galat ? (
+          <p className="text-xs text-amber-300">
+            Data DAPODIK belum bisa dimuat: {dapodik.galat}
+          </p>
+        ) : null}
 
         {feedback ? (
           <FeedbackBanner
@@ -1037,6 +1069,12 @@ export default function SiswaPage() {
                                   : "Laki-laki"}{" "}
                                 | Angkatan {String(item.angkatan || "-")}
                               </div>
+                              {canLihatDapodik ? (
+                                <LencanaDapodik
+                                  baris={dapodik.peta.get(id)}
+                                  onBuka={() => setDapodikSiswa(item)}
+                                />
+                              ) : null}
                             </div>
                           </div>
                         </td>
@@ -1965,6 +2003,19 @@ export default function SiswaPage() {
               </div>
             </div>
           </Modal>
+        ) : null}
+        {dapodikSiswa ? (
+          <ModalDapodikSiswa
+            baris={dapodik.peta.get(String(dapodikSiswa.id_siswa))}
+            bisaUbah={canUbahDapodik}
+            onClose={() => setDapodikSiswa(null)}
+            onTersimpan={(message) => {
+              void dapodik.muatUlang(String(dapodikSiswa.id_siswa));
+              setDapodikSiswa(null);
+              setFeedback({ tone: "success", message });
+            }}
+            siswa={dapodikSiswa}
+          />
         ) : null}
       </div>
       {dialogKonfirmasi}

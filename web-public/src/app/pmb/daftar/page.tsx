@@ -3,8 +3,11 @@ import { headers } from "next/headers";
 import Link from "next/link";
 import { StatusTidakTerbaca } from "@/components/StatusData";
 import { HEADER_LISENSI } from "@/lib/server/license-gate";
-import { muatGelombangAktif, muatRekeningPmb } from "@/lib/server/pmb-data";
-import { muatProgramStudi } from "@/lib/server/school-data";
+import {
+  muatGelombangAktif,
+  muatPilihanPmb,
+  muatRekeningPmb,
+} from "@/lib/server/pmb-data";
 import { FormPendaftaran } from "./FormPendaftaran";
 
 export const metadata: Metadata = {
@@ -52,25 +55,32 @@ export default async function HalamanDaftar() {
     );
   }
 
-  const [gelombang, program, rekening] = await Promise.all([
+  const [gelombang, pilihan, rekening] = await Promise.all([
     muatGelombangAktif(),
-    muatProgramStudi(),
+    muatPilihanPmb(),
     muatRekeningPmb(),
   ]);
 
-  if (gelombang.status !== "ok") {
+  // Unit dan program dibaca dari database yang sama dengan gelombang; tanpa
+  // keduanya formulir hanya akan ditolak server di langkah terakhir.
+  const gagal =
+    gelombang.status !== "ok"
+      ? gelombang
+      : pilihan.status !== "ok"
+        ? pilihan
+        : null;
+  if (gagal) {
     return (
       <main className="mx-auto max-w-3xl px-6 py-14">
         <h1 className="font-semibold text-3xl">Formulir Pendaftaran</h1>
         <div className="mt-6">
-          <StatusTidakTerbaca
-            hasil={gelombang}
-            konteks="Formulir pendaftaran"
-          />
+          <StatusTidakTerbaca hasil={gagal} konteks="Formulir pendaftaran" />
         </div>
       </main>
     );
   }
+  // Tidak pernah benar di titik ini; hanya menyempitkan tipe untuk TypeScript.
+  if (gelombang.status !== "ok" || pilihan.status !== "ok") return null;
 
   if (!gelombang.data) {
     return (
@@ -93,12 +103,6 @@ export default async function HalamanDaftar() {
   }
 
   const aktif = gelombang.data;
-  // Daftar jurusan hanyalah pilihan bantu pada formulir. Bila tidak terbaca,
-  // formulirnya tetap tampil tanpa pilihan itu — memblokir pendaftaran karena
-  // daftar opsional gagal dimuat jauh lebih merugikan daripada membiarkan satu
-  // isian kosong yang bisa dilengkapi panitia.
-  const jurusan =
-    program.status === "ok" ? program.data.map((item) => item.nama) : [];
 
   return (
     <main className="mx-auto max-w-3xl px-6 py-14">
@@ -111,7 +115,7 @@ export default async function HalamanDaftar() {
       </p>
 
       <div className="mt-10">
-        <FormPendaftaran jurusan={jurusan} rekening={rekening} />
+        <FormPendaftaran pilihan={pilihan.data} rekening={rekening} />
       </div>
     </main>
   );

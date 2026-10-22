@@ -6,6 +6,7 @@ import {
   GelombangTidakTerbukaError,
   KuotaPenuhError,
   readGelombangAktif,
+  readPilihanPmb,
   readStatusPendaftaran,
   tulisPendaftaran,
 } from "./pmb";
@@ -71,7 +72,8 @@ async function siapkanDatabase() {
       dibayar_metode TEXT CHECK(dibayar_metode IN ('tunai', 'transfer', 'qris', 'gateway')),
       dibayar_dicatat_oleh TEXT,
       dibayar_dicatat_at TEXT,
-      pembayaran_batal_catatan TEXT
+      pembayaran_batal_catatan TEXT,
+      pilihan_unit TEXT
     );
   `);
   await client.execute(`
@@ -155,6 +157,7 @@ const MASUKAN = {
   noWhatsappWali: "+6281200000000",
   emailWali: null,
   pilihanJurusan: "TKJ",
+  pilihanUnit: "SMK",
   berkas: [],
   dataDapodik: dataDapodikSchema.parse({
     nik: "3273011705100001",
@@ -603,5 +606,65 @@ describe("biaya pendaftaran (v52)", () => {
         tanggalLahir: MASUKAN.tanggalLahir,
       }),
     ).rejects.toBeInstanceOf(SchemaNotReadyError);
+  });
+});
+
+describe("unit tujuan (v58)", () => {
+  async function siapkanAkademik(client: Klien, denganIdUnit = true) {
+    await client.execute(`
+      CREATE TABLE akademik_unit (
+        id_unit TEXT PRIMARY KEY,
+        nama_unit TEXT NOT NULL,
+        urutan INTEGER NOT NULL DEFAULT 0,
+        status_aktif INTEGER NOT NULL DEFAULT 1
+      );
+    `);
+    await client.execute(`
+      CREATE TABLE akademik_jurusan (
+        id_jurusan TEXT PRIMARY KEY,
+        nama_jurusan TEXT NOT NULL,
+        is_aktif INTEGER NOT NULL DEFAULT 1${denganIdUnit ? ", id_unit TEXT" : ""}
+      );
+    `);
+  }
+
+  test("unit aktif berurutan, jurusan membawa unitnya", async () => {
+    const client = await siapkanDatabase();
+    await siapkanAkademik(client);
+    await client.execute(`INSERT INTO akademik_unit VALUES
+      ('u-smk', 'SMK', 2, 1), ('u-sd', 'SD', 1, 1), ('u-lama', 'TK', 0, 0);`);
+    await client.execute(`INSERT INTO akademik_jurusan VALUES
+      ('j1', 'TKJ', 1, 'u-smk'), ('j2', 'Umum', 1, NULL), ('j3', 'Lama', 0, NULL);`);
+
+    expect(await readPilihanPmb(client)).toEqual({
+      unit: [
+        { idUnit: "u-sd", nama: "SD" },
+        { idUnit: "u-smk", nama: "SMK" },
+      ],
+      jurusan: [
+        { nama: "TKJ", idUnit: "u-smk" },
+        { nama: "Umum", idUnit: null },
+      ],
+    });
+  });
+
+  test("database belum v58 dijawab belum siap", async () => {
+    const client = await siapkanDatabase();
+    await siapkanAkademik(client, false);
+    await expect(readPilihanPmb(client)).rejects.toBeInstanceOf(
+      SchemaNotReadyError,
+    );
+  });
+
+  test("unit pendaftar tersimpan", async () => {
+    const client = await siapkanDatabase();
+    await tambahGelombang(client);
+    const gelombang = await readGelombangAktif(client);
+    if (!gelombang) throw new Error("gelombang tidak ada");
+    await tulisPendaftaran(client, gelombang, MASUKAN);
+    const baris = await client.execute(
+      "SELECT pilihan_unit FROM pmb_pendaftar LIMIT 1;",
+    );
+    expect(baris.rows[0]?.pilihan_unit).toBe("SMK");
   });
 });

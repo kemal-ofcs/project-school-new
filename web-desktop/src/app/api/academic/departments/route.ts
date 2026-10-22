@@ -29,6 +29,7 @@ export async function POST(request: NextRequest) {
         nama_jurusan: string;
         deskripsi?: string | null;
         is_aktif?: number;
+        id_unit?: string | null;
       };
       id?: string;
     }>(request);

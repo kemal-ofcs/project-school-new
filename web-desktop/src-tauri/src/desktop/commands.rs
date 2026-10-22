@@ -4216,6 +4216,7 @@ pub async fn desktop_promote_pmb_registrant(
     id_rombel: String,
     id_shift: Option<i64>,
     angkatan: Option<i64>,
+    unit: Option<String>,
 ) -> Result<Value, CommandError> {
     require_permission(&state, "pmb.promote")?;
     // Cakupan data nyata: aksi ini membuat baris `master_data` + `siswa_data` +
@@ -4275,6 +4276,9 @@ pub async fn desktop_promote_pmb_registrant(
     if let Some(tahun) = angkatan {
         draft["angkatan"] = serde_json::json!(tahun);
     }
+    if let Some(unit) = unit.map(|u| u.trim().to_owned()).filter(|u| !u.is_empty()) {
+        draft["unit"] = serde_json::json!(unit);
+    }
 
     let hasil = super::academic::save_student(&state, &draft)?;
     let id_siswa = hasil
@@ -4294,6 +4298,60 @@ pub async fn desktop_promote_pmb_registrant(
     turso.mark_pmb_registered(&id_pendaftar, &id_siswa).await?;
 
     Ok(serde_json::json!({ "idSiswa": id_siswa }))
+}
+
+/// Data DAPODIK sejumlah siswa untuk halaman Siswa (Cloud-Only, v57).
+///
+/// `pmb.view`, bukan `students.view`: isinya NIK, No KK, dan penghasilan orang
+/// tua, yang hanya boleh dilihat orang yang sudah bisa melihatnya di PMB.
+#[tauri::command]
+pub async fn desktop_list_student_dapodik(
+    state: State<'_, DesktopState>,
+    ids: Vec<String>,
+) -> Result<Value, CommandError> {
+    require_permission(&state, "pmb.view")?;
+    state.get_turso_client()?.list_siswa_dapodik(&ids).await
+}
+
+/// Simpan data DAPODIK seorang siswa (Cloud-Only, v57). Butuh `pmb.manage`
+/// dan `students.manage` sekaligus, pola yang sama dengan angkat siswa.
+#[tauri::command]
+pub async fn desktop_save_student_dapodik(
+    state: State<'_, DesktopState>,
+    id_siswa: String,
+    tempat_lahir: Option<String>,
+    tanggal_lahir: Option<String>,
+    sekolah_asal: Option<String>,
+    data: Value,
+) -> Result<Value, CommandError> {
+    let operator = require_permission(&state, "pmb.manage")?;
+    require_permission(&state, "students.manage")?;
+    let masukan = super::siswa_dapodik::validasi_simpan(&serde_json::json!({
+        "idSiswa": id_siswa,
+        "tempatLahir": tempat_lahir,
+        "tanggalLahir": tanggal_lahir,
+        "sekolahAsal": sekolah_asal,
+        "data": data,
+    }))
+    .map_err(|pesan| CommandError::new("VALIDATION_ERROR", pesan))?;
+    state
+        .get_turso_client()?
+        .save_siswa_dapodik(&masukan, &operator.username)
+        .await
+}
+
+/// Kosongkan data DAPODIK seorang siswa (Cloud-Only, v57).
+#[tauri::command]
+pub async fn desktop_clear_student_dapodik(
+    state: State<'_, DesktopState>,
+    id_siswa: String,
+) -> Result<Value, CommandError> {
+    let operator = require_permission(&state, "pmb.manage")?;
+    require_permission(&state, "students.manage")?;
+    state
+        .get_turso_client()?
+        .clear_siswa_dapodik(&id_siswa, &operator.username)
+        .await
 }
 
 #[cfg(test)]

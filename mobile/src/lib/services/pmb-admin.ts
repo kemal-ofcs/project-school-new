@@ -10,6 +10,7 @@ import {
   tolakPerpanjangBayarPmb,
   tolakUbahStatusPmb,
 } from "@/lib/validations/pmb-pembayaran";
+import { SQL_SALIN_DAPODIK_PMB } from "@/lib/validations/siswa-dapodik";
 import type {
   PmbFileContent,
   PmbPaymentInput,
@@ -215,7 +216,7 @@ export async function listPmbRegistrants(
 ): Promise<{ items: PmbRegistrantItem[] }> {
   let query = `
     SELECT p.id_pendaftar, p.nomor_pendaftaran, p.id_gelombang, p.nama_lengkap,
-           p.nisn, p.jenis_kelamin, p.asal_sekolah, p.pilihan_jurusan,
+           p.nisn, p.jenis_kelamin, p.asal_sekolah, p.pilihan_jurusan, p.pilihan_unit,
            p.nama_wali, p.no_whatsapp_wali, p.status, p.id_siswa,
            p.created_at, p.updated_at, p.biaya_tagihan, p.batas_bayar,
            ${SQL_KEADAAN_BAYAR_PMB} AS keadaan_bayar,
@@ -362,15 +363,26 @@ export async function markPmbRegistered(
   idPendaftar: string,
   idSiswa: string,
 ): Promise<void> {
-  const hasil = await client.execute({
-    sql: `UPDATE pmb_pendaftar
+  // Biodata DAPODIK ikut disalin dalam satu transaksi; salinannya hanya
+  // menyentuh baris yang sudah `Terdaftar`. Cerminan `mark_pmb_registered`.
+  const [hasil] = await client.batch(
+    [
+      {
+        sql: `UPDATE pmb_pendaftar
              SET status = 'Terdaftar',
                  id_siswa = ?,
                  updated_at = datetime('now')
            WHERE id_pendaftar = ?
              AND status = 'Diterima';`,
-    args: [idSiswa, idPendaftar],
-  });
+        args: [idSiswa, idPendaftar],
+      },
+      {
+        sql: `${SQL_SALIN_DAPODIK_PMB} AND id_pendaftar = ?;`,
+        args: [idPendaftar],
+      },
+    ],
+    "write",
+  );
 
   if (Number(hasil.rowsAffected ?? 0) === 0) {
     throw new PmbValidationError(

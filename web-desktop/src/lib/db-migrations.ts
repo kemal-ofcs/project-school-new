@@ -9,6 +9,7 @@ import {
   JENIS_NILAI_BAWAAN,
   SEED_JENIS_SQL,
 } from "@/lib/validations/nilai-akhir";
+import { SQL_SALIN_DAPODIK_PMB } from "@/lib/validations/siswa-dapodik";
 import TARIF_PAYROLL_BAWAAN from "@/lib/validations/tarif-payroll-bawaan.json";
 
 const RBAC_MIGRATION_VERSION = 1;
@@ -67,6 +68,8 @@ const INVENTORY_COLUMN_MIGRATION_VERSION = 53;
 const INVENTORY_COLUMN_DELETE_MIGRATION_VERSION = 54;
 const INVENTORY_DECIMAL_MIGRATION_VERSION = 55;
 const PERSONNEL_EMAIL_MIGRATION_VERSION = 56;
+const STUDENT_DAPODIK_MIGRATION_VERSION = 57;
+const PMB_UNIT_MIGRATION_VERSION = 58;
 
 /**
  * v21 — aturan jam scan baru: Jam Kerja Normal = (Jam Pulang − Jam Masuk) −
@@ -1286,7 +1289,8 @@ export async function runDatabaseMigrations(client: Client) {
       kode_jurusan TEXT NOT NULL,
       nama_jurusan TEXT NOT NULL,
       deskripsi TEXT,
-      is_aktif INTEGER NOT NULL DEFAULT 1 CHECK (is_aktif IN (0, 1))
+      is_aktif INTEGER NOT NULL DEFAULT 1 CHECK (is_aktif IN (0, 1)),
+      id_unit TEXT
     );
   `);
 
@@ -1383,7 +1387,8 @@ export async function runDatabaseMigrations(client: Client) {
       kode_jurusan TEXT NOT NULL,
       nama_jurusan TEXT NOT NULL,
       deskripsi TEXT,
-      is_aktif INTEGER NOT NULL DEFAULT 1 CHECK (is_aktif IN (0, 1))
+      is_aktif INTEGER NOT NULL DEFAULT 1 CHECK (is_aktif IN (0, 1)),
+      id_unit TEXT
     );`,
     columns: "id_jurusan, kode_jurusan, nama_jurusan, deskripsi, is_aktif",
     indexes: [],
@@ -2553,7 +2558,8 @@ export async function runDatabaseMigrations(client: Client) {
       dibayar_metode TEXT CHECK(dibayar_metode IN ('tunai', 'transfer', 'qris', 'gateway')),
       dibayar_dicatat_oleh TEXT,
       dibayar_dicatat_at TEXT,
-      pembayaran_batal_catatan TEXT
+      pembayaran_batal_catatan TEXT,
+      pilihan_unit TEXT
     );
   `);
 
@@ -2946,4 +2952,55 @@ export async function runDatabaseMigrations(client: Client) {
   await client.execute(
     "CREATE INDEX IF NOT EXISTS idx_wali_kredensial_siswa ON wali_kredensial(id_siswa);",
   );
+
+  // ── v57: Data DAPODIK per siswa ──
+  //
+  // Cloud-only seperti PMB: NIK, No KK, dan penghasilan orang tua tidak boleh
+  // tersalin ke SQLite setiap terminal pemindai. Tanpa FOREIGN KEY ke
+  // `siswa_data`, alasan yang sama dengan `pmb_pendaftar.id_siswa`. Cerminan
+  // `turso.rs`; salinan dari PMB ditaruh paling akhir supaya kolom
+  // `pmb_pendaftar.data_dapodik` pasti sudah ada. Lihat `validations/siswa-dapodik.ts`.
+  await client.execute(`
+    CREATE TABLE IF NOT EXISTS siswa_dapodik (
+      id_siswa TEXT PRIMARY KEY,
+      tempat_lahir TEXT,
+      tanggal_lahir TEXT,
+      sekolah_asal TEXT,
+      data_dapodik TEXT,
+      diubah_oleh TEXT,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+  `);
+  await client.execute(`${SQL_SALIN_DAPODIK_PMB};`);
+  await client.execute({
+    sql: `INSERT OR IGNORE INTO schema_migration (version, name, applied_at)
+          VALUES (?, 'student-dapodik', ?);`,
+    args: [STUDENT_DAPODIK_MIGRATION_VERSION, now],
+  });
+
+  // ── v58: Unit tujuan PMB dan unit pemilik jurusan ──
+  //
+  // Ditaruh paling akhir, SETELAH `rebuildWithoutUnique` membangun ulang
+  // `akademik_jurusan` dengan daftar kolom eksplisit. NULL = jurusan berlaku
+  // di semua unit. Cerminan `ensure_column` di `turso.rs` dan `storage.rs`.
+  for (const [table, column, sql] of [
+    [
+      "akademik_jurusan",
+      "id_unit",
+      "ALTER TABLE akademik_jurusan ADD COLUMN id_unit TEXT;",
+    ],
+    [
+      "pmb_pendaftar",
+      "pilihan_unit",
+      "ALTER TABLE pmb_pendaftar ADD COLUMN pilihan_unit TEXT;",
+    ],
+  ] as const) {
+    if (!(await hasColumn(client, table, column))) await client.execute(sql);
+  }
+  await client.execute({
+    sql: `INSERT OR IGNORE INTO schema_migration (version, name, applied_at)
+          VALUES (?, 'pmb-unit', ?);`,
+    args: [PMB_UNIT_MIGRATION_VERSION, now],
+  });
 }

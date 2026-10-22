@@ -728,7 +728,8 @@ const ACADEMIC_UNIQUE_RELAXATIONS: &[UniqueRelaxation] = &[
             kode_jurusan TEXT NOT NULL,
             nama_jurusan TEXT NOT NULL,
             deskripsi TEXT,
-            is_aktif INTEGER NOT NULL DEFAULT 1 CHECK (is_aktif IN (0, 1))
+            is_aktif INTEGER NOT NULL DEFAULT 1 CHECK (is_aktif IN (0, 1)),
+            id_unit TEXT
         );",
         columns: "id_jurusan, kode_jurusan, nama_jurusan, deskripsi, is_aktif",
         indexes: &[],
@@ -3241,7 +3242,8 @@ impl TursoClient {
                     kode_jurusan TEXT NOT NULL,
                     nama_jurusan TEXT NOT NULL,
                     deskripsi TEXT,
-                    is_aktif INTEGER NOT NULL DEFAULT 1 CHECK (is_aktif IN (0, 1))
+                    is_aktif INTEGER NOT NULL DEFAULT 1 CHECK (is_aktif IN (0, 1)),
+                    id_unit TEXT
                 );"#,
                 vec![],
             ),
@@ -3566,7 +3568,8 @@ impl TursoClient {
                     dibayar_metode TEXT CHECK(dibayar_metode IN ('tunai', 'transfer', 'qris', 'gateway')),
                     dibayar_dicatat_oleh TEXT,
                     dibayar_dicatat_at TEXT,
-                    pembayaran_batal_catatan TEXT
+                    pembayaran_batal_catatan TEXT,
+                    pilihan_unit TEXT
                 );"#,
                 vec![],
             ),
@@ -3591,6 +3594,25 @@ impl TursoClient {
             Statement::new("CREATE INDEX IF NOT EXISTS idx_pmb_pendaftar_gelombang ON pmb_pendaftar(id_gelombang, status, created_at DESC);", vec![]),
             Statement::new("CREATE UNIQUE INDEX IF NOT EXISTS idx_pmb_pendaftar_nomor ON pmb_pendaftar(nomor_pendaftaran);", vec![]),
             Statement::new("CREATE INDEX IF NOT EXISTS idx_pmb_berkas_pendaftar ON pmb_berkas(id_pendaftar);", vec![]),
+            // ── v57: Data DAPODIK per siswa ──
+            //
+            // CLOUD-ONLY seperti PMB: NIK, No KK, dan penghasilan orang tua
+            // tidak boleh tersalin ke SQLite setiap terminal pemindai. Tanpa
+            // FOREIGN KEY ke `siswa_data` dengan alasan yang sama dengan
+            // `pmb_pendaftar.id_siswa`. Lihat `siswa_dapodik.rs`.
+            Statement::new(
+                r#"CREATE TABLE IF NOT EXISTS siswa_dapodik (
+                    id_siswa TEXT PRIMARY KEY,
+                    tempat_lahir TEXT,
+                    tanggal_lahir TEXT,
+                    sekolah_asal TEXT,
+                    data_dapodik TEXT,
+                    diubah_oleh TEXT,
+                    created_at TEXT NOT NULL,
+                    updated_at TEXT NOT NULL
+                );"#,
+                vec![],
+            ),
             // ── v27: Portal wali murid ──
             //
             // Definisi aslinya di `db-migrations.ts`; dipakai situs publik
@@ -3825,7 +3847,9 @@ impl TursoClient {
                 (53, 'inventory-column', datetime('now')),
                 (54, 'inventory-column-delete', datetime('now')),
                 (55, 'inventory-decimal', datetime('now')),
-                (56, 'personnel-email', datetime('now'));"#,
+                (56, 'personnel-email', datetime('now')),
+                (57, 'student-dapodik', datetime('now')),
+                (58, 'pmb-unit', datetime('now'));"#,
                 vec![],
             ),
         ];
@@ -4034,6 +4058,8 @@ impl TursoClient {
             ("pmb_pendaftar", "dibayar_dicatat_oleh", "ALTER TABLE pmb_pendaftar ADD COLUMN dibayar_dicatat_oleh TEXT;"),
             ("pmb_pendaftar", "dibayar_dicatat_at", "ALTER TABLE pmb_pendaftar ADD COLUMN dibayar_dicatat_at TEXT;"),
             ("pmb_pendaftar", "pembayaran_batal_catatan", "ALTER TABLE pmb_pendaftar ADD COLUMN pembayaran_batal_catatan TEXT;"),
+            // Unit tujuan pendaftar PMB (v58, nama unit, cloud-only).
+            ("pmb_pendaftar", "pilihan_unit", "ALTER TABLE pmb_pendaftar ADD COLUMN pilihan_unit TEXT;"),
             // Isi kolom tambahan barang (v53, JSON berkunci id_kolom).
             ("inventory_barang", "atribut", "ALTER TABLE inventory_barang ADD COLUMN atribut TEXT;"),
             // Hapus permanen kolom tambahan (v54).
@@ -4043,6 +4069,15 @@ impl TursoClient {
         ] {
             self.ensure_column(table, column, sql).await?;
         }
+
+        // v57: salin data DAPODIK siswa yang sudah diangkat dari PMB. Setelah
+        // loop di atas karena `pmb_pendaftar.data_dapodik` bisa baru lahir di
+        // sana; `INSERT OR IGNORE` membuatnya aman diulang.
+        self.query_one(
+            &format!("{};", crate::mobile::siswa_dapodik::SQL_SALIN_DAPODIK_PMB),
+            vec![],
+        )
+        .await?;
 
         // Indeks ini WAJIB dibuat setelah loop di atas, bukan di dalam pipeline
         // DDL. Pada database cloud yang sudah ada, `master_operator` lahir tanpa
@@ -4115,6 +4150,14 @@ impl TursoClient {
         for spec in ACADEMIC_UNIQUE_RELAXATIONS {
             self.rebuild_without_unique(spec).await?;
         }
+        // Unit pemilik jurusan (v58). SETELAH rebuild di atas, yang menyalin
+        // daftar kolom eksplisit; NULL = jurusan berlaku di semua unit.
+        self.ensure_column(
+            "akademik_jurusan",
+            "id_unit",
+            "ALTER TABLE akademik_jurusan ADD COLUMN id_unit TEXT;",
+        )
+        .await?;
 
         // v25: memperluas CHECK `calc_type`. WAJIB di sini — sebelum
         // `ensure_sync_pulse` — karena membangun ulang tabel ikut membuang
@@ -8057,6 +8100,7 @@ impl TursoClient {
             r#"
             SELECT p.id_pendaftar, p.nomor_pendaftaran, p.id_gelombang, p.nama_lengkap,
                    p.nisn, p.jenis_kelamin, p.asal_sekolah, p.pilihan_jurusan,
+                   p.pilihan_unit,
                    p.nama_wali, p.no_whatsapp_wali, p.status, p.id_siswa,
                    p.created_at, p.updated_at, p.biaya_tagihan, p.batas_bayar,
                    {keadaan} AS keadaan_bayar,
@@ -8252,25 +8296,112 @@ impl TursoClient {
         id_siswa: &str,
     ) -> Result<Value, CommandError> {
         self.ensure_schema_current().await?;
+        // Biodata DAPODIK ikut disalin dalam pipeline yang sama; salinannya
+        // hanya menyentuh baris yang sudah `Terdaftar`, jadi aman bila UPDATE
+        // pertama tidak mengenai apa pun.
         let hasil = self
-            .query_one(
-                r#"UPDATE pmb_pendaftar
+            .execute_pipeline(vec![
+                Statement::new(
+                    r#"UPDATE pmb_pendaftar
                       SET status = 'Terdaftar',
                           id_siswa = ?,
                           updated_at = datetime('now')
                     WHERE id_pendaftar = ?
                       AND status = 'Diterima';"#,
-                vec![json!(id_siswa), json!(id_pendaftar)],
-            )
+                    vec![json!(id_siswa), json!(id_pendaftar)],
+                ),
+                Statement::new(
+                    format!(
+                        "{} AND id_pendaftar = ?;",
+                        crate::mobile::siswa_dapodik::SQL_SALIN_DAPODIK_PMB
+                    ),
+                    vec![json!(id_pendaftar)],
+                ),
+            ])
             .await?;
 
-        if hasil.rows_affected == 0 {
+        if hasil.first().map_or(0, |baris| baris.rows_affected) == 0 {
             return Err(CommandError::new(
                 "VALIDATION_ERROR",
                 "Hanya pendaftar berstatus 'Diterima' yang dapat diangkat menjadi siswa.",
             ));
         }
 
+        Ok(json!({ "sukses": true }))
+    }
+
+    /// Data DAPODIK sejumlah siswa (v57, cloud-only), paling banyak
+    /// `MAKS_ID_BACA` id per panggilan. Siswa tanpa baris tidak ikut.
+    pub async fn list_siswa_dapodik(&self, ids: &[String]) -> Result<Value, CommandError> {
+        self.ensure_schema_current().await?;
+        let ids: Vec<&str> = ids
+            .iter()
+            .map(|id| id.trim())
+            .filter(|id| !id.is_empty())
+            .collect();
+        if ids.len() > crate::mobile::siswa_dapodik::MAKS_ID_BACA {
+            return Err(CommandError::new(
+                "VALIDATION_ERROR",
+                "Terlalu banyak siswa dalam satu permintaan.",
+            ));
+        }
+        if ids.is_empty() {
+            return Ok(json!({ "items": [] }));
+        }
+        let sql = format!(
+            "SELECT id_siswa, tempat_lahir, tanggal_lahir, sekolah_asal, data_dapodik, diubah_oleh, updated_at FROM siswa_dapodik WHERE id_siswa IN ({});",
+            vec!["?"; ids.len()].join(", ")
+        );
+        let res = self
+            .query_one(&sql, ids.iter().map(|id| json!(id)).collect())
+            .await?;
+        Ok(json!({ "items": res.to_objects() }))
+    }
+
+    /// Simpan data DAPODIK seorang siswa. `masukan` sudah lolos
+    /// `siswa_dapodik::validasi_simpan`.
+    pub async fn save_siswa_dapodik(
+        &self,
+        masukan: &Value,
+        operator: &str,
+    ) -> Result<Value, CommandError> {
+        self.ensure_schema_current().await?;
+        let id_siswa = masukan["idSiswa"].as_str().unwrap_or_default();
+        let hasil = self
+            .query_one(
+                crate::mobile::siswa_dapodik::SQL_SIMPAN_DAPODIK_SISWA,
+                vec![
+                    json!(id_siswa),
+                    masukan["tempatLahir"].clone(),
+                    masukan["tanggalLahir"].clone(),
+                    masukan["sekolahAsal"].clone(),
+                    json!(crate::mobile::siswa_dapodik::json_data_dapodik(&masukan["data"])),
+                    json!(operator),
+                    json!(id_siswa),
+                ],
+            )
+            .await?;
+        if hasil.rows_affected == 0 {
+            return Err(CommandError::new(
+                "VALIDATION_ERROR",
+                crate::mobile::siswa_dapodik::PESAN_SISWA_BELUM_DI_CLOUD,
+            ));
+        }
+        Ok(json!({ "sukses": true }))
+    }
+
+    /// Kosongkan data DAPODIK seorang siswa; siswanya tidak tersentuh.
+    pub async fn clear_siswa_dapodik(
+        &self,
+        id_siswa: &str,
+        operator: &str,
+    ) -> Result<Value, CommandError> {
+        self.ensure_schema_current().await?;
+        self.query_one(
+            crate::mobile::siswa_dapodik::SQL_KOSONGKAN_DAPODIK_SISWA,
+            vec![json!(operator), json!(id_siswa.trim())],
+        )
+        .await?;
         Ok(json!({ "sukses": true }))
     }
 
@@ -11816,23 +11947,34 @@ async fn apply_event_to_turso(
                     .unwrap_or("");
                 let deskripsi = row.get("deskripsi").and_then(Value::as_str);
                 let is_aktif = row.get("is_aktif").and_then(Value::as_i64).unwrap_or(1);
+                // v58. Kunci yang absen = tidak berubah (payload klien lama),
+                // kosong = berlaku di semua unit.
+                let ada_unit = row.get("id_unit").is_some();
+                let id_unit = row
+                    .get("id_unit")
+                    .and_then(Value::as_str)
+                    .map(str::trim)
+                    .filter(|v| !v.is_empty());
 
                 turso
                     .query_one(
                         r#"INSERT INTO akademik_jurusan (
-                        id_jurusan, kode_jurusan, nama_jurusan, deskripsi, is_aktif
-                    ) VALUES (?, ?, ?, ?, ?)
+                        id_jurusan, kode_jurusan, nama_jurusan, deskripsi, is_aktif, id_unit
+                    ) VALUES (?, ?, ?, ?, ?, ?)
                     ON CONFLICT(id_jurusan) DO UPDATE SET
                         kode_jurusan = excluded.kode_jurusan,
                         nama_jurusan = excluded.nama_jurusan,
                         deskripsi = excluded.deskripsi,
-                        is_aktif = excluded.is_aktif;"#,
+                        is_aktif = excluded.is_aktif,
+                        id_unit = CASE WHEN ? THEN excluded.id_unit ELSE akademik_jurusan.id_unit END;"#,
                         vec![
                             json!(id),
                             json!(kode),
                             json!(nama),
                             json!(deskripsi),
                             json!(is_aktif),
+                            json!(id_unit),
+                            json!(i64::from(ada_unit)),
                         ],
                     )
                     .await?;

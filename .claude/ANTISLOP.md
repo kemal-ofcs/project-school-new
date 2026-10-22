@@ -1,19 +1,19 @@
 # ANTISLOP.md — hasil antislop
 
-- Waktu: 2026-10-22 08:15 WIB
-- Commit: e2b967a (+ 8 berkas berubah, belum commit)
-- Berkas disunting: 0
+- Waktu: 2026-10-22 12:02 WIB
+- Commit: 6e6f971 (+ 83 berkas berubah, belum commit)
+- Berkas disunting: 1
 
 ## Disunting
-*(tidak ada berkas yang perlu disunting, seluruh komentar kode dan teks antarmuka sudah bersih dan sesuai standar antislop)*
+- `web-desktop/src/components/siswa/DapodikSiswa.tsx` — teks UI — ganti em dash pada judul modal dan opsi placeholder dengan titik dua dan tanda kurung
 
 ## Dilewati
-- `mobile/scripts/sync-frontend-lib.ts` — skrip sinkronisasi salinan Mobile
-- `mobile/src/components/inventory/**` — salinan Mobile turunan dari web-desktop yang dihasilkan skrip sync
-- `web-desktop/src/components/inventory/ekspor.test.ts` — berkas pengujian dan fixture data
-- `web-desktop/src/components/inventory/InventarisWorkspace.tsx` — teks UI dan komentar ringkas, tanpa AI-slop
-- `web-desktop/src/components/inventory/ekspor.ts` — komentar teknis format data dan arsitektur sudah presisi
-- `web-desktop/src/components/inventory/DialogEkspor.tsx` — teks UI lugas, aksesibilitas tap target terpenuhi
+- `mobile/scripts/sync-*` — skrip sinkronisasi salinan Mobile
+- `mobile/src/**` & `mobile/src-tauri/**` — salinan Mobile turunan yang dihasilkan skrip sync
+- `*.test.ts`, `*.test.tsx`, `*.vektor.json` — berkas pengujian dan fixture data
+- `*.toml`, `*.json`, `build.rs` — konfigurasi dan build artifact
+- `web-desktop/src-tauri/**` & `web-desktop/src/**` — komentar teknis dan teks UI sudah ringkas tanpa AI-slop
+- `web-public/src/**` — komentar teknis dan teks formulir PMB sudah presisi
 
 ## Perlu tindakan
-*(tidak ada)*
+Jalankan `bun run sync:mobile` untuk memperbarui salinan Mobile dari `web-desktop/src/components/siswa/DapodikSiswa.tsx`.

@@ -194,6 +194,9 @@ pub fn run() {
             mobile::commands::desktop_extend_pmb_payment_deadline,
             mobile::commands::desktop_delete_pmb_registrant,
             mobile::commands::desktop_promote_pmb_registrant,
+            mobile::commands::desktop_list_student_dapodik,
+            mobile::commands::desktop_save_student_dapodik,
+            mobile::commands::desktop_clear_student_dapodik,
             // Tinjauan antrean WhatsApp: command khusus Mobile yang membaca CLOUD.
             // Membaca `notifikasi_wa` LOKAL akan selalu kosong di perangkat yang
             // bukan terminal pemindai — lihat `wa_review.rs`.

@@ -209,6 +209,7 @@ export default function AkademikPage() {
     nama_jurusan: "",
     deskripsi: "",
     is_aktif: 1,
+    id_unit: null,
   });
 
   const [formRombel, setFormRombel] = useState<RombelInput>({
@@ -596,6 +597,7 @@ export default function AkademikPage() {
                         nama_jurusan: "",
                         deskripsi: "",
                         is_aktif: 1,
+                        id_unit: null,
                       });
                     } else if (activeTab === "rombel") {
                       const allOpts = resolveTingkatOptions(unitList);
@@ -1321,6 +1323,39 @@ export default function AkademikPage() {
                       }
                       className="mt-1 w-full rounded-xl border border-white/10 bg-slate-900 px-3 py-2 text-sm text-slate-100 focus:border-sky-500 focus:outline-none"
                     />
+                  </div>
+                  <div>
+                    <label
+                      htmlFor="jur-unit"
+                      className="block text-xs font-semibold text-slate-300"
+                    >
+                      Unit
+                    </label>
+                    <select
+                      id="jur-unit"
+                      value={formJurusan.id_unit ?? ""}
+                      onChange={(e) =>
+                        setFormJurusan({
+                          ...formJurusan,
+                          id_unit: e.target.value || null,
+                        })
+                      }
+                      className="mt-1 w-full rounded-xl border border-white/10 bg-slate-900 px-3 py-2 text-sm text-slate-100 focus:border-sky-500 focus:outline-none"
+                    >
+                      <option value="">Semua unit</option>
+                      {unitList.map((u) => (
+                        <option
+                          key={String(u.id_unit)}
+                          value={String(u.id_unit)}
+                        >
+                          {String(u.nama_unit)}
+                        </option>
+                      ))}
+                    </select>
+                    <p className="mt-1 text-xs text-slate-400">
+                      Formulir PMB hanya menawarkan jurusan ini kepada pendaftar
+                      unit tersebut.
+                    </p>
                   </div>
                 </>
               ) : null}

@@ -26,6 +26,7 @@ const bodySchema = z
     idRombel: z.string().max(80),
     idShift: z.number().int().positive().nullish(),
     angkatan: z.number().int().min(1900).max(2200).nullish(),
+    unit: z.string().trim().max(80).nullish(),
   })
   .strict();
 
@@ -93,6 +94,7 @@ export async function POST(request: NextRequest) {
       status: "Aktif",
       ...(input.idShift ? { id_shift: input.idShift } : {}),
       ...(input.angkatan ? { angkatan: input.angkatan } : {}),
+      ...(input.unit ? { unit: input.unit } : {}),
     });
 
     await markPmbRegistered(client, input.idPendaftar, hasil.id_siswa);

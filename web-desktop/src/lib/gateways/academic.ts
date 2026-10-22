@@ -134,6 +134,8 @@ export interface JurusanInput {
   nama_jurusan: string;
   deskripsi?: string | null;
   is_aktif?: number;
+  /** Unit pemilik jurusan (v58); `null` = berlaku di semua unit. */
+  id_unit: string | null;
 }
 
 export async function getDaftarJurusan() {

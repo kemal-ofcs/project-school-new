@@ -1,0 +1,253 @@
+[
+  {
+    "nama": "isian campuran dibersihkan dan dinormalkan",
+    "masukan": {
+      "idSiswa": " s-1 ",
+      "tempatLahir": " Bandung ",
+      "tanggalLahir": "2010-02-28",
+      "sekolahAsal": "",
+      "data": {
+        "nik": " 3201234567890123 ",
+        "agama": "Islam",
+        "anakKe": "2",
+        "jarakKm": "1,5",
+        "hpSiswa": "0812-3456-7890",
+        "emailSiswa": " Siswa@Contoh.SCH.id ",
+        "kps": "Ya",
+        "kip": false,
+        "dusun": "  ",
+        "rt": "005",
+        "ayahPenghasilan": "Rp1.000.001 - Rp3.000.000",
+        "ayahTahunLahir": "1980",
+        "lingkarKepalaCm": 52,
+        "ayahNama": " Budi ",
+        "noKps": null
+      }
+    },
+    "hasil": {
+      "idSiswa": "s-1",
+      "tempatLahir": "Bandung",
+      "tanggalLahir": "2010-02-28",
+      "sekolahAsal": null,
+      "data": {
+        "nik": "3201234567890123",
+        "agama": "Islam",
+        "anakKe": 2,
+        "jarakKm": 1.5,
+        "hpSiswa": "+6281234567890",
+        "emailSiswa": "siswa@contoh.sch.id",
+        "kps": true,
+        "kip": false,
+        "rt": "005",
+        "ayahPenghasilan": "Rp1.000.001 - Rp3.000.000",
+        "ayahTahunLahir": 1980,
+        "lingkarKepalaCm": 52,
+        "ayahNama": "Budi"
+      }
+    }
+  },
+  {
+    "nama": "data kosong boleh disimpan",
+    "masukan": {
+      "idSiswa": "s-2",
+      "data": {}
+    },
+    "hasil": {
+      "idSiswa": "s-2",
+      "tempatLahir": null,
+      "tanggalLahir": null,
+      "sekolahAsal": null,
+      "data": {}
+    }
+  },
+  {
+    "nama": "agama di luar daftar ditolak, tanpa trim",
+    "masukan": {
+      "idSiswa": "s",
+      "data": {
+        "agama": "Islam "
+      }
+    },
+    "galat": "Pilih agama calon siswa."
+  },
+  {
+    "nama": "penghasilan di luar daftar ditolak",
+    "masukan": {
+      "idSiswa": "s",
+      "data": {
+        "ibuPenghasilan": "Rp1.000.000"
+      }
+    },
+    "galat": "Pilih penghasilan ibu."
+  },
+  {
+    "nama": "NIK 15 angka",
+    "masukan": {
+      "idSiswa": "s",
+      "data": {
+        "nik": "320123456789012"
+      }
+    },
+    "galat": "NIK calon siswa harus 16 angka."
+  },
+  {
+    "nama": "29 Februari bukan kabisat",
+    "masukan": {
+      "idSiswa": "s",
+      "tanggalLahir": "2011-02-29",
+      "data": {}
+    },
+    "galat": "Tanggal lahir tidak valid."
+  },
+  {
+    "nama": "29 Februari kabisat",
+    "masukan": {
+      "idSiswa": "s",
+      "tanggalLahir": "2012-02-29",
+      "data": {}
+    },
+    "hasil": {
+      "idSiswa": "s",
+      "tempatLahir": null,
+      "tanggalLahir": "2012-02-29",
+      "sekolahAsal": null,
+      "data": {}
+    }
+  },
+  {
+    "nama": "anak ke-0",
+    "masukan": {
+      "idSiswa": "s",
+      "data": {
+        "anakKe": "0"
+      }
+    },
+    "galat": "Anak ke- harus 1 sampai 20."
+  },
+  {
+    "nama": "jarak bukan angka",
+    "masukan": {
+      "idSiswa": "s",
+      "data": {
+        "jarakKm": "abc"
+      }
+    },
+    "galat": "Jarak ke sekolah harus 0 sampai 500 km."
+  },
+  {
+    "nama": "lingkar kepala nol",
+    "masukan": {
+      "idSiswa": "s",
+      "data": {
+        "lingkarKepalaCm": "0"
+      }
+    },
+    "galat": "Lingkar kepala harus 1 sampai 100 cm."
+  },
+  {
+    "nama": "HP terlalu pendek",
+    "masukan": {
+      "idSiswa": "s",
+      "data": {
+        "hpSiswa": "12345"
+      }
+    },
+    "galat": "Nomor HP calon siswa tidak valid."
+  },
+  {
+    "nama": "email tanpa domain",
+    "masukan": {
+      "idSiswa": "s",
+      "data": {
+        "emailSiswa": "siswa@"
+      }
+    },
+    "galat": "Email siswa tidak valid."
+  },
+  {
+    "nama": "RT berhuruf",
+    "masukan": {
+      "idSiswa": "s",
+      "data": {
+        "rt": "12a"
+      }
+    },
+    "galat": "RT berupa angka (maksimal 3)."
+  },
+  {
+    "nama": "id siswa kosong",
+    "masukan": {
+      "idSiswa": "  ",
+      "data": {}
+    },
+    "galat": "Siswa tidak dikenal."
+  },
+  {
+    "nama": "tempat lahir terlalu panjang",
+    "masukan": {
+      "idSiswa": "s",
+      "tempatLahir": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+      "data": {}
+    },
+    "galat": "Tempat lahir maksimal 80 karakter."
+  },
+  {
+    "nama": "dusun terlalu panjang",
+    "masukan": {
+      "idSiswa": "s",
+      "data": {
+        "dusun": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+      }
+    },
+    "galat": "Maksimal 80 karakter."
+  },
+  {
+    "nama": "nama ayah terlalu panjang",
+    "masukan": {
+      "idSiswa": "s",
+      "data": {
+        "ayahNama": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+      }
+    },
+    "galat": "Maksimal 120 karakter."
+  },
+  {
+    "nama": "KPS selain Ya/Tidak",
+    "masukan": {
+      "idSiswa": "s",
+      "data": {
+        "kps": "Mungkin"
+      }
+    }
+  },
+  {
+    "nama": "isian tidak dikenal",
+    "masukan": {
+      "idSiswa": "s",
+      "data": {
+        "warnaFavorit": "biru"
+      }
+    }
+  },
+  {
+    "nama": "kunci atas tidak dikenal",
+    "masukan": {
+      "idSiswa": "s",
+      "data": {},
+      "nis": "1"
+    }
+  },
+  {
+    "nama": "data bukan objek",
+    "masukan": {
+      "idSiswa": "s",
+      "data": "x"
+    }
+  },
+  {
+    "nama": "data tidak dikirim",
+    "masukan": {
+      "idSiswa": "s"
+    }
+  }
+]
