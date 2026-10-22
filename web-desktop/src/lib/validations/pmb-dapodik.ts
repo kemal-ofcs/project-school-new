@@ -176,8 +176,92 @@ const yaTidak = z.preprocess(
 );
 const tahunLahir = (siapa: string) =>
   angka(1900, 2100, `Tahun lahir ${siapa} wajib diisi dengan benar.`);
+// Kosong = null; apakah isian itu wajib diputuskan `isianWajibDapodik`.
+const opsional = <T extends z.ZodType>(skema: T) =>
+  z.preprocess(kosongJadiNull, skema.nullable().default(null));
 
-export const dataDapodikSchema = z
+export const PEKERJAAN_MENINGGAL = "Sudah Meninggal";
+
+const kosong = (nilai: unknown) =>
+  nilai === null || nilai === undefined || String(nilai).trim() === "";
+
+const WAJIB_TETAP = [
+  "nik",
+  "agama",
+  "noAktaLahir",
+  "anakKe",
+  "jumlahSaudara",
+  "hpSiswa",
+  "emailSiswa",
+  "rt",
+  "rw",
+  "kelurahan",
+  "kecamatan",
+  "kodePos",
+  "jenisTinggal",
+  "transportasi",
+  "jarakKm",
+  "noKk",
+  "ibuNama",
+  "waliNama",
+  "beratKg",
+  "tinggiCm",
+];
+
+const PESAN_WAJIB: Record<string, string> = Object.fromEntries(
+  (
+    [
+      ["ayah", "ayah"],
+      ["ibu", "ibu"],
+      ["wali", "wali"],
+    ] as const
+  ).flatMap(([awalan, siapa]) => [
+    [`${awalan}TahunLahir`, `Tahun lahir ${siapa} wajib diisi dengan benar.`],
+    [`${awalan}Pendidikan`, `Pilih pendidikan ${siapa}.`],
+    [`${awalan}Pekerjaan`, `Pilih pekerjaan ${siapa}.`],
+    [`${awalan}Penghasilan`, `Pilih penghasilan ${siapa}.`],
+  ]),
+);
+
+/**
+ * Isian wajib untuk data ini (keputusan User 2026-10-22). NIK orang tua tidak
+ * pernah wajib: NIK karangan lebih merusak daripada kosong. Ayah tanpa nama
+ * (tidak diketahui) tidak dituntut apa pun; orang tua yang sudah meninggal
+ * cukup nama, tahun lahir, dan pekerjaan; isian wali selain nama hanya wajib
+ * bila siswa tinggal bersama wali. Dipakai formulir PMB dan penghitung
+ * "kurang N isian" di halaman Siswa.
+ */
+export function isianWajibDapodik(d: Record<string, unknown>): string[] {
+  const wajib = [...WAJIB_TETAP];
+  const orangTua = (awalan: "ayah" | "ibu" | "wali") => {
+    wajib.push(`${awalan}TahunLahir`, `${awalan}Pekerjaan`);
+    if (d[`${awalan}Pekerjaan`] !== PEKERJAAN_MENINGGAL) {
+      wajib.push(`${awalan}Pendidikan`, `${awalan}Penghasilan`);
+    }
+  };
+  if (!kosong(d.ayahNama)) orangTua("ayah");
+  orangTua("ibu");
+  if (d.jenisTinggal === "Wali") orangTua("wali");
+  return wajib;
+}
+
+/** Orang tua yang sudah meninggal tidak berpenghasilan; isiannya diisikan. */
+function isiPenghasilanMeninggal(nilai: unknown): unknown {
+  if (!nilai || typeof nilai !== "object" || Array.isArray(nilai)) return nilai;
+  const d = { ...(nilai as Record<string, unknown>) };
+  for (const awalan of ["ayah", "ibu", "wali"]) {
+    if (
+      d[`${awalan}Pekerjaan`] === PEKERJAAN_MENINGGAL &&
+      kosong(d[`${awalan}Penghasilan`])
+    ) {
+      d[`${awalan}Penghasilan`] = "Tidak Berpenghasilan";
+    }
+  }
+  return d;
+}
+
+/** Bentuk isian tanpa aturan wajib bersyarat; dipakai versi admin (`.partial()`). */
+export const dataDapodikDasarSchema = z
   .object({
     // Calon siswa
     nik: z
@@ -218,24 +302,30 @@ export const dataDapodikSchema = z
 
     // Keluarga
     noKk: digit(16, 16, "Nomor KK harus 16 angka."),
-    ayahNama: teksWajib(120, "Nama ayah wajib diisi."),
-    ayahTahunLahir: tahunLahir("ayah"),
-    ayahPendidikan: pilihan(JENJANG_PENDIDIKAN, "Pilih pendidikan ayah."),
-    ayahPekerjaan: pilihan(PEKERJAAN, "Pilih pekerjaan ayah."),
-    ayahPenghasilan: pilihan(PENGHASILAN, "Pilih penghasilan ayah."),
-    ayahNik: digit(16, 16, "NIK ayah harus 16 angka."),
+    ayahNama: teks(120),
+    ayahTahunLahir: opsional(tahunLahir("ayah")),
+    ayahPendidikan: opsional(
+      pilihan(JENJANG_PENDIDIKAN, "Pilih pendidikan ayah."),
+    ),
+    ayahPekerjaan: opsional(pilihan(PEKERJAAN, "Pilih pekerjaan ayah.")),
+    ayahPenghasilan: opsional(pilihan(PENGHASILAN, "Pilih penghasilan ayah.")),
+    ayahNik: opsional(digit(16, 16, "NIK ayah harus 16 angka.")),
     ibuNama: teksWajib(120, "Nama ibu kandung wajib diisi."),
-    ibuTahunLahir: tahunLahir("ibu"),
-    ibuPendidikan: pilihan(JENJANG_PENDIDIKAN, "Pilih pendidikan ibu."),
-    ibuPekerjaan: pilihan(PEKERJAAN, "Pilih pekerjaan ibu."),
-    ibuPenghasilan: pilihan(PENGHASILAN, "Pilih penghasilan ibu."),
-    ibuNik: digit(16, 16, "NIK ibu harus 16 angka."),
+    ibuTahunLahir: opsional(tahunLahir("ibu")),
+    ibuPendidikan: opsional(
+      pilihan(JENJANG_PENDIDIKAN, "Pilih pendidikan ibu."),
+    ),
+    ibuPekerjaan: opsional(pilihan(PEKERJAAN, "Pilih pekerjaan ibu.")),
+    ibuPenghasilan: opsional(pilihan(PENGHASILAN, "Pilih penghasilan ibu.")),
+    ibuNik: opsional(digit(16, 16, "NIK ibu harus 16 angka.")),
     waliNama: teksWajib(120, "Nama wali wajib diisi."),
-    waliTahunLahir: tahunLahir("wali"),
-    waliPendidikan: pilihan(JENJANG_PENDIDIKAN, "Pilih pendidikan wali."),
-    waliPekerjaan: pilihan(PEKERJAAN, "Pilih pekerjaan wali."),
-    waliPenghasilan: pilihan(PENGHASILAN, "Pilih penghasilan wali."),
-    waliNik: digit(16, 16, "NIK wali harus 16 angka."),
+    waliTahunLahir: opsional(tahunLahir("wali")),
+    waliPendidikan: opsional(
+      pilihan(JENJANG_PENDIDIKAN, "Pilih pendidikan wali."),
+    ),
+    waliPekerjaan: opsional(pilihan(PEKERJAAN, "Pilih pekerjaan wali.")),
+    waliPenghasilan: opsional(pilihan(PENGHASILAN, "Pilih penghasilan wali.")),
+    waliNik: opsional(digit(16, 16, "NIK wali harus 16 angka.")),
 
     // Bantuan
     kps: yaTidak,
@@ -251,12 +341,25 @@ export const dataDapodikSchema = z
   })
   .strict();
 
-export type DataDapodik = z.output<typeof dataDapodikSchema>;
-export type MasukanDataDapodik = z.input<typeof dataDapodikSchema>;
+/** Isian formulir PMB: bentuk dasar + aturan wajib bersyarat. */
+export const dataDapodikSchema = z.preprocess(
+  isiPenghasilanMeninggal,
+  dataDapodikDasarSchema.superRefine((d, ctx) => {
+    for (const kunci of isianWajibDapodik(d)) {
+      const pesan = PESAN_WAJIB[kunci];
+      if (pesan && kosong(d[kunci as keyof typeof d])) {
+        ctx.addIssue({ code: "custom", path: [kunci], message: pesan });
+      }
+    }
+  }),
+);
+
+export type DataDapodik = z.output<typeof dataDapodikDasarSchema>;
+export type MasukanDataDapodik = z.input<typeof dataDapodikDasarSchema>;
 
 /** Nama isian formulir = kunci objek, dalam urutan skema. */
 export const KUNCI_DATA_DAPODIK = Object.keys(
-  dataDapodikSchema.shape,
+  dataDapodikDasarSchema.shape,
 ) as (keyof DataDapodik)[];
 
 /**

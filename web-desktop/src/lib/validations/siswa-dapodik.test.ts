@@ -4,6 +4,7 @@ import { join } from "node:path";
 import {
   AGAMA,
   ALAT_TRANSPORTASI,
+  isianWajibDapodik,
   JENIS_TINGGAL,
   JENJANG_PENDIDIKAN,
   KEBUTUHAN_KHUSUS,
@@ -12,7 +13,6 @@ import {
   PENGHASILAN,
 } from "./pmb-dapodik";
 import {
-  ISIAN_WAJIB_DAPODIK,
   isianKurangDapodik,
   SQL_KOSONGKAN_DAPODIK_SISWA,
   SQL_SALIN_DAPODIK_PMB,
@@ -47,14 +47,8 @@ describe("isianKurangDapodik", () => {
       "tempatLahir",
       "tanggalLahir",
       "sekolahAsal",
-      ...ISIAN_WAJIB_DAPODIK,
+      ...isianWajibDapodik({}),
     ]);
-  });
-
-  test("dusun dan blok bantuan tidak dihitung", () => {
-    expect(ISIAN_WAJIB_DAPODIK).not.toContain("dusun");
-    expect(ISIAN_WAJIB_DAPODIK).not.toContain("noKks");
-    expect(ISIAN_WAJIB_DAPODIK).toContain("nik");
   });
 
   test("isian terisi tidak dihitung, nol tetap terisi", () => {
@@ -71,6 +65,7 @@ describe("isianKurangDapodik", () => {
     expect(kurang).not.toContain("nik");
     expect(kurang).not.toContain("jumlahSaudara");
     expect(kurang).toContain("agama");
+    expect(kurang).not.toContain("ibuNik");
   });
 });
 

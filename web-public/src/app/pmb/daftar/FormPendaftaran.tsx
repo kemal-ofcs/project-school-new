@@ -20,6 +20,7 @@ import {
 import {
   AGAMA,
   ALAT_TRANSPORTASI,
+  isianWajibDapodik,
   JENIS_TINGGAL,
   JENJANG_PENDIDIKAN,
   KEBUTUHAN_KHUSUS,
@@ -195,11 +196,14 @@ function Pilihan({
 function OrangTua({
   awalan,
   judul,
+  wajib,
   aksi,
   children,
 }: {
   awalan: "ayah" | "ibu" | "wali";
   judul: string;
+  /** Hasil `isianWajibDapodik`, aturan yang sama dengan server. */
+  wajib: ReadonlySet<string>;
   aksi?: ReactNode;
   children?: ReactNode;
 }) {
@@ -211,10 +215,15 @@ function OrangTua({
         {aksi}
       </div>
       <Isian
+        bantuan={
+          awalan === "ayah"
+            ? "Kosongkan bila tidak diketahui; isian ayah lainnya ikut boleh kosong."
+            : undefined
+        }
         label={awalan === "ibu" ? "Nama ibu kandung" : "Nama"}
         maxLength={120}
         name={`${awalan}Nama`}
-        wajib
+        wajib={awalan !== "ayah"}
       />
       <div className="grid gap-4 sm:grid-cols-2">
         <Isian
@@ -224,36 +233,36 @@ function OrangTua({
           min={1900}
           name={`${awalan}TahunLahir`}
           type="number"
-          wajib
+          wajib={wajib.has(`${awalan}TahunLahir`)}
         />
         <Isian
+          bantuan="Lihat KTP, KK lama, atau akta kematian. Kosongkan bila tidak tersedia."
           inputMode="numeric"
           label="NIK"
           maxLength={16}
           name={`${awalan}Nik`}
           pattern="\d{16}"
           title="16 angka sesuai KTP"
-          wajib
         />
       </div>
       <Pilihan
         daftar={JENJANG_PENDIDIKAN}
         label="Pendidikan terakhir"
         name={`${awalan}Pendidikan`}
-        wajib
+        wajib={wajib.has(`${awalan}Pendidikan`)}
       />
       <div className="grid gap-4 sm:grid-cols-2">
         <Pilihan
           daftar={PEKERJAAN}
           label="Pekerjaan"
           name={`${awalan}Pekerjaan`}
-          wajib
+          wajib={wajib.has(`${awalan}Pekerjaan`)}
         />
         <Pilihan
           daftar={PENGHASILAN}
           label="Penghasilan per bulan"
           name={`${awalan}Penghasilan`}
-          wajib
+          wajib={wajib.has(`${awalan}Penghasilan`)}
         />
       </div>
       {children}
@@ -280,6 +289,26 @@ export function FormPendaftaran({
   const [unit, setUnit] = useState("");
   const [program, setProgram] = useState("");
   const jurusan = jurusanUntukUnit(pilihan, unit || null);
+  // Isian penentu aturan wajib orang tua dan wali; dibaca ulang setiap input.
+  const [penentu, setPenentu] = useState<Record<string, string>>({});
+  const wajib = new Set(isianWajibDapodik(penentu));
+
+  function perbaruiPenentu() {
+    const form = formRef.current;
+    if (!form) return;
+    const data = new FormData(form);
+    setPenentu(
+      Object.fromEntries(
+        [
+          "ayahNama",
+          "ayahPekerjaan",
+          "ibuPekerjaan",
+          "waliPekerjaan",
+          "jenisTinggal",
+        ].map((kunci) => [kunci, String(data.get(kunci) ?? "")]),
+      ),
+    );
+  }
 
   /**
    * Penjaga klik ganda.
@@ -310,6 +339,7 @@ export function FormPendaftaran({
       }
       setUnit(String(draf.pilihanUnit ?? ""));
       setProgram(String(draf.pilihanJurusan ?? ""));
+      setPenentu(draf);
     } catch {
       // Penyimpanan diblokir atau draf rusak: formulir tetap bisa diisi.
     }
@@ -404,6 +434,7 @@ export function FormPendaftaran({
       }
     }
     simpanDraf();
+    perbaruiPenentu();
   }
 
   async function pilihBerkas(
@@ -642,7 +673,10 @@ export function FormPendaftaran({
       // tertutup header setiap kali pindah langkah.
       className="scroll-mt-24 space-y-8"
       noValidate
-      onInput={simpanDraf}
+      onInput={() => {
+        simpanDraf();
+        perbaruiPenentu();
+      }}
       onSubmit={kirim}
       ref={formRef}
     >
@@ -912,8 +946,8 @@ export function FormPendaftaran({
           title="16 angka"
           wajib
         />
-        <OrangTua awalan="ayah" judul="Data ayah" />
-        <OrangTua awalan="ibu" judul="Data ibu" />
+        <OrangTua awalan="ayah" judul="Data ayah" wajib={wajib} />
+        <OrangTua awalan="ibu" judul="Data ibu" wajib={wajib} />
         <OrangTua
           aksi={
             <div className="flex gap-2">
@@ -935,6 +969,7 @@ export function FormPendaftaran({
           }
           awalan="wali"
           judul="Data wali"
+          wajib={wajib}
         >
           <div className="grid gap-4 sm:grid-cols-2">
             <Isian

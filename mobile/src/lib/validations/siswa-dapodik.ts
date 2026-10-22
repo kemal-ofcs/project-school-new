@@ -4,9 +4,8 @@ import {
   normalizeOperatorEmail,
 } from "@/lib/operators/contact";
 import {
-  type DataDapodik,
-  dataDapodikSchema,
-  KUNCI_DATA_DAPODIK,
+  dataDapodikDasarSchema,
+  isianWajibDapodik,
   uraiDataDapodik,
 } from "./pmb-dapodik";
 
@@ -77,7 +76,7 @@ const PESAN_LINGKAR = "Lingkar kepala harus 1 sampai 100 cm.";
  */
 export const dataDapodikSiswaSchema = z.preprocess(
   tanpaKosong,
-  dataDapodikSchema.partial().extend({
+  dataDapodikDasarSchema.partial().extend({
     emailSiswa: z
       .string()
       .trim()
@@ -166,23 +165,10 @@ export function validasiSimpanDapodikSiswa(
       };
 }
 
-// Mengikuti keputusan formulir PMB 2026-10-16: semua wajib kecuali dusun dan
-// blok bantuan; kebutuhan khusus selalu terisi ("Tidak ada").
-const TIDAK_WAJIB = new Set<string>([
-  "dusun",
-  "kebutuhanKhusus",
-  "kps",
-  "noKps",
-  "kip",
-  "noKip",
-  "namaKip",
-  "noKks",
-]);
-
-export const ISIAN_WAJIB_DAPODIK: (keyof DataDapodik)[] =
-  KUNCI_DATA_DAPODIK.filter((kunci) => !TIDAK_WAJIB.has(kunci));
-
-/** Kunci isian wajib yang masih kosong; `tempatLahir` dsb. ikut dihitung. */
+/**
+ * Kunci isian wajib yang masih kosong; `tempatLahir` dsb. ikut dihitung.
+ * Aturan wajibnya sama dengan formulir PMB (`isianWajibDapodik`).
+ */
 export function isianKurangDapodik(
   baris: BarisDapodikSiswa | null | undefined,
 ): string[] {
@@ -193,6 +179,6 @@ export function isianKurangDapodik(
     ...(kosong(baris?.tempat_lahir) ? ["tempatLahir"] : []),
     ...(kosong(baris?.tanggal_lahir) ? ["tanggalLahir"] : []),
     ...(kosong(baris?.sekolah_asal) ? ["sekolahAsal"] : []),
-    ...ISIAN_WAJIB_DAPODIK.filter((kunci) => kosong(d[kunci])),
+    ...isianWajibDapodik(d).filter((kunci) => kosong(d[kunci])),
   ];
 }

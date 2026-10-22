@@ -2,8 +2,10 @@ import { describe, expect, test } from "bun:test";
 import {
   barisEksporDapodik,
   dataDapodikSchema,
+  isianWajibDapodik,
   JUDUL_EKSPOR_DAPODIK,
   KUNCI_DATA_DAPODIK,
+  PEKERJAAN_MENINGGAL,
 } from "./pmb-dapodik";
 
 // Satu baris dari ekspor "daftar_pd" DAPODIK yang diberikan sekolah
@@ -82,8 +84,6 @@ describe("dataDapodikSchema", () => {
       ibuNama: "",
       kelurahan: " ",
       rt: "",
-      ayahPekerjaan: "",
-      waliTahunLahir: "",
       tinggiCm: "",
       emailSiswa: "",
     });
@@ -93,8 +93,6 @@ describe("dataDapodikSchema", () => {
     expect(pesan).toContain("Nama ibu kandung wajib diisi.");
     expect(pesan).toContain("Kelurahan/desa wajib diisi.");
     expect(pesan).toContain("RT berupa angka (maksimal 3).");
-    expect(pesan).toContain("Pilih pekerjaan ayah.");
-    expect(pesan).toContain("Tahun lahir wali wajib diisi dengan benar.");
     expect(pesan).toContain("Tinggi badan harus 30 sampai 250 cm.");
     expect(pesan).toContain("Email calon siswa wajib diisi dengan benar.");
 
@@ -114,6 +112,79 @@ describe("dataDapodikSchema", () => {
       dataDapodikSchema.safeParse({ ...ISIAN_LENGKAP, lingkarKepalaCm: "50" })
         .success,
     ).toBe(false);
+  });
+});
+
+// Keputusan User 2026-10-22: NIK orang tua opsional, orang tua yang meninggal
+// dan ayah yang tidak diketahui, wali hanya lengkap bila tinggal bersama wali.
+describe("isian orang tua bersyarat", () => {
+  const pesanDari = (isian: Record<string, unknown>) =>
+    dataDapodikSchema
+      .safeParse({ ...ISIAN_LENGKAP, ...isian })
+      .error?.issues.map((i) => i.message) ?? [];
+
+  test("NIK orang tua boleh kosong, tetapi bila diisi harus 16 angka", () => {
+    expect(pesanDari({ ayahNik: "", ibuNik: "", waliNik: "" })).toEqual([]);
+    expect(pesanDari({ ibuNik: "123" })).toEqual(["NIK ibu harus 16 angka."]);
+  });
+
+  test("pekerjaan ayah tetap wajib bila nama ayah diisi", () => {
+    expect(pesanDari({ ayahPekerjaan: "" })).toEqual(["Pilih pekerjaan ayah."]);
+  });
+
+  test("orang tua yang meninggal: penghasilan diisikan, pendidikan opsional", () => {
+    const hasil = dataDapodikSchema.parse({
+      ...ISIAN_LENGKAP,
+      ayahPekerjaan: PEKERJAAN_MENINGGAL,
+      ayahPenghasilan: "",
+      ayahPendidikan: "",
+      ayahNik: "",
+    });
+    expect(hasil.ayahPenghasilan).toBe("Tidak Berpenghasilan");
+    expect(hasil.ayahPendidikan).toBeNull();
+    expect(
+      pesanDari({ ayahPekerjaan: PEKERJAAN_MENINGGAL, ayahTahunLahir: "" }),
+    ).toEqual(["Tahun lahir ayah wajib diisi dengan benar."]);
+  });
+
+  test("ayah tidak diketahui: seluruh isian ayah boleh kosong", () => {
+    expect(
+      pesanDari({
+        ayahNama: "",
+        ayahTahunLahir: "",
+        ayahPendidikan: "",
+        ayahPekerjaan: "",
+        ayahPenghasilan: "",
+        ayahNik: "",
+      }),
+    ).toEqual([]);
+    expect(pesanDari({ ibuNama: "" })).toContain(
+      "Nama ibu kandung wajib diisi.",
+    );
+  });
+
+  test("isian wali selain nama wajib hanya bila tinggal bersama wali", () => {
+    const waliKosong = {
+      waliTahunLahir: "",
+      waliPendidikan: "",
+      waliPekerjaan: "",
+      waliPenghasilan: "",
+    };
+    expect(pesanDari(waliKosong)).toEqual([]);
+    expect(pesanDari({ ...waliKosong, jenisTinggal: "Wali" })).toEqual([
+      "Tahun lahir wali wajib diisi dengan benar.",
+      "Pilih pekerjaan wali.",
+      "Pilih pendidikan wali.",
+      "Pilih penghasilan wali.",
+    ]);
+  });
+
+  test("isianWajibDapodik tidak pernah memuat NIK orang tua", () => {
+    const wajib = isianWajibDapodik({ ayahNama: "x", jenisTinggal: "Wali" });
+    expect(wajib).not.toContain("ayahNik");
+    expect(wajib).not.toContain("ibuNik");
+    expect(wajib).not.toContain("waliNik");
+    expect(wajib).toContain("waliPendidikan");
   });
 });
 

@@ -410,7 +410,7 @@ export function ModalDapodikSiswa({
       maxWidth="max-w-3xl"
       onClose={onClose}
       subtitle={`NISN ${String(siswa.nisn || "-")} · NIS ${String(siswa.nis || "-")}`}
-      title={`Data DAPODIK — ${String(siswa.nama_lengkap ?? "")}`}
+      title={`Data DAPODIK: ${String(siswa.nama_lengkap ?? "")}`}
     >
       <div className="space-y-5 text-sm">
         <p className="text-slate-400">
@@ -453,7 +453,7 @@ export function ModalDapodikSiswa({
                           onChange={(e) => ubah(isian.kunci, e.target.value)}
                           value={nilai}
                         >
-                          <option value="">— Belum diisi —</option>
+                          <option value="">(Belum diisi)</option>
                           {(isian.jenis === "yaTidak"
                             ? ["Ya", "Tidak"]
                             : (isian.pilihan ?? [])
