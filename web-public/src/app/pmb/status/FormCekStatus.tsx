@@ -51,8 +51,8 @@ export function FormCekStatus({
   /**
    * Minta kode ke nomor wali yang dicatat saat mendaftar.
    *
-   * Hanya dipakai pada mode `otp`. Modenya ditentukan server — lihat
-   * `pilihModeCekStatus` — karena jalur cadangan tanggal lahir harus tetap ada
+   * Hanya dipakai pada mode `otp`. Modenya ditentukan server (lihat
+   * `pilihModeCekStatus`) karena jalur cadangan tanggal lahir harus tetap ada
    * untuk sekolah yang belum menyambungkan gateway WhatsApp. Tanpa cadangan
    * itu, situs PMB akan menerima pendaftaran tetapi tidak pernah bisa
    * memberitahu hasilnya.
@@ -95,7 +95,7 @@ export function FormCekStatus({
     }
   }
 
-  // Penjaga klik ganda, `useRef` bukan state — state baru terlihat setelah
+  // Penjaga klik ganda, `useRef` bukan state: state baru terlihat setelah
   // render berikutnya, sehingga dua klik cepat sama-sama membaca `false`. Di
   // sini akibatnya bukan data ganda melainkan jatah rate limit yang habis dua
   // kali lebih cepat daripada yang diniatkan.

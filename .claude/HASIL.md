@@ -1,7 +1,7 @@
 # HASIL.md — hasil `bun run check`
 
-- Waktu: 2026-10-22 12:09 WIB
-- Commit: 8c9ec19 (+ 0 berkas berubah, belum commit)
+- Waktu: 2026-10-22 18:36 WIB
+- Commit: f82c471 (+ 7 berkas berubah, belum commit)
 - Perintah: `bun run check` (root)
 - Exit code: 0
 - Status: **LULUS**
@@ -29,4 +29,4 @@
 *(tidak ada)*
 
 ## Catatan
-Semua audit integritas skema 4-layer, kontrak sinkronisasi, SQL, penjaga akses/UI, serta cargo test dan test suite di ketiga workspace berhasil lolos tanpa galat.
+Seluruh 11 skrip audit integritas, linting/typecheck, pengujian Playwright/Bun test, serta `cargo test` Rust di workspace `web-desktop`, `mobile`, dan `web-public` lulus 100% tanpa galat.

@@ -87,7 +87,7 @@ export default function PmbPage() {
    *
    * `useRef`, bukan state: state baru terlihat setelah render berikutnya,
    * sehingga dua klik cepat sama-sama membaca `false`. Di halaman ini akibatnya
-   * paling mahal pada tombol "Jadikan Siswa" — dua permintaan berarti dua baris
+   * paling mahal pada tombol "Jadikan Siswa": dua permintaan berarti dua baris
    * `master_data`, dua kartu identitas, dan dua token QR untuk satu anak.
    */
   const isSubmittingRef = useRef(false);
@@ -109,12 +109,12 @@ export default function PmbPage() {
       setGelombang(hasilGelombang.items);
     } catch (error) {
       // PMB cloud-only: tanpa jaringan tidak ada data sama sekali. Kegagalannya
-      // WAJIB terlihat — daftar kosong yang sebenarnya kegagalan tidak bisa
+      // WAJIB terlihat: daftar kosong yang sebenarnya kegagalan tidak bisa
       // dibedakan dari "belum ada pendaftar", dan panitia akan menyimpulkan yang
       // salah tepat pada hari pendaftaran dibuka.
       setGalat(
         error instanceof Error
-          ? `${error.message} — halaman PMB membaca data langsung dari cloud dan memerlukan jaringan.`
+          ? `${error.message}: halaman PMB membaca data langsung dari cloud dan memerlukan jaringan.`
           : "Gagal memuat data PMB. Halaman ini memerlukan jaringan.",
       );
       setPendaftar([]);
@@ -194,8 +194,8 @@ export default function PmbPage() {
       title: "Hapus pendaftar ini?",
       description: (
         <>
-          Seluruh berkas identitas <strong>{item.nama_lengkap}</strong> — kartu
-          keluarga, akta kelahiran, ijazah — ikut terhapus permanen. Berkas itu
+          Seluruh berkas identitas <strong>{item.nama_lengkap}</strong> (kartu
+          keluarga, akta kelahiran, ijazah) ikut terhapus permanen. Berkas itu
           diunggah keluarganya dan tidak tersimpan di tempat lain mana pun di
           sistem ini.
         </>
@@ -510,7 +510,7 @@ export default function PmbPage() {
                         {item.nama_gelombang}
                       </td>
                       <td className="py-2 text-slate-400">
-                        {item.pilihan_unit || "—"}
+                        {item.pilihan_unit || "-"}
                       </td>
                       <td className="py-2 text-slate-400">
                         {item.jumlah_berkas}
@@ -554,13 +554,13 @@ export default function PmbPage() {
                 {detail.pendaftar.nomor_pendaftaran}
               </dd>
               <dt className="text-slate-500">NISN</dt>
-              <dd>{detail.pendaftar.nisn || "—"}</dd>
+              <dd>{detail.pendaftar.nisn || "-"}</dd>
               <dt className="text-slate-500">Asal sekolah</dt>
-              <dd>{detail.pendaftar.asal_sekolah || "—"}</dd>
+              <dd>{detail.pendaftar.asal_sekolah || "-"}</dd>
               <dt className="text-slate-500">Unit tujuan</dt>
-              <dd>{detail.pendaftar.pilihan_unit || "—"}</dd>
+              <dd>{detail.pendaftar.pilihan_unit || "-"}</dd>
               <dt className="text-slate-500">Program keahlian</dt>
-              <dd>{detail.pendaftar.pilihan_jurusan || "—"}</dd>
+              <dd>{detail.pendaftar.pilihan_jurusan || "-"}</dd>
               <dt className="text-slate-500">Wali</dt>
               <dd>{detail.pendaftar.nama_wali}</dd>
               <dt className="text-slate-500">WhatsApp wali</dt>

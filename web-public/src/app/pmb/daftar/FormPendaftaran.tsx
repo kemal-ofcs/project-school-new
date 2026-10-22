@@ -294,7 +294,7 @@ export function FormPendaftaran({
    * `useRef`, bukan state: state baru terlihat setelah render berikutnya,
    * sehingga dua klik cepat pada tombol kirim sama-sama membaca `false` dan
    * mengirim dua pendaftaran. Aturan yang sama ditegakkan mesin di panel admin
-   * lewat `audit:ui-guard`, dan berlaku di sini karena alasan yang identik —
+   * lewat `audit:ui-guard`, dan berlaku di sini karena alasan yang identik:
    * hanya saja akibatnya lebih terlihat: dua nomor pendaftaran untuk satu anak.
    */
   const isSubmittingRef = useRef(false);
@@ -375,7 +375,7 @@ export function FormPendaftaran({
     const form = formRef.current;
     if (!form) return [];
     const data = new FormData(form);
-    const ambil = (nama: string) => String(data.get(nama) ?? "").trim() || "—";
+    const ambil = (nama: string) => String(data.get(nama) ?? "").trim() || "-";
     return [
       ["Nama", ambil("namaLengkap")],
       ["Tanggal lahir", ambil("tanggalLahir")],

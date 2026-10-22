@@ -22,7 +22,7 @@ import {
  * validasinya sekadar hiasan.
  *
  * Yang TIDAK dilakukan: menormalkan nilai asing menjadi nilai bawaan. Pelajaran
- * `notifikasi_wa` berlaku di sini juga — menormalkan diam-diam mengubah bug
+ * `notifikasi_wa` berlaku di sini juga: menormalkan diam-diam mengubah bug
  * klien menjadi baris yang salah tanpa jejak bahwa ada yang keliru.
  */
 
@@ -187,8 +187,8 @@ export type MasukanCekStatus = z.infer<typeof cekStatusSchema>;
  * Nomor pendaftaran yang dibaca manusia dan dibacakan lewat telepon.
  *
  * Formatnya `PMB-<tahun>-<6 karakter>`. Alfabetnya sengaja membuang huruf dan
- * angka yang mudah tertukar saat didikte atau disalin dari kertas — O/0, I/1,
- * S/5, B/8 — karena nomor ini akan dieja lewat telepon oleh orang tua kepada
+ * angka yang mudah tertukar saat didikte atau disalin dari kertas (O/0, I/1,
+ * S/5, B/8), karena nomor ini akan dieja lewat telepon oleh orang tua kepada
  * panitia, dan satu karakter salah berarti pendaftaran yang tidak ditemukan.
  */
 const ALFABET_NOMOR = "ACDEFGHJKLMNPQRTUVWXY2346789";

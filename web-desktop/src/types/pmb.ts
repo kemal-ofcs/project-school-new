@@ -6,7 +6,7 @@ import type {
 /**
  * Tipe bersama untuk Penerimaan Peserta Didik Baru (PMB).
  *
- * Ketiga tabelnya cloud-only — tidak pernah ada di SQLite perangkat, tidak
+ * Ketiga tabelnya cloud-only: tidak pernah ada di SQLite perangkat, tidak
  * pernah lewat outbox. Konsekuensinya seluruh layar PMB menuntut jaringan,
  * sama seperti Bimbingan Konseling.
  */
@@ -34,7 +34,7 @@ export type PmbStatus = (typeof PMB_STATUS_LIST)[number];
  * `Terdaftar` sengaja di luar daftar: status itu hanya lahir dari promosi yang
  * benar-benar membuat baris siswa. Menyetelnya dengan tangan menghasilkan
  * pendaftar yang tampak sudah menjadi siswa padahal tidak ada baris
- * `master_data` mana pun yang mewakilinya — dan tidak ada yang akan mencarinya.
+ * `master_data` mana pun yang mewakilinya, dan tidak ada yang akan mencarinya.
  */
 export const PMB_STATUS_MANUAL = PMB_STATUS_LIST.filter(
   (status) => status !== "Terdaftar",
@@ -104,7 +104,7 @@ export interface PmbRegistrantItem {
   updated_at: string;
 }
 
-/** Metadata berkas — TIDAK pernah membawa `konten_base64`. */
+/** Metadata berkas: TIDAK pernah membawa `konten_base64`. */
 export interface PmbFileMeta {
   id_berkas: string;
   jenis: string;
