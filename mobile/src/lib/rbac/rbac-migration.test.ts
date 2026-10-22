@@ -163,6 +163,8 @@ describe("dynamic RBAC migration", () => {
       54,
       // v55 — jumlah desimal per barang (`inventory_barang.desimal`).
       55,
+      // v56 — email guru dan karyawan (`master_data.email`).
+      56,
     ]);
 
     const sessionColumns = await client.execute(

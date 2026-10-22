@@ -31,7 +31,7 @@ export function TemaVisualCard({ isOnline }: TemaVisualCardProps) {
         <div>
           <h2 className="text-base font-black text-white">Tema & visual</h2>
           <p className="mt-1 text-sm leading-6 text-slate-400">
-            Pilih tema tampilan aplikasi dan palet warna visual.
+            Pilih tema tampilan aplikasi dan kualitas visual.
           </p>
         </div>
       </div>
@@ -51,37 +51,12 @@ export function TemaVisualCard({ isOnline }: TemaVisualCardProps) {
         <VisualTierControl />
       </div>
 
-      <div className="mt-6 grid grid-cols-1 gap-2 sm:grid-cols-3">
-        {[
-          ["Putih", "bg-white", "#F8FAFC"],
-          ["Biru muda", "bg-sky-400", "#38BDF8"],
-          ["Gold", "bg-amber-300", "#F6C453"],
-        ].map(([label, color, value]) => (
-          <div
-            key={label}
-            className="rounded-2xl border border-white/10 bg-white/[0.04] p-3"
-          >
-            <span className={`block h-14 rounded-xl ${color}`} />
-            <p className="mt-3 text-xs font-bold text-white">{label}</p>
-            <p className="mt-0.5 text-[10px] text-slate-500">{value}</p>
-          </div>
-        ))}
-      </div>
-
       <dl className="mt-6 divide-y divide-white/10 rounded-2xl border border-white/10 bg-slate-950/50 px-4">
         <div className="flex items-center justify-between gap-4 py-3 text-xs">
           <dt className="text-slate-400">Aplikasi</dt>
           <dd className="font-bold text-white">
             {BRANDING.appDisplayName} v0.1.0
           </dd>
-        </div>
-        <div className="flex items-center justify-between gap-4 py-3 text-xs">
-          <dt className="text-slate-400">Frontend</dt>
-          <dd className="font-bold text-sky-200">Next.js 16 · React 19</dd>
-        </div>
-        <div className="flex items-center justify-between gap-4 py-3 text-xs">
-          <dt className="text-slate-400">Desktop</dt>
-          <dd className="font-bold text-sky-200">Tauri 2</dd>
         </div>
         <div className="flex items-center justify-between gap-4 py-3 text-xs">
           <dt className="text-slate-400">Jaringan</dt>

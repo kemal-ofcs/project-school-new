@@ -19,6 +19,8 @@ export interface GuruInput {
   status_aktif?: string;
   /** Nama unit satuan pendidikan, bukan `id_unit`. Lihat `akademik_unit`. */
   unit?: string;
+  /** `undefined` = jangan ubah, "" = kosongkan. Lihat `emailPersonil`. */
+  email?: string;
   is_edit?: boolean;
 }
 

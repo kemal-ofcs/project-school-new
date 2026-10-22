@@ -66,6 +66,7 @@ const PMB_PAYMENT_MIGRATION_VERSION = 52;
 const INVENTORY_COLUMN_MIGRATION_VERSION = 53;
 const INVENTORY_COLUMN_DELETE_MIGRATION_VERSION = 54;
 const INVENTORY_DECIMAL_MIGRATION_VERSION = 55;
+const PERSONNEL_EMAIL_MIGRATION_VERSION = 56;
 
 /**
  * v21 — aturan jam scan baru: Jam Kerja Normal = (Jam Pulang − Jam Masuk) −
@@ -654,6 +655,8 @@ export async function runDatabaseMigrations(client: Client) {
       "desimal",
       "ALTER TABLE inventory_barang ADD COLUMN desimal INTEGER NOT NULL DEFAULT 0 CHECK (desimal IN (0, 1));",
     ],
+    // Email guru dan karyawan (v56). Cerminan `ensure_column` di `turso.rs`.
+    ["master_data", "email", "ALTER TABLE master_data ADD COLUMN email TEXT;"],
   ] as const) {
     if (
       (await hasTable(client, table)) &&
@@ -2185,6 +2188,12 @@ export async function runDatabaseMigrations(client: Client) {
     sql: `INSERT OR IGNORE INTO schema_migration (version, name, applied_at)
           VALUES (?, 'inventory-decimal', ?);`,
     args: [INVENTORY_DECIMAL_MIGRATION_VERSION, now],
+  });
+  // v56 — email guru dan karyawan (ALTER-nya ada di daftar kolom di atas).
+  await client.execute({
+    sql: `INSERT OR IGNORE INTO schema_migration (version, name, applied_at)
+          VALUES (?, 'personnel-email', ?);`,
+    args: [PERSONNEL_EMAIL_MIGRATION_VERSION, now],
   });
 
   await client.execute(

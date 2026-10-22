@@ -256,7 +256,7 @@ export function EmployeeBulkActions({
             .
           </p>
           <p>
-            Kolom opsional: jabatan_status, no_hp, lp, status_aktif,
+            Kolom opsional: jabatan_status, no_hp, email, lp, status_aktif,
             tanggal_daftar, catatan, jenis_personil, tanggal_mulai_aktif,
             tanggal_selesai_aktif.
           </p>

@@ -93,6 +93,7 @@ export default function GuruPage() {
     spesialisasi_mapel: "",
     status_kepegawaian: "Honorer",
     no_hp: "",
+    email: "",
     lp: "L",
     id_shift: 1,
     status_aktif: "Aktif",
@@ -146,6 +147,7 @@ export default function GuruPage() {
       const nip = String(item.nip || "").toLowerCase();
       const nuptk = String(item.nuptk || "").toLowerCase();
       const mapel = String(item.spesialisasi_mapel || "").toLowerCase();
+      const email = String(item.email || "").toLowerCase();
       const q = search.toLowerCase().trim();
 
       if (
@@ -153,7 +155,8 @@ export default function GuruPage() {
         !nama.includes(q) &&
         !nip.includes(q) &&
         !nuptk.includes(q) &&
-        !mapel.includes(q)
+        !mapel.includes(q) &&
+        !email.includes(q)
       ) {
         return false;
       }
@@ -206,6 +209,7 @@ export default function GuruPage() {
       spesialisasi_mapel: "",
       status_kepegawaian: "Honorer",
       no_hp: "",
+      email: "",
       lp: "L",
       id_shift: shiftList[0] ? Number(shiftList[0].id_shift) : 1,
       status_aktif: "Aktif",
@@ -593,7 +597,7 @@ export default function GuruPage() {
             <input
               aria-label="Cari guru"
               type="text"
-              placeholder="Cari guru berdasarkan nama, NIP, NUPTK, atau bidang mapel..."
+              placeholder="Cari guru berdasarkan nama, NIP, NUPTK, bidang mapel, atau email..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               className="w-full rounded-xl border border-white/10 bg-slate-950/60 px-4 py-2.5 pl-10 text-sm text-slate-100 placeholder-slate-500 shadow-inner focus:border-sky-500 focus:outline-none"
@@ -829,6 +833,11 @@ export default function GuruPage() {
                         </td>
                         <td className="px-6 py-4 text-xs text-slate-300">
                           <div>{String(item.no_hp || "-")}</div>
+                          {item.email ? (
+                            <div className="break-all text-slate-400">
+                              {String(item.email)}
+                            </div>
+                          ) : null}
                           <div className="text-slate-400">
                             Jam scan: {(() => {
                               const shift = shiftList.find(
@@ -1223,6 +1232,26 @@ export default function GuruPage() {
                   value={formData.no_hp || ""}
                   onChange={(e) =>
                     setFormData({ ...formData, no_hp: e.target.value })
+                  }
+                  className="mt-1 w-full rounded-xl border border-white/10 bg-slate-900 px-3 py-2 text-sm text-slate-100 focus:border-sky-500 focus:outline-none"
+                />
+              </div>
+
+              <div>
+                <label
+                  htmlFor="guru-email"
+                  className="block text-xs font-semibold text-slate-300"
+                >
+                  Email
+                </label>
+                <input
+                  id="guru-email"
+                  type="email"
+                  autoComplete="off"
+                  placeholder="nama@sekolah.sch.id"
+                  value={formData.email || ""}
+                  onChange={(e) =>
+                    setFormData({ ...formData, email: e.target.value })
                   }
                   className="mt-1 w-full rounded-xl border border-white/10 bg-slate-900 px-3 py-2 text-sm text-slate-100 focus:border-sky-500 focus:outline-none"
                 />

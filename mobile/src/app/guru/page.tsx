@@ -66,6 +66,7 @@ function emptyForm(idShift?: number): GuruInput {
     spesialisasi_mapel: "",
     status_kepegawaian: "Honorer",
     no_hp: "",
+    email: "",
     lp: "L",
     id_shift: idShift,
     status_aktif: "Aktif",
@@ -182,11 +183,16 @@ export default function GuruMobilePage() {
         return false;
       }
       if (!q) return true;
-      return [item.nama, item.nip, item.nuptk, item.spesialisasi_mapel].some(
-        (field) =>
-          String(field ?? "")
-            .toLowerCase()
-            .includes(q),
+      return [
+        item.nama,
+        item.nip,
+        item.nuptk,
+        item.spesialisasi_mapel,
+        item.email,
+      ].some((field) =>
+        String(field ?? "")
+          .toLowerCase()
+          .includes(q),
       );
     });
   }, [guru, debouncedSearch, filterStatus, filterUnit]);
@@ -562,7 +568,7 @@ export default function GuruMobilePage() {
           type="search"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          placeholder="Cari nama, NIP, NUPTK, atau mapel..."
+          placeholder="Cari nama, NIP, NUPTK, mapel, atau email..."
           className="w-full rounded-xl border border-white/10 bg-slate-800/60 py-2.5 pl-9 pr-4 text-sm text-white placeholder-slate-500 outline-none transition focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20"
         />
       </div>
@@ -903,6 +909,20 @@ export default function GuruMobilePage() {
                 value={form.no_hp ?? ""}
                 onChange={(e) =>
                   setForm((p) => ({ ...p, no_hp: e.target.value }))
+                }
+                className="mt-1 w-full rounded-xl border border-white/10 bg-slate-800/60 px-3 py-2 text-sm text-white outline-none focus:border-indigo-500"
+              />
+            </label>
+            <label className="text-[11px] font-semibold text-slate-300">
+              Email
+              <input
+                type="email"
+                inputMode="email"
+                autoComplete="off"
+                placeholder="nama@sekolah.sch.id"
+                value={form.email ?? ""}
+                onChange={(e) =>
+                  setForm((p) => ({ ...p, email: e.target.value }))
                 }
                 className="mt-1 w-full rounded-xl border border-white/10 bg-slate-800/60 px-3 py-2 text-sm text-white outline-none focus:border-indigo-500"
               />

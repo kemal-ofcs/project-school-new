@@ -20,6 +20,8 @@ export interface KaryawanInput {
   tanggal_selesai_aktif?: string;
   /** Nama unit satuan pendidikan, bukan `id_unit`. Lihat `akademik_unit`. */
   unit?: string;
+  /** `undefined` = jangan ubah, "" = kosongkan. Lihat `emailPersonil`. */
+  email?: string;
 }
 
 export function generateRandomToken(length = 8): string {
@@ -97,8 +99,8 @@ export async function importKaryawanMassal(drafts: KaryawanInput[]) {
             id_unik, kode_karyawan, nama, divisi, jabatan_status, no_hp, lp,
             id_shift, status_aktif, tanggal_daftar, catatan, token_absensi,
             qr_code, status_qr, jenis_personil, tanggal_mulai_aktif,
-            tanggal_selesai_aktif, unit, status_backup
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Generated', ?, ?, ?, ?, 'NORMAL');`,
+            tanggal_selesai_aktif, unit, status_backup, email
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Generated', ?, ?, ?, ?, 'NORMAL', ?);`,
           args: [
             data.id_unik,
             data.kode_karyawan,
@@ -117,6 +119,7 @@ export async function importKaryawanMassal(drafts: KaryawanInput[]) {
             data.tanggal_mulai_aktif || today,
             data.tanggal_selesai_aktif || "",
             data.unit || null,
+            data.email || null,
           ],
         },
         {
@@ -151,7 +154,7 @@ export async function getDaftarKaryawan(filter?: {
       m.no_hp, m.lp, m.id_shift, m.status_aktif, m.tanggal_daftar,
       m.catatan, m.status_qr, m.jenis_personil, m.tanggal_mulai_aktif,
       m.tanggal_selesai_aktif, m.status_backup, s.nama_shift,
-      c.idcard_status, c.idcard_pdf_url, c.link_qr_png, m.unit
+      c.idcard_status, c.idcard_pdf_url, c.link_qr_png, m.unit, m.email
     FROM master_data m
     LEFT JOIN tbl_shift s ON m.id_shift = s.id_shift
     LEFT JOIN id_card c ON m.id_unik = c.id_unik
@@ -171,9 +174,9 @@ export async function getDaftarKaryawan(filter?: {
 
   if (filter?.search) {
     query +=
-      " AND (m.nama LIKE ? OR m.kode_karyawan LIKE ? OR m.id_unik LIKE ? OR m.divisi LIKE ?)";
+      " AND (m.nama LIKE ? OR m.kode_karyawan LIKE ? OR m.id_unik LIKE ? OR m.divisi LIKE ? OR m.email LIKE ?)";
     const s = `%${filter.search}%`;
-    params.push(s, s, s, s);
+    params.push(s, s, s, s, s);
   }
 
   if (filter?.divisi) {
@@ -203,7 +206,7 @@ export async function getKaryawanById(id_unik: string) {
         m.catatan, m.status_qr, m.jenis_personil, m.tanggal_mulai_aktif,
         m.tanggal_selesai_aktif, m.status_backup, s.nama_shift,
         c.idcard_status, c.idcard_pdf_url, c.link_qr_png,
-        c.idcard_last_generate, m.unit
+        c.idcard_last_generate, m.unit, m.email
       FROM master_data m
       LEFT JOIN tbl_shift s ON m.id_shift = s.id_shift
       LEFT JOIN id_card c ON m.id_unik = c.id_unik
@@ -265,8 +268,8 @@ export async function tambahKaryawan(data: KaryawanInput) {
         id_unik, kode_karyawan, nama, divisi, jabatan_status, no_hp, lp,
         id_shift, status_aktif, tanggal_daftar, catatan, token_absensi, qr_code,
         status_qr, jenis_personil, tanggal_mulai_aktif, tanggal_selesai_aktif,
-        unit, status_backup
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Generated', ?, ?, ?, ?, 'NORMAL');
+        unit, status_backup, email
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Generated', ?, ?, ?, ?, 'NORMAL', ?);
     `,
     args: [
       data.id_unik,
@@ -286,6 +289,7 @@ export async function tambahKaryawan(data: KaryawanInput) {
       data.tanggal_mulai_aktif || today,
       data.tanggal_selesai_aktif || "",
       data.unit || null,
+      data.email || null,
     ],
   });
 
@@ -362,6 +366,10 @@ export async function updateKaryawan(
   if (data.unit !== undefined) {
     updates.push("unit = ?");
     args.push(data.unit || null);
+  }
+  if (data.email !== undefined) {
+    updates.push("email = ?");
+    args.push(data.email || null);
   }
   // Tanggal Mulai Masuk. String kosong diabaikan agar form yang mengirim
   // nilai kosong tidak menghapus tanggal pendaftaran yang sudah ada.

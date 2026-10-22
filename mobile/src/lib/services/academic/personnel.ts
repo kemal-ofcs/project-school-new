@@ -26,7 +26,8 @@ export async function getTeachers() {
     SELECT g.id_guru, g.nip, g.nuptk, g.gelar, g.spesialisasi_mapel, g.status_kepegawaian,
            g.created_at, g.updated_at,
            m.kode_karyawan, m.nama, m.divisi, m.jabatan_status, m.no_hp, m.lp,
-           m.status_aktif, m.id_shift, m.token_absensi, m.qr_code, m.status_qr, m.unit
+           m.status_aktif, m.id_shift, m.token_absensi, m.qr_code, m.status_qr, m.unit,
+           m.email
     FROM guru_data g
     JOIN master_data m ON m.id_unik = g.id_guru
     ORDER BY m.nama ASC;
@@ -49,6 +50,8 @@ export async function saveTeacher(draft: {
   id_shift?: number;
   status_aktif?: string;
   unit?: string;
+  /** `undefined` = jangan ubah, "" = kosongkan. Lihat `emailPersonil`. */
+  email?: string;
   is_edit?: boolean;
 }) {
   await ensureDbInitialized();
@@ -120,8 +123,8 @@ export async function saveTeacher(draft: {
       INSERT INTO master_data (
         id_unik, kode_karyawan, nama, divisi, jabatan_status, no_hp, lp,
         id_shift, status_aktif, tanggal_daftar, catatan, token_absensi, qr_code,
-        status_qr, jenis_personil, unit, status_backup
-      ) VALUES (?, ?, ?, 'Tenaga Pengajar', 'Guru', ?, ?, COALESCE(?, 1), ?, date('now','+7 hours'), 'Data PTK Sekolah', ?, ?, 'Generated', 'GURU', NULLIF(?, ''), 'NORMAL')
+        status_qr, jenis_personil, unit, status_backup, email
+      ) VALUES (?, ?, ?, 'Tenaga Pengajar', 'Guru', ?, ?, COALESCE(?, 1), ?, date('now','+7 hours'), 'Data PTK Sekolah', ?, ?, 'Generated', 'GURU', NULLIF(?, ''), 'NORMAL', NULLIF(?, ''))
       ON CONFLICT(id_unik) DO UPDATE SET
         kode_karyawan = excluded.kode_karyawan,
         nama = excluded.nama,
@@ -135,7 +138,9 @@ export async function saveTeacher(draft: {
         jenis_personil = 'GURU',
         -- Draft tanpa unit tidak boleh mengosongkan unit tersimpan; pola yang
         -- sama dengan id_shift di atas.
-        unit = COALESCE(NULLIF(?, ''), master_data.unit);
+        unit = COALESCE(NULLIF(?, ''), master_data.unit),
+        -- Tanpa email (impor berkas lama) = jangan ubah; kosong = hapus.
+        email = CASE WHEN ? THEN NULLIF(?, '') ELSE master_data.email END;
     `,
         args: [
           id,
@@ -148,8 +153,11 @@ export async function saveTeacher(draft: {
           token,
           qrCode,
           draft.unit || "",
+          draft.email ?? "",
           idShift,
           draft.unit || "",
+          draft.email !== undefined,
+          draft.email ?? "",
         ],
       },
       {

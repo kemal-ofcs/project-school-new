@@ -1,7 +1,10 @@
 "use client";
 
 import type { KaryawanInput } from "@/lib/gateways/employee";
-import { normalizeOperatorPhone } from "@/lib/operators/contact";
+import {
+  normalizeOperatorEmail,
+  normalizeOperatorPhone,
+} from "@/lib/operators/contact";
 import {
   type ImportLookups,
   type ImportRow,
@@ -32,6 +35,7 @@ const HEADERS = [
   "jabatan_status",
   "no_hp",
   "lp",
+  "email",
   "kode_shift",
   "status_aktif",
   "tanggal_daftar",
@@ -139,6 +143,7 @@ export async function readEmployeeWorkbook(
         baris,
       ),
       unit: val(row, "unit") || undefined,
+      email: normalizeOperatorEmail(val(row, "email")),
     };
 
     const message = firstValidationMessage(validateEmployeeDraft(draft));

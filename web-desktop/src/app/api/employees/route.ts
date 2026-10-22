@@ -1,4 +1,5 @@
 import type { NextRequest } from "next/server";
+import { normalizeOperatorEmail } from "@/lib/operators/contact";
 import { requireWebPermission } from "@/lib/server/auth/authorize";
 import { ensureServerDatabaseInitialized } from "@/lib/server/db";
 import {
@@ -67,6 +68,10 @@ function parseDraft(value: unknown): KaryawanInput {
         ? draft.tanggal_selesai_aktif
         : undefined,
     unit: typeof draft.unit === "string" ? draft.unit.trim() : undefined,
+    email:
+      typeof draft.email === "string"
+        ? normalizeOperatorEmail(draft.email)
+        : undefined,
   };
   const message = firstValidationMessage(validateEmployeeDraft(parsed));
   if (message) throw new ApiRequestError(message, 400);

@@ -1,9 +1,15 @@
+import {
+  isValidOperatorEmail,
+  normalizeOperatorEmail,
+} from "@/lib/operators/contact";
+
 interface EmployeeDraft {
   divisi: string;
   id_shift: number;
   id_unik: string;
   kode_karyawan: string;
   nama: string;
+  email?: string;
 }
 
 interface ShiftDraft {
@@ -50,8 +56,28 @@ export function validateEmployeeDraft(data: EmployeeDraft) {
   if (!Number.isInteger(data.id_shift) || data.id_shift < 1) {
     errors.id_shift = "Pilih shift kerja yang valid.";
   }
+  if (data.email?.trim() && !isValidOperatorEmail(data.email)) {
+    errors.email = PESAN_EMAIL_TIDAK_VALID;
+  }
 
   return errors;
+}
+
+/** Sama persis dengan pesan `email_personil` di `turso.rs`. */
+export const PESAN_EMAIL_TIDAK_VALID = "Format email tidak valid.";
+
+/**
+ * Email guru/karyawan dari draft. `undefined` = tidak dikirim, jadi email
+ * tersimpan tidak diubah; "" = dikosongkan. Formatnya sama dengan email
+ * operator. Cerminan `email_personil` di `turso.rs`.
+ */
+export function emailPersonil(value: unknown): string | undefined {
+  if (value === undefined) return undefined;
+  const email = normalizeOperatorEmail(typeof value === "string" ? value : "");
+  if (email && !isValidOperatorEmail(email)) {
+    throw new Error(PESAN_EMAIL_TIDAK_VALID);
+  }
+  return email;
 }
 
 export function isValidTime(value: string) {

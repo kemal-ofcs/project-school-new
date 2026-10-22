@@ -3824,7 +3824,8 @@ impl TursoClient {
                 (52, 'pmb-payment', datetime('now')),
                 (53, 'inventory-column', datetime('now')),
                 (54, 'inventory-column-delete', datetime('now')),
-                (55, 'inventory-decimal', datetime('now'));"#,
+                (55, 'inventory-decimal', datetime('now')),
+                (56, 'personnel-email', datetime('now'));"#,
                 vec![],
             ),
         ];
@@ -4000,6 +4001,8 @@ impl TursoClient {
             // baris personil lama memang belum punya unit, dan memaksanya NOT
             // NULL akan menolak seluruh ALTER pada database yang sudah berisi.
             ("master_data", "unit", "ALTER TABLE master_data ADD COLUMN unit TEXT;"),
+            // Email guru dan karyawan (v56), boleh kosong.
+            ("master_data", "email", "ALTER TABLE master_data ADD COLUMN email TEXT;"),
             // Sakelar notifikasi WA untuk Koreksi Admin dan Import Manual.
             // Nilai bawaannya 0 — sama dengan yang dibaca `wa_notify_enabled`
             // untuk kunci `wa_notify_*` yang belum ada, sehingga pemasangan lama
@@ -9686,10 +9689,11 @@ async fn apply_event_to_turso(
                         r#"INSERT INTO master_data (
                             id_unik, kode_karyawan, nama, divisi, jabatan_status, no_hp,
                             lp, id_shift, status_aktif, catatan, jenis_personil,
-                            tanggal_mulai_aktif, tanggal_selesai_aktif, unit, status_backup
-                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'NORMAL')
+                            tanggal_mulai_aktif, tanggal_selesai_aktif, unit, status_backup, email
+                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'NORMAL', ?)
                         ON CONFLICT(id_unik) DO UPDATE SET
                             unit = excluded.unit,
+                            email = CASE WHEN ? THEN excluded.email ELSE master_data.email END,
                             kode_karyawan = excluded.kode_karyawan,
                             nama = excluded.nama,
                             divisi = excluded.divisi,
@@ -9723,6 +9727,8 @@ async fn apply_event_to_turso(
                             json!(row.get("tanggal_mulai_aktif").and_then(Value::as_str)),
                             json!(row.get("tanggal_selesai_aktif").and_then(Value::as_str)),
                             json!(row.get("unit").and_then(Value::as_str)),
+                            json!(payload_email(row)),
+                            json!(row.get("email").is_some()),
                         ],
                     )
                     .await?;
@@ -9779,10 +9785,11 @@ async fn apply_event_to_turso(
                         id_unik, kode_karyawan, nama, divisi, jabatan_status, no_hp, lp,
                         id_shift, status_aktif, tanggal_daftar, catatan, token_absensi,
                         qr_code, status_qr, jenis_personil, tanggal_mulai_aktif,
-                        tanggal_selesai_aktif, unit, status_backup
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        tanggal_selesai_aktif, unit, status_backup, email
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     ON CONFLICT(id_unik) DO UPDATE SET
                         unit = excluded.unit,
+                        email = CASE WHEN ? THEN excluded.email ELSE master_data.email END,
                         kode_karyawan = excluded.kode_karyawan,
                         nama = excluded.nama,
                         divisi = excluded.divisi,
@@ -9830,6 +9837,8 @@ async fn apply_event_to_turso(
                                 .get("status_backup")
                                 .and_then(Value::as_str)
                                 .unwrap_or("NORMAL")),
+                            json!(payload_email(row)),
+                            json!(row.get("email").is_some()),
                         ],
                     )
                     .await?;
@@ -14898,6 +14907,31 @@ pub fn is_valid_operator_email(value: &str) -> bool {
         && !domain.contains("..")
 }
 
+/// Email guru/karyawan dari draft. `None` = kunci `email` tidak dikirim, jadi
+/// email tersimpan tidak diubah; `Some("")` = dikosongkan. Formatnya sama
+/// dengan email operator. Cerminan `emailPersonil` di `validations/stabilization.ts`.
+pub fn email_personil(draft: &Value) -> Result<Option<String>, CommandError> {
+    let Some(value) = draft.get("email") else {
+        return Ok(None);
+    };
+    let email = normalize_operator_email(value.as_str().unwrap_or(""));
+    if !email.is_empty() && !is_valid_operator_email(&email) {
+        return Err(CommandError::new(
+            "VALIDATION_ERROR",
+            "Format email tidak valid.",
+        ));
+    }
+    Ok(Some(email))
+}
+
+/// Email dari payload outbox `employee`; kosong disimpan sebagai NULL.
+fn payload_email(row: &Value) -> Option<String> {
+    row.get("email")
+        .and_then(Value::as_str)
+        .map(normalize_operator_email)
+        .filter(|email| !email.is_empty())
+}
+
 pub fn is_valid_operator_phone(value: &str) -> bool {
     let phone = normalize_operator_phone(value);
     let digits = phone.trim_start_matches('+');
@@ -15596,6 +15630,20 @@ mod tests {
                 "harus ditolak: {invalid}"
             );
         }
+    }
+
+    /// Vektor yang sama dengan `emailPersonil` di `stabilization.test.ts`.
+    #[test]
+    fn email_personil_membedakan_absen_kosong_dan_salah() {
+        assert_eq!(email_personil(&json!({})).unwrap(), None);
+        assert_eq!(email_personil(&json!({ "email": null })).unwrap(), Some(String::new()));
+        assert_eq!(email_personil(&json!({ "email": "  " })).unwrap(), Some(String::new()));
+        assert_eq!(
+            email_personil(&json!({ "email": " Guru.Satu@Sekolah.SCH.ID " })).unwrap(),
+            Some("guru.satu@sekolah.sch.id".to_owned())
+        );
+        let galat = email_personil(&json!({ "email": "guru@sekolah" })).unwrap_err();
+        assert_eq!(galat.message, "Format email tidak valid.");
     }
 
     #[test]

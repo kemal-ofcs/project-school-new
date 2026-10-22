@@ -6,7 +6,7 @@ use serde_json::{json, Map, Value};
 use sha2::{Digest, Sha256};
 
 use super::{
-    config::DesktopState, face_match, models::CommandError, scanner, storage, sync,
+    config::DesktopState, face_match, models::CommandError, scanner, storage, sync, turso,
 };
 
 fn text<'a>(value: &'a Value, key: &str) -> &'a str {
@@ -109,7 +109,7 @@ pub fn list_employees(state: &DesktopState, filter: &Value) -> Result<Value, Com
         m.catatan, m.status_qr, m.jenis_personil, m.tanggal_mulai_aktif,
         m.tanggal_selesai_aktif, m.status_backup, s.nama_shift,
         c.idcard_status, c.idcard_pdf_url, c.link_qr_png,
-        m.token_absensi, m.qr_code, m.unit
+        m.token_absensi, m.qr_code, m.unit, m.email
       FROM master_data m
       LEFT JOIN tbl_shift s ON m.id_shift = s.id_shift
       LEFT JOIN id_card c ON m.id_unik = c.id_unik
@@ -155,6 +155,7 @@ pub fn list_employees(state: &DesktopState, filter: &Value) -> Result<Value, Com
                 "token_absensi": row.get::<_, Option<String>>(20)?,
                 "qr_code": row.get::<_, Option<String>>(21)?,
                 "unit": row.get::<_, Option<String>>(22)?,
+                "email": row.get::<_, Option<String>>(23)?,
             }))
         })
         .map_err(|_| CommandError::internal())?;
@@ -162,7 +163,7 @@ pub fn list_employees(state: &DesktopState, filter: &Value) -> Result<Value, Com
     for row in rows {
         let row = row.map_err(|_| CommandError::internal())?;
         let matches_search = search.is_empty()
-            || ["id_unik", "kode_karyawan", "nama", "divisi"]
+            || ["id_unik", "kode_karyawan", "nama", "divisi", "email"]
                 .iter()
                 .any(|key| text(&row, key).to_lowercase().contains(&search));
         let matches_division = division.is_empty() || text(&row, "divisi") == division;
@@ -186,6 +187,7 @@ pub fn create_employee(state: &DesktopState, draft: &Value) -> Result<Value, Com
             "Data karyawan belum lengkap atau tidak valid.",
         ));
     }
+    let email = turso::email_personil(draft)?.unwrap_or_default();
     let client_id = sync::ensure_client_id(state)?;
     let event_id = sync::new_event_id(&client_id, "employee", "create");
     let token = token_from_event(&event_id);
@@ -204,6 +206,7 @@ pub fn create_employee(state: &DesktopState, draft: &Value) -> Result<Value, Com
     payload.insert("token_absensi".into(), Value::String(token.clone()));
     payload.insert("qr_code".into(), Value::String(qr_code.clone()));
     payload.insert("status_qr".into(), Value::String("Generated".into()));
+    payload.insert("email".into(), Value::String(email.clone()));
     let payload = Value::Object(payload);
 
     let transaction = connection
@@ -217,8 +220,8 @@ pub fn create_employee(state: &DesktopState, draft: &Value) -> Result<Value, Com
         id_unik, kode_karyawan, nama, divisi, jabatan_status, no_hp, lp,
         id_shift, status_aktif, tanggal_daftar, catatan, token_absensi, qr_code,
         status_qr, jenis_personil, tanggal_mulai_aktif, tanggal_selesai_aktif,
-        unit, status_backup
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Generated', ?, ?, ?, ?, 'NORMAL');
+        unit, status_backup, email
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Generated', ?, ?, ?, ?, 'NORMAL', NULLIF(?, ''));
       "#,
             params![
                 id,
@@ -250,6 +253,7 @@ pub fn create_employee(state: &DesktopState, draft: &Value) -> Result<Value, Com
                 },
                 text(draft, "tanggal_selesai_aktif"),
                 text(draft, "unit"),
+                email,
             ],
         )
         .map_err(|error| {
@@ -346,6 +350,13 @@ pub fn import_employees(state: &DesktopState, drafts: &[Value]) -> Result<Value,
             gagal.push(json!({ "index": index, "pesan": format!("Kode karyawan '{code}' sudah dipakai.") }));
             continue;
         }
+        let email = match turso::email_personil(draft) {
+            Ok(email) => email.unwrap_or_default(),
+            Err(error) => {
+                gagal.push(json!({ "index": index, "pesan": error.message }));
+                continue;
+            }
+        };
 
         let event_id = sync::new_event_id(&client_id, "employee", "create");
         let token = token_from_event(&event_id);
@@ -368,6 +379,7 @@ pub fn import_employees(state: &DesktopState, drafts: &[Value]) -> Result<Value,
         let mut payload = draft.as_object().cloned().unwrap_or_else(Map::new);
         payload.insert("token_absensi".into(), Value::String(token.clone()));
         payload.insert("qr_code".into(), Value::String(qr_code.clone()));
+        payload.insert("email".into(), Value::String(email.clone()));
         let payload = Value::Object(payload);
 
         let insert_res = transaction.execute(
@@ -376,8 +388,8 @@ pub fn import_employees(state: &DesktopState, drafts: &[Value]) -> Result<Value,
                 id_unik, kode_karyawan, nama, divisi, jabatan_status, no_hp, lp,
                 id_shift, status_aktif, tanggal_daftar, catatan, token_absensi, qr_code,
                 status_qr, jenis_personil, tanggal_mulai_aktif, tanggal_selesai_aktif,
-                unit, status_backup
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Generated', ?, ?, ?, ?, 'NORMAL');
+                unit, status_backup, email
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Generated', ?, ?, ?, ?, 'NORMAL', NULLIF(?, ''));
             "#,
             params![
                 id,
@@ -413,6 +425,7 @@ pub fn import_employees(state: &DesktopState, drafts: &[Value]) -> Result<Value,
                 start_date,
                 text(draft, "tanggal_selesai_aktif"),
                 text(draft, "unit"),
+                email,
             ],
         );
 
@@ -478,6 +491,7 @@ pub fn update_employee(
     // Edit Karyawan. Kosong berarti "jangan ubah" supaya klien lama yang belum
     // mengirim field ini tidak menghapus tanggal yang sudah tersimpan.
     let tanggal_daftar = text(draft, "tanggal_daftar");
+    let email = turso::email_personil(draft)?;
 
     transaction
         .execute(
@@ -498,7 +512,9 @@ pub fn update_employee(
         tanggal_daftar = COALESCE(NULLIF(?, ''), tanggal_daftar),
         -- Kosong berarti "jangan ubah", sama seperti kolom di atas: klien lama
         -- yang belum mengirim `unit` tidak boleh menghapus unit tersimpan.
-        unit = COALESCE(NULLIF(?, ''), unit)
+        unit = COALESCE(NULLIF(?, ''), unit),
+        -- Tanpa kunci `email` (klien lama) = jangan ubah; string kosong = hapus.
+        email = CASE WHEN ? THEN NULLIF(?, '') ELSE email END
       WHERE id_unik = ?;
       "#,
             params![
@@ -517,6 +533,8 @@ pub fn update_employee(
                 tanggal_selesai_aktif,
                 tanggal_daftar,
                 text(draft, "unit"),
+                email.is_some(),
+                email.unwrap_or_default(),
                 id,
             ],
         )
@@ -571,7 +589,7 @@ pub fn update_employee(
         SELECT kode_karyawan, nama, divisi, jabatan_status, no_hp, lp,
                id_shift, status_aktif, tanggal_daftar, catatan, token_absensi,
                qr_code, status_qr, jenis_personil, tanggal_mulai_aktif,
-               tanggal_selesai_aktif, status_backup
+               tanggal_selesai_aktif, status_backup, unit, email
         FROM master_data WHERE id_unik = ? LIMIT 1;
         "#,
         params![id],
@@ -595,6 +613,8 @@ pub fn update_employee(
                 "tanggal_mulai_aktif": row.get::<_, Option<String>>(14)?,
                 "tanggal_selesai_aktif": row.get::<_, Option<String>>(15)?,
                 "status_backup": row.get::<_, Option<String>>(16)?,
+                "unit": row.get::<_, Option<String>>(17)?,
+                "email": row.get::<_, Option<String>>(18)?,
             }))
         },
     ) {
@@ -4704,6 +4724,36 @@ mod tests_identitas_karyawan {
             edit_ganda.message,
             "Kode Karyawan '001' sudah dipakai Ani (K-01). Kode Karyawan harus unik."
         );
+    }
+
+    /// Klien lama tidak mengirim kunci `email`; email tersimpan tidak boleh
+    /// ikut hilang saat mereka menyunting karyawan.
+    #[test]
+    fn email_karyawan_hanya_berubah_bila_kuncinya_dikirim() {
+        let (_dir, state) = fixture();
+        let email = || -> Option<String> {
+            storage::database(&state.data_dir)
+                .expect("db")
+                .query_row("SELECT email FROM master_data WHERE id_unik = 'K-01';", [], |row| {
+                    row.get(0)
+                })
+                .expect("baris")
+        };
+        let mut draft = karyawan("K-01", "001", "Ani");
+        draft["email"] = json!(" Ani@Sekolah.sch.id ");
+        create_employee(&state, &draft).expect("karyawan");
+        assert_eq!(email().as_deref(), Some("ani@sekolah.sch.id"));
+
+        update_employee(&state, "K-01", &karyawan("K-01", "001", "Ani")).expect("tanpa email");
+        assert_eq!(email().as_deref(), Some("ani@sekolah.sch.id"));
+
+        draft["email"] = json!("");
+        update_employee(&state, "K-01", &draft).expect("email dikosongkan");
+        assert_eq!(email(), None);
+
+        draft["email"] = json!("ani@sekolah");
+        let galat = update_employee(&state, "K-01", &draft).expect_err("format salah");
+        assert_eq!(galat.message, "Format email tidak valid.");
     }
 
     /// Baris yang ID atau kodenya sudah ada tidak ditimpa dan tidak dilewati

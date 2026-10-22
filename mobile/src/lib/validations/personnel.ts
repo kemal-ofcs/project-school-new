@@ -180,6 +180,7 @@ export function draftGuruDariBaris(item: Record<string, unknown>): GuruInput {
     id_shift: Number(item.id_shift || 1),
     status_aktif: item.status_aktif ? String(item.status_aktif) : "Aktif",
     unit: item.unit ? String(item.unit) : "",
+    email: item.email ? String(item.email) : "",
   };
 }
 
@@ -203,5 +204,6 @@ export function draftKaryawanDariBaris(
     tanggal_mulai_aktif: String(row.tanggal_mulai_aktif || ""),
     tanggal_selesai_aktif: String(row.tanggal_selesai_aktif || ""),
     unit: String(row.unit || ""),
+    email: String(row.email || ""),
   };
 }

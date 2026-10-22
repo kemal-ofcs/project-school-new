@@ -117,6 +117,7 @@ export default function KaryawanPage() {
     jenis_personil: "Pegawai",
     tanggal_mulai_aktif: new Date().toLocaleDateString("en-CA"),
     tanggal_selesai_aktif: "",
+    email: "",
   });
   const [alertMsg, setAlertMsg] = useState<string | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -242,6 +243,7 @@ export default function KaryawanPage() {
       tanggal_mulai_aktif: todayStr,
       tanggal_selesai_aktif: "",
       unit: "",
+      email: "",
     });
     setFormErrors({});
     setErrorMsg(null);
@@ -644,7 +646,7 @@ export default function KaryawanPage() {
             type="text"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Cari ID, Kode, Nama, Divisi, Jabatan..."
+            placeholder="Cari ID, Kode, Nama, Divisi, Email..."
             className="min-h-10 w-full rounded-xl border border-slate-800 bg-slate-950 px-3.5 text-xs text-white outline-none transition focus:border-sky-500 placeholder:text-slate-600"
           />
           <button
@@ -1063,6 +1065,14 @@ export default function KaryawanPage() {
                 </span>
                 <span className="text-white font-bold">
                   {String(detailKaryawan.no_hp || "-")}
+                </span>
+              </div>
+              <div className="p-3 bg-slate-950/60 rounded-xl border border-slate-800/80">
+                <span className="text-[10px] text-slate-500 block uppercase">
+                  Email
+                </span>
+                <span className="text-white font-bold break-all">
+                  {String(detailKaryawan.email || "-")}
                 </span>
               </div>
               <div className="p-3 bg-slate-950/60 rounded-xl border border-slate-800/80">
@@ -1490,6 +1500,28 @@ export default function KaryawanPage() {
                   className="min-h-10 w-full rounded-xl border border-slate-800 bg-slate-950 px-3 text-white outline-none focus:border-sky-500"
                 />
               </div>
+            </div>
+
+            {/* Email */}
+            <div>
+              <label
+                htmlFor="employee-email"
+                className="mb-1 block text-slate-400 font-semibold"
+              >
+                Email:
+              </label>
+              <input
+                id="employee-email"
+                type="email"
+                autoComplete="off"
+                value={formData.email ?? ""}
+                onChange={(event) =>
+                  setFormData({ ...formData, email: event.target.value })
+                }
+                placeholder="nama@sekolah.sch.id"
+                aria-invalid={!!formErrors.email}
+                className="min-h-10 w-full rounded-xl border border-slate-800 bg-slate-950 px-3 text-white outline-none focus:border-sky-500"
+              />
             </div>
 
             {/* Tanggal Mulai & Selesai Aktif */}

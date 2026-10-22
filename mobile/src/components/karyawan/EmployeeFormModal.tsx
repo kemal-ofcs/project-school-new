@@ -41,6 +41,7 @@ const DEFAULT_FORM: KaryawanInput = {
   tanggal_mulai_aktif: new Date().toLocaleDateString("en-CA"),
   tanggal_selesai_aktif: "",
   unit: "",
+  email: "",
 };
 
 interface EmployeeFormModalProps {
@@ -452,6 +453,28 @@ export function EmployeeFormModal({
               <option value="Nonaktif">Nonaktif</option>
             </select>
           </div>
+        </div>
+
+        <div>
+          <label
+            htmlFor="employee-email"
+            className="mb-1 block text-slate-400 font-semibold"
+          >
+            Email:
+          </label>
+          <input
+            id="employee-email"
+            type="email"
+            inputMode="email"
+            autoComplete="off"
+            value={formData.email ?? ""}
+            onChange={(e) =>
+              setFormData((prev) => ({ ...prev, email: e.target.value }))
+            }
+            placeholder="nama@sekolah.sch.id"
+            aria-invalid={!!formErrors.email}
+            className={inputClass(!!formErrors.email)}
+          />
         </div>
 
         {/* 11. Tanggal Mulai Masuk (tanggal_daftar) — default hari ini, bisa diubah manual */}

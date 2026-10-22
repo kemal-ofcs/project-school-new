@@ -124,6 +124,7 @@ export function EmployeeDetailModal({
   const divisi = String(employee.divisi ?? "-");
   const jabatan = String(employee.jabatan_status ?? "-");
   const noHp = String(employee.no_hp ?? "");
+  const email = String(employee.email ?? "");
   const lp = String(employee.lp ?? "-");
   const namaShift = String(employee.nama_shift ?? "-");
   const statusAktif = String(employee.status_aktif ?? "Aktif");
@@ -378,6 +379,7 @@ export function EmployeeDetailModal({
               value={lp === "L" ? "Laki-laki" : lp === "P" ? "Perempuan" : lp}
             />
             <InfoRow label="Jenis Personil" value={jenisPersonil} />
+            <InfoRow label="Email" value={email || "-"} />
           </div>
 
           {/* Grup 2: Penugasan & Shift */}

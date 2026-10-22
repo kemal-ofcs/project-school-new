@@ -184,6 +184,36 @@ describe("parseTeacherRows", () => {
       /Kolom wajib 'nama'/,
     );
   });
+
+  test("berkas tanpa kolom email tidak mengubah email tersimpan", () => {
+    const [hasil] = parseTeacherRows([["nama"], ["Pak Budi"]], lookups);
+    expect(hasil.draft.email).toBeUndefined();
+  });
+
+  test("sel email kosong mengosongkan, isinya dinormalkan", () => {
+    const [kosong, isi] = parseTeacherRows(
+      [
+        ["nama", "email"],
+        ["Pak Budi", ""],
+        ["Bu Ani", " Ani@Sekolah.SCH.ID "],
+      ],
+      lookups,
+    );
+    expect(kosong.draft.email).toBe("");
+    expect(isi.draft.email).toBe("ani@sekolah.sch.id");
+  });
+
+  test("email salah format ditolak dengan nomor barisnya", () => {
+    expect(() =>
+      parseTeacherRows(
+        [
+          ["nama", "email"],
+          ["Pak Budi", "budi@sekolah"],
+        ],
+        lookups,
+      ),
+    ).toThrow("Baris 2: email 'budi@sekolah' tidak valid.");
+  });
 });
 
 test("shiftCodeOf menerjemahkan id perangkat kembali ke kode yang stabil", () => {

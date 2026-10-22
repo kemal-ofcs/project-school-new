@@ -5,6 +5,7 @@ import { validateGeofenceSettings } from "@/lib/validations/geofence";
 import { parseQrToken } from "@/lib/validations/scanner";
 import {
   createEmployeeIdentifiers,
+  emailPersonil,
   firstValidationMessage,
   isValidTime,
   validateEmployeeDraft,
@@ -118,5 +119,37 @@ describe("geofencing", () => {
       latitude: "Tentukan koordinat kantor sebelum geofencing diaktifkan.",
       radiusMeter: "Radius wajib berupa angka bulat antara 10-10.000 meter.",
     });
+  });
+});
+
+// Vektor yang sama dengan `email_personil_membedakan_absen_kosong_dan_salah`
+// di `turso.rs`.
+describe("emailPersonil", () => {
+  test("membedakan tidak dikirim, dikosongkan, dan diisi", () => {
+    expect(emailPersonil(undefined)).toBeUndefined();
+    expect(emailPersonil(null)).toBe("");
+    expect(emailPersonil("  ")).toBe("");
+    expect(emailPersonil(" Guru.Satu@Sekolah.SCH.ID ")).toBe(
+      "guru.satu@sekolah.sch.id",
+    );
+    expect(() => emailPersonil("guru@sekolah")).toThrow(
+      "Format email tidak valid.",
+    );
+  });
+
+  test("validateEmployeeDraft menolak email salah format, kosong boleh", () => {
+    const draft = {
+      id_unik: "EMP_1",
+      kode_karyawan: "K1",
+      nama: "Ani",
+      divisi: "Dapur",
+      id_shift: 1,
+    };
+    expect(
+      validateEmployeeDraft({ ...draft, email: "" }).email,
+    ).toBeUndefined();
+    expect(
+      validateEmployeeDraft({ ...draft, email: "ani@sekolah" }).email,
+    ).toBe("Format email tidak valid.");
   });
 });

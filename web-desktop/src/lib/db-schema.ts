@@ -2,7 +2,7 @@ import type { Client } from "@libsql/client";
 import { BRANDING } from "@/lib/constants/branding";
 import { runDatabaseMigrations } from "./db-migrations";
 
-export const CURRENT_SCHEMA_VERSION = 55;
+export const CURRENT_SCHEMA_VERSION = 56;
 export const REQUIRED_TABLE_COUNT = 91;
 
 export async function isDatabaseSchemaReady(client: Client) {
@@ -86,7 +86,10 @@ export async function initDatabaseSchema(client: Client) {
         -- akademik_unit: id itu dibuat per perangkat, namanya yang sama di
         -- semua perangkat. Tanpa CHECK — daftarnya dikelola user di halaman
         -- Akademik, jadi unit baru tidak boleh menuntut migrasi skema.
-        unit TEXT
+        unit TEXT,
+        -- Email personil (v56), boleh kosong. Di sini, bukan di guru_data,
+        -- karena halaman Guru dan Karyawan sama-sama menulisnya.
+        email TEXT
       );
     `);
 

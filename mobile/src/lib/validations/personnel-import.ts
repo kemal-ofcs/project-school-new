@@ -17,6 +17,7 @@ import type { SiswaInput } from "@/lib/gateways/student";
 import type { GuruInput } from "@/lib/gateways/teacher";
 import { normalizeOperatorPhone } from "@/lib/operators/contact";
 import { normalizeStatusSiswa, STATUS_KEPEGAWAIAN_GURU } from "./personnel";
+import { emailPersonil } from "./stabilization";
 
 /** Batas baris per berkas: satu angkatan besar, bukan seluruh sekolah sekaligus. */
 export const MAX_PERSONNEL_IMPORT_ROWS = 1000;
@@ -52,6 +53,7 @@ export const TEACHER_WORKBOOK_HEADERS = [
   "status_kepegawaian",
   "lp",
   "no_hp",
+  "email",
   "kode_shift",
   "status_aktif",
   "unit",
@@ -324,6 +326,11 @@ export function parseTeacherRows(
   lookups: Pick<ImportLookups, "shifts">,
 ): ImportRow<GuruInput>[] {
   const val = workbookColumns(rows[0] || [], ["nama"]);
+  // Berkas ekspor lama tidak punya kolom email; tanpa kolom itu email
+  // tersimpan dibiarkan, bukan dikosongkan.
+  const adaKolomEmail = (rows[0] || []).some(
+    (h) => h.toLowerCase().trim() === "email",
+  );
   const nipTerpakai = new Set<string>();
   const kodeTerpakai = new Set<string>();
   const hasil: ImportRow<GuruInput>[] = [];
@@ -362,6 +369,15 @@ export function parseTeacherRows(
       );
     }
 
+    let email: string | undefined;
+    try {
+      email = adaKolomEmail ? emailPersonil(val(row, "email")) : undefined;
+    } catch {
+      throw new Error(
+        `Baris ${baris}: email '${val(row, "email")}' tidak valid.`,
+      );
+    }
+
     hasil.push({
       baris,
       draft: {
@@ -375,6 +391,7 @@ export function parseTeacherRows(
         status_kepegawaian: statusPeg,
         lp: jenisKelamin(val(row, "lp"), baris),
         no_hp: teksIdentitas(val(row, "no_hp"), "no_hp", baris) || null,
+        email,
         id_shift: resolveShift(val(row, "kode_shift"), lookups.shifts, baris),
         status_aktif: statusAktifMentah === "nonaktif" ? "Nonaktif" : "Aktif",
         // Kolom `unit` sudah ikut diekspor; tanpa ini unit guru hilang pada

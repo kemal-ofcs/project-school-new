@@ -1530,7 +1530,8 @@ pub fn list_teachers(state: &MobileState) -> Result<Value, CommandError> {
         SELECT g.id_guru, g.nip, g.nuptk, g.gelar, g.spesialisasi_mapel, g.status_kepegawaian,
                g.created_at, g.updated_at,
                m.kode_karyawan, m.nama, m.divisi, m.jabatan_status, m.no_hp, m.lp,
-               m.status_aktif, m.id_shift, m.token_absensi, m.qr_code, m.status_qr, m.unit
+               m.status_aktif, m.id_shift, m.token_absensi, m.qr_code, m.status_qr, m.unit,
+               m.email
         FROM guru_data g
         JOIN master_data m ON m.id_unik = g.id_guru
         ORDER BY m.nama ASC;
@@ -1560,6 +1561,7 @@ pub fn list_teachers(state: &MobileState) -> Result<Value, CommandError> {
                 "qr_code": row.get::<_, Option<String>>(17)?,
                 "status_qr": row.get::<_, Option<String>>(18)?,
                 "unit": row.get::<_, Option<String>>(19)?,
+                "email": row.get::<_, Option<String>>(20)?,
             }))
         })
         .map_err(|_| CommandError::internal())?
@@ -1601,6 +1603,7 @@ pub fn save_teacher(state: &MobileState, draft: &Value) -> Result<Value, Command
     let lp = optional_text(draft, "lp").unwrap_or_else(|| "L".to_owned());
     let id_shift = chosen_shift(&tx, draft)?;
     let status_aktif = optional_text(draft, "status_aktif").unwrap_or_else(|| "Aktif".to_owned());
+    let email = super::turso::email_personil(draft)?;
 
     if nama.is_empty() {
         return Err(CommandError::new(
@@ -1697,8 +1700,8 @@ pub fn save_teacher(state: &MobileState, draft: &Value) -> Result<Value, Command
         INSERT INTO master_data (
             id_unik, kode_karyawan, nama, divisi, jabatan_status, no_hp, lp,
             id_shift, status_aktif, tanggal_daftar, catatan, token_absensi, qr_code,
-            status_qr, jenis_personil, unit, status_backup
-        ) VALUES (?1, ?2, ?3, 'Tenaga Pengajar', 'Guru', ?4, ?5, COALESCE(?6, 1), ?7, date('now','+7 hours'), 'Data PTK Sekolah', ?8, ?9, 'Generated', 'GURU', NULLIF(?10, ''), 'NORMAL')
+            status_qr, jenis_personil, unit, status_backup, email
+        ) VALUES (?1, ?2, ?3, 'Tenaga Pengajar', 'Guru', ?4, ?5, COALESCE(?6, 1), ?7, date('now','+7 hours'), 'Data PTK Sekolah', ?8, ?9, 'Generated', 'GURU', NULLIF(?10, ''), 'NORMAL', NULLIF(?12, ''))
         ON CONFLICT(id_unik) DO UPDATE SET
             kode_karyawan = excluded.kode_karyawan,
             nama = excluded.nama,
@@ -1713,9 +1716,24 @@ pub fn save_teacher(state: &MobileState, draft: &Value) -> Result<Value, Command
             -- Draft tanpa `unit` (formulir lama, impor tanpa kolom unit) tidak
             -- boleh mengosongkan unit yang sudah dipilih; pola yang sama dengan
             -- `id_shift` di baris atas.
-            unit = COALESCE(NULLIF(?10, ''), master_data.unit);
+            unit = COALESCE(NULLIF(?10, ''), master_data.unit),
+            -- Tanpa kunci `email` (impor berkas lama) = jangan ubah; kosong = hapus.
+            email = CASE WHEN ?11 THEN NULLIF(?12, '') ELSE master_data.email END;
         "#,
-        params![id, kode_karyawan, nama, no_hp, lp, id_shift, status_aktif, token, qr_code, unit],
+        params![
+            id,
+            kode_karyawan,
+            nama,
+            no_hp,
+            lp,
+            id_shift,
+            status_aktif,
+            token,
+            qr_code,
+            unit,
+            email.is_some(),
+            email.unwrap_or_default()
+        ],
     )
     .map_err(|e| CommandError::new("DB_ERROR", format!("Gagal menyimpan identitas personil guru: {e}")))?;
 

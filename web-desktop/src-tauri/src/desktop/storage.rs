@@ -494,7 +494,9 @@ pub fn initialize(path: &Path) -> Result<(), String> {
         -- menuntut migrasi skema. Ia di `master_data` dan bukan `siswa_data`
         -- karena dropdown-nya dipakai peserta didik, guru/PTK, DAN karyawan,
         -- dan ketiga halaman itu menulis ke tabel ini.
-        unit TEXT
+        unit TEXT,
+        -- Email guru dan karyawan (v56), boleh kosong.
+        email TEXT
       );
       CREATE TABLE IF NOT EXISTS id_card (
         id_card_id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -1771,6 +1773,14 @@ pub fn initialize(path: &Path) -> Result<(), String> {
         "master_data",
         "unit",
         "ALTER TABLE master_data ADD COLUMN unit TEXT;",
+    )?;
+
+    // Email guru dan karyawan (v56).
+    ensure_column(
+        &connection,
+        "master_data",
+        "email",
+        "ALTER TABLE master_data ADD COLUMN email TEXT;",
     )?;
 
     // Jenis penilaian dinamis (v43). Nullable: baris lama menurunkan jenisnya

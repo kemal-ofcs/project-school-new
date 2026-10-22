@@ -9,6 +9,10 @@ import {
 } from "@/lib/server/http/api-response";
 import { assertSameOriginMutation } from "@/lib/server/http/request-security";
 import { deleteTeacher, saveTeacher } from "@/lib/services/academic";
+import {
+  emailPersonil,
+  PESAN_EMAIL_TIDAK_VALID,
+} from "@/lib/validations/stabilization";
 
 export const runtime = "nodejs";
 
@@ -34,6 +38,7 @@ export async function POST(request: NextRequest) {
         id_shift?: number;
         status_aktif?: string;
         unit?: string;
+        email?: string | null;
         is_edit?: boolean;
       };
       id?: string;
@@ -50,7 +55,13 @@ export async function POST(request: NextRequest) {
       throw new ApiRequestError("Draft profil guru tidak lengkap.", 400);
     }
 
-    return noStoreJson(await saveTeacher(body.draft));
+    let email: string | undefined;
+    try {
+      email = emailPersonil(body.draft.email);
+    } catch {
+      throw new ApiRequestError(PESAN_EMAIL_TIDAK_VALID, 400);
+    }
+    return noStoreJson(await saveTeacher({ ...body.draft, email }));
   } catch (error) {
     return toApiErrorResponse(error);
   }
