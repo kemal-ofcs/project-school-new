@@ -27,10 +27,10 @@ import type {
 import { PMB_STATUS_MANUAL } from "@/types/pmb";
 
 /**
- * Sisi sekolah untuk PMB — cerminan TypeScript dari metode PMB di `turso.rs`.
+ * Sisi sekolah untuk PMB: cerminan TypeScript dari metode PMB di `turso.rs`.
  *
  * Keduanya melayani halaman yang sama pada dua build berbeda: Desktop lewat
- * command Rust, Web lewat route handler ini. Query-nya WAJIB tetap sepadan —
+ * command Rust, Web lewat route handler ini. Query-nya WAJIB tetap sepadan:
  * kalau tidak, panitia yang membuka halaman dari panel admin akan melihat
  * daftar yang berbeda dari panitia yang membukanya dari aplikasi Desktop, pada
  * database yang sama persis.
@@ -69,7 +69,7 @@ function teksWajib(nilai: unknown, pesan: string): string {
  * Id baris PMB: `<prefix>-<epoch detik>-<48 bit acak>`.
  *
  * Bentuk yang sama dengan `new_pmb_id` di `turso.rs` dan `buatIdPendaftar` di
- * web-public. Bagian acaknya yang menjamin keunikan — id epoch telanjang sudah
+ * web-public. Bagian acaknya yang menjamin keunikan: id epoch telanjang sudah
  * pernah bertabrakan di repo ini, di dalam satu penyimpanan massal.
  */
 function buatIdPmb(prefix: string): string {
@@ -99,7 +99,7 @@ export async function listPmbWaves(client: Client): Promise<PmbWave[]> {
 /**
  * Simpan gelombang dengan aturan aktif-tunggal yang ATOMIK.
  *
- * Penonaktifan gelombang lain ikut dalam batch yang sama — pola idempoten yang
+ * Penonaktifan gelombang lain ikut dalam batch yang sama: pola idempoten yang
  * sudah dipakai `akademik_tahun_ajaran.is_aktif`. Dua gelombang aktif sekaligus
  * membuat situs publik memilih salah satunya berdasarkan urutan tanggal, dan
  * pendaftar akan masuk ke gelombang yang tidak diniatkan panitia tanpa ada yang
@@ -208,7 +208,7 @@ export async function deletePmbWave(
 }
 
 /**
- * Daftar pendaftar — TANPA isi berkas, hanya jumlahnya.
+ * Daftar pendaftar: TANPA isi berkas, hanya jumlahnya.
  *
  * Satu berkas sampai 500 KB; seratus pendaftar akan membuat balasannya puluhan
  * megabyte, dan halaman ini dibuka panitia berkali-kali sehari. Aturan yang

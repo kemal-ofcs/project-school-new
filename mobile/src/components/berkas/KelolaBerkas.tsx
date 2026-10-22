@@ -74,7 +74,10 @@ export function KelolaBerkas({
     void jalankan(jenis, async () => {
       const siap = await siapkanBerkas(file);
       if (!siap.ok) throw new Error(`${label}: ${siap.pesan}`);
-      await simpan({ jenis, ...siap.berkas });
+      // `ukuranByte` tidak dikirim: server menghitungnya dari isi dan menolak
+      // kunci asing.
+      const { namaFile, mime, kontenBase64 } = siap.berkas;
+      await simpan({ jenis, namaFile, mime, kontenBase64 });
       setDibuka(null);
       await onBerubah();
       return `${label} tersimpan (${Math.ceil(siap.berkas.ukuranByte / 1024)} KB).`;
@@ -156,13 +159,16 @@ export function KelolaBerkas({
                 ))}
                 {bisaUbah ? (
                   <label
-                    className={`${TOMBOL_KEDUA} inline-flex cursor-pointer items-center focus-within:ring-2 focus-within:ring-sky-500 ${proses !== null ? "pointer-events-none opacity-60" : ""}`}
+                    className={`${TOMBOL_KEDUA} relative inline-flex cursor-pointer items-center focus-within:ring-2 focus-within:ring-sky-500 ${proses !== null ? "pointer-events-none opacity-60" : ""}`}
                   >
                     {proses === jenis
                       ? "Mengunggah..."
                       : milik.length > 0
                         ? "Ganti"
                         : "Unggah"}
+                    {/* `relative` di label wajib: tanpa itu input `sr-only` diposisikan
+                        terhadap panel modal, dan fokus setelah pemilih berkas
+                        tertutup menggulir panel `overflow-hidden` hingga kosong. */}
                     <input
                       accept={MIME_BERKAS_SEKOLAH.join(",")}
                       className="sr-only"

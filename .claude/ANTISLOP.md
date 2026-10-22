@@ -1,23 +1,17 @@
 # ANTISLOP.md — hasil antislop
 
-- Waktu: 2026-10-22 18:28 WIB
-- Commit: f82c471 (+ 6 berkas berubah, belum commit)
-- Berkas disunting: 6
+- Waktu: 2026-10-22 19:58 WIB
+- Commit: 5083f7d (+ 4 berkas berubah, belum commit)
+- Berkas disunting: 0
 
 ## Disunting
-- `web-desktop/src/app/pmb/page.tsx` — teks UI & komentar — ganti em dash pada dialog konfirmasi, placeholder kosong, galat, dan komentar dengan tanda kurung, titik dua, dan tanda hubung
-- `web-desktop/src/types/pmb.ts` — komentar — ganti em dash pada dokumentasi tipe PMB dengan titik dua dan tanda koma
-- `web-desktop/src/lib/services/pmb-admin.ts` — komentar — ganti em dash pada dokumentasi layanan admin PMB dengan titik dua
-- `web-public/src/app/pmb/daftar/FormPendaftaran.tsx` — teks UI & komentar — ganti placeholder em dash ringkasan pendaftaran dengan tanda hubung dan rapikan komentar
-- `web-public/src/app/pmb/status/FormCekStatus.tsx` — komentar — ganti em dash pada penjelasan fungsi minta kode dan penjaga klik ganda dengan tanda kurung dan titik dua
-- `web-public/src/lib/validations/pmb.ts` — komentar — ganti em dash pada penjelasan validasi nomor pendaftaran dan status dengan tanda kurung dan titik dua
+(tidak ada berkas yang perlu disunting)
 
 ## Dilewati
-- `mobile/scripts/sync-*` — skrip sinkronisasi salinan Mobile
-- `mobile/src/**` & `mobile/src-tauri/**` — salinan Mobile turunan yang dihasilkan skrip sync
-- `*.test.ts`, `*.test.tsx`, `*.vektor.json` — berkas pengujian dan fixture data
-- `*.toml`, `*.json`, `build.rs` — konfigurasi dan build artifact
-- `web-desktop/src-tauri/**` & `web-desktop/src/lib/client/**` — komentar teknis dan teks UI sudah ringkas tanpa AI-slop
+- `web-desktop/src/components/berkas/KelolaBerkas.tsx` — komentar penjelasan kendala teknis dan teks antarmuka sudah ringkas, bebas em dash, dan sesuai kaidah antislop
+- `mobile/src/components/berkas/KelolaBerkas.tsx` — salinan Mobile dari `web-desktop` via `sync-frontend-lib.ts` (`filesToCopy`)
+- `mobile/src/lib/services/pmb-admin.ts` — salinan Mobile turunan yang dihasilkan `sync:mobile` (padanan `web-desktop` sudah bersih)
+- `mobile/src/types/pmb.ts` — salinan Mobile turunan yang dihasilkan `sync:mobile` (padanan `web-desktop` sudah bersih)
 
 ## Perlu tindakan
-Jalankan `bun run sync:mobile` untuk memperbarui salinan Mobile dari `web-desktop/src/types/pmb.ts`.
+Tidak ada.
