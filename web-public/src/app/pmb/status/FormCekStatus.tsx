@@ -279,10 +279,13 @@ export function FormCekStatus({
                 <dd>{keadaan.status.namaGelombang}</dd>
               </div>
             ) : null}
-            <div className="flex gap-2">
-              <dt>Berkas terlampir:</dt>
-              <dd>{keadaan.status.jumlahBerkas}</dd>
-            </div>
+            {/* Setelah menjadi siswa, berkasnya pindah ke data siswa (v59). */}
+            {keadaan.status.status !== "Terdaftar" ? (
+              <div className="flex gap-2">
+                <dt>Berkas terlampir:</dt>
+                <dd>{keadaan.status.jumlahBerkas}</dd>
+              </div>
+            ) : null}
           </dl>
         </div>
       ) : null}

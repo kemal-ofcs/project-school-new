@@ -197,6 +197,12 @@ pub fn run() {
             mobile::commands::desktop_list_student_dapodik,
             mobile::commands::desktop_save_student_dapodik,
             mobile::commands::desktop_clear_student_dapodik,
+            mobile::commands::desktop_save_pmb_file,
+            mobile::commands::desktop_delete_pmb_file,
+            mobile::commands::desktop_list_student_files,
+            mobile::commands::desktop_get_student_file,
+            mobile::commands::desktop_save_student_file,
+            mobile::commands::desktop_delete_student_file,
             // Tinjauan antrean WhatsApp: command khusus Mobile yang membaca CLOUD.
             // Membaca `notifikasi_wa` LOKAL akan selalu kosong di perangkat yang
             // bukan terminal pemindai — lihat `wa_review.rs`.

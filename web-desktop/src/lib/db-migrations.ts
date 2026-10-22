@@ -6,6 +6,10 @@ import {
 } from "@/lib/rbac/catalog";
 import { AKUN_BAWAAN, SEED_AKUN_SQL } from "@/lib/validations/accounting";
 import {
+  SQL_BUANG_BERKAS_PMB_TERPINDAH,
+  SQL_PINDAH_BERKAS_PMB,
+} from "@/lib/validations/berkas-sekolah";
+import {
   JENIS_NILAI_BAWAAN,
   SEED_JENIS_SQL,
 } from "@/lib/validations/nilai-akhir";
@@ -70,6 +74,7 @@ const INVENTORY_DECIMAL_MIGRATION_VERSION = 55;
 const PERSONNEL_EMAIL_MIGRATION_VERSION = 56;
 const STUDENT_DAPODIK_MIGRATION_VERSION = 57;
 const PMB_UNIT_MIGRATION_VERSION = 58;
+const STUDENT_FILES_MIGRATION_VERSION = 59;
 
 /**
  * v21 — aturan jam scan baru: Jam Kerja Normal = (Jam Pulang − Jam Masuk) −
@@ -3002,5 +3007,39 @@ export async function runDatabaseMigrations(client: Client) {
     sql: `INSERT OR IGNORE INTO schema_migration (version, name, applied_at)
           VALUES (?, 'pmb-unit', ?);`,
     args: [PMB_UNIT_MIGRATION_VERSION, now],
+  });
+
+  // ── v59: Berkas siswa ──
+  //
+  // Cloud-only seperti `pmb_berkas`. Berkas pendaftar yang sudah menjadi
+  // siswa dipindah ke sini, tidak disalin. Cerminan `turso.rs`; lihat
+  // `validations/berkas-sekolah.ts`.
+  await client.execute(`
+    CREATE TABLE IF NOT EXISTS siswa_berkas (
+      id_berkas TEXT PRIMARY KEY,
+      id_siswa TEXT NOT NULL,
+      jenis TEXT NOT NULL
+        CHECK(jenis IN ('kartu_keluarga', 'akta_lahir', 'ijazah', 'rapor',
+                        'foto', 'lainnya')),
+      nama_file TEXT NOT NULL,
+      mime TEXT NOT NULL
+        CHECK(mime IN ('image/jpeg', 'image/png', 'image/webp', 'application/pdf')),
+      ukuran_byte INTEGER NOT NULL,
+      konten_base64 TEXT NOT NULL,
+      diunggah_oleh TEXT,
+      created_at TEXT NOT NULL
+    );
+  `);
+  await client.execute(
+    "CREATE INDEX IF NOT EXISTS idx_siswa_berkas_siswa ON siswa_berkas(id_siswa);",
+  );
+  await client.batch(
+    [`${SQL_PINDAH_BERKAS_PMB};`, `${SQL_BUANG_BERKAS_PMB_TERPINDAH};`],
+    "write",
+  );
+  await client.execute({
+    sql: `INSERT OR IGNORE INTO schema_migration (version, name, applied_at)
+          VALUES (?, 'student-files', ?);`,
+    args: [STUDENT_FILES_MIGRATION_VERSION, now],
   });
 }

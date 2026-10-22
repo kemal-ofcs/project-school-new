@@ -3613,6 +3613,29 @@ impl TursoClient {
                 );"#,
                 vec![],
             ),
+            // ── v59: Berkas siswa ──
+            //
+            // CLOUD-ONLY seperti `pmb_berkas`: KK dan akta tidak boleh
+            // tersalin ke setiap perangkat. Berkas PMB pindah ke sini saat
+            // pendaftar diangkat menjadi siswa. Lihat `berkas_sekolah.rs`.
+            Statement::new(
+                r#"CREATE TABLE IF NOT EXISTS siswa_berkas (
+                    id_berkas TEXT PRIMARY KEY,
+                    id_siswa TEXT NOT NULL,
+                    jenis TEXT NOT NULL
+                        CHECK(jenis IN ('kartu_keluarga', 'akta_lahir', 'ijazah', 'rapor',
+                                        'foto', 'lainnya')),
+                    nama_file TEXT NOT NULL,
+                    mime TEXT NOT NULL
+                        CHECK(mime IN ('image/jpeg', 'image/png', 'image/webp', 'application/pdf')),
+                    ukuran_byte INTEGER NOT NULL,
+                    konten_base64 TEXT NOT NULL,
+                    diunggah_oleh TEXT,
+                    created_at TEXT NOT NULL
+                );"#,
+                vec![],
+            ),
+            Statement::new("CREATE INDEX IF NOT EXISTS idx_siswa_berkas_siswa ON siswa_berkas(id_siswa);", vec![]),
             // ── v27: Portal wali murid ──
             //
             // Definisi aslinya di `db-migrations.ts`; dipakai situs publik
@@ -3849,7 +3872,8 @@ impl TursoClient {
                 (55, 'inventory-decimal', datetime('now')),
                 (56, 'personnel-email', datetime('now')),
                 (57, 'student-dapodik', datetime('now')),
-                (58, 'pmb-unit', datetime('now'));"#,
+                (58, 'pmb-unit', datetime('now')),
+                (59, 'student-files', datetime('now'));"#,
                 vec![],
             ),
         ];
@@ -4077,6 +4101,13 @@ impl TursoClient {
             &format!("{};", crate::mobile::siswa_dapodik::SQL_SALIN_DAPODIK_PMB),
             vec![],
         )
+        .await?;
+        // v59: berkas pendaftar yang sudah menjadi siswa pindah ke
+        // `siswa_berkas`; pasangan ini aman diulang.
+        self.execute_pipeline(vec![
+            Statement::new(crate::mobile::berkas_sekolah::SQL_PINDAH_BERKAS_PMB, vec![]),
+            Statement::new(crate::mobile::berkas_sekolah::SQL_BUANG_BERKAS_PMB_TERPINDAH, vec![]),
+        ])
         .await?;
 
         // Indeks ini WAJIB dibuat setelah loop di atas, bukan di dalam pipeline
@@ -8076,7 +8107,7 @@ impl TursoClient {
     /// Daftar pendaftar.
     ///
     /// `konten_base64` TIDAK pernah ikut — hanya jumlah berkasnya. Satu berkas
-    /// sampai 500 KB; seratus pendaftar akan membuat balasannya puluhan megabyte
+    /// sampai 200 KB; seratus pendaftar akan membuat balasannya puluhan megabyte
     /// dan halaman ini dibuka panitia berkali-kali sehari. Aturan yang sama
     /// dengan `photo_base64` di riwayat reset password.
     pub async fn list_pmb_registrants(
@@ -8107,7 +8138,9 @@ impl TursoClient {
                    {kolom_dapodik}
                    COALESCE(g.nama, '') AS nama_gelombang,
                    (SELECT COUNT(*) FROM pmb_berkas b
-                     WHERE b.id_pendaftar = p.id_pendaftar) AS jumlah_berkas
+                     WHERE b.id_pendaftar = p.id_pendaftar)
+                   + (SELECT COUNT(*) FROM siswa_berkas s
+                       WHERE s.id_siswa = p.id_siswa) AS jumlah_berkas
               FROM pmb_pendaftar p
               LEFT JOIN pmb_gelombang g ON g.id_gelombang = p.id_gelombang
              WHERE 1=1
@@ -8314,6 +8347,21 @@ impl TursoClient {
                     format!(
                         "{} AND id_pendaftar = ?;",
                         crate::mobile::siswa_dapodik::SQL_SALIN_DAPODIK_PMB
+                    ),
+                    vec![json!(id_pendaftar)],
+                ),
+                // Berkasnya pindah ke `siswa_berkas` (v59), tidak disalin.
+                Statement::new(
+                    format!(
+                        "{} AND b.id_pendaftar = ?;",
+                        crate::mobile::berkas_sekolah::SQL_PINDAH_BERKAS_PMB
+                    ),
+                    vec![json!(id_pendaftar)],
+                ),
+                Statement::new(
+                    format!(
+                        "{} AND id_pendaftar = ?;",
+                        crate::mobile::berkas_sekolah::SQL_BUANG_BERKAS_PMB_TERPINDAH
                     ),
                     vec![json!(id_pendaftar)],
                 ),

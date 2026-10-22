@@ -86,6 +86,13 @@ const filesToCopy = [
   // `initDatabaseSchema`, yang sengaja tidak ada di workspace ini.
   "lib/license/types.ts",
   "lib/server/license.ts",
+  // Berkas pendaftar (v59): batas, jenis, tanda tangan berkas, dan pemadat
+  // foto wajib sama dengan unggahan admin di /pmb dan /siswa.
+  "lib/validations/berkas-sekolah.ts",
+  "lib/validations/berkas-sekolah.test.ts",
+  "lib/validations/berkas-sekolah.vektor.json",
+  "lib/client/image-optimizer.ts",
+  "lib/client/siapkan-berkas.ts",
 ];
 
 const desktopSrc = join(import.meta.dir, "../../web-desktop/src");

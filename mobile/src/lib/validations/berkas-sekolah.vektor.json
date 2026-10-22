@@ -1,0 +1,212 @@
+[
+  {
+    "nama": "JPEG sah, nama dan isi dirapikan",
+    "masukan": {
+      "jenis": "kartu_keluarga",
+      "namaFile": "  kk ayah.jpg ",
+      "mime": "image/jpeg",
+      "kontenBase64": " /9j/4AAQSkZJRgABAQAAAQ==\n"
+    },
+    "hasil": {
+      "jenis": "kartu_keluarga",
+      "namaFile": "kk ayah.jpg",
+      "mime": "image/jpeg",
+      "ukuranByte": 16,
+      "kontenBase64": "/9j/4AAQSkZJRgABAQAAAQ=="
+    }
+  },
+  {
+    "nama": "PNG sah",
+    "masukan": {
+      "jenis": "akta_lahir",
+      "namaFile": "akta.png",
+      "mime": "image/png",
+      "kontenBase64": "iVBORw0KGgoAAAANSUhEUg=="
+    },
+    "hasil": {
+      "jenis": "akta_lahir",
+      "namaFile": "akta.png",
+      "mime": "image/png",
+      "ukuranByte": 16,
+      "kontenBase64": "iVBORw0KGgoAAAANSUhEUg=="
+    }
+  },
+  {
+    "nama": "WEBP sah",
+    "masukan": {
+      "jenis": "foto",
+      "namaFile": "foto.webp",
+      "mime": "image/webp",
+      "kontenBase64": "UklGRiQAAABXRUJQVlA4IA=="
+    },
+    "hasil": {
+      "jenis": "foto",
+      "namaFile": "foto.webp",
+      "mime": "image/webp",
+      "ukuranByte": 16,
+      "kontenBase64": "UklGRiQAAABXRUJQVlA4IA=="
+    }
+  },
+  {
+    "nama": "PDF sah",
+    "masukan": {
+      "jenis": "ijazah",
+      "namaFile": "skl.pdf",
+      "mime": "application/pdf",
+      "kontenBase64": "JVBERi0xLjcKJeLjz9MKMSAwIG9iag=="
+    },
+    "hasil": {
+      "jenis": "ijazah",
+      "namaFile": "skl.pdf",
+      "mime": "application/pdf",
+      "ukuranByte": 22,
+      "kontenBase64": "JVBERi0xLjcKJeLjz9MKMSAwIG9iag=="
+    }
+  },
+  {
+    "nama": "nama 180 huruf beraksen dihitung per karakter",
+    "masukan": {
+      "jenis": "lainnya",
+      "namaFile": "éééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééé",
+      "mime": "image/jpeg",
+      "kontenBase64": "/9j/4AAQSkZJRgABAQAAAQ=="
+    },
+    "hasil": {
+      "jenis": "lainnya",
+      "namaFile": "éééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééé",
+      "mime": "image/jpeg",
+      "ukuranByte": 16,
+      "kontenBase64": "/9j/4AAQSkZJRgABAQAAAQ=="
+    }
+  },
+  {
+    "nama": "jenis asing ditolak",
+    "masukan": {
+      "jenis": "kk",
+      "namaFile": "kk.jpg",
+      "mime": "image/jpeg",
+      "kontenBase64": "/9j/4AAQSkZJRgABAQAAAQ=="
+    },
+    "galat": "Jenis berkas tidak dikenal."
+  },
+  {
+    "nama": "jenis tidak dirapikan",
+    "masukan": {
+      "jenis": " foto",
+      "namaFile": "kk.jpg",
+      "mime": "image/jpeg",
+      "kontenBase64": "/9j/4AAQSkZJRgABAQAAAQ=="
+    },
+    "galat": "Jenis berkas tidak dikenal."
+  },
+  {
+    "nama": "nama kosong ditolak",
+    "masukan": {
+      "jenis": "kartu_keluarga",
+      "namaFile": "   ",
+      "mime": "image/jpeg",
+      "kontenBase64": "/9j/4AAQSkZJRgABAQAAAQ=="
+    },
+    "galat": "Nama berkas wajib diisi."
+  },
+  {
+    "nama": "nama 181 karakter ditolak",
+    "masukan": {
+      "jenis": "kartu_keluarga",
+      "namaFile": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "mime": "image/jpeg",
+      "kontenBase64": "/9j/4AAQSkZJRgABAQAAAQ=="
+    },
+    "galat": "Nama berkas maksimal 180 karakter."
+  },
+  {
+    "nama": "GIF ditolak",
+    "masukan": {
+      "jenis": "kartu_keluarga",
+      "namaFile": "kk.jpg",
+      "mime": "image/gif",
+      "kontenBase64": "/9j/4AAQSkZJRgABAQAAAQ=="
+    },
+    "galat": "Berkas harus berupa JPG, PNG, WEBP, atau PDF."
+  },
+  {
+    "nama": "isi kosong ditolak",
+    "masukan": {
+      "jenis": "kartu_keluarga",
+      "namaFile": "kk.jpg",
+      "mime": "image/jpeg",
+      "kontenBase64": ""
+    },
+    "galat": "Berkas tidak terbaca."
+  },
+  {
+    "nama": "panjang base64 cacat ditolak",
+    "masukan": {
+      "jenis": "kartu_keluarga",
+      "namaFile": "kk.jpg",
+      "mime": "image/jpeg",
+      "kontenBase64": "abc"
+    },
+    "galat": "Berkas tidak terbaca."
+  },
+  {
+    "nama": "karakter asing di base64 ditolak",
+    "masukan": {
+      "jenis": "kartu_keluarga",
+      "namaFile": "kk.jpg",
+      "mime": "image/jpeg",
+      "kontenBase64": "/9j$4AAQ"
+    },
+    "galat": "Berkas tidak terbaca."
+  },
+  {
+    "nama": "data URL utuh ditolak",
+    "masukan": {
+      "jenis": "kartu_keluarga",
+      "namaFile": "kk.jpg",
+      "mime": "image/jpeg",
+      "kontenBase64": "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQ=="
+    },
+    "galat": "Berkas tidak terbaca."
+  },
+  {
+    "nama": "padding di tengah ditolak",
+    "masukan": {
+      "jenis": "kartu_keluarga",
+      "namaFile": "kk.jpg",
+      "mime": "image/jpeg",
+      "kontenBase64": "/9j=4AAQ"
+    },
+    "galat": "Berkas tidak terbaca."
+  },
+  {
+    "nama": "JPEG yang mengaku PDF ditolak",
+    "masukan": {
+      "jenis": "kartu_keluarga",
+      "namaFile": "kk.jpg",
+      "mime": "application/pdf",
+      "kontenBase64": "/9j/4AAQSkZJRgABAQAAAQ=="
+    },
+    "galat": "Isi berkas tidak sesuai formatnya."
+  },
+  {
+    "nama": "WEBP yang mengaku PNG ditolak",
+    "masukan": {
+      "jenis": "kartu_keluarga",
+      "namaFile": "kk.jpg",
+      "mime": "image/png",
+      "kontenBase64": "UklGRiQAAABXRUJQVlA4IA=="
+    },
+    "galat": "Isi berkas tidak sesuai formatnya."
+  },
+  {
+    "nama": "PDF yang mengaku JPEG ditolak",
+    "masukan": {
+      "jenis": "kartu_keluarga",
+      "namaFile": "kk.jpg",
+      "mime": "image/jpeg",
+      "kontenBase64": "JVBERi0xLjcKJeLjz9MKMSAwIG9iag=="
+    },
+    "galat": "Isi berkas tidak sesuai formatnya."
+  }
+]

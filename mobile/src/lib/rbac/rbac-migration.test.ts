@@ -169,6 +169,8 @@ describe("dynamic RBAC migration", () => {
       57,
       // v58 — unit tujuan PMB dan unit pemilik jurusan.
       58,
+      // v59 — berkas siswa (`siswa_berkas`, cloud-only).
+      59,
     ]);
 
     const sessionColumns = await client.execute(

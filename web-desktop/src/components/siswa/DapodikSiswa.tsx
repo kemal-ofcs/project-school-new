@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { KelolaBerkas } from "@/components/berkas/KelolaBerkas";
 import {
   INPUT,
   LABEL,
@@ -11,6 +12,12 @@ import {
 import { Modal } from "@/components/ui/Modal";
 import { saveFileWithPicker } from "@/lib/client/download";
 import { createXlsxBuffer } from "@/lib/client/xlsx";
+import {
+  daftarBerkasSiswa,
+  getBerkasSiswa,
+  hapusBerkasSiswa,
+  simpanBerkasSiswa,
+} from "@/lib/gateways/berkas-sekolah";
 import {
   daftarDapodikSiswa,
   kosongkanDapodikSiswa,
@@ -33,6 +40,7 @@ import {
   type BarisDapodikSiswa,
   isianKurangDapodik,
 } from "@/lib/validations/siswa-dapodik";
+import type { PmbFileMeta } from "@/types/pmb";
 
 /**
  * Data DAPODIK per siswa di halaman Siswa (Web/Desktop dan Mobile, disalin
@@ -488,6 +496,7 @@ export function ModalDapodikSiswa({
             </div>
           ))}
         </fieldset>
+        <BerkasSiswa bisaUbah={bisaUbah} idSiswa={idSiswa} />
         {baris?.diubah_oleh ? (
           <p className="text-slate-500 text-xs">
             Terakhir diubah{" "}
@@ -500,6 +509,55 @@ export function ModalDapodikSiswa({
       </div>
       {dialogKonfirmasi}
     </Modal>
+  );
+}
+
+/** Berkas siswa (v59, `siswa_berkas`); berkas PMB pindah ke sini saat diangkat. */
+function BerkasSiswa({
+  idSiswa,
+  bisaUbah,
+}: {
+  idSiswa: string;
+  bisaUbah: boolean;
+}) {
+  const [berkas, setBerkas] = useState<PmbFileMeta[] | null>(null);
+  const [galat, setGalat] = useState<string | null>(null);
+
+  const muat = useCallback(async () => {
+    try {
+      setBerkas(await daftarBerkasSiswa(idSiswa));
+      setGalat(null);
+    } catch (err) {
+      setGalat(err instanceof Error ? err.message : "Berkas gagal dimuat.");
+    }
+  }, [idSiswa]);
+
+  useEffect(() => {
+    void muat();
+  }, [muat]);
+
+  return (
+    <div>
+      <h3 className="mb-2 font-semibold text-white text-xs uppercase">
+        Berkas siswa
+      </h3>
+      {galat ? (
+        <p className="text-rose-300 text-xs" role="alert">
+          {galat}
+        </p>
+      ) : berkas === null ? (
+        <p className="text-slate-400 text-xs">Memuat berkas...</p>
+      ) : (
+        <KelolaBerkas
+          ambil={getBerkasSiswa}
+          berkas={berkas}
+          bisaUbah={bisaUbah}
+          hapus={hapusBerkasSiswa}
+          onBerubah={muat}
+          simpan={(isi) => simpanBerkasSiswa(idSiswa, isi)}
+        />
+      )}
+    </div>
   );
 }
 

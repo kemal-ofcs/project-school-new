@@ -10,6 +10,12 @@ import {
   useState,
 } from "react";
 import { InfoBayarPmb, type RekeningPmb } from "@/components/pmb/InfoBayarPmb";
+import { siapkanBerkas } from "@/lib/client/siapkan-berkas";
+import {
+  type BerkasSekolah,
+  type JenisBerkasSekolah,
+  LABEL_JENIS_BERKAS as LABEL_BERKAS,
+} from "@/lib/validations/berkas-sekolah";
 import {
   jurusanUntukUnit,
   type PilihanPmb,
@@ -28,23 +34,6 @@ import {
   PEKERJAAN,
   PENGHASILAN,
 } from "@/lib/validations/pmb-dapodik";
-
-interface BerkasTerpilih {
-  jenis: (typeof PMB_JENIS_BERKAS)[number];
-  namaFile: string;
-  mime: (typeof PMB_MIME_BERKAS)[number];
-  ukuranByte: number;
-  kontenBase64: string;
-}
-
-const LABEL_BERKAS: Record<(typeof PMB_JENIS_BERKAS)[number], string> = {
-  kartu_keluarga: "Kartu Keluarga",
-  akta_lahir: "Akta Kelahiran",
-  ijazah: "Ijazah / SKL",
-  rapor: "Rapor",
-  foto: "Pas foto",
-  lainnya: "Berkas lain",
-};
 
 const LANGKAH = [
   "Calon siswa",
@@ -89,21 +78,6 @@ function pesanTanpaJson(status: number): string {
 
 const KELAS_ISIAN =
   "mt-1 w-full min-h-11 rounded-md border border-garis bg-latar px-3 py-2";
-
-function bacaSebagaiBase64(berkas: File): Promise<string> {
-  return new Promise((selesai, gagal) => {
-    const pembaca = new FileReader();
-    pembaca.onerror = () => gagal(new Error("Berkas tidak dapat dibaca."));
-    pembaca.onload = () => {
-      const hasil = String(pembaca.result ?? "");
-      // `readAsDataURL` menghasilkan `data:<mime>;base64,<isi>`. Yang dikirim
-      // hanya bagian isinya — awalannya akan membuat panjang stringnya melewati
-      // batas validator tanpa menambah satu byte pun data yang berguna.
-      selesai(hasil.slice(hasil.indexOf(",") + 1));
-    };
-    pembaca.readAsDataURL(berkas);
-  });
-}
 
 function Label({
   htmlFor,
@@ -281,9 +255,13 @@ export function FormPendaftaran({
   const formRef = useRef<HTMLFormElement>(null);
   const [langkah, setLangkah] = useState(0);
   const [ringkasan, setRingkasan] = useState<[string, string][]>([]);
-  const [berkas, setBerkas] = useState<BerkasTerpilih[]>([]);
+  const [berkas, setBerkas] = useState<BerkasSekolah[]>([]);
   const [kiriman, setKiriman] = useState<Kiriman>({ keadaan: "kosong" });
-  const [galatBerkas, setGalatBerkas] = useState<string | null>(null);
+  // Per jenis, supaya penolakan satu berkas tidak tertimpa penolakan berikutnya.
+  const [galatBerkas, setGalatBerkas] = useState<
+    Partial<Record<JenisBerkasSekolah, string>>
+  >({});
+  const [menyiapkan, setMenyiapkan] = useState<JenisBerkasSekolah | null>(null);
   // Terkendali karena daftar program bergantung pada unit (v58); nilainya
   // tetap terbaca `FormData` lewat atribut `name`.
   const [unit, setUnit] = useState("");
@@ -438,47 +416,36 @@ export function FormPendaftaran({
   }
 
   async function pilihBerkas(
-    jenis: (typeof PMB_JENIS_BERKAS)[number],
-    daftar: FileList | null,
+    jenis: JenisBerkasSekolah,
+    masukan: HTMLInputElement,
   ) {
-    const dipilih = daftar?.[0];
+    const dipilih = masukan.files?.[0];
     if (!dipilih) return;
+    const tolak = (pesan: string) => {
+      // Kolomnya dikosongkan: nama berkas yang ditolak tidak boleh tetap
+      // terlihat seolah terlampir.
+      masukan.value = "";
+      setGalatBerkas((lama) => ({ ...lama, [jenis]: pesan }));
+    };
 
-    setGalatBerkas(null);
-
-    if (dipilih.size > PMB_BERKAS_MAX_BYTE) {
-      setGalatBerkas(
-        `${LABEL_BERKAS[jenis]} berukuran ${Math.round(dipilih.size / 1024)} KB, melebihi batas ${Math.round(PMB_BERKAS_MAX_BYTE / 1024)} KB.`,
-      );
-      return;
-    }
-
-    if (!PMB_MIME_BERKAS.includes(dipilih.type as never)) {
-      setGalatBerkas(
-        `${LABEL_BERKAS[jenis]} harus berupa JPG, PNG, WEBP, atau PDF.`,
-      );
-      return;
-    }
-
+    setGalatBerkas((lama) => ({ ...lama, [jenis]: undefined }));
+    setMenyiapkan(jenis);
     try {
-      const kontenBase64 = await bacaSebagaiBase64(dipilih);
+      const siap = await siapkanBerkas(dipilih);
+      if (!siap.ok) {
+        tolak(siap.pesan);
+        return;
+      }
       setBerkas((sebelumnya) => [
         ...sebelumnya.filter((item) => item.jenis !== jenis),
-        {
-          jenis,
-          namaFile: dipilih.name.slice(0, 180),
-          mime: dipilih.type as (typeof PMB_MIME_BERKAS)[number],
-          ukuranByte: dipilih.size,
-          kontenBase64,
-        },
+        { jenis, ...siap.berkas },
       ]);
     } catch (error) {
-      // Tidak didiamkan: pengguna harus tahu berkasnya tidak jadi terlampir,
-      // karena kalau tidak ia akan mengirim pendaftaran yang tampak lengkap di
-      // layarnya dan tiba di panitia tanpa berkas.
-      setGalatBerkas(
+      tolak(
         error instanceof Error ? error.message : "Berkas tidak dapat dibaca.",
       );
+    } finally {
+      setMenyiapkan(null);
     }
   }
 
@@ -559,7 +526,12 @@ export function FormPendaftaran({
           emailWali: ambil("emailWali") || null,
           pilihanJurusan: ambil("pilihanJurusan"),
           pilihanUnit: ambil("pilihanUnit") || null,
-          berkas,
+          berkas: berkas.map(({ jenis, namaFile, mime, kontenBase64 }) => ({
+            jenis,
+            namaFile,
+            mime,
+            kontenBase64,
+          })),
           dataDapodik: Object.fromEntries(
             KUNCI_DATA_DAPODIK.map((kunci) => [kunci, ambil(kunci)]),
           ),
@@ -1060,43 +1032,48 @@ export function FormPendaftaran({
       >
         <legend className="sr-only">{LANGKAH[4]}</legend>
         <p className="text-sm text-teks-lembut leading-relaxed">
-          Format JPG, PNG, WEBP, atau PDF. Maksimal{" "}
-          {Math.round(PMB_BERKAS_MAX_BYTE / 1024)} KB per berkas. Berkas yang
+          Format JPG, PNG, WEBP, atau PDF. Foto dipadatkan otomatis; PDF
+          maksimal {Math.round(PMB_BERKAS_MAX_BYTE / 1024)} KB. Berkas yang
           belum siap dapat menyusul lewat panitia.
         </p>
 
         {PMB_JENIS_BERKAS.filter((jenis) => jenis !== "lainnya").map(
           (jenis) => {
             const terlampir = berkas.find((item) => item.jenis === jenis);
+            const galat = galatBerkas[jenis];
+            const idInfo = `${id}-${jenis}-info`;
             return (
               <div key={jenis}>
                 <Label htmlFor={`${id}-${jenis}`}>{LABEL_BERKAS[jenis]}</Label>
                 <input
                   accept={PMB_MIME_BERKAS.join(",")}
+                  aria-describedby={idInfo}
+                  aria-invalid={galat ? true : undefined}
                   className={`${KELAS_ISIAN} text-sm`}
+                  disabled={menyiapkan !== null}
                   id={`${id}-${jenis}`}
                   name={`berkas-${jenis}`}
                   onChange={(peristiwa) =>
-                    pilihBerkas(jenis, peristiwa.currentTarget.files)
+                    void pilihBerkas(jenis, peristiwa.currentTarget)
                   }
                   type="file"
                 />
-                {terlampir ? (
-                  <p className="mt-1 text-teks-lembut text-xs">
-                    Terlampir: {terlampir.namaFile} (
-                    {Math.round(terlampir.ukuranByte / 1024)} KB)
-                  </p>
-                ) : null}
+                <p
+                  className={`mt-1 text-xs ${galat ? "font-medium text-red-600 dark:text-red-400" : "text-teks-lembut"}`}
+                  id={idInfo}
+                >
+                  {menyiapkan === jenis
+                    ? "Memadatkan berkas…"
+                    : galat
+                      ? `Belum terlampir. ${galat}`
+                      : terlampir
+                        ? `Terlampir: ${terlampir.namaFile} (${Math.ceil(terlampir.ukuranByte / 1024)} KB)`
+                        : null}
+                </p>
               </div>
             );
           },
         )}
-
-        {galatBerkas ? (
-          <p className="rounded-md border border-garis bg-latar-lembut p-3 text-sm">
-            {galatBerkas}
-          </p>
-        ) : null}
 
         <div className="rounded-lg border border-garis p-4">
           <h3 className="font-semibold">Periksa sebelum mengirim</h3>
@@ -1107,6 +1084,14 @@ export function FormPendaftaran({
                 <dd className="font-medium wrap-break-word">{nilai}</dd>
               </div>
             ))}
+            <div className="contents">
+              <dt className="text-teks-lembut">Berkas terlampir</dt>
+              <dd className="font-medium wrap-break-word">
+                {berkas.length > 0
+                  ? berkas.map((item) => LABEL_BERKAS[item.jenis]).join(", ")
+                  : "Belum ada, menyusul lewat panitia"}
+              </dd>
+            </div>
           </dl>
         </div>
 

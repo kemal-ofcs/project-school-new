@@ -7,6 +7,7 @@ import {
   DataDapodikDetail,
   TombolEksporDapodik,
 } from "@/components/pmb/DataDapodikPmb";
+import { KelolaBerkas } from "@/components/berkas/KelolaBerkas";
 import { PembayaranPmb } from "@/components/pmb/PembayaranPmb";
 import { FeedbackBanner } from "@/components/ui/FeedbackBanner";
 import { Modal } from "@/components/ui/Modal";
@@ -14,13 +15,16 @@ import { canAccessArea, hasPermission } from "@/lib/auth/access";
 import { useAuth } from "@/lib/context/AuthContext";
 import { getDaftarRombel, getDaftarUnit } from "@/lib/gateways/academic";
 import {
+  hapusBerkasPendaftar,
+  simpanBerkasPendaftar,
+} from "@/lib/gateways/berkas-sekolah";
+import {
   daftarGelombangPmb,
   daftarPendaftarPmb,
   getBerkasPendaftarPmb,
   getDetailPendaftarPmb,
   hapusPendaftarPmb,
   jadikanSiswaDariPmb,
-  type PmbFileContent,
   type PmbRegistrantDetail,
   type PmbRegistrantItem,
   type PmbWave,
@@ -92,7 +96,6 @@ export default function PmbMobilePage() {
   const [draftGelombang, setDraftGelombang] = useState(GELOMBANG_KOSONG);
 
   const [detail, setDetail] = useState<PmbRegistrantDetail | null>(null);
-  const [berkasDibuka, setBerkasDibuka] = useState<PmbFileContent | null>(null);
   const [modalPromosi, setModalPromosi] = useState<PmbRegistrantItem | null>(
     null,
   );
@@ -176,15 +179,6 @@ export default function PmbMobilePage() {
       setGalat(error instanceof Error ? error.message : "Detail gagal dimuat.");
     }
   }, []);
-
-  async function bukaBerkas(idBerkas: string) {
-    setGalat("");
-    try {
-      setBerkasDibuka(await getBerkasPendaftarPmb(idBerkas));
-    } catch (error) {
-      setGalat(error instanceof Error ? error.message : "Berkas gagal dimuat.");
-    }
-  }
 
   async function ubahStatus(idPendaftar: string, status: string) {
     if (isSubmittingRef.current) return;
@@ -569,25 +563,34 @@ export default function PmbMobilePage() {
               <h2 className="font-semibold text-white text-xs uppercase">
                 Berkas
               </h2>
-              {detail.berkas.length === 0 ? (
+              {detail.pendaftar.status === "Terdaftar" ? (
                 <p className="mt-1 text-slate-400 text-xs">
-                  Tidak ada berkas diunggah.
+                  Berkas sudah dipindah ke data siswa. Kelola di halaman Siswa,
+                  tombol DAPODIK.
                 </p>
               ) : (
-                <ul className="mt-2 space-y-2">
-                  {detail.berkas.map((berkas) => (
-                    <li key={berkas.id_berkas}>
-                      <button
-                        className="w-full rounded-xl border border-white/15 px-3 py-2 text-left text-white text-xs"
-                        onClick={() => void bukaBerkas(berkas.id_berkas)}
-                        type="button"
-                      >
-                        {berkas.jenis} · {berkas.nama_file} (
-                        {Math.round(berkas.ukuran_byte / 1024)} KB)
-                      </button>
-                    </li>
-                  ))}
-                </ul>
+                <div className="mt-2">
+                  <KelolaBerkas
+                    ambil={getBerkasPendaftarPmb}
+                    berkas={detail.berkas}
+                    bisaUbah={bolehKelola}
+                    hapus={hapusBerkasPendaftar}
+                    onBerubah={async () => {
+                      await muatData();
+                      setDetail(
+                        await getDetailPendaftarPmb(
+                          detail.pendaftar.id_pendaftar,
+                        ),
+                      );
+                    }}
+                    simpan={(berkas) =>
+                      simpanBerkasPendaftar(
+                        detail.pendaftar.id_pendaftar,
+                        berkas,
+                      )
+                    }
+                  />
+                </div>
               )}
             </div>
 
@@ -662,28 +665,6 @@ export default function PmbMobilePage() {
               ) : null}
             </div>
           </div>
-        ) : null}
-      </Modal>
-
-      <Modal
-        isOpen={berkasDibuka !== null}
-        onClose={() => setBerkasDibuka(null)}
-        title={berkasDibuka?.nama_file ?? "Berkas"}
-      >
-        {berkasDibuka ? (
-          berkasDibuka.mime === "application/pdf" ? (
-            <p className="text-slate-300 text-sm">
-              Berkas PDF ({Math.round(berkasDibuka.ukuran_byte / 1024)} KB).
-              Pratinjau PDF tidak tersedia di jendela ini.
-            </p>
-          ) : (
-            // biome-ignore lint/performance/noImgElement: sumbernya data URI dari cloud, bukan aset statis yang bisa dioptimalkan
-            <img
-              alt={`Berkas ${berkasDibuka.jenis}`}
-              className="w-full rounded-xl"
-              src={`data:${berkasDibuka.mime};base64,${berkasDibuka.konten_base64}`}
-            />
-          )
         ) : null}
       </Modal>
 

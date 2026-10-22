@@ -112,6 +112,8 @@ export interface PmbFileMeta {
   mime: string;
   ukuran_byte: number;
   created_at?: string;
+  /** Hanya berkas siswa (v59): operator pengunggah, atau `PMB`. */
+  diunggah_oleh?: string | null;
 }
 
 export interface PmbFileContent extends PmbFileMeta {

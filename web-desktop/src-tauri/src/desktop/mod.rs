@@ -30,6 +30,7 @@ pub mod nilai_akhir;
 pub mod payroll;
 pub mod pmb_bayar;
 pub mod siswa_dapodik;
+pub mod berkas_sekolah;
 pub mod portability;
 pub mod rapel;
 pub mod teaching_journal;

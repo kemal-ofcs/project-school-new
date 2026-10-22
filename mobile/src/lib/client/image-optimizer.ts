@@ -86,6 +86,11 @@ export async function optimizeImageDataUrl(
       ctx.imageSmoothingEnabled = true;
       ctx.imageSmoothingQuality = "high";
 
+      // JPEG tidak punya transparansi; tanpa latar putih, PNG transparan jadi hitam.
+      if (mimeType === "image/jpeg") {
+        ctx.fillStyle = "#ffffff";
+        ctx.fillRect(0, 0, targetW, targetH);
+      }
       ctx.drawImage(img, 0, 0, targetW, targetH);
 
       const optimizedDataUrl = canvas.toDataURL(mimeType, quality);

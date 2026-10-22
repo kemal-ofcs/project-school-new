@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { berkasSekolahSchema } from "@/lib/validations/berkas-sekolah";
 import {
   dataDapodikSchema,
   VERSI_DATA_DAPODIK,
@@ -35,31 +36,12 @@ export const PMB_STATUS = [
   "Terdaftar",
 ] as const;
 
-export const PMB_JENIS_BERKAS = [
-  "kartu_keluarga",
-  "akta_lahir",
-  "ijazah",
-  "rapor",
-  "foto",
-  "lainnya",
-] as const;
-
-export const PMB_MIME_BERKAS = [
-  "image/jpeg",
-  "image/png",
-  "image/webp",
-  "application/pdf",
-] as const;
-
-/**
- * Batas ukuran satu berkas, dalam byte sebelum base64.
- *
- * Angka yang sama dengan foto siswa di panel admin. Base64 menggembungkan
- * ±4/3, jadi batas panjang stringnya dihitung dari sini alih-alih ditulis
- * sebagai angka kedua yang bisa bergeser sendiri.
- */
-export const PMB_BERKAS_MAX_BYTE = 500 * 1024;
-export const PMB_BERKAS_MAX_BASE64 = Math.ceil(PMB_BERKAS_MAX_BYTE / 3) * 4;
+// Jenis, mime, dan batas berkas diatur bersama panel admin (v59).
+export {
+  JENIS_BERKAS_SEKOLAH as PMB_JENIS_BERKAS,
+  MAKS_BYTE_BERKAS as PMB_BERKAS_MAX_BYTE,
+  MIME_BERKAS_SEKOLAH as PMB_MIME_BERKAS,
+} from "@/lib/validations/berkas-sekolah";
 
 const teksWajib = (maks: number) => z.string().trim().min(1).max(maks);
 const teksOpsional = (maks: number) =>
@@ -92,15 +74,8 @@ const tanggal = z
     );
   }, "Tanggal tidak ada di kalender");
 
-export const berkasPendaftaranSchema = z
-  .object({
-    jenis: z.enum(PMB_JENIS_BERKAS),
-    namaFile: teksWajib(180),
-    mime: z.enum(PMB_MIME_BERKAS),
-    ukuranByte: z.number().int().positive().max(PMB_BERKAS_MAX_BYTE),
-    kontenBase64: z.string().min(1).max(PMB_BERKAS_MAX_BASE64),
-  })
-  .strict();
+/** Ukuran dihitung dari isi dan tanda tangan berkas diperiksa; lihat `berkas-sekolah.ts`. */
+export const berkasPendaftaranSchema = berkasSekolahSchema;
 
 export const pendaftaranSchema = z
   .object({

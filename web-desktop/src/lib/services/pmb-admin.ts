@@ -2,6 +2,10 @@ import "server-only";
 
 import type { Client } from "@libsql/client";
 import {
+  SQL_BUANG_BERKAS_PMB_TERPINDAH,
+  SQL_PINDAH_BERKAS_PMB,
+} from "@/lib/validations/berkas-sekolah";
+import {
   type KeadaanPendaftarPmb,
   SQL_KEADAAN_BAYAR_PMB,
   SQL_MEMAKAN_KUOTA_PMB,
@@ -223,7 +227,9 @@ export async function listPmbRegistrants(
            ${filter.dapodik ? "p.tempat_lahir, p.tanggal_lahir, p.alamat, p.data_dapodik," : ""}
            COALESCE(g.nama, '') AS nama_gelombang,
            (SELECT COUNT(*) FROM pmb_berkas b
-             WHERE b.id_pendaftar = p.id_pendaftar) AS jumlah_berkas
+             WHERE b.id_pendaftar = p.id_pendaftar)
+           + (SELECT COUNT(*) FROM siswa_berkas s
+               WHERE s.id_siswa = p.id_siswa) AS jumlah_berkas
       FROM pmb_pendaftar p
       LEFT JOIN pmb_gelombang g ON g.id_gelombang = p.id_gelombang
      WHERE 1=1`;
@@ -378,6 +384,15 @@ export async function markPmbRegistered(
       },
       {
         sql: `${SQL_SALIN_DAPODIK_PMB} AND id_pendaftar = ?;`,
+        args: [idPendaftar],
+      },
+      // Berkasnya pindah ke `siswa_berkas` (v59), tidak disalin.
+      {
+        sql: `${SQL_PINDAH_BERKAS_PMB} AND b.id_pendaftar = ?;`,
+        args: [idPendaftar],
+      },
+      {
+        sql: `${SQL_BUANG_BERKAS_PMB_TERPINDAH} AND id_pendaftar = ?;`,
         args: [idPendaftar],
       },
     ],

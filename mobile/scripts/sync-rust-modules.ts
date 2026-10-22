@@ -21,6 +21,8 @@ const filesToSync = [
   // Pembayaran PMB (v52): keadaan bayar dan penolakan wajib identik dengan TS.
   "pmb_bayar.rs",
   "siswa_dapodik.rs",
+  // Berkas pendaftar dan siswa (v59): aturan unggah wajib identik dengan TS.
+  "berkas_sekolah.rs",
   // Tagihan siswa (K3a): tarif dan keringanan wajib identik dengan Desktop dan TS.
   "billing.rs",
   "tutup_buku.rs",

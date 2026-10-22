@@ -4354,6 +4354,96 @@ pub async fn desktop_clear_student_dapodik(
         .await
 }
 
+fn urai_berkas_kiriman(
+    jenis: &str,
+    nama_file: &str,
+    mime: &str,
+    konten_base64: &str,
+) -> Result<super::berkas_sekolah::BerkasSah, CommandError> {
+    super::berkas_sekolah::urai_berkas(jenis, nama_file, mime, konten_base64)
+        .map_err(|pesan| CommandError::new("VALIDATION_ERROR", pesan))
+}
+
+/// Unggah atau ganti satu berkas pendaftar PMB (Cloud-Only, v59).
+#[tauri::command]
+pub async fn desktop_save_pmb_file(
+    state: State<'_, DesktopState>,
+    id_pendaftar: String,
+    jenis: String,
+    nama_file: String,
+    mime: String,
+    konten_base64: String,
+) -> Result<Value, CommandError> {
+    require_permission(&state, "pmb.manage")?;
+    let berkas = urai_berkas_kiriman(&jenis, &nama_file, &mime, &konten_base64)?;
+    super::berkas_sekolah::simpan_berkas_pmb(&state.get_turso_client()?, id_pendaftar.trim(), &berkas).await
+}
+
+/// Hapus satu berkas pendaftar PMB (Cloud-Only, v59).
+#[tauri::command]
+pub async fn desktop_delete_pmb_file(
+    state: State<'_, DesktopState>,
+    id_berkas: String,
+) -> Result<Value, CommandError> {
+    require_permission(&state, "pmb.manage")?;
+    super::berkas_sekolah::hapus_berkas_pmb(&state.get_turso_client()?, &id_berkas).await
+}
+
+/// Daftar berkas seorang siswa tanpa isinya (Cloud-Only, v59). `pmb.view`
+/// seperti data DAPODIK siswa: isinya KK dan akta.
+#[tauri::command]
+pub async fn desktop_list_student_files(
+    state: State<'_, DesktopState>,
+    id_siswa: String,
+) -> Result<Value, CommandError> {
+    require_permission(&state, "pmb.view")?;
+    super::berkas_sekolah::daftar_berkas_siswa(&state.get_turso_client()?, &id_siswa).await
+}
+
+/// Satu berkas siswa beserta isinya, diambil saat dibuka (Cloud-Only, v59).
+#[tauri::command]
+pub async fn desktop_get_student_file(
+    state: State<'_, DesktopState>,
+    id_berkas: String,
+) -> Result<Value, CommandError> {
+    require_permission(&state, "pmb.view")?;
+    super::berkas_sekolah::ambil_berkas_siswa(&state.get_turso_client()?, &id_berkas).await
+}
+
+/// Unggah atau ganti satu berkas siswa (Cloud-Only, v59). Dua izin seperti
+/// simpan data DAPODIK siswa.
+#[tauri::command]
+pub async fn desktop_save_student_file(
+    state: State<'_, DesktopState>,
+    id_siswa: String,
+    jenis: String,
+    nama_file: String,
+    mime: String,
+    konten_base64: String,
+) -> Result<Value, CommandError> {
+    let operator = require_permission(&state, "pmb.manage")?;
+    require_permission(&state, "students.manage")?;
+    let berkas = urai_berkas_kiriman(&jenis, &nama_file, &mime, &konten_base64)?;
+    super::berkas_sekolah::simpan_berkas_siswa(
+        &state.get_turso_client()?,
+        &id_siswa,
+        &berkas,
+        &operator.username,
+    )
+    .await
+}
+
+/// Hapus satu berkas siswa (Cloud-Only, v59).
+#[tauri::command]
+pub async fn desktop_delete_student_file(
+    state: State<'_, DesktopState>,
+    id_berkas: String,
+) -> Result<Value, CommandError> {
+    require_permission(&state, "pmb.manage")?;
+    require_permission(&state, "students.manage")?;
+    super::berkas_sekolah::hapus_berkas_siswa(&state.get_turso_client()?, &id_berkas).await
+}
+
 #[cfg(test)]
 mod tests_offline_login {
     use super::*;
