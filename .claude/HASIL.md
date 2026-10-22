@@ -1,7 +1,7 @@
 # HASIL.md — hasil `bun run check`
 
-- Waktu: 2026-10-21 22:20 WIB
-- Commit: 2addaad (+ 52 berkas berubah, belum commit)
+- Waktu: 2026-10-22 08:25 WIB
+- Commit: b0c8826 (bersih)
 - Perintah: `bun run check` (root)
 - Exit code: 0
 - Status: **LULUS**
@@ -39,4 +39,4 @@
 *(tidak ada galat)*
 
 ## Catatan
-Seluruh audit integritas dan gerbang pengujian di ketiga workspace (`web-desktop`, `mobile`, `web-public`) berhasil lulus 100%.
+Seluruh audit integritas, verifikasi skema/kontrak, linting, typecheck, dan pengujian unit (termasuk cargo test pada web-desktop dan mobile) berhasil lulus 100%.
