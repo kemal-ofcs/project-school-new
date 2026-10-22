@@ -673,7 +673,10 @@ export function FormPendaftaran({
       // tertutup header setiap kali pindah langkah.
       className="scroll-mt-24 space-y-8"
       noValidate
-      onInput={() => {
+      // `onChange`, bukan `onInput`: event `input` datang sebelum `change`, dan
+      // render ulang dari `setPenentu` di sana mengembalikan select terkendali
+      // (unit, program) ke nilai lamanya sebelum `onChange`-nya sempat jalan.
+      onChange={() => {
         simpanDraf();
         perbaruiPenentu();
       }}
