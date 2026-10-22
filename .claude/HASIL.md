@@ -1,7 +1,7 @@
 # HASIL.md — hasil `bun run check`
 
-- Waktu: 2026-10-22 18:36 WIB
-- Commit: f82c471 (+ 7 berkas berubah, belum commit)
+- Waktu: 2026-10-22 20:08 WIB
+- Commit: 92a3102 (+ 1 berkas berubah, belum commit)
 - Perintah: `bun run check` (root)
 - Exit code: 0
 - Status: **LULUS**
@@ -29,4 +29,4 @@
 *(tidak ada)*
 
 ## Catatan
-Seluruh 11 skrip audit integritas, linting/typecheck, pengujian Playwright/Bun test, serta `cargo test` Rust di workspace `web-desktop`, `mobile`, dan `web-public` lulus 100% tanpa galat.
+Seluruh 11 skrip audit integritas skema dan kontrak, linting Biome, typecheck TypeScript, Bun test suite, serta pengujian Rust `cargo test` di workspace `web-desktop` (448 tes), `mobile` (451 tes), dan `web-public` (semua tes) lulus 100% tanpa galat.
