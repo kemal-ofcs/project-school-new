@@ -48,6 +48,8 @@ const filesToCopy = [
   "components/inventory/gaya.ts",
   "components/inventory/beritaAcara.ts",
   "components/inventory/ekspor.ts",
+  // Dialog ekspor Excel berkolom pilihan, misalnya lembar validasi stok.
+  "components/inventory/DialogEkspor.tsx",
   // Pemindai label (kamera + pemindai USB) dan dialog cetak label QR.
   "components/inventory/LabelQr.tsx",
   // Registri aset per unit: daftarkan unit dan ubah nomor seri.

@@ -48,10 +48,10 @@ import {
   PENERIMA_TIPE,
   TIPE_BARANG,
 } from "@/lib/validations/inventory";
+import { DialogEkspor } from "./DialogEkspor";
 import {
   bacaImporBarang,
   eksporKartuStok,
-  eksporRekapStok,
   unduhTemplateBarang,
 } from "./ekspor";
 import {
@@ -179,6 +179,10 @@ export function InventarisWorkspace({
   const [barangKartu, setBarangKartu] = useState("");
   const [aturAwalan, setAturAwalan] = useState(false);
   const [aturKolom, setAturKolom] = useState(false);
+  const [ekspor, setEkspor] = useState<{
+    barang: BarangInventaris[];
+    tempat: string;
+  } | null>(null);
   const [unitAksi, setUnitAksi] = useState<
     | { jenis: "daftar"; barang: BarangInventaris }
     | { jenis: "ubah"; barang: BarangInventaris; posisi: PosisiStok }
@@ -222,16 +226,6 @@ export function InventarisWorkspace({
   };
   const galat = (message: string) => setFeedback({ tone: "error", message });
   const info = (message: string) => setFeedback({ tone: "success", message });
-
-  const eksporStok = async () => {
-    if (!data) return;
-    try {
-      const hasil = await eksporRekapStok(data);
-      if (hasil.sukses) info("Rekap stok tersimpan sebagai berkas Excel.");
-    } catch (error) {
-      galat(pesanGalat(error, "Berkas Excel tidak bisa disimpan."));
-    }
-  };
 
   const unduhTemplate = async () => {
     if (!data) return;
@@ -461,7 +455,7 @@ export function InventarisWorkspace({
             onTambah={() => setFormBarang("baru")}
             onAturAwalan={() => setAturAwalan(true)}
             onAturKolom={() => setAturKolom(true)}
-            onEkspor={() => void eksporStok()}
+            onEkspor={(barang, tempat) => setEkspor({ barang, tempat })}
             onUnduhTemplate={() => void unduhTemplate()}
             onImpor={(file) => void imporBarang(file)}
             mengimpor={mengimpor}
@@ -541,6 +535,18 @@ export function InventarisWorkspace({
         />
       ) : null}
 
+      {ekspor && data ? (
+        <DialogEkspor
+          data={data}
+          barang={ekspor.barang}
+          tempat={ekspor.tempat}
+          onClose={() => setEkspor(null)}
+          onTersimpan={() => {
+            setEkspor(null);
+            info("Data inventaris tersimpan sebagai berkas Excel.");
+          }}
+        />
+      ) : null}
       {aturKolom && data ? (
         <DialogKolomTambahan
           kolom={data.kolom}
@@ -594,7 +600,8 @@ function DaftarBarang({
   onTambah: () => void;
   onAturAwalan: () => void;
   onAturKolom: () => void;
-  onEkspor: () => void;
+  /** Barang yang tampil di layar dan filter tempatnya, untuk ekspor. */
+  onEkspor: (barang: BarangInventaris[], tempat: string) => void;
   onUnduhTemplate: () => void;
   onImpor: (file: File) => void;
   mengimpor: boolean;
@@ -792,8 +799,12 @@ function DaftarBarang({
       </div>
 
       <div className="flex flex-wrap justify-end gap-2">
-        <button type="button" onClick={onEkspor} className={TOMBOL_KEDUA}>
-          Ekspor rekap stok
+        <button
+          type="button"
+          onClick={() => onEkspor(daftar, tempat)}
+          className={TOMBOL_KEDUA}
+        >
+          Ekspor Excel
         </button>
         {bisaCetak ? (
           <button
