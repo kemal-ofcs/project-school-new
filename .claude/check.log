@@ -2627,3 +2627,2615 @@ running 0 tests
 test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
 
    Doc-tests manajemen_sekolah_desktop_lib
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+$ bun run lint && bun run typecheck && bun run test && bun run test:rust
+$ biome check .
+Checked 506 files in 1951ms. No fixes applied.
+$ tsc --noEmit
+$ bun scripts/run-tests.ts
+bun test v1.4.2 (744846f84)
+
+src\lib\services\payroll-calculator.test.ts:
+(pass) upah dari menit > membulatkan titik tengah menjauhi nol [103.02ms]
+(pass) upah dari menit > membagi lebih dulu kehilangan titik tengahnya [0.40ms]
+(pass) sakelar lembur > memindahkan jam hari libur, bukan membuangnya [1.35ms]
+(pass) sakelar lembur > tanpa jenjang hari libur dibayar seperti hari biasa [0.41ms]
+(pass) sakelar lembur guru di setting_gex_system > kunci yang belum ada berarti menyala [0.28ms]
+(pass) tarif honor per jam pelajaran > tarif khusus guru menang atas tarif umum mapel [0.57ms]
+(pass) tarif honor per jam pelajaran > tarif yang berlaku mengikuti tanggal sesi, bukan akhir periode [0.82ms]
+(pass) tarif honor per jam pelajaran > baris tarif kembar dipilih secara deterministik [0.32ms]
+(pass) gabungan jam pelajaran > jam yang sama pada satu tanggal dihitung sekali [0.78ms]
+(pass) gabungan jam pelajaran > JP tanpa tarif dihitung terpisah dan tidak menggagalkan apa pun [0.24ms]
+(pass) sasaran komponen payroll > dinilai dari kelompok, bukan dari tebakan [0.41ms]
+(pass) sasaran komponen payroll > kelompok status tidak pernah cocok untuk yang bukan guru [0.16ms]
+(pass) jenis perhitungan komponen > dihitung dari dasar masing-masing [0.35ms]
+(pass) jenis perhitungan komponen > dasar negatif tidak pernah mengurangi tunjangan [0.13ms]
+
+ 14 pass
+ 0 fail
+ 64 expect() calls
+Ran 14 tests across 1 file. [129.00ms]
+bun test v1.4.2 (744846f84)
+
+src\lib\validations\class-attendance.test.ts:
+(pass) normalizeJamKe > menerima "1" menjadi "1" [1.90ms]
+(pass) normalizeJamKe > menerima "8" menjadi "8" [0.03ms]
+(pass) normalizeJamKe > menerima "12" menjadi "12" [0.01ms]
+(pass) normalizeJamKe > menerima "  3  " menjadi "3" [0.40ms]
+(pass) normalizeJamKe > menerima "1-2" menjadi "1-2" [0.03ms]
+(pass) normalizeJamKe > menerima "7-8" menjadi "7-8"
+(pass) normalizeJamKe > menerima "1 - 2" menjadi "1-2" [0.01ms]
+(pass) normalizeJamKe > menerima "11-12" menjadi "11-12"
+(pass) normalizeJamKe > menerima "20" menjadi "20" [0.01ms]
+(pass) normalizeJamKe > menerima "13-20" menjadi "13-20"
+(pass) normalizeJamKe > menolak "" [0.66ms]
+(pass) normalizeJamKe > menolak "0" [0.02ms]
+(pass) normalizeJamKe > menolak "21"
+(pass) normalizeJamKe > menolak "abc"
+(pass) normalizeJamKe > menolak "2-1"
+(pass) normalizeJamKe > menolak "3-3"
+(pass) normalizeJamKe > menolak "1-"
+(pass) normalizeJamKe > menolak "-2"
+(pass) normalizeJamKe > menolak "1-2-3"
+(pass) normalizeJamKe > menolak "1,2"
+(pass) normalizeJamKe > menolak "∩╝É" [0.06ms]
+(pass) normalizeJamKe > bentuk kanonik membuat dua ejaan sesi yang sama tidak lolos sebagai duplikat [72.80ms]
+(pass) rentangJamKe > membaca "1" [0.25ms]
+(pass) rentangJamKe > membaca "12" [0.02ms]
+(pass) rentangJamKe > membaca "1-2"
+(pass) rentangJamKe > membaca "3 - 5"
+(pass) rentangJamKe > membaca "20"
+(pass) rentangJamKe > membaca "abc"
+(pass) rentangJamKe > membaca "2-1"
+(pass) rentangJamKe > membaca "21"
+(pass) jamKeBeririsan > "1" beririsan dengan "1" [0.06ms]
+(pass) jamKeBeririsan > "1-2" beririsan dengan "2" [68.53ms]
+(pass) jamKeBeririsan > "2" beririsan dengan "1-2" [0.05ms]
+(pass) jamKeBeririsan > "1-2" beririsan dengan "2-3"
+(pass) jamKeBeririsan > "1-4" beririsan dengan "2-3"
+(pass) jamKeBeririsan > "2-3" beririsan dengan "1-4"
+(pass) jamKeBeririsan > "1 - 2" beririsan dengan "1-2"
+(pass) jamKeBeririsan > "1" tidak beririsan dengan "2" [0.06ms]
+(pass) jamKeBeririsan > "1-2" tidak beririsan dengan "3-4"
+(pass) jamKeBeririsan > "3-4" tidak beririsan dengan "1-2" [0.01ms]
+(pass) jamKeBeririsan > "1-2" tidak beririsan dengan "3"
+(pass) jamKeBeririsan > "1-2" tidak beririsan dengan "abc"
+(pass) jamKeBeririsan > "abc" tidak beririsan dengan "1-2" [30.48ms]
+(pass) jamKeBeririsan > "" tidak beririsan dengan "1" [0.03ms]
+(pass) hitungJp > angka tunggal bernilai satu JP [0.14ms]
+(pass) hitungJp > rentang dihitung inklusif di kedua ujungnya [0.06ms]
+(pass) hitungJp > nilai tidak valid tidak menghasilkan angka [0.03ms]
+(pass) susunJamKe > dua angka sama menjadi angka tunggal [0.09ms]
+(pass) susunJamKe > dua angka berbeda menjadi rentang kanonik [0.03ms]
+(pass) susunJamKe > urutan terbalik dan angka di luar batas ditolak [0.06ms]
+(pass) peringatan Hadir tanpa scan gerbang > hanya menandai yang berstatus Hadir tanpa jam masuk [0.32ms]
+(pass) peringatan Hadir tanpa scan gerbang > tidak bertanya apa pun ketika semuanya wajar [0.10ms]
+(pass) peringatan Hadir tanpa scan gerbang > meringkas sisanya ketika namanya lebih dari lima [0.35ms]
+(pass) composeReconciliationMessage > tanpa template tersimpan memakai teks bawaan per anomali [0.43ms]
+(pass) composeReconciliationMessage > template tersimpan dipakai, dan jam gerbang hanya jam:menit [0.09ms]
+(pass) composeReconciliationMessage > template tersimpan yang tidak sah jatuh ke bawaan [0.04ms]
+(pass) composeReconciliationMessage > kolom kosong diisi cadangan, bukan undefined [0.03ms]
+(pass) hasUnsavedAttendanceMarks > roster yang belum disentuh tidak perlu ditanyakan [0.16ms]
+(pass) hasUnsavedAttendanceMarks > status yang menyimpang dari bawaan dihitung sebagai pekerjaan [0.08ms]
+(pass) hasUnsavedAttendanceMarks > catatan yang diketik guru juga dihitung [0.04ms]
+(pass) hasUnsavedAttendanceMarks > status kosong berarti belum ditandai, bukan penyimpangan [0.02ms]
+(pass) pengaturan jam pelajaran > jumlah per hari "null" dibaca 12 [0.06ms]
+(pass) pengaturan jam pelajaran > jumlah per hari "" dibaca 12
+(pass) pengaturan jam pelajaran > jumlah per hari "   " dibaca 12
+(pass) pengaturan jam pelajaran > jumlah per hari "bukan angka" dibaca 12
+(pass) pengaturan jam pelajaran > jumlah per hari "0" dibaca 12
+(pass) pengaturan jam pelajaran > jumlah per hari "-3" dibaca 12
+(pass) pengaturan jam pelajaran > jumlah per hari "21" dibaca 12
+(pass) pengaturan jam pelajaran > jumlah per hari "1" dibaca 1
+(pass) pengaturan jam pelajaran > jumlah per hari "8" dibaca 8
+(pass) pengaturan jam pelajaran > jumlah per hari "12" dibaca 12
+(pass) pengaturan jam pelajaran > jumlah per hari "20" dibaca 20
+(pass) pengaturan jam pelajaran > jumlah per hari " 10 " dibaca 10
+(pass) pengaturan jam pelajaran > durasi "null" dibaca 45 [0.06ms]
+(pass) pengaturan jam pelajaran > durasi "" dibaca 45
+(pass) pengaturan jam pelajaran > durasi "abc" dibaca 45
+(pass) pengaturan jam pelajaran > durasi "0" dibaca 45
+(pass) pengaturan jam pelajaran > durasi "241" dibaca 45
+(pass) pengaturan jam pelajaran > durasi "35" dibaca 35
+(pass) pengaturan jam pelajaran > durasi "40" dibaca 40
+(pass) pengaturan jam pelajaran > durasi "45" dibaca 45
+(pass) pengaturan jam pelajaran > durasi "240" dibaca 240
+(pass) normalizeJamBel > menerima "07:00" menjadi "07:00" [0.17ms]
+(pass) normalizeJamBel > menerima "7:0" menjadi "07:00" [0.02ms]
+(pass) normalizeJamBel > menerima "7:5" menjadi "07:05"
+(pass) normalizeJamBel > menerima "23:59" menjadi "23:59"
+(pass) normalizeJamBel > menerima "00:00" menjadi "00:00"
+(pass) normalizeJamBel > menerima " 08 : 30 " menjadi "08:30"
+(pass) normalizeJamBel > menolak "" [0.03ms]
+(pass) normalizeJamBel > menolak "0700"
+(pass) normalizeJamBel > menolak "24:00"
+(pass) normalizeJamBel > menolak "07:60"
+(pass) normalizeJamBel > menolak "7"
+(pass) normalizeJamBel > menolak ":30"
+(pass) normalizeJamBel > menolak "07:"
+(pass) normalizeJamBel > menolak "abc:00"
+(pass) normalizeJamBel > menolak "007:00"
+(pass) normalizeJamBel > menolak "∩╝É7:00" [0.03ms]
+(pass) aturNomorJamBel > hanya KBM yang bernomor [0.19ms]
+(pass) jadwal bel untuk jadwal mengajar dan presensi > celah penomoran KBM ditandai, baris nonaktif diabaikan [1.74ms]
+(pass) jadwal bel untuk jadwal mengajar dan presensi > pukul rentang hanya dari baris KBM aktif [0.42ms]
+(pass) jadwal bel untuk jadwal mengajar dan presensi > jam yang sedang berlangsung [0.16ms]
+(pass) jadwal bel untuk jadwal mengajar dan presensi > sesi yang diusulkan mengikuti rentang jadwal [0.20ms]
+
+ 103 pass
+ 0 fail
+ 126 expect() calls
+Ran 103 tests across 1 file. [290.00ms]
+bun test v1.4.2 (744846f84)
+
+src\lib\attendance\time-policy.test.ts:
+(pass) mesin aturan waktu scan shift reguler > menolak shift pagi sebelum jendela Awal Absen Masuk dibuka [7.66ms]
+(pass) mesin aturan waktu scan shift reguler > menerima datang lebih awal di jendela Awal Absen Masuk [105.32ms]
+(pass) mesin aturan waktu scan shift reguler > jendela Tepat Waktu berada sebelum jam masuk [48.39ms]
+(pass) mesin aturan waktu scan shift reguler > scan tepat pada jam masuk masih tepat waktu [0.34ms]
+(pass) mesin aturan waktu scan shift reguler > terlambat dihitung sejak jam masuk selama masih dalam toleransi [0.15ms]
+(pass) mesin aturan waktu scan shift reguler > menolak masuk setelah jam masuk + toleransi [0.09ms]
+(pass) mesin aturan waktu scan shift reguler > tidak langsung menganggap scan kedua sebagai pulang [0.12ms]
+(pass) mesin aturan waktu scan shift reguler > mencatat pulang lebih awal dan kekurangan kerja dalam menit [1.01ms]
+(pass) mesin aturan waktu scan shift reguler > menerima pulang normal [0.35ms]
+(pass) mesin aturan waktu scan shift reguler > menghitung lembur dalam menit selama jendela pulang masih terbuka [0.24ms]
+(pass) mesin aturan waktu scan shift reguler > menolak pulang melewati batas akhir [0.17ms]
+(pass) mesin aturan waktu scan shift reguler > menolak scan ketiga setelah jam pulang tercatat [0.10ms]
+(pass) mesin aturan waktu scan shift reguler > mencatat pulang tanpa masuk sebagai Perlu Verifikasi [0.11ms]
+(pass) tanggal kerja dan timezone operasional > shift malam sebelum tengah malam memakai tanggal masuk [0.19ms]
+(pass) tanggal kerja dan timezone operasional > shift malam setelah tengah malam tetap memakai tanggal masuk [0.17ms]
+(pass) tanggal kerja dan timezone operasional > buffer shift malam mempertahankan tanggal kerja lama [0.18ms]
+(pass) shift fleksibel > menerima tepat satu masuk dan satu pulang tanpa aturan terlambat [0.22ms]
+(pass) potongan istirahat > belum diterapkan tepat pada offset istirahat [0.11ms]
+(pass) potongan istirahat > diterapkan setelah durasi melewati offset istirahat [0.08ms]
+(pass) potongan istirahat > dipotong penuh bila pulang melewati jam masuk + offset [0.32ms]
+(pass) potongan istirahat > offset diukur dari jam masuk shift, bukan dari jam scan [0.09ms]
+(pass) jam kerja dimulai dari jam masuk shift > datang di jendela tepat waktu tidak menambah jam kerja maupun lembur [0.08ms]
+(pass) jam kerja dimulai dari jam masuk shift > terlambat tetap dihitung dari jam scan sebenarnya [0.08ms]
+(pass) jam kerja dimulai dari jam masuk shift > shift malam memakai jam masuk pada tanggal kerjanya [0.07ms]
+(pass) rumus bersama jendela masuk dan jam kerja normal > jendela masuk disusun mundur dari jam masuk [0.13ms]
+(pass) rumus bersama jendela masuk dan jam kerja normal > koreksi admin boleh mencatat masuk setelah toleransi, sebelum jam pulang [0.13ms]
+(pass) rumus bersama jendela masuk dan jam kerja normal > jam kerja normal tidak lagi ditambah batas masuk [0.60ms]
+(pass) rumus bersama jendela masuk dan jam kerja normal > perhitungan ulang jalur admin sama dengan scanner [0.46ms]
+(pass) input waktu eksplisit > menolak timestamp string tanpa offset timezone [2.24ms]
+
+ 29 pass
+ 0 fail
+ 81 expect() calls
+Ran 29 tests across 1 file. [312.00ms]
+bun test v1.4.2 (744846f84)
+
+src\lib\validations\accounting.test.ts:
+(pass) format > formatRupiah [0.67ms]
+(pass) format > formatNomorJurnal [0.19ms]
+(pass) saldo > saldoNormalBawaan [0.07ms]
+(pass) saldo > saldoAkun dan saldoBerjalan [0.22ms]
+(pass) saldo > kolomNeracaSaldo [0.24ms]
+(pass) bagan akun bawaan > 24 akun, akun sistem ditandai, saldo normal sesuai kelompok [0.31ms]
+(pass) validateAkun > draft sah dirapikan [21.20ms]
+(pass) validateAkun > penolakan [0.34ms]
+(pass) aturanUbahAkun > akun sistem hanya boleh diganti nama [0.15ms]
+(pass) aturanUbahAkun > akun yang sudah dipakai jurnal terkunci strukturnya [0.04ms]
+(pass) validateJurnal > jurnal seimbang diterima [7.81ms]
+(pass) validateJurnal > penolakan [2.68ms]
+(pass) susunPembalik > debit dan kredit ditukar, id deterministik [0.27ms]
+(pass) susunPembalik > penolakan [0.12ms]
+(pass) laporan ISAK 35 > posisi keuangan, aktivitas, dan arus kas [0.48ms]
+
+ 15 pass
+ 0 fail
+ 98 expect() calls
+Ran 15 tests across 1 file. [156.00ms]
+bun test v1.4.2 (744846f84)
+
+src\lib\security\face-liveness.test.ts:
+(pass) analyzeFrame > menemukan kotak wajah pada elips warna kulit [45.94ms]
+(pass) analyzeFrame > tidak menemukan wajah pada frame tanpa warna kulit [0.58ms]
+(pass) analyzeFrame > mata tertutup menurunkan eyeOpenness [66.09ms]
+(pass) analyzeFrame > wajah yang mendekat memperbesar kotak wajah [2.31ms]
+(pass) frameDifference > frame identik menghasilkan selisih nol [5.19ms]
+(pass) frameDifference > frame berbeda menghasilkan selisih positif [1.18ms]
+(pass) evaluateLivenessSession > meloloskan sesi yang menuruti seluruh tantangan [40.47ms]
+(pass) evaluateLivenessSession > menolak foto diam yang tidak bergerak sama sekali [10.46ms]
+(pass) evaluateLivenessSession > menolak rekaman yang urutan tantangannya tidak sesuai [7.23ms]
+(pass) evaluateLivenessSession > menolak sesi tanpa wajah [5.68ms]
+(pass) evaluateLivenessSession > menolak rekaman yang terlalu pendek [5.57ms]
+(pass) evaluateLivenessSession > tantangan yang tidak dituruti tetap gagal [20.04ms]
+(pass) deteksi kedipan pada perangkat kelas bawah > kedipan tetap terbaca walau eksposur kamera bergeser tiap frame [68.91ms]
+(pass) deteksi kedipan pada perangkat kelas bawah > ayunan eksposur tanpa kedipan TIDAK dianggap kedipan [27.69ms]
+(pass) deteksi kedipan pada perangkat kelas bawah > garis dasar diambil dari median, bukan frame pertama [4.33ms]
+(pass) deteksi kedipan pada perangkat kelas bawah > wajah tanpa mata terbaca memberi pesan pencahayaan, bukan pesan kedipan [3.60ms]
+(pass) evaluateSingleChallenge > menolak rekaman yang terlalu pendek dengan saran yang jelas [1.35ms]
+(pass) evaluateSingleChallenge > menilai satu tantangan tanpa peduli tantangan lain [3.53ms]
+(pass) pickLivenessChallenges > mengembalikan tantangan unik sebanyak yang diminta [0.42ms]
+(pass) pickLivenessChallenges > urutan berubah mengikuti sumber acak [0.64ms]
+(pass) liveness codec > encode lalu decode mengembalikan frame yang setara [98.90ms]
+(pass) liveness codec > menolak frame dengan ukuran yang salah [0.77ms]
+(pass) liveness codec > menolak tantangan yang tidak dikenal [0.15ms]
+(pass) penilaian berkelanjutan pada jendela bergulir > kedipan yang dilakukan terlambat tetap terbaca [36.60ms]
+(pass) penilaian berkelanjutan pada jendela bergulir > tidak lolos sebelum gerakan benar-benar dilakukan [14.62ms]
+
+ 25 pass
+ 0 fail
+ 40 expect() calls
+Ran 25 tests across 1 file. [504.00ms]
+bun test v1.4.2 (744846f84)
+
+src\lib\validations\billing.test.ts:
+(pass) periode dan id > validatePeriodeTagihan [19.17ms]
+(pass) validateJenisTagihan > sah dan penolakan [7.34ms]
+(pass) tarif > validateTarif [3.78ms]
+(pass) tarif > pilihTarif: paling spesifik menang [0.47ms]
+(pass) keringanan > validateKeringanan [2.06ms]
+(pass) keringanan > keringananBerlaku [0.11ms]
+(pass) keringanan > hitungPotongan: persen dibulatkan setengah ke atas, dibatasi nominal [0.22ms]
+(pass) pembayaran > nomor kuitansi dan seri [0.22ms]
+(pass) pembayaran > validatePembayaran [3.10ms]
+(pass) pembayaran > alokasiPembayaran: jatuh tempo terlama dulu, kelebihan ke titipan [0.23ms]
+(pass) pembayaran > barisJurnalPembayaran [0.12ms]
+(pass) isian pengingat tagihan > label periode [0.08ms]
+(pass) isian pengingat tagihan > rincian, total, dan jatuh tempo terawal [0.49ms]
+(pass) persen terkumpul dan rentang bulan > persen bulat setengah ke atas [0.07ms]
+(pass) persen terkumpul dan rentang bulan > dua belas bulan dan batas atasnya [0.35ms]
+
+ 15 pass
+ 0 fail
+ 84 expect() calls
+Ran 15 tests across 1 file. [459.00ms]
+bun test v1.4.2 (744846f84)
+
+src\lib\validations\inventory.test.ts:
+(pass) aturan inventaris (vektor kembar inventory.rs) > normalizeTempat [0.40ms]
+(pass) aturan inventaris (vektor kembar inventory.rs) > isValidDate [0.23ms]
+(pass) aturan inventaris (vektor kembar inventory.rs) > validateMutasi [34.94ms]
+(pass) aturan inventaris (vektor kembar inventory.rs) > field yang tidak relevan dinormalkan [0.24ms]
+(pass) aturan inventaris (vektor kembar inventory.rs) > validateBarang [2.35ms]
+(pass) aturan inventaris (vektor kembar inventory.rs) > draft menolak kunci asing seperti dicatat_oleh [1.34ms]
+(pass) aturan inventaris (vektor kembar inventory.rs) > susunPembatalan [0.21ms]
+(pass) aturan inventaris (vektor kembar inventory.rs) > awalan kode [0.87ms]
+(pass) aturan inventaris (vektor kembar inventory.rs) > nomor urut kode [0.23ms]
+(pass) aturan inventaris (vektor kembar inventory.rs) > aturan Fase 2 [0.88ms]
+(pass) aturan inventaris (vektor kembar inventory.rs) > validateOpname [1.80ms]
+(pass) aturan inventaris (vektor kembar inventory.rs) > aturan Fase 3 [0.47ms]
+(pass) label QR inventaris > isi label tanpa karakter | yang dibaca scanner absensi [0.09ms]
+(pass) label QR inventaris > membaca label, kode ketikan, dan menolak yang lain [0.47ms]
+(pass) label QR inventaris > label dan kode unit [0.35ms]
+(pass) label QR inventaris > aksi pindai opname [0.74ms]
+(pass) registri aset per unit > aturan unit [0.66ms]
+(pass) registri aset per unit > baris pendaftaran unit tidak bisa dibatalkan [0.13ms]
+(pass) kolom tambahan (vektor kembar inventory.rs) > validateKolom [9.83ms]
+(pass) kolom tambahan (vektor kembar inventory.rs) > isAngkaKanonik [0.17ms]
+(pass) kolom tambahan (vektor kembar inventory.rs) > validateAtribut [8.11ms]
+(pass) angka kolom tambahan > ketikan berformat Indonesia [0.42ms]
+(pass) angka kolom tambahan > sel Angka Excel bertitik desimal [0.71ms]
+(pass) angka kolom tambahan > formatAngka dan bacaAtribut [0.81ms]
+(pass) jumlah desimal per barang > ketikan berformat Indonesia menjadi jumlah tersimpan [0.20ms]
+(pass) jumlah desimal per barang > sel Angka Excel: titik desimal, sisa pembulatan dirapikan [0.13ms]
+(pass) jumlah desimal per barang > formatJumlah bisa diketik ulang apa adanya [0.24ms]
+
+ 27 pass
+ 0 fail
+ 247 expect() calls
+Ran 27 tests across 1 file. [579.00ms]
+bun test v1.4.2 (744846f84)
+
+src\lib\validations\inventory-import.test.ts:
+(pass) parseInventarisRows > barang baru tanpa kode membawa saldo awal di tempat utama [11.31ms]
+(pass) parseInventarisRows > saldo awal berformat Indonesia harus bulat; sel Angka bertitik desimal [3.20ms]
+(pass) parseInventarisRows > kolom Desimal: koma diterima, Aset ditolak, barang bermutasi dipertahankan [8.03ms]
+(pass) parseInventarisRows > kode yang sudah ada mengubah barang itu dan tidak menambah stok [1.77ms]
+(pass) parseInventarisRows > kolom yang tidak ada di judul mempertahankan nilai lama [0.70ms]
+(pass) parseInventarisRows > kode ganda di database atau di file menolak seluruh berkas [0.56ms]
+(pass) parseInventarisRows > tipe, angka, dan validasi barang ditolak dengan nomor baris [0.41ms]
+(pass) parseInventarisRows > saldo barang kedaluwarsa butuh tanggal; nomor seri Excel diterima [3.19ms]
+(pass) parseInventarisRows > baris kosong dilewati tanpa menggeser nomor baris [0.52ms]
+(pass) kolom tambahan di impor > teks, angka berformat Indonesia, dan sel Angka Excel [2.13ms]
+(pass) kolom tambahan di impor > titik desimal pada sel teks ditolak, tidak ditebak [0.67ms]
+(pass) kolom tambahan di impor > judul absen dipertahankan, sel kosong dikosongkan, kolom nonaktif tidak disentuh [0.42ms]
+(pass) kolom tambahan di impor > dua kolom aktif bernama sama menolak berkas yang memuat judulnya [1.03ms]
+(pass) kolom tambahan di impor > judulAsing melaporkan kolom buatan sendiri dan kolom nonaktif [0.42ms]
+
+ 14 pass
+ 0 fail
+ 49 expect() calls
+Ran 14 tests across 1 file. [203.00ms]
+bun test v1.4.2 (744846f84)
+
+src\lib\validations\wa-notification.test.ts:
+(pass) sakelar induk notifikasi WhatsApp > pemetaan jenis ke kunci setting [0.22ms]
+(pass) sakelar induk notifikasi WhatsApp > kunci yang belum pernah ditulis berarti mati [0.17ms]
+(pass) sakelar induk notifikasi WhatsApp > menyalakan satu jenis tidak menyalakan jenis lain [0.08ms]
+(pass) sakelar induk notifikasi WhatsApp > hanya nilai 'true' yang menyalakan, jenis asing selalu mati [0.04ms]
+(pass) sakelar induk notifikasi WhatsApp > Map dan objek biasa dinilai sama [0.05ms]
+(pass) sakelar induk notifikasi WhatsApp > hanya empat status kanonik yang diterima [0.09ms]
+(pass) sakelar induk notifikasi WhatsApp > ambang retensi sama dengan WA_QUEUE_RETENTION_DAYS di Rust [0.02ms]
+(pass) pengaturan parameter ambang batas akumulasi alfa > konstanta bawaan ambang alfa [0.03ms]
+(pass) pengaturan parameter ambang batas akumulasi alfa > parsing limit ambang alfa dengan boundary [1.13ms]
+(pass) pengaturan parameter ambang batas akumulasi alfa > parsing days ambang alfa dengan boundary [0.21ms]
+(pass) pengaturan parameter ambang batas akumulasi alfa > mendukung format Map maupun Record [0.06ms]
+(pass) template teks pesan WhatsApp > isian diisi dalam satu lintasan [0.26ms]
+(pass) template teks pesan WhatsApp > validasi menolak isian asing dan mewajibkan {nama} [0.61ms]
+(pass) template teks pesan WhatsApp > tanpa template tersimpan, teksnya sama dengan sebelum fitur ini [0.13ms]
+(pass) setelan pengingat tagihan otomatis [0.14ms]
+
+ 15 pass
+ 0 fail
+ 87 expect() calls
+Ran 15 tests across 1 file. [21.00ms]
+bun test v1.4.2 (744846f84)
+
+src\lib\server\license.test.ts:
+(pass) vektor kembar > kunci uji sama dengan penerbit [2.22ms]
+(pass) vektor kembar > V1, V2, V3 terverifikasi dan terbaca utuh [3.11ms]
+(pass) vektor kembar > spasi dan baris baru di tengah teks dibuang [0.30ms]
+(pass) vektor kembar > teks yang diubah, kunci lain, dan awalan lain ditolak [0.95ms]
+(pass) aturan isi (cermin validate_payload) > pesan penolakan sama dengan Rust [3.59ms]
+(pass) kolom versi Web > instance saja sudah sah; website opsional [0.28ms]
+(pass) kolom versi Web > kode instance [1.40ms]
+(pass) kolom versi Web > daftar website [5.72ms]
+(pass) kolom versi Web > alamat website [0.27ms]
+(pass) penilaian untuk server Web > tanpa lisensi dan lisensi rusak memblokir [0.71ms]
+(pass) penilaian untuk server Web > lisensi Desktop saja tidak berlaku di Web [0.56ms]
+(pass) penilaian untuk server Web > instance lain ditolak [0.45ms]
+(pass) penilaian untuk server Web > tanpa daftar website, alamat apa pun diterima (pemasangan LAN) [0.71ms]
+(pass) penilaian untuk server Web > dengan daftar website, hanya alamat terdaftar yang diterima [1.10ms]
+(pass) penilaian untuk server Web > sewa habis dan versi di luar masa pembaruan: baca-saja [1.36ms]
+(pass) pembantu > izin mode baca-saja sama dengan Rust [0.12ms]
+(pass) pembantu > kode instance diturunkan seperti kode perangkat, berawalan S [1.18ms]
+(pass) pembantu > sisa sewa: hari terakhir = 1 [0.21ms]
+(pass) pembantu > host permintaan: tanpa port, huruf kecil, proxy didahulukan [6.87ms]
+(pass) penyimpanan dan gerbang > kode instance lahir sekali dan tetap sama [2.32ms]
+(pass) penyimpanan dan gerbang > pembaca tanpa hak tulis tidak melahirkan id instance [0.70ms]
+(pass) penyimpanan dan gerbang > build yang tidak menegakkan lisensi tidak pernah menolak [0.48ms]
+(pass) penyimpanan dan gerbang > build terkunci menolak tanpa lisensi [2.87ms]
+(pass) penyimpanan dan gerbang > lisensi bertanda tangan kunci lain ditolak saat dipasang [2.48ms]
+(pass) penyimpanan dan gerbang > lisensi untuk server ini: aktif penuh, lalu baca-saja saat sewa habis [3.99ms]
+(pass) penyimpanan dan gerbang > lisensi yang dikunci ke alamat menolak alamat lain [3.94ms]
+(pass) penyimpanan dan gerbang > hanya lisensi yang aktif penuh untuk server ini yang boleh dipasang [2.80ms]
+(pass) penyimpanan dan gerbang > lisensi tersimpan terbaca lewat konteks setelah cache dibuang [0.99ms]
+
+ 28 pass
+ 0 fail
+ 115 expect() calls
+Ran 28 tests across 1 file. [874.00ms]
+bun test v1.4.2 (744846f84)
+
+src\lib\server\database-config.test.ts:
+(pass) mode lokal ditolak di sisi Web > provider local_file selalu ditolak, bahkan dengan URL yang sah [0.41ms]
+(pass) mode lokal ditolak di sisi Web > penolakan berlaku juga di lingkungan pengembangan [0.10ms]
+(pass) Turso Cloud > HTTPS dengan token diterima [1.02ms]
+(pass) Turso Cloud > tanpa token ditolak di production [0.17ms]
+(pass) Turso Cloud > HTTP ke alamat publik ditolak [0.28ms]
+(pass) server libSQL sendiri > HTTP ke jaringan privat diterima tanpa token [0.10ms]
+(pass) server libSQL sendiri > HTTPS publik tanpa token ditolak di production [0.07ms]
+(pass) server libSQL sendiri > HTTP ke alamat publik ditolak tanpa izin eksplisit [0.05ms]
+(pass) server libSQL sendiri > HTTP ke alamat publik diterima setelah izin eksplisit dinyatakan [0.04ms]
+(pass) nilai bawaan dan alias > provider yang tidak dikenal jatuh ke aturan paling ketat [0.04ms]
+(pass) nilai bawaan dan alias > alias SPPG_DATABASE_URL setara dengan TURSO_DATABASE_URL [0.04ms]
+(pass) nilai bawaan dan alias > KOS_* menang atas TURSO_* dan SPPG_* [0.06ms]
+(pass) nilai bawaan dan alias > KOS_ALLOW_INSECURE_DATABASE dibaca seperti nama lamanya [0.12ms]
+(pass) nilai bawaan dan alias > URL kosong ditolak di production [0.09ms]
+(pass) nilai bawaan dan alias > tanpa URL di pengembangan memakai berkas lokal [0.04ms]
+(pass) databaseConfigIssue > konfigurasi yang sah tidak punya masalah [0.08ms]
+(pass) databaseConfigIssue > production tanpa alamat menyebut variabel yang kurang [0.05ms]
+(pass) databaseConfigIssue > pesan tidak pernah memuat nilai alamat atau token [2.27ms]
+
+ 18 pass
+ 0 fail
+ 39 expect() calls
+Ran 18 tests across 1 file. [26.00ms]
+bun test v1.4.2 (744846f84)
+
+src\lib\client\print-layout-store.test.ts:
+(pass) pembagian halaman cetak > bolak-balik: 23 kartu menjadi 3 lembar, urut depan lalu belakang [19.98ms]
+(pass) pembagian halaman cetak > depan saja dan belakang saja: satu halaman per lembar, tidak ada kartu yang dibuang [0.41ms]
+(pass) pembagian halaman cetak > berdampingan: 5 kartu per halaman A4, kartu ke-6 pindah halaman [0.44ms]
+(pass) pembagian halaman cetak > preset bawaan berdampingan tetap satu kartu per lembar [0.18ms]
+(pass) pembagian halaman cetak > matriks manual: indeks kartu bergeser per halaman [0.34ms]
+(pass) cermin sisi belakang > titik awal belakang dihitung dari tepi kertas yang berlawanan [0.06ms]
+(pass) cermin sisi belakang > setiap kartu belakang jatuh tepat di balik kartu depannya (long_edge) [0.31ms]
+(pass) cermin sisi belakang > setiap kartu belakang jatuh tepat di balik kartu depannya (short_edge) [0.17ms]
+(pass) tengahkan kartu di kertas > margin kiri-kanan dan atas-bawah membagi rata sisa kertas [0.24ms]
+(pass) tengahkan kartu di kertas > grid yang lebih besar dari kertas mendapat margin 0 [0.04ms]
+(pass) kalibrasi sisi belakang > gambar belakang digeser berlawanan dengan selisih terukur (long_edge) [0.85ms]
+(pass) kalibrasi sisi belakang > gambar belakang digeser berlawanan dengan selisih terukur (short_edge) [0.15ms]
+(pass) kalibrasi sisi belakang > sisi depan dan mode berdampingan tidak ikut bergeser [0.25ms]
+(pass) bleed dan tanda potong > bleed tidak mengubah posisi maupun jarak kartu [0.19ms]
+(pass) bleed dan tanda potong > tanda potong segaris dengan garis potong kartu [2.24ms]
+
+ 15 pass
+ 0 fail
+ 130 expect() calls
+Ran 15 tests across 1 file. [73.00ms]
+bun test v1.4.2 (744846f84)
+
+src\lib\server\auth\password-reset-audit.test.ts:
+(pass) katalog RBAC riwayat reset > mendaftarkan izin lihat dan hapus sebagai izin yang bisa diatur [0.40ms]
+(pass) katalog RBAC riwayat reset > Admin bawaan boleh melihat, tetapi menghapus harus diberikan sadar [0.19ms]
+(pass) katalog RBAC riwayat reset > Operator dan Scanner bawaan tidak melihat riwayat siapa pun [0.14ms]
+(pass) listPasswordResetHistory > mengembalikan riwayat terbaru lebih dulu dengan email tersamar [2.21ms]
+(pass) listPasswordResetHistory > tidak pernah membawa foto pada daftar, hanya penandanya [1.45ms]
+(pass) listPasswordResetHistory > menyaring berdasarkan status [1.19ms]
+(pass) listPasswordResetHistory > mencari berdasarkan nama, username, atau identitas yang diketik [2.03ms]
+(pass) listPasswordResetHistory > laporan liveness yang rusak tidak menjatuhkan seluruh daftar [1.82ms]
+(pass) listPasswordResetHistory > menghormati batas jumlah baris [2.24ms]
+(pass) getPasswordResetPhoto > mengembalikan foto beserta mime-nya [0.99ms]
+(pass) getPasswordResetPhoto > menolak permintaan tanpa foto dan id yang tidak dikenal [1.08ms]
+(pass) deletePasswordResetHistory > menghapus satu baris beserta fotonya [1.20ms]
+(pass) deletePasswordResetHistory > menolak id yang sudah tidak ada [0.29ms]
+(pass) purgePasswordResetHistory > hanya membuang riwayat selesai yang sudah lewat batas umur [2.09ms]
+(pass) purgePasswordResetHistory > menolak rentang hari yang tidak masuk akal [0.37ms]
+
+ 15 pass
+ 0 fail
+ 35 expect() calls
+Ran 15 tests across 1 file. [576.00ms]
+bun test v1.4.2 (744846f84)
+
+src\lib\auth\web-rbac-boundary.test.ts:
+(pass) Web RBAC trusted boundary > direct call guest dan role tanpa permission ditolak [0.38ms]
+(pass) Web RBAC trusted boundary > origin publik tetap valid saat URL internal memakai localhost [0.32ms]
+(pass) Web RBAC trusted boundary > session kedaluwarsa dan operator nonaktif tidak dapat dipakai [109.40ms]
+(pass) Web RBAC trusted boundary > Superadmin aktif terakhir tidak dapat diturunkan [96.72ms]
+(pass) Web RBAC trusted boundary > perubahan permission mencabut session role terkait [102.82ms]
+(pass) Web RBAC trusted boundary > lima kegagalan login mengaktifkan rate limit persisten [105.97ms]
+(pass) Web RBAC trusted boundary > reservasi login atomik menolak percobaan setelah batas [132.83ms]
+
+ 7 pass
+ 0 fail
+ 16 expect() calls
+Ran 7 tests across 1 file. [650.00ms]
+bun test v1.4.2 (744846f84)
+
+src\lib\rbac\rbac-migration.test.ts:
+(pass) dynamic RBAC migration > mendeteksi skema siap agar request berikutnya melewati migrasi [170.47ms]
+(pass) dynamic RBAC migration > migrasi idempotent dan mempertahankan operator lama [192.89ms]
+(pass) dynamic RBAC migration > permission khusus Superadmin tidak masuk default role lain [0.20ms]
+(pass) dynamic RBAC migration > pengecualian seed Admin di Rust sama dengan paket bawaan TS [102.30ms]
+(pass) dynamic RBAC migration > sakelar keamanan absensi role bertahan saat dibuat dan disunting [21.81ms]
+(pass) password hashing > memverifikasi PBKDF2 dan mengenali password legacy [444.44ms]
+(pass) provisioning silang Web dan Desktop/Mobile > migrasi menambal kolom yang hanya dibuat jalur Rust [121.50ms]
+(pass) provisioning silang Web dan Desktop/Mobile > semua ALTER ADD COLUMN memakai default konstan [1.34ms]
+(pass) production schema initialization > tidak membuat operator default legacy [109.06ms]
+
+ 9 pass
+ 0 fail
+ 22 expect() calls
+Ran 9 tests across 1 file. [1334.00ms]
+bun test v1.4.2 (744846f84)
+
+src\lib\services\attendance-audit.test.ts:
+(pass) Audit Kualitas Absensi > menandai karyawan yang belum absen setelah jendela scan masuk tutup [21.60ms]
+(pass) Audit Kualitas Absensi > belum menyalahkan karyawan selagi jendela scan masuk masih terbuka [6.69ms]
+(pass) Audit Kualitas Absensi > menandai sesi menggantung setelah jendela scan pulang tutup [10.51ms]
+(pass) Audit Kualitas Absensi > menghitung scan yang perlu verifikasi dan yang ditolak [13.73ms]
+(pass) Audit Kualitas Absensi > Alfa, terlambat, jam kerja kurang, dan koreksi admin muncul sebagai temuan [11.24ms]
+(pass) Audit Kualitas Absensi > hari libur aktif membuat tidak ada karyawan yang wajib absen [8.68ms]
+(pass) Audit Kualitas Absensi > shift fleksibel belum disalahkan selagi harinya masih berjalan [11.28ms]
+(pass) Audit Kualitas Absensi > shift fleksibel yang tidak absen seharian jadi temuan setelah harinya lewat [9.73ms]
+(pass) Audit Kualitas Absensi > shift fleksibel yang lupa scan pulang tetap dilaporkan [12.68ms]
+(pass) Audit Kualitas Absensi > tanggal lampau tanpa baris absensi dilaporkan sebagai tanpa data [4.76ms]
+(pass) Audit Kualitas Absensi > shift malam > belum scan masuk baru muncul setelah jendela masuk 22:30 lewat [12.26ms]
+(pass) Audit Kualitas Absensi > shift malam > masih dianggap bekerja sampai jendela pulang lintas hari tertutup [17.58ms]
+(pass) Audit Kualitas Absensi > shift malam > tidak pernah dianggap fleksibel meski melintasi tengah malam [8.39ms]
+
+ 13 pass
+ 0 fail
+ 62 expect() calls
+Ran 13 tests across 1 file. [1.80s]
+bun test v1.4.2 (744846f84)
+
+src\lib\validations\personnel-import.test.ts:
+(pass) parseStudentRows > nama rombel dan kode shift diterjemahkan ke id perangkat ini [1.68ms]
+(pass) parseStudentRows > kode shift kosong berarti tidak memilih, bukan shift 1 [9.60ms]
+(pass) parseStudentRows > nama rombel kembar wajib diperjelas dengan id_rombel [1.59ms]
+(pass) parseStudentRows > seluruh berkas ditolak dengan nomor baris bila satu sel cacat [0.76ms]
+(pass) parseStudentRows > NIS kembar di dalam berkas ditolak sebelum apa pun disimpan [0.79ms]
+(pass) parseStudentRows > nama rombel format 'Kelas X - TSM' berhasil dipetakan ke rombel TSM tingkat X [0.26ms]
+(pass) parseStudentRows > NIPD kembar di dalam berkas ditolak dengan pesan NIPD [0.29ms]
+(pass) parseStudentRows > nomor WhatsApp wali yang tidak valid ditolak lebih awal [0.28ms]
+(pass) parseStudentRows > baris kosong dilewati, berkas tanpa data ditolak [0.11ms]
+(pass) parseTeacherRows > status kepegawaian dicocokkan tanpa peduli huruf besar/kecil [0.65ms]
+(pass) parseTeacherRows > status kepegawaian asing ditolak [0.32ms]
+(pass) parseTeacherRows > kolom nama wajib ada di baris judul [0.09ms]
+(pass) parseTeacherRows > berkas tanpa kolom email tidak mengubah email tersimpan [0.05ms]
+(pass) parseTeacherRows > sel email kosong mengosongkan, isinya dinormalkan [0.28ms]
+(pass) parseTeacherRows > email salah format ditolak dengan nomor barisnya [0.10ms]
+(pass) shiftCodeOf menerjemahkan id perangkat kembali ke kode yang stabil [0.08ms]
+(pass) perbaikan impor Excel > angka yang sudah dirusak Excel ditolak, bukan disimpan [0.03ms]
+(pass) perbaikan impor Excel > tanggal dari sel Excel diterjemahkan dari nomor seri [0.21ms]
+(pass) perbaikan impor Excel > kode personil peserta didik dibaca dari header baru maupun lama [0.18ms]
+(pass) perbaikan impor Excel > unit guru ikut terbaca, tidak hilang saat impor ulang [0.05ms]
+
+ 20 pass
+ 0 fail
+ 37 expect() calls
+Ran 20 tests across 1 file. [36.00ms]
+bun test v1.4.2 (744846f84)
+
+src\lib\server\auth\two-factor.test.ts:
+(pass) pendaftaran 2FA > rahasia diterbitkan tetapi 2FA belum aktif sebelum dibuktikan [2.03ms]
+(pass) pendaftaran 2FA > kode yang benar mengaktifkan 2FA dan menerbitkan kode cadangan [6.66ms]
+(pass) pendaftaran 2FA > kode cadangan disimpan sebagai hash, bukan apa adanya [2.51ms]
+(pass) pendaftaran 2FA > kode yang salah tidak mengaktifkan apa pun [1.24ms]
+(pass) pendaftaran 2FA > mendaftar ulang saat 2FA masih aktif ditolak [1.87ms]
+(pass) gerbang 2FA saat login > akun tanpa 2FA lewat tanpa diminta apa pun [0.64ms]
+(pass) gerbang 2FA saat login > akun ber-2FA tanpa kode diminta memasukkan kode [2.40ms]
+(pass) gerbang 2FA saat login > kode autentikator yang benar diterima [10.26ms]
+(pass) gerbang 2FA saat login > kode yang salah ditolak [2.85ms]
+(pass) gerbang 2FA saat login > kode cadangan diterima dan hanya bisa dipakai sekali [4.71ms]
+(pass) gerbang 2FA saat login > role yang mewajibkan 2FA menahan operator yang belum mendaftar [0.36ms]
+(pass) mematikan 2FA > operator sendiri wajib membuktikan dengan kode [3.29ms]
+(pass) mematikan 2FA > Admin dapat mematikannya tanpa kode untuk operator yang kehilangan ponsel [1.95ms]
+(pass) mematikan 2FA > rahasia benar-benar dihapus, bukan sekadar ditandai nonaktif [1.91ms]
+
+ 14 pass
+ 0 fail
+ 40 expect() calls
+Ran 14 tests across 1 file. [364.00ms]
+bun test v1.4.2 (744846f84)
+
+src\lib\validations\holiday-whitelist.test.ts:
+(pass) normalizeScopeType > menerima dua cakupan yang sah, apa pun kapitalisasinya [0.10ms]
+(pass) normalizeScopeType > menolak cakupan lain [0.05ms]
+(pass) normalizeScopeValue > SHIFT dinormalkan ke desimal tanpa nol di depan [0.31ms]
+(pass) normalizeScopeValue > SHIFT menolak nilai bukan angka positif [0.07ms]
+(pass) normalizeScopeValue > DIVISI merapikan spasi tapi mempertahankan huruf aslinya [0.05ms]
+(pass) normalizeHolidayDate > menerima YYYY-MM-DD dan memotong bagian waktu [0.18ms]
+(pass) normalizeHolidayDate > menolak bentuk lain [0.14ms]
+(pass) foldWhitelistText > membandingkan tanpa peduli spasi dan kapitalisasi [0.04ms]
+(pass) matchesHolidayWhitelist > cakupan DIVISI cocok tanpa peduli kapitalisasi [0.22ms]
+(pass) matchesHolidayWhitelist > cakupan SHIFT cocok pada kode_shift, bukan id_shift [0.09ms]
+(pass) matchesHolidayWhitelist > shift yang tidak dikenal tidak pernah cocok pada cakupan SHIFT [0.07ms]
+(pass) matchesHolidayWhitelist > entri nonaktif tidak pernah mengizinkan [0.05ms]
+(pass) matchesHolidayWhitelist > tanggal_libur kosong berlaku untuk semua hari libur [0.05ms]
+(pass) matchesHolidayWhitelist > tanggal_libur terisi hanya berlaku pada tanggal itu [0.03ms]
+(pass) matchesHolidayWhitelist > cakupan dan nilai yang tidak sah diabaikan, bukan mengizinkan [0.02ms]
+(pass) evaluateHolidayScan > daftar kosong menolak ΓÇö bawaan aplikasi tetap 'libur = tidak ada scan' [0.10ms]
+(pass) evaluateHolidayScan > satu entri yang cocok sudah cukup, dan alasannya siap tampil [0.08ms]
+(pass) evaluateHolidayScan > cakupan SHIFT juga memberi alasan yang siap tampil [0.04ms]
+(pass) evaluateHolidayScan > tidak ada yang cocok tetap menolak [0.02ms]
+
+ 19 pass
+ 0 fail
+ 50 expect() calls
+Ran 19 tests across 1 file. [22.00ms]
+bun test v1.4.2 (744846f84)
+
+src\lib\server\auth\password-reset.test.ts:
+(pass) lookupResetAccount > menemukan akun lewat username dan menyamarkan kontaknya [2.04ms]
+(pass) lookupResetAccount > menemukan akun lewat email tanpa peduli huruf besar-kecil [4.18ms]
+(pass) lookupResetAccount > menolak akun yang tidak ada [1.53ms]
+(pass) lookupResetAccount > menolak akun nonaktif [1.34ms]
+(pass) lookupResetAccount > menolak akun tanpa email dengan pesan yang jelas [1.30ms]
+(pass) confirmResetAccount > menerbitkan tantangan ketika konfirmasi cocok [5.02ms]
+(pass) confirmResetAccount > menolak konfirmasi yang menunjuk akun lain [1.35ms]
+(pass) confirmResetAccount > permintaan baru membatalkan permintaan lama akun yang sama [3.90ms]
+(pass) swapResetChallenge > mengganti satu langkah dengan tantangan yang belum dipakai [3.72ms]
+(pass) swapResetChallenge > urutan baru benar-benar tersimpan dan dipakai saat verifikasi [3.25ms]
+(pass) swapResetChallenge > dibatasi dua kali penggantian per permintaan [20.91ms]
+(pass) swapResetChallenge > menolak indeks langkah di luar rangkaian [2.55ms]
+(pass) swapResetChallenge > menolak token tantangan yang salah [2.54ms]
+(pass) verifyResetLiveness > menolak rekaman yang urutan tantangannya tidak cocok [62.22ms]
+(pass) verifyResetLiveness > menolak token tantangan yang salah [23.88ms]
+(pass) verifyResetLiveness > menolak permintaan yang sudah kedaluwarsa [28.95ms]
+(pass) verifyResetLiveness > email belum dikonfigurasi: permintaan menunggu persetujuan, bukan gagal [53.98ms]
+(pass) verifyResetLiveness > jalur email yang dipaksa tetap membatalkan bila emailnya mati [47.77ms]
+(pass) verifyResetLiveness > menolak foto yang kosong [35.39ms]
+(pass) inspectResetToken & completePasswordReset > menampilkan pemilik token yang masih berlaku [5.12ms]
+(pass) inspectResetToken & completePasswordReset > menolak token yang tidak dikenal [0.68ms]
+(pass) inspectResetToken & completePasswordReset > menolak token yang kedaluwarsa [0.85ms]
+(pass) inspectResetToken & completePasswordReset > password lama benar-benar digantikan yang baru [272.34ms]
+(pass) inspectResetToken & completePasswordReset > token hanya dapat dipakai satu kali [94.43ms]
+(pass) inspectResetToken & completePasswordReset > password lemah ditolak dan token tetap utuh [0.88ms]
+(pass) inspectResetToken & completePasswordReset > seluruh sesi aktif operator ikut dicabut [95.61ms]
+(pass) resolvePasswordResetRoute > tanpa email aktif, bawaannya persetujuan di aplikasi [1.60ms]
+(pass) resolvePasswordResetRoute > email yang aktif membuat bawaannya kembali ke email [1.13ms]
+(pass) resolvePasswordResetRoute > nilai eksplisit mengalahkan deteksi otomatis, dua arah [2.23ms]
+(pass) resetApprovalRejection > aktor 5/false ΓåÆ target 7/false [0.86ms]
+(pass) resetApprovalRejection > aktor 5/false ΓåÆ target 5/false [0.51ms]
+(pass) resetApprovalRejection > aktor 5/true ΓåÆ target 5/true [0.53ms]
+(pass) resetApprovalRejection > aktor 5/false ΓåÆ target 7/true [0.39ms]
+(pass) resetApprovalRejection > aktor 5/true ΓåÆ target 7/true [0.47ms]
+(pass) resetApprovalRejection > aktor 5/false ΓåÆ target null/false [0.37ms]
+(pass) approvePasswordReset > token yang diserahkan peninjau benar-benar dapat dipakai [250.05ms]
+(pass) approvePasswordReset > hanya hash tokennya yang tersimpan [42.77ms]
+(pass) approvePasswordReset > persetujuan kedua ditolak, sehingga tidak ada dua token hidup [39.26ms]
+(pass) approvePasswordReset > permintaan yang kedaluwarsa ditolak dan ditandai [53.37ms]
+(pass) approvePasswordReset > permintaan yang tidak ada ditolak [4.96ms]
+(pass) approvePasswordReset > pemohon tidak bisa menyetujui pengajuannya sendiri [46.64ms]
+(pass) approvePasswordReset > akun Superadmin hanya bisa dipulihkan atas persetujuan Superadmin [29.25ms]
+(pass) issuePasswordRecoveryCodes & recoverWithRecoveryCode > database hanya memegang hash kodenya [2.68ms]
+(pass) issuePasswordRecoveryCodes & recoverWithRecoveryCode > satu kode tidak bisa dipakai dua permintaan paralel [93.03ms]
+(pass) issuePasswordRecoveryCodes & recoverWithRecoveryCode > kode yang sah mengganti password dan mencabut sesi lama [177.91ms]
+(pass) issuePasswordRecoveryCodes & recoverWithRecoveryCode > kode sekali pakai benar-benar sekali pakai [101.10ms]
+(pass) issuePasswordRecoveryCodes & recoverWithRecoveryCode > pemisah apa pun diterima, sesuai normalisasi Rust [93.97ms]
+(pass) issuePasswordRecoveryCodes & recoverWithRecoveryCode > akun yang tidak ada dan kode yang salah dijawab sama persis [2.17ms]
+(pass) issuePasswordRecoveryCodes & recoverWithRecoveryCode > password baru yang lemah ditolak sebelum kode dikonsumsi [87.03ms]
+(pass) issuePasswordRecoveryCodes & recoverWithRecoveryCode > menerbitkan ulang membatalkan seluruh kode lama [1.04ms]
+
+ 50 pass
+ 0 fail
+ 103 expect() calls
+Ran 50 tests across 1 file. [2.82s]
+bun test v1.4.2 (744846f84)
+
+src\lib\services\attendance-dashboard.test.ts:
+(pass) Dasbor Audit Kehadiran (jalur Web) > metrik dihitung sama persis dengan implementasi Rust [5.19ms]
+(pass) Dasbor Audit Kehadiran (jalur Web) > tanggal tanpa data menghasilkan nol, bukan error [4.32ms]
+
+ 2 pass
+ 0 fail
+ 22 expect() calls
+Ran 2 tests across 1 file. [242.00ms]
+bun test v1.4.2 (744846f84)
+
+src\lib\security\totp.test.ts:
+(pass) base32 > encode-decode pulang pergi tanpa kehilangan byte [5.72ms]
+(pass) base32 > rahasia RFC 4226 menghasilkan base32 yang dikenal luas [0.82ms]
+(pass) base32 > memaafkan spasi, tanda hubung, huruf kecil, dan padding [0.44ms]
+(pass) base32 > menolak karakter di luar alfabet base32 [0.21ms]
+(pass) HOTP terhadap vektor RFC 4226 > delapan pencacah pertama menghasilkan kode resmi [5.19ms]
+(pass) TOTP terhadap vektor RFC 6238 > stempel waktu resmi menghasilkan kode SHA-1 yang benar [1.45ms]
+(pass) TOTP terhadap vektor RFC 6238 > pencacah berganti setiap 30 detik [2.38ms]
+(pass) verifyTotp > menerima kode langkah waktu berjalan [9.03ms]
+(pass) verifyTotp > menerima kode satu langkah sebelum dan sesudah [2.06ms]
+(pass) verifyTotp > menolak kode di luar jendela toleransi [0.95ms]
+(pass) verifyTotp > jendela lebar menerima jam perangkat yang meleset [2.05ms]
+(pass) verifyTotp > menolak kode yang panjangnya bukan enam digit [0.25ms]
+(pass) verifyTotp > memaafkan spasi yang ikut tersalin dari autentikator [0.69ms]
+(pass) generateTotpSecret > menghasilkan rahasia 32 karakter yang berbeda tiap panggilan [0.29ms]
+(pass) buildOtpAuthUri > menyusun URI yang bisa dipindai autentikator [0.39ms]
+(pass) kode cadangan > menerbitkan kode unik dengan format yang mudah disalin tangan [0.44ms]
+(pass) kode cadangan > normalisasi menyamakan bentuk yang diketik ulang [0.07ms]
+
+ 17 pass
+ 0 fail
+ 63 expect() calls
+Ran 17 tests across 1 file. [54.00ms]
+bun test v1.4.2 (744846f84)
+
+src\lib\server\operational\constraint-guard.test.ts:
+(pass) foreign key ditegakkan > libSQL menyalakan PRAGMA foreign_keys [166.77ms]
+(pass) foreign key ditegakkan > password_reset_request menunjuk master_operator dengan ON DELETE CASCADE [141.13ms]
+(pass) menghapus operator tidak boleh memusnahkan bukti foto > removeOperator menolak akun yang punya riwayat reset [259.64ms]
+(pass) menghapus operator tidak boleh memusnahkan bukti foto > operator tanpa riwayat tetap dapat dihapus [180.91ms]
+(pass) paritas penjagaan penghapusan operator > akun yang sedang dipakai tidak dapat menghapus dirinya sendiri [185.69ms]
+(pass) paritas penjagaan penghapusan operator > operator yang tidak ada ditolak [97.17ms]
+(pass) paritas penjagaan penghapusan operator > Superadmin aktif terakhir tidak dapat dihapus [214.59ms]
+(pass) paritas penjagaan penghapusan operator > Superadmin kedua tetap dapat dihapus [327.64ms]
+(pass) paritas penjagaan penghapusan operator > operator dengan histori transaksi ditolak sebelum riwayat reset [179.40ms]
+(pass) indeks unik email operator > menolak email kembar walau beda huruf besar-kecil [295.92ms]
+(pass) indeks unik email operator > beberapa operator lama tanpa email tidak saling bentrok [97.76ms]
+(pass) migrasi database lama > menambah kolom kontak dan indeksnya pada tabel yang sudah ada [175.72ms]
+(pass) CHECK constraint > status riwayat di luar daftar ditolak [227.11ms]
+(pass) CHECK constraint > penyedia email dan is_active dijaga CHECK [124.39ms]
+
+ 14 pass
+ 0 fail
+ 24 expect() calls
+Ran 14 tests across 1 file. [2.83s]
+bun test v1.4.2 (744846f84)
+
+src\lib\validations\loan.test.ts:
+(pass) periode dan id > isValidPeriode [0.23ms]
+(pass) periode dan id > id deterministik [0.11ms]
+(pass) validatePinjaman > draft sah dirapikan [4.96ms]
+(pass) validatePinjaman > penolakan [0.78ms]
+(pass) aturanKeputusan > transisi sah dan yang ditolak [0.24ms]
+(pass) validatePelunasan > batas sisa [0.18ms]
+(pass) potongKasbon > cukup gaji: setiap cicilan dibatasi sisanya [0.38ms]
+(pass) potongKasbon > gaji tidak cukup: dipotong sebagian, tidak pernah minus [0.09ms]
+(pass) potongKasbon > komponen slip [0.14ms]
+(pass) susunJurnalPayroll > seimbang, potongan komponen adalah selisihnya [0.40ms]
+(pass) susunJurnalPayroll > selisih negatif menjadi debit, baris nol dibuang [0.09ms]
+
+ 11 pass
+ 0 fail
+ 33 expect() calls
+Ran 11 tests across 1 file. [90.00ms]
+bun test v1.4.2 (744846f84)
+
+src\lib\validations\nilai-akhir.test.ts:
+(pass) jenis > id efektif dan jenis warisan [0.35ms]
+(pass) jenis > validateJenisNilai [4.20ms]
+(pass) jenis > validateBobotNilai [0.56ms]
+(pass) hari sekolah > validasi [0.62ms]
+(pass) hari sekolah > parse dan pilih per unit [0.32ms]
+(pass) rentang semester > baris sendiri, saudara, dan aturan tetap [0.39ms]
+(pass) kehadiran > klasifikasi hari dan persen [0.18ms]
+(pass) nilai akhir > rata jenis ditimbang bobot penilaian, kosong = 0 [0.13ms]
+(pass) nilai akhir > bobot dibagi ulang dan dibulatkan sekali [0.34ms]
+
+ 9 pass
+ 0 fail
+ 51 expect() calls
+Ran 9 tests across 1 file. [82.00ms]
+bun test v1.4.2 (744846f84)
+
+src\lib\services\alfa-audit.test.ts:
+(pass) Generate Alfa Harian & Setting Automation > Auto Alfa Setting toggle dan nonaktif [16.87ms]
+(pass) Generate Alfa Harian & Setting Automation > Generate Alfa dilewati pada Hari Libur Aktif [17.80ms]
+(pass) Generate Alfa Harian & Setting Automation > Generate Alfa membuat entri Alfa untuk karyawan aktif setelah jam cutoff [27.77ms]
+(pass) Generate Alfa Harian & Setting Automation > shift ber-kode_shift 4 tetap di-generate (bukan dianggap fleksibel) [24.38ms]
+(pass) Generate Alfa Harian & Setting Automation > Alfa tidak dibuat selagi jendela scan pulang masih terbuka [11.59ms]
+(pass) Generate Alfa Harian & Setting Automation > shift fleksibel di-Alfa-kan untuk hari kemarin, bukan hari berjalan [28.75ms]
+(pass) Generate Alfa Harian & Setting Automation > shift fleksibel yang sudah absen kemarin tidak di-Alfa-kan [28.01ms]
+(pass) Generate Alfa Harian & Setting Automation > karyawan dengan shift hilang dilewati dan dicatat ke audit [26.07ms]
+(pass) Generate Alfa: libur mingguan dan whitelist > karyawan ikut hari kerja shift, siswa ikut Hari Sekolah unit [38.48ms]
+(pass) Generate Alfa: libur mingguan dan whitelist > tanggal libur hanya mengalfakan yang masuk whitelist [28.71ms]
+
+ 10 pass
+ 0 fail
+ 39 expect() calls
+Ran 10 tests across 1 file. [3.31s]
+bun test v1.4.2 (744846f84)
+
+src\lib\server\operational\constraint-guard-v13.test.ts:
+(pass) sakelar keamanan absensi pada app_role > role bawaan lahir dengan kedua sakelar mati, bukan NULL [175.67ms]
+(pass) sakelar keamanan absensi pada app_role > kedua kolom menolak NULL [197.01ms]
+(pass) tabel absensi_foto > dibuat jalur provisioning Web dengan seluruh kolomnya [177.31ms]
+(pass) tabel absensi_foto > id_foto unik: event yang sama dikirim dua kali tidak menggandakan foto [222.82ms]
+(pass) tabel absensi_foto > foto wajib punya isi: foto_base64 NOT NULL [170.27ms]
+(pass) migrasi database versi 12 ke versi 13 > menambah kolom dan tabel baru pada database lama tanpa kehilangan data [190.66ms]
+(pass) migrasi database versi 12 ke versi 13 > versi skema tercatat dan cocok dengan konstanta aplikasi [179.76ms]
+
+ 7 pass
+ 0 fail
+ 21 expect() calls
+Ran 7 tests across 1 file. [1433.00ms]
+bun test v1.4.2 (744846f84)
+
+src\lib\services\operational-workflow.test.ts:
+(pass) workflow operasional: penugasan backup karyawan > berhasil membuat penugasan backup dengan normalisasi format tanggal [10.68ms]
+(pass) workflow operasional: penugasan backup karyawan > menolak penugasan backup jika karyawan asal dan pengganti sama [7.57ms]
+(pass) workflow operasional: koreksi admin & entri manual > koreksi kehadiran non-hadir (Sakit) membuat record Tidak Hadir [45.56ms]
+(pass) workflow operasional: koreksi admin & entri manual > entri koreksi jam masuk dan pulang menghitung keterlambatan dan jam kerja [65.92ms]
+(pass) workflow operasional: koreksi admin & entri manual > entri koreksi jam karyawan pengganti otomatis memetakan ke sesi backup [40.68ms]
+(pass) workflow operasional: import offline / spreadsheet manual > import spreadsheet menghasilkan 2 baris terpisah untuk shift normal dan shift backup [81.96ms]
+(pass) workflow operasional: import offline / spreadsheet manual > import manual jam masuk lalu jam pulang untuk shift malam menggabungkan 1 baris utuh dan mencatat log scan Masuk & Pulang [67.47ms]
+(pass) workflow operasional: import offline / spreadsheet manual > koreksi admin: lupa absen pulang mempertahankan menit_terlambat dari jam_masuk yang sudah ada [75.10ms]
+(pass) workflow operasional: import offline / spreadsheet manual > koreksi admin: kendala sistem - jam masuk dan jam pulang berhasil mencatat log scan dan absensi harian [60.19ms]
+(pass) workflow operasional: import offline / spreadsheet manual > koreksi admin: jam pulang yang diinput pada tanggal keesokan harinya (H+1) otomatis menyatu dengan sesi H-1 yang belum pulang [71.14ms]
+(pass) workflow operasional: import offline / spreadsheet manual > hapus log scan memperbarui atau menghapus absensi harian secara relasional [138.91ms]
+(pass) workflow operasional: import offline / spreadsheet manual > hapus koreksi admin menghapus absensi harian dan log scan terkait [79.58ms]
+(pass) workflow operasional: import offline / spreadsheet manual > edit absensi harian memperbarui jam kerja dan metrik tanpa merusak data [212.22ms]
+(pass) workflow operasional: import offline / spreadsheet manual > hapusLogScan untuk scan Pulang mempertahankan menit_terlambat dari scan Masuk asli dan mereset status ke Belum Pulang [44.97ms]
+(pass) workflow operasional: import offline / spreadsheet manual > koreksi admin: smart shift auto-detection jika jam koreksi cocok dengan shift 3 malam (23:00-07:00) [34.32ms]
+(pass) workflow operasional: shift fleksibel > shift fleksibel: import manual menerima jam berapa pun [32.61ms]
+(pass) workflow operasional: shift fleksibel > koreksi admin pada shift fleksibel tidak dipindahkan ke shift reguler [39.99ms]
+(pass) workflow operasional: hapus log scan merapikan riwayat asal > hapus log scan menghapus riwayat koreksi admin yang merujuknya [61.99ms]
+(pass) workflow operasional: hapus log scan merapikan riwayat asal > riwayat import manual bertahan selagi masih ada log lain yang merujuknya [110.64ms]
+(pass) workflow operasional: hapus log scan hanya menyentuh tanggalnya sendiri > menghapus log Scan Ditolak tidak menghapus absensi kemarin [38.85ms]
+(pass) workflow operasional: hapus log scan hanya menyentuh tanggalnya sendiri > pulang shift malam yang dibangun ulang jatuh pada hari berikutnya [60.95ms]
+(pass) workflow operasional: hapus log scan hanya menyentuh tanggalnya sendiri > menghapus log scanner tidak menimpa baris Koreksi Admin [43.04ms]
+(pass) workflow operasional: hapus penugasan backup > penugasan yang sudah dipakai absensi ditolak, yang belum boleh dihapus [20.41ms]
+(pass) workflow operasional: identitas karyawan wajib unik > ID Unik dan Kode Karyawan ganda ditolak dengan pesan jelas [38.70ms]
+
+ 24 pass
+ 0 fail
+ 127 expect() calls
+Ran 24 tests across 1 file. [5.02s]
+bun test v1.4.2 (744846f84)
+
+src\lib\validations\hari-kerja.test.ts:
+(pass) hari kerja > validasi [0.59ms]
+(pass) hari kerja > parse jatuh ke tujuh hari [0.57ms]
+(pass) hari kerja > ringkasan untuk kartu shift [0.26ms]
+(pass) hari kerja > hari ISO dan tanggal [0.44ms]
+(pass) hari kerja > wajib masuk [1.96ms]
+(pass) hari libur massal > validasi [1.72ms]
+(pass) hari libur massal > rentang tanggal [0.34ms]
+(pass) hari libur massal > data libur nasional bawaan sah dan sesuai SKB [1.99ms]
+
+ 8 pass
+ 0 fail
+ 64 expect() calls
+Ran 8 tests across 1 file. [26.00ms]
+bun test v1.4.2 (744846f84)
+
+src\lib\validations\pmb-dapodik.test.ts:
+(pass) dataDapodikSchema > isian contoh lolos dan dinormalkan [8.92ms]
+(pass) dataDapodikSchema > isian wajib dan pilihan asing ditolak [7.59ms]
+(pass) ekspor format DAPODIK > judul dua baris mengikuti berkas DAPODIK [0.25ms]
+(pass) ekspor format DAPODIK > baris contoh sama dengan baris DAPODIK aslinya [5.93ms]
+
+ 4 pass
+ 0 fail
+ 31 expect() calls
+Ran 4 tests across 1 file. [114.00ms]
+bun test v1.4.2 (744846f84)
+
+src\lib\server\operational\constraint-guard-v12.test.ts:
+(pass) kolom 2FA pada master_operator > operator baru lahir dengan 2FA mati, bukan NULL [382.85ms]
+(pass) kolom 2FA pada master_operator > totp_enabled menolak NULL [259.12ms]
+(pass) kolom 2FA pada master_operator > menghapus operator ikut membuang rahasia 2FA-nya [306.42ms]
+(pass) app_role.require_totp > role bawaan lahir tanpa kewajiban 2FA [158.00ms]
+(pass) app_role.require_totp > require_totp menolak NULL [162.12ms]
+(pass) migrasi database versi 11 ke versi 12 > menambah seluruh kolom 2FA pada database lama tanpa kehilangan data [575.44ms]
+(pass) migrasi database versi 11 ke versi 12 > versi skema tercatat dan cocok dengan konstanta aplikasi [137.82ms]
+
+ 7 pass
+ 0 fail
+ 22 expect() calls
+Ran 7 tests across 1 file. [2.15s]
+bun test v1.4.2 (744846f84)
+
+src\lib\operators\operator-admin.test.ts:
+(pass) aturan draft Superadmin (cermin validate_bootstrap_draft) > draft kuat diterima [2.95ms]
+(pass) aturan draft Superadmin (cermin validate_bootstrap_draft) > password lemah ditolak [0.89ms]
+(pass) aturan draft Superadmin (cermin validate_bootstrap_draft) > kontak wajib, kode wajib SPD001 [0.56ms]
+(pass) superadmin bootstrap > membuat satu Superadmin, klaim, dan kode pemulihan [140.42ms]
+(pass) superadmin bootstrap > dua permintaan bersamaan: hanya satu yang menang [140.70ms]
+(pass) superadmin bootstrap > klaim lama tanpa Superadmin aktif tetap menutup bootstrap [132.69ms]
+(pass) nomor HP akun operator tidak boleh kembar > tambah dan sunting menolak nomor milik akun lain [413.98ms]
+
+ 7 pass
+ 0 fail
+ 22 expect() calls
+Ran 7 tests across 1 file. [1198.00ms]
+bun test v1.4.2 (744846f84)
+
+src\lib\constants\landing-cms-fields.test.ts:
+(pass) CMS landing: koleksi dan perpindahan kunci lama > kunci koleksi sama dengan yang dibaca situs publik [0.31ms]
+(pass) CMS landing: koleksi dan perpindahan kunci lama > setiap koleksi terpasang pada sub-tab yang benar-benar ada [0.24ms]
+(pass) CMS landing: koleksi dan perpindahan kunci lama > panel tidak lagi punya field bernomor [0.59ms]
+(pass) CMS landing: koleksi dan perpindahan kunci lama > repeater diisi dari kunci bernomor lama bila koleksinya kosong [1.19ms]
+(pass) CMS landing: koleksi dan perpindahan kunci lama > koleksi yang sudah ada menang atas kunci lama [1.88ms]
+(pass) CMS landing: koleksi dan perpindahan kunci lama > JSON rusak menjadi koleksi kosong, bukan galat [0.71ms]
+(pass) CMS landing: koleksi dan perpindahan kunci lama > menyimpan mengosongkan kunci lama dan menyerialisasi koleksi [0.76ms]
+(pass) CMS landing: koleksi dan perpindahan kunci lama > koleksi kosong disimpan sebagai string kosong, bukan '[]' [0.42ms]
+(pass) CMS landing: koleksi dan perpindahan kunci lama > field header/footer situs tersedia di tab Profil dan Kontak [0.23ms]
+(pass) CMS landing: koleksi dan perpindahan kunci lama > field hero_image terdaftar di sub-tab hero_stats dengan tipe image [0.13ms]
+(pass) CMS landing: koleksi dan perpindahan kunci lama > siapkanSimpanLanding mempertahankan nilai landing.hero_image [0.40ms]
+
+ 11 pass
+ 0 fail
+ 30 expect() calls
+Ran 11 tests across 1 file. [37.00ms]
+bun test v1.4.2 (744846f84)
+
+src\lib\mail\mail-config.test.ts:
+(pass) describeMailFailure > 403 domain belum diverifikasi menunjuk ke menu Domains [0.26ms]
+(pass) describeMailFailure > 403 mode uji menjelaskan batas alamat tujuan [0.13ms]
+(pass) describeMailFailure > 403 tanpa penjelasan tetap menyebut dua sebab paling umum [0.06ms]
+(pass) describeMailFailure > 401 diarahkan ke kunci API, bukan ke domain [0.05ms]
+(pass) describeMailFailure > 429 dijelaskan sebagai kuota, bukan kesalahan konfigurasi [0.04ms]
+(pass) describeMailFailure > kegagalan jaringan dibedakan dari penolakan penyedia [0.03ms]
+(pass) describeMailFailure > 422 pada alamat pengirim menunjuk ke kolom email pengirim [0.02ms]
+(pass) describeMailFailure > konfigurasi belum lengkap diarahkan ke sakelar pengiriman [0.02ms]
+(pass) describeMailFailure > balasan yang tidak dikenal tidak mengarang saran [0.03ms]
+(pass) kegagalan pengirim Brevo > pengirim belum terdaftar diarahkan ke validasi alamat, bukan ke domain [0.04ms]
+(pass) kegagalan pengirim Brevo > 401 yang menyebut pengirim tidak disalahartikan sebagai kunci API salah [0.04ms]
+(pass) kegagalan pengirim Brevo > 401 tanpa menyebut pengirim tetap diarahkan ke kunci API [0.03ms]
+(pass) penolakan daftar IP Brevo > tidak disalahartikan sebagai kunci API yang salah [0.04ms]
+(pass) penolakan daftar IP Brevo > mengarahkan ke pembatasan IP dan menyuruh mematikannya [0.04ms]
+(pass) penolakan daftar IP Brevo > menjelaskan kenapa mendaftarkan IP tidak akan menyelesaikan masalah [0.03ms]
+
+ 15 pass
+ 0 fail
+ 26 expect() calls
+Ran 15 tests across 1 file. [28.00ms]
+bun test v1.4.2 (744846f84)
+
+src\lib\validations\tutup-buku.test.ts:
+(pass) aturan tutup buku > periode terbuka dan tertutup [0.28ms]
+(pass) aturan tutup buku > tanggal tutup buku [0.37ms]
+(pass) aturan tutup buku > alasan membuka kembali [0.17ms]
+(pass) aturan tutup buku > potret saldo kanonik [0.22ms]
+(pass) waktu tampil [0.10ms]
+(pass) banding saldo dan catatan keputusan [1.44ms]
+(pass) pemberitahuan tutup buku (kembar Rust pemberitahuan_kembar) > kejadian, kunci, dan teks sama dengan Rust [0.59ms]
+
+ 7 pass
+ 0 fail
+ 23 expect() calls
+Ran 7 tests across 1 file. [81.00ms]
+bun test v1.4.2 (744846f84)
+
+src\lib\services\nilai-akhir.test.ts:
+(pass) nilai akhir Web terhadap skema cloud asli > pengaturan dan rekap nilai akhir [155.11ms]
+(pass) bahan ekspor e-Rapor > satu rombel, semua mapel berpenilaian, rekap N2 [79.20ms]
+
+ 2 pass
+ 0 fail
+ 33 expect() calls
+Ran 2 tests across 1 file. [6.96s]
+bun test v1.4.2 (744846f84)
+
+src\lib\server\database-promotion.test.ts:
+(pass) urutan penyalinan > setiap tabel muncul setelah tabel yang dirujuknya [0.26ms]
+(pass) urutan penyalinan > urutan yang terbalik ditolak dan menyebut kedua tabelnya [0.44ms]
+(pass) urutan penyalinan > tidak ada tabel yang terdaftar dua kali [0.27ms]
+(pass) urutan penyalinan > tabel yang dikecualikan tidak ikut rencana promosi [0.12ms]
+(pass) deteksi tabrakan nilai unik > nilai sama dengan kunci berbeda dilaporkan sebagai tabrakan [0.26ms]
+(pass) deteksi tabrakan nilai unik > baris yang sama persis bukan tabrakan [0.07ms]
+(pass) deteksi tabrakan nilai unik > nilai kosong dan null diabaikan [0.10ms]
+(pass) deteksi tabrakan nilai unik > beberapa kolom unik diperiksa seluruhnya [0.15ms]
+(pass) pemetaan ulang kunci AUTOINCREMENT > id yang bentrok diberi nilai baru di atas nilai tertinggi tujuan [0.23ms]
+(pass) pemetaan ulang kunci AUTOINCREMENT > id yang belum dipakai tujuan dipertahankan apa adanya [0.08ms]
+(pass) pemetaan ulang kunci AUTOINCREMENT > tabel berkunci TEXT tidak menghasilkan pemetaan apa pun [0.05ms]
+(pass) pemetaan ulang kunci AUTOINCREMENT > id baru tidak pernah bertabrakan satu sama lain [0.31ms]
+
+ 12 pass
+ 0 fail
+ 26 expect() calls
+Ran 12 tests across 1 file. [17.00ms]
+bun test v1.4.2 (744846f84)
+
+src\lib\validations\erapor.test.ts:
+(pass) ekspor e-Rapor > label kolom identitas [0.11ms]
+(pass) ekspor e-Rapor > kalimat capaian mengikuti batas skor [0.67ms]
+(pass) ekspor e-Rapor > baris, sel kosong, dan peringatan [1.15ms]
+(pass) ekspor e-Rapor > lebih dari tiga LM menambah kolom [0.19ms]
+(pass) ekspor e-Rapor > teks bertab [0.40ms]
+
+ 5 pass
+ 0 fail
+ 25 expect() calls
+Ran 5 tests across 1 file. [57.00ms]
+bun test v1.4.2 (744846f84)
+
+src\lib\services\wa-sender.test.ts:
+(pass) aturan murni antrean > keputusan per baris [0.59ms]
+(pass) aturan murni antrean > status setelah gagal [0.52ms]
+(pass) klaim pengirim > baris yang diklaim pengirim lain tidak disentuh; klaim basi diambil alih [1024.72ms]
+(pass) kirim otomatis > runner tidak mengirim apa pun selama sakelarnya mati; tombol manual tetap jalan [1007.85ms]
+
+ 4 pass
+ 0 fail
+ 16 expect() calls
+Ran 4 tests across 1 file. [2.45s]
+bun test v1.4.2 (744846f84)
+
+src\lib\validations\database-endpoint.test.ts:
+(pass) isPrivateNetworkHost > mengenali seluruh rentang jaringan privat yang lazim di kantor [0.86ms]
+(pass) isPrivateNetworkHost > tidak menganggap alamat publik sebagai jaringan privat [1.66ms]
+(pass) reviewDatabaseEndpoint > menerima alamat LAN ber-HTTP untuk server sendiri [0.48ms]
+(pass) reviewDatabaseEndpoint > menolak HTTP publik untuk server sendiri sampai pengguna mengizinkannya [0.38ms]
+(pass) reviewDatabaseEndpoint > izin transport tidak berlaku untuk Turso terkelola [0.09ms]
+(pass) reviewDatabaseEndpoint > server sendiri ber-HTTPS publik tetap mewajibkan token [0.04ms]
+(pass) reviewDatabaseEndpoint > menerima ejaan libsql:// dan ws:// sebagai endpoint yang sama [0.06ms]
+(pass) reviewDatabaseEndpoint > menolak URL kosong, skema asing, dan kredensial tertanam [0.06ms]
+(pass) normalizeProvider > nilai asing jatuh ke provider dengan aturan paling ketat [0.08ms]
+(pass) normalizeProvider > deskripsi provider selalu tersedia [0.29ms]
+(pass) mode Database Lokal > tidak memerlukan endpoint sama sekali [0.07ms]
+(pass) mode Database Lokal > validator endpoint MENOLAK mode lokal, bukan meloloskannya [0.04ms]
+(pass) mode Database Lokal > alamat kosong pun tetap ditolak untuk mode lokal [0.02ms]
+
+ 13 pass
+ 0 fail
+ 47 expect() calls
+Ran 13 tests across 1 file. [33.00ms]
+bun test v1.4.2 (744846f84)
+
+src\lib\validations\ip-allowlist.test.ts:
+(pass) normalizeIpEntry > menerima alamat dan blok yang sah [1.67ms]
+(pass) normalizeIpEntry > menolak bentuk yang tidak valid [0.18ms]
+(pass) parseIpAllowlist > membaca JSON array dan membuang entri sampah [0.36ms]
+(pass) parseIpAllowlist > membaca teks bebas dipisah koma atau baris [0.23ms]
+(pass) parseIpAllowlist > nilai kosong menghasilkan daftar kosong [0.07ms]
+(pass) ipMatchesAllowlist > cocok pada alamat tunggal dan di dalam blok [0.69ms]
+(pass) ipMatchesAllowlist > tidak cocok di luar blok, beda keluarga, atau daftar kosong [2.22ms]
+(pass) ipMatchesAllowlist > cukup satu alamat perangkat yang cocok [0.16ms]
+(pass) ipMatchesAllowlist > prefix /0 mencakup seluruh keluarga alamatnya [0.11ms]
+(pass) serializeIpAllowlist > menyimpan bentuk kanonik tanpa duplikat [0.29ms]
+(pass) validateIpAllowlistEntries > menandai entri yang salah dengan indeksnya [0.22ms]
+
+ 11 pass
+ 0 fail
+ 40 expect() calls
+Ran 11 tests across 1 file. [22.00ms]
+bun test v1.4.2 (744846f84)
+
+src\lib\validations\pmb-pembayaran.test.ts:
+(pass) pmb-pembayaran > rupiah titik ribuan [0.31ms]
+(pass) pmb-pembayaran > ubah status saat belum lunas [0.12ms]
+(pass) pmb-pembayaran > konfirmasi bayar [0.16ms]
+(pass) pmb-pembayaran > batal bayar [0.04ms]
+(pass) pmb-pembayaran > perpanjang bayar [0.12ms]
+(skip) pmb-pembayaran > konstanta SQL dieja sama persis di pmb_bayar.rs
+
+ 5 pass
+ 1 skip
+ 0 fail
+ 28 expect() calls
+Ran 6 tests across 1 file. [30.00ms]
+bun test v1.4.2 (744846f84)
+
+src\lib\validations\face-match.test.ts:
+(pass) face-match (vektor kembar dengan face_match.rs) > kuantisasi int8 [3.06ms]
+(pass) face-match (vektor kembar dengan face_match.rs) > vektor tidak sah ditolak [1.14ms]
+(pass) face-match (vektor kembar dengan face_match.rs) > kemiripan [1.44ms]
+(pass) face-match (vektor kembar dengan face_match.rs) > vonis [0.90ms]
+(pass) face-match (vektor kembar dengan face_match.rs) > hanya Tidak Cocok pada mode tolak yang menolak [0.10ms]
+(pass) face-match (vektor kembar dengan face_match.rs) > normalisasi setting [0.39ms]
+(pass) face-match (vektor kembar dengan face_match.rs) > validasi template [0.33ms]
+
+ 7 pass
+ 0 fail
+ 36 expect() calls
+Ran 7 tests across 1 file. [30.00ms]
+bun test v1.4.2 (744846f84)
+
+src\lib\services\tutup-buku.test.ts:
+(pass) tutup buku Web > tutup, tolak, lalu buka kembali [164.04ms]
+(pass) tutup buku Web: Tahap 2 > transaksi telat ditinjau lalu ditutup ulang [110.76ms]
+(pass) tutup buku Web: Tahap 2 > versi yang menunggu dipakai [54.47ms]
+(pass) tutup buku Web: pemberitahuan WhatsApp > hanya pemegang izin aktif, sekali per kejadian [50.79ms]
+
+ 4 pass
+ 0 fail
+ 33 expect() calls
+Ran 4 tests across 1 file. [7.93s]
+bun test v1.4.2 (744846f84)
+
+src\lib\constants\academic-levels.test.ts:
+(pass) academic-levels > harus menangani keterangan kosong atau null secara aman [0.41ms]
+(pass) academic-levels > harus mengenali keterangan legacy berupa teks biasa tanpa merusaknya [0.33ms]
+(pass) academic-levels > harus berhasil melakukan serialisasi dan parsing JSON daftar tingkat [0.21ms]
+(pass) academic-levels > harus memvalidasi duplikasi dan angka negatif saat serialisasi [0.08ms]
+(pass) academic-levels > harus me-resolve opsi tingkat dari banyak unit dengan filter [0.50ms]
+(pass) academic-levels > harus mempertahankan currentTingkat jika nilainya belum ada di unit [0.15ms]
+(pass) academic-levels > harus memformat label tampilan tingkat dengan benar [0.22ms]
+
+ 7 pass
+ 0 fail
+ 23 expect() calls
+Ran 7 tests across 1 file. [27.00ms]
+bun test v1.4.2 (744846f84)
+
+src\lib\validations\payroll-rapel.test.ts:
+(pass) hitungRapel > kenaikan tarif [0.28ms]
+(pass) hitungRapel > pembulatan dihitung dari angka beku yang sama [0.06ms]
+(pass) hitungRapel > tarif turun = kelebihan bayar [0.04ms]
+(pass) hitungRapel > tarif sama = nol [0.03ms]
+(pass) komponenPersen > hanya PERCENTAGE yang terbaca [0.37ms]
+(pass) komponenPersen > snapshot rusak = tanpa komponen [0.11ms]
+(pass) rentang, alasan, label, status, id > validateRentang [0.36ms]
+(pass) rentang, alasan, label, status, id > validateAlasanBatal [0.50ms]
+(pass) rentang, alasan, label, status, id > labelRapel [0.12ms]
+(pass) rentang, alasan, label, status, id > statusRapel [0.09ms]
+(pass) rentang, alasan, label, status, id > id dan entri slip [0.19ms]
+
+ 11 pass
+ 0 fail
+ 23 expect() calls
+Ran 11 tests across 1 file. [71.00ms]
+bun test v1.4.2 (744846f84)
+
+src\lib\services\billing-rekap.test.ts:
+(pass) rekap tagihan: skenario kembar Rust > rekap per rombel [5.88ms]
+(pass) rekap tagihan: skenario kembar Rust > penerimaan per jenis per bulan [4.85ms]
+(pass) saringan jatuh tempo > lewat, segera, belum, dan urutan jatuh tempo terlama [24.19ms]
+
+ 3 pass
+ 0 fail
+ 18 expect() calls
+Ran 3 tests across 1 file. [7.21s]
+bun test v1.4.2 (744846f84)
+
+src\lib\services\billing.test.ts:
+(pass) tagihan Web terhadap skema cloud asli > terbit massal idempoten, keringanan, dan pembatalan [192.45ms]
+(pass) pembayaran Web terhadap skema cloud asli > alokasi, titipan, pembatalan, pindah ke titipan, dan tinjauan [400.47ms]
+(pass) pengingat tunggakan WhatsApp > satu pesan per siswa per hari, hanya bila sakelar menyala [130.06ms]
+(pass) sakelar portal wali > tersimpan sebagai setting dan terbaca di master [43.28ms]
+
+ 4 pass
+ 0 fail
+ 64 expect() calls
+Ran 4 tests across 1 file. [8.96s]
+bun test v1.4.2 (744846f84)
+
+src\lib\services\uks.test.ts:
+(pass) service kunjungan UKS Web > buka dengan obat lalu tutup [147.94ms]
+(pass) service kunjungan UKS Web > menutup mengantre satu pesan wali hanya bila sakelar menyala [178.14ms]
+(pass) service kunjungan UKS Web > stok obat kurang membatalkan seluruh kunjungan [81.64ms]
+(pass) service kunjungan UKS Web > jam keluar sebelum jam masuk ditolak dan hapus tidak menyentuh stok [133.48ms]
+
+ 4 pass
+ 0 fail
+ 23 expect() calls
+Ran 4 tests across 1 file. [7.54s]
+bun test v1.4.2 (744846f84)
+
+src\lib\auth\phase-b-foundation.test.ts:
+(pass) Phase B web security foundation > token session acak tidak disimpan sebagai nilai asli [3.87ms]
+(pass) Phase B web security foundation > cookie session bersifat HttpOnly dan Secure pada production [0.15ms]
+(pass) Phase B web security foundation > database server tidak menerima fallback environment publik [0.28ms]
+(pass) Phase B web security foundation > development tanpa Turso memakai SQLite lokal [0.05ms]
+(pass) Phase B web security foundation > database remote production wajib memiliki token server [0.69ms]
+(pass) Phase B web security foundation > server database sendiri di jaringan privat boleh tanpa token [0.30ms]
+(pass) Phase B web security foundation > server database sendiri ber-HTTPS publik tetap wajib token [0.08ms]
+(pass) Phase B web security foundation > HTTP polos ke alamat publik ditolak sampai diizinkan eksplisit [0.16ms]
+(pass) Phase B web security foundation > provider tak dikenal tidak melonggarkan aturan Turso [0.11ms]
+
+ 9 pass
+ 0 fail
+ 13 expect() calls
+Ran 9 tests across 1 file. [26.00ms]
+bun test v1.4.2 (744846f84)
+
+src\lib\operators\contact.test.ts:
+(pass) normalizeOperatorPhone > semua bentuk nomor Indonesia menjadi satu bentuk kanonik [0.34ms]
+(pass) normalizeOperatorPhone > nomor internasional dipertahankan bila memakai awalan + [0.09ms]
+(pass) normalizeOperatorPhone > masukan tanpa awalan yang dikenali ditolak [0.06ms]
+(pass) normalizeOperatorEmail > email disimpan lowercase agar cocok dengan index LOWER(email) [0.06ms]
+(pass) isValidOperatorEmail > menerima email wajar [0.13ms]
+(pass) isValidOperatorEmail > menolak bentuk yang tidak lengkap [0.10ms]
+(pass) isValidOperatorPhone > menerima panjang nomor yang wajar [0.10ms]
+(pass) isValidOperatorPhone > menolak nomor terlalu pendek atau kosong [0.04ms]
+(pass) assertOperatorContact > lolos untuk kontak lengkap [0.12ms]
+(pass) assertOperatorContact > pesan menyebut bidang yang kosong [0.16ms]
+(pass) penyamaran kontak > maskEmail menyembunyikan bagian lokal dan domain [0.39ms]
+(pass) penyamaran kontak > maskEmail aman untuk masukan kosong atau rusak [0.08ms]
+(pass) penyamaran kontak > maskPhone menyisakan awalan negara dan empat digit terakhir [0.19ms]
+(pass) penyamaran kontak > maskPhone mengembalikan string kosong untuk nomor tidak valid [0.03ms]
+
+ 14 pass
+ 0 fail
+ 36 expect() calls
+Ran 14 tests across 1 file. [21.00ms]
+bun test v1.4.2 (744846f84)
+
+src\lib\validations\stabilization.test.ts:
+(pass) temporary access guard > membatasi area sensitif untuk role non-Admin [5.45ms]
+(pass) employee stabilization > membuat identitas stabil dari UUID [0.28ms]
+(pass) employee stabilization > menolak draft karyawan yang belum lengkap [0.27ms]
+(pass) shift stabilization > memvalidasi jam 24 jam [0.14ms]
+(pass) shift stabilization > menolak nilai shift yang tidak aman [0.44ms]
+(pass) QR payload > hanya menerima payload ID dan token QR [0.20ms]
+(pass) QR payload > membentuk payload untuk data lama yang hanya memiliki token [0.12ms]
+(pass) geofencing > memvalidasi koordinat dan radius kantor [0.16ms]
+(pass) emailPersonil > membedakan tidak dikirim, dikosongkan, dan diisi [0.41ms]
+(pass) emailPersonil > validateEmployeeDraft menolak email salah format, kosong boleh [0.11ms]
+
+ 10 pass
+ 0 fail
+ 26 expect() calls
+Ran 10 tests across 1 file. [1053.00ms]
+bun test v1.4.2 (744846f84)
+
+src\lib\services\report.test.ts:
+(pass) rekap kehadiran per tanggal (jalur Web) > satu orang sekali per hari dan hasilnya sama dengan Rust [1.20ms]
+
+ 1 pass
+ 0 fail
+ 1 expect() calls
+Ran 1 test across 1 file. [444.00ms]
+bun test v1.4.2 (744846f84)
+
+src\lib\validations\siswa-dapodik.test.ts:
+(pass) validasiSimpanDapodikSiswa > isian campuran dibersihkan dan dinormalkan [10.16ms]
+(pass) validasiSimpanDapodikSiswa > data kosong boleh disimpan [1.15ms]
+(pass) validasiSimpanDapodikSiswa > agama di luar daftar ditolak, tanpa trim [1.70ms]
+(pass) validasiSimpanDapodikSiswa > penghasilan di luar daftar ditolak [0.57ms]
+(pass) validasiSimpanDapodikSiswa > NIK 15 angka [0.51ms]
+(pass) validasiSimpanDapodikSiswa > 29 Februari bukan kabisat [0.82ms]
+(pass) validasiSimpanDapodikSiswa > 29 Februari kabisat [0.29ms]
+(pass) validasiSimpanDapodikSiswa > anak ke-0 [0.67ms]
+(pass) validasiSimpanDapodikSiswa > jarak bukan angka [0.59ms]
+(pass) validasiSimpanDapodikSiswa > lingkar kepala nol [0.40ms]
+(pass) validasiSimpanDapodikSiswa > HP terlalu pendek [0.57ms]
+(pass) validasiSimpanDapodikSiswa > email tanpa domain [0.37ms]
+(pass) validasiSimpanDapodikSiswa > RT berhuruf [0.47ms]
+(pass) validasiSimpanDapodikSiswa > id siswa kosong [0.27ms]
+(pass) validasiSimpanDapodikSiswa > tempat lahir terlalu panjang [0.30ms]
+(pass) validasiSimpanDapodikSiswa > dusun terlalu panjang [0.24ms]
+(pass) validasiSimpanDapodikSiswa > nama ayah terlalu panjang [0.21ms]
+(pass) validasiSimpanDapodikSiswa > KPS selain Ya/Tidak [0.78ms]
+(pass) validasiSimpanDapodikSiswa > isian tidak dikenal [0.46ms]
+(pass) validasiSimpanDapodikSiswa > kunci atas tidak dikenal [0.33ms]
+(pass) validasiSimpanDapodikSiswa > data bukan objek [0.12ms]
+(pass) validasiSimpanDapodikSiswa > data tidak dikirim [0.15ms]
+(pass) isianKurangDapodik > tanpa baris, semua isian wajib kurang [0.42ms]
+(pass) isianKurangDapodik > dusun dan blok bantuan tidak dihitung [0.07ms]
+(pass) isianKurangDapodik > isian terisi tidak dihitung, nol tetap terisi [0.23ms]
+(skip) kembaran Rust > konstanta SQL dieja sama persis
+(skip) kembaran Rust > daftar pilihan dan kunci isian sama
+
+2 tests skipped:
+(skip) kembaran Rust > konstanta SQL dieja sama persis
+(skip) kembaran Rust > daftar pilihan dan kunci isian sama
+
+ 25 pass
+ 2 skip
+ 0 fail
+ 44 expect() calls
+Ran 27 tests across 1 file. [115.00ms]
+bun test v1.4.2 (744846f84)
+
+src\lib\services\pmb-admin.test.ts:
+(pass) pembayaran PMB > keadaan bayar diturunkan dan bisa disaring [56.30ms]
+(pass) pembayaran PMB > konfirmasi mencatat pencatat dan tidak bisa diulang [42.26ms]
+(pass) pembayaran PMB > jumlah yang berbeda, tanggal masa depan, dan kedaluwarsa ditolak [48.77ms]
+(pass) pembayaran PMB > status terkunci sampai lunas, kecuali ditolak atau dibatalkan [83.87ms]
+(pass) pembayaran PMB > batal konfirmasi menyimpan alasan dan hanya selama status Baru [79.13ms]
+(pass) pembayaran PMB > perpanjang menghidupkan kembali yang kedaluwarsa, kecuali kuota penuh [93.91ms]
+
+ 6 pass
+ 0 fail
+ 20 expect() calls
+Ran 6 tests across 1 file. [7.36s]
+bun test v1.4.2 (744846f84)
+
+src\lib\utils\bootstrap-check.test.ts:
+(pass) summarizeDatabaseCheck > database tak terjangkau menutup seluruh aksi provisioning [0.36ms]
+(pass) summarizeDatabaseCheck > superadmin aktif memblokir pembuatan akun baru [2.13ms]
+(pass) summarizeDatabaseCheck > database kosong tetap boleh diprovisioning tanpa konfirmasi tambahan [0.18ms]
+(pass) summarizeDatabaseCheck > skema asing wajib dikonfirmasi manual agar salah database tertahan [0.12ms]
+(pass) summarizeDatabaseCheck > klaim bootstrap terpakai tanpa superadmin aktif ditandai bahaya [0.06ms]
+(pass) summarizeDatabaseCheck > skema lengkap tanpa superadmin siap diprovisioning [0.29ms]
+
+ 6 pass
+ 0 fail
+ 17 expect() calls
+Ran 6 tests across 1 file. [27.00ms]
+bun test v1.4.2 (744846f84)
+
+src\lib\services\inventory.test.ts:
+(pass) service inventaris Web > dua perangkat offline mengeluarkan 2 dan 3 dari stok 10 menghasilkan 5 [126.74ms]
+(pass) service inventaris Web > menolak pengeluaran melebihi saldo dan memakai ejaan tempat yang sudah ada [73.81ms]
+(pass) service inventaris Web > dicatat_oleh dari body ditolak dan operator diambil dari sesi [69.62ms]
+(pass) service inventaris Web > batch barang ber-expired mengikuti id mutasi masuknya [88.18ms]
+(pass) service inventaris Web > pembatalan idempoten dan tidak membuat stok yang sudah terpakai minus [109.81ms]
+(pass) service inventaris Web > kartu stok menghitung saldo berjalan dan saldo awal [73.24ms]
+(pass) service inventaris Web > satuan terkunci setelah barang punya riwayat [54.00ms]
+(pass) service inventaris Web > kode otomatis bernomor urut per awalan [107.02ms]
+(pass) service inventaris Web > kode kembar dari dua perangkat offline ditandai [36.90ms]
+(pass) service inventaris Web > peminjaman melacak pengembalian sebagian [161.72ms]
+(pass) service inventaris Web > pengembalian barang ber-expired kembali ke batch asalnya [117.51ms]
+(pass) service inventaris Web > opname menulis selisih dengan satu nomor dokumen [124.29ms]
+(pass) service inventaris Web > daftar melaporkan status kedaluwarsa dan stok menipis [76.21ms]
+(pass) service inventaris Web > berita acara mengelompokkan nomor dokumen dan melewati baris batal [215.57ms]
+(pass) service inventaris Web > rekap pengadaan menjumlah nilai per sumber dana tanpa baris batal [130.95ms]
+(pass) service inventaris Web > riwayat opname mendaftar sesi yang punya selisih [75.61ms]
+(pass) registri aset per unit Web > masuk per unit membuat unit dan memindahkannya satu per satu [182.76ms]
+(pass) registri aset per unit Web > opname menghitung unit terhadap batch unitnya sendiri [143.29ms]
+(pass) registri aset per unit Web > pendaftaran unit mengubah stok lama tanpa mengubah jumlahnya [180.45ms]
+(pass) kolom tambahan Web > nama unik, tipe terkunci, batas kolom aktif [555.88ms]
+(pass) kolom tambahan Web > isi kolom tersimpan, divalidasi tipenya, dan kosong dibuang [70.16ms]
+(pass) hapus permanen kolom tambahan Web > isi dibuang dari barang, nama bisa dipakai lagi, tidak bisa dihidupkan [191.87ms]
+(pass) barang desimal Web > terkunci sejak mutasi pertama, nilai pengadaan dibulatkan per baris [163.67ms]
+
+ 23 pass
+ 0 fail
+ 105 expect() calls
+Ran 23 tests across 1 file. [10.02s]
+bun test v1.4.2 (744846f84)
+
+src\lib\client\id-card-renderer.test.ts:
+(pass) nomor identitas di kartu > teacher.nip: yang kosong tetap kosong di kartu sungguhan [0.34ms]
+(pass) nomor identitas di kartu > teacher.nip: nomor asli dipakai apa adanya [0.06ms]
+(pass) nomor identitas di kartu > teacher.nip: contoh hanya muncul di perancang template [0.03ms]
+(pass) nomor identitas di kartu > teacher.nuptk: yang kosong tetap kosong di kartu sungguhan [0.01ms]
+(pass) nomor identitas di kartu > teacher.nuptk: nomor asli dipakai apa adanya [0.01ms]
+(pass) nomor identitas di kartu > teacher.nuptk: contoh hanya muncul di perancang template
+(pass) nomor identitas di kartu > student.nisn: yang kosong tetap kosong di kartu sungguhan
+(pass) nomor identitas di kartu > student.nisn: nomor asli dipakai apa adanya
+(pass) nomor identitas di kartu > student.nisn: contoh hanya muncul di perancang template
+(pass) nomor identitas di kartu > student.nis: yang kosong tetap kosong di kartu sungguhan
+(pass) nomor identitas di kartu > student.nis: nomor asli dipakai apa adanya
+(pass) nomor identitas di kartu > student.nis: contoh hanya muncul di perancang template
+(pass) jenis kelamin di kartu > kode L/P dari data induk diterjemahkan [0.13ms]
+(pass) jenis kelamin di kartu > teks yang sudah berupa kata dipakai apa adanya [0.04ms]
+(pass) jenis kelamin di kartu > yang kosong tidak pernah menjadi Laki-laki di kartu sungguhan [0.05ms]
+(pass) data kosong lain di kartu > employee.position: kosong di kartu sungguhan, contoh di perancang [0.03ms]
+(pass) data kosong lain di kartu > employee.department: kosong di kartu sungguhan, contoh di perancang
+(pass) data kosong lain di kartu > employee.unit: kosong di kartu sungguhan, contoh di perancang
+(pass) data kosong lain di kartu > data yang terisi tidak berubah [0.06ms]
+
+ 19 pass
+ 0 fail
+ 36 expect() calls
+Ran 19 tests across 1 file. [125.00ms]
+bun test v1.4.2 (744846f84)
+
+src\lib\validations\uks.test.ts:
+(pass) aturan UKS (vektor kembar uks.rs) > isValidJam [0.26ms]
+(pass) aturan UKS (vektor kembar uks.rs) > validateBuka dan validateSimpan [8.50ms]
+(pass) aturan UKS (vektor kembar uks.rs) > obat menjadi mutasi tanpa nama siswa [1.46ms]
+(pass) aturan UKS (vektor kembar uks.rs) > formatSejakSync [0.13ms]
+
+ 4 pass
+ 0 fail
+ 25 expect() calls
+Ran 4 tests across 1 file. [78.00ms]
+bun test v1.4.2 (744846f84)
+
+src\lib\validations\personnel.test.ts:
+(pass) STATUS_SISWA > sama persis dengan CHECK constraint siswa_data.status [0.92ms]
+(pass) STATUS_SISWA > normalisasi mengabaikan huruf besar/kecil dan menolak nilai asing [0.14ms]
+(pass) shiftLabel > menyebut jam masuk dan pulang [0.17ms]
+(pass) shiftLabel > jatuh ke nama saja bila jamnya kosong [0.06ms]
+(pass) filter unit lalu kelas > unit: kosong berarti semua, sentinel berarti unit yang belum diisi [0.28ms]
+(pass) filter unit lalu kelas > kelas: satu pilihan per rombel, urut tingkat lalu nama [1.87ms]
+(pass) filter unit lalu kelas > kelas: menyempit mengikuti unit yang dipilih [0.27ms]
+
+ 7 pass
+ 0 fail
+ 13 expect() calls
+Ran 7 tests across 1 file. [25.00ms]
+bun test v1.4.2 (744846f84)
+
+src\lib\gateways\content.test.ts:
+(pass) Tahap D: CMS Landing Page (Berita & Konten Publik) RBAC & Gateway Contract > Permission 'content.view', 'content.manage', 'content.delete' terdaftar di katalog [1.11ms]
+(pass) Tahap D: CMS Landing Page (Berita & Konten Publik) RBAC & Gateway Contract > 'content.delete' masuk SENSITIVE_MUTATION_PERMISSIONS [1.68ms]
+(pass) Tahap D: CMS Landing Page (Berita & Konten Publik) RBAC & Gateway Contract > Area guard 'konten' dijaga oleh canAccessArea dan izin 'content.view' [2.08ms]
+(pass) Tahap D: CMS Landing Page (Berita & Konten Publik) RBAC & Gateway Contract > Kontrak tipe ArticleItem dan ArticleDraft terstruktur sesuai skema [0.10ms]
+(pass) Tahap D: CMS Landing Page (Berita & Konten Publik) RBAC & Gateway Contract > Kontrak PageContentMap mendukung pasangan key-value string [0.04ms]
+
+ 5 pass
+ 0 fail
+ 16 expect() calls
+Ran 5 tests across 1 file. [30.00ms]
+bun test v1.4.2 (744846f84)
+
+src\lib\server\operational\schema-consistency.test.ts:
+(pass) Schema Consistency & Zero-Drift Guard > inisialisasi skema lengkap menghasilkan seluruh tabel dan migrasi tanpa drift [238.27ms]
+
+ 1 pass
+ 0 fail
+ 3 expect() calls
+Ran 1 test across 1 file. [395.00ms]
+bun test v1.4.2 (744846f84)
+
+src\lib\services\attendance-processor.test.ts:
+(pass) integrasi Web mesin aturan scan > scan masuk berhasil menulis LOG_SCAN dan ABSENSI_HARIAN dalam timezone Jakarta [69.38ms]
+(pass) integrasi Web mesin aturan scan > scan waktu ditolak hanya menulis LOG_SCAN [54.60ms]
+(pass) integrasi Web mesin aturan scan > identitas yang diketahui tetap dilog saat token ditolak [54.92ms]
+(pass) integrasi Web mesin aturan scan > status nonaktif tetap ditolak dan dicatat tanpa membuat absensi [83.88ms]
+(pass) integrasi Web mesin aturan scan > cooldown scanner ditolak sebelum menjadi multi-scan [97.65ms]
+(pass) integrasi Web mesin aturan scan > scan kedua dalam batas multi-scan tidak menjadi pulang [103.91ms]
+(pass) integrasi Web mesin aturan scan > pulang normal memperbarui satu sesi dan menghitung menit kerja [100.22ms]
+(pass) integrasi Web mesin aturan scan > pulang tanpa masuk membuat Perlu Verifikasi [64.76ms]
+(pass) integrasi Web mesin aturan scan > shift malam sebelum dan setelah tengah malam memakai satu tanggal kerja [113.48ms]
+(pass) integrasi Web mesin aturan scan > shift malam scan masuk setelah tengah malam (00:02) dalam toleransi keterlambatan diterima dan pulang normal menyatu ke sesi H-1 [118.72ms]
+(pass) integrasi Web mesin aturan scan > shift fleksibel menerima satu masuk dan satu pulang tanpa keterlambatan reguler [115.45ms]
+(pass) notifikasi wali dari scanner Web > scan masuk siswa mengantre satu pesan ke nomor wali [106.25ms]
+(pass) notifikasi wali dari scanner Web > sakelar mati berarti tidak ada antrean [70.90ms]
+(pass) guard dan konsistensi integrasi Web > geofence tetap menolak, melog, dan tidak membuat absensi [66.97ms]
+(pass) guard dan konsistensi integrasi Web > Koreksi Admin tidak ditimpa scanner [92.80ms]
+(pass) guard dan konsistensi integrasi Web > penugasan backup memakai shift efektif dan ID referensi [91.80ms]
+(pass) guard dan konsistensi integrasi Web > kegagalan ABSENSI_HARIAN menggulung balik LOG_SCAN [75.47ms]
+(pass) guard dan konsistensi integrasi Web > auto multi-sesi aktif ketika shift target memiliki izinkan_multi_sesi = 1 [139.80ms]
+(pass) guard dan konsistensi integrasi Web > scan ulang setelah pulang ditolak aman jika shift target izinkan_multi_sesi = 0 [107.30ms]
+(pass) verifikasi wajah 1:1 (cermin scanner.rs) > mode tolak: wajah orang lain ditolak, hanya LOG_SCAN yang tertulis [80.24ms]
+(pass) verifikasi wajah 1:1 (cermin scanner.rs) > mode pantau: wajah orang lain diterima dan ditandai Tidak Cocok [74.76ms]
+(pass) verifikasi wajah 1:1 (cermin scanner.rs) > pemilik kartu cocok; tanpa vektor tetap diterima sebagai Tidak Diperiksa [161.38ms]
+
+ 22 pass
+ 0 fail
+ 71 expect() calls
+Ran 22 tests across 1 file. [10.55s]
+bun test v1.4.2 (744846f84)
+
+src\lib\gateways\wali-credential.test.ts:
+(pass) Tahap B: Kredensial & Password Portal Wali > Permission 'students.reset_wali_password' terdaftar dalam katalog RBAC dan masuk SENSITIVE_MUTATION_PERMISSIONS [0.22ms]
+(pass) Tahap B: Kredensial & Password Portal Wali > Password sementara wali acak dari alfabet tanpa karakter kembar-rupa [1.80ms]
+(pass) Tahap B: Kredensial & Password Portal Wali > Paritas hashing PBKDF2 600k iterasi kompatibel antara helper TS dan verifikasi [427.83ms]
+(pass) Tahap B: Kredensial & Password Portal Wali > Kontrak tipe WaliCredentialStatus dan WaliSlipCredential terstruktur dengan baik [0.25ms]
+
+ 4 pass
+ 0 fail
+ 15 expect() calls
+Ran 4 tests across 1 file. [454.00ms]
+bun test v1.4.2 (744846f84)
+
+src\lib\services\grades.test.ts:
+(pass) listAssessments > rombel kosong = semua rombel, dengan nama rombel [4.09ms]
+(pass) listAssessments > filter rombel, jenis, dan gabungan [3.53ms]
+(pass) listAssessments > jenis asing ditolak, bukan diabaikan [0.43ms]
+
+ 3 pass
+ 0 fail
+ 6 expect() calls
+Ran 3 tests across 1 file. [401.00ms]
+bun test v1.4.2 (744846f84)
+
+src\lib\validations\konten-gambar.test.ts:
+(pass) uraiGambarKonten > menerima JPEG dan WebP bertanda tangan sah [1.32ms]
+(pass) uraiGambarKonten > menolak jenis lain, isi yang tidak cocok, dan bentuk rusak [0.28ms]
+(pass) uraiGambarKonten > menolak foto di atas 400 KB [1.61ms]
+(pass) idGambarKontenSah hanya menerima 32 hex huruf kecil [0.28ms]
+
+ 4 pass
+ 0 fail
+ 15 expect() calls
+Ran 4 tests across 1 file. [22.00ms]
+bun test v1.4.2 (744846f84)
+
+src\lib\server\file-database.test.ts:
+(pass) opsi berkas SQLite > berkas diberi waktu tunggu, database remote tidak [0.82ms]
+(pass) opsi berkas SQLite > mode WAL tersimpan di berkasnya [18.51ms]
+(pass) dua proses menulis ke berkas yang sama > tanpa waktu tunggu gagal terkunci; dengan waktu tunggu berhasil [1705.20ms]
+
+ 3 pass
+ 0 fail
+ 8 expect() calls
+Ran 3 tests across 1 file. [1.85s]
+bun test v1.4.2 (744846f84)
+
+src\lib\services\loan.test.ts:
+(pass) kasbon Web terhadap skema cloud asli > ajukan, cair, potong gaji, bayar, tunda, lunas [236.01ms]
+
+ 1 pass
+ 0 fail
+ 24 expect() calls
+Ran 1 test across 1 file. [7.29s]
+bun test v1.4.2 (744846f84)
+
+src\lib\server\operational\constraint-guard-v21.test.ts:
+(pass) migrasi v21 jam kerja normal > menghitung ulang shift reguler tanpa menyentuh penanda fleksibel [377.12ms]
+(pass) migrasi v21 jam kerja normal > hanya berjalan sekali [276.53ms]
+(pass) migrasi v21 jam kerja normal > versi skema tercatat dan cocok dengan konstanta aplikasi [172.72ms]
+
+ 3 pass
+ 0 fail
+ 7 expect() calls
+Ran 3 tests across 1 file. [980.00ms]
+bun test v1.4.2 (744846f84)
+
+src\lib\contracts\scanner.test.ts:
+(pass) normalizePersonnelRole > mengenali ejaan huruf besar yang benar-benar tersimpan database [1.78ms]
+(pass) normalizePersonnelRole > tetap mengenali ejaan kapital awal [0.14ms]
+(pass) normalizePersonnelRole > toleran terhadap spasi tepi dan ejaan campur [0.04ms]
+(pass) normalizePersonnelRole > nilai lain jatuh ke Pegawai, termasuk kosong [0.06ms]
+(pass) normalizePersonnelRole > hasilnya selalu salah satu peran yang dikenal [1.55ms]
+(pass) ATTENDANCE_SOURCE_VALUES > memuat Import Manual yang sempat hilang dari dua salinannya [0.10ms]
+
+ 6 pass
+ 0 fail
+ 18 expect() calls
+Ran 6 tests across 1 file. [32.00ms]
+bun test v1.4.2 (744846f84)
+
+src\lib\services\wa-provider.test.ts:
+(pass) buatPermintaanProvider > fonnte memakai URL bawaan dan nomor tanpa tanda baca [0.29ms]
+(pass) buatPermintaanProvider > wablas memakai URL yang diisi, dipangkas [0.08ms]
+(pass) buatPermintaanProvider > custom memakai Bearer dan membawa nomor pengirim [0.08ms]
+(pass) buatPermintaanProvider > custom tanpa URL ditolak [0.11ms]
+
+ 4 pass
+ 0 fail
+ 8 expect() calls
+Ran 4 tests across 1 file. [23.00ms]
+bun test v1.4.2 (744846f84)
+
+src\lib\server\http\api-response.test.ts:
+(pass) kegagalan fetch database dilaporkan sebagai layanan sementara [88.97ms]
+(pass) galat database mentah tidak diteruskan ke klien [1.34ms]
+(pass) pesan domain tetap diteruskan apa adanya [0.35ms]
+
+ 3 pass
+ 0 fail
+ 7 expect() calls
+Ran 3 tests across 1 file. [108.00ms]
+bun test v1.4.2 (744846f84)
+
+src\lib\server\http\static-export-guard.test.ts:
+(pass) Next.js Static Export Compatibility Guard (Tauri v2) > seluruh route handler di src/app/api TIDAK boleh mengekspor method GET (wajib POST/PUT/PATCH/DELETE) [1.14ms]
+
+ 1 pass
+ 0 fail
+ 1 expect() calls
+Ran 1 test across 1 file. [26.00ms]
+bun test v1.4.2 (744846f84)
+
+src\lib\server\http\json-body.test.ts:
+(pass) bounded JSON body > membaca JSON valid tanpa bergantung pada Content-Length [2.39ms]
+(pass) bounded JSON body > menolak body aktual yang melampaui batas [0.53ms]
+(pass) bounded JSON body > menolak deklarasi panjang, content type, dan JSON invalid [0.31ms]
+
+ 3 pass
+ 0 fail
+ 5 expect() calls
+Ran 3 tests across 1 file. [14.00ms]
+bun test v1.4.2 (744846f84)
+
+src\lib\server\auth\setup-token.test.ts:
+(pass) token pemasangan > kosong berarti provisioning lewat browser dimatikan [0.14ms]
+(pass) token pemasangan > token pendek tidak pernah membuka provisioning [0.06ms]
+(pass) token pemasangan > token 32 karakter ke atas diterima, spasi tepi dibuang [0.04ms]
+(pass) token pemasangan > pencocokan menolak token lain, termasuk yang panjangnya berbeda [0.74ms]
+
+ 4 pass
+ 0 fail
+ 10 expect() calls
+Ran 4 tests across 1 file. [23.00ms]
+bun test v1.4.2 (744846f84)
+
+src\lib\validations\geofence.test.ts:
+(pass) validateGeofenceSettings > mengikuti aturan Rust [0.43ms]
+
+ 1 pass
+ 0 fail
+ 10 expect() calls
+Ran 1 test across 1 file. [17.00ms]
+bun test v1.4.2 (744846f84)
+
+src\lib\server\database-retry.test.ts:
+(pass) transient database retry > mengenali connect timeout yang tersimpan sebagai cause [0.53ms]
+(pass) transient database retry > mencoba ulang satu kali lalu mengembalikan hasil [0.52ms]
+(pass) transient database retry > tidak mencoba ulang error bisnis [0.35ms]
+
+ 3 pass
+ 0 fail
+ 5 expect() calls
+Ran 3 tests across 1 file. [17.00ms]
+bun test v1.4.2 (744846f84)
+
+src\lib\validations\personnel-photo.test.ts:
+(pass) izin foto mengikuti jenis personil > jenis_personil dinormalkan sebelum dibandingkan [0.14ms]
+(pass) izin foto mengikuti jenis personil > mengelola foto butuh izin kelola jenisnya sendiri [0.07ms]
+(pass) izin foto mengikuti jenis personil > melihat foto tidak meminjam izin jenis lain, kecuali pencetak kartu [0.08ms]
+
+ 3 pass
+ 0 fail
+ 11 expect() calls
+Ran 3 tests across 1 file. [15.00ms]
+bun test v1.4.2 (744846f84)
+
+src\lib\validations\employee-identity.test.ts:
+(pass) riwayat identitas karyawan > baris mentah dari Rust atau Web dinormalkan ke satu bentuk [0.57ms]
+(pass) riwayat identitas karyawan > JSON rusak tidak menjatuhkan halaman riwayat [0.08ms]
+
+ 2 pass
+ 0 fail
+ 2 expect() calls
+Ran 2 tests across 1 file. [17.00ms]
+bun test v1.4.2 (744846f84)
+
+src\lib\client\qr-release-gate.test.ts:
+(pass) penahan QR setelah jendela foto > kartu yang terus dipegang tidak pernah memicu ulang [0.26ms]
+(pass) penahan QR setelah jendela foto > kartu yang dijauhkan lalu ditempel lagi boleh memicu [0.07ms]
+(pass) penahan QR setelah jendela foto > kartu lain langsung lolos [0.04ms]
+
+ 3 pass
+ 0 fail
+ 24 expect() calls
+Ran 3 tests across 1 file. [19.00ms]
+bun test v1.4.2 (744846f84)
+
+src\lib\server\http\request-security.test.ts:
+(pass) entri kiri X-Forwarded-For isian klien tidak dipercaya [0.98ms]
+(pass) satu alamat (Vercel) dan tanpa header tetap berfungsi [0.17ms]
+
+ 2 pass
+ 0 fail
+ 4 expect() calls
+Ran 2 tests across 1 file. [18.00ms]
+bun test v1.4.2 (744846f84)
+
+src\lib\auth\logout-marker.test.ts:
+(pass) forced logout marker > mencegah pemulihan sesi sampai login baru berhasil [0.23ms]
+
+ 1 pass
+ 0 fail
+ 3 expect() calls
+Ran 1 test across 1 file. [14.00ms]
+bun test v1.4.2 (744846f84)
+
+src\lib\runtime\security-mutation.test.ts:
+(pass) security mutation runtime guard > tidak menganggap Bun CLI sebagai browser offline [0.21ms]
+(pass) security mutation runtime guard > menolak mutasi ketika browser benar-benar offline [0.10ms]
+(pass) security mutation runtime guard > mengizinkan mutasi ketika browser online [0.27ms]
+
+ 3 pass
+ 0 fail
+ 3 expect() calls
+Ran 3 tests across 1 file. [15.00ms]
+bun test v1.4.2 (744846f84)
+
+src\lib\client\xlsx.test.ts:
+(pass) createXlsxBuffer > AngkaExcel menjadi sel Angka; nilai lain tetap teks [2.12ms]
+
+ 1 pass
+ 0 fail
+ 2 expect() calls
+Ran 1 test across 1 file. [87.00ms]
+bun test v1.4.2 (744846f84)
+
+src\lib\auth\logout-navigation.test.ts:
+(pass) logout navigation > mengganti halaman aktif dengan Login [0.25ms]
+
+ 1 pass
+ 0 fail
+ 1 expect() calls
+Ran 1 test across 1 file. [14.00ms]
+bun test v1.4.2 (744846f84)
+
+src\lib\services\accounting.test.ts:
+(pass) akuntansi Web terhadap skema cloud asli > bagan akun bawaan tertanam [2.02ms]
+(pass) akuntansi Web terhadap skema cloud asli > posting, pembatalan, neraca saldo, dan buku besar [97.69ms]
+(pass) akuntansi Web terhadap skema cloud asli > kode ganda dan akun nonaktif ditolak [22.11ms]
+(pass) akuntansi Web terhadap skema cloud asli > akun sistem tidak bisa dinonaktifkan [6.02ms]
+
+ 4 pass
+ 0 fail
+ 31 expect() calls
+Ran 4 tests across 1 file. [7.08s]
+bun test v1.4.2 (744846f84)
+
+src\lib\services\payroll-rapel.test.ts:
+(pass) rapel Web terhadap skema cloud asli > deteksi, setujui, masuk rekap, dipegang draf, batal [113.63ms]
+
+ 1 pass
+ 0 fail
+ 17 expect() calls
+Ran 1 test across 1 file. [6.85s]
+bun test v1.4.2 (744846f84)
+
+src\lib\services\holiday.test.ts:
+(pass) Holiday Service (Hari Libur) > tambah, list, update, dan hapus hari libur [15.64ms]
+
+ 1 pass
+ 0 fail
+ 10 expect() calls
+Ran 1 test across 1 file. [1.93s]
+bun test v1.4.2 (744846f84)
+
+src\lib\services\id-card-template.test.ts:
+(pass) ID Card Template Service > getIdCardTemplate mengembalikan default template dengan elemen awal [1.49ms]
+(pass) ID Card Template Service > saveIdCardTemplate menyimpan dan memperbarui konfigurasi elemen template [5.76ms]
+
+ 2 pass
+ 0 fail
+ 10 expect() calls
+Ran 2 tests across 1 file. [1.94s]
+bun test v1.4.2 (744846f84)
+
+src\lib\services\company-profile.test.ts:
+(pass) Company Profile Service > getCompanyProfile mengembalikan default profile jika belum ada data [0.70ms]
+(pass) Company Profile Service > updateCompanyProfile memperbarui profil instansi dengan benar [3.50ms]
+
+ 2 pass
+ 0 fail
+ 8 expect() calls
+Ran 2 tests across 1 file. [1.93s]
+bun test v1.4.2 (744846f84)
+
+src\lib\services\payroll-recap-hari-kerja.test.ts:
+(pass) rekap gaji dan libur mingguan shift > jam di luar hari kerja shift masuk jam hari libur [15.07ms]
+(pass) rekap gaji dan libur mingguan shift > tanpa jenjang HARI_LIBUR aktif dibayar seperti hari biasa [31.37ms]
+(pass) rekap gaji dan libur mingguan shift > shift tujuh hari tidak punya libur mingguan [17.10ms]
+
+ 3 pass
+ 0 fail
+ 9 expect() calls
+Ran 3 tests across 1 file. [6.40s]
+bun test v1.4.2 (744846f84)
+
+src\lib\services\siswa-dapodik.test.ts:
+(pass) siswa_dapodik > angkat siswa menyalin biodata PMB [13.74ms]
+(pass) siswa_dapodik > simpan admin menimpa, siswa yang belum di cloud ditolak [24.28ms]
+(pass) siswa_dapodik > dikosongkan tidak dihidupkan lagi oleh salinan PMB [8.42ms]
+
+ 3 pass
+ 0 fail
+ 9 expect() calls
+Ran 3 tests across 1 file. [6.28s]
+bun test v1.4.2 (744846f84)
+
+src\lib\services\billing-otomatis.test.ts:
+(pass) pengingat tagihan otomatis > H-n dan lewat jatuh tempo, sekali sehari [82.94ms]
+
+ 1 pass
+ 0 fail
+ 4 expect() calls
+Ran 1 test across 1 file. [6.31s]
+bun test v1.4.2 (744846f84)
+
+src\lib\server\operational\autoincrement-sequence.test.ts:
+(pass) AUTOINCREMENT sequence guard > tbl_shift kosong setelah inisialisasi agar counter AUTOINCREMENT belum terpakai [6333.62ms]
+(pass) AUTOINCREMENT static guard > tidak ada upsert / OR IGNORE ke tabel AUTOINCREMENT tanpa kolom primary key [1887.86ms]
+
+ 2 pass
+ 0 fail
+ 3 expect() calls
+Ran 2 tests across 1 file. [8.33s]
+bun test v1.4.2 (744846f84)
+
+src\lib\validations\tarif-payroll-bawaan.test.ts:
+(pass) tarif payroll bawaan di database Web > database baru memakai tarif yang sama dengan seed Rust [0.59ms]
+(pass) tarif payroll bawaan di database Web > migrasi membersihkan id lama dan tidak menimpa tarif yang disesuaikan [94.14ms]
+
+ 2 pass
+ 0 fail
+ 6 expect() calls
+Ran 2 tests across 1 file. [6.05s]
+bun test v1.4.2 (744846f84)
+
+src\lib\services\content-images.test.ts:
+(pass) id = 32 hex pertama SHA-256 (vektor kembar konten_gambar.rs) [0.18ms]
+(pass) unggah idempoten, pratinjau, dan bersih-bersih foto yatim [18.26ms]
+
+ 2 pass
+ 0 fail
+ 7 expect() calls
+Ran 2 tests across 1 file. [5.59s]
+$ cargo test --manifest-path src-tauri/Cargo.toml
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 14.62s
+     Running unittests src\lib.rs (src-tauri\target\debug\deps\manajemen_sekolah_mobile_lib-e6389762f5bffee8.exe)
+
+running 449 tests
+test mobile::academic::tests::batas_foto_siswa_sepadan_dengan_validator_sync ... ok
+test mobile::academic::tests::sumber_foto_mengikuti_cloud_kecuali_ada_perubahan_lokal ... ok
+test mobile::academic::tests::password_wali_acak_memakai_alfabet_yang_sama_dengan_web ... ok
+test mobile::academic::tests::izin_foto_mengikuti_jenis_personil ... ok
+test mobile::accounting::tests::aturan_ubah ... ok
+test mobile::accounting::tests::cloud_menolak_jurnal_timpang_seluruhnya ... ok
+test mobile::accounting::tests::format_rupiah_dan_nomor ... ok
+test mobile::accounting::tests::bagan_akun_bawaan ... ok
+test mobile::accounting::tests::jurnal_seimbang_diterima ... ok
+test mobile::accounting::tests::pembalik ... ok
+test mobile::accounting::tests::laporan_isak35_kembar ... ok
+test mobile::accounting::tests::saldo ... ok
+test mobile::accounting::tests::jurnal_ditolak ... ok
+test mobile::accounting::tests::seri_perangkat_dari_kode_perangkat ... ok
+test mobile::accounting::tests::validasi_akun ... ok
+test mobile::academic::tests::shift_guru_dipertahankan_bila_draft_tidak_memilih ... ok
+test mobile::academic::tests::shift_siswa_bisa_dipilih_dan_dipertahankan_saat_edit ... ok
+test mobile::accounting::tests::seed_akun_ditanam_tanpa_outbox ... ok
+test mobile::academic::tests::status_foto_menggabungkan_cloud_dengan_perubahan_lokal_yang_belum_terkirim ... ok
+test mobile::administration::tests::create_backup_and_correction_workflow_in_rust ... ok
+test mobile::accounting::tests::akun_nonaktif_dan_kode_ganda_ditolak ... ok
+test mobile::academic::tests::jenis_personil_dibaca_dari_data_lokal_dengan_cadangan_siswa_data ... ok
+test mobile::academic::tests::jurusan_menyimpan_unit_dan_menolak_unit_asing ... ok
+test mobile::academic::tests::tambah_guru_atau_siswa_dengan_id_duplikat_harus_ditolak_pada_mode_tambah ... ok
+test mobile::administration::tests::dashboard_reads_status_minutes_and_work_date_without_reinterpreting_them ... ok
+test mobile::administration::tests::hapus_log_ditolak_tidak_menyentuh_absensi_kemarin ... ok
+test mobile::administration::tests::senin_pekan_berjalan_dari_hari_apa_pun ... ok
+test mobile::academic::tests::kode_personil_memakai_id_utuh_bukan_irisannya ... ok
+test mobile::accounting::tests::posting_pembalik_dan_laporan ... ok
+test mobile::administration::tests::hapus_log_scanner_tidak_menimpa_koreksi_admin ... ok
+test mobile::administration::tests::hapus_satu_satunya_log_menghapus_baris_dengan_event_delete ... ok
+test mobile::administration::tests::hapus_log_pulang_shift_malam_memakai_tanggal_berikutnya ... ok
+test mobile::administration::tests::hapus_backup_ditolak_bila_sudah_dipakai_absensi ... ok
+test mobile::administration::tests::rekap_per_tanggal_menghitung_satu_orang_sekali_per_hari ... ok
+test mobile::administration::tests::import_di_jendela_tepat_waktu_tidak_telat ... ok
+test mobile::billing::tests::aturan_pembayaran ... ok
+test mobile::billing::tests::isian_pengingat_kembar ... ok
+test mobile::administration::tests::import_menghitung_telat_dari_jam_masuk ... ok
+test mobile::administration::tests::import_offline_persists_separate_rows_for_normal_and_backup_shifts ... ok
+test mobile::attendance_dashboard::tests::dasbor_kosong_tetap_berhasil ... ok
+test mobile::billing::tests::periode_dan_id ... ok
+test mobile::billing::tests::persen_dan_rentang_bulan_kembar ... ok
+test mobile::attendance_dashboard::tests::setiap_query_dasbor_valid_terhadap_skema_asli ... ok
+test mobile::attendance_dashboard::tests::metrik_dasbor_dihitung_dari_data_nyata ... ok
+test mobile::administration::tests::test_shift_multi_session_crud ... ok
+test mobile::administration::tests::status_backup_dipelihara_saat_backup_dibuat_dan_dibatalkan ... ok
+test mobile::billing::tests::validasi_dan_hitungan_keringanan ... ok
+test mobile::billing::tests::validasi_dan_pilihan_tarif ... ok
+test mobile::billing::tests::validasi_jenis ... ok
+test mobile::class_attendance::tests::baris_detail_di_luar_roster_terdeteksi_untuk_dibuang ... ok
+test mobile::class_attendance::tests::irisan_jam_ke_dinilai_dari_rentang_bukan_teks ... ok
+test mobile::class_attendance::tests::jam_masuk_kosong_tidak_dihitung_hadir_di_gerbang ... ok
+test mobile::class_attendance::tests::normalisasi_jam_bel_menerima_bentuk_manusia ... ok
+test mobile::class_attendance::tests::normalisasi_jam_ke_menerima_angka_dan_rentang ... ok
+test mobile::class_attendance::tests::pengaturan_jp_jatuh_ke_bawaan_bukan_ke_nol ... ok
+test mobile::class_attendance::tests::rentang_jam_ke_membaca_angka_tunggal_dan_rentang ... ok
+test mobile::class_attendance::tests::ringkasan_gerbang_meruntuhkan_sesi_ganda_menjadi_satu_baris ... ok
+test mobile::class_attendance::tests::test_class_status_validation ... ok
+test mobile::class_attendance::tests::test_duplicate_session_prevention ... ok
+test mobile::class_attendance::tests::test_numeric_jam_ke_sorting ... ok
+test mobile::class_attendance::tests::test_total_calculation_and_classification ... ok
+test mobile::class_attendance::tests_atur_nomor_jam_bel::hanya_kbm_yang_bernomor ... ok
+test mobile::class_attendance::tests_reconciliation_message::mengikuti_vektor_typescript ... ok
+test mobile::commands::tests_alfa_simulated_time::debug_meneruskan_waktu_simulasi ... ok
+test mobile::commands::tests_alfa_simulated_time::rilis_menerima_pemanggilan_tanpa_waktu ... ok
+test mobile::commands::tests_alfa_simulated_time::rilis_menolak_waktu_simulasi ... ok
+test mobile::commands::tests_gabung_antrean_wa::menggabung_tanpa_menggandakan ... ok
+test mobile::commands::tests_gabung_antrean_wa::salah_satu_kosong_tetap_utuh ... ok
+test mobile::commands::tests_offline_login::akun_ber_2fa_ditolak_pada_jalur_offline ... ok
+test mobile::commands::tests_offline_login::akun_tanpa_2fa_tetap_boleh_masuk_offline ... ok
+test mobile::commands::tests_offline_login::kode_penolakan_offline_tidak_bentrok_dengan_kode_2fa_online ... ok
+test mobile::administration::tests::test_scanner_holiday_rejection ... ok
+test mobile::commands::tests_offline_login::pesan_offline_tidak_memuat_frasa_pemicu_layar_kode ... ok
+test mobile::administration::tests::test_holiday_crud_and_alfa_settings ... ok
+test mobile::config::tests::bool_setting_only_accepts_explicit_truth ... ok
+test mobile::config::tests::offline_window_is_bounded_and_required_in_release ... ok
+test mobile::config::tests::provider_setting_defaults_to_turso_for_unknown_values ... ok
+test mobile::config::tests::turso_endpoint_normalization ... ok
+test mobile::face_match::tests::hanya_tidak_cocok_pada_mode_tolak_yang_menolak ... ok
+test mobile::face_match::tests::kemiripan ... ok
+test mobile::face_match::tests::kuantisasi_dan_decode ... ok
+test mobile::face_match::tests::normalisasi_setting ... ok
+test mobile::face_match::tests::template_tidak_sah_tidak_sampai_cloud ... ok
+test mobile::face_match::tests::vonis ... ok
+test mobile::commands::tests_offline_login::mode_lokal_tidak_menuntut_alamat_saat_provisioning ... ok
+test mobile::grades::tests::id_nilai_selalu_berbeda_meski_dibuat_beruntun ... ok
+test mobile::grades::tests::jenis_asing_ditolak_bukan_dinormalkan ... ok
+test mobile::grades::tests::semester_asing_ditolak ... ok
+test mobile::hari_kerja::tests::hari_iso_dan_tanggal ... ok
+test mobile::hari_kerja::tests::parse_hari_kerja_jatuh_ke_tujuh_hari ... ok
+test mobile::hari_kerja::tests::validasi_hari_kerja ... ok
+test mobile::billing::tests::pengingat_otomatis_h_n_dan_lewat_sekali_sehari ... ok
+test mobile::hari_kerja::tests::wajib_masuk_vektor ... ok
+test mobile::hari_kerja::tests::validasi_libur_massal ... ok
+test mobile::inventory::tests::build_cancellation_swaps_sides ... ok
+test mobile::billing::tests::rekap_rombel_dan_penerimaan_skenario_kembar ... ok
+test mobile::inventory::tests::cloud_keeps_decimal_flag_when_payload_omits_it ... ok
+test mobile::inventory::tests::cloud_values_reject_check_violations ... ok
+test mobile::billing::tests::saringan_dan_urutan_jatuh_tempo ... ok
+test mobile::attendance_ledger::tests::test_attendance_ledger_preview_and_freeze_lifecycle ... ok
+test mobile::commands::tests_offline_login::provider_remote_tetap_menuntut_alamat ... ok
+test mobile::inventory::tests::draft_rejects_unknown_keys ... ok
+test mobile::billing::tests::sakelar_portal_wali_masuk_outbox ... ok
+test mobile::inventory::tests::duplicate_codes_from_offline_devices_are_flagged ... ok
+test mobile::billing::tests::pengingat_tunggakan_sekali_sehari ... ok
+test mobile::grades::tests::daftar_penilaian_semua_rombel_dan_filter_jenis ... ok
+test mobile::inventory::tests::is_valid_date_vectors ... ok
+test mobile::inventory::tests::kode_prefix_vectors ... ok
+test mobile::inventory::tests::kolom_tambahan_vectors ... ok
+test mobile::inventory::tests::expirable_batches_follow_their_own_id ... ok
+test mobile::billing::tests::terbit_massal_idempoten_dan_batal ... ok
+test mobile::inventory::tests::next_kode_number_vectors ... ok
+test mobile::inventory::tests::normalize_tempat_vectors ... ok
+test mobile::inventory::tests::automatic_codes_are_sequential_per_prefix ... ok
+test mobile::inventory::tests::formulir_rejects_phase_two_reasons ... ok
+test mobile::inventory::tests::expirable_return_goes_back_to_its_batch ... ok
+test mobile::inventory::tests::opname_history_lists_sessions_with_differences ... ok
+test mobile::inventory::tests::phase_three_rule_vectors ... ok
+test mobile::inventory::tests::phase_two_rule_vectors ... ok
+test mobile::inventory::tests::decimal_items_lock_after_history_and_round_procurement_value ... ok
+test mobile::inventory::tests::cancellation_is_idempotent_and_guards_consumed_stock ... ok
+test mobile::inventory::tests::list_reports_expiry_status_and_low_stock ... ok
+test mobile::inventory::tests::delete_column_purges_values_and_cannot_be_revived ... ok
+test mobile::inventory::tests::registration_rows_cannot_be_cancelled ... ok
+test mobile::inventory::tests::document_groups_by_number_and_skips_cancelled_rows ... ok
+test mobile::inventory::tests::opname_writes_differences_with_one_document_number ... ok
+test mobile::inventory::tests::record_mutation_takes_operator_from_session_and_enqueues ... ok
+test mobile::inventory::tests::unit_rule_vectors ... ok
+test mobile::inventory::tests::validate_barang_vectors ... ok
+test mobile::inventory::tests::validate_mutation_normalizes_irrelevant_fields ... ok
+test mobile::inventory::tests::validate_mutation_vectors ... ok
+test mobile::inventory::tests::validate_opname_vectors ... ok
+test mobile::konten_gambar::tests::id_adalah_32_hex_pertama_sha256 ... ok
+test mobile::konten_gambar::tests::menerima_jpeg_dan_webp_bertanda_tangan_sah ... ok
+test mobile::konten_gambar::tests::menolak_foto_di_atas_400_kb ... ok
+test mobile::konten_gambar::tests::menolak_jenis_lain_isi_tidak_cocok_dan_bentuk_rusak ... ok
+test mobile::konten_gambar::tests::sql_bersih_yatim_bisa_disiapkan ... ok
+test mobile::license::tests::build_date_is_a_calendar_date ... ok
+test mobile::license::tests::device_binding_respects_mobile_flag ... ok
+test mobile::license::tests::device_code_is_stable_and_well_formed ... ok
+test mobile::license::tests::device_name_is_tidied_and_android_label_is_readable ... ok
+test mobile::license::tests::evaluation_states ... ok
+test mobile::license::tests::grant_only_for_usable_states ... ok
+test mobile::license::tests::instance_code_matches_web_server ... ok
+test mobile::inventory::tests::opname_counts_units_against_their_own_batch ... ok
+test mobile::license::tests::read_only_gate ... ok
+test mobile::license::tests::rental_days_left_counts_today ... ok
+test mobile::license::tests::rust_signing_reproduces_issuer_vector_bytes ... ok
+test mobile::license::tests::tampering_and_foreign_keys_are_rejected ... ok
+test mobile::license::tests::test_key_matches_issuer_vector ... ok
+test mobile::license::tests::twin_vectors_verify_and_parse ... ok
+test mobile::license::tests::web_fields_do_not_affect_device_evaluation ... ok
+test mobile::license::tests::payload_rules_match_issuer ... ok
+test mobile::license::tests::whitespace_inside_license_is_ignored ... ok
+test mobile::license::tests::wib_date_rolls_over_at_17_utc ... ok
+test mobile::loan::tests::jurnal_payroll ... ok
+test mobile::loan::tests::keputusan ... ok
+test mobile::loan::tests::pelunasan ... ok
+test mobile::inventory::tests::unit_change_locked_after_history ... ok
+test mobile::loan::tests::periode_dan_id ... ok
+test mobile::license::tests::web_fields_match_issuer ... ok
+test mobile::loan::tests::potongan_kasbon ... ok
+test mobile::loan::tests::validasi_pinjaman ... ok
+test mobile::inventory::tests::record_rejects_overdraw_and_canonicalizes_tempat ... ok
+test mobile::nilai_akhir::tests::hari_sekolah ... ok
+test mobile::nilai_akhir::tests::jenis_dan_bobot ... ok
+test mobile::nilai_akhir::tests::kehadiran_dan_nilai ... ok
+test mobile::inventory::tests::loans_track_partial_returns ... ok
+test mobile::inventory::tests::stock_card_running_balance ... ok
+test mobile::nilai_akhir::tests::rentang_semester_tiga_jalan ... ok
+test mobile::inventory::tests::per_unit_entry_creates_units_and_moves_them_one_by_one ... ok
+test mobile::inventory::tests::two_offline_devices_sum_to_true_stock ... ok
+test mobile::inventory::tests::procurement_sums_value_per_source_without_cancelled_rows ... ok
+test mobile::operational::tests_geofence_validation::mengikuti_aturan_web ... ok
+test mobile::billing::tests::pembayaran_alokasi_titipan_dan_tinjauan ... ok
+test mobile::nilai_akhir::tests::bahan_erapor_dari_rekap_n2 ... ok
+test mobile::inventory::tests::register_units_converts_pool_stock_without_changing_totals ... ok
+test mobile::nilai_akhir::tests::kursor_jenis_dilupakan_sekali_saja ... ok
+test mobile::loan::tests::pembatalan_membalik_pencairan ... ok
+test mobile::payroll_admin::commands::tests::id_payroll_mempertahankan_awalan_yang_terbaca ... ok
+test mobile::payroll_admin::commands::tests::id_payroll_tidak_bertabrakan_dalam_satu_detik ... ok
+test mobile::payroll_admin::commands::tests::sesi_mengajar_hanya_terhitung_bila_jurnalnya_diparaf ... ok
+test mobile::payroll_admin::commands::tests::tarif_jp_dibaca_beserta_baris_tanpa_guru ... ok
+test mobile::payroll_admin::engine::tests::baris_tarif_kembar_dipilih_secara_deterministik ... ok
+test mobile::payroll_admin::engine::tests::dasar_negatif_tidak_pernah_mengurangi_tunjangan ... ok
+test mobile::payroll_admin::engine::tests::jam_yang_sama_pada_satu_tanggal_dihitung_sekali ... ok
+test mobile::payroll_admin::engine::tests::jenis_perhitungan_komponen_dihitung_dari_dasar_masing_masing ... ok
+test mobile::payroll_admin::engine::tests::jp_tanpa_tarif_dihitung_terpisah_dan_tidak_menggagalkan_apa_pun ... ok
+test mobile::payroll_admin::engine::tests::kelompok_status_tidak_pernah_cocok_untuk_yang_bukan_guru ... ok
+test mobile::payroll_admin::engine::tests::membagi_lebih_dulu_kehilangan_titik_tengahnya ... ok
+test mobile::payroll_admin::engine::tests::sakelar_lembur_memindahkan_jam_hari_libur_bukan_membuangnya ... ok
+test mobile::payroll_admin::engine::tests::sasaran_komponen_dinilai_dari_kelompok_dan_bukan_dari_tebakan ... ok
+test mobile::payroll_admin::engine::tests::tanpa_jenjang_hari_libur_dibayar_seperti_hari_biasa ... ok
+test mobile::payroll_admin::engine::tests::tarif_khusus_guru_menang_atas_tarif_umum_mapel ... ok
+test mobile::payroll_admin::engine::tests::tarif_yang_berlaku_mengikuti_tanggal_sesi_bukan_akhir_periode ... ok
+test mobile::payroll_admin::engine::tests::upah_dari_menit_membulatkan_titik_tengah_menjauhi_nol ... ok
+test mobile::payroll_seed::tests::tarif_bawaan_lengkap_dan_tidak_memuat_id_lama ... ok
+test mobile::pmb_bayar::tests::batal_bayar ... ok
+test mobile::pmb_bayar::tests::ekspresi_sql_keadaan_dan_kuota ... ok
+test mobile::pmb_bayar::tests::konfirmasi_bayar ... ok
+test mobile::pmb_bayar::tests::perpanjang_bayar ... ok
+test mobile::pmb_bayar::tests::rupiah_titik_ribuan ... ok
+test mobile::pmb_bayar::tests::ubah_status_saat_belum_lunas ... ok
+test mobile::portability::tests::berkas_bukan_database_ditolak ... ok
+test mobile::portability::tests::berkas_terenkripsi_bolak_balik_utuh ... ok
+test mobile::operational::tests_generate_alfa_hari_libur::hari_libur_tanpa_whitelist_tidak_mengalfakan_siapa_pun ... ok
+test mobile::operational::tests_generate_alfa_hari_libur::hari_libur_hanya_mengalfakan_yang_masuk_whitelist ... ok
+test mobile::portability::tests::frasa_sandi_salah_ditolak_dengan_kode_yang_jelas ... ok
+test mobile::portability::tests::database_asing_ditolak_sebelum_menimpa_apa_pun ... ok
+test mobile::operational::tests_identitas_karyawan::daftar_id_card_membawa_kelas_siswa ... ok
+test mobile::operational::tests_generate_alfa_hari_libur::libur_mingguan_mengikuti_hari_kerja_shift_dan_hari_sekolah ... ok
+test mobile::rapel::tests::hitung_rapel_kenaikan_tarif ... ok
+test mobile::rapel::tests::hitung_rapel_pembulatan_dari_angka_beku ... ok
+test mobile::rapel::tests::hitung_rapel_turun_dan_sama ... ok
+test mobile::rapel::tests::komponen_persen_hanya_percentage ... ok
+test mobile::rapel::tests::rentang_alasan_label_status_id ... ok
+test mobile::portability::tests::hub_yang_sah_diterima_dengan_versi_skemanya ... ok
+test mobile::portability::tests::vacuum_into_menangkap_transaksi_terakhir_pada_mode_wal ... ok
+test mobile::scanner::tests::cakupan_whitelist_dinormalkan_sama_dengan_typescript ... ok
+test mobile::scanner::tests::daftar_ip_dibaca_dari_json_maupun_teks_bebas ... ok
+test mobile::portability::tests::skema_lebih_baru_ditolak ... ok
+test mobile::nilai_akhir::tests::pengaturan_dan_rekap_nilai_akhir ... ok
+test mobile::operational::tests_identitas_karyawan::filter_hanya_pegawai_menyaring_siswa_dan_guru ... ok
+test mobile::operational::tests_identitas_karyawan::email_karyawan_hanya_berubah_bila_kuncinya_dikirim ... ok
+test mobile::operational::tests_identitas_karyawan::impor_melaporkan_indeks_baris_yang_bentrok ... ok
+test mobile::scanner::tests::entri_whitelist_dicocokkan_sama_dengan_typescript ... ok
+test mobile::rapel::tests::sql_rapel_siap_di_skema_lokal ... ok
+test mobile::operational::tests_identitas_karyawan::id_unik_dan_kode_karyawan_ganda_ditolak_dengan_pesan_jelas ... ok
+test mobile::loan::tests::siklus_kasbon_dan_pembayaran_gaji ... ok
+test mobile::rapel::tests::deteksi_simpan_pegang_dan_batal ... ok
+test mobile::scanner::tests::attendance_log_and_outbox_are_rolled_back_together ... ok
+test mobile::scanner::tests::desktop_geofence_rejection_is_logged_without_attendance ... ok
+test mobile::scanner::tests::daftar_ip_kosong_tidak_membatasi_scan ... ok
+test mobile::scanner::tests::ejaan_jenis_personil_huruf_besar_tetap_dikenali_sebagai_siswa ... ok
+test mobile::scanner::tests::daftar_ip_terisi_menolak_alamat_di_luar_daftar ... ok
+test mobile::scanner::tests::fitur_foto_mati_membuat_sakelar_role_tidak_berlaku ... ok
+test mobile::scanner::tests::normalisasi_entri_ip_sama_dengan_typescript ... ok
+test mobile::scanner::tests::pencocokan_ip_sama_dengan_typescript ... ok
+test mobile::scanner::tests::duplicate_is_logged_without_changing_daily_attendance ... ok
+test mobile::scanner::tests::foto_bukti_tersimpan_lokal_dan_ikut_outbox ... ok
+test mobile::academic::tests::terbit_massal_melewati_wali_yang_sudah_mengganti_password ... ok
+test mobile::scanner::tests::foto_ditolak_bila_dikirim_sebagai_data_url ... ok
+test mobile::scanner::tests::foto_wajib_menolak_scan_tanpa_foto_dan_tetap_tercatat ... ok
+test mobile::scanner::tests::koreksi_admin_jam_masuk_masih_bisa_diselesaikan_scan_pulang ... ok
+test mobile::scanner::tests::policy_rejection_is_logged_and_enqueued_without_attendance ... ok
+test mobile::scanner::tests::tanggal_libur_dinormalkan_sama_dengan_typescript ... ok
+test mobile::scanner::tests::multi_scan_uses_policy_after_cooldown ... ok
+test mobile::scanner::tests::known_employee_rejections_are_logged_and_enqueued ... ok
+test mobile::scanner::tests::teks_whitelist_dibandingkan_tanpa_spasi_dan_kapitalisasi ... ok
+test mobile::scanner::tests::vonis_whitelist_sama_dengan_typescript ... ok
+test mobile::scanner::tests::night_shift_keeps_one_session_on_the_entry_work_date ... ok
+test mobile::scanner::tests::multi_sesi_dibaca_dari_shift_asal_karyawan ... ok
+test mobile::scanner::tests::koreksi_admin_yang_sudah_lengkap_tidak_bisa_ditimpa_scanner ... ok
+test mobile::scanner::tests::sakelar_mati_tidak_mengantrekan_notifikasi_sama_sekali ... ok
+test mobile::secrets::tests::identity_is_bound_to_customer_origin ... ok
+test mobile::secrets::tests::identity_is_bound_to_device ... ok
+test mobile::scanner::tests::previous_day_night_backup_is_resolved_for_replacement ... ok
+test mobile::scanner::tests::sakelar_hidup_mengantrekan_hanya_jenis_yang_dinyalakan ... ok
+test mobile::scanner::tests::tanpa_flag_di_shift_asal_sesi_lanjutan_ditolak ... ok
+test mobile::share::tests::base64_diterima_dengan_maupun_tanpa_prefix_data_url ... ok
+test mobile::share::tests::mime_mengikuti_petunjuk_yang_wajar_lalu_ekstensi ... ok
+test mobile::share::tests::nama_berkas_kosong_tetap_punya_nama ... ok
+test mobile::share::tests::nama_file_berbahaya_disanitasi_sebelum_ditulis ... ok
+test mobile::siswa_dapodik::tests::data_dapodik_diberi_versi_dan_kosong_jadi_null ... ok
+test mobile::siswa_dapodik::tests::vektor_bersama_validasi_simpan ... ok
+test mobile::sql_backend::tests::boolean_tersimpan_sebagai_integer ... ok
+test mobile::sql_backend::tests::dekoder_lokal_dan_hrana_menghasilkan_bentuk_sama ... ok
+test mobile::sql_backend::tests::integer_besar_tidak_kehilangan_presisi ... ok
+test mobile::scanner::tests::wajah_orang_lain_ditandai_pada_mode_pantau ... ok
+test mobile::scanner::tests::shift_lanjutan_eksplisit_memindahkan_shift_karyawan ... ok
+test mobile::scanner::tests::shift_fleksibel_tidak_menelan_sesi_lanjutan ... ok
+test mobile::scanner::tests::shift_lanjutan_tidak_diterapkan_saat_multi_sesi_mati ... ok
+test mobile::sql_backend::tests::kolom_dan_baris_terbaca_sesuai_urutan ... ok
+test mobile::sql_backend::tests::pipeline_gagal_tidak_membatalkan_yang_sudah_berhasil ... ok
+test mobile::sql_backend::tests::rows_affected_dan_last_insert_rowid_terisi ... ok
+test mobile::sql_backend::tests::transaksi_gagal_tidak_meninggalkan_data_parsial ... ok
+test mobile::secrets::tests::corrupted_salt_is_rejected_without_trusting_the_snapshot ... ok
+test mobile::sql_backend::tests::transaksi_berhasil_menyimpan_seluruh_baris ... ok
+test mobile::storage::tests::notifikasi_wa_rebuild_keeps_claims_and_accepts_uks ... ok
+test mobile::secrets::tests::legacy_snapshot_is_migrated_to_device_bound_version ... ok
+test mobile::storage::tests::device_identity_is_local_and_stable ... ok
+test mobile::scanner::tests::wajah_orang_lain_ditolak_pada_mode_tolak ... ok
+test mobile::secrets::tests::wrong_password_and_other_customer_are_rejected ... ok
+test mobile::sync::tests::domain_yang_dipakai_banyak_tabel_tidak_boleh_menghapus_baris ... ok
+test mobile::sync::tests::every_snapshot_table_is_purged_on_database_switch ... ok
+test mobile::secrets::tests::expired_snapshot_requires_online_login ... ok
+test mobile::storage::tests::every_local_table_is_classified_for_database_switch ... ok
+test mobile::secrets::tests::tampered_alias_cannot_impersonate_an_operator ... ok
+test mobile::secrets::tests::encrypted_snapshot_supports_username_and_operator_code ... ok
+test mobile::storage::tests::initializes_operational_schema_idempotently ... ok
+test mobile::storage::tests::tarif_default_lokal_memakai_id_yang_sama_dengan_cloud ... ok
+test mobile::sync::tests::pemangkasan_outbox_hanya_membuang_yang_sudah_diterima_cloud ... ok
+test mobile::storage::tests::migrasi_memasang_check_sumber_pada_tabel_lama ... ok
+test mobile::storage::tests::seed_tarif_lama_dibersihkan_saat_inisialisasi_ulang ... ok
+test mobile::sync::tests::push_ditolak_hanya_saat_skema_cloud_lebih_baru ... ok
+test mobile::sync::tests::apply_snapshot_self_heals_a_stale_local_schema_missing_a_snapshot_table ... ok
+test mobile::sync::tests::pending_batch_prioritizes_shift_create_and_defers_future_retry ... ok
+test mobile::sync::tests::konflik_revisi_basi_dicoba_ulang_sampai_batas_percobaan ... ok
+test mobile::sync::tests::konflik_selain_revisi_basi_tidak_dicoba_ulang ... ok
+test mobile::storage::tests::switching_cloud_database_purges_old_local_data ... ok
+test mobile::sync::tests::pending_events_memakai_revisi_server_terbaru_untuk_entitas_yang_sama ... ok
+test mobile::sync::tests::pending_events_membiarkan_base_revision_null_apa_adanya ... ok
+test mobile::sync::tests::retensi_foto_lokal_melindungi_bukti_yang_belum_terkirim ... ok
+test mobile::sync::tests::push_results_must_be_complete_and_store_shift_revision_by_server_id ... ok
+test mobile::storage::tests::login_is_temporarily_locked_after_five_failures ... ok
+test mobile::sync::tests::pengaturan_koneksi_perangkat_tidak_pernah_ikut_sinkronisasi ... ok
+test mobile::sync::tests::pull_menerapkan_pertukaran_kode_karyawan_yang_sudah_tersinkron ... ok
+test mobile::sync::tests::pull_melewati_karyawan_cloud_yang_kodenya_dipegang_karyawan_belum_terkirim ... ok
+test mobile::sync::tests::snapshot_berjendela_menghapus_di_dalam_jendela_saja ... ok
+test mobile::sync::tests::tanpa_database_sinkronisasi_ditolak_dan_outbox_tetap_pending ... ok
+test mobile::sync::tests::snapshot_reconciles_shift_ids_and_keeps_id_card_ids_local ... ok
+test mobile::sync::tests::snapshot_berkunci_partial_tidak_menghapus_riwayat_di_luar_jendela ... ok
+test mobile::sync::tests::snapshot_does_not_overwrite_an_unsynced_local_entity ... ok
+test mobile::time_policy::tests::batas_pulang_tidak_memperpanjang_hari_shift_fleksibel ... ok
+test mobile::time_policy::tests::calendar_helpers_handle_month_and_leap_boundaries ... ok
+test mobile::time_policy::tests::checkout_without_entry_needs_verification ... ok
+test mobile::time_policy::tests::cutoff_alfa_menambahkan_batas_pulang_dan_offset ... ok
+test mobile::time_policy::tests::cutoff_alfa_menolak_jam_shift_rusak ... ok
+test mobile::time_policy::tests::cutoff_alfa_shift_fleksibel_jatuh_setelah_tengah_malam ... ok
+test mobile::time_policy::tests::cutoff_alfa_shift_malam_melewati_tengah_malam ... ok
+test mobile::time_policy::tests::flexible_shift_and_break_threshold_match_web ... ok
+test mobile::time_policy::tests::istirahat_dipotong_penuh_setelah_jam_masuk_ditambah_offset ... ok
+test mobile::time_policy::tests::jam_kerja_dimulai_dari_jam_masuk_shift ... ok
+test mobile::time_policy::tests::jam_kerja_normal_tidak_lagi_ditambah_batas_masuk ... ok
+test mobile::time_policy::tests::jam_kerja_shift_malam_dimulai_dari_jam_masuk ... ok
+test mobile::time_policy::tests::jam_shift_rusak_tidak_dianggap_fleksibel ... ok
+test mobile::time_policy::tests::jendela_masuk_disusun_mundur_dari_jam_masuk ... ok
+test mobile::time_policy::tests::jendela_masuk_tutup_pada_jam_masuk_ditambah_toleransi ... ok
+test mobile::time_policy::tests::jendela_shift_fleksibel_tutup_di_akhir_hari ... ok
+test mobile::time_policy::tests::kode_shift_bukan_penanda_fleksibel ... ok
+test mobile::time_policy::tests::koreksi_admin_boleh_mencatat_masuk_setelah_toleransi_sebelum_pulang ... ok
+test mobile::time_policy::tests::multi_scan_checkout_and_third_scan_match_web ... ok
+test mobile::time_policy::tests::night_shift_keeps_entry_date_after_midnight ... ok
+test mobile::time_policy::tests::perhitungan_ulang_jalur_admin_sama_dengan_scanner ... ok
+test mobile::time_policy::tests::regular_entry_matrix_matches_web ... ok
+test mobile::time_policy::tests::shift_kind_of_mengikuti_deteksi_fleksibel ... ok
+test mobile::time_policy::tests::shift_tanpa_jam_tetap_dianggap_fleksibel ... ok
+test mobile::sync::tests::snapshot_does_not_overwrite_pending_scanner_attendance_or_log ... ok
+test mobile::turso::tests::atomic_batch_has_guarded_commit_and_rollback ... ok
+test mobile::sync::tests::tombstone_menghapus_baris_yang_delete_missing_nya_mati ... ok
+test mobile::turso::tests::auth_token_is_optional_only_where_it_is_safe ... ok
+test mobile::turso::tests::base32_decoding_forgives_human_typing ... ok
+test mobile::turso::tests::bentrok_id_unik_ditahan_dengan_pesan_yang_sama_dengan_web ... ok
+test mobile::turso::tests::bentrok_kode_karyawan_menjadi_pesan_yang_bisa_ditindaklanjuti ... ok
+test mobile::turso::tests::bootstrap_requires_a_strong_non_default_password ... ok
+test mobile::turso::tests::database_url_never_carries_credentials ... ok
+test mobile::turso::tests::email_personil_membedakan_absen_kosong_dan_salah ... ok
+test mobile::turso::tests::error_skema_dikenali_untuk_penyembuhan ... ok
+test mobile::turso::tests::event_absensi_basi_ditolak_sebagai_konflik ... ok
+test mobile::turso::tests::extract_attendance_row_params_resolves_integer_and_string_tahun ... ok
+test mobile::turso::tests::force_local_override_menyelesaikan_konflik_basi ... ok
+test mobile::turso::tests::gambar_sampul_hanya_menerima_mime_yang_sama_dengan_typescript ... ok
+test mobile::turso::tests::generated_secrets_and_recovery_codes_are_usable ... ok
+test mobile::turso::tests::insecure_flag_is_dropped_outside_self_hosted_mode ... ok
+test mobile::sync::tests::tombstone_melewati_entitas_yang_outbox_nya_menggantung ... ok
+test mobile::sync::tests::status_menandai_mode_lokal_hanya_untuk_provider_local_file ... ok
+test mobile::turso::tests::kunci_payload_snapshot_sama_dengan_tabel_sync ... ok
+test mobile::turso::tests::legacy_vault_payload_defaults_to_turso_provider ... ok
+test mobile::turso::tests::lokasi_berkas_lokal_wajib_terisi ... ok
+test mobile::sync::tests::snapshot_tanpa_kunci_tabel_tidak_menghapus_data_lokal_tabel_itu ... ok
+test mobile::turso::tests::matches_url_compares_normalized_spellings ... ok
+test mobile::sync::tests::snapshot_kedua_yang_identik_tidak_menulis_ulang_satu_baris_pun ... ok
+test mobile::turso::tests::mode_lokal_tidak_pernah_menuntut_token ... ok
+test mobile::turso::tests::nama_setting_provider_lokal_bukan_local ... ok
+test mobile::turso::tests::operator_deletion_guards_match_the_web_path ... ok
+test mobile::turso::tests::origin_mode_lokal_stabil_dan_tidak_bergantung_isi_path ... ok
+test mobile::sync::tests::test_resolve_conflicts_and_clear_failed ... ok
+test mobile::sync::tests_identitas_klien::setelah_disemai_aman_di_dalam_transaksi_tulis ... ok
+test mobile::sync::tests::snapshot_requires_monotonic_revision_and_only_removes_server_tracked_shift ... ok
+test mobile::teaching_journal::tests::test_teaching_journal_lifecycle ... ok
+test mobile::turso::tests::reset_approval_rejection_matches_web_vectors ... ok
+test mobile::turso::tests::scan_pulang_boleh_melengkapi_baris_koreksi_admin ... ok
+test mobile::turso::tests::scan_tidak_boleh_menimpa_koreksi_admin_di_jalur_turso ... ok
+test mobile::turso::tests::self_hosted_allows_plain_http_on_private_networks ... ok
+test mobile::turso::tests::self_hosted_keeps_custom_port_and_strips_path ... ok
+test mobile::turso::tests::self_hosted_rejects_plain_http_on_public_hosts_unless_opted_in ... ok
+test mobile::sync::tests_identitas_klien::tanpa_semai_gagal_di_dalam_transaksi_tulis ... ok
+test mobile::turso::tests::provisioning_lokal_membangun_seluruh_tabel_cloud ... ok
+test mobile::turso::tests::provisioning_lokal_menanam_role_dan_permission ... ok
+test mobile::turso::tests::personil_baru_lewat_event_update_membawa_jenis_personil_ke_cloud ... ok
+test mobile::turso::tests::persetujuan_reset_menolak_diri_sendiri_dan_non_superadmin ... ok
+test mobile::turso::tests::antrean_wa_cloud_menolak_dedupe_ganda_lintas_perangkat ... ok
+test mobile::turso::tests::lupa_password_menemukan_akun_lewat_email ... ok
+test mobile::turso::tests::kode_pemulihan_mengembalikan_akses_tanpa_jaringan ... ok
+test mobile::turso::tests::sync_routes_are_canonicalized_and_unsupported_mutations_are_closed ... ok
+test mobile::turso::tests::bootstrap_lalu_login_berhasil_tanpa_jaringan ... ok
+test mobile::turso::tests::test_contact_masking_hides_identity ... ok
+test mobile::turso::tests::test_legacy_plaintext_verify ... ok
+test mobile::turso::tests::test_normalize_operator_email_is_lowercased ... ok
+test mobile::turso::tests::test_normalize_operator_phone_matches_typescript ... ok
+test mobile::turso::tests::test_normalize_turso_url ... ok
+test mobile::turso::tests::test_operator_email_validation ... ok
+test mobile::turso::tests::test_operator_phone_validation ... ok
+test mobile::turso::tests::test_pbkdf2_hash_and_verify ... ok
+test mobile::turso::tests::test_pick_reset_challenges_returns_unique_triplet ... ok
+test mobile::turso::tests::test_random_reset_token_is_unique_and_hashed ... ok
+test mobile::turso::tests::test_validate_new_password_mirrors_typescript_rules ... ok
+test mobile::turso::tests::test_validate_operator_contact_rejects_incomplete_data ... ok
+test mobile::turso::tests::totp_matches_the_official_rfc_vectors ... ok
+test mobile::turso::tests::totp_verification_window_behaves_like_typescript ... ok
+test mobile::turso::tests::izin_admin_yang_dicabut_tidak_hidup_lagi_setelah_provisioning_ulang has been running for over 60 seconds
+test mobile::turso::tests::migrasi_v21_menghitung_ulang_jam_kerja_normal_sekali has been running for over 60 seconds
+test mobile::turso::tests::sentinel_2017_memicu_skema_inventaris_dan_uks has been running for over 60 seconds
+test mobile::turso::tests::sentinel_2018_memicu_skema_verifikasi_wajah has been running for over 60 seconds
+test mobile::turso::tests::izin_admin_yang_dicabut_tidak_hidup_lagi_setelah_provisioning_ulang ... ok
+test mobile::tutup_buku::tests::aturan_keputusan_kembar ... ok
+test mobile::tutup_buku::tests::aturan_murni_kembar ... ok
+test mobile::tutup_buku::tests::pemberitahuan_diantre_sekali_per_penerima ... ok
+test mobile::tutup_buku::tests::pemberitahuan_kembar ... ok
+test mobile::tutup_buku::tests::status_tutup_diterima_check_lokal ... ok
+test mobile::tutup_buku::tests::transaksi_telat_ditinjau_lalu_ditutup_ulang ... ok
+test mobile::tutup_buku::tests::tutup_tolak_lalu_buka_kembali ... ok
+test mobile::tutup_buku::tests::versi_menunggu_dipakai_atau_ditolak ... ok
+test mobile::uks::tests::closed_and_synced_copies_are_pruned_after_thirty_days ... ok
+test mobile::uks::tests::closing_queues_one_wali_message_only_when_switched_on ... ok
+test mobile::uks::tests::cloud_values_validate_shape ... ok
+test mobile::turso::tests::sentinel_2017_memicu_skema_inventaris_dan_uks ... ok
+test mobile::uks::tests::jam_vectors ... ok
+test mobile::uks::tests::foreign_visit_requires_copy_and_list_reports_offline ... ok
+test mobile::uks::tests::medicine_overdraw_rolls_back_the_whole_visit ... ok
+test mobile::uks::tests::validation_vectors ... ok
+test mobile::wa_notification::tests::ambang_alfa_diurai_sesuai_vektor_typescript ... ok
+test mobile::wa_notification::tests::cerminan_lokal_langsung_terbaca_scanner ... ok
+test mobile::wa_notification::tests::kunci_sakelar_notifikasi_sesuai_vektor ... ok
+test mobile::uks::tests::open_give_medicine_and_close_in_one_flow ... ok
+test mobile::wa_notification::tests::notifikasi_wali_dedupe_sekali_saja ... ok
+test mobile::turso::tests::tutup_buku_cloud_mengisi_waktu_terima_dan_bisa_dibuka ... ok
+test mobile::wa_notification::tests::notifikasi_wali_hanya_untuk_siswa ... ok
+test mobile::wa_notification::tests::render_template_sesuai_vektor ... ok
+test mobile::wa_notification::tests::sakelar_notifikasi_bawaannya_mati ... ok
+test mobile::wa_notification::tests::sakelar_wa_bawaannya_mati_semua ... ok
+test mobile::wa_notification::tests::sakelar_wa_yang_dinyalakan_terbaca_hidup ... ok
+test mobile::wa_notification::tests::setelan_pengingat_otomatis_kembar ... ok
+test mobile::wa_notification::tests::notifikasi_wali_menghormati_sakelar ... ok
+test mobile::wa_notification::tests::pemangkasan_hanya_baris_selesai_dan_sudah_terkirim ... ok
+test mobile::wa_notification::tests::test_phone_normalization ... ok
+test mobile::wa_notification::tests::status_notifikasi_asing_ditolak_bukan_dinormalkan ... ok
+test mobile::wa_notification::tests::validasi_template_sesuai_vektor ... ok
+test mobile::wa_sender::tests::keputusan_baris_antrean ... ok
+test mobile::wa_sender::tests::penolakan_fonnte_dibaca_dari_badan_respons ... ok
+test mobile::wa_sender::tests::permintaan_per_provider ... ok
+test mobile::wa_sender::tests::status_setelah_gagal ... ok
+test mobile::turso::tests::sentinel_2019_memicu_skema_akuntansi has been running for over 60 seconds
+test mobile::wa_notification::tests::susun_pesan_memakai_template_tersimpan ... ok
+test mobile::turso::tests::sentinel_2020_memicu_skema_kasbon has been running for over 60 seconds
+test mobile::turso::tests::sentinel_2021_memicu_skema_tagihan has been running for over 60 seconds
+test mobile::wa_notification::tests::test_wa_notification_lifecycle ... ok
+test mobile::turso::tests::sentinel_2022_memicu_skema_pembayaran has been running for over 60 seconds
+test mobile::turso::tests::tarik_inkremental_tabel_append_only ... ok
+test mobile::turso::tests::sentinel_2023_memicu_skema_jenis_nilai has been running for over 60 seconds
+test mobile::turso::tests::sentinel_2018_memicu_skema_verifikasi_wajah ... ok
+test mobile::turso::tests::sentinel_2019_memicu_skema_akuntansi ... ok
+test mobile::turso::tests::sentinel_lama_memicu_provisioning_ulang has been running for over 60 seconds
+test mobile::turso::tests::sentinel_2020_memicu_skema_kasbon ... ok
+test mobile::turso::tests::sentinel_2021_memicu_skema_tagihan ... ok
+test mobile::turso::tests::sentinel_2022_memicu_skema_pembayaran ... ok
+test mobile::turso::tests::sentinel_2023_memicu_skema_jenis_nilai ... ok
+test mobile::turso::tests::migrasi_v21_menghitung_ulang_jam_kerja_normal_sekali ... ok
+test mobile::turso::tests::sentinel_lama_memicu_provisioning_ulang ... ok
+
+test result: ok. 449 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 109.86s
+
+     Running unittests src\main.rs (src-tauri\target\debug\deps\manajemen_sekolah_mobile-50bef1aa1287b4f7.exe)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests manajemen_sekolah_mobile_lib
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+$ bun run check:quick
+$ bun run lint && bun run typecheck && bun run test
+$ biome check .
+Checked 131 files in 385ms. No fixes applied.
+$ tsc --noEmit
+$ bun scripts/run-tests.ts
+bun test v1.4.2 (744846f84)
+
+src\lib\server\database-config.test.ts:
+(pass) mode lokal ditolak di sisi Web > provider local_file selalu ditolak, bahkan dengan URL yang sah [0.41ms]
+(pass) mode lokal ditolak di sisi Web > penolakan berlaku juga di lingkungan pengembangan [0.10ms]
+(pass) Turso Cloud > HTTPS dengan token diterima [0.52ms]
+(pass) Turso Cloud > tanpa token ditolak di production [0.11ms]
+(pass) Turso Cloud > HTTP ke alamat publik ditolak [0.33ms]
+(pass) server libSQL sendiri > HTTP ke jaringan privat diterima tanpa token [0.09ms]
+(pass) server libSQL sendiri > HTTPS publik tanpa token ditolak di production [0.06ms]
+(pass) server libSQL sendiri > HTTP ke alamat publik ditolak tanpa izin eksplisit [0.04ms]
+(pass) server libSQL sendiri > HTTP ke alamat publik diterima setelah izin eksplisit dinyatakan [0.04ms]
+(pass) nilai bawaan dan alias > provider yang tidak dikenal jatuh ke aturan paling ketat [0.03ms]
+(pass) nilai bawaan dan alias > alias SPPG_DATABASE_URL setara dengan TURSO_DATABASE_URL [0.03ms]
+(pass) nilai bawaan dan alias > KOS_* menang atas TURSO_* dan SPPG_* [0.05ms]
+(pass) nilai bawaan dan alias > KOS_ALLOW_INSECURE_DATABASE dibaca seperti nama lamanya [0.09ms]
+(pass) nilai bawaan dan alias > URL kosong ditolak di production [0.10ms]
+(pass) nilai bawaan dan alias > tanpa URL di pengembangan memakai berkas lokal [0.04ms]
+(pass) databaseConfigIssue > konfigurasi yang sah tidak punya masalah [0.10ms]
+(pass) databaseConfigIssue > production tanpa alamat menyebut variabel yang kurang [0.06ms]
+(pass) databaseConfigIssue > pesan tidak pernah memuat nilai alamat atau token [1.77ms]
+
+ 18 pass
+ 0 fail
+ 39 expect() calls
+Ran 18 tests across 1 file. [15.00ms]
+bun test v1.4.2 (744846f84)
+
+src\lib\services\landing-features.test.ts:
+(pass) Fitur Landing Page UI/UX Baru (Delta Verification) > Validasi Format dan Ukuran Unggahan Hero Background Image > menerima berkas JPEG, PNG, dan WebP di bawah batas ukuran [0.10ms]
+(pass) Fitur Landing Page UI/UX Baru (Delta Verification) > Validasi Format dan Ukuran Unggahan Hero Background Image > menolak format yang tidak diizinkan seperti GIF, BMP, SVG, PDF [0.07ms]
+(pass) Fitur Landing Page UI/UX Baru (Delta Verification) > Validasi Format dan Ukuran Unggahan Hero Background Image > menolak berkas yang melebihi 5 MB [0.03ms]
+(pass) Fitur Landing Page UI/UX Baru (Delta Verification) > Logika Pencarian dan Filter Jurusan / Ekskul > pencarian kosong mengembalikan seluruh jurusan [0.09ms]
+(pass) Fitur Landing Page UI/UX Baru (Delta Verification) > Logika Pencarian dan Filter Jurusan / Ekskul > pencarian mencocokkan nama, kode, atau deskripsi secara case-insensitive [0.21ms]
+(pass) Fitur Landing Page UI/UX Baru (Delta Verification) > Logika Pencarian dan Filter Jurusan / Ekskul > filter ekskul menyaring kategori dan kata kunci secara bersamaan [0.14ms]
+(pass) Fitur Landing Page UI/UX Baru (Delta Verification) > Logika Pencarian Cepat FAQ > pencarian faq mencocokkan pertanyaan maupun jawaban [0.09ms]
+(pass) Fitur Landing Page UI/UX Baru (Delta Verification) > Kalkulasi Waktu Mundur PMB (Countdown Math) > menghitung sisa hari, jam, menit secara akurat [0.22ms]
+(pass) Fitur Landing Page UI/UX Baru (Delta Verification) > Kalkulasi Waktu Mundur PMB (Countdown Math) > menandai expired jika target tanggal sudah lewat [0.04ms]
+
+ 9 pass
+ 0 fail
+ 33 expect() calls
+Ran 9 tests across 1 file. [30.00ms]
+bun test v1.4.2 (744846f84)
+
+src\lib\services\landing-collections.test.ts:
+(pass) koleksi dinamis landing page > tanpa isi di database, setiap koleksi kosong ΓÇö tidak ada teks contoh [3.24ms]
+(pass) koleksi dinamis landing page > JSON rusak diperlakukan sebagai belum diisi, bukan galat [0.25ms]
+(pass) koleksi dinamis landing page > hanya objek yang dihitung, dan jumlahnya dibatasi [0.62ms]
+(pass) koleksi dinamis landing page > baris yang ditambahkan lalu tidak diisi tidak ditampilkan [0.23ms]
+(pass) koleksi dinamis landing page > kunci bernomor lama dibaca ketika koleksinya belum ada [0.15ms]
+(pass) koleksi dinamis landing page > koleksi yang ada menang atas kunci bernomor lama [0.05ms]
+(pass) koleksi dinamis landing page > ekskul lama memakai akhiran `_cat`, bukan `_category` [0.48ms]
+(pass) koleksi dinamis landing page > FAQ dan tahapan PMB tidak punya lapis kunci lama [0.13ms]
+(pass) koleksi dinamis landing page > specs menerima array maupun teks berbaris-baris [0.45ms]
+(pass) koleksi dinamis landing page > nama kunci koleksi adalah kontrak dengan panel admin [0.04ms]
+(pass) kartu program di slider beranda > tagar dipisah koma, `#` yang ikut diketik dibuang, dan tidak dobel [0.19ms]
+(pass) kartu program di slider beranda > program membaca subjudul dan tagar; item lama tanpa keduanya tetap terbaca [0.17ms]
+
+ 12 pass
+ 0 fail
+ 26 expect() calls
+Ran 12 tests across 1 file. [43.00ms]
+bun test v1.4.2 (744846f84)
+
+src\lib\validations\database-endpoint.test.ts:
+(pass) isPrivateNetworkHost > mengenali seluruh rentang jaringan privat yang lazim di kantor [0.65ms]
+(pass) isPrivateNetworkHost > tidak menganggap alamat publik sebagai jaringan privat [1.35ms]
+(pass) reviewDatabaseEndpoint > menerima alamat LAN ber-HTTP untuk server sendiri [1.58ms]
+(pass) reviewDatabaseEndpoint > menolak HTTP publik untuk server sendiri sampai pengguna mengizinkannya [0.15ms]
+(pass) reviewDatabaseEndpoint > izin transport tidak berlaku untuk Turso terkelola [0.05ms]
+(pass) reviewDatabaseEndpoint > server sendiri ber-HTTPS publik tetap mewajibkan token [0.02ms]
+(pass) reviewDatabaseEndpoint > menerima ejaan libsql:// dan ws:// sebagai endpoint yang sama [0.04ms]
+(pass) reviewDatabaseEndpoint > menolak URL kosong, skema asing, dan kredensial tertanam [0.05ms]
+(pass) normalizeProvider > nilai asing jatuh ke provider dengan aturan paling ketat [0.06ms]
+(pass) normalizeProvider > deskripsi provider selalu tersedia [0.11ms]
+(pass) mode Database Lokal > tidak memerlukan endpoint sama sekali [0.03ms]
+(pass) mode Database Lokal > validator endpoint MENOLAK mode lokal, bukan meloloskannya [0.03ms]
+(pass) mode Database Lokal > alamat kosong pun tetap ditolak untuk mode lokal [0.01ms]
+
+ 13 pass
+ 0 fail
+ 47 expect() calls
+Ran 13 tests across 1 file. [23.00ms]
+bun test v1.4.2 (744846f84)
+
+src\lib\validations\pmb-dapodik.test.ts:
+(pass) dataDapodikSchema > isian contoh lolos dan dinormalkan [9.25ms]
+(pass) dataDapodikSchema > isian wajib dan pilihan asing ditolak [4.77ms]
+(pass) ekspor format DAPODIK > judul dua baris mengikuti berkas DAPODIK [0.20ms]
+(pass) ekspor format DAPODIK > baris contoh sama dengan baris DAPODIK aslinya [1.76ms]
+
+ 4 pass
+ 0 fail
+ 31 expect() calls
+Ran 4 tests across 1 file. [92.00ms]
+bun test v1.4.2 (744846f84)
+
+src\lib\services\content.test.ts:
+(pass) Tahap D: web-public Content Service & Fallback Contract > readPublishedArticles hanya mengambil artikel dengan status 'Terbit' [6.63ms]
+(pass) Tahap D: web-public Content Service & Fallback Contract > readArticleBySlug mengambil artikel terbit dan mengembalikan null jika draft/tidak ada [8.85ms]
+(pass) Tahap D: web-public Content Service & Fallback Contract > readPageContent hanya mengembalikan isi database [4.23ms]
+(pass) Tahap D: web-public Content Service & Fallback Contract > readPageContent mengambil landing.hero_image base64 secara utuh dan membuang spasi kosong [2.49ms]
+[web-public] konten halaman 'landing' gagal dibaca: 430 | }
+431 | function mapSqliteError(e) {
+432 |     if (e instanceof Database.SqliteError) {
+433 |         const extendedCode = e.code;
+434 |         const code = mapToBaseCode(e.rawCode);
+435 |         return new LibsqlError(e.message, code, extendedCode, e.rawCode, e);
+                     ^
+LibsqlError: SQLITE_ERROR: no such table: konten_publik
+ extendedCode: "SQLITE_ERROR",
+    rawCode: 1,
+       code: "SQLITE_ERROR"
+
+      at mapSqliteError (C:\fr\project-school-new\web-public\node_modules\@libsql\client\lib-esm\sqlite3.js:435:16)
+      at executeStmt (C:\fr\project-school-new\web-public\node_modules\@libsql\client\lib-esm\sqlite3.js:338:15)
+      at execute (C:\fr\project-school-new\web-public\node_modules\@libsql\client\lib-esm\sqlite3.js:83:16)
+      at readPageContent (C:\fr\project-school-new\web-public\src\lib\services\content.ts:127:30)
+      at <anonymous> (C:\fr\project-school-new\web-public\src\lib\services\content.test.ts:133:18)
+
+(pass) Tahap D: web-public Content Service & Fallback Contract > readPageContent tanpa tabel mengembalikan objek kosong, bukan melempar [5.92ms]
+(pass) Tahap D: web-public Content Service & Fallback Contract > readArticleCoverBySlug menolak artikel Draft dan baris tanpa gambar [4.92ms]
+
+ 6 pass
+ 0 fail
+ 24 expect() calls
+Ran 6 tests across 1 file. [108.00ms]
+bun test v1.4.2 (744846f84)
+
+src\lib\services\school-profile.test.ts:
+(pass) readSchoolProfile > profil yang belum ada barisnya dilaporkan, bukan dibuatkan [7.29ms]
+(pass) readSchoolProfile > nilai placeholder template diperlakukan sebagai belum diisi [2.11ms]
+(pass) readSchoolProfile > profil terisi dibaca apa adanya [3.21ms]
+(pass) readSchoolProfile > kolom kosong dan spasi kosong menjadi null, bukan string kosong [2.81ms]
+(pass) readProgramStudi > hanya jurusan aktif, terurut nama [2.48ms]
+(pass) readProgramStudi > batas dihormati [4.95ms]
+(pass) readProgramStudi > tabel kosong menghasilkan daftar kosong, bukan error [1.81ms]
+
+ 7 pass
+ 0 fail
+ 22 expect() calls
+Ran 7 tests across 1 file. [113.00ms]
+bun test v1.4.2 (744846f84)
+
+src\lib\services\wali-tagihan.test.ts:
+(pass) portal wali: tagihan > tampil hanya bila modul ada dan sakelar menyala [9.07ms]
+(pass) portal wali: tagihan > sisa, titipan, dan kuitansi hanya milik siswa sesi [4.07ms]
+(pass) portal wali: tagihan > label dan format [2.66ms]
+
+ 3 pass
+ 0 fail
+ 11 expect() calls
+Ran 3 tests across 1 file. [97.00ms]
+bun test v1.4.2 (744846f84)
+
+src\lib\operators\contact.test.ts:
+(pass) normalizeOperatorPhone > semua bentuk nomor Indonesia menjadi satu bentuk kanonik [0.30ms]
+(pass) normalizeOperatorPhone > nomor internasional dipertahankan bila memakai awalan + [0.06ms]
+(pass) normalizeOperatorPhone > masukan tanpa awalan yang dikenali ditolak [0.03ms]
+(pass) normalizeOperatorEmail > email disimpan lowercase agar cocok dengan index LOWER(email) [0.03ms]
+(pass) isValidOperatorEmail > menerima email wajar [0.12ms]
+(pass) isValidOperatorEmail > menolak bentuk yang tidak lengkap [0.07ms]
+(pass) isValidOperatorPhone > menerima panjang nomor yang wajar [0.06ms]
+(pass) isValidOperatorPhone > menolak nomor terlalu pendek atau kosong [0.04ms]
+(pass) assertOperatorContact > lolos untuk kontak lengkap [0.12ms]
+(pass) assertOperatorContact > pesan menyebut bidang yang kosong [0.12ms]
+(pass) penyamaran kontak > maskEmail menyembunyikan bagian lokal dan domain [0.27ms]
+(pass) penyamaran kontak > maskEmail aman untuk masukan kosong atau rusak [0.04ms]
+(pass) penyamaran kontak > maskPhone menyisakan awalan negara dan empat digit terakhir [0.09ms]
+(pass) penyamaran kontak > maskPhone mengembalikan string kosong untuk nomor tidak valid [0.02ms]
+
+ 14 pass
+ 0 fail
+ 36 expect() calls
+Ran 14 tests across 1 file. [18.00ms]
+bun test v1.4.2 (744846f84)
+
+src\lib\validations\pmb-pembayaran.test.ts:
+(pass) pmb-pembayaran > rupiah titik ribuan [0.29ms]
+(pass) pmb-pembayaran > ubah status saat belum lunas [0.13ms]
+(pass) pmb-pembayaran > konfirmasi bayar [0.19ms]
+(pass) pmb-pembayaran > batal bayar [0.07ms]
+(pass) pmb-pembayaran > perpanjang bayar [0.22ms]
+(skip) pmb-pembayaran > konstanta SQL dieja sama persis di pmb_bayar.rs
+
+ 5 pass
+ 1 skip
+ 0 fail
+ 28 expect() calls
+Ran 6 tests across 1 file. [23.00ms]
+bun test v1.4.2 (744846f84)
+
+src\lib\server\schema-readiness.test.ts:
+(pass) inspectSchemaReadiness > database kosong dilaporkan belum siap, bukan dibuatkan tabelnya [6.03ms]
+(pass) inspectSchemaReadiness > skema lengkap pada versi minimum dilaporkan siap [2.69ms]
+(pass) inspectSchemaReadiness > versi di atas minimum tetap diterima [2.18ms]
+(pass) inspectSchemaReadiness > versi di bawah minimum ditolak meski semua tabel ada [1.77ms]
+(pass) inspectSchemaReadiness > satu tabel hilang cukup untuk menolak [3.07ms]
+(pass) assertSchemaReady > menyebut tabel yang hilang di dalam pesannya [2.43ms]
+(pass) assertSchemaReady > menyebut versi yang kurang, dan tindakan yang menyelesaikannya [7.22ms]
+(pass) assertSchemaReady > tidak melempar saat skema siap [3.15ms]
+
+ 8 pass
+ 0 fail
+ 19 expect() calls
+Ran 8 tests across 1 file. [112.00ms]
+bun test v1.4.2 (744846f84)
+
+src\lib\services\gambar-konten.test.ts:
+(pass) foto koleksi dan jurusan hanya menerima id 32 hex [0.96ms]
+(pass) sumber gambar: id ke rute ber-cache, data URL lama apa adanya [0.11ms]
+(pass) tautan luar hanya http(s); galeri jatuh ke Instagram [0.17ms]
+
+ 3 pass
+ 0 fail
+ 15 expect() calls
+Ran 3 tests across 1 file. [18.00ms]
+bun test v1.4.2 (744846f84)
+
+src\lib\teks.test.ts:
+(pass) pecahButir membuang nomor/poin dan baris kosong [0.63ms]
+(pass) pecahPoin memecah paragraf bernomor dari CMS [0.32ms]
+(pass) tautanWhatsApp mengubah 0 di depan menjadi 62 dan menolak nomor kosong [0.12ms]
+
+ 3 pass
+ 0 fail
+ 11 expect() calls
+Ran 3 tests across 1 file. [14.00ms]
+bun test v1.4.2 (744846f84)
+
+src\lib\server\site-url.test.ts:
+(pass) resolveSiteUrl > variabel eksplisit menang [0.24ms]
+(pass) resolveSiteUrl > garis miring penutup dibuang [0.06ms]
+(pass) resolveSiteUrl > alamat tanpa skema dianggap https [0.03ms]
+(pass) resolveSiteUrl > cadangan memakai domain produksi Vercel, bukan preview [0.03ms]
+(pass) resolveSiteUrl > tanpa variabel apa pun jatuh ke localhost [0.02ms]
+
+ 5 pass
+ 0 fail
+ 5 expect() calls
+Ran 5 tests across 1 file. [14.00ms]
+bun test v1.4.2 (744846f84)
+
+src\lib\server\license-gate.test.ts:
+(pass) vonis lisensi situs publik > build yang tidak menegakkan lisensi selalu terbuka [1.17ms]
+(pass) vonis lisensi situs publik > tanpa lisensi: terblokir, dan situs tidak menulis apa pun [1.44ms]
+(pass) vonis lisensi situs publik > lisensi sah tetapi id instance belum ada: terblokir [1.41ms]
+(pass) vonis lisensi situs publik > lisensi aktif untuk database ini: terbuka [0.81ms]
+(pass) vonis lisensi situs publik > sewa habis: baca-saja [1.06ms]
+(pass) vonis lisensi situs publik > lisensi untuk database lain: terblokir [0.98ms]
+(pass) vonis lisensi situs publik > lisensi yang dikunci ke alamat: alamat situs publik wajib tercantum [1.65ms]
+[lisensi] Status lisensi tidak terbaca: 430 | }
+431 | function mapSqliteError(e) {
+432 |     if (e instanceof Database.SqliteError) {
+433 |         const extendedCode = e.code;
+434 |         const code = mapToBaseCode(e.rawCode);
+435 |         return new LibsqlError(e.message, code, extendedCode, e.rawCode, e);
+                     ^
+LibsqlError: SQLITE_ERROR: no such table: setting_gex_system
+ extendedCode: "SQLITE_ERROR",
+    rawCode: 1,
+       code: "SQLITE_ERROR"
+
+      at mapSqliteError (C:\fr\project-school-new\web-public\node_modules\@libsql\client\lib-esm\sqlite3.js:435:16)
+      at executeStmt (C:\fr\project-school-new\web-public\node_modules\@libsql\client\lib-esm\sqlite3.js:338:15)
+      at execute (C:\fr\project-school-new\web-public\node_modules\@libsql\client\lib-esm\sqlite3.js:83:16)
+      at readContextRow (C:\fr\project-school-new\web-public\src\lib\server\license.ts:510:31)
+      at loadLicenseContext (C:\fr\project-school-new\web-public\src\lib\server\license.ts:546:19)
+      at resolveWebLicense (C:\fr\project-school-new\web-public\src\lib\server\license.ts:586:25)
+      at vonisLisensiPublik (C:\fr\project-school-new\web-public\src\lib\server\license-gate.ts:46:34)
+      at <anonymous> (C:\fr\project-school-new\web-public\src\lib\server\license-gate.test.ts:152:15)
+
+(pass) vonis lisensi situs publik > database yang tidak terbaca tidak dijadikan alasan memblokir [1.80ms]
+
+ 8 pass
+ 0 fail
+ 10 expect() calls
+Ran 8 tests across 1 file. [131.00ms]
+bun test v1.4.2 (744846f84)
+
+src\lib\validations\pmb.test.ts:
+(pass) jurusanUntukUnit > hanya jurusan milik unit itu [0.14ms]
+(pass) jurusanUntukUnit > belum memilih unit = belum ada program [0.02ms]
+(pass) jurusanUntukUnit > jurusan tanpa unit berlaku di semua unit [0.03ms]
+(pass) jurusanUntukUnit > sekolah tanpa unit: semua jurusan tanpa unit [0.02ms]
+(pass) tolakPilihanPmb > pendaftar SD tidak diminta program keahlian [0.09ms]
+(pass) tolakPilihanPmb > pendaftar SMK wajib memilih program miliknya [0.03ms]
+(pass) tolakPilihanPmb > unit wajib bila sekolah punya unit aktif [0.01ms]
+(pass) tolakPilihanPmb > nilai asing ditolak [0.04ms]
+(pass) tolakPilihanPmb > sekolah tanpa unit dan tanpa jurusan menerima kosong [0.01ms]
+
+ 9 pass
+ 0 fail
+ 13 expect() calls
+Ran 9 tests across 1 file. [55.00ms]
+bun test v1.4.2 (744846f84)
+
+src\lib\services\rate-limit.test.ts:
+(pass) periksaRateLimit dan catatPercobaan > kunci baru diizinkan [5.08ms]
+(pass) periksaRateLimit dan catatPercobaan > percobaan di bawah ambang belum memblokir [1.10ms]
+(pass) periksaRateLimit dan catatPercobaan > ambang yang terlampaui memblokir, dengan sisa waktu yang masuk akal [0.95ms]
+(pass) periksaRateLimit dan catatPercobaan > kunci yang berbeda dihitung terpisah [1.07ms]
+(pass) periksaRateLimit dan catatPercobaan > jendela yang sudah lewat memulai hitungan dari nol [0.99ms]
+(pass) periksaRateLimit dan catatPercobaan > bersihkanPercobaan menghapus hitungannya [1.73ms]
+(pass) kunciRateLimit > alamat yang sama menghasilkan kunci yang sama [0.54ms]
+(pass) kunciRateLimit > alamat berbeda menghasilkan kunci berbeda [0.18ms]
+(pass) kunciRateLimit > ruang nama berbeda tidak saling mengunci [0.10ms]
+(pass) kunciRateLimit > alamat tidak tersimpan apa adanya di dalam kunci [0.07ms]
+
+ 10 pass
+ 0 fail
+ 16 expect() calls
+Ran 10 tests across 1 file. [101.00ms]
+bun test v1.4.2 (744846f84)
+
+src\proxy.test.ts:
+(pass) proxy situs publik > terbuka: diteruskan apa adanya, header internal tidak ada [3.06ms]
+(pass) proxy situs publik > header internal kiriman pengunjung dibuang [0.29ms]
+(pass) proxy situs publik > terblokir: halaman 503 tanpa alasan dan tanpa konten sekolah [0.29ms]
+(pass) proxy situs publik > terblokir: endpoint menjawab 503 JSON, bukan halaman HTML [0.32ms]
+(pass) proxy situs publik > baca-saja: halaman tetap tampil dan diberi tahu lewat header [0.17ms]
+(pass) proxy situs publik > baca-saja: pendaftaran PMB baru ditolak tanpa menyebut alasan [0.25ms]
+(pass) proxy situs publik > baca-saja: cek status PMB dan portal wali tetap dilayani [0.32ms]
+
+ 7 pass
+ 0 fail
+ 21 expect() calls
+Ran 7 tests across 1 file. [86.00ms]
+bun test v1.4.2 (744846f84)
+
+src\lib\services\pmb.test.ts:
+(pass) readGelombangAktif > gelombang yang dibuka dan masih dalam rentang tanggal ditemukan [13.54ms]
+(pass) readGelombangAktif > gelombang nonaktif tidak dianggap terbuka [2.65ms]
+(pass) readGelombangAktif > gelombang yang sudah lewat tanggal tutupnya tidak dianggap terbuka [3.15ms]
+(pass) readGelombangAktif > gelombang yang belum dibuka tidak dianggap terbuka [2.46ms]
+(pass) tulisPendaftaran > menyimpan pendaftar dan mengembalikan nomornya [9.33ms]
+(pass) tulisPendaftaran > berkas tersimpan bersama pendaftarnya [6.03ms]
+(pass) tulisPendaftaran > berkas yang ditolak CHECK tidak menyisakan pendaftar setengah jadi [4.94ms]
+(pass) tulisPendaftaran > kuota yang sudah terpenuhi menolak pendaftaran baru [4.56ms]
+(pass) tulisPendaftaran > pendaftar yang ditolak tidak ikut menghabiskan kuota [7.28ms]
+(pass) tulisPendaftaran > nomor yang bentrok dicoba ulang, bukan dilempar [5.23ms]
+(pass) readStatusPendaftaran > nomor dan tanggal lahir yang cocok mengembalikan statusnya [3.83ms]
+(pass) readStatusPendaftaran > tanggal lahir yang salah menghasilkan null, sama seperti nomor yang tidak ada [4.46ms]
+(pass) readStatusPendaftaran > nomor dicocokkan tanpa peduli huruf besar/kecil [5.74ms]
+(pass) readStatusPendaftaran > status tidak pernah membawa isi berkas [3.59ms]
+(pass) GelombangTidakTerbukaError > membawa status HTTP-nya sendiri [0.11ms]
+(pass) data DAPODIK pendaftar (v49) > isian DAPODIK tersimpan sebagai JSON berversi [2.46ms]
+(pass) data DAPODIK pendaftar (v49) > database yang belum dimigrasi v49 dijawab belum siap, tidak menulis apa pun [3.93ms]
+(pass) biaya pendaftaran (v52) > gelombang berbiaya menyalin biaya dan menetapkan batas bayar WIB [3.59ms]
+(pass) biaya pendaftaran (v52) > gelombang tanpa biaya tidak punya batas bayar [3.34ms]
+(pass) biaya pendaftaran (v52) > pendaftar kedaluwarsa melepas kuotanya, yang masih menunggu tidak [3.70ms]
+(pass) biaya pendaftaran (v52) > database yang belum dimigrasi v52 dijawab belum siap [2.64ms]
+(pass) unit tujuan (v58) > unit aktif berurutan, jurusan membawa unitnya [1.71ms]
+(pass) unit tujuan (v58) > database belum v58 dijawab belum siap [1.17ms]
+(pass) unit tujuan (v58) > unit pendaftar tersimpan [1.37ms]
+
+ 24 pass
+ 0 fail
+ 46 expect() calls
+Ran 24 tests across 1 file. [273.00ms]
+bun test v1.4.2 (744846f84)
+
+src\lib\services\wali-auth.test.ts:
+(pass) buatKodeOtp > selalu enam digit [1.99ms]
+(pass) samarkanNomor > menyisakan empat digit terakhir saja [0.17ms]
+(pass) cariSiswaUntukOtp > cocok lewat NIS maupun NISN [13.48ms]
+(pass) cariSiswaUntukOtp > siswa yang sudah lulus tidak bisa dipakai masuk [3.06ms]
+(pass) cariSiswaUntukOtp > siswa tanpa nomor wali tidak bisa dipakai masuk [2.78ms]
+(pass) cariSiswaUntukOtp > nomor induk asing menghasilkan null [10.54ms]
+(pass) terbitkanOtp dan verifikasiOtp > kode yang benar diterima sekali saja [11.08ms]
+(pass) terbitkanOtp dan verifikasiOtp > kode asli tidak pernah tersimpan di database [4.53ms]
+(pass) terbitkanOtp dan verifikasiOtp > kode salah mengurangi sisa percobaan, lalu habis [8.04ms]
+(pass) terbitkanOtp dan verifikasiOtp > menerbitkan kode baru membatalkan kode lama [8.59ms]
+(pass) terbitkanOtp dan verifikasiOtp > kode tidak bisa diminta beruntun untuk siswa yang sama [8.76ms]
+(pass) terbitkanOtp dan verifikasiOtp > kode kedaluwarsa ditolak [3.42ms]
+(pass) terbitkanOtp dan verifikasiOtp > subjek yang berbeda tidak saling menerima kode [3.30ms]
+(pass) sesi wali > token yang sah mengembalikan id_siswa dari sesi [5.69ms]
+(pass) sesi wali > token mentah tidak tersimpan [3.58ms]
+(pass) sesi wali > token asing ditolak [3.34ms]
+(pass) sesi wali > sesi kedaluwarsa ditolak [5.95ms]
+(pass) sesi wali > siswa yang berubah status membuat sesi tidak sah [6.99ms]
+(pass) sesi wali > nomor wali yang berubah membuat sesi tidak sah [3.39ms]
+(pass) sesi wali > keluar mencabut sesi di server [6.30ms]
+(pass) kredensial kata sandi portal wali > hitungPasswordDefaultWali menghitung formula nisn/nis + unit uppercase [0.15ms]
+(pass) kredensial kata sandi portal wali > formula NISN + unit tidak lagi bisa dipakai masuk [86.05ms]
+(pass) kredensial kata sandi portal wali > password sementara terbitan sekolah bisa dipakai dan wajib diganti [132.56ms]
+(pass) kredensial kata sandi portal wali > autentikasi dengan password salah ditolak [1.32ms]
+(pass) kredensial kata sandi portal wali > ganti password memperbarui kredensial dan menonaktifkan perluGantiPassword [315.56ms]
+(pass) kredensial kata sandi portal wali > password baru tidak boleh berupa formula lama [60.69ms]
+(pass) kredensial kata sandi portal wali > setelah masuk lewat kode WhatsApp, password lama tidak diperlukan [252.78ms]
+
+ 27 pass
+ 0 fail
+ 254 expect() calls
+Ran 27 tests across 1 file. [1046.00ms]
