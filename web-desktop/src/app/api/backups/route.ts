@@ -87,6 +87,7 @@ export async function DELETE(request: NextRequest) {
     }
 
     const result = await batalkanPenugasanBackup(id, actor.kode_operator);
+    if (!result.sukses) throw new ApiRequestError(result.pesan, 404);
     return noStoreJson(result);
   } catch (error) {
     return toApiErrorResponse(error);

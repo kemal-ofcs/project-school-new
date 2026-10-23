@@ -5,6 +5,7 @@ import type { InValue, Transaction } from "@libsql/client";
 import {
   aturanShiftDariBaris,
   diDalamJendelaScanMasuk,
+  formatTanggalOperasional,
   hitungUlangAbsensiDariJam,
   isShiftFleksibel,
   normalizeDate,
@@ -14,6 +15,7 @@ import {
   MAX_WALI_NOTIFICATIONS_PER_IMPORT,
   queueWaliNotification,
 } from "@/lib/services/wa-notification";
+import { validasiBarisImport } from "@/lib/validations/operational";
 
 export interface OfflineImportRow {
   tanggal: string;
@@ -27,7 +29,6 @@ export interface OfflineImportRow {
   keterangan?: string;
 }
 
-const TIME = /^([01]\d|2[0-3]):[0-5]\d(?::[0-5]\d)?$/;
 const MONTHS = [
   "Januari",
   "Februari",
@@ -63,13 +64,19 @@ interface NotifikasiImport {
 
 async function processRow(
   transaction: Transaction,
-  row: OfflineImportRow,
+  input: OfflineImportRow,
   operator: string,
   notifikasi: NotifikasiImport,
 ) {
   const eventKey = `IMP-${randomUUID()}`;
   const now = new Date().toISOString();
-  let date = normalizeDate(row.tanggal);
+  let date = normalizeDate(input.tanggal);
+  const hadir = (input.status_kehadiran?.trim() || "Hadir") === "Hadir";
+  // Hari bukan Hadir tidak punya jam: jam yang terbawa dari formulir atau CSV
+  // dulu tersimpan sebagai `jam_kerja` dan ikut digaji.
+  const row: OfflineImportRow = hadir
+    ? input
+    : { ...input, jam_masuk: undefined, jam_pulang: undefined };
   const fail = async (message: string) => {
     await transaction.execute({
       sql: `INSERT INTO import_offline (event_key, timestamp_input, tanggal, id_unik,
@@ -80,14 +87,14 @@ async function processRow(
         eventKey,
         now,
         date,
-        row.id_unik,
-        row.nama ?? "",
-        row.divisi ?? "",
-        row.jam_masuk ?? "",
-        row.jam_pulang ?? "",
-        row.status_kehadiran ?? "",
-        row.status_absen ?? "",
-        row.keterangan ?? "",
+        input.id_unik,
+        input.nama ?? "",
+        input.divisi ?? "",
+        input.jam_masuk ?? "",
+        input.jam_pulang ?? "",
+        input.status_kehadiran ?? "",
+        input.status_absen ?? "",
+        input.keterangan ?? "",
         now,
         message,
         operator,
@@ -95,14 +102,18 @@ async function processRow(
     });
     return { sukses: false, eventKey, pesan: message };
   };
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || !row.id_unik)
-    return fail("Tanggal atau ID tidak valid.");
-  if (
-    (!row.jam_masuk && !row.jam_pulang) ||
-    (row.jam_masuk && !TIME.test(row.jam_masuk)) ||
-    (row.jam_pulang && !TIME.test(row.jam_pulang))
-  )
-    return fail("Jam masuk/pulang tidak valid.");
+  const salah = validasiBarisImport(
+    {
+      tanggal: date,
+      id_unik: input.id_unik,
+      jam_masuk: input.jam_masuk ?? "",
+      jam_pulang: input.jam_pulang ?? "",
+      status_kehadiran: input.status_kehadiran?.trim() ?? "",
+      status_absen: input.status_absen?.trim() ?? "",
+    },
+    formatTanggalOperasional(Date.now()),
+  );
+  if (salah) return fail(salah);
   const employeeResult = await transaction.execute({
     sql: "SELECT id_unik, nama, divisi, id_shift, status_aktif FROM master_data WHERE id_unik = ? OR kode_karyawan = ? LIMIT 1;",
     args: [row.id_unik, row.id_unik],
@@ -259,7 +270,9 @@ async function processRow(
 
   const checkIn = row.jam_masuk
     ? timestamp(date, row.jam_masuk)
-    : String(existing?.jam_masuk ?? "");
+    : hadir
+      ? String(existing?.jam_masuk ?? "")
+      : "";
   const inTimeStr = row.jam_masuk || String(shiftRowData?.jam_masuk || "07:00");
   const nextDay = Boolean(
     row.jam_pulang &&
@@ -268,16 +281,19 @@ async function processRow(
   );
   const checkOut = row.jam_pulang
     ? timestamp(date, row.jam_pulang, nextDay)
-    : String(existing?.jam_pulang ?? "");
+    : hadir
+      ? String(existing?.jam_pulang ?? "")
+      : "";
 
   const statusAttendance = row.status_kehadiran?.trim() || "Hadir";
-  const statusRecord =
-    row.status_absen?.trim() ||
-    (checkIn && checkOut
-      ? "Lengkap"
-      : checkIn
-        ? "Belum Pulang"
-        : "Perlu Verifikasi");
+  const statusRecord = !hadir
+    ? "Tidak Hadir"
+    : row.status_absen?.trim() ||
+      (checkIn && checkOut
+        ? "Lengkap"
+        : checkIn
+          ? "Belum Pulang"
+          : "Perlu Verifikasi");
   let durasiHadir: number | null = null;
   if (checkIn && checkOut) {
     const inDate = new Date(`${checkIn.replace(" ", "T")}+07:00`).getTime();
@@ -343,13 +359,23 @@ async function processRow(
 
   // Shift fleksibel tidak punya jam masuk efektif, jadi terlambat/datang awal
   // selalu 0 di sana — ditangani `hitungUlangAbsensiDariJam`.
-  const hasil = hitungUlangAbsensiDariJam({
-    masukMenit: checkIn
-      ? parseTimeMin(checkIn.includes(" ") ? checkIn.split(" ")[1] : checkIn)
-      : null,
-    durasiMenit: durasiHadir,
-    shift: aturanShift,
-  });
+  const hasil = hadir
+    ? hitungUlangAbsensiDariJam({
+        masukMenit: checkIn
+          ? parseTimeMin(
+              checkIn.includes(" ") ? checkIn.split(" ")[1] : checkIn,
+            )
+          : null,
+        durasiMenit: durasiHadir,
+        shift: aturanShift,
+      })
+    : {
+        menitTerlambat: 0,
+        menitDatangAwal: 0,
+        jamKerja: 0,
+        lembur: 0,
+        jamKerjaKurang: 0,
+      };
   const menitTerlambat = hasil.menitTerlambat;
   const menitDatangAwal = hasil.menitDatangAwal;
   const worked = hasil.jamKerja;

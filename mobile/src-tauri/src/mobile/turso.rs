@@ -11105,6 +11105,17 @@ async fn apply_event_to_turso(
                         vec![json!(id_referensi)],
                     )
                     .await?;
+                // Log koreksi mode pengganti merujuk ID backup. Klien lama tidak
+                // mengirim kunci ini; perilakunya tetap seperti dulu.
+                if let Some(log) = payload.get("log_koreksi").filter(|v| v.is_object()) {
+                    let field = |key: &str| json!(log.get(key).and_then(Value::as_str).unwrap_or(""));
+                    turso
+                        .query_one(
+                            super::administration::SQL_HAPUS_LOG_KOREKSI_PENGGANTI,
+                            vec![field("id_karyawan"), field("tanggal_kerja"), field("jenis_scan")],
+                        )
+                        .await?;
+                }
             }
         }
         (
@@ -11236,6 +11247,22 @@ async fn apply_event_to_turso(
                         vec![json!(event_key)],
                     )
                     .await?;
+                // Log mode pengganti dan log lama berreferensi kosong milik baris ini.
+                if let Some(log) = payload.get("log_import").filter(|v| v.is_object()) {
+                    let field = |key: &str| json!(log.get(key).and_then(Value::as_str).unwrap_or(""));
+                    turso
+                        .query_one(
+                            super::administration::SQL_HAPUS_LOG_IMPORT,
+                            vec![
+                                json!(event_key),
+                                field("id_karyawan"),
+                                field("tanggal_kerja"),
+                                field("jam_masuk"),
+                                field("jam_pulang"),
+                            ],
+                        )
+                        .await?;
+                }
             }
         }
         (

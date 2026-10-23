@@ -10,6 +10,10 @@ import {
   jenisPersonil,
   ringkasHasil,
 } from "@/components/operational/aturanPilihPersonil";
+import {
+  HEADER_CSV_IMPORT,
+  uraiCsvImport,
+} from "@/components/operational/csvImportManual";
 import { PilihPersonil } from "@/components/operational/PilihPersonil";
 import { FeedbackBanner } from "@/components/ui/FeedbackBanner";
 import { Modal } from "@/components/ui/Modal";
@@ -66,7 +70,7 @@ export default function OperationalPage() {
   } | null>(null);
 
   const [deleteConfirm, setDeleteConfirm] = useState<{
-    type?: "correction" | "import" | "backup";
+    type?: "correction" | "import" | "backup" | "cancelBackup";
     idReferensi: string;
     title: string;
     subtitle: string;
@@ -78,7 +82,13 @@ export default function OperationalPage() {
     setBusy(true);
     setFeedback(null);
     try {
-      if (deleteConfirm.type === "import") {
+      if (deleteConfirm.type === "cancelBackup") {
+        const result = await batalkanPenugasanBackup(deleteConfirm.idReferensi);
+        setFeedback({
+          tone: result.sukses ? "success" : "error",
+          text: result.pesan,
+        });
+      } else if (deleteConfirm.type === "import") {
         const result = await hapusImportOffline(deleteConfirm.idReferensi);
         setFeedback({
           tone: result.sukses ? "success" : "error",
@@ -98,15 +108,8 @@ export default function OperationalPage() {
         });
       }
       setDeleteConfirm(null);
-      await load(
-        deleteConfirm.type === "import"
-          ? "import"
-          : deleteConfirm.type === "backup"
-            ? "backup"
-            : "correction",
-        false,
-        false,
-      );
+      // Hapus dan batal hanya bisa dipicu dari tabel tab yang sedang terbuka.
+      await load();
     } catch (err: unknown) {
       setFeedback({
         tone: "error",
@@ -139,7 +142,8 @@ export default function OperationalPage() {
     id_karyawan_pengganti: "",
     nama_karyawan_pengganti: "",
     divisi_pengganti: "",
-    id_shift_backup: 1,
+    // 0 = belum dipilih; tebakan "Shift 1" bisa menunjuk shift yang tidak ada.
+    id_shift_backup: 0,
     alasan_backup: "Penggantian Shift",
     catatan: "",
   });
@@ -157,8 +161,16 @@ export default function OperationalPage() {
 
   // Bulk CSV import state
   const [showBulkUpload, setShowBulkUpload] = useState(false);
-  const [csv, setCsv] = useState(
-    "tanggal,id_unik,jam_masuk,jam_pulang,status_kehadiran,keterangan\n",
+  const [csv, setCsv] = useState(`${HEADER_CSV_IMPORT}\n`);
+  const [tanggalRiwayat, setTanggalRiwayat] = useState(() =>
+    formatTanggalOperasional(Date.now()),
+  );
+  // Respons pemuatan yang datang terlambat tidak boleh menimpa tab lain.
+  const loadSeqRef = useRef(0);
+  const bolehLihatKoreksi = hasPermission(user, "corrections.view");
+  const bolehLihatBackup = hasPermission(user, "backups.view");
+  const tabTersedia = (["correction", "backup", "import"] as Tab[]).filter(
+    (value) => (value === "backup" ? bolehLihatBackup : bolehLihatKoreksi),
   );
 
   const run = useCallback(async (task: () => Promise<void>) => {
@@ -185,18 +197,21 @@ export default function OperationalPage() {
       synchronize = false,
       showFeedback = false,
     ) => {
+      const seq = ++loadSeqRef.current;
       try {
         if (synchronize) {
           await syncNow().catch(() => undefined);
         }
+        const filter = { tanggal: tanggalRiwayat };
         const [data, shiftList] = await Promise.all([
           currentTab === "backup"
-            ? getDaftarBackup()
+            ? getDaftarBackup(filter)
             : currentTab === "import"
-              ? getDaftarImport()
-              : getDaftarKoreksi(),
+              ? getDaftarImport(filter)
+              : getDaftarKoreksi(filter),
           getDaftarShift().catch(() => []),
         ]);
+        if (seq !== loadSeqRef.current) return;
         setRecords(data);
         if (Array.isArray(shiftList) && shiftList.length > 0) {
           setShifts(shiftList);
@@ -216,18 +231,29 @@ export default function OperationalPage() {
         }
       }
     },
-    [tab],
+    [tab, tanggalRiwayat],
   );
 
-  // Load employee list for auto-fill dropdowns and active records
   useEffect(() => {
     if (hydrated && isAuthenticated) {
       void getDaftarKaryawan({ status_aktif: "Aktif" })
         .then((data) => setEmployees(data))
         .catch(() => undefined);
-      void load(tab, false, false);
     }
-  }, [hydrated, isAuthenticated, tab, load]);
+  }, [hydrated, isAuthenticated]);
+
+  // Satu-satunya pemicu muat ulang saat tab atau tanggal riwayat berganti.
+  useEffect(() => {
+    if (hydrated && isAuthenticated) void load();
+  }, [hydrated, isAuthenticated, load]);
+
+  // Pengguna yang hanya boleh melihat backup tidak dibuka di tab Koreksi.
+  useEffect(() => {
+    const bolehTabIni = tab === "backup" ? bolehLihatBackup : bolehLihatKoreksi;
+    if (!bolehTabIni && (bolehLihatKoreksi || bolehLihatBackup)) {
+      setTab(bolehLihatKoreksi ? "correction" : "backup");
+    }
+  }, [tab, bolehLihatKoreksi, bolehLihatBackup]);
 
   useEffect(() => {
     return subscribeSyncCompleted(() => {
@@ -247,21 +273,11 @@ export default function OperationalPage() {
     (row) => jenisPersonil(row) !== "siswa",
   );
 
-  const shiftOptions =
-    shifts.length > 0 ? (
-      shifts.map((s) => (
-        <option key={String(s.id_shift)} value={Number(s.id_shift)}>
-          {String(s.nama_shift)} ({String(s.jam_masuk)} - {String(s.jam_pulang)}
-          )
-        </option>
-      ))
-    ) : (
-      <>
-        <option value={1}>Shift 1 (07:00 - 15:00)</option>
-        <option value={2}>Shift 2 (15:00 - 23:00)</option>
-        <option value={3}>Shift 3 (23:00 - 07:00)</option>
-      </>
-    );
+  const shiftOptions = shifts.map((s) => (
+    <option key={String(s.id_shift)} value={Number(s.id_shift)}>
+      {String(s.nama_shift)} ({String(s.jam_masuk)} - {String(s.jam_pulang)})
+    </option>
+  ));
 
   const handleSelectBackupAsal = (ids: string[]) => {
     const found = ids[0] ? cariPersonil(ids[0]) : undefined;
@@ -270,9 +286,7 @@ export default function OperationalPage() {
       id_karyawan_asal: ids[0] ?? "",
       nama_karyawan_asal: String(found?.nama || ""),
       divisi_asal: String(found?.divisi || ""),
-      id_shift_backup: found
-        ? Number(found.id_shift || 1)
-        : prev.id_shift_backup,
+      id_shift_backup: Number(found?.id_shift) || prev.id_shift_backup,
     }));
   };
 
@@ -286,79 +300,78 @@ export default function OperationalPage() {
     }));
   };
 
-  const executeCorrection = (ids: string[]) =>
+  const prosesKoreksi = async (ids: string[]) => {
+    const hasil = await jalankanBerurutan(ids, (idPersonil) =>
+      prosesKoreksiAdmin({
+        tanggal: correction.tanggal,
+        id_karyawan: idPersonil,
+        jenis_koreksi: correction.jenis_koreksi as Parameters<
+          typeof prosesKoreksiAdmin
+        >[0]["jenis_koreksi"],
+        jam_koreksi: correction.jam_koreksi || undefined,
+        keterangan_admin: correction.keterangan_admin || undefined,
+        id_shift: correction.id_shift || undefined,
+      }),
+    );
+    setFeedback({
+      tone: hasil.gagal.length > 0 ? "error" : "success",
+      text:
+        ids.length === 1
+          ? (hasil.gagal[0]?.pesan ??
+            `Koreksi admin untuk ${namaPersonil(ids[0])} tanggal ${correction.tanggal} tersimpan.`)
+          : `Koreksi admin: ${ringkasHasil(hasil, namaPersonil)}`,
+    });
+    // Yang gagal tetap terpilih supaya bisa langsung dicoba lagi.
+    setCorrection((prev) => ({
+      ...prev,
+      idPersonil: hasil.gagal.map((item) => item.id),
+      ...(hasil.gagal.length === 0
+        ? { jam_koreksi: "", keterangan_admin: "" }
+        : {}),
+    }));
+    if (hasil.berhasil.length > 0) {
+      await load("correction", false, false);
+    }
+  };
+
+  const executeCorrection = (ids: string[]) => run(() => prosesKoreksi(ids));
+
+  const submitCorrection = () =>
     run(async () => {
+      const ids = correction.idPersonil;
       if (ids.length === 0) {
         throw new Error("Pilih minimal satu personil terlebih dahulu.");
       }
-      const hasil = await jalankanBerurutan(ids, (idPersonil) =>
-        prosesKoreksiAdmin({
-          tanggal: correction.tanggal,
-          id_karyawan: idPersonil,
-          jenis_koreksi: correction.jenis_koreksi as Parameters<
-            typeof prosesKoreksiAdmin
-          >[0]["jenis_koreksi"],
-          jam_koreksi: correction.jam_koreksi || undefined,
-          keterangan_admin: correction.keterangan_admin || undefined,
-          id_shift: correction.id_shift || undefined,
-        }),
+      // Ditanyakan ke server untuk tanggal koreksinya, karena tabel riwayat
+      // hanya memuat tanggal yang sedang dipilih di sana.
+      const koreksiTanggalIni = await getDaftarKoreksi({
+        tanggal: correction.tanggal,
+      });
+      const sudahAda = ids.filter((idPersonil) =>
+        koreksiTanggalIni.some((r) => String(r.id_karyawan) === idPersonil),
       );
-      setFeedback({
-        tone: hasil.gagal.length > 0 ? "error" : "success",
-        text:
-          ids.length === 1
-            ? (hasil.gagal[0]?.pesan ??
-              `Koreksi admin untuk ${namaPersonil(ids[0])} tanggal ${correction.tanggal} tersimpan.`)
-            : `Koreksi admin: ${ringkasHasil(hasil, namaPersonil)}`,
-      });
-      // Yang gagal tetap terpilih supaya bisa langsung dicoba lagi.
-      setCorrection((prev) => ({
-        ...prev,
-        idPersonil: hasil.gagal.map((item) => item.id),
-        ...(hasil.gagal.length === 0
-          ? { jam_koreksi: "", keterangan_admin: "" }
-          : {}),
-      }));
-      if (hasil.berhasil.length > 0) {
-        await load("correction", false, false);
+      const jumlahSiswa = ids.filter((idPersonil) => {
+        const row = cariPersonil(idPersonil);
+        return row ? jenisPersonil(row) === "siswa" : false;
+      }).length;
+      if (sudahAda.length > 0 || ids.length > 1) {
+        setConfirmKoreksi({
+          ids,
+          sudahAda: sudahAda.map(namaPersonil),
+          jumlahSiswa,
+        });
+        return;
       }
+      await prosesKoreksi(ids);
     });
-
-  const submitCorrection = () => {
-    const ids = correction.idPersonil;
-    if (ids.length === 0) {
-      setFeedback({
-        tone: "error",
-        text: "Pilih minimal satu personil terlebih dahulu.",
-      });
-      return;
-    }
-    const sudahAda = ids.filter((idPersonil) =>
-      records.some(
-        (r) =>
-          String(r.id_karyawan || r.id_unik) === idPersonil &&
-          String(r.tanggal || r.tanggal_kerja) === correction.tanggal,
-      ),
-    );
-    const jumlahSiswa = ids.filter((idPersonil) => {
-      const row = cariPersonil(idPersonil);
-      return row ? jenisPersonil(row) === "siswa" : false;
-    }).length;
-    if (sudahAda.length > 0 || ids.length > 1) {
-      setConfirmKoreksi({
-        ids,
-        sudahAda: sudahAda.map(namaPersonil),
-        jumlahSiswa,
-      });
-      return;
-    }
-    void executeCorrection(ids);
-  };
 
   const submitBackup = () =>
     run(async () => {
       if (!backup.id_karyawan_asal || !backup.id_karyawan_pengganti) {
         throw new Error("Pilih personil asal dan pengganti terlebih dahulu.");
+      }
+      if (!backup.id_shift_backup) {
+        throw new Error("Pilih shift backup terlebih dahulu.");
       }
       const result = await buatPenugasanBackup({
         tanggal_tugas: backup.tanggal_tugas,
@@ -394,6 +407,7 @@ export default function OperationalPage() {
       if (ids.length === 0) {
         throw new Error("Pilih minimal satu personil terlebih dahulu.");
       }
+      const hadir = manualEntry.status_kehadiran === "Hadir";
       const rows: OfflineImportRow[] = ids.map((idPersonil) => {
         const found = cariPersonil(idPersonil);
         return {
@@ -401,10 +415,10 @@ export default function OperationalPage() {
           id_unik: idPersonil,
           nama: found?.nama ? String(found.nama) : undefined,
           divisi: found?.divisi ? String(found.divisi) : undefined,
-          jam_masuk: manualEntry.jam_masuk || undefined,
-          jam_pulang: manualEntry.jam_pulang || undefined,
+          jam_masuk: (hadir && manualEntry.jam_masuk) || undefined,
+          jam_pulang: (hadir && manualEntry.jam_pulang) || undefined,
           status_kehadiran: manualEntry.status_kehadiran,
-          status_absen: manualEntry.status_absen || undefined,
+          status_absen: (hadir && manualEntry.status_absen) || undefined,
           keterangan: manualEntry.keterangan || undefined,
         };
       });
@@ -444,44 +458,28 @@ export default function OperationalPage() {
 
   const submitBulkCsv = () =>
     run(async () => {
-      const lines = csv.trim().split("\n");
-      if (lines.length < 2) {
+      const rows = uraiCsvImport(csv);
+      if (rows.length > BATAS_IMPORT_MASSAL) {
         throw new Error(
-          "CSV kosong atau hanya berisi header. Masukkan data minimal 1 baris.",
+          `Import massal maksimal ${BATAS_IMPORT_MASSAL} baris; CSV ini berisi ${rows.length} baris.`,
         );
       }
-      const headerParts = lines[0].split(",").map((h) => h.trim());
-      const rows: OfflineImportRow[] = [];
-      for (let i = 1; i < lines.length; i++) {
-        const line = lines[i].trim();
-        if (!line) continue;
-        const parts = line.split(",").map((p) => p.trim());
-        const rowObj: Record<string, string> = {};
-        headerParts.forEach((header, idx) => {
-          rowObj[header] = parts[idx] ?? "";
-        });
-        rows.push({
-          tanggal: rowObj.tanggal || formatTanggalOperasional(Date.now()),
-          id_unik: rowObj.id_unik || "",
-          nama: rowObj.nama || undefined,
-          divisi: rowObj.divisi || undefined,
-          jam_masuk: rowObj.jam_masuk || undefined,
-          jam_pulang: rowObj.jam_pulang || undefined,
-          status_kehadiran: rowObj.status_kehadiran || "Hadir",
-          status_absen: rowObj.status_absen || undefined,
-          keterangan: rowObj.keterangan || undefined,
-        });
-      }
       const result = await prosesImportOffline(rows);
+      const rincianGagal = result.results
+        .map((item, index) =>
+          item.sukses ? null : `data ke-${index + 1}: ${item.pesan}`,
+        )
+        .filter(Boolean)
+        .slice(0, 5)
+        .join("; ");
       setFeedback({
         tone: result.gagal > 0 ? "error" : "success",
-        text: `Import massal selesai: ${result.berhasil} berhasil, ${result.gagal} gagal.${result.catatanNotifikasi ?? ""}`,
+        text: `Import massal selesai: ${result.berhasil} berhasil, ${result.gagal} gagal.${rincianGagal ? ` ${rincianGagal}.` : ""}${result.catatanNotifikasi ?? ""}`,
       });
       if (result.berhasil > 0) {
         setShowBulkUpload(false);
-        setCsv(
-          "tanggal,id_unik,jam_masuk,jam_pulang,status_kehadiran,keterangan\n",
-        );
+        setCsv(`${HEADER_CSV_IMPORT}\n`);
+        await load("import", false, false);
       }
     });
 
@@ -579,14 +577,13 @@ export default function OperationalPage() {
 
       {/* Tab Switcher */}
       <div className="flex flex-wrap gap-2 rounded-2xl border border-white/10 bg-slate-900/60 p-2 font-mono text-xs">
-        {(["correction", "backup", "import"] as Tab[]).map((value) => (
+        {tabTersedia.map((value) => (
           <button
             key={value}
             type="button"
             onClick={() => {
               setTab(value);
               setRecords([]);
-              void load(value, false, false);
             }}
             className={`rounded-xl px-4 py-2.5 font-bold transition ${
               tab === value
@@ -800,6 +797,11 @@ export default function OperationalPage() {
                   })
                 }
               >
+                <option value={0} disabled>
+                  {shifts.length > 0
+                    ? "Pilih shift"
+                    : "Daftar shift belum dimuat"}
+                </option>
                 {shiftOptions}
               </select>
             </div>
@@ -957,68 +959,82 @@ export default function OperationalPage() {
               </select>
             </div>
 
-            {/* Jam Masuk */}
-            <div>
-              <span className="text-emerald-400 block mb-1 font-semibold">
-                Jam Masuk (HH:mm)
-              </span>
-              <input
-                aria-label="Jam Masuk"
-                type="time"
-                className={inputClass}
-                value={manualEntry.jam_masuk}
-                onChange={(e) =>
-                  setManualEntry({ ...manualEntry, jam_masuk: e.target.value })
-                }
-              />
-            </div>
+            {/* Jam dan status absen hanya untuk Hadir; status lain disimpan tanpa jam. */}
+            {manualEntry.status_kehadiran === "Hadir" ? (
+              <>
+                <div>
+                  <span className="text-emerald-400 block mb-1 font-semibold">
+                    Jam Masuk (HH:mm)
+                  </span>
+                  <input
+                    aria-label="Jam Masuk"
+                    type="time"
+                    className={inputClass}
+                    value={manualEntry.jam_masuk}
+                    onChange={(e) =>
+                      setManualEntry({
+                        ...manualEntry,
+                        jam_masuk: e.target.value,
+                      })
+                    }
+                  />
+                </div>
 
-            {/* Jam Pulang */}
-            <div>
-              <span className="text-sky-400 block mb-1 font-semibold">
-                Jam Pulang (HH:mm)
-              </span>
-              <input
-                aria-label="Jam Pulang"
-                type="time"
-                className={inputClass}
-                value={manualEntry.jam_pulang}
-                onChange={(e) =>
-                  setManualEntry({ ...manualEntry, jam_pulang: e.target.value })
-                }
-              />
-            </div>
+                <div>
+                  <span className="text-sky-400 block mb-1 font-semibold">
+                    Jam Pulang (HH:mm)
+                  </span>
+                  <input
+                    aria-label="Jam Pulang"
+                    type="time"
+                    className={inputClass}
+                    value={manualEntry.jam_pulang}
+                    onChange={(e) =>
+                      setManualEntry({
+                        ...manualEntry,
+                        jam_pulang: e.target.value,
+                      })
+                    }
+                  />
+                </div>
 
-            {/* Status Absen */}
-            <div>
-              <span className="text-amber-400 block mb-1 font-semibold">
-                Status Absen
-              </span>
-              <select
-                aria-label="Status Absen"
-                className={inputClass}
-                value={manualEntry.status_absen}
-                onChange={(e) =>
-                  setManualEntry({
-                    ...manualEntry,
-                    status_absen: e.target.value,
-                  })
-                }
-              >
-                <option value="">Otomatis (Generate Sistem Sesuai Jam)</option>
-                <option value="Lengkap">Lengkap (Masuk & Pulang)</option>
-                <option value="Belum Pulang">Belum Pulang (Hanya Masuk)</option>
-                <option value="Perlu Verifikasi">
-                  Perlu Verifikasi (Hanya Pulang)
-                </option>
-                <option value="Tidak Hadir">
-                  Tidak Hadir (Sakit/Izin/Alfa)
-                </option>
-                <option value="Tepat Waktu">Tepat Waktu</option>
-                <option value="Terlambat">Terlambat</option>
-                <option value="Datang Lebih Awal">Datang Lebih Awal</option>
-              </select>
-            </div>
+                <div>
+                  <span className="text-amber-400 block mb-1 font-semibold">
+                    Status Absen
+                  </span>
+                  <select
+                    aria-label="Status Absen"
+                    className={inputClass}
+                    value={manualEntry.status_absen}
+                    onChange={(e) =>
+                      setManualEntry({
+                        ...manualEntry,
+                        status_absen: e.target.value,
+                      })
+                    }
+                  >
+                    <option value="">
+                      Otomatis (Generate Sistem Sesuai Jam)
+                    </option>
+                    <option value="Lengkap">Lengkap (Masuk & Pulang)</option>
+                    <option value="Belum Pulang">
+                      Belum Pulang (Hanya Masuk)
+                    </option>
+                    <option value="Perlu Verifikasi">
+                      Perlu Verifikasi (Hanya Pulang)
+                    </option>
+                    <option value="Tepat Waktu">Tepat Waktu</option>
+                    <option value="Terlambat">Terlambat</option>
+                    <option value="Datang Lebih Awal">Datang Lebih Awal</option>
+                  </select>
+                </div>
+              </>
+            ) : (
+              <p className="sm:col-span-2 text-xs text-slate-400 self-end pb-3">
+                {manualEntry.status_kehadiran} disimpan tanpa jam masuk dan
+                pulang, sehingga tidak dihitung sebagai jam kerja.
+              </p>
+            )}
 
             {/* Keterangan */}
             <div>
@@ -1102,7 +1118,7 @@ export default function OperationalPage() {
 
       {/* Riwayat Data Section */}
       <section className="app-panel rounded-3xl p-5 bg-slate-900/80 border border-slate-800 space-y-4">
-        <div className="flex items-center justify-between gap-3 border-b border-slate-800 pb-3">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-800 pb-3">
           <h2 className="font-bold text-white text-sm">
             Log Riwayat{" "}
             {tab === "backup"
@@ -1111,14 +1127,23 @@ export default function OperationalPage() {
                 ? "Import Manual"
                 : "Koreksi Admin"}
           </h2>
-          <button
-            type="button"
-            disabled={busy}
-            onClick={() => void load(tab)}
-            className="rounded-xl border border-white/10 px-4 py-2 text-xs font-mono font-bold bg-slate-800 hover:bg-slate-700 text-sky-300 transition"
-          >
-            Muat Data
-          </button>
+          <div className="flex items-center gap-2">
+            <input
+              aria-label="Tanggal riwayat"
+              type="date"
+              className={`${inputClass} w-auto font-mono text-xs`}
+              value={tanggalRiwayat}
+              onChange={(event) => setTanggalRiwayat(event.target.value)}
+            />
+            <button
+              type="button"
+              disabled={busy}
+              onClick={() => void load(tab)}
+              className="rounded-xl border border-white/10 px-4 py-2 text-xs font-mono font-bold bg-slate-800 hover:bg-slate-700 text-sky-300 transition"
+            >
+              Muat Data
+            </button>
+          </div>
         </div>
 
         {tab === "backup" && records.length > 0 ? (
@@ -1171,15 +1196,11 @@ export default function OperationalPage() {
                           <button
                             type="button"
                             onClick={() =>
-                              run(async () => {
-                                const result = await batalkanPenugasanBackup(
-                                  String(item.id_backup),
-                                );
-                                setFeedback({
-                                  tone: result.sukses ? "success" : "error",
-                                  text: result.pesan,
-                                });
-                                load();
+                              setDeleteConfirm({
+                                type: "cancelBackup",
+                                idReferensi: String(item.id_backup || ""),
+                                title: `Batalkan Backup: ${item.id_backup}`,
+                                subtitle: `${item.nama_karyawan_pengganti} (${item.id_karyawan_pengganti}) menggantikan ${item.nama_karyawan_asal} (${item.id_karyawan_asal}) pada ${item.tanggal_tugas}`,
                               })
                             }
                             className="px-2.5 py-1 rounded bg-amber-950/80 hover:bg-amber-900 border border-amber-800 text-amber-300 text-[11px]"
@@ -1385,7 +1406,11 @@ export default function OperationalPage() {
         <Modal
           isOpen
           onClose={() => setDeleteConfirm(null)}
-          title={`Konfirmasi Hapus ${deleteConfirm.type === "import" ? "Import Manual" : deleteConfirm.type === "backup" ? "Penugasan Backup" : "Koreksi"}`}
+          title={
+            deleteConfirm.type === "cancelBackup"
+              ? "Konfirmasi Batalkan Penugasan Backup"
+              : `Konfirmasi Hapus ${deleteConfirm.type === "import" ? "Import Manual" : deleteConfirm.type === "backup" ? "Penugasan Backup" : "Koreksi"}`
+          }
           subtitle={deleteConfirm.title}
           maxWidth="max-w-md"
           footer={
@@ -1407,8 +1432,14 @@ export default function OperationalPage() {
                 {busy ? (
                   <>
                     <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                    <span>Menghapus...</span>
+                    <span>
+                      {deleteConfirm.type === "cancelBackup"
+                        ? "Membatalkan..."
+                        : "Menghapus..."}
+                    </span>
                   </>
+                ) : deleteConfirm.type === "cancelBackup" ? (
+                  <span>Ya, Batalkan Backup</span>
                 ) : (
                   <span>
                     Ya, Hapus{" "}
@@ -1427,9 +1458,11 @@ export default function OperationalPage() {
             <div className="bg-slate-950/60 p-3.5 rounded-2xl border border-slate-800 text-xs font-mono text-slate-300 space-y-1">
               <p>{deleteConfirm.subtitle}</p>
               <p className="text-amber-400 text-[11px] pt-1">
-                {deleteConfirm.type === "backup"
-                  ? "Menghapus data penugasan backup akan menghapus riwayat penugasan ini secara permanen dan menyelaraskan kembali status backup personil jika tidak ada penugasan aktif lainnya."
-                  : `Menghapus ${deleteConfirm.type === "import" ? "rekaman import" : "koreksi"} akan membatalkan efeknya pada absensi harian dan mencatat jejak audit operator.`}
+                {deleteConfirm.type === "cancelBackup"
+                  ? "Penugasan yang dibatalkan tidak bisa diaktifkan lagi. Scan personil pengganti kembali memakai shift normalnya."
+                  : deleteConfirm.type === "backup"
+                    ? "Menghapus data penugasan backup akan menghapus riwayat penugasan ini secara permanen dan menyelaraskan kembali status backup personil jika tidak ada penugasan aktif lainnya."
+                    : `Menghapus ${deleteConfirm.type === "import" ? "rekaman import" : "koreksi"} akan membatalkan efeknya pada absensi harian dan mencatat jejak audit operator.`}
               </p>
             </div>
           </div>

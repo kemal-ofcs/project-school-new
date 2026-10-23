@@ -366,6 +366,25 @@ export async function hapusLogScan(
   };
 }
 
+/**
+ * Log milik SATU baris import. Dulu semua log import orang itu pada tanggal
+ * itu ikut dihapus, sehingga import lain hari yang sama kehilangan efeknya.
+ * Log mode pengganti merujuk ID backup, dan log import lama berreferensi
+ * kosong; keduanya dicocokkan lewat jamnya. Kembar `SQL_HAPUS_LOG_IMPORT` di
+ * administration.rs (juga dipakai cloud saat menerapkan offline-import/delete).
+ */
+const SQL_HAPUS_LOG_IMPORT = `
+  DELETE FROM log_scan
+  WHERE id_referensi = ?1
+     OR (sumber_data IN ('Import Offline', 'Import Manual')
+         AND id_karyawan = ?2 AND tanggal_kerja = ?3
+         AND (COALESCE(id_referensi, '') = ''
+              OR id_referensi IN (
+                SELECT id_backup FROM backup_karyawan
+                WHERE id_karyawan_pengganti = ?2 AND tanggal_tugas = ?3))
+         AND ((jenis_scan = 'Masuk' AND ?4 <> '' AND substr(jam_scan, 1, 5) = substr(?4, 1, 5))
+           OR (jenis_scan = 'Pulang' AND ?5 <> '' AND substr(jam_scan, 1, 5) = substr(?5, 1, 5))));`;
+
 export async function hapusImportOffline(
   eventKey: string,
   kodeOperator: string,
@@ -384,6 +403,8 @@ export async function hapusImportOffline(
   const imp = importRes.rows[0] as Record<string, unknown>;
   const idUnik = String(imp.id_unik);
   const tanggal = String(imp.tanggal);
+  // Baris "Gagal" tidak pernah menulis absensi maupun log.
+  const pernahDiterapkan = String(imp.status_proses) !== "Gagal";
 
   const tx = await db.transaction("write");
   try {
@@ -391,12 +412,21 @@ export async function hapusImportOffline(
       sql: "DELETE FROM import_offline WHERE event_key = ?;",
       args: [eventKey],
     });
-    await tx.execute({
-      sql: "DELETE FROM log_scan WHERE id_referensi = ? OR (id_karyawan = ? AND tanggal_kerja = ? AND (sumber_data = 'Import Offline' OR sumber_data = 'Import Manual'));",
-      args: [eventKey, idUnik, tanggal],
-    });
-
-    await rebuildAttendanceFromLogs(tx, idUnik, tanggal, { kind: "import" });
+    if (pernahDiterapkan) {
+      await tx.execute({
+        sql: SQL_HAPUS_LOG_IMPORT,
+        args: [
+          eventKey,
+          idUnik,
+          tanggal,
+          String(imp.jam_masuk ?? ""),
+          String(imp.jam_pulang ?? ""),
+        ],
+      });
+      await rebuildAttendanceFromLogs(tx, idUnik, tanggal, {
+        kind: "import",
+      });
+    }
 
     await tx.execute({
       sql: `INSERT INTO audit_absensi (

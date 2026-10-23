@@ -1,11 +1,13 @@
 import "server-only";
 
+import { randomUUID } from "node:crypto";
 import type { Transaction } from "@libsql/client";
 import { rebuildAttendanceFromLogs } from "@/lib/attendance/rebuild-from-logs";
 import {
   aturanShiftDariBaris,
   diDalamJendelaScanMasuk,
   diDalamRentangKoreksiMasuk,
+  formatTanggalOperasional,
   hitungUlangAbsensiDariJam,
   isShiftFleksibel,
   normalizeDate,
@@ -13,20 +15,16 @@ import {
 } from "@/lib/attendance/time-policy";
 import { db, ensureDbInitialized } from "@/lib/db";
 import { queueWaliNotification } from "@/lib/services/wa-notification";
+import {
+  type JenisKoreksi,
+  jenisScanKoreksi,
+  validasiKoreksi,
+} from "@/lib/validations/operational";
 
 export interface KoreksiInput {
   tanggal: string; // YYYY-MM-DD
   id_karyawan: string;
-  jenis_koreksi:
-    | "Sakit"
-    | "Izin"
-    | "Dispen"
-    | "Alfa"
-    | "Lupa Absen Masuk"
-    | "Lupa Absen Pulang"
-    | "Kendala Sistem - Jam Masuk"
-    | "Kendala Sistem - Jam Pulang"
-    | "Terlambat";
+  jenis_koreksi: JenisKoreksi;
   jam_koreksi?: string; // HH:mm
   keterangan_admin?: string;
   kode_operator: string;
@@ -34,33 +32,43 @@ export interface KoreksiInput {
   mode_tugas?: string;
 }
 
-export function generateIdReferensiKoreksi(): string {
-  const now = new Date();
-  const dateStr = now.toISOString().split("T")[0].replace(/-/g, "");
-  const randomNum = Math.floor(1000 + Math.random() * 9000);
-  return `KOR-${dateStr}-${randomNum}`;
+// Log koreksi mode pengganti merujuk ID backup, bukan ID koreksi, sehingga
+// tidak ikut terhapus oleh `id_referensi`. Kembar `SQL_HAPUS_LOG_KOREKSI_PENGGANTI`
+// di administration.rs (juga dipakai cloud saat menerapkan correction/delete).
+const SQL_HAPUS_LOG_KOREKSI_PENGGANTI = `
+  DELETE FROM log_scan
+  WHERE sumber_data = 'Koreksi Admin' AND id_karyawan = ?1 AND tanggal_kerja = ?2
+    AND jenis_scan = ?3
+    AND COALESCE(id_referensi, '') IN (
+      SELECT id_backup FROM backup_karyawan
+      WHERE id_karyawan_pengganti = ?1 AND tanggal_tugas = ?2
+    );`;
+
+// Bentuk sama dengan Rust (`KOR-<tanggal koreksi>-<12 hex>`). Angka acak
+// 4 digit dulu bertabrakan pada koreksi massal lalu ditolak UNIQUE.
+export function generateIdReferensiKoreksi(tanggal: string): string {
+  const acak = randomUUID().replace(/-/g, "").slice(0, 12).toUpperCase();
+  return `KOR-${tanggal.replace(/-/g, "")}-${acak}`;
 }
 
 export async function prosesKoreksiAdmin(input: KoreksiInput) {
   await ensureDbInitialized();
 
   const date = normalizeDate(input.tanggal);
-
-  if (
-    [
-      "Lupa Absen Masuk",
-      "Lupa Absen Pulang",
-      "Kendala Sistem - Jam Masuk",
-      "Kendala Sistem - Jam Pulang",
-      "Terlambat",
-    ].includes(input.jenis_koreksi) &&
-    !input.jam_koreksi
-  ) {
-    return {
-      sukses: false,
-      pesan: `Gagal: Jenis koreksi '${input.jenis_koreksi}' wajib menyertakan jam koreksi (HH:mm).`,
-    };
-  }
+  const salah = validasiKoreksi(
+    {
+      tanggal: date,
+      id_karyawan: input.id_karyawan,
+      jenis_koreksi: input.jenis_koreksi,
+      jam_koreksi: input.jam_koreksi ?? "",
+    },
+    formatTanggalOperasional(Date.now()),
+  );
+  if (salah) return { sukses: false, pesan: salah };
+  const explicitShift =
+    Number.isSafeInteger(input.id_shift) && Number(input.id_shift) > 0
+      ? Number(input.id_shift)
+      : undefined;
 
   // 1. Validasi Operator
   const opRes = await db.execute({
@@ -108,12 +116,20 @@ export async function prosesKoreksiAdmin(input: KoreksiInput) {
     };
   }
 
-  let effectiveShiftId = input.id_shift ? Number(input.id_shift) : idShift;
+  let effectiveShiftId = explicitShift ?? idShift;
   let modeTugas = input.mode_tugas || "NORMAL";
   let backupId = "";
   let originalId = "";
 
-  if (backup && !input.id_shift) {
+  // Shift pilihan admin yang sama dengan shift backup berarti koreksi untuk
+  // tugas penggantiannya. Cermin `create_correction` di administration.rs.
+  if (backup && explicitShift === Number(backup.id_shift_backup)) {
+    modeTugas = "PENGGANTI";
+    backupId = String(backup.id_backup);
+    originalId = String(backup.id_karyawan_asal);
+  }
+
+  if (backup && !explicitShift) {
     const backupShiftId = Number(backup.id_shift_backup);
     const normalShiftId = idShift;
 
@@ -207,7 +223,7 @@ export async function prosesKoreksiAdmin(input: KoreksiInput) {
       modeTugas = String(existRecord.mode_tugas || "NORMAL");
       backupId = String(existRecord.id_backup || "");
       originalId = String(existRecord.id_karyawan_asal || "");
-      if (!input.id_shift) {
+      if (!explicitShift) {
         effectiveShiftId = Number(existRecord.id_shift || effectiveShiftId);
       }
       targetDate = String(existRecord.tanggal || date);
@@ -230,7 +246,7 @@ export async function prosesKoreksiAdmin(input: KoreksiInput) {
         modeTugas = String(existRecord.mode_tugas || "NORMAL");
         backupId = String(existRecord.id_backup || "");
         originalId = String(existRecord.id_karyawan_asal || "");
-        if (!input.id_shift) {
+        if (!explicitShift) {
           effectiveShiftId = Number(existRecord.id_shift || effectiveShiftId);
         }
         targetDate = prevDate;
@@ -244,6 +260,9 @@ export async function prosesKoreksiAdmin(input: KoreksiInput) {
     args: [effectiveShiftId],
   });
   let shiftData = shiftRes.rows[0] as Record<string, unknown> | undefined;
+  if (explicitShift && !shiftData) {
+    return { sukses: false, pesan: `Shift #${explicitShift} tidak ditemukan.` };
+  }
 
   // Shift fleksibel (00:00-23:59) tidak punya rentang jadwal, jadi jam koreksi
   // apa pun sah. Tanpa pengecualian ini Smart Shift Detection menganggap shift
@@ -258,11 +277,7 @@ export async function prosesKoreksiAdmin(input: KoreksiInput) {
     );
 
   // Smart Shift Detection: jika jam yang diinput tidak cocok dengan shift saat ini dan user tidak eksplisit memilih shift, cari shift yang cocok di tbl_shift
-  if (
-    input.jam_koreksi &&
-    !input.id_shift &&
-    !adalahShiftFleksibel(shiftData)
-  ) {
+  if (input.jam_koreksi && !explicitShift && !adalahShiftFleksibel(shiftData)) {
     const isCheckIn = [
       "Lupa Absen Masuk",
       "Kendala Sistem - Jam Masuk",
@@ -361,7 +376,7 @@ export async function prosesKoreksiAdmin(input: KoreksiInput) {
     }
   }
 
-  const idReferensi = generateIdReferensiKoreksi();
+  const idReferensi = generateIdReferensiKoreksi(date);
   const nowStr = new Date().toISOString();
 
   // ── Atomic transaction: semua mutasi multi-tabel dalam satu unit ────────
@@ -778,6 +793,10 @@ export async function hapusKoreksiAdmin(
     await tx.execute({
       sql: "DELETE FROM log_scan WHERE id_referensi = ?;",
       args: [idReferensi],
+    });
+    await tx.execute({
+      sql: SQL_HAPUS_LOG_KOREKSI_PENGGANTI,
+      args: [idKaryawan, tanggal, jenisScanKoreksi(String(kor.jenis_koreksi))],
     });
 
     await rebuildAttendanceFromLogs(tx, idKaryawan, tanggal, {

@@ -415,6 +415,7 @@ export default function OperationalPage() {
     setBusy(true);
     setFeedback(null);
     try {
+      const hadir = manStatusKehadiran === "Hadir";
       const result = await prosesImportOffline(
         ids.map((idPersonil) => {
           const targetEmp = cariPersonil(idPersonil);
@@ -423,10 +424,10 @@ export default function OperationalPage() {
             id_unik: idPersonil,
             nama: targetEmp?.nama ? String(targetEmp.nama) : undefined,
             divisi: targetEmp?.divisi ? String(targetEmp.divisi) : undefined,
-            jam_masuk: manJamMasuk || undefined,
-            jam_pulang: manJamPulang || undefined,
+            jam_masuk: (hadir && manJamMasuk) || undefined,
+            jam_pulang: (hadir && manJamPulang) || undefined,
             status_kehadiran: manStatusKehadiran,
-            status_absen: manStatusAbsen,
+            status_absen: (hadir && manStatusAbsen) || undefined,
             keterangan: manKeterangan || undefined,
           };
         }),
@@ -1105,39 +1106,46 @@ export default function OperationalPage() {
                 disabled={loadingMaster || busy}
               />
 
-              {/* Jam Masuk & Pulang */}
-              <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <label
-                    htmlFor="man-masuk"
-                    className="block text-[11px] font-semibold text-slate-400 mb-1"
-                  >
-                    Jam Masuk
-                  </label>
-                  <input
-                    id="man-masuk"
-                    type="time"
-                    value={manJamMasuk}
-                    onChange={(e) => setManJamMasuk(e.target.value)}
-                    className="w-full rounded-xl border border-white/10 bg-slate-950 px-3 py-2 font-mono text-xs text-white outline-none focus:border-sky-400"
-                  />
+              {/* Jam hanya untuk Hadir; status lain disimpan tanpa jam. */}
+              {manStatusKehadiran === "Hadir" ? (
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label
+                      htmlFor="man-masuk"
+                      className="block text-[11px] font-semibold text-slate-400 mb-1"
+                    >
+                      Jam Masuk
+                    </label>
+                    <input
+                      id="man-masuk"
+                      type="time"
+                      value={manJamMasuk}
+                      onChange={(e) => setManJamMasuk(e.target.value)}
+                      className="w-full rounded-xl border border-white/10 bg-slate-950 px-3 py-2 font-mono text-xs text-white outline-none focus:border-sky-400"
+                    />
+                  </div>
+                  <div>
+                    <label
+                      htmlFor="man-pulang"
+                      className="block text-[11px] font-semibold text-slate-400 mb-1"
+                    >
+                      Jam Pulang
+                    </label>
+                    <input
+                      id="man-pulang"
+                      type="time"
+                      value={manJamPulang}
+                      onChange={(e) => setManJamPulang(e.target.value)}
+                      className="w-full rounded-xl border border-white/10 bg-slate-950 px-3 py-2 font-mono text-xs text-white outline-none focus:border-sky-400"
+                    />
+                  </div>
                 </div>
-                <div>
-                  <label
-                    htmlFor="man-pulang"
-                    className="block text-[11px] font-semibold text-slate-400 mb-1"
-                  >
-                    Jam Pulang
-                  </label>
-                  <input
-                    id="man-pulang"
-                    type="time"
-                    value={manJamPulang}
-                    onChange={(e) => setManJamPulang(e.target.value)}
-                    className="w-full rounded-xl border border-white/10 bg-slate-950 px-3 py-2 font-mono text-xs text-white outline-none focus:border-sky-400"
-                  />
-                </div>
-              </div>
+              ) : (
+                <p className="text-[11px] text-slate-400">
+                  {manStatusKehadiran} disimpan tanpa jam masuk dan pulang,
+                  sehingga tidak dihitung sebagai jam kerja.
+                </p>
+              )}
 
               {/* Status Kehadiran */}
               <div className="grid grid-cols-2 gap-2">
@@ -1161,26 +1169,28 @@ export default function OperationalPage() {
                     ))}
                   </select>
                 </div>
-                <div>
-                  <label
-                    htmlFor="man-absen"
-                    className="block text-[11px] font-semibold text-slate-400 mb-1"
-                  >
-                    Status Absen
-                  </label>
-                  <select
-                    id="man-absen"
-                    value={manStatusAbsen}
-                    onChange={(e) => setManStatusAbsen(e.target.value)}
-                    className="w-full rounded-xl border border-white/10 bg-slate-950 px-3 py-2 text-xs text-white outline-none focus:border-sky-400"
-                  >
-                    {STATUS_ABSEN_MANUAL_OPTIONS.map((opt) => (
-                      <option key={opt.value} value={opt.value}>
-                        {opt.label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+                {manStatusKehadiran === "Hadir" ? (
+                  <div>
+                    <label
+                      htmlFor="man-absen"
+                      className="block text-[11px] font-semibold text-slate-400 mb-1"
+                    >
+                      Status Absen
+                    </label>
+                    <select
+                      id="man-absen"
+                      value={manStatusAbsen}
+                      onChange={(e) => setManStatusAbsen(e.target.value)}
+                      className="w-full rounded-xl border border-white/10 bg-slate-950 px-3 py-2 text-xs text-white outline-none focus:border-sky-400"
+                    >
+                      {STATUS_ABSEN_MANUAL_OPTIONS.map((opt) => (
+                        <option key={opt.value} value={opt.value}>
+                          {opt.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                ) : null}
               </div>
 
               {/* Keterangan */}

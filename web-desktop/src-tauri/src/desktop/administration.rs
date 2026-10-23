@@ -54,6 +54,179 @@ fn parse_time_min(raw: &str) -> Option<i64> {
     Some(h * 60 + m)
 }
 
+// Aturan masukan halaman Operasional, kembar `src/lib/validations/operational.ts`
+// dengan vektor tes yang sama (`validasi_operasional_vektor_kembar`).
+const JENIS_KOREKSI: &[&str] = &[
+    "Sakit",
+    "Izin",
+    "Dispen",
+    "Alfa",
+    "Lupa Absen Masuk",
+    "Lupa Absen Pulang",
+    "Kendala Sistem - Jam Masuk",
+    "Kendala Sistem - Jam Pulang",
+    "Terlambat",
+];
+const STATUS_KEHADIRAN_IMPORT: &[&str] = &["Hadir", "Sakit", "Izin", "Dispen", "Alfa"];
+const STATUS_ABSEN_IMPORT: &[&str] = &[
+    "Lengkap",
+    "Belum Pulang",
+    "Perlu Verifikasi",
+    "Tidak Hadir",
+    "Tepat Waktu",
+    "Terlambat",
+    "Datang Lebih Awal",
+];
+
+/// `HH:MM`, atau `HH:MM:SS` bila `dengan_detik`.
+fn jam_sah(value: &str, dengan_detik: bool) -> bool {
+    let bytes = value.as_bytes();
+    let bagian_sah = |i: usize, batas: u8| {
+        bytes[i].is_ascii_digit()
+            && bytes[i + 1].is_ascii_digit()
+            && (bytes[i] - b'0') * 10 + (bytes[i + 1] - b'0') <= batas
+    };
+    match bytes.len() {
+        5 => bytes[2] == b':' && bagian_sah(0, 23) && bagian_sah(3, 59),
+        8 if dengan_detik => {
+            bytes[2] == b':'
+                && bytes[5] == b':'
+                && bagian_sah(0, 23)
+                && bagian_sah(3, 59)
+                && bagian_sah(6, 59)
+        }
+        _ => false,
+    }
+}
+
+fn koreksi_butuh_jam(jenis: &str) -> bool {
+    !matches!(jenis, "Sakit" | "Izin" | "Dispen" | "Alfa")
+}
+
+/// `jenis_scan` log yang ditulis sebuah koreksi.
+fn jenis_scan_koreksi(jenis: &str) -> &str {
+    match jenis {
+        "Lupa Absen Masuk" | "Kendala Sistem - Jam Masuk" | "Terlambat" => "Masuk",
+        "Lupa Absen Pulang" | "Kendala Sistem - Jam Pulang" => "Pulang",
+        _ => jenis,
+    }
+}
+
+fn pesan_masa_depan(tanggal: &str) -> String {
+    format!("Tanggal {tanggal} belum terjadi; absensi berjam hanya boleh untuk hari ini atau sebelumnya.")
+}
+
+fn validasi_koreksi(
+    tanggal: &str,
+    id_karyawan: &str,
+    jenis: &str,
+    jam: &str,
+    hari_ini: &str,
+) -> Result<(), String> {
+    if !super::inventory::is_valid_date(tanggal)
+        || id_karyawan.is_empty()
+        || !JENIS_KOREKSI.contains(&jenis)
+    {
+        return Err("Data Koreksi Admin tidak valid.".to_owned());
+    }
+    if !koreksi_butuh_jam(jenis) {
+        return Ok(());
+    }
+    if jam.is_empty() {
+        return Err(format!(
+            "Jenis koreksi '{jenis}' wajib menyertakan jam koreksi (HH:mm)."
+        ));
+    }
+    if !jam_sah(jam, false) {
+        return Err("Jam koreksi harus berformat HH:mm.".to_owned());
+    }
+    if tanggal > hari_ini {
+        return Err(pesan_masa_depan(tanggal));
+    }
+    Ok(())
+}
+
+/// Baris bukan Hadir tidak divalidasi jamnya: jamnya dibuang saat disimpan
+/// supaya hari Sakit/Alfa tidak menghasilkan `jam_kerja` yang ikut digaji.
+fn validasi_baris_import(
+    tanggal: &str,
+    id_unik: &str,
+    jam_masuk: &str,
+    jam_pulang: &str,
+    status_kehadiran: &str,
+    status_absen: &str,
+    hari_ini: &str,
+) -> Result<(), String> {
+    if !super::inventory::is_valid_date(tanggal) || id_unik.is_empty() {
+        return Err("Tanggal atau ID tidak valid.".to_owned());
+    }
+    let status = if status_kehadiran.is_empty() {
+        "Hadir"
+    } else {
+        status_kehadiran
+    };
+    if !STATUS_KEHADIRAN_IMPORT.contains(&status) {
+        return Err(format!("Status kehadiran '{status}' tidak dikenal."));
+    }
+    if !status_absen.is_empty() && !STATUS_ABSEN_IMPORT.contains(&status_absen) {
+        return Err(format!("Status absen '{status_absen}' tidak dikenal."));
+    }
+    if status != "Hadir" {
+        return Ok(());
+    }
+    if (jam_masuk.is_empty() && jam_pulang.is_empty())
+        || (!jam_masuk.is_empty() && !jam_sah(jam_masuk, true))
+        || (!jam_pulang.is_empty() && !jam_sah(jam_pulang, true))
+    {
+        return Err("Jam masuk/pulang tidak valid.".to_owned());
+    }
+    if tanggal > hari_ini {
+        return Err(pesan_masa_depan(tanggal));
+    }
+    Ok(())
+}
+
+fn hari_ini_wib() -> String {
+    super::time_policy::wib_date_from_epoch(storage::now_epoch_seconds())
+}
+
+/// Log koreksi mode pengganti merujuk ID backup, bukan ID koreksi, sehingga
+/// tidak ikut terhapus oleh `id_referensi`. Kembar `SQL_HAPUS_LOG_KOREKSI_PENGGANTI`
+/// di `services/correction.ts`; cloud memakainya saat menerapkan correction/delete.
+pub(crate) const SQL_HAPUS_LOG_KOREKSI_PENGGANTI: &str = r#"
+  DELETE FROM log_scan
+  WHERE sumber_data = 'Koreksi Admin' AND id_karyawan = ?1 AND tanggal_kerja = ?2
+    AND jenis_scan = ?3
+    AND COALESCE(id_referensi, '') IN (
+      SELECT id_backup FROM backup_karyawan
+      WHERE id_karyawan_pengganti = ?1 AND tanggal_tugas = ?2
+    );"#;
+
+/// Log milik SATU baris import (kembar `SQL_HAPUS_LOG_IMPORT` di
+/// `services/history-mutation.ts`). Dulu semua log import orang itu pada
+/// tanggal itu ikut dihapus. Log mode pengganti merujuk ID backup dan log
+/// import lama berreferensi kosong; keduanya dicocokkan lewat jamnya.
+pub(crate) const SQL_HAPUS_LOG_IMPORT: &str = r#"
+  DELETE FROM log_scan
+  WHERE id_referensi = ?1
+     OR (sumber_data IN ('Import Offline', 'Import Manual')
+         AND id_karyawan = ?2 AND tanggal_kerja = ?3
+         AND (COALESCE(id_referensi, '') = ''
+              OR id_referensi IN (
+                SELECT id_backup FROM backup_karyawan
+                WHERE id_karyawan_pengganti = ?2 AND tanggal_tugas = ?3))
+         AND ((jenis_scan = 'Masuk' AND ?4 <> '' AND substr(jam_scan, 1, 5) = substr(?4, 1, 5))
+           OR (jenis_scan = 'Pulang' AND ?5 <> '' AND substr(jam_scan, 1, 5) = substr(?5, 1, 5))));"#;
+
+/// Penugasan aktif yang bentrok dengan penugasan baru, kembar
+/// `SQL_BENTROK_BACKUP` di `services/backup.ts`.
+const SQL_BENTROK_BACKUP: &str = r#"
+  SELECT id_backup, id_karyawan_asal FROM backup_karyawan
+  WHERE tanggal_tugas = ?1 AND status_tugas = 'Aktif'
+    AND (id_karyawan_asal = ?2 OR id_karyawan_asal = ?3 OR id_karyawan_pengganti = ?3)
+  ORDER BY (id_karyawan_asal = ?2) DESC, (id_karyawan_asal = ?3) DESC
+  LIMIT 1;"#;
+
 /// Aturan jam kerja shift `(jam_masuk, jam_pulang, jam_kerja_normal,
 /// istirahat, offset_istirahat)` untuk perhitungan ulang jalur admin.
 type ShiftClockRules = (String, String, i64, i64, i64);
@@ -521,33 +694,23 @@ pub fn create_correction(
     draft: &Value,
     operator: &str,
 ) -> Result<Value, CommandError> {
-    const TYPES: &[&str] = &[
-        "Sakit",
-        "Izin",
-        "Dispen",
-        "Alfa",
-        "Lupa Absen Masuk",
-        "Lupa Absen Pulang",
-        "Kendala Sistem - Jam Masuk",
-        "Kendala Sistem - Jam Pulang",
-        "Terlambat",
-    ];
     let date_raw = text(draft, "tanggal");
     let date = normalize_date(&date_raw);
     let employee_key = text(draft, "id_karyawan");
     let correction_type = text(draft, "jenis_koreksi");
     let correction_time = text(draft, "jam_koreksi");
-    let needs_time = !matches!(correction_type, "Sakit" | "Izin" | "Dispen" | "Alfa");
-    if date.len() != 10
-        || employee_key.is_empty()
-        || !TYPES.contains(&correction_type)
-        || (needs_time && correction_time.len() != 5)
-    {
-        return Err(CommandError::new(
-            "OPERATIONAL_VALIDATION_FAILED",
-            "Data Koreksi Admin tidak valid.",
-        ));
-    }
+    validasi_koreksi(&date, employee_key, correction_type, correction_time, &hari_ini_wib())
+        .map_err(|pesan| CommandError::new("OPERATIONAL_VALIDATION_FAILED", pesan))?;
+    // Gateway mengirim angka; dulu hanya string yang terbaca, sehingga pilihan
+    // shift di formulir tidak pernah sampai ke sini.
+    let explicit_shift = draft
+        .get("id_shift")
+        .and_then(|value| {
+            value
+                .as_i64()
+                .or_else(|| value.as_str().and_then(|s| s.trim().parse().ok()))
+        })
+        .filter(|id| *id > 0);
     let client_id = sync::ensure_client_id(state)?;
     let event_id = sync::new_event_id(&client_id, "correction", "create");
     let reference = format!(
@@ -570,6 +733,22 @@ pub fn create_correction(
         .ok_or_else(|| CommandError::new("OPERATIONAL_NOT_FOUND", "Personil tidak ditemukan."))?;
     let (employee_id, name, division, normal_shift) = employee;
 
+    if let Some(id) = explicit_shift {
+        let ada: bool = transaction
+            .query_row(
+                "SELECT EXISTS(SELECT 1 FROM tbl_shift WHERE id_shift = ?);",
+                [id],
+                |row| row.get(0),
+            )
+            .map_err(|_| CommandError::internal())?;
+        if !ada {
+            return Err(CommandError::new(
+                "OPERATIONAL_VALIDATION_FAILED",
+                format!("Shift #{id} tidak ditemukan."),
+            ));
+        }
+    }
+
     let backup: Option<(String, String, String, i64)> = transaction
         .query_row(
             "SELECT id_backup, id_karyawan_asal, id_karyawan_pengganti, id_shift_backup FROM backup_karyawan WHERE tanggal_tugas = ? AND status_tugas = 'Aktif' AND (id_karyawan_asal = ? OR id_karyawan_pengganti = ?) LIMIT 1;",
@@ -588,19 +767,18 @@ pub fn create_correction(
 
     let (mode, backup_id, original_id, shift_id, session_id) = if let Some(b) = backup {
         let backup_shift_id = b.3;
-        let explicit_shift = text(draft, "id_shift").parse::<i64>().ok();
         let explicit_mode = text(draft, "mode_tugas");
 
         let (m, b_id, o_id, s_id) = if explicit_mode == "PENGGANTI"
             || explicit_shift == Some(backup_shift_id)
         {
             ("PENGGANTI".to_owned(), b.0, b.1, backup_shift_id)
-        } else if explicit_mode == "NORMAL" || explicit_shift == Some(normal_shift) {
+        } else if explicit_mode == "NORMAL" || explicit_shift.is_some() {
             (
                 "NORMAL".to_owned(),
                 String::new(),
                 String::new(),
-                normal_shift,
+                explicit_shift.unwrap_or(normal_shift),
             )
         } else {
             let backup_shift_cfg: Option<(String, String, i64, i64, i64, i64)> = transaction
@@ -671,15 +849,13 @@ pub fn create_correction(
         };
         (m, b_id, o_id, s_id, s_id_str)
     } else {
+        let s_id = explicit_shift.unwrap_or(normal_shift);
         (
             "NORMAL".to_owned(),
             String::new(),
             String::new(),
-            normal_shift,
-            format!(
-                "NORMAL-{}-{employee_id}-{normal_shift}",
-                date.replace('-', "")
-            ),
+            s_id,
+            format!("NORMAL-{}-{employee_id}-{s_id}", date.replace('-', "")),
         )
     };
 
@@ -708,7 +884,7 @@ pub fn create_correction(
             .optional()
             .map_err(|_| CommandError::internal())?;
         if let Some(u) = unclosed {
-            (u.1, u.3, u.4, u.2, u.0, u.5)
+            (u.1, u.3, u.4, explicit_shift.unwrap_or(u.2), u.0, u.5)
         } else if is_checkout {
             let prev_date: String = transaction
                 .query_row("SELECT date(?, '-1 day');", [&date], |row| row.get(0))
@@ -722,7 +898,7 @@ pub fn create_correction(
                 .optional()
                 .map_err(|_| CommandError::internal())?;
             if let Some(uy) = unclosed_yesterday {
-                (uy.1, uy.3, uy.4, uy.2, uy.0, uy.5)
+                (uy.1, uy.3, uy.4, explicit_shift.unwrap_or(uy.2), uy.0, uy.5)
             } else {
                 (mode, backup_id, original_id, shift_id, session_id, date)
             }
@@ -846,7 +1022,6 @@ pub fn create_correction(
     );
 
     // Smart Shift Detection jika jam koreksi berada di luar shift saat ini dan id_shift tidak dipilih eksplisit
-    let explicit_shift = text(draft, "id_shift").parse::<i64>().ok();
     // Shift fleksibel (00:00-23:59) tidak punya rentang jadwal, jadi jam koreksi
     // apa pun sah. Tanpa pengecualian ini shift karyawan dianggap "tidak cocok"
     // lalu diam-diam dipindahkan ke shift reguler oleh deteksi di bawah.
@@ -1294,7 +1469,7 @@ pub fn create_backup(
         .get("id_shift_backup")
         .and_then(Value::as_i64)
         .unwrap_or_default();
-    if date.len() != 10
+    if !super::inventory::is_valid_date(&date)
         || original_key.is_empty()
         || replacement_key.is_empty()
         || backup_shift == 0
@@ -1330,6 +1505,47 @@ pub fn create_backup(
             "Personil asal dan pengganti tidak boleh sama.",
         ));
     }
+    let shift_ada: bool = transaction
+        .query_row(
+            "SELECT EXISTS(SELECT 1 FROM tbl_shift WHERE id_shift = ?);",
+            [backup_shift],
+            |row| row.get(0),
+        )
+        .map_err(|_| CommandError::internal())?;
+    if !shift_ada {
+        return Err(CommandError::new(
+            "OPERATIONAL_VALIDATION_FAILED",
+            "Gagal: Shift backup tidak ditemukan.",
+        ));
+    }
+    // Cermin `SQL_BENTROK_BACKUP` di services/backup.ts, pesan dan urutannya sama.
+    let bentrok: Option<(String, String)> = transaction
+        .query_row(
+            SQL_BENTROK_BACKUP,
+            params![date, original.0, replacement.0],
+            |row| Ok((row.get(0)?, row.get(1)?)),
+        )
+        .optional()
+        .map_err(|_| CommandError::internal())?;
+    if let Some((id_bentrok, asal_bentrok)) = bentrok {
+        let pesan = if asal_bentrok == original.0 {
+            format!(
+                "Gagal: Sudah ada penugasan backup aktif untuk '{}' pada tanggal {date}. (ID: {id_bentrok})",
+                original.1
+            )
+        } else if asal_bentrok == replacement.0 {
+            format!(
+                "Gagal: Personil pengganti '{}' sendiri sedang digantikan pada tanggal {date}. (ID: {id_bentrok})",
+                replacement.1
+            )
+        } else {
+            format!(
+                "Gagal: '{}' sudah menjadi pengganti di penugasan lain pada tanggal {date}. (ID: {id_bentrok})",
+                replacement.1
+            )
+        };
+        return Err(CommandError::new("OPERATIONAL_CONFLICT", pesan));
+    }
     let now: String = transaction
         .query_row(
             "SELECT strftime('%Y-%m-%d %H:%M:%S','now','+7 hours');",
@@ -1355,7 +1571,7 @@ pub fn create_backup(
     transaction.execute(
         "INSERT INTO backup_karyawan (id_backup, tanggal_tugas, id_karyawan_asal, nama_karyawan_asal, divisi_asal, id_shift_asal, id_karyawan_pengganti, nama_karyawan_pengganti, divisi_pengganti, id_shift_normal_pengganti, id_shift_backup, alasan_backup, status_tugas, kode_operator, waktu_input, catatan) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Aktif', ?, ?, ?);",
         params![id, date, original.0, original.1, original.2, original.3, replacement.0, replacement.1, replacement.2, replacement.3, backup_shift, reason, operator, now, text(draft, "catatan")],
-    ).map_err(|error| CommandError::new("OPERATIONAL_CONFLICT", format!("Penugasan backup tidak dapat disimpan: {error}")))?;
+    ).map_err(|_| CommandError::new("OPERATIONAL_CONFLICT", "Penugasan backup tidak dapat disimpan."))?;
     sync::enqueue(
         &transaction,
         &client_id,
@@ -1506,12 +1722,16 @@ pub fn import_offline(
     // notifikasinya yang dibatasi.
     let mut notif_diantre: usize = 0;
     let mut notif_dibatasi = false;
+    let hari_ini = hari_ini_wib();
     for row in rows {
         let date_raw = text(row, "tanggal");
         let date = normalize_date(&date_raw);
         let employee_key = text(row, "id_unik");
-        let check_in_time = text(row, "jam_masuk");
-        let check_out_time = text(row, "jam_pulang");
+        let hadir = matches!(text(row, "status_kehadiran"), "" | "Hadir");
+        // Hari bukan Hadir tidak punya jam: jam yang terbawa dari formulir
+        // dulu tersimpan sebagai `jam_kerja` dan ikut digaji.
+        let check_in_time = if hadir { text(row, "jam_masuk") } else { "" };
+        let check_out_time = if hadir { text(row, "jam_pulang") } else { "" };
         let event_id = sync::new_event_id(&client_id, "offline-import", "row");
         let event_key = format!("IMP-{}", event_id[4..20].to_uppercase());
         let mut connection = storage::database(&state.data_dir)?;
@@ -1519,15 +1739,16 @@ pub fn import_offline(
             .transaction()
             .map_err(|_| CommandError::internal())?;
         let process = (|| -> Result<Value, CommandError> {
-            if date.len() != 10
-                || employee_key.is_empty()
-                || (check_in_time.is_empty() && check_out_time.is_empty())
-            {
-                return Err(CommandError::new(
-                    "OPERATIONAL_VALIDATION_FAILED",
-                    "Tanggal, ID, atau jam import tidak valid.",
-                ));
-            }
+            validasi_baris_import(
+                &date,
+                employee_key,
+                text(row, "jam_masuk"),
+                text(row, "jam_pulang"),
+                text(row, "status_kehadiran"),
+                text(row, "status_absen"),
+                &hari_ini,
+            )
+            .map_err(|pesan| CommandError::new("OPERATIONAL_VALIDATION_FAILED", pesan))?;
             let employee = transaction
                 .query_row(
                     "SELECT id_unik, nama, divisi, id_shift FROM master_data WHERE (id_unik = ? OR kode_karyawan = ?) AND status_aktif = 'Aktif' LIMIT 1;",
@@ -1785,7 +2006,9 @@ pub fn import_offline(
                 .and_then(|r| r.6.clone())
                 .unwrap_or_default();
 
-            let check_in = if check_in_time.is_empty() {
+            let check_in = if !hadir {
+                String::new()
+            } else if check_in_time.is_empty() {
                 existing_in.clone()
             } else {
                 format!(
@@ -1818,11 +2041,9 @@ pub fn import_offline(
             };
 
             let is_overnight_shift = to_min(&shift.1) < to_min(&shift.0);
-            let existing_in_clock = if existing_in.len() >= 16 {
-                &existing_in[11..16]
-            } else {
-                ""
-            };
+            // `get` dan bukan `[11..16]`: potongan per byte panik pada teks
+            // non-ASCII, dan Mobile memakai `panic = "abort"`.
+            let existing_in_clock = existing_in.get(11..16).unwrap_or("");
             let out_date: String = if is_overnight_shift
                 || (!check_in_time.is_empty()
                     && !check_out_time.is_empty()
@@ -1838,7 +2059,9 @@ pub fn import_offline(
                 date.clone()
             };
 
-            let check_out = if check_out_time.is_empty() {
+            let check_out = if !hadir {
+                String::new()
+            } else if check_out_time.is_empty() {
                 existing_out
             } else {
                 format!(
@@ -1935,7 +2158,9 @@ pub fn import_offline(
             );
             let (late, early, worked) =
                 (recalc.late_minutes, recalc.early_minutes, recalc.work_minutes);
-            let record_status = if !text(row, "status_absen").is_empty() {
+            let record_status = if !hadir {
+                "Tidak Hadir"
+            } else if !text(row, "status_absen").is_empty() {
                 text(row, "status_absen")
             } else if !check_in.is_empty() && !check_out.is_empty() {
                 "Lengkap"
@@ -1966,7 +2191,7 @@ pub fn import_offline(
                 "Desember",
             ];
             transaction.execute(
-                "INSERT INTO absensi_harian (id_absensi, tanggal, id_karyawan, nama, kelas_divisi, jam_masuk, jam_pulang, status_kehadiran, status_absen, keterangan, sumber, update_terakhir, menit_terlambat, menit_datang_awal, jam_kerja, lembur, jam_kerja_kurang, id_shift, bulan, tahun, id_sesi, mode_tugas, id_backup, id_karyawan_asal, tanggal_tugas) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Import Offline', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT(id_sesi) DO UPDATE SET jam_masuk = CASE WHEN excluded.jam_masuk != '' THEN excluded.jam_masuk ELSE absensi_harian.jam_masuk END, jam_pulang = CASE WHEN excluded.jam_pulang != '' THEN excluded.jam_pulang ELSE absensi_harian.jam_pulang END, status_kehadiran = excluded.status_kehadiran, status_absen = excluded.status_absen, keterangan = excluded.keterangan, sumber = 'Import Offline', update_terakhir = excluded.update_terakhir, menit_terlambat = excluded.menit_terlambat, menit_datang_awal = excluded.menit_datang_awal, jam_kerja = excluded.jam_kerja, lembur = excluded.lembur, jam_kerja_kurang = excluded.jam_kerja_kurang;",
+                "INSERT INTO absensi_harian (id_absensi, tanggal, id_karyawan, nama, kelas_divisi, jam_masuk, jam_pulang, status_kehadiran, status_absen, keterangan, sumber, update_terakhir, menit_terlambat, menit_datang_awal, jam_kerja, lembur, jam_kerja_kurang, id_shift, bulan, tahun, id_sesi, mode_tugas, id_backup, id_karyawan_asal, tanggal_tugas) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Import Offline', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT(id_sesi) DO UPDATE SET jam_masuk = CASE WHEN excluded.status_kehadiran <> 'Hadir' THEN '' WHEN excluded.jam_masuk != '' THEN excluded.jam_masuk ELSE absensi_harian.jam_masuk END, jam_pulang = CASE WHEN excluded.status_kehadiran <> 'Hadir' THEN '' WHEN excluded.jam_pulang != '' THEN excluded.jam_pulang ELSE absensi_harian.jam_pulang END, status_kehadiran = excluded.status_kehadiran, status_absen = excluded.status_absen, keterangan = excluded.keterangan, sumber = 'Import Offline', update_terakhir = excluded.update_terakhir, menit_terlambat = excluded.menit_terlambat, menit_datang_awal = excluded.menit_datang_awal, jam_kerja = excluded.jam_kerja, lembur = excluded.lembur, jam_kerja_kurang = excluded.jam_kerja_kurang;",
                 params![sync::new_local_id(), &date, id, name, division, check_in, check_out, attendance_status, record_status, text(row, "keterangan"), now, late, early, worked, recalc.overtime_minutes, recalc.shortage_minutes, shift_id, months.get(month.saturating_sub(1) as usize).unwrap_or(&"Januari"), year, session_id, mode, backup_id, original_id, if mode == "PENGGANTI" { &date } else { "" }],
             ).map_err(|_| CommandError::internal())?;
             let attendance = attendance_json(&transaction, &session_id)?;
@@ -2539,16 +2764,16 @@ pub fn delete_correction(
         .transaction()
         .map_err(|_| CommandError::internal())?;
 
-    let row: Option<(String, String, String)> = transaction
+    let row: Option<(String, String, String, String)> = transaction
         .query_row(
-            "SELECT id_karyawan, tanggal, nama FROM koreksi_admin WHERE id_referensi = ? LIMIT 1;",
+            "SELECT id_karyawan, tanggal, nama, jenis_koreksi FROM koreksi_admin WHERE id_referensi = ? LIMIT 1;",
             params![id_referensi],
-            |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)),
+            |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?)),
         )
         .optional()
         .map_err(|_| CommandError::internal())?;
 
-    let Some((id_karyawan, tanggal, nama)) = row else {
+    let Some((id_karyawan, tanggal, nama, jenis_koreksi)) = row else {
         return Err(CommandError::new(
             "OPERATIONAL_NOT_FOUND",
             "Data koreksi admin tidak ditemukan.",
@@ -2576,6 +2801,13 @@ pub fn delete_correction(
             params![id_referensi],
         )
         .map_err(|_| CommandError::internal())?;
+    let jenis_scan = jenis_scan_koreksi(&jenis_koreksi).to_owned();
+    transaction
+        .execute(
+            SQL_HAPUS_LOG_KOREKSI_PENGGANTI,
+            params![id_karyawan, tanggal, jenis_scan],
+        )
+        .map_err(|_| CommandError::internal())?;
 
     rebuild_attendance_from_logs(
         &transaction,
@@ -2600,7 +2832,11 @@ pub fn delete_correction(
         "correction",
         "delete",
         id_referensi,
-        &json!({ "id_referensi": id_referensi }),
+        // `log_koreksi` membuat cloud ikut menghapus log mode pengganti.
+        &json!({
+            "id_referensi": id_referensi,
+            "log_koreksi": { "id_karyawan": id_karyawan, "tanggal_kerja": tanggal, "jenis_scan": jenis_scan },
+        }),
         current_revision,
     )?;
 
@@ -3070,16 +3306,17 @@ pub fn delete_import_offline(
         .transaction()
         .map_err(|_| CommandError::internal())?;
 
-    let current: Option<(String, String, String)> = transaction
+    type ImportRow = (String, String, String, String, String, String);
+    let current: Option<ImportRow> = transaction
         .query_row(
-            "SELECT id_unik, tanggal, COALESCE(nama, '') FROM import_offline WHERE event_key = ? LIMIT 1;",
+            "SELECT id_unik, tanggal, COALESCE(nama, ''), COALESCE(jam_masuk, ''), COALESCE(jam_pulang, ''), COALESCE(status_proses, '') FROM import_offline WHERE event_key = ? LIMIT 1;",
             params![event_key],
-            |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)),
+            |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?, r.get(4)?, r.get(5)?)),
         )
         .optional()
         .map_err(|_| CommandError::internal())?;
 
-    let Some((id_unik, tanggal, nama)) = current else {
+    let Some((id_unik, tanggal, nama, jam_masuk, jam_pulang, status_proses)) = current else {
         return Err(CommandError::new(
             "OPERATIONAL_NOT_FOUND",
             "Data import offline tidak ditemukan.",
@@ -3101,21 +3338,25 @@ pub fn delete_import_offline(
         )
         .map_err(|_| CommandError::internal())?;
 
-    transaction
-        .execute(
-            "DELETE FROM log_scan WHERE id_referensi = ? OR (id_karyawan = ? AND tanggal_kerja = ? AND sumber_data = 'Import Offline');",
-            params![event_key, id_unik, tanggal],
-        )
-        .map_err(|_| CommandError::internal())?;
+    // Baris "Gagal" (tertarik dari Web) tidak pernah menulis absensi maupun log.
+    let pernah_diterapkan = status_proses != "Gagal";
+    if pernah_diterapkan {
+        transaction
+            .execute(
+                SQL_HAPUS_LOG_IMPORT,
+                params![event_key, id_unik, tanggal, jam_masuk, jam_pulang],
+            )
+            .map_err(|_| CommandError::internal())?;
 
-    rebuild_attendance_from_logs(
-        &transaction,
-        &client_id,
-        &id_unik,
-        &tanggal,
-        &now,
-        LogRemoval::Import,
-    )?;
+        rebuild_attendance_from_logs(
+            &transaction,
+            &client_id,
+            &id_unik,
+            &tanggal,
+            &now,
+            LogRemoval::Import,
+        )?;
+    }
 
     transaction
         .execute(
@@ -3131,7 +3372,15 @@ pub fn delete_import_offline(
         "offline-import",
         "delete",
         event_key,
-        &json!({ "event_key": event_key }),
+        // `log_import` membuat cloud menghapus log mode pengganti dan log lama
+        // berreferensi kosong milik baris ini saja.
+        &json!({
+            "event_key": event_key,
+            "log_import": pernah_diterapkan.then(|| json!({
+                "id_karyawan": id_unik, "tanggal_kerja": tanggal,
+                "jam_masuk": jam_masuk, "jam_pulang": jam_pulang,
+            })),
+        }),
         current_revision,
     )?;
 
@@ -4016,5 +4265,254 @@ INSERT INTO hari_libur_whitelist (id, scope_type, scope_value, tanggal_libur, ke
             .execute("DELETE FROM absensi_harian WHERE id_backup = ?;", [&id_backup])
             .expect("lepas absensi");
         delete_backup(&state, &id_backup, "SPD001").expect("backup tanpa absensi boleh dihapus");
+    }
+
+    /// Vektor yang sama dengan `src/lib/validations/operational.test.ts`.
+    #[test]
+    fn validasi_operasional_vektor_kembar() {
+        const HARI_INI: &str = "2026-10-23";
+        let masa_depan = "Tanggal 2026-10-24 belum terjadi; absensi berjam hanya boleh untuk hari ini atau sebelumnya.";
+        let koreksi = |tanggal: &str, jenis: &str, jam: &str| {
+            super::validasi_koreksi(tanggal, "K001", jenis, jam, HARI_INI).err()
+        };
+        assert_eq!(koreksi("2026-10-20", "Lupa Absen Masuk", "07:10"), None);
+        assert_eq!(
+            koreksi("2026-02-30", "Lupa Absen Masuk", "07:10").as_deref(),
+            Some("Data Koreksi Admin tidak valid.")
+        );
+        assert_eq!(
+            koreksi("2026-10-20", "Cuti", "07:10").as_deref(),
+            Some("Data Koreksi Admin tidak valid.")
+        );
+        assert_eq!(
+            koreksi("2026-10-20", "Lupa Absen Masuk", "").as_deref(),
+            Some("Jenis koreksi 'Lupa Absen Masuk' wajib menyertakan jam koreksi (HH:mm).")
+        );
+        for jam in ["99:99", "7:10"] {
+            assert_eq!(
+                koreksi("2026-10-20", "Lupa Absen Masuk", jam).as_deref(),
+                Some("Jam koreksi harus berformat HH:mm.")
+            );
+        }
+        assert_eq!(
+            koreksi("2026-10-24", "Lupa Absen Masuk", "07:10").as_deref(),
+            Some(masa_depan)
+        );
+        assert_eq!(koreksi("2026-10-24", "Sakit", ""), None);
+
+        let baris = |tanggal: &str, id: &str, masuk: &str, pulang: &str, status: &str, absen: &str| {
+            super::validasi_baris_import(tanggal, id, masuk, pulang, status, absen, HARI_INI).err()
+        };
+        assert_eq!(baris("2026-10-20", "K001", "07:00", "15:00:00", "Hadir", ""), None);
+        assert_eq!(
+            baris("2026-10-20", "", "07:00", "15:00:00", "Hadir", "").as_deref(),
+            Some("Tanggal atau ID tidak valid.")
+        );
+        assert_eq!(
+            baris("2026-10-20", "K001", "07:00", "15:00:00", "hadir", "").as_deref(),
+            Some("Status kehadiran 'hadir' tidak dikenal.")
+        );
+        assert_eq!(
+            baris("2026-10-20", "K001", "07:00", "15:00:00", "Hadir", "Cuti").as_deref(),
+            Some("Status absen 'Cuti' tidak dikenal.")
+        );
+        for masuk in ["", "07:0é"] {
+            let pulang = if masuk.is_empty() { "" } else { "15:00:00" };
+            assert_eq!(
+                baris("2026-10-20", "K001", masuk, pulang, "Hadir", "").as_deref(),
+                Some("Jam masuk/pulang tidak valid.")
+            );
+        }
+        assert_eq!(
+            baris("2026-10-24", "K001", "07:00", "15:00:00", "Hadir", "").as_deref(),
+            Some(masa_depan)
+        );
+        assert_eq!(baris("2026-10-20", "K001", "garbage", "", "Sakit", ""), None);
+        assert_eq!(baris("2026-10-24", "K001", "07:00", "15:00:00", "Izin", ""), None);
+    }
+
+    #[test]
+    fn import_bukan_hadir_tanpa_jam_dan_tanggal_mendatang_ditolak() {
+        let (_directory, state) = fixture();
+        let hasil = import_offline(
+            &state,
+            &[
+                json!({ "tanggal": "2026-08-20", "id_unik": "K001", "jam_masuk": "07:00", "jam_pulang": "15:00", "status_kehadiran": "Sakit", "status_absen": "Lengkap" }),
+                json!({ "tanggal": "2099-01-01", "id_unik": "K002", "jam_masuk": "07:00", "status_kehadiran": "Hadir" }),
+            ],
+            "SPD001",
+        )
+        .expect("import offline");
+        assert_eq!(hasil["berhasil"], 1, "{hasil}");
+        assert!(hasil["results"][1]["pesan"]
+            .as_str()
+            .unwrap_or("")
+            .contains("belum terjadi"));
+
+        let connection = storage::database(&state.data_dir).expect("db");
+        let (masuk, pulang, kerja, absen): (String, String, i64, String) = connection
+            .query_row(
+                "SELECT jam_masuk, jam_pulang, jam_kerja, status_absen FROM absensi_harian WHERE id_karyawan = 'K001' AND tanggal = '2026-08-20';",
+                [],
+                |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?)),
+            )
+            .expect("baris absensi");
+        assert_eq!((masuk.as_str(), pulang.as_str(), kerja, absen.as_str()), ("", "", 0, "Tidak Hadir"));
+        let log: i64 = connection
+            .query_row(
+                "SELECT COUNT(*) FROM log_scan WHERE id_karyawan = 'K001' AND tanggal_kerja = '2026-08-20';",
+                [],
+                |row| row.get(0),
+            )
+            .expect("log");
+        assert_eq!(log, 0);
+    }
+
+    #[test]
+    fn hapus_import_hanya_menghapus_log_barisnya_sendiri() {
+        let (_directory, state) = fixture();
+        let masuk = import_offline(
+            &state,
+            &[json!({ "tanggal": "2026-08-21", "id_unik": "K001", "jam_masuk": "07:00" })],
+            "SPD001",
+        )
+        .expect("import masuk");
+        let pulang = import_offline(
+            &state,
+            &[json!({ "tanggal": "2026-08-21", "id_unik": "K001", "jam_pulang": "15:00" })],
+            "SPD001",
+        )
+        .expect("import pulang");
+        assert_eq!((masuk["berhasil"].clone(), pulang["berhasil"].clone()), (json!(1), json!(1)));
+        {
+            // Baris "Gagal" hasil tarikan dari Web.
+            let connection = storage::database(&state.data_dir).expect("db");
+            connection
+                .execute_batch(
+                    "INSERT INTO import_offline (id_import, event_key, timestamp_input, tanggal, id_unik, nama, divisi, jam_masuk, jam_pulang, status_kehadiran, status_absen, keterangan, status_proses, diproses_pada, pesan_error, kode_operator) VALUES (90001, 'IMP-GAGAL', '2026-08-21 08:00:00', '2026-08-21', 'K001', 'Karyawan Test', 'Dapur', '99:99', '', 'Hadir', '', '', 'Gagal', '2026-08-21 08:00:00', 'Jam masuk/pulang tidak valid.', 'SPD001');",
+                )
+                .expect("seed gagal");
+        }
+        let jam = |state: &DesktopState| -> (String, String) {
+            let connection = storage::database(&state.data_dir).expect("db");
+            connection
+                .query_row(
+                    "SELECT COALESCE(jam_masuk, ''), COALESCE(jam_pulang, '') FROM absensi_harian WHERE id_karyawan = 'K001' AND tanggal = '2026-08-21';",
+                    [],
+                    |row| Ok((row.get(0)?, row.get(1)?)),
+                )
+                .expect("absensi")
+        };
+        super::delete_import_offline(&state, "IMP-GAGAL", "SPD001").expect("hapus gagal");
+        let (m, p) = jam(&state);
+        assert!(m.contains("07:00") && p.contains("15:00"), "{m} / {p}");
+
+        let event_pulang = pulang["results"][0]["eventKey"].as_str().expect("event").to_owned();
+        super::delete_import_offline(&state, &event_pulang, "SPD001").expect("hapus pulang");
+        let (m, p) = jam(&state);
+        assert!(m.contains("07:00"), "jam masuk import lain harus bertahan: {m}");
+        assert_eq!(p, "");
+    }
+
+    #[test]
+    fn hapus_koreksi_pengganti_membatalkan_efeknya_dan_dikirim_ke_cloud() {
+        let (_directory, state) = fixture();
+        create_backup(
+            &state,
+            &json!({ "tanggal_tugas": "2026-08-15", "id_karyawan_asal": "K001", "id_karyawan_pengganti": "K002", "id_shift_backup": 2 }),
+            "SPD001",
+        )
+        .expect("backup");
+        let koreksi = create_correction(
+            &state,
+            &json!({ "tanggal": "2026-08-15", "id_karyawan": "K002", "jenis_koreksi": "Lupa Absen Masuk", "jam_koreksi": "15:00" }),
+            "SPD001",
+        )
+        .expect("koreksi");
+        let reference = koreksi["id_referensi"].as_str().expect("referensi").to_owned();
+        super::delete_correction(&state, &reference, "SPD001").expect("hapus koreksi");
+
+        let connection = storage::database(&state.data_dir).expect("db");
+        let (absensi, log): (i64, i64) = connection
+            .query_row(
+                "SELECT (SELECT COUNT(*) FROM absensi_harian WHERE id_karyawan = 'K002' AND tanggal = '2026-08-15'), (SELECT COUNT(*) FROM log_scan WHERE id_karyawan = 'K002' AND tanggal_kerja = '2026-08-15');",
+                [],
+                |row| Ok((row.get(0)?, row.get(1)?)),
+            )
+            .expect("hitung");
+        assert_eq!((absensi, log), (0, 0));
+        let payload: String = connection
+            .query_row(
+                "SELECT payload_json FROM desktop_sync_outbox WHERE domain = 'correction' AND operation = 'delete' AND entity_key = ?;",
+                [&reference],
+                |row| row.get(0),
+            )
+            .expect("outbox hapus koreksi");
+        assert!(payload.contains("\"jenis_scan\":\"Masuk\""), "{payload}");
+    }
+
+    #[test]
+    fn shift_pilihan_admin_dipakai_dan_shift_tidak_ada_ditolak() {
+        let (_directory, state) = fixture();
+        create_correction(
+            &state,
+            &json!({ "tanggal": "2026-08-16", "id_karyawan": "K001", "jenis_koreksi": "Lupa Absen Masuk", "jam_koreksi": "15:10", "id_shift": 2 }),
+            "SPD001",
+        )
+        .expect("koreksi shift 2");
+        let connection = storage::database(&state.data_dir).expect("db");
+        let id_sesi: String = connection
+            .query_row(
+                "SELECT id_sesi FROM absensi_harian WHERE id_karyawan = 'K001' AND tanggal = '2026-08-16';",
+                [],
+                |row| row.get(0),
+            )
+            .expect("sesi");
+        assert_eq!(id_sesi, "NORMAL-20260816-K001-2");
+
+        let galat = create_correction(
+            &state,
+            &json!({ "tanggal": "2026-08-16", "id_karyawan": "K001", "jenis_koreksi": "Lupa Absen Masuk", "jam_koreksi": "07:10", "id_shift": 77 }),
+            "SPD001",
+        )
+        .expect_err("shift 77 tidak ada");
+        assert_eq!(galat.message, "Shift #77 tidak ditemukan.");
+    }
+
+    #[test]
+    fn backup_bentrok_dan_shift_tidak_ada_ditolak() {
+        let (_directory, state) = fixture();
+        {
+            let connection = storage::database(&state.data_dir).expect("db");
+            connection
+                .execute_batch(
+                    "INSERT INTO master_data (id_unik, kode_karyawan, nama, divisi, id_shift, status_aktif) VALUES ('K003', 'K003', 'Karyawan Ketiga', 'Dapur', 1, 'Aktif');",
+                )
+                .expect("seed K003");
+        }
+        let buat = |asal: &str, pengganti: &str, shift: i64| {
+            create_backup(
+                &state,
+                &json!({ "tanggal_tugas": "2026-08-25", "id_karyawan_asal": asal, "id_karyawan_pengganti": pengganti, "id_shift_backup": shift }),
+                "SPD001",
+            )
+        };
+        assert_eq!(
+            buat("K001", "K002", 77).expect_err("shift tidak ada").message,
+            "Gagal: Shift backup tidak ditemukan."
+        );
+        buat("K001", "K002", 2).expect("backup pertama");
+        assert!(buat("K001", "K003", 2)
+            .expect_err("asal sudah digantikan")
+            .message
+            .contains("Sudah ada penugasan backup aktif"));
+        assert!(buat("K003", "K002", 2)
+            .expect_err("pengganti dobel")
+            .message
+            .contains("sudah menjadi pengganti"));
+        assert!(buat("K003", "K001", 2)
+            .expect_err("pengganti sedang digantikan")
+            .message
+            .contains("sendiri sedang digantikan"));
     }
 }
