@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import { DashboardInsights } from "@/components/dashboard/DashboardInsights";
+import { EksporLaporanKehadiran } from "@/components/dashboard/EksporLaporanKehadiran";
 import { MobileAppShell } from "@/components/MobileAppShell";
 import { HubGroupLabel, HubRow } from "@/components/ui/HubRow";
 import { Icon } from "@/components/ui/Icon";
@@ -22,6 +23,7 @@ export default function DashboardPage() {
   const router = useRouter();
 
   const canViewMetrics = hasPermission(user, "dashboard.view");
+  const canExport = canViewMetrics && hasPermission(user, "dashboard.export");
   const canViewHome = canAccessArea(user, "home");
   const canViewScanner = canAccessArea(user, "scanner");
   const canViewHistory = canAccessArea(user, "history");
@@ -52,6 +54,8 @@ export default function DashboardPage() {
   const [recentScans, setRecentScans] = useState<Record<string, unknown>[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [eksporTerbuka, setEksporTerbuka] = useState(false);
+  const [pesanEkspor, setPesanEkspor] = useState<string | null>(null);
 
   useEffect(() => {
     if (!authLoading && !isAuthenticated) {
@@ -105,6 +109,34 @@ export default function DashboardPage() {
             persentase={metrics?.persentaseKehadiran ?? 0}
             isLoading={isLoading}
             onRefresh={loadData}
+          />
+        ) : null}
+
+        {canExport ? (
+          <button
+            type="button"
+            onClick={() => {
+              setPesanEkspor(null);
+              setEksporTerbuka(true);
+            }}
+            className="flex min-h-11 items-center justify-center gap-2 rounded-2xl border border-emerald-400/30 bg-emerald-400/10 px-4 py-3 text-sm font-semibold text-emerald-100"
+          >
+            <Icon name="document" className="size-4" />
+            Ekspor Laporan Kehadiran (Excel)
+          </button>
+        ) : null}
+        {pesanEkspor ? (
+          <output className="rounded-2xl border border-emerald-400/30 bg-emerald-400/10 p-3 text-xs text-emerald-100">
+            {pesanEkspor}
+          </output>
+        ) : null}
+        {eksporTerbuka ? (
+          <EksporLaporanKehadiran
+            onClose={() => setEksporTerbuka(false)}
+            onTersimpan={(namaBerkas) => {
+              setEksporTerbuka(false);
+              setPesanEkspor(`Laporan Excel tersimpan: ${namaBerkas}`);
+            }}
           />
         ) : null}
 

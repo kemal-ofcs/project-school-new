@@ -1,32 +1,33 @@
 # HASIL.md — hasil `bun run check`
 
-- Waktu: 2026-10-22 20:08 WIB
-- Commit: 92a3102 (+ 1 berkas berubah, belum commit)
+- Waktu: 2026-10-23 14:59 WIB
+- Commit: 69cfcfc (+ 35 berkas berubah, belum commit)
 - Perintah: `bun run check` (root)
-- Exit code: 0
-- Status: **LULUS**
+- Exit code: 1
+- Status: **GAGAL**
 - Log penuh: `.claude/check.log`
 
 ## Gate yang gagal
+
 | Gate | Status |
 | :--- | :--- |
-| `schema-audit` | LULUS |
-| `audit-sync-contract` | LULUS |
-| `audit-sql` | LULUS |
-| `audit-ui-guard` | LULUS |
-| `audit-a11y` | LULUS |
-| `audit-page-guard` | LULUS |
-| `audit-dialog` | LULUS |
-| `audit-route-guard` | LULUS |
-| `audit-confirm` | LULUS |
-| `audit-silent-catch` | LULUS |
-| `audit-list-bound` | LULUS |
-| `web-desktop check` (+ cargo test) | LULUS |
-| `mobile check` (+ cargo test) | LULUS |
-| `web-public check` | LULUS |
+| Audit skema (`schema-audit.ts`) | lulus |
+| Kontrak sinkronisasi (`audit-sync-contract.ts`) | lulus |
+| Audit SQL (`audit-sql.ts`) | lulus |
+| Audit UI guard (`audit-ui-guard.ts`) | lulus |
+| Audit aksesibilitas (`audit-a11y.ts`) | lulus |
+| Audit guard halaman (`audit-page-guard.ts`) | lulus |
+| Audit permukaan dialog (`audit-dialog.ts`) | GAGAL |
+| Audit guard route (`audit-route-guard.ts`) | tidak sempat jalan |
+| Audit konfirmasi (`audit-confirm.ts`) | tidak sempat jalan |
+| Audit penanganan galat (`audit-silent-catch.ts`) | tidak sempat jalan |
+| Audit pembatas daftar (`audit-list-bound.ts`) | tidak sempat jalan |
+| Web-Desktop (lint, typecheck, test, cargo test) | tidak sempat jalan |
+| Mobile (lint, typecheck, test, cargo test) | tidak sempat jalan |
+| Web-Public (lint, typecheck, test) | tidak sempat jalan |
 
 ## Galat (maks 10, urutan kemunculan)
-*(tidak ada)*
+1. `mobile/src/components/ScannerView.tsx:813` — audit-dialog: 1 permukaan dialog buatan tangan (`fixed inset-0` tanpa `role="dialog"`)
 
 ## Catatan
-Seluruh 11 skrip audit integritas skema dan kontrak, linting Biome, typecheck TypeScript, Bun test suite, serta pengujian Rust `cargo test` di workspace `web-desktop` (448 tes), `mobile` (451 tes), dan `web-public` (semua tes) lulus 100% tanpa galat.
+`audit-dialog.ts` mendeteksi overlay layar penuh `fixed inset-0` pada `ScannerView.tsx:813` yang memuat judul tanpa semantik dialog (`role="dialog"` atau `<dialog>`).

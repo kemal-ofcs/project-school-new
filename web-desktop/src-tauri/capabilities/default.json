@@ -6,6 +6,7 @@
   "local": true,
   "permissions": [
     "core:default",
+    "core:window:allow-set-fullscreen",
     "allow-desktop-get-session",
     "allow-desktop-get-runtime-status",
     "allow-desktop-get-license-status",

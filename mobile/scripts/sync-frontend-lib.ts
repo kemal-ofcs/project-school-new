@@ -40,6 +40,9 @@ const filesToCopy = [
   // UI inventaris: satu komponen untuk ketiga build. Hanya bergantung pada
   // kontrak `Modal` yang sama dan gateway tersinkron; pesan sukses/galat ditulis
   // di dalamnya karena `FeedbackBanner` kedua workspace berbeda props.
+  // Ekspor laporan kehadiran per orang × tanggal dari dasbor.
+  "components/dashboard/EksporLaporanKehadiran.tsx",
+  "components/dashboard/laporanKehadiranExcel.ts",
   // Hari kerja shift dan hari libur massal (v50).
   "components/shift/PilihHariKerja.tsx",
   "components/holiday/LiburMassalDialog.tsx",

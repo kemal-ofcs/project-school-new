@@ -1516,6 +1516,18 @@ html.light {
   animation: visual-fade-up 300ms cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
+/* Mode scan /scanner. Kamera berada di top layer selama modal, tetapi turun ke
+   non-modal saat panel foto wajah terbuka; pada saat itu transform sisa animasi
+   di atas dan z-10 <main> akan mengurungnya di bawah HeaderBar. */
+html[data-scan-mode] {
+  overflow: hidden;
+}
+
+html[data-scan-mode] #main-content {
+  animation: none;
+  z-index: auto;
+}
+
 .visual-fade-in {
   animation: visual-fade-up 420ms cubic-bezier(0.22, 1, 0.36, 1) both;
 }

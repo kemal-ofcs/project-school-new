@@ -13,7 +13,9 @@ mock.module("@/lib/db", () => ({
   ensureDbInitialized: async () => {},
 }));
 
-const { rekapPerTanggal } = await import("@/lib/services/report");
+const { getLaporanKehadiran, rekapPerTanggal } = await import(
+  "@/lib/services/report"
+);
 
 /**
  * IDENTIK dengan `FIXTURE_REKAP_PER_TANGGAL` di `administration.rs`, dan angka
@@ -48,9 +50,29 @@ INSERT INTO absensi_harian (
   ('2026-10-06', 'H', 'H', 'X', '', '', 'Hadir', 'Masuk', 'Koreksi Admin', '2026-10-06 09:00:00', 0, 1, 'Oktober', 2026, 'h-06');
 `;
 
+/**
+ * IDENTIK dengan `FIXTURE_LAPORAN_KEHADIRAN` di `administration.rs`. A aktif
+ * (Guru), B nonaktif tetapi punya catatan di rentang, Z nonaktif tanpa
+ * catatan. Libur 8 Oktober nonaktif; whitelist bertanggal 1 November di luar
+ * rentang.
+ */
+const FIXTURE_LAPORAN_KEHADIRAN = `
+INSERT INTO master_data (id_unik, kode_karyawan, nama, divisi, id_shift, status_aktif, jenis_personil) VALUES
+  ('A', 'K-A', 'Ani', 'X', 1, 'Aktif', 'Guru'),
+  ('B', 'K-B', 'Budi', 'X', 1, 'Nonaktif', 'Pegawai'),
+  ('Z', 'K-Z', 'Zaki', 'X', 1, 'Nonaktif', 'Pegawai');
+INSERT INTO tbl_hari_libur (tanggal, nama_libur, status_aktif) VALUES
+  ('2026-10-07', 'Libur Uji', 1),
+  ('2026-10-08', 'Libur Nonaktif', 0);
+INSERT INTO hari_libur_whitelist (id, scope_type, scope_value, tanggal_libur, keterangan, status_aktif) VALUES
+  ('w-semua', 'DIVISI', 'X', NULL, NULL, 1),
+  ('w-luar', 'SHIFT', '1', '2026-11-01', NULL, 1);
+`;
+
 beforeAll(async () => {
   await initDatabaseSchema(client);
   await client.execute(FIXTURE_REKAP_PER_TANGGAL);
+  await client.executeMultiple(FIXTURE_LAPORAN_KEHADIRAN);
 });
 
 afterAll(() => client.close());
@@ -73,5 +95,45 @@ describe("rekap kehadiran per tanggal (jalur Web)", () => {
         alfa: 0,
       },
     ]);
+  });
+});
+
+describe("data laporan kehadiran (jalur Web)", () => {
+  const hari = (id: string, tanggal: string, n: number[]) => ({
+    id,
+    tanggal,
+    hadir: n[0],
+    telat: n[1],
+    sakit: n[2],
+    izin: n[3],
+    dispensasi: n[4],
+    alfa: n[5],
+  });
+
+  test("sesi digabung per hari dan personil disaring, sama dengan Rust", async () => {
+    const hasil = await getLaporanKehadiran("2026-10-05", "2026-10-08");
+    expect(hasil.personil.map((p) => [p.id, p.jenis, p.aktif])).toEqual([
+      ["A", "Guru", 1],
+      ["B", "Pegawai", 0],
+    ]);
+    expect(hasil.hari).toEqual([
+      hari("A", "2026-10-05", [1, 0, 0, 0, 0, 0]),
+      hari("A", "2026-10-06", [1, 10, 0, 0, 0, 0]),
+      hari("B", "2026-10-05", [1, 20, 0, 0, 0, 0]),
+      hari("C", "2026-10-05", [0, 0, 1, 0, 0, 0]),
+      hari("D", "2026-10-05", [0, 0, 0, 0, 1, 0]),
+      hari("E", "2026-10-05", [0, 0, 0, 0, 0, 1]),
+      hari("F", "2026-10-06", [0, 0, 0, 0, 1, 0]),
+      hari("G", "2026-10-06", [1, 0, 0, 0, 0, 1]),
+      hari("H", "2026-10-06", [1, 0, 0, 0, 0, 0]),
+    ]);
+    expect(hasil.libur).toEqual([{ tanggal: "2026-10-07", nama: "Libur Uji" }]);
+    expect(hasil.whitelist.map((w) => w.id)).toEqual(["w-semua"]);
+  });
+
+  test("rentang yang tidak sah ditolak sebelum menyentuh database", async () => {
+    await expect(
+      getLaporanKehadiran("2026-10-01", "2027-01-01"),
+    ).rejects.toThrow("Rentang laporan paling panjang 92 hari.");
   });
 });

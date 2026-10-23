@@ -10,11 +10,13 @@ import {
 import { assertSameOriginMutation } from "@/lib/server/http/request-security";
 import {
   getDashboardMetrics,
+  getLaporanKehadiran,
   getRekapBulanan,
   getRekapHarian,
   getRiwayatScan,
   getTopKaryawanTerajin,
   getTrenMingguan,
+  RentangLaporanError,
 } from "@/lib/services/report";
 
 export const runtime = "nodejs";
@@ -73,6 +75,23 @@ export async function POST(request: NextRequest) {
           divisi: typeof body.divisi === "string" ? body.divisi : undefined,
         }),
       });
+    if (body.kind === "attendance-report") {
+      await requireWebPermission(request, "dashboard.export");
+      try {
+        return noStoreJson({
+          data: await getLaporanKehadiran(
+            typeof body.tanggal_mulai === "string" ? body.tanggal_mulai : "",
+            typeof body.tanggal_selesai === "string"
+              ? body.tanggal_selesai
+              : "",
+          ),
+        });
+      } catch (error) {
+        if (error instanceof RentangLaporanError)
+          throw new ApiRequestError(error.message, 400);
+        throw error;
+      }
+    }
     if (body.kind === "top")
       return noStoreJson({
         data: await getTopKaryawanTerajin(

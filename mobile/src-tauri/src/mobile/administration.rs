@@ -2131,6 +2131,137 @@ fn rekap_per_tanggal(
         .map_err(|_| CommandError::internal())
 }
 
+/// Cermin `MAKS_HARI_LAPORAN` di `validations/laporan-kehadiran.ts`.
+pub const MAKS_HARI_LAPORAN: i64 = 92;
+
+/// Cermin `validateRentangLaporan`; pesannya sama kata demi kata.
+pub fn validate_rentang_laporan(mulai: &str, selesai: &str) -> Result<(), String> {
+    if !super::hari_kerja::tanggal_valid(mulai) || !super::hari_kerja::tanggal_valid(selesai) {
+        return Err("Tanggal laporan tidak valid.".to_owned());
+    }
+    let selisih = super::time_policy::days_between(mulai, selesai)?;
+    if selisih < 0 {
+        return Err("Tanggal selesai tidak boleh sebelum tanggal mulai.".to_owned());
+    }
+    if selisih >= MAKS_HARI_LAPORAN {
+        return Err(format!(
+            "Rentang laporan paling panjang {MAKS_HARI_LAPORAN} hari."
+        ));
+    }
+    Ok(())
+}
+
+/// Cermin persis `LAPORAN_KEHADIRAN_SQL` di `src/lib/services/report.ts`
+/// (alasannya ditulis di sana), urutan: personil, hari, libur, whitelist.
+/// Fixture tesnya sama dengan `report.test.ts`.
+const LAPORAN_KEHADIRAN_SQL: [(&str, &str); 4] = [
+    (
+        "personil",
+        r#"
+    SELECT json_object(
+      'id', m.id_unik, 'kode', COALESCE(m.kode_karyawan, ''), 'nama', m.nama,
+      'jenis', CASE
+        WHEN LOWER(TRIM(COALESCE(m.jenis_personil, ''))) = 'siswa'
+          OR EXISTS (SELECT 1 FROM siswa_data s WHERE s.id_siswa = m.id_unik)
+          THEN 'Peserta Didik'
+        WHEN LOWER(TRIM(COALESCE(m.jenis_personil, ''))) = 'guru'
+          OR EXISTS (SELECT 1 FROM guru_data g WHERE g.id_guru = m.id_unik)
+          THEN 'Guru'
+        ELSE 'Pegawai' END,
+      'divisi', COALESCE(m.divisi, ''),
+      'aktif', CASE WHEN m.status_aktif = 'Aktif' THEN 1 ELSE 0 END,
+      'hari_kerja', sh.hari_kerja, 'kode_shift', sh.kode_shift,
+      'id_unit_siswa', (SELECT u.id_unit FROM akademik_unit u
+        WHERE LOWER(TRIM(u.nama_unit)) = LOWER(TRIM(m.unit))
+        ORDER BY u.id_unit LIMIT 1))
+    FROM master_data m LEFT JOIN tbl_shift sh ON sh.id_shift = m.id_shift
+    WHERE m.status_aktif = 'Aktif'
+      OR EXISTS (SELECT 1 FROM absensi_harian a WHERE a.id_karyawan = m.id_unik
+        AND a.tanggal BETWEEN ?1 AND ?2)
+    ORDER BY m.nama;
+"#,
+    ),
+    (
+        "hari",
+        r#"
+    SELECT json_object(
+      'id', id_karyawan, 'tanggal', tanggal,
+      'hadir', MAX(CASE
+        WHEN (COALESCE(TRIM(jam_masuk), '') <> ''
+              AND COALESCE(status_kehadiran, '') <> 'Alfa')
+          OR status_kehadiran IN ('Hadir', 'Terlambat')
+        THEN 1 ELSE 0 END),
+      'telat', MAX(COALESCE(menit_terlambat, 0)),
+      'sakit', MAX(CASE WHEN status_kehadiran = 'Sakit' THEN 1 ELSE 0 END),
+      'izin', MAX(CASE WHEN status_kehadiran = 'Izin' THEN 1 ELSE 0 END),
+      'dispensasi', MAX(CASE WHEN status_kehadiran IN ('Dispen', 'Dispensasi')
+        THEN 1 ELSE 0 END),
+      'alfa', MAX(CASE WHEN status_kehadiran = 'Alfa' THEN 1 ELSE 0 END))
+    FROM absensi_harian
+    WHERE tanggal BETWEEN ?1 AND ?2
+    GROUP BY id_karyawan, tanggal
+    ORDER BY id_karyawan, tanggal;
+"#,
+    ),
+    (
+        "libur",
+        r#"
+    SELECT json_object('tanggal', tanggal, 'nama', nama_libur)
+    FROM tbl_hari_libur
+    WHERE status_aktif = 1 AND tanggal BETWEEN ?1 AND ?2
+    ORDER BY tanggal;
+"#,
+    ),
+    (
+        "whitelist",
+        r#"
+    SELECT json_object('id', id, 'scope_type', scope_type,
+      'scope_value', scope_value, 'tanggal_libur', tanggal_libur,
+      'keterangan', keterangan, 'status_aktif', status_aktif)
+    FROM hari_libur_whitelist
+    WHERE status_aktif = 1 AND (COALESCE(TRIM(tanggal_libur), '') = ''
+      OR tanggal_libur BETWEEN ?1 AND ?2)
+    ORDER BY id;
+"#,
+    ),
+];
+
+/// Data mentah laporan kehadiran; cermin `getLaporanKehadiran`.
+fn laporan_kehadiran(
+    connection: &rusqlite::Connection,
+    mulai: &str,
+    selesai: &str,
+) -> Result<Value, CommandError> {
+    validate_rentang_laporan(mulai, selesai)
+        .map_err(|pesan| CommandError::new("OPERATIONAL_VALIDATION_FAILED", pesan))?;
+    let (hari_ini, hari_sekolah): (String, Option<String>) = connection
+        .query_row(
+            "SELECT date('now', '+7 hours') AS hari_ini, (SELECT value FROM setting_gex_system WHERE key = ?) AS hari_sekolah;",
+            [super::nilai_akhir::KUNCI_HARI_SEKOLAH],
+            |row| Ok((row.get(0)?, row.get(1)?)),
+        )
+        .map_err(|_| CommandError::internal())?;
+    let mut hasil = json!({
+        "mulai": mulai,
+        "selesai": selesai,
+        "hari_ini": hari_ini,
+        "hari_sekolah": hari_sekolah,
+    });
+    for (kunci, sql) in LAPORAN_KEHADIRAN_SQL {
+        let mut statement = connection
+            .prepare(sql)
+            .map_err(|_| CommandError::internal())?;
+        let baris = statement
+            .query_map(params![mulai, selesai], |row| row.get::<_, String>(0))
+            .map_err(|_| CommandError::internal())?
+            .map(|teks| teks.map(|teks| serde_json::from_str(&teks).unwrap_or(Value::Null)))
+            .collect::<Result<Vec<Value>, _>>()
+            .map_err(|_| CommandError::internal())?;
+        hasil[kunci] = Value::Array(baris);
+    }
+    Ok(hasil)
+}
+
 /// Senin-Minggu pekan berjalan (WIB). `weekday 0` maju ke Minggu terdekat (hari
 /// ini bila sudah Minggu), lalu mundur 6 hari ke Senin. Cermin `getTrenMingguan`.
 fn tren_mingguan(connection: &rusqlite::Connection) -> Result<Value, CommandError> {
@@ -2194,6 +2325,13 @@ pub fn dashboard_data(
     }
     if kind == "weekly-trend" {
         return tren_mingguan(&connection);
+    }
+    if kind == "attendance-report" {
+        return laporan_kehadiran(
+            &connection,
+            text(filter, "tanggal_mulai"),
+            text(filter, "tanggal_selesai"),
+        );
     }
     let division = text(filter, "divisi").replace("'", "''");
     if kind == "scan-history" {
@@ -3015,7 +3153,8 @@ mod tests {
 
     use super::{
         create_backup, create_correction, dashboard_data, delete_backup, delete_log_scan,
-        import_offline, rekap_per_tanggal, storage, MobileState,
+        import_offline, laporan_kehadiran, rekap_per_tanggal, storage, validate_rentang_laporan,
+        MobileState,
     };
 
     /// IDENTIK dengan `FIXTURE_REKAP_PER_TANGGAL` di
@@ -3063,6 +3202,97 @@ INSERT INTO absensi_harian (
                 json!({"tanggal": "2026-10-06", "tepat_waktu": 2, "terlambat": 1, "sakit_izin": 1, "alfa": 0}),
             ]
         );
+    }
+
+    /// IDENTIK dengan `FIXTURE_LAPORAN_KEHADIRAN` di `report.test.ts`, dipasang
+    /// di atas `FIXTURE_REKAP_PER_TANGGAL`. A aktif (Guru), B nonaktif tetapi
+    /// punya catatan di rentang, Z nonaktif tanpa catatan. Libur 8 Oktober
+    /// nonaktif; whitelist bertanggal 1 November di luar rentang.
+    const FIXTURE_LAPORAN_KEHADIRAN: &str = r#"
+INSERT INTO master_data (id_unik, kode_karyawan, nama, divisi, id_shift, status_aktif, jenis_personil) VALUES
+  ('A', 'K-A', 'Ani', 'X', 1, 'Aktif', 'Guru'),
+  ('B', 'K-B', 'Budi', 'X', 1, 'Nonaktif', 'Pegawai'),
+  ('Z', 'K-Z', 'Zaki', 'X', 1, 'Nonaktif', 'Pegawai');
+INSERT INTO tbl_hari_libur (tanggal, nama_libur, status_aktif) VALUES
+  ('2026-10-07', 'Libur Uji', 1),
+  ('2026-10-08', 'Libur Nonaktif', 0);
+INSERT INTO hari_libur_whitelist (id, scope_type, scope_value, tanggal_libur, keterangan, status_aktif) VALUES
+  ('w-semua', 'DIVISI', 'X', NULL, NULL, 1),
+  ('w-luar', 'SHIFT', '1', '2026-11-01', NULL, 1);
+"#;
+
+    #[test]
+    fn rentang_laporan_dibatasi_92_hari() {
+        // Vektor sama dengan `laporan-kehadiran.test.ts`.
+        assert_eq!(validate_rentang_laporan("2026-10-01", "2026-10-01"), Ok(()));
+        assert_eq!(validate_rentang_laporan("2026-10-01", "2026-12-31"), Ok(()));
+        assert_eq!(
+            validate_rentang_laporan("2026-10-01", "2027-01-01"),
+            Err("Rentang laporan paling panjang 92 hari.".to_owned())
+        );
+        assert_eq!(
+            validate_rentang_laporan("2026-10-02", "2026-10-01"),
+            Err("Tanggal selesai tidak boleh sebelum tanggal mulai.".to_owned())
+        );
+        assert_eq!(
+            validate_rentang_laporan("2026-02-30", "2026-03-01"),
+            Err("Tanggal laporan tidak valid.".to_owned())
+        );
+    }
+
+    #[test]
+    fn laporan_kehadiran_menggabung_sesi_dan_menyaring_personil() {
+        let directory = tempdir().expect("temporary directory");
+        storage::initialize(directory.path()).expect("local schema");
+        let connection = storage::database(directory.path()).expect("local database");
+        connection
+            .execute_batch(FIXTURE_REKAP_PER_TANGGAL)
+            .expect("fixture rekap");
+        connection
+            .execute_batch(FIXTURE_LAPORAN_KEHADIRAN)
+            .expect("fixture laporan");
+
+        let hasil = laporan_kehadiran(&connection, "2026-10-05", "2026-10-08")
+            .expect("laporan kehadiran");
+        let personil: Vec<_> = hasil["personil"]
+            .as_array()
+            .expect("personil")
+            .iter()
+            .map(|p| json!([p["id"], p["jenis"], p["aktif"]]))
+            .collect();
+        assert_eq!(
+            personil,
+            vec![json!(["A", "Guru", 1]), json!(["B", "Pegawai", 0])]
+        );
+        let hari = |id: &str, tanggal: &str, nilai: [i64; 6]| {
+            json!({"id": id, "tanggal": tanggal, "hadir": nilai[0], "telat": nilai[1],
+                "sakit": nilai[2], "izin": nilai[3], "dispensasi": nilai[4], "alfa": nilai[5]})
+        };
+        assert_eq!(
+            hasil["hari"],
+            json!([
+                hari("A", "2026-10-05", [1, 0, 0, 0, 0, 0]),
+                hari("A", "2026-10-06", [1, 10, 0, 0, 0, 0]),
+                hari("B", "2026-10-05", [1, 20, 0, 0, 0, 0]),
+                hari("C", "2026-10-05", [0, 0, 1, 0, 0, 0]),
+                hari("D", "2026-10-05", [0, 0, 0, 0, 1, 0]),
+                hari("E", "2026-10-05", [0, 0, 0, 0, 0, 1]),
+                hari("F", "2026-10-06", [0, 0, 0, 0, 1, 0]),
+                hari("G", "2026-10-06", [1, 0, 0, 0, 0, 1]),
+                hari("H", "2026-10-06", [1, 0, 0, 0, 0, 0]),
+            ])
+        );
+        assert_eq!(
+            hasil["libur"],
+            json!([{"tanggal": "2026-10-07", "nama": "Libur Uji"}])
+        );
+        let whitelist: Vec<_> = hasil["whitelist"]
+            .as_array()
+            .expect("whitelist")
+            .iter()
+            .map(|w| w["id"].clone())
+            .collect();
+        assert_eq!(whitelist, vec![json!("w-semua")]);
     }
 
     /// Ekspresi Senin pekan berjalan yang dipakai `tren_mingguan` dan

@@ -3,6 +3,7 @@
 import { redirect } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { AppShell } from "@/components/AppShell";
+import { EksporLaporanKehadiran } from "@/components/dashboard/EksporLaporanKehadiran";
 import { Icon } from "@/components/ui/Icon";
 import { AnimatedCounter } from "@/components/visual/AnimatedCounter";
 import { AttendanceGaugeGate } from "@/components/visual/AttendanceGaugeGate";
@@ -13,7 +14,6 @@ import { Skeleton } from "@/components/visual/Skeleton";
 import { SpotlightCard } from "@/components/visual/SpotlightCard";
 import { TiltCard } from "@/components/visual/TiltCard";
 import { canAccessArea, hasPermission } from "@/lib/auth/access";
-import { exportToCsv, exportToExcel } from "@/lib/client/excel-export";
 import { useAuth } from "@/lib/context/AuthContext";
 import {
   type DashboardMetrics,
@@ -53,6 +53,7 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState<boolean>(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [exportMessage, setExportMessage] = useState<string | null>(null);
+  const [eksporTerbuka, setEksporTerbuka] = useState(false);
 
   // ── Data Grid Filters & Pagination ───────────────────────────────────────
   const [searchQuery, setSearchQuery] = useState<string>("");
@@ -256,102 +257,6 @@ export default function DashboardPage() {
     }
   };
 
-  // ── Export Handlers (CSV & Excel) ────────────────────────────────────────
-  const handleExportCSV = async () => {
-    if (!hasPermission(user, "dashboard.export")) return;
-    setExportMessage(null);
-    try {
-      if (activeTab === "harian") {
-        const filename =
-          filterMode === "range" && startDate !== endDate
-            ? `Rekap_Kehadiran_${startDate}_sd_${endDate}.csv`
-            : `Rekap_Kehadiran_${startDate}.csv`;
-        const headers = [
-          "ID / NIK",
-          "Nama Karyawan",
-          "Divisi",
-          "Tanggal",
-          "Jam Masuk",
-          "Jam Pulang",
-          "Status Kehadiran",
-          "Menit Terlambat",
-          "Keterangan",
-        ];
-        const rows = filteredDailyList.map((row) => [
-          String(row.id_karyawan ?? ""),
-          String(row.nama ?? ""),
-          String(row.kelas_divisi ?? row.divisi ?? ""),
-          String(row.tanggal ?? startDate),
-          String(row.jam_masuk ?? "-"),
-          String(row.jam_pulang ?? "-"),
-          String(row.status_kehadiran ?? ""),
-          Number(row.menit_terlambat ?? 0),
-          String(row.keterangan ?? "-"),
-        ]);
-        const res = await exportToCsv(filename, headers, rows);
-        if (res.sukses) {
-          setExportMessage(
-            `Berkas CSV berhasil disimpan: ${res.filename || filename}`,
-          );
-        }
-      }
-    } catch (err) {
-      setLoadError(
-        err instanceof Error ? err.message : "Gagal mengekspor data CSV.",
-      );
-    }
-  };
-
-  const handleExportExcel = async () => {
-    if (!hasPermission(user, "dashboard.export")) return;
-    setExportMessage(null);
-    try {
-      if (activeTab === "harian") {
-        const filename =
-          filterMode === "range" && startDate !== endDate
-            ? `Rekap_Kehadiran_${startDate}_sd_${endDate}.xlsx`
-            : `Rekap_Kehadiran_${startDate}.xlsx`;
-        const headers = [
-          "ID / NIK",
-          "Nama Karyawan",
-          "Divisi",
-          "Tanggal",
-          "Jam Masuk",
-          "Jam Pulang",
-          "Status Kehadiran",
-          "Menit Terlambat",
-          "Keterangan",
-        ];
-        const rows = filteredDailyList.map((row) => [
-          String(row.id_karyawan ?? ""),
-          String(row.nama ?? ""),
-          String(row.kelas_divisi ?? row.divisi ?? ""),
-          String(row.tanggal ?? startDate),
-          String(row.jam_masuk ?? "-"),
-          String(row.jam_pulang ?? "-"),
-          String(row.status_kehadiran ?? ""),
-          Number(row.menit_terlambat ?? 0),
-          String(row.keterangan ?? "-"),
-        ]);
-        const res = await exportToExcel(
-          filename,
-          "Rekap Kehadiran",
-          headers,
-          rows,
-        );
-        if (res.sukses) {
-          setExportMessage(
-            `Berkas Excel berhasil disimpan: ${res.filename || filename}`,
-          );
-        }
-      }
-    } catch (err) {
-      setLoadError(
-        err instanceof Error ? err.message : "Gagal mengekspor data Excel.",
-      );
-    }
-  };
-
   if (!isHydrated || authLoading) {
     return (
       <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center p-6 text-slate-100 font-sans">
@@ -388,34 +293,17 @@ export default function DashboardPage() {
 
           <div className="flex flex-wrap items-center gap-2">
             {hasPermission(user, "dashboard.export") ? (
-              <>
-                <button
-                  type="button"
-                  onClick={handleExportCSV}
-                  disabled={
-                    isLoading ||
-                    activeTab !== "harian" ||
-                    filteredDailyList.length === 0
-                  }
-                  className="flex items-center justify-center gap-1.5 rounded-xl border border-slate-700 bg-slate-800 px-3.5 py-2 text-xs font-bold text-sky-200 shadow-md transition hover:bg-slate-700 disabled:opacity-50"
-                >
-                  <Icon name="download" className="size-3.5" />
-                  <span>Ekspor CSV</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={handleExportExcel}
-                  disabled={
-                    isLoading ||
-                    activeTab !== "harian" ||
-                    filteredDailyList.length === 0
-                  }
-                  className="flex items-center justify-center gap-1.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 px-3.5 py-2 text-xs font-bold text-white shadow-lg shadow-emerald-950/60 transition hover:from-emerald-500 hover:to-teal-500 disabled:opacity-50"
-                >
-                  <Icon name="document" className="size-3.5" />
-                  <span>Ekspor Excel (.xlsx)</span>
-                </button>
-              </>
+              <button
+                type="button"
+                onClick={() => {
+                  setExportMessage(null);
+                  setEksporTerbuka(true);
+                }}
+                className="flex items-center justify-center gap-1.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 px-3.5 py-2 text-xs font-bold text-white shadow-lg shadow-emerald-950/60 transition hover:from-emerald-500 hover:to-teal-500"
+              >
+                <Icon name="document" className="size-3.5" />
+                <span>Ekspor Laporan Excel</span>
+              </button>
             ) : null}
           </div>
         </div>
@@ -431,6 +319,16 @@ export default function DashboardPage() {
               &times;
             </button>
           </output>
+        ) : null}
+
+        {eksporTerbuka ? (
+          <EksporLaporanKehadiran
+            onClose={() => setEksporTerbuka(false)}
+            onTersimpan={(namaBerkas) => {
+              setEksporTerbuka(false);
+              setExportMessage(`Laporan Excel tersimpan: ${namaBerkas}`);
+            }}
+          />
         ) : null}
 
         {loadError && (

@@ -1568,6 +1568,9 @@ pub fn desktop_get_dashboard_data(
     } else {
         require_permission(&state, "dashboard.view")?;
     }
+    if kind == "attendance-report" {
+        require_permission(&state, "dashboard.export")?;
+    }
     administration::dashboard_data(&state, &kind, &filter)
 }
 

@@ -9,6 +9,7 @@ import { Icon } from "@/components/ui/Icon";
 import { Modal } from "@/components/ui/Modal";
 import { canAccessArea, hasPermission } from "@/lib/auth/access";
 import { loadFaceEngine, scanFaceVector } from "@/lib/client/face-engine";
+import { setScanFullscreen } from "@/lib/client/fullscreen";
 import {
   getCachedCoordinates,
   watchCoordinates,
@@ -132,9 +133,12 @@ export default function ScannerPage() {
   const [scanFlashStatus, setScanFlashStatus] = useState<
     "success" | "warning" | "error" | null
   >(null);
+  /** Kamera layar penuh + riwayat mengambang, untuk monitor gerbang. */
+  const [scanMode, setScanMode] = useState(false);
 
   const inputRef = useRef<HTMLInputElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
+  const scanStageRef = useRef<HTMLDialogElement>(null);
   const faceVideoRef = useRef<HTMLVideoElement>(null);
   const faceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   /** Kamera QR sedang hidup sebelum penahanan, jadi wajib dinyalakan lagi. */
@@ -262,6 +266,37 @@ export default function ScannerPage() {
   // yang bergantung pada state akan mematikan kamera WebView Android tepat
   // setelah dibuka (aturan siklus kamera repo ini).
   useEffect(() => () => stopFaceCamera(), [stopFaceCamera]);
+
+  // Elemen <video> yang sama hanya naik ke top layer; memasang elemen baru
+  // memutus stream kamera yang menempel di `videoRef`.
+  useEffect(() => {
+    if (!scanMode) return;
+    const root = document.documentElement;
+    root.dataset.scanMode = "";
+    // Esc pada layar penuh browser ditelan browser; yang sampai ke sini hanya
+    // peristiwa keluarnya.
+    const onFullscreenChange = () => {
+      if (!document.fullscreenElement) setScanMode(false);
+    };
+    document.addEventListener("fullscreenchange", onFullscreenChange);
+    return () => {
+      document.removeEventListener("fullscreenchange", onFullscreenChange);
+      delete root.dataset.scanMode;
+      void setScanFullscreen(false);
+    };
+  }, [scanMode]);
+
+  // Selama panel foto terbuka, kotak kamera turun ke non-modal: top layer akan
+  // menutupi <Modal> foto, dan kamera QR memang sedang dimatikan saat itu.
+  useEffect(() => {
+    const stage = scanStageRef.current;
+    if (!stage) return;
+    // showModal() pada dialog yang sudah terbuka melempar galat.
+    if (stage.open) stage.close();
+    if (scanMode && !pendingScan) stage.showModal();
+    // Atribut, bukan show(): show() ikut memindahkan fokus ke dalam kotak.
+    else stage.setAttribute("open", "");
+  }, [scanMode, pendingScan]);
 
   const submitScan = useCallback(
     async (
@@ -713,6 +748,7 @@ export default function ScannerPage() {
       setCameraActive(true);
     } catch (error: unknown) {
       stopCamera();
+      setScanMode(false);
       setCameraMessage(
         error instanceof Error
           ? error.message
@@ -998,12 +1034,39 @@ export default function ScannerPage() {
                   >
                     {cameraActive ? "Hentikan kamera" : "Mulai pindai QR"}
                   </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setScanMode(true);
+                      // Di handler klik, bukan di effect: browser mensyaratkan
+                      // gestur pengguna.
+                      void setScanFullscreen(true);
+                    }}
+                    disabled={!cameraActive}
+                    className="min-h-10 rounded-xl border border-sky-400/30 bg-sky-400/10 px-4 text-xs font-bold text-sky-200 transition hover:bg-sky-400/20 disabled:opacity-50"
+                  >
+                    Mode scan
+                  </button>
                 </div>
               </div>
 
-              {/* Camera Video Feed Container with Laser Scan Animation & Dynamic Overlay HUD */}
-              <div
-                className={`relative aspect-video overflow-hidden rounded-2xl border transition-all duration-300 bg-slate-950 ${
+              {/* <dialog> sejak awal supaya mode scan cukup memanggil
+                  showModal() pada elemen yang sama: <video> tidak dipasang
+                  ulang, dan modal native mengurus inert, Tab, serta Esc. */}
+              <dialog
+                ref={scanStageRef}
+                open
+                aria-label="Kamera pemindai QR"
+                onCancel={(e) => {
+                  e.preventDefault();
+                  setScanMode(false);
+                }}
+                className={`m-0 max-h-none max-w-none overflow-hidden p-0 text-inherit transition-all duration-300 bg-slate-950 ${
+                  scanMode
+                    ? "fixed inset-0 z-90 size-full border-0 ring-inset overscroll-none backdrop:bg-slate-950"
+                    : "relative aspect-video w-full rounded-2xl border"
+                } ${
                   scanFlashStatus === "success"
                     ? "border-emerald-400 ring-4 ring-emerald-500/40 shadow-2xl shadow-emerald-950"
                     : scanFlashStatus === "warning"
@@ -1020,6 +1083,62 @@ export default function ScannerPage() {
                   aria-label="Pratinjau kamera pemindai QR"
                   className="size-full object-cover"
                 />
+
+                {scanMode ? (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => setScanMode(false)}
+                      aria-label="Keluar dari mode scan"
+                      className="absolute right-3 top-3 z-40 grid size-11 place-items-center rounded-xl border border-white/15 bg-slate-950/90 text-xl text-white backdrop-blur-md hover:bg-slate-900"
+                    >
+                      &times;
+                    </button>
+
+                    {cameraMessage ? (
+                      <output className="absolute inset-x-3 top-16 z-40 mx-auto block max-w-md rounded-xl border border-amber-300/20 bg-slate-950/90 p-3 text-center text-xs text-amber-100">
+                        {cameraMessage}
+                      </output>
+                    ) : null}
+
+                    {/* Gaya obrolan: terbaru di bawah, yang lama memudar ke
+                        atas. Layar sempit hanya memuat tiga supaya kamera
+                        tidak tertutup. */}
+                    <ol
+                      aria-label="Riwayat scan sesi ini"
+                      className="pointer-events-none absolute inset-x-3 bottom-3 z-30 flex flex-col-reverse gap-2 overflow-hidden lg:inset-x-auto lg:top-16 lg:right-4 lg:bottom-4 lg:w-80"
+                    >
+                      {scanHistory.slice(0, 8).map((item, index) => (
+                        <li
+                          key={item.id}
+                          style={{ opacity: 1 - index * 0.1 }}
+                          className={`visual-fade-in shrink-0 rounded-2xl border bg-slate-950/90 p-3 shadow-2xl backdrop-blur-xl ${
+                            index >= 3 ? "max-lg:hidden" : ""
+                          } ${
+                            item.sukses
+                              ? "border-emerald-400/60 text-emerald-300"
+                              : item.pesan.includes("Scan ganda") ||
+                                  item.pesan.includes("cooldown")
+                                ? "border-amber-400/60 text-amber-300"
+                                : "border-rose-400/60 text-rose-300"
+                          }`}
+                        >
+                          <div className="flex items-baseline justify-between gap-2">
+                            <span className="truncate text-sm font-bold text-white">
+                              {item.nama}
+                            </span>
+                            <span className="shrink-0 font-mono text-[11px] text-slate-300">
+                              {item.waktu}
+                            </span>
+                          </div>
+                          <p className="truncate text-[11px] font-semibold">
+                            {item.pesan}
+                          </p>
+                        </li>
+                      ))}
+                    </ol>
+                  </>
+                ) : null}
 
                 {!cameraActive ? (
                   <div className="absolute inset-0 grid place-items-center p-6 text-center text-xs text-slate-500">
@@ -1060,7 +1179,13 @@ export default function ScannerPage() {
 
                     {/* Glassmorphic Scan Result HUD Overlay */}
                     {lastResult ? (
-                      <div className="absolute inset-x-3 bottom-3 z-30 animate-in fade-in zoom-in-95 duration-200">
+                      <div
+                        className={`absolute inset-x-3 z-30 animate-in fade-in zoom-in-95 duration-200 ${
+                          scanMode
+                            ? "top-16 lg:top-auto lg:bottom-3 lg:right-88"
+                            : "bottom-3"
+                        }`}
+                      >
                         <div
                           className={`rounded-2xl border p-3.5 sm:p-4 backdrop-blur-xl shadow-2xl transition ${
                             lastResult.sukses
@@ -1156,7 +1281,7 @@ export default function ScannerPage() {
                     ) : null}
                   </>
                 )}
-              </div>
+              </dialog>
 
               {cameraMessage ? (
                 <output className="rounded-xl border border-amber-300/20 bg-amber-300/10 p-3 text-xs text-amber-100 block">

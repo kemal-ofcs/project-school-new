@@ -8,6 +8,7 @@ import type {
   RekapBulananItem,
   TrenMingguan,
 } from "@/lib/services/report";
+import type { DataLaporanKehadiran } from "@/lib/validations/laporan-kehadiran";
 
 export type {
   DashboardMetrics,
@@ -53,6 +54,11 @@ export const getRiwayatScan = (
 export const getRekapBulanan = (
   filter: { bulan?: string; tahun?: number; divisi?: string } = {},
 ) => query<RekapBulananItem[]>("monthly", filter);
+/** Data mentah ekspor laporan; disusun `susunLaporanKehadiran`. Izin `dashboard.export`. */
+export const getLaporanKehadiran = (filter: {
+  tanggal_mulai: string;
+  tanggal_selesai: string;
+}) => query<DataLaporanKehadiran>("attendance-report", filter);
 export const getTopKaryawanTerajin = (limit = 5) =>
   query<Record<string, unknown>[]>("top", { limit });
 

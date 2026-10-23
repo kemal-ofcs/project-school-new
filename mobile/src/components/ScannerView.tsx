@@ -107,6 +107,9 @@ export function ScannerView() {
   const [torchOn, setTorchOn] = useState<boolean>(false);
   const [torchSupported, setTorchSupported] = useState<boolean>(false);
   const [cameraError, setCameraError] = useState<string | null>(null);
+  /** Kamera layar penuh + riwayat mengambang. Kotak <video> yang sama hanya
+   *  berganti kelas; memasang elemen baru memutus stream kamera. */
+  const [scanMode, setScanMode] = useState(false);
   // Penahanan scan untuk foto wajah. Begitu QR terbaca dan role mewajibkan
   // foto, absensi DITAHAN: kamera hadap-depan dibuka, orangnya difoto beserta
   // latarnya, baru datanya dikirim. Memotret pada detik QR terbaca hanya
@@ -120,6 +123,7 @@ export function ScannerView() {
   const [faceMessage, setFaceMessage] = useState<string | null>(null);
 
   const videoRef = useRef<HTMLVideoElement>(null);
+  const scanStageRef = useRef<HTMLDialogElement>(null);
   const faceVideoRef = useRef<HTMLVideoElement>(null);
   const faceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   /** Kamera QR sedang hidup sebelum penahanan, jadi wajib dinyalakan lagi. */
@@ -677,6 +681,7 @@ export function ScannerView() {
           : "Kamera tidak dapat diakses. Pastikan izin kamera aktif.";
       setCameraError(message);
       setCameraActive(false);
+      setScanMode(false);
     }
   }, [handleProcessQr, loadCameraDevices, selectedDeviceId, stopCamera]);
 
@@ -697,6 +702,18 @@ export function ScannerView() {
       }
     }
   };
+
+  // Selama panel foto terbuka, kotak kamera turun ke non-modal: top layer akan
+  // menutupi <Modal> foto, dan kamera QR memang sedang dimatikan saat itu.
+  useEffect(() => {
+    const stage = scanStageRef.current;
+    if (!stage) return;
+    // showModal() pada dialog yang sudah terbuka melempar galat.
+    if (stage.open) stage.close();
+    if (scanMode && !pendingScan) stage.showModal();
+    // Atribut, bukan show(): show() ikut memindahkan fokus ke dalam kotak.
+    else stage.setAttribute("open", "");
+  }, [scanMode, pendingScan]);
 
   // Jembatan untuk closePhotoHold: startCamera didefinisikan setelah gerbang
   // scan, jadi refnya diperbarui setiap render.
@@ -804,7 +821,23 @@ export function ScannerView() {
 
       {/* Top Camera Viewport Card */}
       <div className="relative overflow-hidden rounded-3xl border border-white/15 bg-slate-900 shadow-2xl">
-        <div className="theme-invariant relative aspect-[4/3] w-full bg-black flex items-center justify-center overflow-hidden">
+        {/* <dialog> sejak awal supaya mode scan cukup memanggil showModal()
+            pada elemen yang sama: <video> tidak dipasang ulang, dan modal
+            native mengurus inert dan gestur kembali. */}
+        <dialog
+          ref={scanStageRef}
+          open
+          aria-label="Kamera pemindai QR"
+          onCancel={(e) => {
+            e.preventDefault();
+            setScanMode(false);
+          }}
+          className={`theme-invariant m-0 flex max-h-none max-w-none items-center justify-center overflow-hidden border-0 bg-black p-0 text-inherit ${
+            scanMode
+              ? "fixed inset-0 z-70 size-full overscroll-none backdrop:bg-black"
+              : "relative aspect-[4/3] w-full"
+          }`}
+        >
           <video
             ref={videoRef}
             autoPlay
@@ -858,7 +891,87 @@ export function ScannerView() {
               </div>
             </div>
           )}
-        </div>
+
+          {scanMode ? (
+            <>
+              <div className="absolute right-3 top-[calc(0.75rem+env(safe-area-inset-top))] z-10 flex gap-2">
+                {torchSupported && (
+                  <button
+                    type="button"
+                    onClick={toggleTorch}
+                    aria-label="Toggle Flashlight"
+                    className={`grid size-11 place-items-center rounded-xl border backdrop-blur-md transition ${
+                      torchOn
+                        ? "border-amber-400/40 bg-amber-400/20 text-amber-300"
+                        : "border-white/15 bg-slate-950/90 text-slate-200"
+                    }`}
+                  >
+                    <Icon name="tools" className="size-5" />
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setScanMode(false);
+                    triggerHaptic("light");
+                  }}
+                  aria-label="Keluar dari mode scan"
+                  className="grid size-11 place-items-center rounded-xl border border-white/15 bg-slate-950/90 text-xl text-white backdrop-blur-md"
+                >
+                  &times;
+                </button>
+              </div>
+
+              {kartuMasihTerbaca ? (
+                <p className="absolute inset-x-3 top-[calc(4.5rem+env(safe-area-inset-top))] z-10 rounded-2xl border border-amber-300/20 bg-slate-950/90 p-3 text-center text-xs text-amber-100">
+                  Kartu yang sama masih terbaca. Jauhkan dari kamera sebentar
+                  untuk memindai ulang.
+                </p>
+              ) : null}
+
+              {/* Gaya obrolan: terbaru di bawah dan paling menonjol, dua
+                  sebelumnya memudar ke atas. Hanya tiga supaya bingkai pindai
+                  tetap terlihat. */}
+              <ol
+                aria-label="Riwayat scan sesi ini"
+                className="pointer-events-none absolute inset-x-3 bottom-[calc(0.75rem+env(safe-area-inset-bottom))] z-10 flex flex-col-reverse gap-2"
+              >
+                {scanHistory.slice(0, 3).map((item, index) => (
+                  <li
+                    key={item.id}
+                    style={{ opacity: 1 - index * 0.2 }}
+                    className={`rounded-2xl border bg-slate-950/90 shadow-2xl backdrop-blur-xl ${
+                      index === 0 ? "p-3.5" : "p-2.5"
+                    } ${
+                      item.sukses
+                        ? "border-emerald-400/60 text-emerald-300"
+                        : item.pesan.includes("Scan ganda") ||
+                            item.pesan.includes("cooldown")
+                          ? "border-amber-400/60 text-amber-300"
+                          : "border-rose-400/60 text-rose-300"
+                    }`}
+                  >
+                    <div className="flex items-baseline justify-between gap-2">
+                      <span
+                        className={`truncate font-bold text-white ${
+                          index === 0 ? "text-base" : "text-sm"
+                        }`}
+                      >
+                        {item.nama}
+                      </span>
+                      <span className="shrink-0 font-mono text-[11px] text-slate-300">
+                        {item.waktu}
+                      </span>
+                    </div>
+                    <p className="truncate text-xs font-semibold">
+                      {item.pesan}
+                    </p>
+                  </li>
+                ))}
+              </ol>
+            </>
+          ) : null}
+        </dialog>
 
         {/* Viewport Control Bar */}
         {cameraActive && (
@@ -897,13 +1010,25 @@ export function ScannerView() {
               )}
             </div>
 
-            <button
-              type="button"
-              onClick={stopCamera}
-              className="flex min-h-10 items-center gap-2 rounded-xl bg-rose-500/20 border border-rose-500/30 px-3.5 text-xs font-bold text-rose-300 active:scale-95 transition"
-            >
-              <span>Matikan</span>
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setScanMode(true);
+                  triggerHaptic("light");
+                }}
+                className="flex min-h-10 items-center gap-2 rounded-xl border border-sky-400/30 bg-sky-500/20 px-3.5 text-xs font-bold text-sky-300 active:scale-95 transition"
+              >
+                <span>Mode scan</span>
+              </button>
+              <button
+                type="button"
+                onClick={stopCamera}
+                className="flex min-h-10 items-center gap-2 rounded-xl bg-rose-500/20 border border-rose-500/30 px-3.5 text-xs font-bold text-rose-300 active:scale-95 transition"
+              >
+                <span>Matikan</span>
+              </button>
+            </div>
           </div>
         )}
       </div>

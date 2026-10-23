@@ -2,6 +2,11 @@ import "server-only";
 
 import { formatTanggalOperasional } from "@/lib/attendance/time-policy";
 import { db, ensureDbInitialized } from "@/lib/db";
+import {
+  type DataLaporanKehadiran,
+  validateRentangLaporan,
+} from "@/lib/validations/laporan-kehadiran";
+import { KUNCI_HARI_SEKOLAH } from "@/lib/validations/nilai-akhir";
 
 export interface DashboardMetrics {
   totalKaryawan: number;
@@ -322,6 +327,110 @@ export async function getRekapBulanan(filter?: {
       totalLembur: Number(row.totalLembur || 0),
     };
   });
+}
+
+/**
+ * Data mentah laporan kehadiran; matriksnya disusun `susunLaporanKehadiran`.
+ * Setiap kueri berbentuk satu kolom `json_object` dengan parameter ?1 = mulai
+ * dan ?2 = selesai. Cermin persis `LAPORAN_KEHADIRAN_SQL` di
+ * `administration.rs`, diuji dengan fixture yang sama.
+ *
+ * - personil: aktif, ditambah yang sudah nonaktif tetapi punya catatan di
+ *   rentang itu. Predikat siswa dan unitnya sama dengan `generateAlfaHarian`.
+ * - hari: satu baris per orang per tanggal; hadir dan telat memakai rumus
+ *   `REKAP_PER_TANGGAL_SQL` supaya totalnya cocok dengan kartu dasbor.
+ * - whitelist: yang berlaku untuk semua libur, atau tanggalnya di rentang.
+ */
+export const LAPORAN_KEHADIRAN_SQL = {
+  personil: `
+    SELECT json_object(
+      'id', m.id_unik, 'kode', COALESCE(m.kode_karyawan, ''), 'nama', m.nama,
+      'jenis', CASE
+        WHEN LOWER(TRIM(COALESCE(m.jenis_personil, ''))) = 'siswa'
+          OR EXISTS (SELECT 1 FROM siswa_data s WHERE s.id_siswa = m.id_unik)
+          THEN 'Peserta Didik'
+        WHEN LOWER(TRIM(COALESCE(m.jenis_personil, ''))) = 'guru'
+          OR EXISTS (SELECT 1 FROM guru_data g WHERE g.id_guru = m.id_unik)
+          THEN 'Guru'
+        ELSE 'Pegawai' END,
+      'divisi', COALESCE(m.divisi, ''),
+      'aktif', CASE WHEN m.status_aktif = 'Aktif' THEN 1 ELSE 0 END,
+      'hari_kerja', sh.hari_kerja, 'kode_shift', sh.kode_shift,
+      'id_unit_siswa', (SELECT u.id_unit FROM akademik_unit u
+        WHERE LOWER(TRIM(u.nama_unit)) = LOWER(TRIM(m.unit))
+        ORDER BY u.id_unit LIMIT 1))
+    FROM master_data m LEFT JOIN tbl_shift sh ON sh.id_shift = m.id_shift
+    WHERE m.status_aktif = 'Aktif'
+      OR EXISTS (SELECT 1 FROM absensi_harian a WHERE a.id_karyawan = m.id_unik
+        AND a.tanggal BETWEEN ?1 AND ?2)
+    ORDER BY m.nama;
+  `,
+  hari: `
+    SELECT json_object(
+      'id', id_karyawan, 'tanggal', tanggal,
+      'hadir', MAX(CASE
+        WHEN (COALESCE(TRIM(jam_masuk), '') <> ''
+              AND COALESCE(status_kehadiran, '') <> 'Alfa')
+          OR status_kehadiran IN ('Hadir', 'Terlambat')
+        THEN 1 ELSE 0 END),
+      'telat', MAX(COALESCE(menit_terlambat, 0)),
+      'sakit', MAX(CASE WHEN status_kehadiran = 'Sakit' THEN 1 ELSE 0 END),
+      'izin', MAX(CASE WHEN status_kehadiran = 'Izin' THEN 1 ELSE 0 END),
+      'dispensasi', MAX(CASE WHEN status_kehadiran IN ('Dispen', 'Dispensasi')
+        THEN 1 ELSE 0 END),
+      'alfa', MAX(CASE WHEN status_kehadiran = 'Alfa' THEN 1 ELSE 0 END))
+    FROM absensi_harian
+    WHERE tanggal BETWEEN ?1 AND ?2
+    GROUP BY id_karyawan, tanggal
+    ORDER BY id_karyawan, tanggal;
+  `,
+  libur: `
+    SELECT json_object('tanggal', tanggal, 'nama', nama_libur)
+    FROM tbl_hari_libur
+    WHERE status_aktif = 1 AND tanggal BETWEEN ?1 AND ?2
+    ORDER BY tanggal;
+  `,
+  whitelist: `
+    SELECT json_object('id', id, 'scope_type', scope_type,
+      'scope_value', scope_value, 'tanggal_libur', tanggal_libur,
+      'keterangan', keterangan, 'status_aktif', status_aktif)
+    FROM hari_libur_whitelist
+    WHERE status_aktif = 1 AND (COALESCE(TRIM(tanggal_libur), '') = ''
+      OR tanggal_libur BETWEEN ?1 AND ?2)
+    ORDER BY id;
+  `,
+} as const;
+
+export class RentangLaporanError extends Error {}
+
+export async function getLaporanKehadiran(
+  mulai: string,
+  selesai: string,
+): Promise<DataLaporanKehadiran> {
+  const rentang = validateRentangLaporan(mulai, selesai);
+  if (!rentang.ok) throw new RentangLaporanError(rentang.error);
+  await ensureDbInitialized();
+
+  const daftar = async <T>(sql: string): Promise<T[]> => {
+    const result = await db.execute({ sql, args: [mulai, selesai] });
+    return result.rows.map((row) => JSON.parse(String(row[0])) as T);
+  };
+  const umum = await db.execute({
+    sql: "SELECT date('now', '+7 hours') AS hari_ini, (SELECT value FROM setting_gex_system WHERE key = ?) AS hari_sekolah;",
+    args: [KUNCI_HARI_SEKOLAH],
+  });
+  const baris = umum.rows[0] as Record<string, unknown>;
+  return {
+    mulai,
+    selesai,
+    hari_ini: String(baris.hari_ini),
+    hari_sekolah:
+      baris.hari_sekolah == null ? null : String(baris.hari_sekolah),
+    personil: await daftar(LAPORAN_KEHADIRAN_SQL.personil),
+    hari: await daftar(LAPORAN_KEHADIRAN_SQL.hari),
+    libur: await daftar(LAPORAN_KEHADIRAN_SQL.libur),
+    whitelist: await daftar(LAPORAN_KEHADIRAN_SQL.whitelist),
+  };
 }
 
 export async function getTopKaryawanTerajin(limit = 5) {
