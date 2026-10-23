@@ -1,33 +1,34 @@
 # HASIL.md — hasil `bun run check`
 
-- Waktu: 2026-10-23 19:07 WIB
-- Commit: bd62697 (+ 11 berkas berubah, belum commit)
+- Waktu: 2026-10-23 22:56 WIB
+- Commit: ec084fc (working tree bersih)
 - Perintah: `bun run check` (root)
 - Exit code: 0
 - Status: **LULUS**
 - Log penuh: `.claude/check.log`
 
 ## Gate yang gagal
+Tidak ada (seluruh 14 gerbang kualitas lulus).
 
 | Gate | Status |
 | :--- | :--- |
-| Audit skema (`schema-audit.ts`) | lulus |
-| Kontrak sinkronisasi (`audit-sync-contract.ts`) | lulus |
-| Audit SQL (`audit-sql.ts`) | lulus |
-| Audit UI guard (`audit-ui-guard.ts`) | lulus |
-| Audit aksesibilitas (`audit-a11y.ts`) | lulus |
-| Audit guard halaman (`audit-page-guard.ts`) | lulus |
-| Audit permukaan dialog (`audit-dialog.ts`) | lulus |
-| Audit guard route (`audit-route-guard.ts`) | lulus |
-| Audit konfirmasi (`audit-confirm.ts`) | lulus |
-| Audit penanganan galat (`audit-silent-catch.ts`) | lulus |
-| Audit pembatas daftar (`audit-list-bound.ts`) | lulus |
-| Web-Desktop (lint, typecheck, test, cargo test) | lulus |
-| Mobile (lint, typecheck, test, cargo test) | lulus |
-| Web-Public (lint, typecheck, test) | lulus |
+| `audit:schema` | Lulus |
+| `audit:contract` | Lulus |
+| `audit:sql` | Lulus |
+| `audit:ui-guard` | Lulus |
+| `audit:a11y` | Lulus |
+| `audit:page-guard` | Lulus |
+| `audit:dialog` | Lulus |
+| `audit:route-guard` | Lulus |
+| `audit:confirm` | Lulus |
+| `audit:silent-catch` | Lulus |
+| `audit:list-bound` | Lulus |
+| `web-desktop` (`lint` + `typecheck` + `bun test` + `cargo test`) | Lulus (459 tests passed) |
+| `mobile` (`lint` + `typecheck` + `bun test` + `cargo test`) | Lulus (462 tests passed) |
+| `web-public` (`lint` + `typecheck` + `bun test`) | Lulus |
 
 ## Galat (maks 10, urutan kemunculan)
-Tidak ada.
+Tidak ada galat.
 
 ## Catatan
-Semua 14 gerbang pemeriksaan lulus tanpa galat.
+Seluruh pengujian unit, integritas skema 4-layer, kontrak IPC, linter, typecheck, dan cargo test kedua workspace berhasil tanpa kegagalan.
