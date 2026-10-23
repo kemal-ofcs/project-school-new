@@ -1861,9 +1861,11 @@ pub fn list_students(state: &DesktopState, id_rombel: Option<&str>) -> Result<Va
                s.created_at, s.updated_at,
                r.nama_rombel, r.tingkat,
                m.token_absensi, m.qr_code, m.status_qr, m.id_shift, m.unit,
-               m.kode_karyawan
+               m.kode_karyawan,
+               r.id_tahun_ajaran, t.nama_tahun, t.semester
         FROM siswa_data s
         JOIN akademik_rombel r ON r.id_rombel = s.id_rombel
+        LEFT JOIN akademik_tahun_ajaran t ON t.id_tahun_ajaran = r.id_tahun_ajaran
         LEFT JOIN master_data m ON m.id_unik = s.id_siswa
         WHERE (?1 IS NULL OR s.id_rombel = ?1)
         ORDER BY s.nama_lengkap ASC;
@@ -1894,6 +1896,9 @@ pub fn list_students(state: &DesktopState, id_rombel: Option<&str>) -> Result<Va
                 "id_shift": row.get::<_, Option<i64>>(18)?,
                 "unit": row.get::<_, Option<String>>(19)?,
                 "kode_karyawan": row.get::<_, Option<String>>(20)?,
+                "id_tahun_ajaran": row.get::<_, Option<String>>(21)?,
+                "nama_tahun": row.get::<_, Option<String>>(22)?,
+                "semester": row.get::<_, Option<String>>(23)?,
             }))
         })
         .map_err(|_| CommandError::internal())?
@@ -3259,5 +3264,30 @@ mod tests {
             .expect("event outbox");
         let payload: Value = serde_json::from_str(&payload).expect("payload json");
         assert_eq!(payload["id_unit"], json!(id_unit));
+    }
+
+    /// Tahun ajaran siswa diturunkan dari rombelnya; `siswa_data` tidak
+    /// menyimpannya. Halaman /siswa menyaring dengan `id_tahun_ajaran` ini.
+    #[test]
+    fn daftar_siswa_membawa_tahun_ajaran_rombel() {
+        let (_dir, state) = fixture();
+        storage::database(&state.data_dir)
+            .expect("database lokal")
+            .execute(
+                "INSERT INTO akademik_tahun_ajaran (id_tahun_ajaran, nama_tahun, semester, tanggal_mulai, tanggal_selesai, is_aktif, created_at, updated_at)
+                   VALUES ('ta-1', '2026/2027', 'Ganjil', '2026-07-01', '2026-12-31', 1, '2026-07-01', '2026-07-01');",
+                [],
+            )
+            .expect("tahun ajaran");
+        save_student(
+            &state,
+            &json!({ "id_siswa": "s-1", "nama_lengkap": "Ani", "id_rombel": "rom-1" }),
+        )
+        .expect("siswa");
+
+        let daftar = list_students(&state, None).expect("daftar");
+        assert_eq!(daftar[0]["id_tahun_ajaran"], json!("ta-1"));
+        assert_eq!(daftar[0]["nama_tahun"], json!("2026/2027"));
+        assert_eq!(daftar[0]["semester"], json!("Ganjil"));
     }
 }

@@ -1,5 +1,15 @@
 import { describe, expect, test } from "bun:test";
-import { AngkaExcel, createXlsxBuffer } from "./xlsx";
+import { AngkaExcel, createXlsxBuffer, readWorkbookRows } from "./xlsx";
+
+describe("readWorkbookRows CSV", () => {
+  test("sel berkutip yang memuat baris baru tetap satu sel", async () => {
+    const csv = 'No;"Jml. Saudara\r\nKandung";Nama\r\n;;\r\n1;2;"Ani ""A"""\n';
+    expect(await readWorkbookRows(new File([csv], "daftar_pd.csv"))).toEqual([
+      ["No", "Jml. Saudara\r\nKandung", "Nama"],
+      ["1", "2", 'Ani "A"'],
+    ]);
+  });
+});
 
 // Entri zip ditulis tanpa kompresi, jadi XML sheet terbaca langsung dari
 // byte-nya. Pembaca (`readWorkbookTable`) butuh DOMParser peramban.

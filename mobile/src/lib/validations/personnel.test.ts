@@ -2,7 +2,10 @@ import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import {
+  BELUM_TAHUN_AKTIF,
+  cocokFilterTahun,
   cocokFilterUnit,
+  labelRombel,
   normalizeStatusSiswa,
   opsiFilterKelas,
   STATUS_SISWA,
@@ -83,5 +86,42 @@ describe("filter unit lalu kelas", () => {
       "r-x",
     ]);
     expect(opsiFilterKelas(baris, "SD")).toEqual([]);
+  });
+});
+
+describe("filter tahun ajaran", () => {
+  const baris = [
+    { id_siswa: "a", id_tahun_ajaran: "ta-aktif" },
+    { id_siswa: "b", id_tahun_ajaran: "ta-lama" },
+    { id_siswa: "c", id_tahun_ajaran: null },
+  ];
+  const lolos = (filter: string) =>
+    baris
+      .filter((b) => cocokFilterTahun(b, filter, "ta-aktif"))
+      .map((b) => b.id_siswa);
+
+  test("semua, satu tahun, dan yang belum di tahun aktif", () => {
+    expect(lolos("")).toEqual(["a", "b", "c"]);
+    expect(lolos("ta-lama")).toEqual(["b"]);
+    expect(lolos(BELUM_TAHUN_AKTIF)).toEqual(["b", "c"]);
+  });
+
+  test("tanpa tahun aktif, semua siswa belum di tahun aktif", () => {
+    expect(
+      baris.filter((b) => cocokFilterTahun(b, BELUM_TAHUN_AKTIF, "")).length,
+    ).toBe(3);
+  });
+
+  test("label rombel menyebut tahunnya bila dikenal", () => {
+    const tahun = [
+      { id_tahun_ajaran: "ta-1", nama_tahun: "2026/2027", semester: "Ganjil" },
+    ];
+    const rombel = { tingkat: 10, nama_rombel: "IPA 1" };
+    expect(labelRombel({ ...rombel, id_tahun_ajaran: "ta-1" }, tahun)).toBe(
+      "Kelas 10 - IPA 1 (2026/2027 Ganjil)",
+    );
+    expect(labelRombel({ ...rombel, id_tahun_ajaran: "x" }, tahun)).toBe(
+      "Kelas 10 - IPA 1",
+    );
   });
 });

@@ -102,6 +102,47 @@ export function cocokFilterUnit(
 }
 
 /**
+ * Pilihan filter tahun ajaran untuk siswa yang rombelnya BUKAN rombel tahun
+ * aktif, yaitu yang belum dipindah lewat Ubah massal > Kelas / Rombel.
+ * Tahun ajaran siswa selalu ikut rombelnya; `siswa_data` tidak menyimpannya.
+ */
+export const BELUM_TAHUN_AKTIF = "__belum_tahun_aktif__";
+
+/** "" = semua; `BELUM_TAHUN_AKTIF` = di luar tahun aktif; selain itu id tahun. */
+export function cocokFilterTahun(
+  baris: Record<string, unknown>,
+  filterTahun: string,
+  idTahunAktif: string,
+): boolean {
+  if (!filterTahun) return true;
+  const tahun = String(baris.id_tahun_ajaran ?? "");
+  return filterTahun === BELUM_TAHUN_AKTIF
+    ? !idTahunAktif || tahun !== idTahunAktif
+    : tahun === filterTahun;
+}
+
+/** "2026/2027 Ganjil"; kosong bila tahunnya tidak ditemukan. */
+export function labelTahunAjaran(tahun: Record<string, unknown> | undefined) {
+  if (!tahun?.nama_tahun) return "";
+  return `${String(tahun.nama_tahun)} ${String(tahun.semester ?? "")}`.trim();
+}
+
+/**
+ * "Kelas 10 - IPA 1 (2026/2027 Ganjil)": rombel bernama sama dari tahun
+ * berbeda adalah dua rombel, dan tanpa tahunnya keduanya tak bisa dibedakan.
+ */
+export function labelRombel(
+  rombel: Record<string, unknown>,
+  tahunList: Record<string, unknown>[],
+) {
+  const tahun = labelTahunAjaran(
+    tahunList.find((t) => t.id_tahun_ajaran === rombel.id_tahun_ajaran),
+  );
+  const dasar = `Kelas ${String(rombel.tingkat)} - ${String(rombel.nama_rombel)}`;
+  return tahun ? `${dasar} (${tahun})` : dasar;
+}
+
+/**
  * Pilihan dropdown filter kelas: rombel yang benar-benar punya siswa di
  * `baris` dan lolos `filterUnit`, sehingga memilih unit menyempitkan daftar
  * kelasnya dan tidak pernah menawarkan kelas yang hasilnya kosong.

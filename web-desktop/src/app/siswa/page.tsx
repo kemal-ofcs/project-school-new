@@ -24,6 +24,7 @@ import {
   LencanaDapodik,
   ModalDapodikSiswa,
   TombolEksporDapodikSiswa,
+  TombolImporDapodikSiswa,
   useDapodikSiswa,
 } from "@/components/siswa/DapodikSiswa";
 import { FeedbackBanner } from "@/components/ui/FeedbackBanner";
@@ -41,7 +42,11 @@ import {
 } from "@/lib/client/personnel-workbook";
 import { createQrPng, employeeQrPayload } from "@/lib/client/qr-code";
 import { useAuth } from "@/lib/context/AuthContext";
-import { getDaftarRombel, getDaftarUnit } from "@/lib/gateways/academic";
+import {
+  getDaftarRombel,
+  getDaftarTahunAjaran,
+  getDaftarUnit,
+} from "@/lib/gateways/academic";
 import { simpanFotoPersonilBaru } from "@/lib/gateways/personnel-photo";
 import { getDaftarShift } from "@/lib/gateways/shift";
 import {
@@ -63,7 +68,11 @@ import { useConfirmDialog } from "@/lib/hooks/useConfirmDialog";
 import { useStatusFotoPersonil } from "@/lib/hooks/useStatusFotoPersonil";
 import { normalizeOperatorPhone } from "@/lib/operators/contact";
 import {
+  BELUM_TAHUN_AKTIF,
+  cocokFilterTahun,
   draftSiswaDariBaris,
+  labelRombel,
+  labelTahunAjaran,
   opsiFilterUnit,
   STATUS_SISWA,
   shiftLabel,
@@ -85,6 +94,7 @@ export default function SiswaPage() {
 
   const [siswaList, setSiswaList] = useState<Record<string, unknown>[]>([]);
   const [rombelList, setRombelList] = useState<Record<string, unknown>[]>([]);
+  const [tahunList, setTahunList] = useState<Record<string, unknown>[]>([]);
   const [shiftList, setShiftList] = useState<Record<string, unknown>[]>([]);
   // Daftar shift menuntut `shifts.view`; tanpa izin itu halaman siswa tetap
   // jalan, tetapi pemilih jam scan WAJIB menjelaskan kenapa ia kosong.
@@ -97,6 +107,8 @@ export default function SiswaPage() {
   // Filters
   const [search, setSearch] = useState("");
   const [filterRombel, setFilterRombel] = useState("");
+  // null = belum dimuat; sesudahnya bawaan tahun aktif (atau semua bila tidak ada).
+  const [filterTahun, setFilterTahun] = useState<string | null>(null);
   const [filterStatus, setFilterStatus] = useState("");
   const [filterUnit, setFilterUnit] = useState("");
   const [terpilih, setTerpilih] = useState<string[]>([]);
@@ -160,13 +172,22 @@ export default function SiswaPage() {
   const loadData = useCallback(async () => {
     setLoading(true);
     try {
-      const [sData, rData, uData] = await Promise.all([
+      const [sData, rData, uData, tData] = await Promise.all([
         getDaftarSiswa(filterRombel || undefined),
         getDaftarRombel(),
         getDaftarUnit(),
+        getDaftarTahunAjaran(),
       ]);
       setSiswaList(sData);
       setRombelList(rData);
+      setTahunList(tData);
+      setFilterTahun(
+        (prev) =>
+          prev ??
+          String(
+            tData.find((t) => Number(t.is_aktif) === 1)?.id_tahun_ajaran ?? "",
+          ),
+      );
       // Hanya unit aktif yang masuk dropdown; unit nonaktif tetap tersimpan
       // pada personil lama supaya datanya tidak hilang saat unit dipensiunkan.
       setUnitList(uData.filter((u) => Number(u.status_aktif) === 1));
@@ -204,8 +225,17 @@ export default function SiswaPage() {
     });
   }, [loadData]);
 
+  const idTahunAktif = String(
+    tahunList.find((t) => Number(t.is_aktif) === 1)?.id_tahun_ajaran ?? "",
+  );
+  const tahunById = (id: unknown) =>
+    tahunList.find((t) => t.id_tahun_ajaran === id);
+
   const filteredStudents = useMemo(() => {
     return siswaList.filter((item) => {
+      if (!cocokFilterTahun(item, filterTahun ?? "", idTahunAktif)) {
+        return false;
+      }
       const nama = String(item.nama_lengkap || "").toLowerCase();
       const nis = String(item.nis || "").toLowerCase();
       const nisn = String(item.nisn || "").toLowerCase();
@@ -239,7 +269,7 @@ export default function SiswaPage() {
       }
       return true;
     });
-  }, [siswaList, search, filterStatus, filterUnit]);
+  }, [siswaList, search, filterStatus, filterUnit, filterTahun, idTahunAktif]);
 
   // Kolom Foto hanya butuh status "punya foto"; fotonya dimuat saat dibuka.
   const idSiswaTampil = useMemo(
@@ -292,7 +322,7 @@ export default function SiswaPage() {
         label: "Kelas / Rombel",
         opsi: rombelList.map((r) => ({
           value: String(r.id_rombel),
-          label: `Kelas ${String(r.tingkat)} - ${String(r.nama_rombel)}`,
+          label: labelRombel(r, tahunList),
         })),
       },
       {
@@ -323,7 +353,7 @@ export default function SiswaPage() {
         : []),
       { key: "angkatan", label: "Angkatan", jenis: "angka" },
     ],
-    [rombelList, unitList, shiftList],
+    [rombelList, unitList, shiftList, tahunList],
   );
 
   const namaSiswa = (id: string) =>
@@ -796,6 +826,15 @@ export default function SiswaPage() {
               }
             />
           ) : null}
+          {/* Impor membaca isian lama lebih dulu, jadi ikut butuh `pmb.view`. */}
+          {canLihatDapodik && canUbahDapodik ? (
+            <TombolImporDapodikSiswa
+              className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-emerald-500/40 bg-slate-800 px-4 py-2 text-sm font-semibold text-emerald-300 transition hover:bg-slate-700 disabled:opacity-50"
+              onSelesai={setFeedback}
+              onTersimpan={(ids) => void dapodik.muatUlangBanyak(ids)}
+              siswa={siswaList}
+            />
+          ) : null}
           {canManage ? (
             <>
               <input
@@ -882,6 +921,32 @@ export default function SiswaPage() {
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <select
+              value={filterTahun ?? ""}
+              onChange={(e) => setFilterTahun(e.target.value)}
+              aria-label="Filter berdasarkan tahun ajaran"
+              className="rounded-xl border border-white/10 bg-slate-900 px-3 py-2 text-sm text-slate-100 focus:border-sky-500 focus:outline-none"
+            >
+              <option value="" className="bg-slate-900 text-slate-100">
+                Semua Tahun Ajaran
+              </option>
+              <option
+                value={BELUM_TAHUN_AKTIF}
+                className="bg-slate-900 text-slate-100"
+              >
+                Belum di tahun aktif
+              </option>
+              {tahunList.map((t) => (
+                <option
+                  key={String(t.id_tahun_ajaran)}
+                  value={String(t.id_tahun_ajaran)}
+                  className="bg-slate-900 text-slate-100"
+                >
+                  {labelTahunAjaran(t)}
+                  {Number(t.is_aktif) === 1 ? " (aktif)" : ""}
+                </option>
+              ))}
+            </select>
+            <select
               value={filterRombel}
               onChange={(e) => setFilterRombel(e.target.value)}
               aria-label="Filter berdasarkan rombel"
@@ -896,7 +961,7 @@ export default function SiswaPage() {
                   value={String(r.id_rombel)}
                   className="bg-slate-900 text-slate-100"
                 >
-                  Kelas {String(r.tingkat)} - {String(r.nama_rombel)}
+                  {labelRombel(r, tahunList)}
                 </option>
               ))}
             </select>
@@ -1089,6 +1154,12 @@ export default function SiswaPage() {
                             Kelas {String(item.tingkat || 10)} -{" "}
                             {String(item.nama_rombel || "-")}
                           </span>
+                          <div className="mt-1 text-[11px] text-slate-400">
+                            Tahun ajaran:{" "}
+                            {labelTahunAjaran(
+                              tahunById(item.id_tahun_ajaran),
+                            ) || "-"}
+                          </div>
                           <div className="mt-1 text-[11px] text-slate-400">
                             Jam scan: {(() => {
                               const shift = shiftById(item.id_shift);
@@ -1397,7 +1468,7 @@ export default function SiswaPage() {
                         value={String(r.id_rombel)}
                         className="bg-slate-900 text-slate-100"
                       >
-                        Kelas {String(r.tingkat)} - {String(r.nama_rombel)}
+                        {labelRombel(r, tahunList)}
                       </option>
                     ))}
                   </select>

@@ -11,7 +11,7 @@ import {
 } from "@/components/inventory/gaya";
 import { Modal } from "@/components/ui/Modal";
 import { saveFileWithPicker } from "@/lib/client/download";
-import { createXlsxBuffer } from "@/lib/client/xlsx";
+import { createXlsxBuffer, readWorkbookRows } from "@/lib/client/xlsx";
 import {
   daftarBerkasSiswa,
   getBerkasSiswa,
@@ -24,6 +24,12 @@ import {
   simpanDapodikSiswa,
 } from "@/lib/gateways/siswa-dapodik";
 import { useConfirmDialog } from "@/lib/hooks/useConfirmDialog";
+import {
+  type BarisImporDapodik,
+  cocokkanSiswaDapodik,
+  type HasilCocokDapodik,
+  uraiDaftarPd,
+} from "@/lib/validations/impor-dapodik";
 import {
   AGAMA,
   ALAT_TRANSPORTASI,
@@ -275,7 +281,7 @@ export function useDapodikSiswa(ids: readonly string[], aktif: boolean) {
   }, [aktif, kunci, muat]);
 
   const muatUlang = useCallback((id: string) => muat([id]), [muat]);
-  return { peta, galat, muatUlang };
+  return { peta, galat, muatUlang, muatUlangBanyak: muat };
 }
 
 /** Penanda kelengkapan di daftar siswa; membuka modal saat ditekan. */
@@ -660,5 +666,258 @@ export function TombolEksporDapodikSiswa({
     >
       {proses ? "Menyiapkan..." : "Ekspor DAPODIK"}
     </button>
+  );
+}
+
+interface PratinjauImpor {
+  baris: BarisImporDapodik[];
+  hasil: HasilCocokDapodik[];
+  lama: ReadonlyMap<string, BarisDapodikSiswa>;
+}
+
+/**
+ * Impor massal berkas daftar_pd DAPODIK atau hasil Ekspor DAPODIK ke data
+ * DAPODIK siswa. Pemanggil menampilkannya hanya bagi pemegang `pmb.manage` +
+ * `students.manage`, izin yang sama dengan mengubah satu siswa.
+ */
+export function TombolImporDapodikSiswa({
+  siswa,
+  className,
+  onSelesai,
+  onTersimpan,
+}: {
+  siswa: readonly Siswa[];
+  className: string;
+  onSelesai: (hasil: { tone: "success" | "error"; message: string }) => void;
+  onTersimpan: (ids: string[]) => void;
+}) {
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [membaca, setMembaca] = useState(false);
+  const [pratinjau, setPratinjau] = useState<PratinjauImpor | null>(null);
+
+  async function baca(file: File) {
+    if (membaca) return;
+    setMembaca(true);
+    try {
+      const baris = uraiDaftarPd(await readWorkbookRows(file));
+      if (baris.length === 0) {
+        throw new Error("Berkas tidak memuat baris peserta didik.");
+      }
+      const lama = new Map(
+        (await daftarDapodikSiswa(siswa.map((s) => String(s.id_siswa)))).map(
+          (b) => [b.id_siswa, b],
+        ),
+      );
+      const hasil = cocokkanSiswaDapodik(
+        baris,
+        siswa,
+        new Map([...lama].map(([id, b]) => [id, b.tanggal_lahir])),
+      );
+      setPratinjau({ baris, hasil, lama });
+    } catch (err) {
+      onSelesai({
+        tone: "error",
+        message:
+          err instanceof Error ? err.message : "Berkas DAPODIK gagal dibaca.",
+      });
+    } finally {
+      setMembaca(false);
+    }
+  }
+
+  return (
+    <>
+      <input
+        accept=".csv,.xlsx"
+        aria-label="Berkas daftar_pd DAPODIK untuk impor"
+        className="hidden"
+        onChange={(event) => {
+          const file = event.target.files?.[0];
+          event.target.value = "";
+          if (file) void baca(file);
+        }}
+        ref={inputRef}
+        type="file"
+      />
+      <button
+        className={className}
+        disabled={membaca}
+        onClick={() => inputRef.current?.click()}
+        type="button"
+      >
+        {membaca ? "Membaca..." : "Impor DAPODIK"}
+      </button>
+      {pratinjau ? (
+        <ModalImporDapodik
+          onClose={() => setPratinjau(null)}
+          onSelesai={onSelesai}
+          onTersimpan={onTersimpan}
+          pratinjau={pratinjau}
+        />
+      ) : null}
+    </>
+  );
+}
+
+const MAKS_RINCIAN = 100;
+
+function DaftarRincian({ judul, isi }: { judul: string; isi: string[] }) {
+  if (isi.length === 0) return null;
+  return (
+    <div>
+      <h3 className="mb-1 font-semibold text-white text-xs uppercase">
+        {judul}
+      </h3>
+      <ul className="space-y-1 text-slate-300">
+        {isi.slice(0, MAKS_RINCIAN).map((teks, i) => (
+          // biome-ignore lint/suspicious/noArrayIndexKey: daftar statis, tidak pernah diurutkan ulang
+          <li key={i}>{teks}</li>
+        ))}
+      </ul>
+      {isi.length > MAKS_RINCIAN ? (
+        <p className="mt-1 text-slate-500 text-xs">
+          dan {isi.length - MAKS_RINCIAN} lainnya.
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
+function ModalImporDapodik({
+  pratinjau,
+  onClose,
+  onSelesai,
+  onTersimpan,
+}: {
+  pratinjau: PratinjauImpor;
+  onClose: () => void;
+  onSelesai: (hasil: { tone: "success" | "error"; message: string }) => void;
+  onTersimpan: (ids: string[]) => void;
+}) {
+  const { baris, hasil, lama } = pratinjau;
+  const [kemajuan, setKemajuan] = useState<string | null>(null);
+  const [gagal, setGagal] = useState<string[] | null>(null);
+  const prosesRef = useRef(false);
+
+  const siapSimpan = useMemo(
+    () =>
+      baris.flatMap((b, i) => {
+        const h = hasil[i];
+        return h.status === "cocok" && Object.keys(b.isian).length > 0
+          ? [{ b, idSiswa: h.idSiswa }]
+          : [];
+      }),
+    [baris, hasil],
+  );
+  const dilewati = baris.flatMap((b, i) => {
+    const { status } = hasil[i];
+    if (status === "cocok") return [];
+    const siapa = `${b.nama}${b.nisn ? ` (NISN ${b.nisn})` : ""}`;
+    return [
+      status === "ganda"
+        ? `${siapa}: cocok dengan lebih dari satu siswa atau muncul dua kali di berkas.`
+        : `${siapa}: tidak ditemukan.`,
+    ];
+  });
+  const ditolak = siapSimpan.flatMap(({ b }) =>
+    b.ditolak.map((d) => `${b.nama} · ${d.label} "${d.nilai}": ${d.pesan}`),
+  );
+
+  async function simpan() {
+    if (prosesRef.current) return;
+    prosesRef.current = true;
+    const tersimpan: string[] = [];
+    const galat: string[] = [];
+    // shortcut: satu permintaan per siswa lewat simpan yang sudah ada; buat rute simpan massal bila impor ribuan siswa terasa lambat.
+    for (const [n, { b, idSiswa }] of siapSimpan.entries()) {
+      setKemajuan(`${n + 1}/${siapSimpan.length}`);
+      // Sel kosong tidak masuk `isian`, jadi isian lama tetap.
+      const draf = { ...drafDariBaris(lama.get(idSiswa)), ...b.isian };
+      try {
+        await simpanDapodikSiswa({
+          idSiswa,
+          tempatLahir: draf.tempatLahir,
+          tanggalLahir: draf.tanggalLahir,
+          sekolahAsal: draf.sekolahAsal,
+          data: dataDariDraf(draf),
+        });
+        tersimpan.push(idSiswa);
+      } catch (err) {
+        galat.push(
+          `${b.nama}: ${err instanceof Error ? err.message : "Gagal menyimpan."}`,
+        );
+      }
+    }
+    prosesRef.current = false;
+    setKemajuan(null);
+    onTersimpan(tersimpan);
+    const pesan = `Data DAPODIK ${tersimpan.length} peserta didik tersimpan dari berkas.`;
+    if (galat.length === 0) {
+      onSelesai({ tone: "success", message: pesan });
+      onClose();
+      return;
+    }
+    onSelesai({
+      tone: "error",
+      message: `${pesan} ${galat.length} gagal; rinciannya di jendela impor.`,
+    });
+    setGagal(galat);
+  }
+
+  const tutup = () => {
+    if (!prosesRef.current) onClose();
+  };
+
+  return (
+    <Modal
+      footer={
+        <div className="flex flex-wrap justify-end gap-2">
+          <button
+            className={TOMBOL_KEDUA}
+            disabled={kemajuan !== null}
+            onClick={tutup}
+            type="button"
+          >
+            {gagal ? "Tutup" : "Batal"}
+          </button>
+          {gagal ? null : (
+            <button
+              className={TOMBOL_UTAMA}
+              disabled={kemajuan !== null || siapSimpan.length === 0}
+              onClick={() => void simpan()}
+              type="button"
+            >
+              {kemajuan
+                ? `Menyimpan ${kemajuan}...`
+                : `Simpan ${siapSimpan.length} siswa`}
+            </button>
+          )}
+        </div>
+      }
+      isOpen
+      maxWidth="max-w-3xl"
+      onClose={tutup}
+      subtitle={`${baris.length} baris dibaca dari berkas`}
+      title="Impor DAPODIK"
+    >
+      <div className="space-y-4 text-sm">
+        <p className="text-slate-400">
+          Siswa dicocokkan lewat NISN, lalu nama dan tanggal lahir. Sel kosong
+          tidak menghapus isian yang sudah ada. Nama, NIPD, JK, NISN, alamat,
+          dan rombel hanya dipakai untuk mencocokkan; data siswanya tidak
+          diubah.
+        </p>
+        <p className="text-slate-300">
+          {siapSimpan.length} siap disimpan · {dilewati.length} dilewati ·{" "}
+          {ditolak.length} isian ditolak
+        </p>
+        <DaftarRincian isi={gagal ?? []} judul="Gagal disimpan" />
+        <DaftarRincian isi={dilewati} judul="Dilewati" />
+        <DaftarRincian
+          isi={ditolak}
+          judul="Isian ditolak (isian lain siswa itu tetap disimpan)"
+        />
+      </div>
+    </Modal>
   );
 }

@@ -232,9 +232,11 @@ export async function getStudents(id_rombel?: string | null) {
            s.created_at, s.updated_at,
            r.nama_rombel, r.tingkat,
            m.token_absensi, m.qr_code, m.status_qr, m.id_shift, m.unit,
-           m.kode_karyawan
+           m.kode_karyawan,
+           r.id_tahun_ajaran, t.nama_tahun, t.semester
     FROM siswa_data s
     JOIN akademik_rombel r ON r.id_rombel = s.id_rombel
+    LEFT JOIN akademik_tahun_ajaran t ON t.id_tahun_ajaran = r.id_tahun_ajaran
     LEFT JOIN master_data m ON m.id_unik = s.id_siswa
     WHERE (? IS NULL OR s.id_rombel = ?)
     ORDER BY s.nama_lengkap ASC;

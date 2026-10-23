@@ -352,38 +352,44 @@ export async function readWorkbookTable(
     // "CSV UTF-8" dari Excel diawali BOM: tanpa dibuang, judul kolom pertama
     // menjadi "﻿id_unik" dan kolom wajib dilaporkan tidak ditemukan.
     const text = (await file.text()).replace(/^﻿/, "");
-    const lines = text.split(/\r?\n/);
     // Excel dengan regional Indonesia menyimpan CSV berpemisah titik koma.
-    const pertama = lines.find((line) => line.trim()) ?? "";
+    const pertama = text.split(/\r?\n/).find((line) => line.trim()) ?? "";
     const pemisah =
       (pertama.match(/;/g)?.length ?? 0) > (pertama.match(/,/g)?.length ?? 0)
         ? ";"
         : ",";
-    for (const line of lines) {
-      if (!line.trim()) continue;
-      const row: string[] = [];
-      let inQuote = false;
-      let cell = "";
-      for (let i = 0; i < line.length; i++) {
-        const ch = line[i];
-        if (ch === '"' && inQuote && line[i + 1] === '"') {
-          cell += '"';
-          i++;
-        } else if (ch === '"') {
-          inQuote = !inQuote;
-        } else if (ch === pemisah && !inQuote) {
-          row.push(cell.trim());
-          cell = "";
-        } else {
-          cell += ch;
-        }
-      }
+    // Dibaca per karakter, bukan per baris: sel berkutip boleh memuat baris
+    // baru, seperti judul "Jml. Saudara⏎Kandung" di berkas daftar_pd DAPODIK.
+    let row: string[] = [];
+    let inQuote = false;
+    let cell = "";
+    const tutupBaris = () => {
       row.push(cell.trim());
       if (row.some((c) => c !== "")) {
         rows.push(row);
         selAngka.push(row.map(() => false));
       }
+      row = [];
+      cell = "";
+    };
+    for (let i = 0; i < text.length; i++) {
+      const ch = text[i];
+      if (ch === '"' && inQuote && text[i + 1] === '"') {
+        cell += '"';
+        i++;
+      } else if (ch === '"') {
+        inQuote = !inQuote;
+      } else if (ch === pemisah && !inQuote) {
+        row.push(cell.trim());
+        cell = "";
+      } else if ((ch === "\n" || ch === "\r") && !inQuote) {
+        if (ch === "\r" && text[i + 1] === "\n") i++;
+        tutupBaris();
+      } else {
+        cell += ch;
+      }
     }
+    tutupBaris();
     return { rows, selAngka };
   }
 
