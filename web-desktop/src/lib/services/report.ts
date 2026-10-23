@@ -338,7 +338,8 @@ export async function getRekapBulanan(filter?: {
  * - personil: aktif, ditambah yang sudah nonaktif tetapi punya catatan di
  *   rentang itu. Predikat siswa dan unitnya sama dengan `generateAlfaHarian`.
  * - hari: satu baris per orang per tanggal; hadir dan telat memakai rumus
- *   `REKAP_PER_TANGGAL_SQL` supaya totalnya cocok dengan kartu dasbor.
+ *   `REKAP_PER_TANGGAL_SQL` supaya totalnya cocok dengan kartu dasbor;
+ *   `menit` menjumlah menit terlambat semua sesi hari itu.
  * - whitelist: yang berlaku untuk semua libur, atau tanggalnya di rentang.
  */
 export const LAPORAN_KEHADIRAN_SQL = {
@@ -374,6 +375,7 @@ export const LAPORAN_KEHADIRAN_SQL = {
           OR status_kehadiran IN ('Hadir', 'Terlambat')
         THEN 1 ELSE 0 END),
       'telat', MAX(COALESCE(menit_terlambat, 0)),
+      'menit', SUM(COALESCE(menit_terlambat, 0)),
       'sakit', MAX(CASE WHEN status_kehadiran = 'Sakit' THEN 1 ELSE 0 END),
       'izin', MAX(CASE WHEN status_kehadiran = 'Izin' THEN 1 ELSE 0 END),
       'dispensasi', MAX(CASE WHEN status_kehadiran IN ('Dispen', 'Dispensasi')

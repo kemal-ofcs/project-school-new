@@ -2187,6 +2187,7 @@ const LAPORAN_KEHADIRAN_SQL: [(&str, &str); 4] = [
           OR status_kehadiran IN ('Hadir', 'Terlambat')
         THEN 1 ELSE 0 END),
       'telat', MAX(COALESCE(menit_terlambat, 0)),
+      'menit', SUM(COALESCE(menit_terlambat, 0)),
       'sakit', MAX(CASE WHEN status_kehadiran = 'Sakit' THEN 1 ELSE 0 END),
       'izin', MAX(CASE WHEN status_kehadiran = 'Izin' THEN 1 ELSE 0 END),
       'dispensasi', MAX(CASE WHEN status_kehadiran IN ('Dispen', 'Dispensasi')
@@ -3260,7 +3261,7 @@ INSERT INTO hari_libur_whitelist (id, scope_type, scope_value, tanggal_libur, ke
             vec![json!(["A", "Guru", 1]), json!(["B", "Pegawai", 0])]
         );
         let hari = |id: &str, tanggal: &str, nilai: [i64; 6]| {
-            json!({"id": id, "tanggal": tanggal, "hadir": nilai[0], "telat": nilai[1],
+            json!({"id": id, "tanggal": tanggal, "hadir": nilai[0], "telat": nilai[1], "menit": nilai[1],
                 "sakit": nilai[2], "izin": nilai[3], "dispensasi": nilai[4], "alfa": nilai[5]})
         };
         assert_eq!(

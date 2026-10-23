@@ -104,6 +104,7 @@ describe("data laporan kehadiran (jalur Web)", () => {
     tanggal,
     hadir: n[0],
     telat: n[1],
+    menit: n[1],
     sakit: n[2],
     izin: n[3],
     dispensasi: n[4],

@@ -33,6 +33,7 @@ const hari = (
   tanggal,
   hadir: 0,
   telat: 0,
+  menit: 0,
   sakit: 0,
   izin: 0,
   dispensasi: 0,
@@ -85,7 +86,8 @@ const DATA: DataLaporanKehadiran = {
   ],
   hari: [
     hari("P1", "2026-10-05", { hadir: 1 }),
-    hari("P1", "2026-10-06", { hadir: 1, telat: 15 }),
+    // Dua sesi terlambat (15 dan 5 menit): dihitung satu hari, 20 menit.
+    hari("P1", "2026-10-06", { hadir: 1, telat: 15, menit: 20 }),
     hari("P1", "2026-10-08", { sakit: 1 }),
     hari("G1", "2026-10-05", { alfa: 1 }),
     hari("G1", "2026-10-06", { izin: 1 }),
@@ -127,7 +129,7 @@ describe("susunLaporanKehadiran", () => {
     expect(p1).toMatchObject({
       hadir: 2,
       terlambat: 1,
-      menitTerlambat: 15,
+      menitTerlambat: 20,
       sakit: 1,
       tanpaData: 1,
       libur: 2,

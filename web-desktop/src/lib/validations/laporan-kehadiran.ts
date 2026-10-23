@@ -41,7 +41,10 @@ export interface HariLaporan {
   id: string;
   tanggal: string;
   hadir: number;
+  /** Menit terlambat sesi yang paling telat; > 0 berarti hari itu terlambat. */
   telat: number;
+  /** Jumlah menit terlambat semua sesi hari itu. */
+  menit: number;
   sakit: number;
   izin: number;
   dispensasi: number;
@@ -192,7 +195,7 @@ export function susunLaporanKehadiran(
           if (kode === "H" || kode === "T") hasil.hadir++;
           if (kode === "T") {
             hasil.terlambat++;
-            hasil.menitTerlambat += Number(hari?.telat) || 0;
+            hasil.menitTerlambat += Number(hari?.menit) || 0;
           }
           if (kode === "S") hasil.sakit++;
           if (kode === "I") hasil.izin++;
