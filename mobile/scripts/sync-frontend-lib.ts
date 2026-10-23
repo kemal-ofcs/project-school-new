@@ -36,6 +36,9 @@ const filesToCopy = [
   "components/AutoWaSenderRunner.tsx",
   "components/AutoPemberitahuanRunner.tsx",
   "components/AutoSyncRunner.tsx",
+  // Bel sekolah per perangkat (v60): runner di shell dan panel pengaturannya.
+  "components/BelSekolahRunner.tsx",
+  "components/BelPerangkatPanel.tsx",
   "components/LivenessCapture.tsx",
   // UI inventaris: satu komponen untuk ketiga build. Hanya bergantung pada
   // kontrak `Modal` yang sama dan gateway tersinkron; pesan sukses/galat ditulis

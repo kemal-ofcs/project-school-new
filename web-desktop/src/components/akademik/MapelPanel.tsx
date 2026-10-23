@@ -49,6 +49,7 @@ export function MapelPanel({
             <tr>
               <th className="px-6 py-4">Kode</th>
               <th className="px-6 py-4">Mata Pelajaran</th>
+              <th className="px-6 py-4">Unit</th>
               <th className="px-6 py-4">Kelompok</th>
               <th className="px-6 py-4">Beban Jam</th>
               <th className="px-6 py-4">KKM</th>
@@ -59,7 +60,7 @@ export function MapelPanel({
             {loading ? (
               <tr>
                 <td
-                  colSpan={6}
+                  colSpan={7}
                   className="px-6 py-8 text-center text-slate-400"
                 >
                   Memuat data mata pelajaran...
@@ -68,7 +69,7 @@ export function MapelPanel({
             ) : mapelList.length === 0 ? (
               <tr>
                 <td
-                  colSpan={6}
+                  colSpan={7}
                   className="px-6 py-8 text-center text-slate-400"
                 >
                   Belum ada kurikulum mata pelajaran.
@@ -84,6 +85,11 @@ export function MapelPanel({
                     </td>
                     <td className="px-6 py-4 font-bold text-white">
                       {String(item.nama_mapel)}
+                    </td>
+                    <td className="px-6 py-4 text-xs text-slate-300">
+                      {item.id_unit
+                        ? String(item.nama_unit || "Unit tidak ditemukan")
+                        : "Semua unit"}
                     </td>
                     <td className="px-6 py-4">
                       <span className="rounded-full bg-slate-800 px-2.5 py-0.5 text-xs font-semibold text-slate-300">
@@ -126,6 +132,9 @@ export function MapelPanel({
                                 beban_jam: Number(item.beban_jam),
                                 kkm: Number(item.kkm),
                                 is_aktif: Number(item.is_aktif),
+                                id_unit: item.id_unit
+                                  ? String(item.id_unit)
+                                  : null,
                               });
                               setModalType("mapel");
                             }}

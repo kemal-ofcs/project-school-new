@@ -34,15 +34,83 @@ import {
  */
 export const MAX_JAM_KE = 20;
 
-/** Jenis baris pada jadwal bel sekolah. */
+/**
+ * Jenis baris pada jadwal bel sekolah. `Pulang` (v60) hanya penanda bel jam
+ * pulang: tidak bernomor dan tidak punya jam selesai.
+ */
 export const JENIS_JAM_PELAJARAN = [
   "KBM",
   "Istirahat",
   "Upacara",
   "Ekstrakurikuler",
+  "Pulang",
 ] as const;
 
 export type JenisJamPelajaran = (typeof JENIS_JAM_PELAJARAN)[number];
+
+/**
+ * Suara bel per baris (v60). Nada dibangkitkan Web Audio, MP3 dibaca dari
+ * perangkat bel itu sendiri (tidak ikut sinkronisasi), pengumuman memakai TTS.
+ * Kolomnya tanpa CHECK supaya nada baru tidak menuntut rebuild tabel; nilai
+ * asing ditolak di titik simpan. Cerminan `SUARA_BEL` di `class_attendance.rs`.
+ */
+export const SUARA_BEL = [
+  "nada-1",
+  "nada-2",
+  "nada-3",
+  "mp3-1",
+  "mp3-2",
+  "mp3-3",
+  "pengumuman",
+] as const;
+
+export type SuaraBel = (typeof SUARA_BEL)[number];
+
+export const SUARA_BEL_BAWAAN: SuaraBel = "nada-1";
+
+export const LABEL_SUARA_BEL: Record<SuaraBel, string> = {
+  "nada-1": "Ding-dong",
+  "nada-2": "Tiga nada",
+  "nada-3": "Bel panjang",
+  "mp3-1": "MP3 1",
+  "mp3-2": "MP3 2",
+  "mp3-3": "MP3 3",
+  pengumuman: "Pengumuman suara",
+};
+
+/**
+ * Kosong jatuh ke nada bawaan, nilai asing `null` (ditolak pemanggil).
+ * Cerminan `normalize_suara_bel` di `class_attendance.rs`; vektor sama.
+ */
+export function normalizeSuaraBel(
+  raw: string | null | undefined,
+): SuaraBel | null {
+  const value = String(raw ?? "").trim();
+  if (value === "") return SUARA_BEL_BAWAAN;
+  return (SUARA_BEL as readonly string[]).includes(value)
+    ? (value as SuaraBel)
+    : null;
+}
+
+/**
+ * Jam selesai yang disimpan untuk satu baris bel. Baris `Pulang` hanya punya
+ * satu pukul, jadi jam selesainya disamakan dengan jam mulai; jenis lain
+ * wajib selesai sesudah mulai. Cerminan `atur_jam_selesai_bel`; vektor sama.
+ */
+export function aturJamSelesaiBel(
+  jenis: string,
+  jamMulai: string,
+  jamSelesai: string,
+): { ok: true; jamSelesai: string } | { ok: false; pesan: string } {
+  if (jenis === "Pulang") return { ok: true, jamSelesai: jamMulai };
+  if (jamSelesai <= jamMulai) {
+    return {
+      ok: false,
+      pesan: "Jam selesai harus lebih lambat daripada jam mulai.",
+    };
+  }
+  return { ok: true, jamSelesai };
+}
 
 /**
  * Normalisasi jam dinding `HH:MM` pada jadwal bel.
@@ -116,6 +184,54 @@ export function parseJpDuration(raw: string | null | undefined): number {
     return DEFAULT_JP_DURATION_MINUTES;
   }
   return value;
+}
+
+/**
+ * Kunci pengaturan JP milik satu unit (v60), misalnya `jp_max_per_hari:unt_1`.
+ * Kunci tanpa akhiran tetap berlaku untuk "Semua unit" dan menjadi cadangan.
+ * Cerminan `jp_unit_key` di `class_attendance.rs`.
+ */
+export function jpUnitKey(base: string, idUnit: string): string {
+  return `${base}:${idUnit}`;
+}
+
+/**
+ * Batas JP sebuah unit: nilai unitnya bila sah, kalau tidak nilai sekolah.
+ * Nilai unit yang rusak jatuh ke nilai sekolah, BUKAN ke bawaan 12, supaya
+ * salah tulis di satu unit tidak diam-diam melonggarkan kebijakan sekolah.
+ * Cerminan `jp_max_for_unit`; vektor sama.
+ */
+export function parseJpMaxForUnit(
+  unitRaw: string | null | undefined,
+  sekolahRaw: string | null | undefined,
+): number {
+  const value = Number(String(unitRaw ?? "").trim());
+  if (
+    String(unitRaw ?? "").trim() !== "" &&
+    Number.isInteger(value) &&
+    value >= 1 &&
+    value <= MAX_JAM_KE
+  ) {
+    return value;
+  }
+  return parseJpMaxPerDay(sekolahRaw);
+}
+
+/** Lama JP sebuah unit, pola yang sama. Cerminan `jp_duration_for_unit`. */
+export function parseJpDurationForUnit(
+  unitRaw: string | null | undefined,
+  sekolahRaw: string | null | undefined,
+): number {
+  const value = Number(String(unitRaw ?? "").trim());
+  if (
+    String(unitRaw ?? "").trim() !== "" &&
+    Number.isInteger(value) &&
+    value >= 1 &&
+    value <= 240
+  ) {
+    return value;
+  }
+  return parseJpDuration(sekolahRaw);
 }
 
 /**
@@ -240,6 +356,7 @@ export function aturNomorJamBel(
   batas: number,
 ): { ok: true; jamKe: number } | { ok: false; pesan: string } {
   if (jenis !== "KBM") return { ok: true, jamKe: 1 };
+  // `batas` adalah batas unit baris bel itu (v60), bukan selalu batas sekolah.
   if (!Number.isInteger(jamKe) || jamKe < 1 || jamKe > batas) {
     return {
       ok: false,
@@ -256,6 +373,98 @@ export interface JamBelLike {
   jam_selesai: string;
   jenis: string;
   is_aktif: number;
+}
+
+/** Cakupan satu baris bel (v60). `null` = semua unit / setiap hari. */
+export interface CakupanBel {
+  id_unit?: string | null;
+  hari?: number | null;
+}
+
+/**
+ * Baris bel yang berlaku untuk satu unit pada satu hari.
+ *
+ * Satu cakupan dipakai UTUH, tidak dicampur: begitu unit (atau hari) punya
+ * baris sendiri, baris umum tidak ikut. Mencampurnya akan membunyikan bel
+ * pulang Jumat dan bel pulang biasa sekaligus. Urutannya unit+hari, unit
+ * setiap hari, semua unit+hari, lalu semua unit setiap hari. Hanya dipakai UI
+ * (bel, presensi, jadwal), jadi tidak punya cerminan Rust.
+ */
+export function jadwalBelBerlaku<T extends CakupanBel>(
+  periods: readonly T[],
+  idUnit: string | null,
+  hari: number | null,
+): T[] {
+  const unit = idUnit?.trim() || null;
+  const cocok = (row: T, u: string | null, h: number | null) =>
+    (row.id_unit?.trim() || null) === u && (row.hari ?? null) === h;
+  const urutan: [string | null, number | null][] = unit
+    ? [
+        [unit, hari],
+        [unit, null],
+        [null, hari],
+        [null, null],
+      ]
+    : [
+        [null, hari],
+        [null, null],
+      ];
+  for (const [u, h] of urutan) {
+    const rows = periods.filter((row) => cocok(row, u, h));
+    if (rows.length > 0) return rows;
+  }
+  return [];
+}
+
+/**
+ * Baris yang dibunyikan perangkat bel pada satu hari: gabungan jadwal setiap
+ * unit yang dipilih perangkat itu (kosong = jadwal "Semua unit"), hanya yang
+ * aktif dan berbunyi, satu baris per pukul supaya dua unit yang bersamaan
+ * tidak berbunyi dua kali.
+ */
+export function barisBelBerbunyi<
+  T extends CakupanBel & { jam_mulai: string; is_aktif: number; bunyi: number },
+>(periods: readonly T[], units: readonly string[], hari: number | null): T[] {
+  const cakupan = units.length > 0 ? units : [null];
+  const perPukul = new Map<string, T>();
+  for (const unit of cakupan) {
+    for (const row of jadwalBelBerlaku(periods, unit, hari)) {
+      if (row.is_aktif !== 1 || row.bunyi !== 1) continue;
+      if (!perPukul.has(row.jam_mulai)) perPukul.set(row.jam_mulai, row);
+    }
+  }
+  return [...perPukul.values()].sort((a, b) =>
+    a.jam_mulai.localeCompare(b.jam_mulai),
+  );
+}
+
+/** Kalimat pengumuman suara untuk satu baris bel. */
+export function teksPengumumanBel(row: {
+  jenis: string;
+  jam_ke: number;
+}): string {
+  switch (row.jenis) {
+    case "KBM":
+      return `Jam pelajaran ke-${row.jam_ke} dimulai.`;
+    case "Istirahat":
+      return "Waktu istirahat.";
+    case "Upacara":
+      return "Waktu upacara. Silakan menuju lapangan.";
+    case "Ekstrakurikuler":
+      return "Waktu kegiatan ekstrakurikuler.";
+    case "Pulang":
+      return "Waktu pulang. Hati-hati di jalan.";
+    default:
+      return "Bel berbunyi.";
+  }
+}
+
+/** Hari dari tanggal `YYYY-MM-DD`, 1=Senin sampai 7=Minggu; `null` bila rusak. */
+export function hariDariTanggal(tanggal: string): number | null {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(tanggal)) return null;
+  const hari = new Date(`${tanggal}T00:00:00Z`).getUTCDay();
+  if (Number.isNaN(hari)) return null;
+  return hari === 0 ? 7 : hari;
 }
 
 /** Baris KBM yang aktif, urut nomor jam pelajarannya. */

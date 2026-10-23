@@ -5,6 +5,7 @@ import {
   parseUnitKeterangan,
   resolveTingkatOptions,
   serializeUnitKeterangan,
+  unitDariTingkat,
 } from "./academic-levels";
 
 describe("academic-levels", () => {
@@ -129,5 +130,34 @@ describe("academic-levels", () => {
     // Fallback jika tidak ditemukan
     expect(formatTingkatDisplay(10, unitList)).toBe("Kelas 10");
     expect(formatTingkatDisplay(null, unitList)).toBe("-");
+  });
+});
+
+describe("unitDariTingkat", () => {
+  const unit = (id: string, tingkat: number[]) => ({
+    id_unit: id,
+    keterangan: JSON.stringify({
+      deskripsi: "",
+      daftar_tingkat: tingkat.map((t) => ({ tingkat: t, nama: `Kelas ${t}` })),
+    }),
+  });
+  const daftar = [
+    unit("smp", [7, 8, 9]),
+    unit("sma", [10, 11, 12]),
+    unit("smk", [10, 11, 12, 13]),
+  ];
+
+  it("mengambil unit bila tingkat itu milik satu unit saja", () => {
+    expect(unitDariTingkat(daftar, 8)).toBe("smp");
+    expect(unitDariTingkat(daftar, "13")).toBe("smk");
+  });
+
+  it("tidak menebak bila tingkat dipakai dua unit atau tidak terdaftar", () => {
+    expect(unitDariTingkat(daftar, 10)).toBeNull();
+    expect(unitDariTingkat(daftar, 3)).toBeNull();
+    expect(unitDariTingkat(daftar, null)).toBeNull();
+    expect(
+      unitDariTingkat([{ id_unit: "x", keterangan: "teks biasa" }], 1),
+    ).toBeNull();
   });
 });

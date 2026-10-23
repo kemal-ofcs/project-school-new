@@ -171,6 +171,8 @@ describe("dynamic RBAC migration", () => {
       58,
       // v59 — berkas siswa (`siswa_berkas`, cloud-only).
       59,
+      // v60 — unit mapel/rombel, jam pelajaran per unit dan hari, bunyi bel.
+      60,
     ]);
 
     const sessionColumns = await client.execute(

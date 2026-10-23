@@ -122,6 +122,98 @@ class AudioSynthesizer {
     }
   }
 
+  /**
+   * Membuka audio yang dikunci kebijakan autoplay. Peramban baru mengizinkan
+   * suara setelah ada klik atau ketukan, jadi bel sekolah memanggilnya dari
+   * interaksi pertama. `true` bila audio siap berbunyi.
+   */
+  public async bukaKunci(): Promise<boolean> {
+    this.initContext();
+    if (!this.audioCtx) return false;
+    if (this.audioCtx.state === "suspended") {
+      try {
+        await this.audioCtx.resume();
+      } catch {
+        // Masih terkunci; pemanggil menampilkan tombol untuk membukanya.
+      }
+    }
+    return this.audioCtx.state === "running";
+  }
+
+  /** Nada bel sekolah: 1 ding-dong, 2 tiga nada, 3 bel panjang berdering. */
+  public playNadaBel(nada: 1 | 2 | 3) {
+    this.initContext();
+    const ctx = this.audioCtx;
+    if (!ctx) return;
+
+    try {
+      const now = ctx.currentTime;
+      const nadaTunggal = (freq: number, start: number, lama: number) => {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = "sine";
+        osc.frequency.setValueAtTime(freq, start);
+        gain.gain.setValueAtTime(0.4, start);
+        gain.gain.exponentialRampToValueAtTime(0.001, start + lama);
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start(start);
+        osc.stop(start + lama);
+      };
+
+      if (nada === 1) {
+        nadaTunggal(659.25, now, 1.2); // E5
+        nadaTunggal(523.25, now + 0.6, 1.6); // C5
+      } else if (nada === 2) {
+        [523.25, 659.25, 783.99].forEach((freq, idx) => {
+          nadaTunggal(freq, now + idx * 0.45, 1.2);
+        });
+      } else {
+        // Dering bel listrik: nada segitiga yang dipukul 20 kali per detik.
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        const lfo = ctx.createOscillator();
+        const lfoGain = ctx.createGain();
+        osc.type = "triangle";
+        osc.frequency.setValueAtTime(880, now);
+        lfo.type = "square";
+        lfo.frequency.setValueAtTime(20, now);
+        lfoGain.gain.setValueAtTime(0.2, now);
+        gain.gain.setValueAtTime(0.2, now);
+        gain.gain.setValueAtTime(0.2, now + 3);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 3.3);
+        lfo.connect(lfoGain);
+        lfoGain.connect(gain.gain);
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start(now);
+        lfo.start(now);
+        osc.stop(now + 3.3);
+        lfo.stop(now + 3.3);
+      }
+    } catch {
+      // Ignore audio autoplay policy errors
+    }
+  }
+
+  /** Memutar berkas audio (MP3 bel) lewat konteks yang sama dengan nada. */
+  public async playBerkas(data: ArrayBuffer): Promise<boolean> {
+    this.initContext();
+    const ctx = this.audioCtx;
+    if (!ctx) return false;
+    try {
+      // `slice` karena `decodeAudioData` mengosongkan buffer yang diberikan.
+      const buffer = await ctx.decodeAudioData(data.slice(0));
+      const source = ctx.createBufferSource();
+      source.buffer = buffer;
+      source.connect(ctx.destination);
+      source.start();
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
   private cachedVoices: SpeechSynthesisVoice[] = [];
   private voicesInitialized = false;
 

@@ -2630,9 +2630,12 @@ pub async fn desktop_delete_lesson_period(
 /// Pengaturan jam pelajaran. Dibaca layar presensi, jadi cukup butuh SESI —
 /// gurunya harus tahu berapa jam pelajaran yang tersedia sebelum menyimpan.
 #[tauri::command]
-pub fn desktop_get_jp_settings(state: State<'_, DesktopState>) -> Result<Value, CommandError> {
+pub fn desktop_get_jp_settings(
+    state: State<'_, DesktopState>,
+    id_unit: Option<String>,
+) -> Result<Value, CommandError> {
     require_permission(&state, "home.view")?;
-    class_attendance::get_jp_settings(&state)
+    class_attendance::get_jp_settings(&state, id_unit.as_deref())
 }
 
 #[tauri::command]
@@ -2640,9 +2643,11 @@ pub async fn desktop_save_jp_settings(
     state: State<'_, DesktopState>,
     max_per_hari: i64,
     durasi_menit: i64,
+    id_unit: Option<String>,
 ) -> Result<Value, CommandError> {
     require_permission(&state, "settings.manage")?;
-    let hasil = class_attendance::save_jp_settings(&state, max_per_hari, durasi_menit)?;
+    let hasil =
+        class_attendance::save_jp_settings(&state, max_per_hari, durasi_menit, id_unit.as_deref())?;
     let _ = sync::push_outbox(&state).await;
     Ok(hasil)
 }

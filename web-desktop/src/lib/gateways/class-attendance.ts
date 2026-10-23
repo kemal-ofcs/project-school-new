@@ -3,6 +3,10 @@
 import { requestWebApi } from "@/lib/client/api-client";
 import { isDesktopRuntime } from "@/lib/runtime/app-runtime";
 import { invokeDesktop, kickDesktopSync } from "@/lib/runtime/desktop-commands";
+import type {
+  JenisJamPelajaran,
+  SuaraBel,
+} from "@/lib/validations/class-attendance";
 
 export interface ClassAttendanceSession {
   id_presensi_mapel: string;
@@ -194,30 +198,36 @@ export interface JpSettings {
   durasiMenit: number;
   /** Pagar terluar yang dieja di kode; batas sekolah tidak boleh melampauinya. */
   batasStruktural: number;
+  /** Unit yang diminta sudah punya nilainya sendiri (v60). */
+  khususUnit: boolean;
 }
 
-export async function getJpSettings(): Promise<JpSettings> {
+/** `idUnit` kosong = pengaturan sekolah; unit tanpa nilai sendiri ikut sekolah. */
+export async function getJpSettings(
+  idUnit: string | null = null,
+): Promise<JpSettings> {
   if (isDesktopRuntime()) {
-    return invokeDesktop<JpSettings>("desktop_get_jp_settings");
+    return invokeDesktop<JpSettings>("desktop_get_jp_settings", { idUnit });
   }
-  return requestWebApi<JpSettings>("/api/settings/jp", "POST", {});
+  return requestWebApi<JpSettings>("/api/settings/jp", "POST", { idUnit });
 }
 
 export async function saveJpSettings(
   maxPerHari: number,
   durasiMenit: number,
+  idUnit: string | null,
 ): Promise<boolean> {
   if (isDesktopRuntime()) {
     const result = await invokeDesktop<{ sukses: boolean }>(
       "desktop_save_jp_settings",
-      { maxPerHari, durasiMenit },
+      { maxPerHari, durasiMenit, idUnit },
     );
     return result.sukses;
   }
   const response = await requestWebApi<{ sukses: boolean }>(
     "/api/settings/jp",
     "PUT",
-    { maxPerHari, durasiMenit },
+    { maxPerHari, durasiMenit, idUnit },
   );
   return response.sukses;
 }
@@ -228,11 +238,17 @@ export interface LessonPeriodRow {
   jam_ke: number;
   jam_mulai: string;
   jam_selesai: string;
-  jenis: "KBM" | "Istirahat" | "Upacara" | "Ekstrakurikuler";
+  jenis: JenisJamPelajaran;
   keterangan: string;
   is_aktif: number;
   created_at: string;
   updated_at: string;
+  /** Cakupan (v60): `null` = semua unit / setiap hari (1=Senin … 7=Minggu). */
+  id_unit: string | null;
+  hari: number | null;
+  /** 1 = berbunyi di perangkat bel, 0 = senyap. */
+  bunyi: number;
+  suara: SuaraBel;
 }
 
 export async function getLessonPeriods(): Promise<LessonPeriodRow[]> {

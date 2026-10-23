@@ -5,6 +5,7 @@ import {
   parseUnitKeterangan,
   resolveTingkatOptions,
   serializeUnitKeterangan,
+  unitDariTingkat,
 } from "@/lib/constants/academic-levels";
 import type {
   GuruMapelInput,
@@ -79,6 +80,8 @@ export type AcademicDraft =
       kapasitas: string;
       ruang_kelas: string;
       is_aktif: number;
+      /** "" = belum diatur, ikut pengaturan sekolah (v60). */
+      id_unit: string;
     }
   | {
       kind: "mapel";
@@ -91,6 +94,8 @@ export type AcademicDraft =
       beban_jam: string;
       kkm: string;
       is_aktif: number;
+      /** "" = berlaku di semua unit (v60). */
+      id_unit: string;
     }
   | {
       kind: "penugasan";
@@ -197,6 +202,7 @@ export function toAcademicInput(
           kapasitas,
           ruang_kelas: draft.ruang_kelas.trim() || null,
           is_aktif: draft.is_aktif,
+          id_unit: draft.id_unit || null,
         },
       };
     }
@@ -219,6 +225,7 @@ export function toAcademicInput(
           beban_jam: bebanJam,
           kkm,
           is_aktif: draft.is_aktif,
+          id_unit: draft.id_unit || null,
         },
       };
     }
@@ -671,7 +678,14 @@ export function AkademikFormFields({
                 id="ak-rom-tingkat"
                 value={draft.tingkat}
                 onChange={(e) =>
-                  onChange({ ...draft, tingkat: e.target.value })
+                  onChange({
+                    ...draft,
+                    tingkat: e.target.value,
+                    // Unit diisi dari tingkat bila tingkat itu milik satu unit.
+                    id_unit:
+                      unitDariTingkat(options.unit ?? [], e.target.value) ??
+                      draft.id_unit,
+                  })
                 }
                 className={INPUT}
               >
@@ -704,6 +718,27 @@ export function AkademikFormFields({
               required
               className={INPUT}
             />
+          </div>
+          <div>
+            <label htmlFor="ak-rom-unit" className={LABEL}>
+              Unit
+            </label>
+            <select
+              id="ak-rom-unit"
+              value={draft.id_unit}
+              onChange={(e) => onChange({ ...draft, id_unit: e.target.value })}
+              className={INPUT}
+            >
+              <option value="">Belum diatur (ikut pengaturan sekolah)</option>
+              {(options.unit ?? []).map((u) => (
+                <option key={String(u.id_unit)} value={String(u.id_unit)}>
+                  {String(u.nama_unit)}
+                </option>
+              ))}
+            </select>
+            <p className="mt-1 text-[11px] text-slate-400">
+              Menentukan jam pelajaran dan jadwal bel yang berlaku.
+            </p>
           </div>
           <div>
             <label htmlFor="ak-rom-jur" className={LABEL}>
@@ -850,6 +885,28 @@ export function AkademikFormFields({
               required
               className={INPUT}
             />
+          </div>
+          <div>
+            <label htmlFor="ak-map-unit" className={LABEL}>
+              Unit
+            </label>
+            <select
+              id="ak-map-unit"
+              value={draft.id_unit}
+              onChange={(e) => onChange({ ...draft, id_unit: e.target.value })}
+              className={INPUT}
+            >
+              <option value="">Semua unit</option>
+              {(options.unit ?? []).map((u) => (
+                <option key={String(u.id_unit)} value={String(u.id_unit)}>
+                  {String(u.nama_unit)}
+                </option>
+              ))}
+            </select>
+            <p className="mt-1 text-[11px] text-slate-400">
+              Kode mapel boleh sama di unit berbeda, misalnya IND untuk SMP dan
+              SMK.
+            </p>
           </div>
           <div className="grid grid-cols-2 gap-2">
             <div>

@@ -39,6 +39,10 @@ export async function POST(request: NextRequest) {
         jenis?: JenisJamPelajaran;
         keterangan?: string | null;
         is_aktif?: number;
+        id_unit?: string | null;
+        hari?: number | null;
+        bunyi?: number;
+        suara?: string | null;
       };
       id?: string;
     }>(request);

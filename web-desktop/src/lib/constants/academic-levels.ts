@@ -216,6 +216,30 @@ export function formatTingkatDisplay(
 }
 
 /**
+ * Unit pemilik sebuah tingkat (v60), atau `null` bila tingkat itu tidak
+ * terdaftar atau dipakai lebih dari satu unit (misalnya SMA dan SMK sama-sama
+ * kelas 10). Dipakai untuk mengisi unit rombel secara otomatis; tebakan yang
+ * ambigu sengaja tidak diambil.
+ */
+export function unitDariTingkat(
+  unitList: Record<string, unknown>[],
+  tingkat: number | string | null | undefined,
+): string | null {
+  const num = Number(tingkat);
+  if (tingkat === null || tingkat === undefined || Number.isNaN(num)) {
+    return null;
+  }
+  const pemilik = unitList.filter((u) =>
+    parseUnitKeterangan(u.keterangan).daftar_tingkat.some(
+      (item) => item.tingkat === num,
+    ),
+  );
+  return pemilik.length === 1
+    ? String(pemilik[0]?.id_unit ?? "") || null
+    : null;
+}
+
+/**
  * Template preset untuk bantuan isi cepat di formulir Unit (opsional jika pengguna menginginkannya).
  */
 export const PRESET_TINGKAT_TEMPLATES: Record<

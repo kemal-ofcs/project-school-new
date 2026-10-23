@@ -165,6 +165,27 @@ fn assert_unique_value(
     Ok(())
 }
 
+/// Unit yang dirujuk mapel/rombel (v60) wajib ada; kosong tidak diperiksa.
+fn assert_unit_exists(
+    transaction: &rusqlite::Transaction<'_>,
+    id_unit: &str,
+) -> Result<(), CommandError> {
+    let ada: bool = transaction
+        .query_row(
+            "SELECT EXISTS(SELECT 1 FROM akademik_unit WHERE id_unit = ?1);",
+            params![id_unit],
+            |row| row.get(0),
+        )
+        .map_err(|_| CommandError::internal())?;
+    if !ada {
+        return Err(CommandError::new(
+            "VALIDATION_ERROR",
+            "Unit tidak ditemukan. Muat ulang daftar unit.",
+        ));
+    }
+    Ok(())
+}
+
 /// Daftarkan perubahan `master_data` milik guru/siswa ke outbox.
 ///
 /// `master_data` ikut disinkronkan, jadi baris yang ditulis di sini WAJIB punya
@@ -823,10 +844,12 @@ pub fn list_academic_classes(
                r.id_wali_kelas, r.kapasitas, r.ruang_kelas, r.is_aktif,
                j.nama_jurusan, j.kode_jurusan,
                w.nama AS nama_wali_kelas,
-               (SELECT COUNT(*) FROM siswa_data s WHERE s.id_rombel = r.id_rombel AND s.status = 'Aktif') AS jumlah_siswa
+               (SELECT COUNT(*) FROM siswa_data s WHERE s.id_rombel = r.id_rombel AND s.status = 'Aktif') AS jumlah_siswa,
+               r.id_unit, u.nama_unit
         FROM akademik_rombel r
         LEFT JOIN akademik_jurusan j ON j.id_jurusan = r.id_jurusan
         LEFT JOIN master_data w ON w.id_unik = r.id_wali_kelas
+        LEFT JOIN akademik_unit u ON u.id_unit = r.id_unit
         WHERE (?1 IS NULL OR r.id_tahun_ajaran = ?1)
         ORDER BY r.tingkat ASC, r.nama_rombel ASC;
     "#;
@@ -848,6 +871,8 @@ pub fn list_academic_classes(
                 "kode_jurusan": row.get::<_, Option<String>>(10)?,
                 "nama_wali_kelas": row.get::<_, Option<String>>(11)?,
                 "jumlah_siswa": row.get::<_, i64>(12)?,
+                "id_unit": row.get::<_, Option<String>>(13)?,
+                "nama_unit": row.get::<_, Option<String>>(14)?,
             }))
         })
         .map_err(|_| CommandError::internal())?
@@ -876,6 +901,8 @@ pub fn save_academic_class(state: &DesktopState, draft: &Value) -> Result<Value,
     let kapasitas = integer(draft, "kapasitas", 36);
     let ruang_kelas = optional_text(draft, "ruang_kelas");
     let is_aktif = integer(draft, "is_aktif", 1);
+    // Unit rombel (v60); kosong = belum diatur, memakai pengaturan sekolah.
+    let id_unit = optional_text(draft, "id_unit");
 
     if id_ta.is_empty() || nama_rombel.is_empty() {
         return Err(CommandError::new(
@@ -883,13 +910,16 @@ pub fn save_academic_class(state: &DesktopState, draft: &Value) -> Result<Value,
             "Tahun ajaran dan nama rombel wajib diisi.",
         ));
     }
+    if let Some(unit) = id_unit.as_deref() {
+        assert_unit_exists(&tx, unit)?;
+    }
 
     tx.execute(
         r#"
         INSERT INTO akademik_rombel (
             id_rombel, id_tahun_ajaran, tingkat, id_jurusan, nama_rombel,
-            id_wali_kelas, kapasitas, ruang_kelas, is_aktif
-        ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)
+            id_wali_kelas, kapasitas, ruang_kelas, is_aktif, id_unit
+        ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)
         ON CONFLICT(id_rombel) DO UPDATE SET
             id_tahun_ajaran = excluded.id_tahun_ajaran,
             tingkat = excluded.tingkat,
@@ -898,7 +928,8 @@ pub fn save_academic_class(state: &DesktopState, draft: &Value) -> Result<Value,
             id_wali_kelas = excluded.id_wali_kelas,
             kapasitas = excluded.kapasitas,
             ruang_kelas = excluded.ruang_kelas,
-            is_aktif = excluded.is_aktif;
+            is_aktif = excluded.is_aktif,
+            id_unit = excluded.id_unit;
         "#,
         params![
             id,
@@ -909,7 +940,8 @@ pub fn save_academic_class(state: &DesktopState, draft: &Value) -> Result<Value,
             id_wali_kelas,
             kapasitas,
             ruang_kelas,
-            is_aktif
+            is_aktif,
+            id_unit
         ],
     )
     .map_err(|e| CommandError::new("DB_ERROR", format!("Gagal menyimpan rombel: {e}")))?;
@@ -926,6 +958,7 @@ pub fn save_academic_class(state: &DesktopState, draft: &Value) -> Result<Value,
         "kapasitas": kapasitas,
         "ruang_kelas": ruang_kelas,
         "is_aktif": is_aktif,
+        "id_unit": id_unit,
     });
 
     sync::enqueue(&tx, &client_id, "academic-class", op, &id, &payload, None)?;
@@ -973,9 +1006,11 @@ pub fn list_academic_subjects(state: &DesktopState) -> Result<Value, CommandErro
     let mut stmt = conn
         .prepare(
             r#"
-            SELECT id_mapel, kode_mapel, nama_mapel, tingkat, kelompok, beban_jam, kkm, is_aktif
-            FROM akademik_mapel
-            ORDER BY kode_mapel ASC;
+            SELECT m.id_mapel, m.kode_mapel, m.nama_mapel, m.tingkat, m.kelompok,
+                   m.beban_jam, m.kkm, m.is_aktif, m.id_unit, u.nama_unit
+            FROM akademik_mapel m
+            LEFT JOIN akademik_unit u ON u.id_unit = m.id_unit
+            ORDER BY m.kode_mapel ASC;
             "#,
         )
         .map_err(|_| CommandError::internal())?;
@@ -991,6 +1026,8 @@ pub fn list_academic_subjects(state: &DesktopState) -> Result<Value, CommandErro
                 "beban_jam": row.get::<_, i64>(5)?,
                 "kkm": row.get::<_, i64>(6)?,
                 "is_aktif": row.get::<_, i64>(7)?,
+                "id_unit": row.get::<_, Option<String>>(8)?,
+                "nama_unit": row.get::<_, Option<String>>(9)?,
             }))
         })
         .map_err(|_| CommandError::internal())?
@@ -1023,6 +1060,8 @@ pub fn save_academic_subject(state: &DesktopState, draft: &Value) -> Result<Valu
     let beban = integer(draft, "beban_jam", 2);
     let kkm = integer(draft, "kkm", 75);
     let is_aktif = integer(draft, "is_aktif", 1);
+    // Unit mapel (v60); kosong = berlaku di semua unit.
+    let id_unit = optional_text(draft, "id_unit");
 
     if kode.is_empty() || nama.is_empty() {
         return Err(CommandError::new(
@@ -1030,22 +1069,34 @@ pub fn save_academic_subject(state: &DesktopState, draft: &Value) -> Result<Valu
             "Kode mapel dan nama mapel wajib diisi.",
         ));
     }
+    if let Some(unit) = id_unit.as_deref() {
+        assert_unit_exists(&tx, unit)?;
+    }
 
-    assert_unique_value(
-        &tx,
-        "akademik_mapel",
-        "kode_mapel",
-        "id_mapel",
-        kode,
-        &id,
-        "Kode mata pelajaran sudah dipakai mapel lain.",
-    )?;
+    // Kode unik PER UNIT (v60): "IND" boleh ada di SMP dan SMK. Mapel "Semua
+    // unit" bertabrakan dengan unit mana pun. Cerminan `saveAcademicSubject`.
+    let bentrok = tx
+        .prepare(
+            "SELECT 1 FROM akademik_mapel
+             WHERE LOWER(TRIM(kode_mapel)) = LOWER(TRIM(?1)) AND id_mapel <> ?2
+               AND (NULLIF(TRIM(id_unit), '') IS NULL OR ?3 IS NULL OR id_unit = ?3)
+             LIMIT 1;",
+        )
+        .map_err(|_| CommandError::internal())?
+        .exists(params![kode, id, id_unit])
+        .map_err(|_| CommandError::internal())?;
+    if bentrok {
+        return Err(CommandError::new(
+            "VALIDATION_ERROR",
+            "Kode mata pelajaran sudah dipakai mapel lain di unit yang sama.",
+        ));
+    }
 
     tx.execute(
         r#"
         INSERT INTO akademik_mapel (
-            id_mapel, kode_mapel, nama_mapel, tingkat, kelompok, beban_jam, kkm, is_aktif
-        ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)
+            id_mapel, kode_mapel, nama_mapel, tingkat, kelompok, beban_jam, kkm, is_aktif, id_unit
+        ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)
         ON CONFLICT(id_mapel) DO UPDATE SET
             kode_mapel = excluded.kode_mapel,
             nama_mapel = excluded.nama_mapel,
@@ -1053,9 +1104,10 @@ pub fn save_academic_subject(state: &DesktopState, draft: &Value) -> Result<Valu
             kelompok = excluded.kelompok,
             beban_jam = excluded.beban_jam,
             kkm = excluded.kkm,
-            is_aktif = excluded.is_aktif;
+            is_aktif = excluded.is_aktif,
+            id_unit = excluded.id_unit;
         "#,
-        params![id, kode, nama, tingkat, kelompok, beban, kkm, is_aktif],
+        params![id, kode, nama, tingkat, kelompok, beban, kkm, is_aktif, id_unit],
     )
     .map_err(|e| CommandError::new("DB_ERROR", format!("Gagal menyimpan mapel: {e}")))?;
 
@@ -1070,6 +1122,7 @@ pub fn save_academic_subject(state: &DesktopState, draft: &Value) -> Result<Valu
         "beban_jam": beban,
         "kkm": kkm,
         "is_aktif": is_aktif,
+        "id_unit": id_unit,
     });
 
     sync::enqueue(&tx, &client_id, "academic-subject", op, &id, &payload, None)?;
@@ -1406,6 +1459,29 @@ pub fn save_teaching_schedule(
 
     let mut conn = storage::database(&state.data_dir)?;
     let tx = conn.transaction().map_err(|_| CommandError::internal())?;
+
+    // Mapel milik unit lain tidak boleh dijadwalkan di rombel itu (v60). Unit
+    // kosong di salah satunya berarti "semua unit" dan selalu cocok. Cerminan
+    // `saveTeachingSchedule` di `schedule.ts`.
+    let (unit_mapel, unit_rombel): (Option<String>, Option<String>) = tx
+        .query_row(
+            "SELECT (SELECT id_unit FROM akademik_mapel WHERE id_mapel = ?1),
+                    (SELECT id_unit FROM akademik_rombel WHERE id_rombel = ?2);",
+            params![id_mapel, id_rombel],
+            |row| Ok((row.get(0)?, row.get(1)?)),
+        )
+        .map_err(|_| CommandError::internal())?;
+    let unit_mapel = unit_mapel.unwrap_or_default();
+    let unit_rombel = unit_rombel.unwrap_or_default();
+    if !unit_mapel.trim().is_empty()
+        && !unit_rombel.trim().is_empty()
+        && unit_mapel.trim() != unit_rombel.trim()
+    {
+        return Err(CommandError::new(
+            "VALIDATION_ERROR",
+            "Mata pelajaran ini milik unit lain, bukan unit rombel tersebut.",
+        ));
+    }
 
     // Bentrok dinilai dengan cakupan yang SAMA seperti presensi: rombel +
     // mapel + hari, bukan seluruh rombel. Pelajaran Agama memang memecah satu

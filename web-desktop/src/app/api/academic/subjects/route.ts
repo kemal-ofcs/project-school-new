@@ -32,6 +32,7 @@ export async function POST(request: NextRequest) {
         beban_jam?: number;
         kkm?: number;
         is_aktif?: number;
+        id_unit?: string | null;
       };
       id?: string;
     }>(request);

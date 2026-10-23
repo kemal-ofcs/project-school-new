@@ -9,12 +9,15 @@ import { ApiRequestError } from "@/lib/server/http/api-response";
 import { generateWaNotificationId } from "@/lib/services/wa-notification";
 import {
   composeReconciliationMessage,
+  JP_DURATION_SETTING_KEY,
   JP_MAX_PER_DAY_SETTING_KEY,
   jamKeBeririsan,
+  jpUnitKey,
   MAX_JAM_KE,
   normalizeJamKe,
   type ParentNotificationSource,
-  parseJpMaxPerDay,
+  parseJpDurationForUnit,
+  parseJpMaxForUnit,
   REKONSILIASI_TEMPLATE_KINDS,
   rentangJamKe,
 } from "@/lib/validations/class-attendance";
@@ -50,6 +53,48 @@ const GATE_SUMMARY_SUBQUERY = `(
   FROM absensi_harian
   GROUP BY id_karyawan, tanggal
 )`;
+
+/**
+ * Pengaturan JP sebuah unit (atau sekolah bila `idUnit` kosong), dengan
+ * cadangan nilai sekolah. `khususUnit` = unit itu sudah punya nilainya sendiri.
+ * Cerminan `get_jp_settings` di `class_attendance.rs`.
+ */
+export async function readJpSettings(idUnit: string | null) {
+  await ensureDbInitialized();
+  const unit = idUnit?.trim() || null;
+  const keys = [JP_MAX_PER_DAY_SETTING_KEY, JP_DURATION_SETTING_KEY];
+  if (unit) {
+    keys.push(
+      jpUnitKey(JP_MAX_PER_DAY_SETTING_KEY, unit),
+      jpUnitKey(JP_DURATION_SETTING_KEY, unit),
+    );
+  }
+  const result = await db.execute({
+    sql: `SELECT key, value FROM setting_gex_system WHERE key IN (${keys.map(() => "?").join(", ")});`,
+    args: keys,
+  });
+  const nilai = new Map(
+    result.rows.map((row) => [String(row.key), String(row.value ?? "")]),
+  );
+  const maxUnit = unit
+    ? nilai.get(jpUnitKey(JP_MAX_PER_DAY_SETTING_KEY, unit))
+    : undefined;
+  const durasiUnit = unit
+    ? nilai.get(jpUnitKey(JP_DURATION_SETTING_KEY, unit))
+    : undefined;
+  return {
+    maxPerHari: parseJpMaxForUnit(
+      maxUnit,
+      nilai.get(JP_MAX_PER_DAY_SETTING_KEY),
+    ),
+    durasiMenit: parseJpDurationForUnit(
+      durasiUnit,
+      nilai.get(JP_DURATION_SETTING_KEY),
+    ),
+    batasStruktural: MAX_JAM_KE,
+    khususUnit: maxUnit !== undefined || durasiUnit !== undefined,
+  };
+}
 
 export type ClassAttendanceSessionFilter = {
   id_tahun_ajaran?: string;
@@ -322,15 +367,14 @@ export async function saveClassAttendance(draft: SaveClassAttendanceDraft) {
 
   // Batas sekolah ditegakkan SETELAH batas struktural: yang pertama menjaga
   // databasenya, yang kedua kebijakan sekolahnya. Pesan errornya menyebut angka
-  // yang benar-benar dipakai sekolah itu, bukan pagar terluarnya. Cerminan
-  // `configured_jp_max` di `class_attendance.rs`.
-  const batasRow = await db.execute({
-    sql: "SELECT value FROM setting_gex_system WHERE key = ? LIMIT 1;",
-    args: [JP_MAX_PER_DAY_SETTING_KEY],
+  // yang benar-benar dipakai sekolah itu, bukan pagar terluarnya. Batasnya
+  // milik unit rombel (v60). Cerminan `configured_jp_max` di `class_attendance.rs`.
+  const rombelRow = await db.execute({
+    sql: "SELECT id_unit FROM akademik_rombel WHERE id_rombel = ?;",
+    args: [idRombel],
   });
-  const batasSekolah = parseJpMaxPerDay(
-    batasRow.rows[0] ? String(batasRow.rows[0].value ?? "") : null,
-  );
+  const unitRombel = String(rombelRow.rows[0]?.id_unit ?? "").trim() || null;
+  const batasSekolah = (await readJpSettings(unitRombel)).maxPerHari;
   const rentang = rentangJamKe(jamKeNormal);
   if (rentang && rentang.akhir > batasSekolah) {
     throw new ApiRequestError(

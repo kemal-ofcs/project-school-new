@@ -15,6 +15,7 @@ import {
   resolveTingkatOptions,
   serializeUnitKeterangan,
   type TingkatItem,
+  unitDariTingkat,
 } from "@/lib/constants/academic-levels";
 import { useAuth } from "@/lib/context/AuthContext";
 import {
@@ -221,6 +222,7 @@ export default function AkademikPage() {
     kapasitas: 36,
     ruang_kelas: "",
     is_aktif: 1,
+    id_unit: null,
   });
 
   // State manajemen tingkat dinamis per unit
@@ -304,6 +306,7 @@ export default function AkademikPage() {
     beban_jam: 2,
     kkm: 75,
     is_aktif: 1,
+    id_unit: null,
   });
 
   const [formPenugasan, setFormPenugasan] = useState<GuruMapelInput>({
@@ -522,6 +525,58 @@ export default function AkademikPage() {
     }
   };
 
+  // Rombel lama belum punya unit (v60). Unitnya diisi dari tingkat, hanya bila
+  // tingkat itu milik satu unit saja, lewat jalur simpan biasa supaya ikut
+  // tersinkronisasi. Rombel yang ambigu dibiarkan untuk diatur manual.
+  const handleIsiUnitOtomatis = async () => {
+    if (!canManage || isSubmittingRef.current) return;
+    const target = rombelList
+      .filter((item) => !String(item.id_unit ?? "").trim())
+      .map((item) => ({
+        item,
+        unit: unitDariTingkat(unitList, item.tingkat as number),
+      }))
+      .filter((entry) => entry.unit !== null);
+    if (target.length === 0) {
+      setFeedback({
+        tone: "warning",
+        message:
+          "Tidak ada rombel yang unitnya bisa ditebak dari tingkat. Atur unitnya lewat tombol ubah.",
+      });
+      return;
+    }
+    isSubmittingRef.current = true;
+    try {
+      for (const { item, unit } of target) {
+        await simpanRombel({
+          id_rombel: String(item.id_rombel),
+          id_tahun_ajaran: String(item.id_tahun_ajaran),
+          tingkat: Number(item.tingkat),
+          id_jurusan: item.id_jurusan ? String(item.id_jurusan) : "",
+          nama_rombel: String(item.nama_rombel),
+          id_wali_kelas: item.id_wali_kelas ? String(item.id_wali_kelas) : "",
+          kapasitas: Number(item.kapasitas),
+          ruang_kelas: item.ruang_kelas ? String(item.ruang_kelas) : "",
+          is_aktif: Number(item.is_aktif),
+          id_unit: unit,
+        });
+      }
+      setFeedback({
+        tone: "success",
+        message: `Unit ${target.length} rombel terisi dari tingkatnya.`,
+      });
+      void loadAllData();
+    } catch (err) {
+      setFeedback({
+        tone: "error",
+        message:
+          err instanceof Error ? err.message : "Gagal mengisi unit rombel.",
+      });
+    } finally {
+      isSubmittingRef.current = false;
+    }
+  };
+
   // Gerbang area: setiap halaman lain melakukan hal yang sama. Backend sudah
   // menegakkan izinnya lewat require_permission/requireWebPermission, tetapi
   // tanpa ini halaman struktur akademik tetap terbuka lewat URL bagi role yang tidak
@@ -619,6 +674,7 @@ export default function AkademikPage() {
                         kapasitas: 36,
                         ruang_kelas: "",
                         is_aktif: 1,
+                        id_unit: unitDariTingkat(unitList, defaultTingkat),
                       });
                     } else if (activeTab === "mapel") {
                       setFormMapel({
@@ -629,6 +685,7 @@ export default function AkademikPage() {
                         beban_jam: 2,
                         kkm: 75,
                         is_aktif: 1,
+                        id_unit: null,
                       });
                     } else if (activeTab === "penugasan") {
                       setFormPenugasan({
@@ -821,6 +878,7 @@ export default function AkademikPage() {
             setModalType={setModalType}
             handleTaFilterChange={handleTaFilterChange}
             handleDeleteItem={handleDeleteItem}
+            handleIsiUnitOtomatis={handleIsiUnitOtomatis}
           />
         ) : null}
 
@@ -855,6 +913,7 @@ export default function AkademikPage() {
             rombelList={rombelList}
             mapelList={mapelList}
             guruList={guruList}
+            unitList={unitList}
             canManage={canManage}
             onFeedback={(tone, message) => setFeedback({ tone, message })}
           />
@@ -1429,6 +1488,11 @@ export default function AkademikPage() {
                             setFormRombel({
                               ...formRombel,
                               tingkat: Number(e.target.value) || 0,
+                              id_unit:
+                                unitDariTingkat(
+                                  unitList,
+                                  Number(e.target.value) || 0,
+                                ) ?? formRombel.id_unit,
                             })
                           }
                           placeholder="Angka tingkat (cth: 0, 1, 10)"
@@ -1443,6 +1507,11 @@ export default function AkademikPage() {
                             setFormRombel({
                               ...formRombel,
                               tingkat: Number(e.target.value),
+                              id_unit:
+                                unitDariTingkat(
+                                  unitList,
+                                  Number(e.target.value),
+                                ) ?? formRombel.id_unit,
                             })
                           }
                           className="mt-1 w-full rounded-xl border border-white/10 bg-slate-900 px-3 py-2 text-sm text-slate-100 focus:border-sky-500 focus:outline-none"
@@ -1488,6 +1557,42 @@ export default function AkademikPage() {
                       </select>
                     </div>
                   ) : null}
+                  <div>
+                    <label
+                      htmlFor="rom-unit"
+                      className="block text-xs font-semibold text-slate-300"
+                    >
+                      Unit
+                    </label>
+                    <select
+                      id="rom-unit"
+                      value={formRombel.id_unit ?? ""}
+                      onChange={(e) =>
+                        setFormRombel({
+                          ...formRombel,
+                          id_unit: e.target.value || null,
+                        })
+                      }
+                      className="mt-1 w-full rounded-xl border border-white/10 bg-slate-900 px-3 py-2 text-sm text-slate-100 focus:border-sky-500 focus:outline-none"
+                    >
+                      <option value="">
+                        Belum diatur (ikut pengaturan sekolah)
+                      </option>
+                      {unitList.map((u) => (
+                        <option
+                          key={String(u.id_unit)}
+                          value={String(u.id_unit)}
+                        >
+                          {String(u.nama_unit)}
+                        </option>
+                      ))}
+                    </select>
+                    <p className="mt-1 text-xs text-slate-400">
+                      Menentukan jam pelajaran dan jadwal bel yang berlaku.
+                      Terisi otomatis dari tingkat bila tingkat itu milik satu
+                      unit saja.
+                    </p>
+                  </div>
                   <div>
                     <label
                       htmlFor="rom-jur"
@@ -1717,6 +1822,40 @@ export default function AkademikPage() {
                       }
                       className="mt-1 w-full rounded-xl border border-white/10 bg-slate-900 px-3 py-2 text-sm text-slate-100 focus:border-sky-500 focus:outline-none"
                     />
+                  </div>
+                  <div>
+                    <label
+                      htmlFor="map-unit"
+                      className="block text-xs font-semibold text-slate-300"
+                    >
+                      Unit
+                    </label>
+                    <select
+                      id="map-unit"
+                      value={formMapel.id_unit ?? ""}
+                      onChange={(e) =>
+                        setFormMapel({
+                          ...formMapel,
+                          id_unit: e.target.value || null,
+                        })
+                      }
+                      className="mt-1 w-full rounded-xl border border-white/10 bg-slate-900 px-3 py-2 text-sm text-slate-100 focus:border-sky-500 focus:outline-none"
+                    >
+                      <option value="">Semua unit</option>
+                      {unitList.map((u) => (
+                        <option
+                          key={String(u.id_unit)}
+                          value={String(u.id_unit)}
+                        >
+                          {String(u.nama_unit)}
+                        </option>
+                      ))}
+                    </select>
+                    <p className="mt-1 text-xs text-slate-400">
+                      Kode mapel boleh sama di unit berbeda, misalnya IND untuk
+                      SMP dan SMK. Jadwal Mengajar hanya menawarkan mapel ini ke
+                      rombel unit tersebut.
+                    </p>
                   </div>
                   <div className="grid grid-cols-2 gap-3">
                     <div>

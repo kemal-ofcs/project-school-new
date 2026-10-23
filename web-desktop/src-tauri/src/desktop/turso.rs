@@ -738,7 +738,8 @@ const ACADEMIC_UNIQUE_RELAXATIONS: &[UniqueRelaxation] = &[
             kelompok TEXT NOT NULL DEFAULT 'Wajib' CHECK (kelompok IN ('Wajib', 'Peminatan', 'Muatan Lokal', 'Kejuruan')),
             beban_jam INTEGER NOT NULL DEFAULT 2 CHECK (beban_jam > 0),
             kkm INTEGER NOT NULL DEFAULT 75,
-            is_aktif INTEGER NOT NULL DEFAULT 1 CHECK (is_aktif IN (0, 1))
+            is_aktif INTEGER NOT NULL DEFAULT 1 CHECK (is_aktif IN (0, 1)),
+            id_unit TEXT
         );",
         columns: "id_mapel, kode_mapel, nama_mapel, tingkat, kelompok, beban_jam, kkm, is_aktif",
         indexes: &[],
@@ -1679,6 +1680,73 @@ impl TursoClient {
             Statement::new("DROP TABLE payroll_components;".to_string(), vec![]),
             Statement::new(
                 format!("ALTER TABLE {staging} RENAME TO payroll_components;"),
+                vec![],
+            ),
+        ])
+        .await?;
+        Ok(())
+    }
+
+    /// Bentuk jadwal bel sejak v60 (jenis `Pulang`, cakupan unit + hari, bunyi
+    /// dan suara bel). Cerminan `ensure_lesson_period_shape` di `storage.rs` dan
+    /// blok v60 di `db-migrations.ts`. Idempoten lewat teks DDL-nya.
+    async fn ensure_lesson_period_shape(&self) -> Result<(), CommandError> {
+        let result = self
+            .query_one(
+                "SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'akademik_jam_pelajaran';",
+                vec![],
+            )
+            .await?;
+        let existing = result
+            .to_objects()
+            .first()
+            .and_then(|row| row.get("sql").and_then(Value::as_str).map(str::to_owned));
+        let Some(existing) = existing else {
+            return Ok(());
+        };
+        if existing.contains("'Pulang'") {
+            return Ok(());
+        }
+
+        const KOLOM: &str = "id_jam_pelajaran, jam_ke, jam_mulai, jam_selesai, jenis, keterangan, is_aktif, created_at, updated_at";
+        // Nama staging dirakit saat runtime, alasannya sama dengan
+        // `ensure_payroll_calc_type_values`.
+        let staging = format!("akademik_jam_pelajaran{}", "__rebuild");
+
+        self.execute_pipeline(vec![
+            Statement::new(format!("DROP TABLE IF EXISTS {staging};"), vec![]),
+            Statement::new(
+                r#"CREATE TABLE akademik_jam_pelajaran__rebuild (
+                    id_jam_pelajaran TEXT PRIMARY KEY,
+                    jam_ke INTEGER NOT NULL CHECK (jam_ke >= 1),
+                    jam_mulai TEXT NOT NULL,
+                    jam_selesai TEXT NOT NULL,
+                    jenis TEXT NOT NULL DEFAULT 'KBM'
+                        CHECK (jenis IN ('KBM', 'Istirahat', 'Upacara', 'Ekstrakurikuler', 'Pulang')),
+                    keterangan TEXT,
+                    is_aktif INTEGER NOT NULL DEFAULT 1 CHECK (is_aktif IN (0, 1)),
+                    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+                    updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+                    id_unit TEXT,
+                    hari INTEGER CHECK (hari IS NULL OR hari BETWEEN 1 AND 7),
+                    bunyi INTEGER NOT NULL DEFAULT 1 CHECK (bunyi IN (0, 1)),
+                    suara TEXT
+                );"#
+                .to_string(),
+                vec![],
+            ),
+            Statement::new(
+                format!("INSERT INTO {staging} ({KOLOM}) SELECT {KOLOM} FROM akademik_jam_pelajaran;"),
+                vec![],
+            ),
+            Statement::new("DROP TABLE akademik_jam_pelajaran;".to_string(), vec![]),
+            Statement::new(
+                format!("ALTER TABLE {staging} RENAME TO akademik_jam_pelajaran;"),
+                vec![],
+            ),
+            Statement::new(
+                "CREATE INDEX IF NOT EXISTS idx_jam_pelajaran_urut ON akademik_jam_pelajaran(jam_ke, jam_mulai);"
+                    .to_string(),
                 vec![],
             ),
         ])
@@ -3121,11 +3189,15 @@ impl TursoClient {
                     jam_mulai TEXT NOT NULL,
                     jam_selesai TEXT NOT NULL,
                     jenis TEXT NOT NULL DEFAULT 'KBM'
-                        CHECK (jenis IN ('KBM', 'Istirahat', 'Upacara', 'Ekstrakurikuler')),
+                        CHECK (jenis IN ('KBM', 'Istirahat', 'Upacara', 'Ekstrakurikuler', 'Pulang')),
                     keterangan TEXT,
                     is_aktif INTEGER NOT NULL DEFAULT 1 CHECK (is_aktif IN (0, 1)),
                     created_at TEXT NOT NULL DEFAULT (datetime('now')),
-                    updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+                    updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+                    id_unit TEXT,
+                    hari INTEGER CHECK (hari IS NULL OR hari BETWEEN 1 AND 7),
+                    bunyi INTEGER NOT NULL DEFAULT 1 CHECK (bunyi IN (0, 1)),
+                    suara TEXT
                 );"#,
                 vec![],
             ),
@@ -3251,7 +3323,8 @@ impl TursoClient {
                     id_wali_kelas TEXT,
                     kapasitas INTEGER NOT NULL DEFAULT 36,
                     ruang_kelas TEXT,
-                    is_aktif INTEGER NOT NULL DEFAULT 1 CHECK (is_aktif IN (0, 1))
+                    is_aktif INTEGER NOT NULL DEFAULT 1 CHECK (is_aktif IN (0, 1)),
+                    id_unit TEXT
                 );"#,
                 vec![],
             ),
@@ -3264,7 +3337,8 @@ impl TursoClient {
                     kelompok TEXT NOT NULL DEFAULT 'Wajib' CHECK (kelompok IN ('Wajib', 'Peminatan', 'Muatan Lokal', 'Kejuruan')),
                     beban_jam INTEGER NOT NULL DEFAULT 2 CHECK (beban_jam > 0),
                     kkm INTEGER NOT NULL DEFAULT 75,
-                    is_aktif INTEGER NOT NULL DEFAULT 1 CHECK (is_aktif IN (0, 1))
+                    is_aktif INTEGER NOT NULL DEFAULT 1 CHECK (is_aktif IN (0, 1)),
+                    id_unit TEXT
                 );"#,
                 vec![],
             ),
@@ -3867,7 +3941,8 @@ impl TursoClient {
                 (56, 'personnel-email', datetime('now')),
                 (57, 'student-dapodik', datetime('now')),
                 (58, 'pmb-unit', datetime('now')),
-                (59, 'student-files', datetime('now'));"#,
+                (59, 'student-files', datetime('now')),
+                (60, 'unit-jp-bell', datetime('now'));"#,
                 vec![],
             ),
         ];
@@ -4183,6 +4258,23 @@ impl TursoClient {
             "ALTER TABLE akademik_jurusan ADD COLUMN id_unit TEXT;",
         )
         .await?;
+        // Unit mapel dan rombel (v60), juga SETELAH rebuild di atas. NULL =
+        // mapel semua unit / rombel belum diatur.
+        self.ensure_column(
+            "akademik_mapel",
+            "id_unit",
+            "ALTER TABLE akademik_mapel ADD COLUMN id_unit TEXT;",
+        )
+        .await?;
+        self.ensure_column(
+            "akademik_rombel",
+            "id_unit",
+            "ALTER TABLE akademik_rombel ADD COLUMN id_unit TEXT;",
+        )
+        .await?;
+        // v60: jenis `Pulang` + cakupan bel. Sebelum `ensure_sync_pulse`,
+        // karena rebuild ikut membuang trigger pulse-nya.
+        self.ensure_lesson_period_shape().await?;
 
         // v25: memperluas CHECK `calc_type`. WAJIB di sini — sebelum
         // `ensure_sync_pulse` — karena membangun ulang tabel ikut membuang
@@ -12059,11 +12151,18 @@ async fn apply_event_to_turso(
                 let kapasitas = row.get("kapasitas").and_then(Value::as_i64).unwrap_or(36);
                 let ruang = row.get("ruang_kelas").and_then(Value::as_str);
                 let is_aktif = row.get("is_aktif").and_then(Value::as_i64).unwrap_or(1);
+                // v60. Kunci yang absen = tidak berubah (payload klien lama).
+                let ada_unit = row.get("id_unit").is_some();
+                let id_unit = row
+                    .get("id_unit")
+                    .and_then(Value::as_str)
+                    .map(str::trim)
+                    .filter(|v| !v.is_empty());
 
                 turso.query_one(
                     r#"INSERT INTO akademik_rombel (
-                        id_rombel, id_tahun_ajaran, tingkat, id_jurusan, nama_rombel, id_wali_kelas, kapasitas, ruang_kelas, is_aktif
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        id_rombel, id_tahun_ajaran, tingkat, id_jurusan, nama_rombel, id_wali_kelas, kapasitas, ruang_kelas, is_aktif, id_unit
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     ON CONFLICT(id_rombel) DO UPDATE SET
                         id_tahun_ajaran = excluded.id_tahun_ajaran,
                         tingkat = excluded.tingkat,
@@ -12072,10 +12171,12 @@ async fn apply_event_to_turso(
                         id_wali_kelas = excluded.id_wali_kelas,
                         kapasitas = excluded.kapasitas,
                         ruang_kelas = excluded.ruang_kelas,
-                        is_aktif = excluded.is_aktif;"#,
+                        is_aktif = excluded.is_aktif,
+                        id_unit = CASE WHEN ? THEN excluded.id_unit ELSE akademik_rombel.id_unit END;"#,
                     vec![
                         json!(id), json!(id_ta), json!(tingkat), json!(id_jurusan),
-                        json!(nama), json!(id_wali), json!(kapasitas), json!(ruang), json!(is_aktif)
+                        json!(nama), json!(id_wali), json!(kapasitas), json!(ruang), json!(is_aktif),
+                        json!(id_unit), json!(i64::from(ada_unit))
                     ],
                 ).await?;
             }
@@ -12167,8 +12268,9 @@ async fn apply_event_to_turso(
                     .query_one(
                         r#"INSERT INTO akademik_jam_pelajaran (
                             id_jam_pelajaran, jam_ke, jam_mulai, jam_selesai, jenis,
-                            keterangan, is_aktif, created_at, updated_at
-                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                            keterangan, is_aktif, created_at, updated_at,
+                            id_unit, hari, bunyi, suara
+                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                         ON CONFLICT(id_jam_pelajaran) DO UPDATE SET
                             jam_ke = excluded.jam_ke,
                             jam_mulai = excluded.jam_mulai,
@@ -12176,7 +12278,11 @@ async fn apply_event_to_turso(
                             jenis = excluded.jenis,
                             keterangan = excluded.keterangan,
                             is_aktif = excluded.is_aktif,
-                            updated_at = excluded.updated_at;"#,
+                            updated_at = excluded.updated_at,
+                            id_unit = excluded.id_unit,
+                            hari = excluded.hari,
+                            bunyi = excluded.bunyi,
+                            suara = excluded.suara;"#,
                         vec![
                             json!(id),
                             json!(row.get("jam_ke").and_then(Value::as_i64).unwrap_or(1)),
@@ -12190,6 +12296,16 @@ async fn apply_event_to_turso(
                             json!(row.get("is_aktif").and_then(Value::as_i64).unwrap_or(1)),
                             json!(row.get("created_at").and_then(Value::as_str).unwrap_or("")),
                             json!(row.get("updated_at").and_then(Value::as_str).unwrap_or("")),
+                            // v60: cakupan dan bunyi bel; kosong = semua unit /
+                            // setiap hari, bunyi bawaan menyala.
+                            json!(row
+                                .get("id_unit")
+                                .and_then(Value::as_str)
+                                .map(str::trim)
+                                .filter(|v| !v.is_empty())),
+                            json!(row.get("hari").and_then(Value::as_i64)),
+                            json!(row.get("bunyi").and_then(Value::as_i64).unwrap_or(1)),
+                            json!(row.get("suara").and_then(Value::as_str)),
                         ],
                     )
                     .await?;
@@ -12231,11 +12347,19 @@ async fn apply_event_to_turso(
                 let beban = row.get("beban_jam").and_then(Value::as_i64).unwrap_or(2);
                 let kkm = row.get("kkm").and_then(Value::as_i64).unwrap_or(75);
                 let is_aktif = row.get("is_aktif").and_then(Value::as_i64).unwrap_or(1);
+                // v60. Kunci yang absen = tidak berubah (payload klien lama),
+                // kosong = berlaku di semua unit.
+                let ada_unit = row.get("id_unit").is_some();
+                let id_unit = row
+                    .get("id_unit")
+                    .and_then(Value::as_str)
+                    .map(str::trim)
+                    .filter(|v| !v.is_empty());
 
                 turso.query_one(
                     r#"INSERT INTO akademik_mapel (
-                        id_mapel, kode_mapel, nama_mapel, tingkat, kelompok, beban_jam, kkm, is_aktif
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                        id_mapel, kode_mapel, nama_mapel, tingkat, kelompok, beban_jam, kkm, is_aktif, id_unit
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
                     ON CONFLICT(id_mapel) DO UPDATE SET
                         kode_mapel = excluded.kode_mapel,
                         nama_mapel = excluded.nama_mapel,
@@ -12243,10 +12367,12 @@ async fn apply_event_to_turso(
                         kelompok = excluded.kelompok,
                         beban_jam = excluded.beban_jam,
                         kkm = excluded.kkm,
-                        is_aktif = excluded.is_aktif;"#,
+                        is_aktif = excluded.is_aktif,
+                        id_unit = CASE WHEN ? THEN excluded.id_unit ELSE akademik_mapel.id_unit END;"#,
                     vec![
                         json!(id), json!(kode), json!(nama), json!(tingkat),
-                        json!(kelompok), json!(beban), json!(kkm), json!(is_aktif)
+                        json!(kelompok), json!(beban), json!(kkm), json!(is_aktif),
+                        json!(id_unit), json!(i64::from(ada_unit))
                     ],
                 ).await?;
             }

@@ -6,6 +6,7 @@ import { AutoAlfaRunner } from "./AutoAlfaRunner";
 import { AutoPemberitahuanRunner } from "./AutoPemberitahuanRunner";
 import { AutoSyncRunner } from "./AutoSyncRunner";
 import { AutoWaSenderRunner } from "./AutoWaSenderRunner";
+import { BelSekolahRunner } from "./BelSekolahRunner";
 import { HeaderBar } from "./HeaderBar";
 import { LicenseNotice } from "./license/LicenseNotice";
 import { AuroraBackground } from "./visual/AuroraBackground";
@@ -28,6 +29,7 @@ export function AppShell({
       <AutoSyncRunner />
       <AutoWaSenderRunner />
       <AutoPemberitahuanRunner />
+      <BelSekolahRunner />
       <a
         href="#main-content"
         className="fixed left-4 top-3 z-[100] -translate-y-20 rounded-lg bg-white px-3 py-2 text-sm font-bold text-slate-950 shadow-xl transition-transform focus:translate-y-0"

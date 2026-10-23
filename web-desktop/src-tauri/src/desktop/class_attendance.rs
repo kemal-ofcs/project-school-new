@@ -98,7 +98,41 @@ const MAX_JAM_KE: u32 = 20;
 
 /// Jenis baris pada jadwal bel sekolah. Cerminan `JENIS_JAM_PELAJARAN` di
 /// `class-attendance.ts`, dan WAJIB sama dengan CHECK constraint tabelnya.
-const JENIS_JAM_PELAJARAN: &[&str] = &["KBM", "Istirahat", "Upacara", "Ekstrakurikuler"];
+/// `Pulang` (v60) hanya penanda bel pulang: tanpa nomor dan tanpa jam selesai.
+const JENIS_JAM_PELAJARAN: &[&str] = &["KBM", "Istirahat", "Upacara", "Ekstrakurikuler", "Pulang"];
+
+/// Suara bel per baris (v60). Kolomnya tanpa CHECK supaya nada baru tidak
+/// menuntut rebuild tabel; nilai asing ditolak di sini. Cerminan `SUARA_BEL`.
+const SUARA_BEL: &[&str] = &[
+    "nada-1",
+    "nada-2",
+    "nada-3",
+    "mp3-1",
+    "mp3-2",
+    "mp3-3",
+    "pengumuman",
+];
+
+/// Kosong jatuh ke nada bawaan, nilai asing `None`. Cerminan `normalizeSuaraBel`.
+pub fn normalize_suara_bel(raw: &str) -> Option<&'static str> {
+    let value = raw.trim();
+    if value.is_empty() {
+        return Some(SUARA_BEL[0]);
+    }
+    SUARA_BEL.iter().copied().find(|suara| *suara == value)
+}
+
+/// Jam selesai yang disimpan: baris `Pulang` hanya punya satu pukul, jenis
+/// lain wajib selesai sesudah mulai. Cerminan `aturJamSelesaiBel`.
+pub fn atur_jam_selesai_bel(jenis: &str, mulai: &str, selesai: &str) -> Result<String, String> {
+    if jenis == "Pulang" {
+        return Ok(mulai.to_owned());
+    }
+    if selesai <= mulai {
+        return Err("Jam selesai harus lebih lambat daripada jam mulai.".to_owned());
+    }
+    Ok(selesai.to_owned())
+}
 
 /// Normalisasi jam dinding `HH:MM` pada jadwal bel.
 ///
@@ -168,6 +202,70 @@ pub fn jp_duration_minutes(raw: Option<&str>) -> u32 {
         .unwrap_or(DEFAULT_JP_DURATION_MINUTES)
 }
 
+/// Kunci pengaturan JP milik satu unit (v60). Cerminan `jpUnitKey`.
+pub fn jp_unit_key(base: &str, id_unit: &str) -> String {
+    format!("{base}:{id_unit}")
+}
+
+/// Batas JP sebuah unit: nilai unitnya bila sah, kalau tidak nilai sekolah
+/// (bukan bawaan 12). Cerminan `parseJpMaxForUnit`; vektor sama.
+pub fn jp_max_for_unit(unit_raw: Option<&str>, sekolah_raw: Option<&str>) -> u32 {
+    unit_raw
+        .and_then(|value| value.trim().parse::<u32>().ok())
+        .filter(|value| (1..=MAX_JAM_KE).contains(value))
+        .unwrap_or_else(|| jp_max_per_day(sekolah_raw))
+}
+
+/// Lama JP sebuah unit, pola yang sama. Cerminan `parseJpDurationForUnit`.
+pub fn jp_duration_for_unit(unit_raw: Option<&str>, sekolah_raw: Option<&str>) -> u32 {
+    unit_raw
+        .and_then(|value| value.trim().parse::<u32>().ok())
+        .filter(|value| (1..=240).contains(value))
+        .unwrap_or_else(|| jp_duration_minutes(sekolah_raw))
+}
+
+fn read_setting(conn: &rusqlite::Connection, key: &str) -> Result<Option<String>, CommandError> {
+    conn.query_row(
+        "SELECT value FROM setting_gex_system WHERE key = ?1 LIMIT 1;",
+        params![key],
+        |row| row.get::<_, String>(0),
+    )
+    .optional()
+    .map_err(|_| CommandError::internal())
+}
+
+/// Unit sebuah rombel (v60), `None` bila belum diatur.
+fn rombel_unit(conn: &rusqlite::Connection, id_rombel: &str) -> Result<Option<String>, CommandError> {
+    Ok(conn
+        .query_row(
+            "SELECT id_unit FROM akademik_rombel WHERE id_rombel = ?1;",
+            params![id_rombel],
+            |row| row.get::<_, Option<String>>(0),
+        )
+        .optional()
+        .map_err(|_| CommandError::internal())?
+        .flatten()
+        .map(|unit| unit.trim().to_owned())
+        .filter(|unit| !unit.is_empty()))
+}
+
+fn assert_unit_exists(conn: &rusqlite::Connection, id_unit: &str) -> Result<(), CommandError> {
+    let ada: bool = conn
+        .query_row(
+            "SELECT EXISTS(SELECT 1 FROM akademik_unit WHERE id_unit = ?1);",
+            params![id_unit],
+            |row| row.get(0),
+        )
+        .map_err(|_| CommandError::internal())?;
+    if !ada {
+        return Err(CommandError::new(
+            "VALIDATION_ERROR",
+            "Unit tidak ditemukan. Muat ulang daftar unit.",
+        ));
+    }
+    Ok(())
+}
+
 /// Jadwal bel sekolah, urut menurut jam pelajaran lalu jam mulai.
 ///
 /// Tanpa LIMIT: satu baris per jam pelajaran per hari sekolah — dibatasi
@@ -178,9 +276,10 @@ pub fn list_lesson_periods(state: &DesktopState) -> Result<Value, CommandError> 
         .prepare(
             r#"
             SELECT id_jam_pelajaran, jam_ke, jam_mulai, jam_selesai, jenis,
-                   COALESCE(keterangan, ''), is_aktif, created_at, updated_at
+                   COALESCE(keterangan, ''), is_aktif, created_at, updated_at,
+                   id_unit, hari, bunyi, COALESCE(suara, 'nada-1')
             FROM akademik_jam_pelajaran
-            ORDER BY jam_mulai, jam_ke;
+            ORDER BY COALESCE(hari, 0), jam_mulai, jam_ke;
             "#,
         )
         .map_err(|_| CommandError::internal())?;
@@ -197,6 +296,10 @@ pub fn list_lesson_periods(state: &DesktopState) -> Result<Value, CommandError> 
                 "is_aktif": row.get::<_, i64>(6)?,
                 "created_at": row.get::<_, String>(7)?,
                 "updated_at": row.get::<_, String>(8)?,
+                "id_unit": row.get::<_, Option<String>>(9)?,
+                "hari": row.get::<_, Option<i64>>(10)?,
+                "bunyi": row.get::<_, i64>(11)?,
+                "suara": row.get::<_, String>(12)?,
             }))
         })
         .map_err(|_| CommandError::internal())?;
@@ -236,18 +339,6 @@ pub fn save_lesson_period(state: &DesktopState, draft: &Value) -> Result<Value, 
     };
 
     let jam_ke_masuk = integer(draft, "jam_ke", 0);
-    let jam_mulai = normalize_jam_bel(text(draft, "jam_mulai")).ok_or_else(|| {
-        CommandError::new(
-            "VALIDATION_ERROR",
-            "Jam mulai harus berbentuk jam, misalnya 07:00.",
-        )
-    })?;
-    let jam_selesai = normalize_jam_bel(text(draft, "jam_selesai")).ok_or_else(|| {
-        CommandError::new(
-            "VALIDATION_ERROR",
-            "Jam selesai harus berbentuk jam, misalnya 07:45.",
-        )
-    })?;
     let jenis = {
         let value = text(draft, "jenis");
         let value = if value.is_empty() { "KBM" } else { value };
@@ -259,11 +350,49 @@ pub fn save_lesson_period(state: &DesktopState, draft: &Value) -> Result<Value, 
         }
         value.to_owned()
     };
+    let jam_mulai = normalize_jam_bel(text(draft, "jam_mulai")).ok_or_else(|| {
+        CommandError::new(
+            "VALIDATION_ERROR",
+            "Jam mulai harus berbentuk jam, misalnya 07:00.",
+        )
+    })?;
+    // Baris Pulang tidak punya jam selesai; jenis lain wajib mengisinya.
+    let jam_selesai = if jenis == "Pulang" {
+        jam_mulai.clone()
+    } else {
+        normalize_jam_bel(text(draft, "jam_selesai")).ok_or_else(|| {
+            CommandError::new(
+                "VALIDATION_ERROR",
+                "Jam selesai harus berbentuk jam, misalnya 07:45.",
+            )
+        })?
+    };
     let keterangan = optional_text(draft, "keterangan");
     let is_aktif = if integer(draft, "is_aktif", 1) == 0 { 0 } else { 1 };
+    // Cakupan bel (v60): kosong = semua unit / setiap hari.
+    let id_unit = optional_text(draft, "id_unit");
+    let hari = match draft.get("hari") {
+        None | Some(Value::Null) => None,
+        Some(value) => match value.as_i64() {
+            Some(hari) if (1..=7).contains(&hari) => Some(hari),
+            _ => {
+                return Err(CommandError::new(
+                    "VALIDATION_ERROR",
+                    "Hari harus di antara 1 (Senin) dan 7 (Minggu), atau kosong untuk setiap hari.",
+                ))
+            }
+        },
+    };
+    let bunyi = if integer(draft, "bunyi", 1) == 0 { 0 } else { 1 };
+    let suara = normalize_suara_bel(text(draft, "suara")).ok_or_else(|| {
+        CommandError::new("VALIDATION_ERROR", "Suara bel tidak dikenal.")
+    })?;
 
     let mut conn = storage::database(&state.data_dir)?;
-    let batas = configured_jp_max(&conn)?;
+    if let Some(unit) = id_unit.as_deref() {
+        assert_unit_exists(&conn, unit)?;
+    }
+    let batas = configured_jp_max(&conn, id_unit.as_deref())?;
     let jam_ke = atur_nomor_jam_bel(&jenis, jam_ke_masuk, i64::from(batas))
         .map_err(|pesan| CommandError::new("VALIDATION_ERROR", pesan))?;
     // Jam selesai yang lebih awal daripada jam mulai bukan sekadar salah ketik:
@@ -271,27 +400,26 @@ pub fn save_lesson_period(state: &DesktopState, draft: &Value) -> Result<Value, 
     // akal. Bel yang melewati tengah malam tidak didukung — sekolah tidak
     // punya jam pelajaran seperti itu, dan menebaknya akan memaksa setiap
     // pembaca menebak hal yang sama.
-    if jam_selesai <= jam_mulai {
-        return Err(CommandError::new(
-            "VALIDATION_ERROR",
-            "Jam selesai harus lebih lambat daripada jam mulai.",
-        ));
-    }
+    let jam_selesai = atur_jam_selesai_bel(&jenis, &jam_mulai, &jam_selesai)
+        .map_err(|pesan| CommandError::new("VALIDATION_ERROR", pesan))?;
 
     let tx = conn.transaction().map_err(|_| CommandError::internal())?;
 
     // Keunikan jam pelajaran ditegakkan di APLIKASI, bukan skema: tabelnya
     // sengaja tanpa UNIQUE supaya push dari perangkat offline tidak macet. Hanya
-    // antar baris KBM, karena baris lain tidak bernomor (`atur_nomor_jam_bel`).
+    // antar baris KBM, karena baris lain tidak bernomor (`atur_nomor_jam_bel`),
+    // dan hanya dalam cakupan unit + hari yang sama.
     let bentrok: bool = tx
         .prepare(
             "SELECT 1 FROM akademik_jam_pelajaran
              WHERE jam_ke = ?1 AND id_jam_pelajaran <> ?2 AND is_aktif = 1
                AND jenis = 'KBM'
+               AND COALESCE(id_unit, '') = COALESCE(?3, '')
+               AND COALESCE(hari, 0) = COALESCE(?4, 0)
              LIMIT 1;",
         )
         .map_err(|_| CommandError::internal())?
-        .exists(params![jam_ke, id])
+        .exists(params![jam_ke, id, id_unit, hari])
         .map_err(|_| CommandError::internal())?;
     if bentrok && is_aktif == 1 && jenis == "KBM" {
         return Err(CommandError::new(
@@ -315,8 +443,9 @@ pub fn save_lesson_period(state: &DesktopState, draft: &Value) -> Result<Value, 
         r#"
         INSERT INTO akademik_jam_pelajaran (
             id_jam_pelajaran, jam_ke, jam_mulai, jam_selesai, jenis,
-            keterangan, is_aktif, created_at, updated_at
-        ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)
+            keterangan, is_aktif, created_at, updated_at,
+            id_unit, hari, bunyi, suara
+        ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13)
         ON CONFLICT(id_jam_pelajaran) DO UPDATE SET
             jam_ke = excluded.jam_ke,
             jam_mulai = excluded.jam_mulai,
@@ -324,7 +453,11 @@ pub fn save_lesson_period(state: &DesktopState, draft: &Value) -> Result<Value, 
             jenis = excluded.jenis,
             keterangan = excluded.keterangan,
             is_aktif = excluded.is_aktif,
-            updated_at = excluded.updated_at;
+            updated_at = excluded.updated_at,
+            id_unit = excluded.id_unit,
+            hari = excluded.hari,
+            bunyi = excluded.bunyi,
+            suara = excluded.suara;
         "#,
         params![
             id,
@@ -335,7 +468,11 @@ pub fn save_lesson_period(state: &DesktopState, draft: &Value) -> Result<Value, 
             keterangan,
             is_aktif,
             created_at,
-            now
+            now,
+            id_unit,
+            hari,
+            bunyi,
+            suara
         ],
     )
     .map_err(|_| CommandError::new("SAVE_FAILED", "Gagal menyimpan jadwal jam pelajaran."))?;
@@ -358,6 +495,10 @@ pub fn save_lesson_period(state: &DesktopState, draft: &Value) -> Result<Value, 
             "is_aktif": is_aktif,
             "created_at": created_at,
             "updated_at": now,
+            "id_unit": id_unit,
+            "hari": hari,
+            "bunyi": bunyi,
+            "suara": suara,
         }),
         None,
     )?;
@@ -399,22 +540,27 @@ pub fn delete_lesson_period(state: &DesktopState, id: &str) -> Result<Value, Com
 /// Pengaturan jam pelajaran sekolah: jumlah per hari dan lama satu jam.
 ///
 /// Dibaca bersama supaya layar presensi hanya melakukan satu panggilan.
-pub fn get_jp_settings(state: &DesktopState) -> Result<Value, CommandError> {
+///
+/// `id_unit` (v60) membaca pengaturan unit itu dengan cadangan nilai sekolah;
+/// `khususUnit` memberi tahu layar apakah unit itu sudah punya nilainya sendiri.
+pub fn get_jp_settings(state: &DesktopState, id_unit: Option<&str>) -> Result<Value, CommandError> {
     let conn = storage::database(&state.data_dir)?;
-    let baca = |key: &str| -> Result<Option<String>, CommandError> {
-        conn.query_row(
-            "SELECT value FROM setting_gex_system WHERE key = ?1 LIMIT 1;",
-            params![key],
-            |row| row.get::<_, String>(0),
-        )
-        .optional()
-        .map_err(|_| CommandError::internal())
+    let unit = id_unit.map(str::trim).filter(|unit| !unit.is_empty());
+    let max_sekolah = read_setting(&conn, JP_MAX_PER_DAY_SETTING_KEY)?;
+    let durasi_sekolah = read_setting(&conn, JP_DURATION_SETTING_KEY)?;
+    let (max_unit, durasi_unit) = match unit {
+        Some(unit) => (
+            read_setting(&conn, &jp_unit_key(JP_MAX_PER_DAY_SETTING_KEY, unit))?,
+            read_setting(&conn, &jp_unit_key(JP_DURATION_SETTING_KEY, unit))?,
+        ),
+        None => (None, None),
     };
 
     Ok(json!({
-        "maxPerHari": jp_max_per_day(baca(JP_MAX_PER_DAY_SETTING_KEY)?.as_deref()),
-        "durasiMenit": jp_duration_minutes(baca(JP_DURATION_SETTING_KEY)?.as_deref()),
+        "maxPerHari": jp_max_for_unit(max_unit.as_deref(), max_sekolah.as_deref()),
+        "durasiMenit": jp_duration_for_unit(durasi_unit.as_deref(), durasi_sekolah.as_deref()),
         "batasStruktural": MAX_JAM_KE,
+        "khususUnit": max_unit.is_some() || durasi_unit.is_some(),
     }))
 }
 
@@ -422,11 +568,13 @@ pub fn get_jp_settings(state: &DesktopState) -> Result<Value, CommandError> {
 ///
 /// Keduanya hidup di `setting_gex_system` yang ikut sinkronisasi: ini kebijakan
 /// sekolah, bukan setelan perangkat, sehingga TIDAK boleh masuk
-/// `sync::DEVICE_LOCAL_SETTING_KEYS`.
+/// `sync::DEVICE_LOCAL_SETTING_KEYS`. Dengan `id_unit` (v60) nilainya disimpan
+/// di kunci unit itu, dan kunci sekolah tidak disentuh.
 pub fn save_jp_settings(
     state: &DesktopState,
     max_per_hari: i64,
     durasi_menit: i64,
+    id_unit: Option<&str>,
 ) -> Result<Value, CommandError> {
     if !(1..=i64::from(MAX_JAM_KE)).contains(&max_per_hari) {
         return Err(CommandError::new(
@@ -443,12 +591,21 @@ pub fn save_jp_settings(
 
     let client_id = sync::ensure_client_id(state)?;
     let mut conn = storage::database(&state.data_dir)?;
+    let unit = id_unit.map(str::trim).filter(|unit| !unit.is_empty());
+    if let Some(unit) = unit {
+        assert_unit_exists(&conn, unit)?;
+    }
+    let kunci = |base: &str| match unit {
+        Some(unit) => jp_unit_key(base, unit),
+        None => base.to_owned(),
+    };
     let tx = conn.transaction().map_err(|_| CommandError::internal())?;
 
     for (key, value) in [
-        (JP_MAX_PER_DAY_SETTING_KEY, max_per_hari.to_string()),
-        (JP_DURATION_SETTING_KEY, durasi_menit.to_string()),
+        (kunci(JP_MAX_PER_DAY_SETTING_KEY), max_per_hari.to_string()),
+        (kunci(JP_DURATION_SETTING_KEY), durasi_menit.to_string()),
     ] {
+        let key = key.as_str();
         tx.execute(
             "INSERT INTO setting_gex_system (key, value) VALUES (?1, ?2)
              ON CONFLICT(key) DO UPDATE SET value = excluded.value;",
@@ -490,17 +647,18 @@ pub fn save_jp_settings(
     }))
 }
 
-/// Batas jam pelajaran yang berlaku pada pemasangan ini, dibaca dari database.
-fn configured_jp_max(conn: &rusqlite::Connection) -> Result<u32, CommandError> {
-    let value: Option<String> = conn
-        .query_row(
-            "SELECT value FROM setting_gex_system WHERE key = ?1 LIMIT 1;",
-            params![JP_MAX_PER_DAY_SETTING_KEY],
-            |row| row.get(0),
-        )
-        .optional()
-        .map_err(|_| CommandError::internal())?;
-    Ok(jp_max_per_day(value.as_deref()))
+/// Batas jam pelajaran yang berlaku untuk sebuah unit (atau sekolah bila
+/// `None`), dibaca dari database.
+fn configured_jp_max(
+    conn: &rusqlite::Connection,
+    id_unit: Option<&str>,
+) -> Result<u32, CommandError> {
+    let sekolah = read_setting(conn, JP_MAX_PER_DAY_SETTING_KEY)?;
+    let unit = match id_unit {
+        Some(unit) => read_setting(conn, &jp_unit_key(JP_MAX_PER_DAY_SETTING_KEY, unit))?,
+        None => None,
+    };
+    Ok(jp_max_for_unit(unit.as_deref(), sekolah.as_deref()))
 }
 
 /// Normalisasi dan validasi `presensi_mapel.jam_ke`.
@@ -1018,7 +1176,9 @@ pub fn save_class_attendance(state: &DesktopState, draft: &Value) -> Result<Valu
     // Batas sekolah ditegakkan SETELAH batas struktural: yang pertama menjaga
     // databasenya, yang kedua kebijakan sekolahnya. Pesan errornya menyebut
     // angka yang benar-benar dipakai sekolah itu, bukan pagar terluarnya.
-    let batas_sekolah = configured_jp_max(&tx)?;
+    // Batasnya milik unit rombel itu (v60), dengan cadangan nilai sekolah.
+    let unit_rombel = rombel_unit(&tx, id_rombel)?;
+    let batas_sekolah = configured_jp_max(&tx, unit_rombel.as_deref())?;
     if let Some((_, akhir)) = jam_ke_range(jam_ke) {
         if akhir > batas_sekolah {
             return Err(CommandError::new(
@@ -2250,6 +2410,74 @@ mod tests_atur_nomor_jam_bel {
             assert_eq!(
                 atur_nomor_jam_bel("KBM", jam_ke, 12),
                 Err("Jam pelajaran harus di antara 1 dan 12, sesuai Pengaturan.".to_owned())
+            );
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests_v60_unit_bel {
+    use super::{
+        atur_jam_selesai_bel, jp_duration_for_unit, jp_max_for_unit, jp_unit_key,
+        normalize_suara_bel,
+    };
+
+    // Vektor yang sama dengan "pengaturan JP per unit dan bel (v60)" di
+    // `class-attendance.test.ts`.
+    #[test]
+    fn pengaturan_jp_per_unit_dan_bel_v60() {
+        assert_eq!(jp_unit_key("jp_max_per_hari", "unt_1"), "jp_max_per_hari:unt_1");
+
+        for (unit, sekolah, harapan) in [
+            (None, None, 12),
+            (None, Some("8"), 8),
+            (Some("10"), Some("8"), 10),
+            (Some(" 6 "), Some("8"), 6),
+            (Some(""), Some("8"), 8),
+            (Some("0"), Some("8"), 8),
+            (Some("21"), Some("8"), 8),
+            (Some("abc"), Some("8"), 8),
+            (Some("abc"), Some("rusak"), 12),
+            (Some("20"), None, 20),
+        ] {
+            assert_eq!(jp_max_for_unit(unit, sekolah), harapan, "maks {unit:?}/{sekolah:?}");
+        }
+
+        for (unit, sekolah, harapan) in [
+            (None, None, 45),
+            (None, Some("40"), 40),
+            (Some("35"), Some("40"), 35),
+            (Some("0"), Some("40"), 40),
+            (Some("241"), Some("40"), 40),
+            (Some("x"), Some("x"), 45),
+        ] {
+            assert_eq!(jp_duration_for_unit(unit, sekolah), harapan, "durasi {unit:?}/{sekolah:?}");
+        }
+
+        for (mentah, harapan) in [
+            ("", Some("nada-1")),
+            ("   ", Some("nada-1")),
+            ("nada-2", Some("nada-2")),
+            (" mp3-3 ", Some("mp3-3")),
+            ("pengumuman", Some("pengumuman")),
+            ("nada-4", None),
+            ("MP3-1", None),
+            ("sirene", None),
+        ] {
+            assert_eq!(normalize_suara_bel(mentah), harapan, "suara {mentah:?}");
+        }
+
+        for (jenis, mulai, selesai, harapan) in [
+            ("Pulang", "14:00", "", Some("14:00")),
+            ("Pulang", "14:00", "13:00", Some("14:00")),
+            ("KBM", "07:00", "07:45", Some("07:45")),
+            ("KBM", "07:00", "07:00", None),
+            ("Istirahat", "10:00", "09:30", None),
+        ] {
+            assert_eq!(
+                atur_jam_selesai_bel(jenis, mulai, selesai).ok().as_deref(),
+                harapan,
+                "{jenis} {mulai}-{selesai}"
             );
         }
     }

@@ -227,6 +227,63 @@ fn ensure_payroll_calc_type_values(connection: &Connection) -> Result<(), String
     Ok(())
 }
 
+/// Bentuk jadwal bel sejak v60: jenis `Pulang`, cakupan unit + hari, dan
+/// bunyi/suara bel. SQLite tidak bisa mengubah CHECK lewat ALTER, jadi tabel
+/// lama dibangun ulang; barisnya menjadi "semua unit, setiap hari, berbunyi".
+/// Tanpa ini baris `Pulang` dari cloud menggagalkan SELURUH snapshot lokal.
+///
+/// Idempoten lewat teks DDL-nya. Cerminan `TursoClient::ensure_lesson_period_shape`
+/// dan blok v60 di `db-migrations.ts`.
+fn ensure_lesson_period_shape(connection: &Connection) -> Result<(), String> {
+    let existing: Option<String> = connection
+        .query_row(
+            "SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'akademik_jam_pelajaran';",
+            [],
+            |row| row.get(0),
+        )
+        .optional()
+        .map_err(|_| "Skema akademik_jam_pelajaran tidak dapat diperiksa.".to_string())?;
+    let Some(existing) = existing else {
+        return Ok(());
+    };
+    if existing.contains("'Pulang'") {
+        return Ok(());
+    }
+
+    const KOLOM: &str = "id_jam_pelajaran, jam_ke, jam_mulai, jam_selesai, jenis, keterangan, is_aktif, created_at, updated_at";
+    let script = format!(
+        "BEGIN;
+        DROP TABLE IF EXISTS akademik_jam_pelajaran__rebuild;
+        CREATE TABLE akademik_jam_pelajaran__rebuild (
+          id_jam_pelajaran TEXT PRIMARY KEY,
+          jam_ke INTEGER NOT NULL CHECK (jam_ke >= 1),
+          jam_mulai TEXT NOT NULL,
+          jam_selesai TEXT NOT NULL,
+          jenis TEXT NOT NULL DEFAULT 'KBM'
+            CHECK (jenis IN ('KBM', 'Istirahat', 'Upacara', 'Ekstrakurikuler', 'Pulang')),
+          keterangan TEXT,
+          is_aktif INTEGER NOT NULL DEFAULT 1 CHECK (is_aktif IN (0, 1)),
+          created_at TEXT NOT NULL,
+          updated_at TEXT NOT NULL,
+          id_unit TEXT,
+          hari INTEGER CHECK (hari IS NULL OR hari BETWEEN 1 AND 7),
+          bunyi INTEGER NOT NULL DEFAULT 1 CHECK (bunyi IN (0, 1)),
+          suara TEXT
+        );
+        INSERT INTO akademik_jam_pelajaran__rebuild ({KOLOM})
+          SELECT {KOLOM} FROM akademik_jam_pelajaran;
+        DROP TABLE akademik_jam_pelajaran;
+        ALTER TABLE akademik_jam_pelajaran__rebuild RENAME TO akademik_jam_pelajaran;
+        CREATE INDEX IF NOT EXISTS idx_local_jam_pelajaran_urut
+          ON akademik_jam_pelajaran(jam_ke, jam_mulai);
+        COMMIT;"
+    );
+    connection
+        .execute_batch(&script)
+        .map_err(|_| "Tabel akademik_jam_pelajaran tidak dapat dibangun ulang.".to_string())?;
+    Ok(())
+}
+
 fn ensure_wa_notification_kind_values(connection: &Connection) -> Result<(), String> {
     let existing: Option<String> = connection
         .query_row(
@@ -1354,7 +1411,8 @@ pub fn initialize(path: &Path) -> Result<(), String> {
         id_wali_kelas TEXT,
         kapasitas INTEGER NOT NULL DEFAULT 36,
         ruang_kelas TEXT,
-        is_aktif INTEGER NOT NULL DEFAULT 1 CHECK (is_aktif IN (0, 1))
+        is_aktif INTEGER NOT NULL DEFAULT 1 CHECK (is_aktif IN (0, 1)),
+        id_unit TEXT
       );
       CREATE TABLE IF NOT EXISTS akademik_mapel (
         id_mapel TEXT PRIMARY KEY,
@@ -1364,7 +1422,8 @@ pub fn initialize(path: &Path) -> Result<(), String> {
         kelompok TEXT NOT NULL DEFAULT 'Wajib' CHECK (kelompok IN ('Wajib', 'Peminatan', 'Muatan Lokal', 'Kejuruan')),
         beban_jam INTEGER NOT NULL DEFAULT 2 CHECK (beban_jam > 0),
         kkm INTEGER NOT NULL DEFAULT 75,
-        is_aktif INTEGER NOT NULL DEFAULT 1 CHECK (is_aktif IN (0, 1))
+        is_aktif INTEGER NOT NULL DEFAULT 1 CHECK (is_aktif IN (0, 1)),
+        id_unit TEXT
       );
       CREATE TABLE IF NOT EXISTS akademik_guru_mapel (
         id_penugasan TEXT PRIMARY KEY,
@@ -1626,11 +1685,15 @@ pub fn initialize(path: &Path) -> Result<(), String> {
         jam_mulai TEXT NOT NULL,
         jam_selesai TEXT NOT NULL,
         jenis TEXT NOT NULL DEFAULT 'KBM'
-          CHECK (jenis IN ('KBM', 'Istirahat', 'Upacara', 'Ekstrakurikuler')),
+          CHECK (jenis IN ('KBM', 'Istirahat', 'Upacara', 'Ekstrakurikuler', 'Pulang')),
         keterangan TEXT,
         is_aktif INTEGER NOT NULL DEFAULT 1 CHECK (is_aktif IN (0, 1)),
         created_at TEXT NOT NULL,
-        updated_at TEXT NOT NULL
+        updated_at TEXT NOT NULL,
+        id_unit TEXT,
+        hari INTEGER CHECK (hari IS NULL OR hari BETWEEN 1 AND 7),
+        bunyi INTEGER NOT NULL DEFAULT 1 CHECK (bunyi IN (0, 1)),
+        suara TEXT
       );
       CREATE INDEX IF NOT EXISTS idx_local_jam_pelajaran_urut
         ON akademik_jam_pelajaran(jam_ke, jam_mulai);
@@ -1720,7 +1783,8 @@ pub fn initialize(path: &Path) -> Result<(), String> {
             kelompok TEXT NOT NULL DEFAULT 'Wajib' CHECK (kelompok IN ('Wajib', 'Peminatan', 'Muatan Lokal', 'Kejuruan')),
             beban_jam INTEGER NOT NULL DEFAULT 2 CHECK (beban_jam > 0),
             kkm INTEGER NOT NULL DEFAULT 75,
-            is_aktif INTEGER NOT NULL DEFAULT 1 CHECK (is_aktif IN (0, 1))
+            is_aktif INTEGER NOT NULL DEFAULT 1 CHECK (is_aktif IN (0, 1)),
+            id_unit TEXT
         );",
         "id_mapel, kode_mapel, nama_mapel, tingkat, kelompok, beban_jam, kkm, is_aktif",
         &[],
@@ -1914,6 +1978,21 @@ pub fn initialize(path: &Path) -> Result<(), String> {
         "id_unit",
         "ALTER TABLE akademik_jurusan ADD COLUMN id_unit TEXT;",
     )?;
+    // Unit mapel dan rombel (v60), juga SETELAH rebuild di atas. NULL = mapel
+    // semua unit / rombel belum diatur.
+    ensure_column(
+        &connection,
+        "akademik_mapel",
+        "id_unit",
+        "ALTER TABLE akademik_mapel ADD COLUMN id_unit TEXT;",
+    )?;
+    ensure_column(
+        &connection,
+        "akademik_rombel",
+        "id_unit",
+        "ALTER TABLE akademik_rombel ADD COLUMN id_unit TEXT;",
+    )?;
+    ensure_lesson_period_shape(&connection)?;
 
     // Shift tujuan sesi lanjutan. 0 = belum ditentukan, sehingga pemasangan
     // lama yang hanya menyalakan izinkan_multi_sesi tetap memakai pencocokan
@@ -2964,5 +3043,63 @@ mod tests {
 
         // 5. Idempoten: menjalankan ulang tidak membangun ulang apa pun.
         initialize(directory.path()).expect("migrasi kedua");
+    }
+}
+
+#[cfg(test)]
+mod tests_lesson_period_shape {
+    /// Jadwal bel lama (tanpa `Pulang`) dibangun ulang tanpa kehilangan baris,
+    /// barisnya menjadi "semua unit, setiap hari, berbunyi", dan baris
+    /// `Pulang` dari cloud kini diterima.
+    #[test]
+    fn jadwal_bel_lama_dibangun_ulang_untuk_pulang() {
+        let connection = rusqlite::Connection::open_in_memory().expect("database memori");
+        connection
+            .execute_batch(
+                "CREATE TABLE akademik_jam_pelajaran (
+                    id_jam_pelajaran TEXT PRIMARY KEY,
+                    jam_ke INTEGER NOT NULL CHECK (jam_ke >= 1),
+                    jam_mulai TEXT NOT NULL,
+                    jam_selesai TEXT NOT NULL,
+                    jenis TEXT NOT NULL DEFAULT 'KBM'
+                      CHECK (jenis IN ('KBM', 'Istirahat', 'Upacara', 'Ekstrakurikuler')),
+                    keterangan TEXT,
+                    is_aktif INTEGER NOT NULL DEFAULT 1 CHECK (is_aktif IN (0, 1)),
+                    created_at TEXT NOT NULL,
+                    updated_at TEXT NOT NULL
+                );
+                INSERT INTO akademik_jam_pelajaran
+                    (id_jam_pelajaran, jam_ke, jam_mulai, jam_selesai, jenis, is_aktif, created_at, updated_at)
+                VALUES ('jp-1', 1, '07:00', '07:45', 'KBM', 1, '2026-10-01', '2026-10-01');",
+            )
+            .expect("tabel lama");
+
+        super::ensure_lesson_period_shape(&connection).expect("bangun ulang");
+        super::ensure_lesson_period_shape(&connection).expect("idempoten");
+
+        let (jam_mulai, id_unit, hari, bunyi): (String, Option<String>, Option<i64>, i64) = connection
+            .query_row(
+                "SELECT jam_mulai, id_unit, hari, bunyi FROM akademik_jam_pelajaran WHERE id_jam_pelajaran = 'jp-1';",
+                [],
+                |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?)),
+            )
+            .expect("baris lama tetap ada");
+        assert_eq!(jam_mulai, "07:00");
+        assert_eq!((id_unit, hari, bunyi), (None, None, 1));
+
+        connection
+            .execute(
+                "INSERT INTO akademik_jam_pelajaran
+                    (id_jam_pelajaran, jam_ke, jam_mulai, jam_selesai, jenis, is_aktif, created_at, updated_at, id_unit, hari, bunyi, suara)
+                 VALUES ('jp-2', 1, '14:00', '14:00', 'Pulang', 1, '2026-10-23', '2026-10-23', 'unt_smk', 5, 1, 'nada-3');",
+                [],
+            )
+            .expect("jenis Pulang diterima CHECK baru");
+        assert!(connection
+            .execute(
+                "UPDATE akademik_jam_pelajaran SET hari = 8 WHERE id_jam_pelajaran = 'jp-2';",
+                [],
+            )
+            .is_err());
     }
 }

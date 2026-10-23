@@ -197,6 +197,8 @@ export interface RombelInput {
   kapasitas?: number;
   ruang_kelas?: string | null;
   is_aktif?: number;
+  /** Unit rombel (v60); `null` = belum diatur, memakai pengaturan sekolah. */
+  id_unit: string | null;
 }
 
 export async function getDaftarRombel(id_tahun_ajaran?: string) {
@@ -256,6 +258,8 @@ export interface MapelInput {
   beban_jam?: number;
   kkm?: number;
   is_aktif?: number;
+  /** Unit mapel (v60); `null` = berlaku di semua unit. */
+  id_unit: string | null;
 }
 
 export async function getDaftarMapel() {

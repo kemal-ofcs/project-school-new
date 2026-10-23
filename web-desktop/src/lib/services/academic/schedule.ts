@@ -2,15 +2,16 @@ import "server-only";
 
 import { db, ensureDbInitialized } from "@/lib/db";
 import { ApiRequestError } from "@/lib/server/http/api-response";
+import { readJpSettings } from "@/lib/services/class-attendance";
 import {
+  aturJamSelesaiBel,
   aturNomorJamBel,
   JENIS_JAM_PELAJARAN,
   type JenisJamPelajaran,
-  JP_MAX_PER_DAY_SETTING_KEY,
   jamKeBeririsan,
   normalizeJamBel,
   normalizeJamKe,
-  parseJpMaxPerDay,
+  normalizeSuaraBel,
 } from "@/lib/validations/class-attendance";
 
 /**
@@ -34,9 +35,10 @@ export async function getLessonPeriods() {
   // `jp_max_per_hari` ditambah beberapa baris istirahat, bukan oleh waktu.
   const res = await db.execute(
     `SELECT id_jam_pelajaran, jam_ke, jam_mulai, jam_selesai, jenis,
-            COALESCE(keterangan, '') AS keterangan, is_aktif, created_at, updated_at
+            COALESCE(keterangan, '') AS keterangan, is_aktif, created_at, updated_at,
+            id_unit, hari, bunyi, COALESCE(suara, 'nada-1') AS suara
      FROM akademik_jam_pelajaran
-     ORDER BY jam_mulai, jam_ke;`,
+     ORDER BY COALESCE(hari, 0), jam_mulai, jam_ke;`,
   );
   return res.rows;
 }
@@ -49,18 +51,29 @@ export async function saveLessonPeriod(draft: {
   jenis?: JenisJamPelajaran;
   keterangan?: string | null;
   is_aktif?: number;
+  id_unit?: string | null;
+  hari?: number | null;
+  bunyi?: number;
+  suara?: string | null;
 }) {
   await ensureDbInitialized();
 
+  const jenis: JenisJamPelajaran = draft.jenis ?? "KBM";
+  if (!JENIS_JAM_PELAJARAN.includes(jenis)) {
+    throw new ApiRequestError("Jenis jam pelajaran tidak dikenal.", 400);
+  }
+
   const jamMulai = normalizeJamBel(draft.jam_mulai);
-  const jamSelesai = normalizeJamBel(draft.jam_selesai);
   if (jamMulai === null) {
     throw new ApiRequestError(
       "Jam mulai harus berbentuk jam, misalnya 07:00.",
       400,
     );
   }
-  if (jamSelesai === null) {
+  // Baris Pulang tidak punya jam selesai; jenis lain wajib mengisinya.
+  const jamSelesaiMentah =
+    jenis === "Pulang" ? jamMulai : normalizeJamBel(draft.jam_selesai);
+  if (jamSelesaiMentah === null) {
     throw new ApiRequestError(
       "Jam selesai harus berbentuk jam, misalnya 07:45.",
       400,
@@ -69,26 +82,39 @@ export async function saveLessonPeriod(draft: {
   // Jam selesai yang lebih awal bukan sekadar salah ketik: ia membuat durasi
   // negatif di layar dan urutan bel yang tidak masuk akal. Bel yang melewati
   // tengah malam tidak didukung — sekolah tidak punya jam pelajaran seperti itu.
-  if (jamSelesai <= jamMulai) {
+  const selesai = aturJamSelesaiBel(jenis, jamMulai, jamSelesaiMentah);
+  if (!selesai.ok) throw new ApiRequestError(selesai.pesan, 400);
+  const jamSelesai = selesai.jamSelesai;
+
+  const isAktif = draft.is_aktif === 0 ? 0 : 1;
+  // Cakupan bel (v60): kosong = semua unit / setiap hari.
+  const idUnit = String(draft.id_unit ?? "").trim() || null;
+  const hari = draft.hari ?? null;
+  if (hari !== null && (!Number.isInteger(hari) || hari < 1 || hari > 7)) {
     throw new ApiRequestError(
-      "Jam selesai harus lebih lambat daripada jam mulai.",
+      "Hari harus di antara 1 (Senin) dan 7 (Minggu), atau kosong untuk setiap hari.",
       400,
     );
   }
-
-  const jenis: JenisJamPelajaran = draft.jenis ?? "KBM";
-  if (!JENIS_JAM_PELAJARAN.includes(jenis)) {
-    throw new ApiRequestError("Jenis jam pelajaran tidak dikenal.", 400);
+  const bunyi = draft.bunyi === 0 ? 0 : 1;
+  const suara = normalizeSuaraBel(draft.suara);
+  if (suara === null) {
+    throw new ApiRequestError("Suara bel tidak dikenal.", 400);
   }
-  const isAktif = draft.is_aktif === 0 ? 0 : 1;
+  if (idUnit) {
+    const unit = await db.execute({
+      sql: "SELECT 1 FROM akademik_unit WHERE id_unit = ? LIMIT 1;",
+      args: [idUnit],
+    });
+    if (unit.rows.length === 0) {
+      throw new ApiRequestError(
+        "Unit tidak ditemukan. Muat ulang daftar unit.",
+        400,
+      );
+    }
+  }
 
-  const batasRow = await db.execute({
-    sql: "SELECT value FROM setting_gex_system WHERE key = ? LIMIT 1;",
-    args: [JP_MAX_PER_DAY_SETTING_KEY],
-  });
-  const batas = parseJpMaxPerDay(
-    batasRow.rows[0] ? String(batasRow.rows[0].value ?? "") : null,
-  );
+  const batas = (await readJpSettings(idUnit)).maxPerHari;
   const nomor = aturNomorJamBel(jenis, draft.jam_ke, batas);
   if (!nomor.ok) throw new ApiRequestError(nomor.pesan, 400);
   const jamKe = nomor.jamKe;
@@ -99,14 +125,17 @@ export async function saveLessonPeriod(draft: {
 
   // Keunikan jam pelajaran ditegakkan di APLIKASI, bukan skema: tabelnya
   // sengaja tanpa UNIQUE supaya push dari perangkat offline tidak macet. Hanya
-  // antar baris KBM, karena baris lain tidak bernomor (`aturNomorJamBel`).
+  // antar baris KBM, karena baris lain tidak bernomor (`aturNomorJamBel`), dan
+  // hanya dalam cakupan unit + hari yang sama.
   if (isAktif === 1 && jenis === "KBM") {
     const bentrok = await db.execute({
       sql: `SELECT 1 FROM akademik_jam_pelajaran
             WHERE jam_ke = ? AND id_jam_pelajaran <> ? AND is_aktif = 1
               AND jenis = 'KBM'
+              AND COALESCE(id_unit, '') = COALESCE(?, '')
+              AND COALESCE(hari, 0) = COALESCE(?, 0)
             LIMIT 1;`,
-      args: [jamKe, id],
+      args: [jamKe, id, idUnit, hari],
     });
     if (bentrok.rows.length > 0) {
       throw new ApiRequestError(
@@ -122,8 +151,9 @@ export async function saveLessonPeriod(draft: {
     sql: `
       INSERT INTO akademik_jam_pelajaran (
         id_jam_pelajaran, jam_ke, jam_mulai, jam_selesai, jenis,
-        keterangan, is_aktif, created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))
+        keterangan, is_aktif, created_at, updated_at,
+        id_unit, hari, bunyi, suara
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'), ?, ?, ?, ?)
       ON CONFLICT(id_jam_pelajaran) DO UPDATE SET
         jam_ke = excluded.jam_ke,
         jam_mulai = excluded.jam_mulai,
@@ -131,7 +161,11 @@ export async function saveLessonPeriod(draft: {
         jenis = excluded.jenis,
         keterangan = excluded.keterangan,
         is_aktif = excluded.is_aktif,
-        updated_at = datetime('now');
+        updated_at = datetime('now'),
+        id_unit = excluded.id_unit,
+        hari = excluded.hari,
+        bunyi = excluded.bunyi,
+        suara = excluded.suara;
     `,
     args: [
       id,
@@ -141,6 +175,10 @@ export async function saveLessonPeriod(draft: {
       jenis,
       draft.keterangan?.trim() || null,
       isAktif,
+      idUnit,
+      hari,
+      bunyi,
+      suara,
     ],
   });
 
@@ -260,6 +298,24 @@ export async function saveTeachingSchedule(draft: {
   if (jamKe === null) {
     throw new ApiRequestError(
       `Jam pelajaran '${draft.jam_ke}' tidak valid. Gunakan angka atau rentang seperti 1-2.`,
+      400,
+    );
+  }
+
+  // Mapel milik unit lain tidak boleh dijadwalkan di rombel itu (v60). Unit
+  // kosong di salah satunya berarti "semua unit" dan selalu cocok. Cerminan
+  // `save_teaching_schedule` di `academic.rs`.
+  const unit = await db.execute({
+    sql: `SELECT
+            (SELECT id_unit FROM akademik_mapel WHERE id_mapel = ?) AS unit_mapel,
+            (SELECT id_unit FROM akademik_rombel WHERE id_rombel = ?) AS unit_rombel;`,
+    args: [draft.id_mapel, draft.id_rombel],
+  });
+  const unitMapel = String(unit.rows[0]?.unit_mapel ?? "").trim();
+  const unitRombel = String(unit.rows[0]?.unit_rombel ?? "").trim();
+  if (unitMapel && unitRombel && unitMapel !== unitRombel) {
+    throw new ApiRequestError(
+      "Mata pelajaran ini milik unit lain, bukan unit rombel tersebut.",
       400,
     );
   }

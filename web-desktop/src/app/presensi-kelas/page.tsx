@@ -44,8 +44,10 @@ import {
   buildPresentWithoutGateScanWarning,
   DEFAULT_JP_DURATION_MINUTES,
   DEFAULT_JP_MAX_PER_DAY,
+  hariDariTanggal,
   hasUnsavedAttendanceMarks,
   hitungJp,
+  jadwalBelBerlaku,
   MAX_JAM_KE,
   pukulJamKe,
   REKONSILIASI_TEMPLATE_KINDS,
@@ -103,6 +105,7 @@ export default function PresensiKelasPage() {
     maxPerHari: DEFAULT_JP_MAX_PER_DAY,
     durasiMenit: DEFAULT_JP_DURATION_MINUTES,
     batasStruktural: MAX_JAM_KE,
+    khususUnit: false,
   });
 
   // Jadwal mengajar hari ini untuk rombel terpilih. Sama seperti jadwal bel,
@@ -113,8 +116,23 @@ export default function PresensiKelasPage() {
   // Jadwal bel hanya KETERANGAN: kalau sekolah belum mengisinya, layar ini
   // tetap berjalan dan pukulnya saja yang tidak muncul.
   const [lessonPeriods, setLessonPeriods] = useState<LessonPeriodRow[]>([]);
+  // Sejak v60 jadwal bel dan batas JP milik unit rombel, dan bel bisa berbeda
+  // per hari, jadi pukulnya dibaca untuk rombel dan tanggal yang dipilih.
+  const unitDariRombel = (idRombel: string) =>
+    String(
+      rombelList.find((rom) => String(rom.id_rombel) === idRombel)?.id_unit ??
+        "",
+    ).trim() || null;
+  const belUntuk = (idRombel: string, tanggal: string) =>
+    jadwalBelBerlaku(
+      lessonPeriods,
+      unitDariRombel(idRombel),
+      hariDariTanggal(tanggal),
+    );
   const pukulBel =
-    selectedJamKe === null ? null : pukulJamKe(lessonPeriods, selectedJamKe);
+    selectedJamKe === null
+      ? null
+      : pukulJamKe(belUntuk(selectedRombel, selectedDate), selectedJamKe);
 
   // Sesi yang sedang berjalan menurut jadwal guru yang login, hanya sebagai
   // USULAN: guru tetap menekan "Pakai sesi ini" lalu menyimpan sendiri. Jam
@@ -242,19 +260,50 @@ export default function PresensiKelasPage() {
     })
       .then((rows) => {
         if (batal) return;
+        const hari = hariDariTanggal(formatTanggalOperasional(sekarang));
+        const pukul = formatJamOperasional(sekarang).slice(0, 5);
+        // Guru bisa mengajar di dua unit, jadi setiap baris dinilai dengan
+        // jadwal bel unit rombelnya sendiri.
         setUsulan(
-          usulkanSesiSekarang(
-            rows.filter((row) => row.is_aktif === 1),
-            lessonPeriods,
-            formatJamOperasional(sekarang).slice(0, 5),
-          ),
+          rows
+            .filter((row) => row.is_aktif === 1)
+            .find((row) => {
+              const unit =
+                String(
+                  rombelList.find(
+                    (rom) => String(rom.id_rombel) === row.id_rombel,
+                  )?.id_unit ?? "",
+                ).trim() || null;
+              return (
+                usulkanSesiSekarang(
+                  [row],
+                  jadwalBelBerlaku(lessonPeriods, unit, hari),
+                  pukul,
+                ) !== null
+              );
+            }) ?? null,
         );
       })
       .catch(() => undefined);
     return () => {
       batal = true;
     };
-  }, [guruSaya, lessonPeriods]);
+  }, [guruSaya, lessonPeriods, rombelList]);
+
+  // Batas JP mengikuti unit rombel terpilih; unit tanpa nilai sendiri
+  // memakai nilai sekolah.
+  const unitTerpilih = unitDariRombel(selectedRombel);
+  useEffect(() => {
+    let batal = false;
+    getJpSettings(unitTerpilih)
+      .then((jp) => {
+        if (!batal) setJpSettings(jp);
+      })
+      .catch(() => undefined);
+    return () => {
+      batal = true;
+    };
+  }, [unitTerpilih]);
 
   useEffect(() => {
     if (!isAuthenticated) return;
@@ -695,8 +744,11 @@ export default function PresensiKelasPage() {
                     Sesi sekarang menurut jadwal:
                   </span>{" "}
                   Jam {usulan.jam_ke}
-                  {pukulJamKe(lessonPeriods, usulan.jam_ke)
-                    ? ` (${pukulJamKe(lessonPeriods, usulan.jam_ke)})`
+                  {pukulJamKe(
+                    belUntuk(usulan.id_rombel, selectedDate),
+                    usulan.jam_ke,
+                  )
+                    ? ` (${pukulJamKe(belUntuk(usulan.id_rombel, selectedDate), usulan.jam_ke)})`
                     : ""}{" "}
                   · {usulan.nama_mapel || usulan.id_mapel} ·{" "}
                   {usulan.nama_rombel || usulan.id_rombel}

@@ -33,6 +33,7 @@ export async function POST(request: NextRequest) {
         kapasitas?: number;
         ruang_kelas?: string | null;
         is_aktif?: number;
+        id_unit?: string | null;
       };
       id?: string;
     }>(request);

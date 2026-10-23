@@ -75,6 +75,29 @@ const PERSONNEL_EMAIL_MIGRATION_VERSION = 56;
 const STUDENT_DAPODIK_MIGRATION_VERSION = 57;
 const PMB_UNIT_MIGRATION_VERSION = 58;
 const STUDENT_FILES_MIGRATION_VERSION = 59;
+const UNIT_JP_BELL_MIGRATION_VERSION = 60;
+
+/**
+ * Bentuk `akademik_jam_pelajaran` sejak v60: jenis `Pulang`, cakupan unit +
+ * hari, dan bunyi/suara bel. Dipakai `CREATE` dan rebuild supaya keduanya
+ * tidak bisa berbeda. Cerminan DDL di `storage.rs` dan `turso.rs`.
+ */
+const LESSON_PERIOD_TABLE_SQL = `CREATE TABLE IF NOT EXISTS akademik_jam_pelajaran (
+      id_jam_pelajaran TEXT PRIMARY KEY,
+      jam_ke INTEGER NOT NULL CHECK (jam_ke >= 1),
+      jam_mulai TEXT NOT NULL,
+      jam_selesai TEXT NOT NULL,
+      jenis TEXT NOT NULL DEFAULT 'KBM'
+        CHECK (jenis IN ('KBM', 'Istirahat', 'Upacara', 'Ekstrakurikuler', 'Pulang')),
+      keterangan TEXT,
+      is_aktif INTEGER NOT NULL DEFAULT 1 CHECK (is_aktif IN (0, 1)),
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+      id_unit TEXT,
+      hari INTEGER CHECK (hari IS NULL OR hari BETWEEN 1 AND 7),
+      bunyi INTEGER NOT NULL DEFAULT 1 CHECK (bunyi IN (0, 1)),
+      suara TEXT
+    )`;
 
 /**
  * v21 — aturan jam scan baru: Jam Kerja Normal = (Jam Pulang − Jam Masuk) −
@@ -1309,7 +1332,8 @@ export async function runDatabaseMigrations(client: Client) {
       id_wali_kelas TEXT,
       kapasitas INTEGER NOT NULL DEFAULT 36,
       ruang_kelas TEXT,
-      is_aktif INTEGER NOT NULL DEFAULT 1 CHECK (is_aktif IN (0, 1))
+      is_aktif INTEGER NOT NULL DEFAULT 1 CHECK (is_aktif IN (0, 1)),
+      id_unit TEXT
     );
   `);
 
@@ -1322,7 +1346,8 @@ export async function runDatabaseMigrations(client: Client) {
       kelompok TEXT NOT NULL DEFAULT 'Wajib' CHECK (kelompok IN ('Wajib', 'Peminatan', 'Muatan Lokal', 'Kejuruan')),
       beban_jam INTEGER NOT NULL DEFAULT 2 CHECK (beban_jam > 0),
       kkm INTEGER NOT NULL DEFAULT 75,
-      is_aktif INTEGER NOT NULL DEFAULT 1 CHECK (is_aktif IN (0, 1))
+      is_aktif INTEGER NOT NULL DEFAULT 1 CHECK (is_aktif IN (0, 1)),
+      id_unit TEXT
     );
   `);
 
@@ -1408,7 +1433,8 @@ export async function runDatabaseMigrations(client: Client) {
       kelompok TEXT NOT NULL DEFAULT 'Wajib' CHECK (kelompok IN ('Wajib', 'Peminatan', 'Muatan Lokal', 'Kejuruan')),
       beban_jam INTEGER NOT NULL DEFAULT 2 CHECK (beban_jam > 0),
       kkm INTEGER NOT NULL DEFAULT 75,
-      is_aktif INTEGER NOT NULL DEFAULT 1 CHECK (is_aktif IN (0, 1))
+      is_aktif INTEGER NOT NULL DEFAULT 1 CHECK (is_aktif IN (0, 1)),
+      id_unit TEXT
     );`,
     columns:
       "id_mapel, kode_mapel, nama_mapel, tingkat, kelompok, beban_jam, kkm, is_aktif",
@@ -2392,20 +2418,7 @@ export async function runDatabaseMigrations(client: Client) {
   // menghalangi presensi. Tanpa UNIQUE pada `jam_ke` — dua perangkat offline
   // boleh mendaftarkan jam yang sama, dan UNIQUE akan membuat push-nya gagal
   // permanen. Cerminan DDL di `storage.rs` dan `turso.rs`.
-  await client.execute(`
-    CREATE TABLE IF NOT EXISTS akademik_jam_pelajaran (
-      id_jam_pelajaran TEXT PRIMARY KEY,
-      jam_ke INTEGER NOT NULL CHECK (jam_ke >= 1),
-      jam_mulai TEXT NOT NULL,
-      jam_selesai TEXT NOT NULL,
-      jenis TEXT NOT NULL DEFAULT 'KBM'
-        CHECK (jenis IN ('KBM', 'Istirahat', 'Upacara', 'Ekstrakurikuler')),
-      keterangan TEXT,
-      is_aktif INTEGER NOT NULL DEFAULT 1 CHECK (is_aktif IN (0, 1)),
-      created_at TEXT NOT NULL DEFAULT (datetime('now')),
-      updated_at TEXT NOT NULL DEFAULT (datetime('now'))
-    );
-  `);
+  await client.execute(`${LESSON_PERIOD_TABLE_SQL};`);
 
   await client.execute(
     "CREATE INDEX IF NOT EXISTS idx_jam_pelajaran_urut ON akademik_jam_pelajaran(jam_ke, jam_mulai);",
@@ -3041,5 +3054,56 @@ export async function runDatabaseMigrations(client: Client) {
     sql: `INSERT OR IGNORE INTO schema_migration (version, name, applied_at)
           VALUES (?, 'student-files', ?);`,
     args: [STUDENT_FILES_MIGRATION_VERSION, now],
+  });
+
+  // ── v60: Unit mapel/rombel, jam pelajaran per unit dan hari, bunyi bel ──
+  //
+  // Kolom unit ditaruh SETELAH `rebuildWithoutUnique`, yang menyalin daftar
+  // kolom eksplisit. NULL = mapel semua unit / rombel belum diatur.
+  for (const [table, column, sql] of [
+    [
+      "akademik_mapel",
+      "id_unit",
+      "ALTER TABLE akademik_mapel ADD COLUMN id_unit TEXT;",
+    ],
+    [
+      "akademik_rombel",
+      "id_unit",
+      "ALTER TABLE akademik_rombel ADD COLUMN id_unit TEXT;",
+    ],
+  ] as const) {
+    if (!(await hasColumn(client, table, column))) await client.execute(sql);
+  }
+
+  // SQLite tidak bisa mengubah CHECK lewat ALTER, jadi jadwal bel dibangun
+  // ulang untuk jenis `Pulang`; kolom barunya ikut di DDL yang sama. Baris
+  // lama menjadi "semua unit, setiap hari, berbunyi". Idempoten lewat teks
+  // DDL-nya. Cerminan `ensure_lesson_period_shape` di `storage.rs`/`turso.rs`.
+  const belDdl = await client.execute({
+    sql: "SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'akademik_jam_pelajaran';",
+  });
+  const ddlBel = String(belDdl.rows[0]?.sql ?? "");
+  if (ddlBel && !ddlBel.includes("'Pulang'")) {
+    const kolom =
+      "id_jam_pelajaran, jam_ke, jam_mulai, jam_selesai, jenis, keterangan, is_aktif, created_at, updated_at";
+    await client.batch(
+      [
+        "DROP TABLE IF EXISTS akademik_jam_pelajaran__rebuild;",
+        `${LESSON_PERIOD_TABLE_SQL.replace(
+          "IF NOT EXISTS akademik_jam_pelajaran",
+          "akademik_jam_pelajaran__rebuild",
+        )};`,
+        `INSERT INTO akademik_jam_pelajaran__rebuild (${kolom}) SELECT ${kolom} FROM akademik_jam_pelajaran;`,
+        "DROP TABLE akademik_jam_pelajaran;",
+        "ALTER TABLE akademik_jam_pelajaran__rebuild RENAME TO akademik_jam_pelajaran;",
+        "CREATE INDEX IF NOT EXISTS idx_jam_pelajaran_urut ON akademik_jam_pelajaran(jam_ke, jam_mulai);",
+      ],
+      "write",
+    );
+  }
+  await client.execute({
+    sql: `INSERT OR IGNORE INTO schema_migration (version, name, applied_at)
+          VALUES (?, 'unit-jp-bell', ?);`,
+    args: [UNIT_JP_BELL_MIGRATION_VERSION, now],
   });
 }

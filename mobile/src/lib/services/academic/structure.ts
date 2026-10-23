@@ -237,6 +237,23 @@ export async function deleteAcademicUnit(id: string) {
   return { sukses: true };
 }
 
+/** Unit yang dirujuk mapel/rombel (v60) wajib ada; kosong menjadi `null`. */
+async function assertUnitExists(raw: string | null | undefined) {
+  const idUnit = String(raw ?? "").trim() || null;
+  if (!idUnit) return null;
+  const unit = await db.execute({
+    sql: "SELECT 1 FROM akademik_unit WHERE id_unit = ? LIMIT 1;",
+    args: [idUnit],
+  });
+  if (unit.rows.length === 0) {
+    throw new ApiRequestError(
+      "Unit tidak ditemukan. Muat ulang daftar unit.",
+      400,
+    );
+  }
+  return idUnit;
+}
+
 // ── 2. Jurusan ──────────────────────────────────────────────────────────────
 
 export async function getAcademicDepartments() {
@@ -333,10 +350,12 @@ export async function getAcademicClasses(id_tahun_ajaran?: string | null) {
            r.id_wali_kelas, r.kapasitas, r.ruang_kelas, r.is_aktif,
            j.nama_jurusan, j.kode_jurusan,
            w.nama AS nama_wali_kelas,
-           (SELECT COUNT(*) FROM siswa_data s WHERE s.id_rombel = r.id_rombel AND s.status = 'Aktif') AS jumlah_siswa
+           (SELECT COUNT(*) FROM siswa_data s WHERE s.id_rombel = r.id_rombel AND s.status = 'Aktif') AS jumlah_siswa,
+           r.id_unit, u.nama_unit
     FROM akademik_rombel r
     LEFT JOIN akademik_jurusan j ON j.id_jurusan = r.id_jurusan
     LEFT JOIN master_data w ON w.id_unik = r.id_wali_kelas
+    LEFT JOIN akademik_unit u ON u.id_unit = r.id_unit
     WHERE (? IS NULL OR r.id_tahun_ajaran = ?)
     ORDER BY r.tingkat ASC, r.nama_rombel ASC;
   `;
@@ -357,18 +376,21 @@ export async function saveAcademicClass(draft: {
   kapasitas?: number;
   ruang_kelas?: string | null;
   is_aktif?: number;
+  id_unit?: string | null;
 }) {
   await ensureDbInitialized();
   const id = draft.id_rombel || `rom_${crypto.randomUUID().replace(/-/g, "")}`;
   const isAktif = draft.is_aktif !== undefined ? draft.is_aktif : 1;
   const kapasitas = draft.kapasitas || 36;
+  // Unit rombel (v60); kosong = belum diatur, memakai pengaturan sekolah.
+  const idUnit = await assertUnitExists(draft.id_unit);
 
   await db.execute({
     sql: `
       INSERT INTO akademik_rombel (
         id_rombel, id_tahun_ajaran, tingkat, id_jurusan, nama_rombel,
-        id_wali_kelas, kapasitas, ruang_kelas, is_aktif
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        id_wali_kelas, kapasitas, ruang_kelas, is_aktif, id_unit
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       ON CONFLICT(id_rombel) DO UPDATE SET
         id_tahun_ajaran = excluded.id_tahun_ajaran,
         tingkat = excluded.tingkat,
@@ -377,7 +399,8 @@ export async function saveAcademicClass(draft: {
         id_wali_kelas = excluded.id_wali_kelas,
         kapasitas = excluded.kapasitas,
         ruang_kelas = excluded.ruang_kelas,
-        is_aktif = excluded.is_aktif;
+        is_aktif = excluded.is_aktif,
+        id_unit = excluded.id_unit;
     `,
     args: [
       id,
@@ -389,6 +412,7 @@ export async function saveAcademicClass(draft: {
       kapasitas,
       draft.ruang_kelas || null,
       isAktif,
+      idUnit,
     ],
   });
 
@@ -415,9 +439,11 @@ export async function deleteAcademicClass(id: string) {
 export async function getAcademicSubjects() {
   await ensureDbInitialized();
   const res = await db.execute(`
-    SELECT id_mapel, kode_mapel, nama_mapel, tingkat, kelompok, beban_jam, kkm, is_aktif
-    FROM akademik_mapel
-    ORDER BY kode_mapel ASC;
+    SELECT m.id_mapel, m.kode_mapel, m.nama_mapel, m.tingkat, m.kelompok,
+           m.beban_jam, m.kkm, m.is_aktif, m.id_unit, u.nama_unit
+    FROM akademik_mapel m
+    LEFT JOIN akademik_unit u ON u.id_unit = m.id_unit
+    ORDER BY m.kode_mapel ASC;
   `);
   return res.rows;
 }
@@ -431,17 +457,29 @@ export async function saveAcademicSubject(draft: {
   beban_jam?: number;
   kkm?: number;
   is_aktif?: number;
+  id_unit?: string | null;
 }) {
   await ensureDbInitialized();
   const id = draft.id_mapel || `map_${crypto.randomUUID().replace(/-/g, "")}`;
-  await assertUniqueValue({
-    table: "akademik_mapel",
-    column: "kode_mapel",
-    idColumn: "id_mapel",
-    value: draft.kode_mapel,
-    exceptId: id,
-    message: "Kode mata pelajaran sudah dipakai mapel lain.",
-  });
+  // Unit mapel (v60); kosong = berlaku di semua unit.
+  const idUnit = await assertUnitExists(draft.id_unit);
+  // Kode unik PER UNIT: "IND" boleh ada di SMP dan SMK. Mapel "Semua unit"
+  // bertabrakan dengan unit mana pun. Cerminan `save_academic_subject`.
+  if (String(draft.kode_mapel ?? "").trim()) {
+    const bentrok = await db.execute({
+      sql: `SELECT 1 FROM akademik_mapel
+            WHERE LOWER(TRIM(kode_mapel)) = LOWER(TRIM(?)) AND id_mapel <> ?
+              AND (NULLIF(TRIM(id_unit), '') IS NULL OR ? IS NULL OR id_unit = ?)
+            LIMIT 1;`,
+      args: [draft.kode_mapel, id, idUnit, idUnit],
+    });
+    if (bentrok.rows.length > 0) {
+      throw new ApiRequestError(
+        "Kode mata pelajaran sudah dipakai mapel lain di unit yang sama.",
+        409,
+      );
+    }
+  }
   const kelompok = draft.kelompok || "Wajib";
   const beban = draft.beban_jam || 2;
   const kkm = draft.kkm || 75;
@@ -450,8 +488,8 @@ export async function saveAcademicSubject(draft: {
   await db.execute({
     sql: `
       INSERT INTO akademik_mapel (
-        id_mapel, kode_mapel, nama_mapel, tingkat, kelompok, beban_jam, kkm, is_aktif
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        id_mapel, kode_mapel, nama_mapel, tingkat, kelompok, beban_jam, kkm, is_aktif, id_unit
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
       ON CONFLICT(id_mapel) DO UPDATE SET
         kode_mapel = excluded.kode_mapel,
         nama_mapel = excluded.nama_mapel,
@@ -459,7 +497,8 @@ export async function saveAcademicSubject(draft: {
         kelompok = excluded.kelompok,
         beban_jam = excluded.beban_jam,
         kkm = excluded.kkm,
-        is_aktif = excluded.is_aktif;
+        is_aktif = excluded.is_aktif,
+        id_unit = excluded.id_unit;
     `,
     args: [
       id,
@@ -470,6 +509,7 @@ export async function saveAcademicSubject(draft: {
       beban,
       kkm,
       isAktif,
+      idUnit,
     ],
   });
 

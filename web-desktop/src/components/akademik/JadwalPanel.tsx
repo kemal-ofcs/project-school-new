@@ -16,6 +16,7 @@ import {
 } from "@/lib/gateways/class-attendance";
 import { useConfirmDialog } from "@/lib/hooks/useConfirmDialog";
 import {
+  jadwalBelBerlaku,
   jamKbmAktif,
   pukulJamKe,
   susunJamKe,
@@ -53,6 +54,7 @@ export interface JadwalPanelProps {
   rombelList: Record<string, unknown>[];
   mapelList: Record<string, unknown>[];
   guruList: Record<string, unknown>[];
+  unitList: Record<string, unknown>[];
   canManage: boolean;
   onFeedback: (tone: "success" | "error", message: string) => void;
 }
@@ -74,6 +76,7 @@ export function JadwalPanel({
   rombelList,
   mapelList,
   guruList,
+  unitList,
   canManage,
   onFeedback,
 }: JadwalPanelProps) {
@@ -85,9 +88,37 @@ export function JadwalPanel({
   const [rows, setRows] = useState<TeachingScheduleRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [filterRombel, setFilterRombel] = useState("");
+  // Unit tidak disimpan di jadwal (v60): ia diturunkan dari rombelnya.
+  const [filterUnit, setFilterUnit] = useState("");
   const [draft, setDraft] = useState<JadwalDraft | null>(null);
   const [periods, setPeriods] = useState<LessonPeriodRow[]>([]);
-  const jamKbm = jamKbmAktif(periods);
+
+  const unitRombel = (idRombel: string) =>
+    String(
+      rombelList.find((rom) => String(rom.id_rombel) === idRombel)?.id_unit ??
+        "",
+    ).trim() || null;
+  const belUntuk = (idRombel: string, hari: number) =>
+    jadwalBelBerlaku(periods, unitRombel(idRombel), hari);
+  const rombelTampil = filterUnit
+    ? rombelList.filter(
+        (rom) => unitRombel(String(rom.id_rombel)) === filterUnit,
+      )
+    : rombelList;
+  const rowsTampil = filterUnit
+    ? rows.filter((row) => unitRombel(row.id_rombel) === filterUnit)
+    : rows;
+  // Mapel milik unit lain disembunyikan; mapel "Semua unit" selalu tampil.
+  const mapelUntuk = (idRombel: string) => {
+    const unit = unitRombel(idRombel);
+    return mapelList.filter((mapel) => {
+      const unitMapel = String(mapel.id_unit ?? "").trim();
+      return !unit || !unitMapel || unitMapel === unit;
+    });
+  };
+  const jamKbm = draft
+    ? jamKbmAktif(belUntuk(draft.id_rombel, draft.hari))
+    : jamKbmAktif(periods);
 
   const muat = useCallback(async () => {
     setLoading(true);
@@ -124,14 +155,16 @@ export function JadwalPanel({
   );
 
   const bukaTambah = () => {
+    const idRombel = filterRombel || String(rombelTampil[0]?.id_rombel ?? "");
+    const kbm = jamKbmAktif(belUntuk(idRombel, 1));
     setDraft({
       id_tahun_ajaran: tahunAktif,
-      id_rombel: filterRombel || String(rombelList[0]?.id_rombel ?? ""),
-      id_mapel: String(mapelList[0]?.id_mapel ?? ""),
+      id_rombel: idRombel,
+      id_mapel: String(mapelUntuk(idRombel)[0]?.id_mapel ?? ""),
       id_guru: String(guruList[0]?.id_guru ?? ""),
       hari: 1,
-      jamDari: jamKbm[0]?.jam_ke ?? 1,
-      jamSampai: jamKbm[0]?.jam_ke ?? 2,
+      jamDari: kbm[0]?.jam_ke ?? 1,
+      jamSampai: kbm[0]?.jam_ke ?? 2,
       is_aktif: 1,
     });
   };
@@ -230,7 +263,33 @@ export function JadwalPanel({
       </p>
 
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
+          {unitList.length > 0 ? (
+            <>
+              <label
+                htmlFor="filter-unit-jadwal"
+                className="text-xs font-semibold text-slate-400"
+              >
+                Unit:
+              </label>
+              <select
+                id="filter-unit-jadwal"
+                value={filterUnit}
+                onChange={(event) => {
+                  setFilterUnit(event.target.value);
+                  setFilterRombel("");
+                }}
+                className="rounded-xl border border-white/10 bg-slate-900 px-3 py-2 text-sm text-slate-100 shadow-inner focus:border-sky-500 focus:outline-none"
+              >
+                <option value="">Semua unit</option>
+                {unitList.map((u) => (
+                  <option key={String(u.id_unit)} value={String(u.id_unit)}>
+                    {String(u.nama_unit)}
+                  </option>
+                ))}
+              </select>
+            </>
+          ) : null}
           <label
             htmlFor="filter-rombel-jadwal"
             className="text-xs font-semibold text-slate-400"
@@ -244,7 +303,7 @@ export function JadwalPanel({
             className="rounded-xl border border-white/10 bg-slate-900 px-3 py-2 text-sm text-slate-100 shadow-inner focus:border-sky-500 focus:outline-none"
           >
             <option value="">Semua rombel</option>
-            {rombelList.map((rom) => (
+            {rombelTampil.map((rom) => (
               <option key={String(rom.id_rombel)} value={String(rom.id_rombel)}>
                 Kelas {String(rom.tingkat)} - {String(rom.nama_rombel)}
               </option>
@@ -289,7 +348,7 @@ export function JadwalPanel({
                   Memuat jadwal mengajar...
                 </td>
               </tr>
-            ) : rows.length === 0 ? (
+            ) : rowsTampil.length === 0 ? (
               <tr>
                 <td
                   colSpan={canManage ? 7 : 6}
@@ -299,16 +358,22 @@ export function JadwalPanel({
                 </td>
               </tr>
             ) : (
-              rows.map((row) => (
+              rowsTampil.map((row) => (
                 <tr key={row.id_jadwal} className="hover:bg-white/[0.02]">
                   <td className="px-3 py-2 font-semibold text-slate-200">
                     {HARI.find((h) => h.nilai === row.hari)?.label ?? row.hari}
                   </td>
                   <td className="px-3 py-2 font-mono text-slate-300">
                     {row.jam_ke}
-                    {pukulJamKe(periods, row.jam_ke) ? (
+                    {pukulJamKe(
+                      belUntuk(row.id_rombel, row.hari),
+                      row.jam_ke,
+                    ) ? (
                       <span className="block text-[11px] text-slate-400">
-                        {pukulJamKe(periods, row.jam_ke)}
+                        {pukulJamKe(
+                          belUntuk(row.id_rombel, row.hari),
+                          row.jam_ke,
+                        )}
                       </span>
                     ) : null}
                   </td>
@@ -386,13 +451,24 @@ export function JadwalPanel({
                 Rombel
                 <select
                   value={draft.id_rombel}
-                  onChange={(event) =>
-                    setDraft({ ...draft, id_rombel: event.target.value })
-                  }
+                  onChange={(event) => {
+                    const idRombel = event.target.value;
+                    // Mapel yang tidak cocok dengan unit rombel baru dilepas.
+                    const pilihan = mapelUntuk(idRombel);
+                    setDraft({
+                      ...draft,
+                      id_rombel: idRombel,
+                      id_mapel: pilihan.some(
+                        (mapel) => String(mapel.id_mapel) === draft.id_mapel,
+                      )
+                        ? draft.id_mapel
+                        : String(pilihan[0]?.id_mapel ?? ""),
+                    });
+                  }}
                   required
                   className="rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 font-normal text-slate-200 focus:border-sky-500 focus:outline-none"
                 >
-                  {rombelList.map((rom) => (
+                  {rombelTampil.map((rom) => (
                     <option
                       key={String(rom.id_rombel)}
                       value={String(rom.id_rombel)}
@@ -430,7 +506,7 @@ export function JadwalPanel({
                   required
                   className="rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 font-normal text-slate-200 focus:border-sky-500 focus:outline-none"
                 >
-                  {mapelList.map((mapel) => (
+                  {mapelUntuk(draft.id_rombel).map((mapel) => (
                     <option
                       key={String(mapel.id_mapel)}
                       value={String(mapel.id_mapel)}

@@ -36,6 +36,8 @@ export interface RombelPanelProps {
   setModalType: Dispatch<SetStateAction<TabKey | null>>;
   handleTaFilterChange: (taId: string) => Promise<void>;
   handleDeleteItem: (type: TabKey, id: string) => Promise<void>;
+  /** Mengisi unit rombel lama dari tingkatnya (v60). */
+  handleIsiUnitOtomatis: () => Promise<void>;
 }
 
 export function RombelPanel({
@@ -49,7 +51,11 @@ export function RombelPanel({
   setModalType,
   handleTaFilterChange,
   handleDeleteItem,
+  handleIsiUnitOtomatis,
 }: RombelPanelProps) {
+  const tanpaUnit = rombelList.filter(
+    (item) => !String(item.id_unit ?? "").trim(),
+  ).length;
   return (
     <div className="flex flex-col gap-4">
       <div className="flex items-center gap-3">
@@ -77,6 +83,22 @@ export function RombelPanel({
         </select>
       </div>
 
+      {canManage && tanpaUnit > 0 && (unitList?.length ?? 0) > 0 ? (
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-300/25 bg-amber-300/10 p-3 text-xs leading-5 text-amber-100">
+          <span>
+            {tanpaUnit} rombel belum punya unit, jadi memakai jam pelajaran dan
+            jadwal bel sekolah.
+          </span>
+          <button
+            type="button"
+            onClick={() => void handleIsiUnitOtomatis()}
+            className="rounded-lg border border-amber-300/40 px-3 py-1.5 font-semibold text-amber-100 hover:bg-amber-300/10"
+          >
+            Isi unit dari tingkat
+          </button>
+        </div>
+      ) : null}
+
       <div className="overflow-hidden rounded-2xl border border-white/10 bg-slate-900/60 shadow-xl backdrop-blur-xl">
         <div className="overflow-x-auto">
           <table className="w-full text-left text-sm text-slate-200">
@@ -84,6 +106,7 @@ export function RombelPanel({
               <tr>
                 <th className="px-6 py-4">Tingkat</th>
                 <th className="px-6 py-4">Nama Rombel</th>
+                <th className="px-6 py-4">Unit</th>
                 <th className="px-6 py-4">Jurusan</th>
                 <th className="px-6 py-4">Wali Kelas</th>
                 <th className="px-6 py-4">Ruang & Siswa</th>
@@ -94,7 +117,7 @@ export function RombelPanel({
               {loading ? (
                 <tr>
                   <td
-                    colSpan={6}
+                    colSpan={7}
                     className="px-6 py-8 text-center text-slate-400"
                   >
                     Memuat data rombel...
@@ -103,7 +126,7 @@ export function RombelPanel({
               ) : rombelList.length === 0 ? (
                 <tr>
                   <td
-                    colSpan={6}
+                    colSpan={7}
                     className="px-6 py-8 text-center text-slate-400"
                   >
                     Belum ada rombel pada tahun ajaran ini.
@@ -122,6 +145,11 @@ export function RombelPanel({
                       </td>
                       <td className="px-6 py-4 font-bold text-white">
                         {String(item.nama_rombel)}
+                      </td>
+                      <td className="px-6 py-4 text-xs text-slate-300">
+                        {item.id_unit
+                          ? String(item.nama_unit || "Unit tidak ditemukan")
+                          : "Belum diatur"}
                       </td>
                       <td className="px-6 py-4 text-xs text-slate-300">
                         {String(item.nama_jurusan || item.kode_jurusan || "-")}
@@ -156,6 +184,9 @@ export function RombelPanel({
                                     ? String(item.ruang_kelas)
                                     : "",
                                   is_aktif: Number(item.is_aktif),
+                                  id_unit: item.id_unit
+                                    ? String(item.id_unit)
+                                    : null,
                                 });
                                 setModalType("rombel");
                               }}

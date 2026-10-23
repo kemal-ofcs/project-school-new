@@ -1,21 +1,30 @@
 import { describe, expect, test } from "bun:test";
 import {
+  aturJamSelesaiBel,
   aturNomorJamBel,
+  barisBelBerbunyi,
   buildPresentWithoutGateScanWarning,
   composeReconciliationMessage,
   findPresentWithoutGateScan,
+  hariDariTanggal,
   hasUnsavedAttendanceMarks,
   hitungJp,
+  jadwalBelBerlaku,
   jamKeBeririsan,
   jamKeSekarang,
+  jpUnitKey,
   nomorJamKbmKosong,
   normalizeJamBel,
   normalizeJamKe,
+  normalizeSuaraBel,
   parseJpDuration,
+  parseJpDurationForUnit,
+  parseJpMaxForUnit,
   parseJpMaxPerDay,
   pukulJamKe,
   rentangJamKe,
   susunJamKe,
+  teksPengumumanBel,
   usulkanSesiSekarang,
 } from "@/lib/validations/class-attendance";
 
@@ -490,5 +499,148 @@ describe("jadwal bel untuk jadwal mengajar dan presensi", () => {
     expect(usulkanSesiSekarang(jadwal, bel, "07:50")?.id).toBe("a");
     expect(usulkanSesiSekarang(jadwal, bel, "08:40")?.id).toBe("b");
     expect(usulkanSesiSekarang(jadwal, bel, "08:25")).toBeNull();
+  });
+});
+
+/**
+ * Vektor v60 — WAJIB identik dengan `pengaturan_jp_per_unit_dan_bel_v60` di
+ * `class_attendance.rs`.
+ */
+const VEKTOR_JP_MAX_UNIT: [string | null, string | null, number][] = [
+  [null, null, 12],
+  [null, "8", 8],
+  ["10", "8", 10],
+  [" 6 ", "8", 6],
+  ["", "8", 8],
+  ["0", "8", 8],
+  ["21", "8", 8],
+  ["abc", "8", 8],
+  ["abc", "rusak", 12],
+  ["20", null, 20],
+];
+
+const VEKTOR_JP_DURASI_UNIT: [string | null, string | null, number][] = [
+  [null, null, 45],
+  [null, "40", 40],
+  ["35", "40", 35],
+  ["0", "40", 40],
+  ["241", "40", 40],
+  ["x", "x", 45],
+];
+
+const VEKTOR_SUARA: [string, string | null][] = [
+  ["", "nada-1"],
+  ["   ", "nada-1"],
+  ["nada-2", "nada-2"],
+  [" mp3-3 ", "mp3-3"],
+  ["pengumuman", "pengumuman"],
+  ["nada-4", null],
+  ["MP3-1", null],
+  ["sirene", null],
+];
+
+const VEKTOR_JAM_SELESAI: [string, string, string, string | null][] = [
+  ["Pulang", "14:00", "", "14:00"],
+  ["Pulang", "14:00", "13:00", "14:00"],
+  ["KBM", "07:00", "07:45", "07:45"],
+  ["KBM", "07:00", "07:00", null],
+  ["Istirahat", "10:00", "09:30", null],
+];
+
+describe("pengaturan JP per unit dan bel (v60)", () => {
+  test("kunci unit", () => {
+    expect(jpUnitKey("jp_max_per_hari", "unt_1")).toBe("jp_max_per_hari:unt_1");
+  });
+
+  for (const [unit, sekolah, harapan] of VEKTOR_JP_MAX_UNIT) {
+    test(`batas unit ${unit} / sekolah ${sekolah} = ${harapan}`, () => {
+      // Nilai unit yang rusak jatuh ke nilai SEKOLAH, bukan ke bawaan 12.
+      expect(parseJpMaxForUnit(unit, sekolah)).toBe(harapan);
+    });
+  }
+
+  for (const [unit, sekolah, harapan] of VEKTOR_JP_DURASI_UNIT) {
+    test(`durasi unit ${unit} / sekolah ${sekolah} = ${harapan}`, () => {
+      expect(parseJpDurationForUnit(unit, sekolah)).toBe(harapan);
+    });
+  }
+
+  for (const [mentah, harapan] of VEKTOR_SUARA) {
+    test(`suara "${mentah}" -> ${harapan}`, () => {
+      // Nilai asing DITOLAK, tidak dinormalkan ke nada bawaan.
+      expect(normalizeSuaraBel(mentah)).toBe(harapan as never);
+    });
+  }
+
+  for (const [jenis, mulai, selesai, harapan] of VEKTOR_JAM_SELESAI) {
+    test(`${jenis} ${mulai}-${selesai} -> ${harapan}`, () => {
+      const hasil = aturJamSelesaiBel(jenis, mulai, selesai);
+      expect(hasil.ok ? hasil.jamSelesai : null).toBe(harapan);
+    });
+  }
+});
+
+describe("jadwal bel per unit dan hari", () => {
+  const bel = (
+    id: string,
+    id_unit: string | null,
+    hari: number | null,
+    jam_mulai: string,
+    extra: Partial<{ is_aktif: number; bunyi: number }> = {},
+  ) => ({
+    id,
+    id_unit,
+    hari,
+    jam_mulai,
+    is_aktif: 1,
+    bunyi: 1,
+    ...extra,
+  });
+  const semua = [
+    bel("umum", null, null, "07:00"),
+    bel("umum-jumat", null, 5, "07:30"),
+    bel("smk", "smk", null, "06:45"),
+    bel("smk-jumat", "smk", 5, "06:30"),
+  ];
+  const ids = (rows: { id: string }[]) => rows.map((row) => row.id);
+
+  test("cakupan paling khusus dipakai utuh, tidak dicampur", () => {
+    expect(ids(jadwalBelBerlaku(semua, "smk", 5))).toEqual(["smk-jumat"]);
+    expect(ids(jadwalBelBerlaku(semua, "smk", 1))).toEqual(["smk"]);
+    expect(ids(jadwalBelBerlaku(semua, "smp", 5))).toEqual(["umum-jumat"]);
+    expect(ids(jadwalBelBerlaku(semua, "smp", 1))).toEqual(["umum"]);
+    expect(ids(jadwalBelBerlaku(semua, null, 5))).toEqual(["umum-jumat"]);
+    expect(ids(jadwalBelBerlaku(semua, null, null))).toEqual(["umum"]);
+    expect(jadwalBelBerlaku([], "smk", 1)).toEqual([]);
+  });
+
+  test("hari dari tanggal mengikuti 1=Senin sampai 7=Minggu", () => {
+    expect(hariDariTanggal("2026-10-23")).toBe(5); // Jumat
+    expect(hariDariTanggal("2026-10-25")).toBe(7); // Minggu
+    expect(hariDariTanggal("2026-10-26")).toBe(1); // Senin
+    expect(hariDariTanggal("23-10-2026")).toBeNull();
+  });
+
+  test("perangkat bel menggabungkan unit, membuang senyap dan pukul ganda", () => {
+    const rows = [
+      bel("a", "smp", null, "07:00"),
+      bel("b", "smk", null, "07:00"),
+      bel("c", "smk", null, "08:00", { bunyi: 0 }),
+      bel("d", "smk", null, "09:00", { is_aktif: 0 }),
+      bel("e", "smk", null, "06:45"),
+      bel("f", null, null, "10:00"),
+    ];
+    expect(ids(barisBelBerbunyi(rows, ["smp", "smk"], 1))).toEqual(["e", "a"]);
+    // Tanpa unit terpilih = jadwal "Semua unit".
+    expect(ids(barisBelBerbunyi(rows, [], 1))).toEqual(["f"]);
+  });
+
+  test("pengumuman menyebut jam pelajaran dan pulang", () => {
+    expect(teksPengumumanBel({ jenis: "KBM", jam_ke: 3 })).toBe(
+      "Jam pelajaran ke-3 dimulai.",
+    );
+    expect(teksPengumumanBel({ jenis: "Pulang", jam_ke: 1 })).toContain(
+      "pulang",
+    );
   });
 });

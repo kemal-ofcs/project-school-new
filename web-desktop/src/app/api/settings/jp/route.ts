@@ -11,15 +11,20 @@ import {
   toApiErrorResponse,
 } from "@/lib/server/http/api-response";
 import { assertSameOriginMutation } from "@/lib/server/http/request-security";
+import { readJpSettings } from "@/lib/services/class-attendance";
 import {
   JP_DURATION_SETTING_KEY,
   JP_MAX_PER_DAY_SETTING_KEY,
+  jpUnitKey,
   MAX_JAM_KE,
-  parseJpDuration,
-  parseJpMaxPerDay,
 } from "@/lib/validations/class-attendance";
 
 export const runtime = "nodejs";
+
+/** `idUnit` kosong = pengaturan sekolah (berlaku untuk "Semua unit"). */
+function unitDari(raw: unknown): string | null {
+  return typeof raw === "string" && raw.trim() ? raw.trim() : null;
+}
 
 export async function POST(request: NextRequest) {
   try {
@@ -28,21 +33,9 @@ export async function POST(request: NextRequest) {
     // sebelum gurunya menyimpan.
     await requireWebPermission(request, "home.view");
     await ensureServerDatabaseInitialized();
-    const client = getServerDatabase();
 
-    const result = await client.execute({
-      sql: "SELECT key, value FROM setting_gex_system WHERE key IN (?, ?);",
-      args: [JP_MAX_PER_DAY_SETTING_KEY, JP_DURATION_SETTING_KEY],
-    });
-    const nilai = new Map(
-      result.rows.map((row) => [String(row.key), String(row.value ?? "")]),
-    );
-
-    return noStoreJson({
-      maxPerHari: parseJpMaxPerDay(nilai.get(JP_MAX_PER_DAY_SETTING_KEY)),
-      durasiMenit: parseJpDuration(nilai.get(JP_DURATION_SETTING_KEY)),
-      batasStruktural: MAX_JAM_KE,
-    });
+    const body = await readJsonBody<{ idUnit?: unknown }>(request);
+    return noStoreJson(await readJpSettings(unitDari(body.idUnit)));
   } catch (error) {
     return toApiErrorResponse(error);
   }
@@ -58,9 +51,11 @@ export async function PUT(request: NextRequest) {
     const body = await readJsonBody<{
       maxPerHari?: unknown;
       durasiMenit?: unknown;
+      idUnit?: unknown;
     }>(request);
     const maxPerHari = Number(body.maxPerHari);
     const durasiMenit = Number(body.durasiMenit);
+    const idUnit = unitDari(body.idUnit);
 
     if (
       !Number.isInteger(maxPerHari) ||
@@ -82,18 +77,32 @@ export async function PUT(request: NextRequest) {
         400,
       );
     }
+    if (idUnit) {
+      const unit = await client.execute({
+        sql: "SELECT 1 FROM akademik_unit WHERE id_unit = ? LIMIT 1;",
+        args: [idUnit],
+      });
+      if (unit.rows.length === 0) {
+        throw new ApiRequestError(
+          "Unit tidak ditemukan. Muat ulang daftar unit.",
+          400,
+        );
+      }
+    }
+    // Dengan unit, nilainya masuk kunci unit itu; kunci sekolah tidak disentuh.
+    const kunci = (base: string) => (idUnit ? jpUnitKey(base, idUnit) : base);
 
     await client.batch(
       [
         {
           sql: `INSERT INTO setting_gex_system (key, value) VALUES (?, ?)
                 ON CONFLICT(key) DO UPDATE SET value = excluded.value;`,
-          args: [JP_MAX_PER_DAY_SETTING_KEY, String(maxPerHari)],
+          args: [kunci(JP_MAX_PER_DAY_SETTING_KEY), String(maxPerHari)],
         },
         {
           sql: `INSERT INTO setting_gex_system (key, value) VALUES (?, ?)
                 ON CONFLICT(key) DO UPDATE SET value = excluded.value;`,
-          args: [JP_DURATION_SETTING_KEY, String(durasiMenit)],
+          args: [kunci(JP_DURATION_SETTING_KEY), String(durasiMenit)],
         },
       ],
       "write",

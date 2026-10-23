@@ -2,9 +2,11 @@
 
 import type { FormEvent } from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { BelPerangkatPanel } from "@/components/BelPerangkatPanel";
 import { FeedbackBanner } from "@/components/ui/FeedbackBanner";
 import { Icon } from "@/components/ui/Icon";
 import { triggerHaptic } from "@/lib/client/haptics";
+import { getDaftarUnit } from "@/lib/gateways/academic";
 import {
   getJpSettings,
   getLessonPeriods,
@@ -27,6 +29,16 @@ import {
  * menjaganya dengan `settings.manage` — backend menolak akun lain.
  */
 
+const NAMA_HARI = [
+  "Senin",
+  "Selasa",
+  "Rabu",
+  "Kamis",
+  "Jumat",
+  "Sabtu",
+  "Minggu",
+];
+
 const INPUT_CLASS =
   "min-h-11 w-28 rounded-xl border border-white/15 bg-slate-950 px-3 font-mono text-xs text-white outline-none transition focus:border-sky-400";
 
@@ -41,18 +53,26 @@ export function JamPelajaranCard() {
     message: string;
   } | null>(null);
 
-  const [periods, setPeriods] = useState<LessonPeriodRow[]>([]);
-  const nomorKosong = nomorJamKbmKosong(periods);
+  // "" = Semua unit (nilai sekolah); sejak v60 JP dan jadwal bel per unit.
+  const [unitList, setUnitList] = useState<Record<string, unknown>[]>([]);
+  const [unit, setUnit] = useState("");
+  const [semuaBel, setSemuaBel] = useState<LessonPeriodRow[]>([]);
+  const periods = semuaBel.filter((row) => (row.id_unit ?? "") === unit);
+  const nomorKosong = nomorJamKbmKosong(
+    periods.filter((row) => row.hari === null),
+  );
 
-  const muat = useCallback(async () => {
+  const muat = useCallback(async (idUnit: string) => {
     try {
-      const [settings, daftarBel] = await Promise.all([
-        getJpSettings(),
+      const [settings, daftarBel, units] = await Promise.all([
+        getJpSettings(idUnit || null),
         getLessonPeriods(),
+        getDaftarUnit().catch(() => [] as Record<string, unknown>[]),
       ]);
       setMaxPerHari(settings.maxPerHari);
       setDurasiMenit(settings.durasiMenit);
-      setPeriods(daftarBel);
+      setSemuaBel(daftarBel);
+      setUnitList(units);
     } catch (err) {
       setFeedback({
         type: "error",
@@ -67,8 +87,8 @@ export function JamPelajaranCard() {
   }, []);
 
   useEffect(() => {
-    void muat();
-  }, [muat]);
+    void muat(unit);
+  }, [muat, unit]);
 
   const handleSubmit = async (event: FormEvent) => {
     event.preventDefault();
@@ -76,13 +96,13 @@ export function JamPelajaranCard() {
     isSubmittingRef.current = true;
     setSaving(true);
     try {
-      await saveJpSettings(maxPerHari, durasiMenit);
+      await saveJpSettings(maxPerHari, durasiMenit, unit || null);
       triggerHaptic("success");
       setFeedback({
         type: "success",
         message: "Pengaturan jam pelajaran tersimpan dan ikut tersinkronisasi.",
       });
-      await muat();
+      await muat(unit);
     } catch (err) {
       triggerHaptic("error");
       setFeedback({
@@ -127,6 +147,34 @@ export function JamPelajaranCard() {
           onClose={() => setFeedback(null)}
           className="mt-3 text-xs"
         />
+      ) : null}
+
+      {unitList.length > 0 ? (
+        <div className="mt-3 space-y-2 rounded-2xl border border-white/10 bg-slate-950/60 p-3">
+          <label
+            htmlFor="jp-unit"
+            className="block text-xs font-bold text-slate-200"
+          >
+            Unit
+          </label>
+          <p className="text-[11px] leading-4 text-slate-500">
+            Semua unit = nilai sekolah, dipakai unit yang belum punya pengaturan
+            sendiri.
+          </p>
+          <select
+            id="jp-unit"
+            value={unit}
+            onChange={(event) => setUnit(event.target.value)}
+            className="min-h-11 w-full rounded-xl border border-white/15 bg-slate-950 px-3 text-xs text-white outline-none transition focus:border-sky-400"
+          >
+            <option value="">Semua unit</option>
+            {unitList.map((u) => (
+              <option key={String(u.id_unit)} value={String(u.id_unit)}>
+                {String(u.nama_unit)}
+              </option>
+            ))}
+          </select>
+        </div>
       ) : null}
 
       <div className="mt-3 space-y-2 rounded-2xl border border-white/10 bg-slate-950/60 p-3">
@@ -206,11 +254,14 @@ export function JamPelajaranCard() {
                 className="flex items-center justify-between gap-2 text-[11px]"
               >
                 <span className="text-slate-400">
+                  {row.hari === null ? "" : `${NAMA_HARI[row.hari - 1]} · `}
                   {row.jenis === "KBM" ? `Jam ke-${row.jam_ke}` : row.jenis}
                   {row.is_aktif === 1 ? "" : " · nonaktif"}
                 </span>
                 <span className="font-mono text-slate-300">
-                  {row.jam_mulai}–{row.jam_selesai}
+                  {row.jenis === "Pulang"
+                    ? row.jam_mulai
+                    : `${row.jam_mulai}–${row.jam_selesai}`}
                 </span>
               </li>
             ))}
@@ -223,6 +274,8 @@ export function JamPelajaranCard() {
           </p>
         ) : null}
       </div>
+
+      <BelPerangkatPanel unitList={unitList} />
     </form>
   );
 }

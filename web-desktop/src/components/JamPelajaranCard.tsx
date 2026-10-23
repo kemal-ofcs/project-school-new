@@ -2,8 +2,10 @@
 
 import type { FormEvent } from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { BelPerangkatPanel } from "@/components/BelPerangkatPanel";
 import { Icon } from "@/components/ui/Icon";
 import { Modal } from "@/components/ui/Modal";
+import { getDaftarUnit } from "@/lib/gateways/academic";
 import {
   deleteLessonPeriod,
   getJpSettings,
@@ -18,16 +20,36 @@ import {
   DEFAULT_JP_MAX_PER_DAY,
   JENIS_JAM_PELAJARAN,
   jamKbmAktif,
+  LABEL_SUARA_BEL,
   MAX_JAM_KE,
   nomorJamKbmKosong,
+  SUARA_BEL,
+  SUARA_BEL_BAWAAN,
 } from "@/lib/validations/class-attendance";
 
+const HARI = [
+  { nilai: 1, label: "Senin" },
+  { nilai: 2, label: "Selasa" },
+  { nilai: 3, label: "Rabu" },
+  { nilai: 4, label: "Kamis" },
+  { nilai: 5, label: "Jumat" },
+  { nilai: 6, label: "Sabtu" },
+  { nilai: 7, label: "Minggu" },
+] as const;
+
+const labelHari = (hari: number | null) =>
+  hari === null
+    ? "Setiap hari"
+    : (HARI.find((h) => h.nilai === hari)?.label ?? String(hari));
+
 /**
- * Jumlah jam pelajaran per hari dan lama satu jam pelajaran.
+ * Jumlah jam pelajaran per hari, lama satu jam pelajaran, dan jadwal bel.
  *
- * Keduanya kebijakan sekolah, bukan setelan perangkat: nilainya hidup di
- * `setting_gex_system` yang ikut sinkronisasi, sehingga satu kali diubah di
- * mana pun akan berlaku di seluruh perangkat sekolah itu.
+ * Ketiganya kebijakan sekolah, bukan setelan perangkat: nilainya hidup di
+ * `setting_gex_system` dan `akademik_jam_pelajaran` yang ikut sinkronisasi,
+ * sehingga satu kali diubah di mana pun akan berlaku di seluruh perangkat.
+ * Sejak v60 ketiganya bisa diatur per unit; "Semua unit" adalah nilai sekolah
+ * yang dipakai unit yang belum punya nilainya sendiri.
  *
  * Batas struktural di kode jauh lebih longgar daripada angka di kartu ini, dan
  * itu disengaja: yang di kode menjaga database dari teks asing, yang di sini
@@ -41,30 +63,46 @@ export function JamPelajaranCard() {
   // berikutnya, sehingga dua klik dalam satu tick sama-sama lolos.
   const isSubmittingRef = useRef(false);
 
+  const [unitList, setUnitList] = useState<Record<string, unknown>[]>([]);
+  // "" = Semua unit (nilai sekolah).
+  const [unit, setUnit] = useState("");
   const [maxPerHari, setMaxPerHari] = useState<number>(DEFAULT_JP_MAX_PER_DAY);
   const [durasiMenit, setDurasiMenit] = useState<number>(
     DEFAULT_JP_DURATION_MINUTES,
   );
+  const [khususUnit, setKhususUnit] = useState(false);
   const [busy, setBusy] = useState(false);
   const [feedback, setFeedback] = useState<{
     tone: "success" | "error";
     text: string;
   } | null>(null);
 
-  const [periods, setPeriods] = useState<LessonPeriodRow[]>([]);
+  const [semuaBel, setSemuaBel] = useState<LessonPeriodRow[]>([]);
   const [modalBel, setModalBel] = useState(false);
   const [draftBel, setDraftBel] = useState<Partial<LessonPeriodRow>>({});
-  const nomorKosong = nomorJamKbmKosong(periods);
 
-  const muat = useCallback(async () => {
+  // Tabel menampilkan baris milik unit terpilih saja, persis cakupannya.
+  const periods = semuaBel.filter((row) => (row.id_unit ?? "") === unit);
+  const nomorKosong = nomorJamKbmKosong(
+    periods.filter((row) => row.hari === null),
+  );
+  const namaUnit = (id: string) =>
+    String(
+      unitList.find((u) => String(u.id_unit) === id)?.nama_unit ?? "Semua unit",
+    );
+
+  const muat = useCallback(async (idUnit: string) => {
     try {
-      const [settings, daftarBel] = await Promise.all([
-        getJpSettings(),
+      const [settings, daftarBel, units] = await Promise.all([
+        getJpSettings(idUnit || null),
         getLessonPeriods(),
+        getDaftarUnit().catch(() => [] as Record<string, unknown>[]),
       ]);
       setMaxPerHari(settings.maxPerHari);
       setDurasiMenit(settings.durasiMenit);
-      setPeriods(daftarBel);
+      setKhususUnit(settings.khususUnit);
+      setSemuaBel(daftarBel);
+      setUnitList(units);
     } catch (error: unknown) {
       setFeedback({
         tone: "error",
@@ -77,8 +115,8 @@ export function JamPelajaranCard() {
   }, []);
 
   useEffect(() => {
-    void muat();
-  }, [muat]);
+    void muat(unit);
+  }, [muat, unit]);
 
   const simpanBel = async (event: FormEvent) => {
     event.preventDefault();
@@ -88,7 +126,7 @@ export function JamPelajaranCard() {
       await saveLessonPeriod(draftBel);
       setModalBel(false);
       setFeedback({ tone: "success", text: "Jam bel tersimpan." });
-      await muat();
+      await muat(unit);
     } catch (error: unknown) {
       setFeedback({
         tone: "error",
@@ -107,8 +145,8 @@ export function JamPelajaranCard() {
         title: "Hapus jam bel ini?",
         description:
           row.jenis === "KBM"
-            ? `Jam pelajaran ke-${row.jam_ke} dihapus dari jadwal bel.`
-            : `${row.jenis} pukul ${row.jam_mulai}–${row.jam_selesai} dihapus dari jadwal bel.`,
+            ? `Jam pelajaran ke-${row.jam_ke} (${labelHari(row.hari)}) dihapus dari jadwal bel.`
+            : `${row.jenis} pukul ${row.jam_mulai} (${labelHari(row.hari)}) dihapus dari jadwal bel.`,
         preserved:
           "Presensi mapel yang sudah tercatat pada jam itu tidak ikut terhapus.",
         confirmLabel: "Ya, hapus",
@@ -119,7 +157,7 @@ export function JamPelajaranCard() {
     try {
       await deleteLessonPeriod(row.id_jam_pelajaran);
       setFeedback({ tone: "success", text: "Jam bel dihapus." });
-      await muat();
+      await muat(unit);
     } catch (error: unknown) {
       setFeedback({
         tone: "error",
@@ -137,12 +175,12 @@ export function JamPelajaranCard() {
     isSubmittingRef.current = true;
     setBusy(true);
     try {
-      await saveJpSettings(maxPerHari, durasiMenit);
+      await saveJpSettings(maxPerHari, durasiMenit, unit || null);
       setFeedback({
         tone: "success",
-        text: "Pengaturan jam pelajaran tersimpan dan akan ikut tersinkronisasi.",
+        text: `Pengaturan jam pelajaran ${namaUnit(unit)} tersimpan dan akan ikut tersinkronisasi.`,
       });
-      await muat();
+      await muat(unit);
     } catch (error: unknown) {
       setFeedback({
         tone: "error",
@@ -156,6 +194,8 @@ export function JamPelajaranCard() {
       setBusy(false);
     }
   };
+
+  const jenisDraft = draftBel.jenis ?? "KBM";
 
   return (
     <section className="app-panel rounded-3xl p-5 sm:p-7">
@@ -173,6 +213,31 @@ export function JamPelajaranCard() {
           </p>
         </div>
       </div>
+
+      {unitList.length > 0 ? (
+        <label className="mt-5 grid max-w-xs gap-1.5 text-xs font-bold text-slate-300">
+          Unit
+          <select
+            value={unit}
+            onChange={(event) => setUnit(event.target.value)}
+            className="app-input"
+          >
+            <option value="">Semua unit (nilai sekolah)</option>
+            {unitList.map((u) => (
+              <option key={String(u.id_unit)} value={String(u.id_unit)}>
+                {String(u.nama_unit)}
+              </option>
+            ))}
+          </select>
+          <span className="font-normal leading-5 text-slate-500">
+            {unit
+              ? khususUnit
+                ? "Unit ini memakai pengaturan dan jadwal belnya sendiri."
+                : "Unit ini belum punya pengaturan sendiri, jadi angka di bawah adalah nilai sekolah."
+              : "Berlaku untuk unit yang belum punya pengaturan sendiri."}
+          </span>
+        </label>
+      ) : null}
 
       {feedback ? (
         <p
@@ -232,12 +297,16 @@ export function JamPelajaranCard() {
       <div className="mt-6 border-t border-white/10 pt-5">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <h3 className="text-sm font-black text-white">Jadwal Bel</h3>
+            <h3 className="text-sm font-black text-white">
+              Jadwal Bel {unitList.length > 0 ? `· ${namaUnit(unit)}` : ""}
+            </h3>
             <p className="mt-1 max-w-2xl text-xs leading-5 text-slate-400">
               Pukul berapa setiap jam pelajaran berlangsung. Jadwal Mengajar
               memilih jam dari daftar ini, dan Presensi KBM memakainya untuk
-              mengusulkan sesi yang sedang berjalan. Istirahat dan Upacara tidak
-              memakai nomor jam pelajaran.
+              mengusulkan sesi yang sedang berjalan. Istirahat, Upacara, dan
+              Pulang tidak memakai nomor jam pelajaran. Bila sebuah hari punya
+              baris sendiri (misalnya Jumat), hanya baris hari itu yang dipakai
+              pada hari tersebut; begitu juga unit yang punya jadwal sendiri.
             </p>
           </div>
           <button
@@ -252,6 +321,10 @@ export function JamPelajaranCard() {
                 jenis: "KBM",
                 keterangan: "",
                 is_aktif: 1,
+                id_unit: unit || null,
+                hari: null,
+                bunyi: 1,
+                suara: SUARA_BEL_BAWAAN,
               });
               setModalBel(true);
             }}
@@ -274,9 +347,11 @@ export function JamPelajaranCard() {
           <table className="w-full text-left text-sm text-slate-300">
             <thead className="bg-slate-800/80 text-xs font-semibold uppercase text-slate-400">
               <tr>
+                <th className="px-3 py-2">Hari</th>
                 <th className="px-3 py-2">Jam Ke</th>
                 <th className="px-3 py-2">Pukul</th>
                 <th className="px-3 py-2">Jenis</th>
+                <th className="px-3 py-2">Bel</th>
                 <th className="px-3 py-2">Keterangan</th>
                 <th className="px-3 py-2 text-center">Status</th>
                 <th className="px-3 py-2 text-center">Aksi</th>
@@ -286,24 +361,35 @@ export function JamPelajaranCard() {
               {periods.length === 0 ? (
                 <tr>
                   <td
-                    colSpan={6}
+                    colSpan={8}
                     className="px-3 py-6 text-center text-slate-500"
                   >
-                    Belum ada jadwal bel. Layar presensi tetap berjalan tanpa
-                    ini, hanya pukulnya yang belum ditampilkan.
+                    {unit
+                      ? "Unit ini belum punya jadwal bel sendiri, jadi memakai jadwal Semua unit."
+                      : "Belum ada jadwal bel. Layar presensi tetap berjalan tanpa ini, hanya pukulnya yang belum ditampilkan."}
                   </td>
                 </tr>
               ) : (
                 periods.map((row) => (
                   <tr key={row.id_jam_pelajaran}>
+                    <td className="px-3 py-2 text-xs text-slate-400">
+                      {labelHari(row.hari)}
+                    </td>
                     <td className="px-3 py-2 font-semibold text-slate-200">
                       {row.jenis === "KBM" ? row.jam_ke : "-"}
                     </td>
                     <td className="px-3 py-2 font-mono text-slate-300">
-                      {row.jam_mulai}–{row.jam_selesai}
+                      {row.jenis === "Pulang"
+                        ? row.jam_mulai
+                        : `${row.jam_mulai}–${row.jam_selesai}`}
                     </td>
                     <td className="px-3 py-2 text-xs text-slate-400">
                       {row.jenis}
+                    </td>
+                    <td className="px-3 py-2 text-xs text-slate-400">
+                      {row.bunyi === 1
+                        ? (LABEL_SUARA_BEL[row.suara] ?? row.suara)
+                        : "Senyap"}
                     </td>
                     <td className="px-3 py-2 text-xs text-slate-500">
                       {row.keterangan || "-"}
@@ -346,6 +432,8 @@ export function JamPelajaranCard() {
         </div>
       </div>
 
+      <BelPerangkatPanel unitList={unitList} />
+
       {modalBel ? (
         <Modal
           title="Jam Bel Sekolah"
@@ -354,7 +442,7 @@ export function JamPelajaranCard() {
         >
           <form onSubmit={simpanBel} className="space-y-4 text-sm">
             <div className="grid grid-cols-2 gap-4">
-              {(draftBel.jenis ?? "KBM") === "KBM" ? (
+              {jenisDraft === "KBM" ? (
                 <label className="grid gap-1.5 text-xs font-bold text-slate-300">
                   Jam pelajaran ke
                   <input
@@ -374,13 +462,13 @@ export function JamPelajaranCard() {
                 </label>
               ) : (
                 <p className="self-end text-xs leading-5 text-slate-400">
-                  {draftBel.jenis} tidak memakai nomor jam pelajaran.
+                  {jenisDraft} tidak memakai nomor jam pelajaran.
                 </p>
               )}
               <label className="grid gap-1.5 text-xs font-bold text-slate-300">
                 Jenis
                 <select
-                  value={draftBel.jenis ?? "KBM"}
+                  value={jenisDraft}
                   onChange={(event) =>
                     setDraftBel((prev) => ({
                       ...prev,
@@ -397,7 +485,7 @@ export function JamPelajaranCard() {
                 </select>
               </label>
               <label className="grid gap-1.5 text-xs font-bold text-slate-300">
-                Jam mulai
+                {jenisDraft === "Pulang" ? "Pukul pulang" : "Jam mulai"}
                 <input
                   type="time"
                   value={draftBel.jam_mulai ?? "07:00"}
@@ -411,20 +499,64 @@ export function JamPelajaranCard() {
                   className="app-input font-mono"
                 />
               </label>
+              {jenisDraft === "Pulang" ? null : (
+                <label className="grid gap-1.5 text-xs font-bold text-slate-300">
+                  Jam selesai
+                  <input
+                    type="time"
+                    value={draftBel.jam_selesai ?? ""}
+                    onChange={(event) =>
+                      setDraftBel((prev) => ({
+                        ...prev,
+                        jam_selesai: event.target.value,
+                      }))
+                    }
+                    required
+                    className="app-input font-mono"
+                  />
+                </label>
+              )}
               <label className="grid gap-1.5 text-xs font-bold text-slate-300">
-                Jam selesai
-                <input
-                  type="time"
-                  value={draftBel.jam_selesai ?? ""}
+                Unit
+                <select
+                  value={draftBel.id_unit ?? ""}
                   onChange={(event) =>
                     setDraftBel((prev) => ({
                       ...prev,
-                      jam_selesai: event.target.value,
+                      id_unit: event.target.value || null,
                     }))
                   }
-                  required
-                  className="app-input font-mono"
-                />
+                  className="app-input"
+                >
+                  <option value="">Semua unit</option>
+                  {unitList.map((u) => (
+                    <option key={String(u.id_unit)} value={String(u.id_unit)}>
+                      {String(u.nama_unit)}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="grid gap-1.5 text-xs font-bold text-slate-300">
+                Hari
+                <select
+                  value={draftBel.hari ?? ""}
+                  onChange={(event) =>
+                    setDraftBel((prev) => ({
+                      ...prev,
+                      hari: event.target.value
+                        ? Number(event.target.value)
+                        : null,
+                    }))
+                  }
+                  className="app-input"
+                >
+                  <option value="">Setiap hari</option>
+                  {HARI.map((hari) => (
+                    <option key={hari.nilai} value={hari.nilai}>
+                      {hari.label}
+                    </option>
+                  ))}
+                </select>
               </label>
             </div>
 
@@ -442,6 +574,43 @@ export function JamPelajaranCard() {
               />
             </label>
 
+            <div className="grid grid-cols-2 gap-4">
+              <label className="flex items-center gap-3 self-end text-xs font-semibold text-slate-300">
+                <input
+                  type="checkbox"
+                  checked={(draftBel.bunyi ?? 1) === 1}
+                  onChange={(event) =>
+                    setDraftBel((prev) => ({
+                      ...prev,
+                      bunyi: event.target.checked ? 1 : 0,
+                    }))
+                  }
+                  className="size-4 rounded border-slate-600 bg-slate-800 accent-sky-500"
+                />
+                Bunyikan bel
+              </label>
+              <label className="grid gap-1.5 text-xs font-bold text-slate-300">
+                Suara
+                <select
+                  value={draftBel.suara ?? SUARA_BEL_BAWAAN}
+                  disabled={(draftBel.bunyi ?? 1) !== 1}
+                  onChange={(event) =>
+                    setDraftBel((prev) => ({
+                      ...prev,
+                      suara: event.target.value as LessonPeriodRow["suara"],
+                    }))
+                  }
+                  className="app-input disabled:opacity-50"
+                >
+                  {SUARA_BEL.map((suara) => (
+                    <option key={suara} value={suara}>
+                      {LABEL_SUARA_BEL[suara]}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </div>
+
             <label className="flex items-center gap-3 text-xs font-semibold text-slate-300">
               <input
                 type="checkbox"
@@ -454,7 +623,7 @@ export function JamPelajaranCard() {
                 }
                 className="size-4 rounded border-slate-600 bg-slate-800 accent-sky-500"
               />
-              Jam bel aktif
+              Jam bel aktif (dipakai Jadwal Mengajar dan Presensi KBM)
             </label>
 
             <div className="flex justify-end gap-3 border-t border-slate-700 pt-4">

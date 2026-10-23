@@ -26,6 +26,7 @@ import {
   formatTingkatDisplay,
   parseUnitKeterangan,
   resolveTingkatOptions,
+  unitDariTingkat,
 } from "@/lib/constants/academic-levels";
 import { useAuth } from "@/lib/context/AuthContext";
 import {
@@ -272,6 +273,8 @@ export default function AkademikMobilePage() {
         kapasitas: "36",
         ruang_kelas: "",
         is_aktif: 1,
+        id_unit:
+          unitDariTingkat(unit, resolveTingkatOptions(unit)[0]?.tingkat) ?? "",
       },
       mapel: {
         kind: "mapel",
@@ -282,6 +285,7 @@ export default function AkademikMobilePage() {
         beban_jam: "2",
         kkm: "75",
         is_aktif: 1,
+        id_unit: "",
       },
       penugasan: {
         kind: "penugasan",
@@ -338,6 +342,7 @@ export default function AkademikMobilePage() {
         kapasitas: String(item.kapasitas ?? 36),
         ruang_kelas: item.ruang_kelas ? String(item.ruang_kelas) : "",
         is_aktif: Number(item.is_aktif ?? 1) === 1 ? 1 : 0,
+        id_unit: item.id_unit ? String(item.id_unit) : "",
       });
     } else if (kind === "mapel") {
       setDraft({
@@ -351,6 +356,7 @@ export default function AkademikMobilePage() {
         beban_jam: String(item.beban_jam ?? 2),
         kkm: String(item.kkm ?? 75),
         is_aktif: Number(item.is_aktif ?? 1) === 1 ? 1 : 0,
+        id_unit: item.id_unit ? String(item.id_unit) : "",
       });
     }
   };
