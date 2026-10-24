@@ -121,7 +121,7 @@ Batasnya: tempat tidak bisa diganti nama secara massal, karena mutasi tidak bisa
 - `stok_minimum`: dibandingkan dengan total stok kondisi Baik di semua tempat.
 - `tempat_utama`: tempat yang terisi otomatis di formulir.
 - **Setelah barang punya mutasi, `satuan` dan `bisa_expired` dikunci.** Mengubah satuan mengubah arti seluruh riwayat. Mengubah `bisa_expired` membuat mutasi lama tidak punya batch.
-- Barang dinonaktifkan, tidak dihapus.
+- Barang dinonaktifkan, tidak dihapus. Pengecualian (schema v61): barang salah input yang tanpa unit dan setiap mutasinya sudah dibatalkan boleh dihapus dengan izin sensitif `inventory.item.delete`; lihat `references/14`.
 
 ### 4.3 Barang masuk
 Alasan: `Pengadaan`, `Hibah`, `Saldo Awal` (dipakai sekali saat sekolah mulai memakai modul ini). Isian: tanggal, tempat tujuan, kondisi (khusus aset), jumlah, sumber dana (teks bebas dengan saran BOSP Reguler, BOSP Kinerja, BOP, APBD, Yayasan, Komite, Hibah), nomor nota (opsional), harga satuan dalam rupiah bulat (opsional), dan `tanggal_expired` bila barangnya ber-expired.
