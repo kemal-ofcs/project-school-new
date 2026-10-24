@@ -56,7 +56,7 @@ const APLIKASI = [
  * DAN checksum-nya; checksum diambil dari halaman rilis resminya
  * (`SHASUMS256.txt` milik Node, `checksums.txt` milik Caddy).
  */
-const NODE_VERSI = "22.23.3";
+const NODE_VERSI = "22.23.4";
 const CADDY_VERSI = "2.11.4";
 const UNDUHAN = {
   node: {
@@ -64,7 +64,7 @@ const UNDUHAN = {
     url: `https://nodejs.org/dist/v${NODE_VERSI}/win-x64/node.exe`,
     algoritme: "sha256",
     checksum:
-      "9c9245166b4a8e182e0b797da9c20136117ff24368eaff1fec8343a123c8db0e",
+      "dccc52de28d8df2ee22d2062424f8c563070d95d8ad70c54c4bf01d590dec14f",
   },
   lisensiNode: {
     berkas: `LICENSE-node-${NODE_VERSI}.txt`,

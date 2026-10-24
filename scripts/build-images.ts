@@ -127,7 +127,7 @@ function utama() {
   for (const [index, image] of IMAGES.entries()) {
     jalankan(
       "docker",
-      ["build", "-t", tags[index] as string, "."],
+      ["build", "--pull", "-t", tags[index] as string, "."],
       path.join(rootDir, image.workspace),
     );
   }
