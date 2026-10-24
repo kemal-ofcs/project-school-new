@@ -234,6 +234,15 @@ export async function saveJenis(
       throw new Error("Akun pendapatan harus akun Pendapatan yang aktif.");
     }
     const id = parsed.data.id_jenis_tagihan?.trim() || newId("jt-");
+    // Cermin `save_jenis`: id tagihan memuat periodenya, jadi cara penagihan
+    // yang berubah membuat penerbitan berikutnya menagih ulang siswa yang sama.
+    const lama = await tx.execute({
+      sql: "SELECT periodik FROM keu_jenis_tagihan WHERE id_jenis_tagihan = ?;",
+      args: [id],
+    });
+    if (lama.rows[0] && String(lama.rows[0].periodik) !== valid.periodik) {
+      throw new Error("Cara penagihan tidak bisa diubah setelah jenis dibuat.");
+    }
     const nama = await tx.execute({
       sql: "SELECT EXISTS(SELECT 1 FROM keu_jenis_tagihan WHERE LOWER(nama) = LOWER(?) AND id_jenis_tagihan <> ?) AS ada;",
       args: [valid.nama, id],
@@ -1351,6 +1360,25 @@ async function batalPembayaranTx(
   return row;
 }
 
+export const PESAN_TITIPAN_TERPAKAI =
+  "Titipan dari kuitansi ini sudah dipakai. Batalkan dulu kuitansi bermetode Titipan-nya.";
+
+/** Cermin `assert_titipan_utuh`: kelebihan yang sudah terpakai tidak boleh hilang. */
+async function assertTitipanUtuh(tx: Transaction, id: string) {
+  const result = await tx.execute({
+    sql: `SELECT p.id_siswa, COALESCE(SUM(CASE WHEN a.id_tagihan IS NULL THEN a.nominal END), 0) AS masuk
+          FROM keu_pembayaran p
+          LEFT JOIN keu_pembayaran_alokasi a ON a.id_pembayaran = p.id_pembayaran
+          WHERE p.id_pembayaran = ?;`,
+    args: [id],
+  });
+  const idSiswa = text(result.rows[0]?.id_siswa);
+  const masuk = Number(result.rows[0]?.masuk ?? 0);
+  if (idSiswa && masuk > 0 && masuk > (await saldoTitipan(tx, idSiswa))) {
+    throw new Error(PESAN_TITIPAN_TERPAKAI);
+  }
+}
+
 export async function cancelPayment(
   client: Client,
   operator: string,
@@ -1358,9 +1386,10 @@ export async function cancelPayment(
   alasanMentah: string,
 ): Promise<{ sukses: true }> {
   const alasan = validasiAlasanBatal(alasanMentah);
-  await withTransaction(client, (tx) =>
-    batalPembayaranTx(tx, operator, id, alasan),
-  );
+  await withTransaction(client, async (tx) => {
+    await assertTitipanUtuh(tx, id);
+    await batalPembayaranTx(tx, operator, id, alasan);
+  });
   return { sukses: true as const };
 }
 

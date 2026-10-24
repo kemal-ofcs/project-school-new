@@ -138,11 +138,15 @@ export function validatePinjaman(
   };
 }
 
+export const PESAN_BATAL_DIPOTONG_GAJI =
+  "Kasbon ini sedang dipotong di proses gaji yang belum dibayar. Tolak proses gaji itu dulu.";
+
 /** Cermin `aturan_keputusan`: status baru, atau alasan penolakan. */
 export function aturanKeputusan(
   status: string,
   aksi: string,
   adaAngsuran: boolean,
+  adaPotonganGaji: boolean,
 ): Hasil<StatusPinjaman> {
   if (aksi === "setujui" || aksi === "tolak") {
     if (status !== "Diajukan") {
@@ -165,6 +169,11 @@ export function aturanKeputusan(
         ok: false,
         error: "Pinjaman yang sudah diangsur tidak bisa dibatalkan.",
       };
+    }
+    // Potongan di draf gaji tetap dicatat sebagai angsuran saat PAID, jadi
+    // karyawan akan dipotong untuk pinjaman yang sudah batal.
+    if (adaPotonganGaji) {
+      return { ok: false, error: PESAN_BATAL_DIPOTONG_GAJI };
     }
     return { ok: true, value: "Dibatalkan" };
   }

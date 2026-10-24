@@ -7,7 +7,7 @@ import { LicenseHolderLabel } from "@/components/license/LicenseNotice";
 import { MobileAppShell } from "@/components/MobileAppShell";
 import { FeedbackBanner } from "@/components/ui/FeedbackBanner";
 import { Icon } from "@/components/ui/Icon";
-import { canAccessArea } from "@/lib/auth/access";
+import { canAccessArea, hasPermission } from "@/lib/auth/access";
 import { triggerHaptic } from "@/lib/client/haptics";
 import { shareText } from "@/lib/client/share";
 import { useAuth } from "@/lib/context/AuthContext";
@@ -182,15 +182,17 @@ Status: LUNAS / DIBAYAR`;
             <Icon name="arrow-left" className="w-4 h-4" />
             <span>Kembali</span>
           </Link>
-          <button
-            type="button"
-            onClick={handleShare}
-            disabled={sharing || !slip}
-            className="px-3 py-2 bg-sky-600 hover:bg-sky-500 text-on-accent rounded-xl text-xs font-semibold flex items-center gap-1.5 shadow"
-          >
-            <Icon name="share" className="w-4 h-4" />
-            <span>{sharing ? "Membagikan..." : "Bagikan"}</span>
-          </button>
+          {hasPermission(user, "payroll.export") ? (
+            <button
+              type="button"
+              onClick={handleShare}
+              disabled={sharing || !slip}
+              className="px-3 py-2 bg-sky-600 hover:bg-sky-500 text-on-accent rounded-xl text-xs font-semibold flex items-center gap-1.5 shadow"
+            >
+              <Icon name="share" className="w-4 h-4" />
+              <span>{sharing ? "Membagikan..." : "Bagikan"}</span>
+            </button>
+          ) : null}
         </div>
 
         {feedback && (

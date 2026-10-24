@@ -11,6 +11,11 @@ import {
   toApiErrorResponse,
 } from "@/lib/server/http/api-response";
 import { assertSameOriginMutation } from "@/lib/server/http/request-security";
+import {
+  PENERIMA_GAJI_SQL,
+  PESAN_PENERIMA_GAJI_TIDAK_ADA,
+  pesanKonfigurasiGajiTidakSah,
+} from "@/lib/validations/payroll-policy";
 
 export const runtime = "nodejs";
 
@@ -25,7 +30,7 @@ export async function POST(request: NextRequest) {
 
     const result = await client.execute({
       sql: `
-        SELECT sc.id, sc.id_karyawan, sc.rate_per_hour, sc.ptkp_status,
+        SELECT sc.id, sc.id_karyawan, sc.rate_per_hour, sc.rate_per_jp, sc.ptkp_status,
                sc.effective_date, sc.created_by, sc.created_at
         FROM salary_configs sc
         LEFT JOIN master_data md ON md.id_unik = sc.id_karyawan
@@ -63,6 +68,24 @@ export async function PUT(request: NextRequest) {
         400,
       );
     }
+    const ratePerJp = draft.rate_per_jp ?? 0;
+    const ptkpStatus = draft.ptkp_status || "TK/0";
+    const pesan = pesanKonfigurasiGajiTidakSah({
+      rate_per_hour: draft.rate_per_hour,
+      rate_per_jp: ratePerJp,
+      ptkp_status: ptkpStatus,
+      effective_date: draft.effective_date,
+    });
+    if (pesan) {
+      throw new ApiRequestError(pesan, 400);
+    }
+    const penerima = await client.execute({
+      sql: PENERIMA_GAJI_SQL,
+      args: [String(draft.id_karyawan)],
+    });
+    if (penerima.rows.length === 0) {
+      throw new ApiRequestError(PESAN_PENERIMA_GAJI_TIDAK_ADA, 400);
+    }
 
     const configId =
       typeof draft.id === "string" && draft.id.trim()
@@ -73,10 +96,11 @@ export async function PUT(request: NextRequest) {
     await client.execute({
       sql: `
         INSERT INTO salary_configs (
-          id, id_karyawan, rate_per_hour, ptkp_status, effective_date, created_by, created_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?)
+          id, id_karyawan, rate_per_hour, rate_per_jp, ptkp_status, effective_date, created_by, created_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT(id_karyawan, effective_date) DO UPDATE SET
           rate_per_hour = excluded.rate_per_hour,
+          rate_per_jp = excluded.rate_per_jp,
           ptkp_status = excluded.ptkp_status,
           created_by = excluded.created_by;
       `,
@@ -84,7 +108,8 @@ export async function PUT(request: NextRequest) {
         configId,
         String(draft.id_karyawan),
         Number(draft.rate_per_hour),
-        String(draft.ptkp_status || "TK/0"),
+        Number(ratePerJp),
+        String(ptkpStatus),
         String(draft.effective_date),
         actor.username,
         now,

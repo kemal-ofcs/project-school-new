@@ -166,11 +166,15 @@ pub fn validate_pinjaman(draft: &PinjamanDraft) -> Result<PinjamanValid, String>
     })
 }
 
+pub const PESAN_BATAL_DIPOTONG_GAJI: &str =
+    "Kasbon ini sedang dipotong di proses gaji yang belum dibayar. Tolak proses gaji itu dulu.";
+
 /// Cermin `aturanKeputusan`: status baru, atau alasan penolakan.
 pub fn aturan_keputusan(
     status: &str,
     aksi: &str,
     ada_angsuran: bool,
+    ada_potongan_gaji: bool,
 ) -> Result<&'static str, String> {
     match aksi {
         "setujui" | "tolak" => {
@@ -189,6 +193,11 @@ pub fn aturan_keputusan(
             }
             if ada_angsuran {
                 return Err("Pinjaman yang sudah diangsur tidak bisa dibatalkan.".into());
+            }
+            // Potongan di draf gaji tetap dicatat sebagai angsuran saat PAID,
+            // jadi karyawan akan dipotong untuk pinjaman yang sudah batal.
+            if ada_potongan_gaji {
+                return Err(PESAN_BATAL_DIPOTONG_GAJI.into());
             }
             Ok("Dibatalkan")
         }
@@ -489,18 +498,22 @@ pub fn loan_detail(state: &MobileState, id_pinjaman: &str) -> Result<Value, Comm
     Ok(json!({ "pinjaman": pinjaman, "mutasi": mutasi, "tunda": tunda }))
 }
 
+/// Siswa juga tinggal di `master_data`, tetapi tidak punya gaji tempat kasbon
+/// dipotong. Ejaan `jenis_personil` bercampur, jadi dibandingkan dinormalkan.
+pub const BUKAN_SISWA_SQL: &str = "LOWER(TRIM(COALESCE(jenis_personil, ''))) <> 'siswa'";
+
 /// Personil aktif untuk dipilih sebagai peminjam. Dibaca dengan izin kasbon,
 /// bukan `employees.view`: bendahara perlu memilih orang tanpa melihat
 /// seluruh data kepegawaian.
 pub fn loan_people(state: &MobileState) -> Result<Value, CommandError> {
     let connection = storage::database(&state.data_dir)?;
     let mut statement = connection
-        .prepare(
+        .prepare(&format!(
             "SELECT id_unik, nama, divisi FROM master_data
-             WHERE COALESCE(status_aktif, 'Aktif') = 'Aktif'
+             WHERE COALESCE(status_aktif, 'Aktif') = 'Aktif' AND {BUKAN_SISWA_SQL}
              ORDER BY nama, id_unik
-             LIMIT 3000;",
-        )
+             LIMIT 3000;"
+        ))
         .map_err(db_error)?;
     let items = statement
         .query_map([], |row| {
@@ -548,7 +561,7 @@ pub fn save_loan(
 
     let nama: String = transaction
         .query_row(
-            "SELECT nama FROM master_data WHERE id_unik = ?;",
+            &format!("SELECT nama FROM master_data WHERE id_unik = ? AND {BUKAN_SISWA_SQL};"),
             params![valid.id_karyawan],
             |row| row.get(0),
         )
@@ -746,7 +759,15 @@ pub fn decide_loan(
             |row| row.get(0),
         )
         .map_err(db_error)?;
-    let status_baru = aturan_keputusan(&status, aksi, ada_angsuran).map_err(invalid)?;
+    let ada_potongan_gaji: bool = transaction
+        .query_row(
+            &format!("SELECT {PENDING_SQL} > 0 FROM keu_pinjaman p WHERE p.id_pinjaman = ?;"),
+            params![id_pinjaman],
+            |row| row.get(0),
+        )
+        .map_err(db_error)?;
+    let status_baru =
+        aturan_keputusan(&status, aksi, ada_angsuran, ada_potongan_gaji).map_err(invalid)?;
     let tanggal = hari_ini(&transaction)?;
 
     match aksi {
@@ -1336,28 +1357,35 @@ mod tests {
     #[test]
     fn keputusan() {
         assert_eq!(
-            aturan_keputusan("Diajukan", "setujui", false),
+            aturan_keputusan("Diajukan", "setujui", false, false),
             Ok("Disetujui")
         );
-        assert_eq!(aturan_keputusan("Diajukan", "tolak", false), Ok("Ditolak"));
         assert_eq!(
-            aturan_keputusan("Disetujui", "setujui", false),
+            aturan_keputusan("Diajukan", "tolak", false, false),
+            Ok("Ditolak")
+        );
+        assert_eq!(
+            aturan_keputusan("Disetujui", "setujui", false, false),
             Err("Hanya pengajuan yang bisa disetujui atau ditolak.".into())
         );
         assert_eq!(
-            aturan_keputusan("Disetujui", "batalkan", false),
+            aturan_keputusan("Disetujui", "batalkan", false, false),
             Ok("Dibatalkan")
         );
         assert_eq!(
-            aturan_keputusan("Disetujui", "batalkan", true),
+            aturan_keputusan("Disetujui", "batalkan", true, false),
             Err("Pinjaman yang sudah diangsur tidak bisa dibatalkan.".into())
         );
         assert_eq!(
-            aturan_keputusan("Diajukan", "batalkan", false),
+            aturan_keputusan("Disetujui", "batalkan", false, true),
+            Err(PESAN_BATAL_DIPOTONG_GAJI.into())
+        );
+        assert_eq!(
+            aturan_keputusan("Diajukan", "batalkan", false, false),
             Err("Hanya pinjaman yang sudah disetujui yang bisa dibatalkan.".into())
         );
         assert_eq!(
-            aturan_keputusan("Diajukan", "hapus", false),
+            aturan_keputusan("Diajukan", "hapus", false, false),
             Err("Aksi tidak dikenal.".into())
         );
     }

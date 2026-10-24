@@ -21,6 +21,7 @@ import {
   transitionPayrollStatus,
 } from "@/lib/gateways/payroll";
 import { subscribeSyncCompleted } from "@/lib/gateways/sync-status";
+import { penyetujuSah } from "@/lib/validations/payroll-policy";
 
 /*
  * Detail batch payroll untuk Mobile — padanan
@@ -136,7 +137,12 @@ export default function RunDetailClient() {
       className: "bg-indigo-500 text-white",
     });
   }
-  if (hasPermission(user, "payroll.run.approve") && status === "REVIEWED") {
+  // Empat mata: pembuat run tidak boleh menyetujuinya sendiri (kedua backend).
+  if (
+    hasPermission(user, "payroll.run.approve") &&
+    status === "REVIEWED" &&
+    penyetujuSah(run?.created_by ?? "", user?.username ?? "")
+  ) {
     transitions.push({
       target: "APPROVED",
       label: "Setujui (Approve)",

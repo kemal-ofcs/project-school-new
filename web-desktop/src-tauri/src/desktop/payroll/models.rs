@@ -43,7 +43,8 @@ impl PayrollStatus {
             (PayrollStatus::Reviewed, PayrollStatus::Approved) => true,
             (PayrollStatus::Reviewed, PayrollStatus::Rejected) => true,
             (PayrollStatus::Approved, PayrollStatus::Paid) => true,
-            (PayrollStatus::Rejected, PayrollStatus::Draft) => true,
+            // REJECTED final: menghidupkannya membuat dua run memegang kasbon
+            // dan rapel yang sama. Hitung ulang = buat run baru.
             _ => false,
         }
     }

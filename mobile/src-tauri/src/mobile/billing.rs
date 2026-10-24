@@ -516,13 +516,15 @@ pub fn validate_pembayaran(draft: &PembayaranDraft) -> Result<PembayaranValid, S
     {
         return Err("Keterangan maksimal 150 karakter.".into());
     }
-    let mut id_tagihan: Vec<String> = Vec::new();
-    for id in &draft.id_tagihan {
-        let id = id.trim();
-        if !id.is_empty() && !id_tagihan.iter().any(|ada| ada == id) {
-            id_tagihan.push(id.to_owned());
-        }
-    }
+    // Cermin `validatePembayaran`: buang ganda dalam waktu linear, urutan tetap.
+    let mut terlihat = std::collections::HashSet::new();
+    let id_tagihan: Vec<String> = draft
+        .id_tagihan
+        .iter()
+        .map(|id| id.trim())
+        .filter(|id| !id.is_empty() && terlihat.insert(*id))
+        .map(str::to_owned)
+        .collect();
     if id_tagihan.len() > MAKS_TAGIHAN_PER_KUITANSI {
         return Err("Satu kuitansi paling banyak 100 tagihan.".into());
     }
@@ -1000,6 +1002,22 @@ pub fn save_jenis(state: &MobileState, draft: Value) -> Result<Value, CommandErr
         return Err(invalid("Akun pendapatan harus akun Pendapatan yang aktif."));
     }
     let id = bersih(&draft.id_jenis_tagihan).unwrap_or_else(|| new_id("jt-"));
+    // Id tagihan memuat periodenya, jadi cara penagihan yang berubah membuat
+    // penerbitan berikutnya menagih ulang siswa yang sama. Layar sudah
+    // menguncinya; ini untuk permintaan dan event sinkron dari luar layar.
+    let periodik_lama: Option<String> = transaction
+        .query_row(
+            "SELECT periodik FROM keu_jenis_tagihan WHERE id_jenis_tagihan = ?;",
+            params![id],
+            |row| row.get(0),
+        )
+        .optional()
+        .map_err(db_error)?;
+    if periodik_lama.is_some_and(|lama| lama != valid.periodik) {
+        return Err(invalid(
+            "Cara penagihan tidak bisa diubah setelah jenis dibuat.",
+        ));
+    }
     let nama_dipakai: bool = transaction
         .query_row(
             "SELECT EXISTS(SELECT 1 FROM keu_jenis_tagihan WHERE LOWER(nama) = LOWER(?) AND id_jenis_tagihan <> ?);",
@@ -2410,6 +2428,31 @@ fn batal_pembayaran_tx(
     Ok(asal)
 }
 
+pub const PESAN_TITIPAN_TERPAKAI: &str =
+    "Titipan dari kuitansi ini sudah dipakai. Batalkan dulu kuitansi bermetode Titipan-nya.";
+
+/// Kelebihan bayar yang sudah dipakai kuitansi Titipan tidak boleh hilang
+/// bersama kuitansinya: saldo titipan siswa akan minus. "Pindahkan ke
+/// titipan" tidak lewat sini karena penggantinya mengembalikan saldo itu.
+fn assert_titipan_utuh(transaction: &Transaction<'_>, id: &str) -> Result<(), CommandError> {
+    let (id_siswa, masuk_titipan): (Option<String>, i64) = transaction
+        .query_row(
+            "SELECT p.id_siswa, COALESCE(SUM(CASE WHEN a.id_tagihan IS NULL THEN a.nominal END), 0)
+             FROM keu_pembayaran p
+             LEFT JOIN keu_pembayaran_alokasi a ON a.id_pembayaran = p.id_pembayaran
+             WHERE p.id_pembayaran = ?;",
+            params![id],
+            |row| Ok((row.get(0)?, row.get(1)?)),
+        )
+        .map_err(db_error)?;
+    if let Some(id_siswa) = id_siswa {
+        if masuk_titipan > 0 && masuk_titipan > saldo_titipan(transaction, &id_siswa)? {
+            return Err(invalid(PESAN_TITIPAN_TERPAKAI));
+        }
+    }
+    Ok(())
+}
+
 pub fn cancel_payment(
     state: &MobileState,
     operator: &str,
@@ -2420,6 +2463,7 @@ pub fn cancel_payment(
     let client_id = sync::ensure_client_id(state)?;
     let mut connection = storage::database(&state.data_dir)?;
     let transaction = connection.transaction().map_err(db_error)?;
+    assert_titipan_utuh(&transaction, id)?;
     batal_pembayaran_tx(&transaction, state, &client_id, operator, id, alasan)?;
     transaction.commit().map_err(db_error)?;
     Ok(json!({ "sukses": true }))
@@ -2732,7 +2776,6 @@ pub const CLOUD_UPSERT_TYPE_SQL: &str = "INSERT INTO keu_jenis_tagihan (
     ) VALUES (?, ?, ?, ?, ?, ?, COALESCE(?, datetime('now')), COALESCE(?, datetime('now')))
     ON CONFLICT(id_jenis_tagihan) DO UPDATE SET
         nama = excluded.nama,
-        periodik = excluded.periodik,
         nominal_bawaan = excluded.nominal_bawaan,
         id_akun_pendapatan = excluded.id_akun_pendapatan,
         is_aktif = excluded.is_aktif,
@@ -3452,6 +3495,15 @@ mod tests {
             .as_str()
             .expect("id")
             .to_owned();
+        assert_eq!(
+            save_jenis(
+                &state,
+                json!({ "id_jenis_tagihan": jt, "nama": "SPP", "periodik": "Sekali", "nominal_bawaan": 300_000, "id_akun_pendapatan": "akun-pendapatan-spp" }),
+            )
+            .expect_err("periodik terkunci")
+            .message,
+            "Cara penagihan tidak bisa diubah setelah jenis dibuat."
+        );
         save_tarif(
             &state,
             json!({ "id_jenis_tagihan": jt, "nama_unit": "SMP", "tingkat": 7, "nominal": 500_000 }),
@@ -3646,6 +3698,18 @@ mod tests {
         .expect("pakai titipan");
         assert_eq!(account(&state, "S-01").expect("akun")["titipan"], json!(0));
         assert_eq!(saldo(&state, AKUN_TITIPAN_WALI), 0);
+        // Kelebihan kuitansi kedua sudah dipakai: membatalkannya ditolak.
+        assert_eq!(
+            cancel_payment(
+                &state,
+                "kepala",
+                kwt2["id_pembayaran"].as_str().expect("id"),
+                "Salah input"
+            )
+            .expect_err("titipan terpakai")
+            .message,
+            PESAN_TITIPAN_TERPAKAI
+        );
         assert_eq!(
             pay(
                 &state,

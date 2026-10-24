@@ -11871,9 +11871,12 @@ async fn apply_event_to_turso(
                 .and_then(Value::as_str)
                 .unwrap_or("");
             if !run_id.is_empty() && !status.is_empty() {
+                // PAID tidak pernah ditimpa: event lama dari perangkat lain
+                // (mis. REJECTED yang tertunda offline) akan membuat kasbon dan
+                // rapel run ini dianggap belum dibayar, lalu dibayar lagi.
                 turso
                     .query_one(
-                        "UPDATE payroll_runs SET status = ?, updated_at = ? WHERE id = ?;",
+                        "UPDATE payroll_runs SET status = ?, updated_at = ? WHERE id = ? AND status <> 'PAID';",
                         vec![json!(status), json!(updated_at), json!(run_id)],
                     )
                     .await?;

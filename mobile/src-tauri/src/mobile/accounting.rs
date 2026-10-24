@@ -811,6 +811,12 @@ pub fn post_journal(
 
     let mut connection = storage::database(&state.data_dir)?;
     let transaction = connection.transaction().map_err(db_error)?;
+    let hari_ini: String = transaction
+        .query_row("SELECT date('now', '+7 hours');", [], |row| row.get(0))
+        .map_err(db_error)?;
+    if valid.tanggal > hari_ini {
+        return Err(invalid("Tanggal jurnal tidak boleh melewati hari ini."));
+    }
     assert_akun_aktif(&transaction, &valid.baris)?;
 
     let id_jurnal = new_id("jrn-");
@@ -2253,6 +2259,20 @@ mod tests {
             galat.message,
             "Baris 2: akun tidak ditemukan atau nonaktif."
         );
+        let galat = post_journal(
+            &state,
+            "bendahara",
+            json!({
+                "tanggal": "2999-01-01",
+                "keterangan": "Ongkos",
+                "baris": [
+                    { "id_akun": "akun-kas", "kredit": 50_000 },
+                    { "id_akun": "akun-beban-utilitas", "debit": 50_000 }
+                ]
+            }),
+        )
+        .expect_err("tanggal masa depan");
+        assert_eq!(galat.message, "Tanggal jurnal tidak boleh melewati hari ini.");
     }
 
     #[test]

@@ -368,6 +368,10 @@ export async function postJournal(
   const valid = hasil.value;
 
   return withTransaction(client, async (tx) => {
+    const hari = await tx.execute("SELECT date('now', '+7 hours') AS hari;");
+    if (valid.tanggal > String(hari.rows[0]?.hari ?? "")) {
+      throw new Error("Tanggal jurnal tidak boleh melewati hari ini.");
+    }
     await assertAkunAktif(tx, valid.baris);
     const idJurnal = newId("jrn-");
     const nomor = await tulisJurnalTx(

@@ -191,13 +191,16 @@ export async function loanDetail(
   };
 }
 
-/** Cermin `loan_people`: personil aktif, dengan izin kasbon. */
+/** Cermin `BUKAN_SISWA_SQL`: siswa tidak punya gaji tempat kasbon dipotong. */
+const BUKAN_SISWA_SQL = "LOWER(TRIM(COALESCE(jenis_personil, ''))) <> 'siswa'";
+
+/** Cermin `loan_people`: personil aktif selain siswa, dengan izin kasbon. */
 export async function loanPeople(
   client: Client,
 ): Promise<{ items: OrangPeminjam[] }> {
   const result = await client.execute(
     `SELECT id_unik, nama, divisi FROM master_data
-     WHERE COALESCE(status_aktif, 'Aktif') = 'Aktif'
+     WHERE COALESCE(status_aktif, 'Aktif') = 'Aktif' AND ${BUKAN_SISWA_SQL}
      ORDER BY nama, id_unik
      LIMIT 3000;`,
   );
@@ -225,7 +228,7 @@ export async function saveLoan(
 
   return withTransaction(client, async (tx) => {
     const orang = await tx.execute({
-      sql: "SELECT nama FROM master_data WHERE id_unik = ?;",
+      sql: `SELECT nama FROM master_data WHERE id_unik = ? AND ${BUKAN_SISWA_SQL};`,
       args: [valid.id_karyawan],
     });
     if (!orang.rows[0]) throw new Error("Karyawan tidak ditemukan.");
@@ -357,10 +360,15 @@ export async function decideLoan(
                           WHERE id_pinjaman = ? AND jenis IN ('Angsuran Gaji', 'Pelunasan Tunai')) AS ada;`,
       args: [idPinjaman],
     });
+    const potongan = await tx.execute({
+      sql: `SELECT ${PENDING_SQL} > 0 AS ada FROM keu_pinjaman p WHERE p.id_pinjaman = ?;`,
+      args: [idPinjaman],
+    });
     const keputusan = aturanKeputusan(
       String(row.status),
       aksi,
       Number(angsuran.rows[0]?.ada) === 1,
+      Number(potongan.rows[0]?.ada) === 1,
     );
     if (!keputusan.ok) throw new Error(keputusan.error);
     const statusBaru = keputusan.value;

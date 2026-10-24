@@ -6,12 +6,17 @@ import {
   getServerDatabase,
 } from "@/lib/server/db";
 import {
+  ApiRequestError,
   noStoreJson,
   readJsonBody,
   toApiErrorResponse,
 } from "@/lib/server/http/api-response";
 import { assertSameOriginMutation } from "@/lib/server/http/request-security";
 import { computePayrollRecap } from "@/lib/services/payroll-recap";
+import {
+  PESAN_PERIODE_PAYROLL_TIDAK_SAH,
+  periodePayrollSah,
+} from "@/lib/validations/payroll-policy";
 
 export const runtime = "nodejs";
 
@@ -29,6 +34,9 @@ export async function POST(request: NextRequest) {
     const periodStart =
       body.periodStart || formatTanggalOperasional(Date.now());
     const periodEnd = body.periodEnd || formatTanggalOperasional(Date.now());
+    if (!periodePayrollSah(periodStart, periodEnd)) {
+      throw new ApiRequestError(PESAN_PERIODE_PAYROLL_TIDAK_SAH, 400);
+    }
 
     const recap = await computePayrollRecap(client, periodStart, periodEnd);
 

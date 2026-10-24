@@ -183,6 +183,16 @@ describe("akuntansi Web terhadap skema cloud asli", () => {
         ],
       }),
     ).rejects.toThrow("Baris 2: akun tidak ditemukan atau nonaktif.");
+    await expect(
+      postJournal(client, "bendahara", {
+        tanggal: "2999-01-01",
+        keterangan: "Ongkos",
+        baris: [
+          { id_akun: "akun-kas", kredit: 50_000 },
+          { id_akun: "akun-beban-utilitas", debit: 50_000 },
+        ],
+      }),
+    ).rejects.toThrow("Tanggal jurnal tidak boleh melewati hari ini.");
   });
 
   test("akun sistem tidak bisa dinonaktifkan", async () => {

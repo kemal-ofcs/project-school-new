@@ -12,12 +12,14 @@ const {
   decideLoan,
   deferLoan,
   listLoans,
+  loanPeople,
   payOffLoan,
   pinjamanAktif,
   saveLoan,
   undeferLoan,
 } = await import("@/lib/services/loan");
 const { trialBalance } = await import("@/lib/services/accounting");
+const { PESAN_BATAL_DIPOTONG_GAJI } = await import("@/lib/validations/loan");
 const { computePayrollRecap } = await import("@/lib/services/payroll-recap");
 
 // Berkas sungguhan, satu klien per berkas (pola `inventory.test.ts`).
@@ -132,6 +134,11 @@ describe("kasbon Web terhadap skema cloud asli", () => {
       "write",
     );
 
+    // Potongan di draf yang belum dibayar menahan pembatalan.
+    await expect(
+      decideLoan(client, "kepala", id, "batalkan", null),
+    ).rejects.toThrow(PESAN_BATAL_DIPOTONG_GAJI);
+
     // Draf yang belum dibayar mengurangi sisa efektif.
     await expect(
       payOffLoan(client, "bendahara", id, 700_000, null),
@@ -168,5 +175,22 @@ describe("kasbon Web terhadap skema cloud asli", () => {
     await payOffLoan(client, "bendahara", id, 600_000, null);
     expect(await saldo("akun-piutang-karyawan")).toBe(0);
     expect((await pinjamanAktif(client, "2026-04")).size).toBe(0);
+  });
+
+  test("siswa tidak bisa menjadi peminjam", async () => {
+    await client.execute(
+      `INSERT INTO master_data (id_unik, kode_karyawan, nama, divisi, id_shift, jenis_personil, status_aktif)
+       VALUES ('S-01', 'S-01', 'Ani', 'Kelas 7', 1, 'SISWA', 'Aktif');`,
+    );
+    const { items } = await loanPeople(client);
+    expect(items.map((item) => item.id_karyawan)).toEqual(["K-01"]);
+    await expect(
+      saveLoan(client, "bendahara", {
+        id_karyawan: "S-01",
+        pokok: 100_000,
+        cicilan: 50_000,
+        mulai_potong: "2026-01",
+      }),
+    ).rejects.toThrow("Karyawan tidak ditemukan.");
   });
 });

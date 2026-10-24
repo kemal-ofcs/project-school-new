@@ -22,6 +22,7 @@ import {
   transitionPayrollStatus,
 } from "@/lib/gateways/payroll";
 import { useHydrated } from "@/lib/hooks/useHydrated";
+import { penyetujuSah } from "@/lib/validations/payroll-policy";
 
 const IDR = new Intl.NumberFormat("id-ID", {
   style: "currency",
@@ -140,8 +141,11 @@ export default function RunDetailClient() {
     hasPermission(user, "payroll.run.create") && currentStatus === "DRAFT";
   const canReview =
     hasPermission(user, "payroll.run.review") && currentStatus === "SUBMITTED";
+  // Empat mata: pembuat run tidak boleh menyetujuinya sendiri (kedua backend).
   const canApprove =
-    hasPermission(user, "payroll.run.approve") && currentStatus === "REVIEWED";
+    hasPermission(user, "payroll.run.approve") &&
+    currentStatus === "REVIEWED" &&
+    penyetujuSah(run?.created_by ?? "", user?.username ?? "");
   const canDisburse =
     hasPermission(user, "payroll.run.disburse") && currentStatus === "APPROVED";
   // Tolak menuntut `payroll.run.review` di KEDUA backend (Rust
@@ -471,16 +475,18 @@ export default function RunDetailClient() {
             onClose={() => setSelectedSlip(null)}
           >
             <div className="space-y-4">
-              <div className="flex justify-end gap-2 pb-2">
-                <button
-                  type="button"
-                  onClick={() => window.print()}
-                  className="px-3 py-1.5 bg-sky-700 hover:bg-sky-800 text-white text-xs font-semibold rounded flex items-center gap-1.5 shadow"
-                >
-                  <Icon name="download" className="w-3.5 h-3.5" />
-                  Cetak Dokumen
-                </button>
-              </div>
+              {hasPermission(user, "payroll.export") ? (
+                <div className="flex justify-end gap-2 pb-2">
+                  <button
+                    type="button"
+                    onClick={() => window.print()}
+                    className="px-3 py-1.5 bg-sky-700 hover:bg-sky-800 text-white text-xs font-semibold rounded flex items-center gap-1.5 shadow"
+                  >
+                    <Icon name="download" className="w-3.5 h-3.5" />
+                    Cetak Dokumen
+                  </button>
+                </div>
+              ) : null}
               <div className="max-h-[70vh] overflow-y-auto p-2 bg-slate-950/40 rounded-lg border border-slate-800">
                 <SlipGajiPrintView run={run} item={selectedSlip} />
               </div>

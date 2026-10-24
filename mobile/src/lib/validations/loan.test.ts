@@ -5,6 +5,7 @@ import {
   idTunda,
   isValidPeriode,
   komponenKasbon,
+  PESAN_BATAL_DIPOTONG_GAJI,
   type PinjamanDraft,
   pinjamanDraftSchema,
   potongKasbon,
@@ -81,23 +82,28 @@ describe("validatePinjaman", () => {
 
 describe("aturanKeputusan", () => {
   test("transisi sah dan yang ditolak", () => {
-    expect(hasil(aturanKeputusan("Diajukan", "setujui", false))).toBe(
+    expect(hasil(aturanKeputusan("Diajukan", "setujui", false, false))).toBe(
       "Disetujui",
     );
-    expect(hasil(aturanKeputusan("Diajukan", "tolak", false))).toBe("Ditolak");
-    expect(hasil(aturanKeputusan("Disetujui", "setujui", false))).toBe(
+    expect(hasil(aturanKeputusan("Diajukan", "tolak", false, false))).toBe(
+      "Ditolak",
+    );
+    expect(hasil(aturanKeputusan("Disetujui", "setujui", false, false))).toBe(
       "Hanya pengajuan yang bisa disetujui atau ditolak.",
     );
-    expect(hasil(aturanKeputusan("Disetujui", "batalkan", false))).toBe(
+    expect(hasil(aturanKeputusan("Disetujui", "batalkan", false, false))).toBe(
       "Dibatalkan",
     );
-    expect(hasil(aturanKeputusan("Disetujui", "batalkan", true))).toBe(
+    expect(hasil(aturanKeputusan("Disetujui", "batalkan", true, false))).toBe(
       "Pinjaman yang sudah diangsur tidak bisa dibatalkan.",
     );
-    expect(hasil(aturanKeputusan("Diajukan", "batalkan", false))).toBe(
+    expect(hasil(aturanKeputusan("Disetujui", "batalkan", false, true))).toBe(
+      PESAN_BATAL_DIPOTONG_GAJI,
+    );
+    expect(hasil(aturanKeputusan("Diajukan", "batalkan", false, false))).toBe(
       "Hanya pinjaman yang sudah disetujui yang bisa dibatalkan.",
     );
-    expect(hasil(aturanKeputusan("Diajukan", "hapus", false))).toBe(
+    expect(hasil(aturanKeputusan("Diajukan", "hapus", false, false))).toBe(
       "Aksi tidak dikenal.",
     );
   });

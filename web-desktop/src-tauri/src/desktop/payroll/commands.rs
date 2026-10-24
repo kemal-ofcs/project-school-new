@@ -50,9 +50,8 @@ fn bpjs_rule_id(
         )
         .optional()
         .map_err(|_| CommandError::internal())?;
-    Ok(existing.unwrap_or_else(|| {
-        new_payroll_id(&format!("bpjs-{}", component_code.to_lowercase()))
-    }))
+    Ok(existing
+        .unwrap_or_else(|| new_payroll_id(&format!("bpjs-{}", component_code.to_lowercase()))))
 }
 
 /// Id baris payroll dibuat KLIEN: `<awalan>-<detik epoch>-<48 bit acak>`.
@@ -74,6 +73,70 @@ fn new_payroll_id(prefix: &str) -> String {
         hex::encode(bytes)
     )
 }
+
+const PESAN_PERIODE_PAYROLL_TIDAK_SAH: &str =
+    "Periode gaji harus berupa tanggal YYYY-MM-DD, dan tanggal mulai tidak boleh sesudah tanggal selesai.";
+
+/// Cerminan `periodePayrollSah` di `payroll-policy.ts`.
+fn periode_payroll_sah(start: &str, end: &str) -> bool {
+    crate::desktop::inventory::is_valid_date(start)
+        && crate::desktop::inventory::is_valid_date(end)
+        && start <= end
+}
+
+fn validasi_periode_payroll(start: &str, end: &str) -> Result<(), CommandError> {
+    if periode_payroll_sah(start, end) {
+        Ok(())
+    } else {
+        Err(CommandError::new(
+            "VALIDATION_ERROR",
+            PESAN_PERIODE_PAYROLL_TIDAK_SAH,
+        ))
+    }
+}
+
+/// Proses gaji bukan-REJECTED yang periodenya beririsan dengan `[?1, ?2]`. Dua
+/// run untuk hari yang sama membayar gaji, tunjangan tetap, kasbon, dan rapel
+/// dua kali. Sama persis dengan `RUN_BERIRISAN_SQL` di `payroll-policy.ts`.
+const RUN_BERIRISAN_SQL: &str = "SELECT id, period_start, period_end FROM payroll_runs WHERE status <> 'REJECTED' AND period_start <= ?2 AND period_end >= ?1 ORDER BY period_start, id LIMIT 1;";
+
+/// Cerminan `pesanRunBeririsan` di `payroll-policy.ts`.
+fn pesan_run_beririsan(id: &str, start: &str, end: &str) -> String {
+    format!(
+        "Periode ini beririsan dengan proses gaji {id} ({start} s.d. {end}). Tolak proses itu dulu bila ingin menghitung ulang."
+    )
+}
+
+const PESAN_PENYETUJU_SAMA: &str = "Proses gaji harus disetujui oleh pengguna selain pembuatnya.";
+
+/// Empat mata: pembuat run tidak boleh menyetujuinya sendiri. Cerminan
+/// `penyetujuSah` di `payroll-policy.ts`.
+fn penyetuju_sah(created_by: &str, approver: &str) -> bool {
+    created_by.trim().to_lowercase() != approver.trim().to_lowercase()
+}
+
+/// Sama dengan CHECK `salary_configs.ptkp_status`.
+const PTKP_STATUSES: &[&str] = &["TK/0", "TK/1", "TK/2", "TK/3", "K/0", "K/1", "K/2", "K/3"];
+
+/// Cerminan `pesanKonfigurasiGajiTidakSah` di `payroll-policy.ts`.
+fn pesan_konfigurasi_gaji_tidak_sah(draft: &SalaryConfig) -> Option<&'static str> {
+    if draft.rate_per_hour < 0 || draft.rate_per_jp < 0 {
+        return Some("Tarif per jam dan tarif per JP harus bilangan bulat, nol atau lebih.");
+    }
+    if !PTKP_STATUSES.contains(&draft.ptkp_status.as_str()) {
+        return Some("Status PTKP tidak dikenal.");
+    }
+    if !crate::desktop::inventory::is_valid_date(&draft.effective_date) {
+        return Some("Tanggal berlaku harus berupa tanggal YYYY-MM-DD.");
+    }
+    None
+}
+
+/// Penerima gaji harus ada dan bukan siswa. Sama dengan `PENERIMA_GAJI_SQL` di
+/// `payroll-policy.ts`.
+const PENERIMA_GAJI_SQL: &str = "SELECT 1 FROM master_data WHERE id_unik = ?1 AND LOWER(TRIM(COALESCE(jenis_personil, ''))) <> 'siswa' LIMIT 1;";
+
+const PESAN_PENERIMA_GAJI_TIDAK_ADA: &str = "Karyawan tidak ditemukan atau berstatus siswa.";
 
 /// Kunci sakelar lembur guru di `setting_gex_system`.
 ///
@@ -213,7 +276,21 @@ pub async fn desktop_save_salary_config(
     draft: SalaryConfig,
 ) -> Result<bool, CommandError> {
     let operator = require_permission(&state, "payroll.config.manage")?;
+    if let Some(pesan) = pesan_konfigurasi_gaji_tidak_sah(&draft) {
+        return Err(CommandError::new("VALIDATION_ERROR", pesan));
+    }
     let mut conn = storage::database(&state.data_dir)?;
+    let penerima_ada = conn
+        .query_row(PENERIMA_GAJI_SQL, params![draft.id_karyawan], |_| Ok(()))
+        .optional()
+        .map_err(|_| CommandError::internal())?
+        .is_some();
+    if !penerima_ada {
+        return Err(CommandError::new(
+            "VALIDATION_ERROR",
+            PESAN_PENERIMA_GAJI_TIDAK_ADA,
+        ));
+    }
 
     let tx = conn.transaction().map_err(|_| CommandError::internal())?;
     // Rate unik per (karyawan, tanggal berlaku) dan INSERT di bawah menimpa
@@ -565,16 +642,13 @@ fn load_taught_sessions(
         let Some((awal, akhir)) = crate::desktop::class_attendance::jam_ke_range(&jam_ke) else {
             continue;
         };
-        per_guru
-            .entry(id_guru)
-            .or_default()
-            .push(TaughtSession {
-                id_presensi_mapel,
-                id_mapel,
-                tanggal,
-                jam_awal: awal,
-                jam_akhir: akhir,
-            });
+        per_guru.entry(id_guru).or_default().push(TaughtSession {
+            id_presensi_mapel,
+            id_mapel,
+            tanggal,
+            jam_awal: awal,
+            jam_akhir: akhir,
+        });
     }
     Ok(per_guru)
 }
@@ -1471,6 +1545,7 @@ pub async fn desktop_get_payroll_recap(
     period_end: String,
 ) -> Result<Vec<PayrollRecapRow>, CommandError> {
     require_permission(&state, "payroll.view")?;
+    validasi_periode_payroll(&period_start, &period_end)?;
     let conn = storage::database(&state.data_dir)?;
 
     let overtime_tiers = load_overtime_tiers(&conn, "HARI_KERJA")?;
@@ -1508,7 +1583,9 @@ pub async fn desktop_get_payroll_recap(
                 COALESCE(sc.rate_per_hour, 0) AS rate_per_hour,
                 COALESCE(sc.rate_per_jp, 0) AS rate_per_jp,
                 COALESCE(sc.ptkp_status, 'TK/0') AS ptkp_status,
-                COUNT(CASE WHEN ah.status_kehadiran IN ('Hadir', 'PRESENT') THEN 1 END) AS total_hadir,
+                -- Hari, bukan baris: shift multi-sesi menulis beberapa baris
+                -- per tanggal, dan komponen PER_HADIR dibayar per hari.
+                COUNT(DISTINCT CASE WHEN ah.status_kehadiran IN ('Hadir', 'PRESENT') THEN ah.tanggal END) AS total_hadir,
                 COALESCE(SUM(ah.menit_terlambat), 0) AS total_terlambat_menit,
                 COALESCE(SUM(CASE WHEN (hl.tanggal IS NOT NULL OR COALESCE(instr(COALESCE(NULLIF(TRIM(sh.hari_kerja), ''), '1,2,3,4,5,6,7'), replace(strftime('%w', ah.tanggal), '0', '7')), 1) = 0) THEN 0 ELSE ah.jam_kerja END), 0) AS total_jam_kerja_menit,
                 COALESCE(SUM(CASE WHEN (hl.tanggal IS NOT NULL OR COALESCE(instr(COALESCE(NULLIF(TRIM(sh.hari_kerja), ''), '1,2,3,4,5,6,7'), replace(strftime('%w', ah.tanggal), '0', '7')), 1) = 0) THEN 0 ELSE ah.lembur END), 0) AS total_lembur_menit,
@@ -1539,7 +1616,13 @@ pub async fn desktop_get_payroll_recap(
             -- mingguan dengan hari libur resmi untuk lembur). replace() mengubah
             -- 0 (Minggu) dari strftime('%w') menjadi 7; hari_kerja kosong = 7 hari.
             LEFT JOIN tbl_shift sh ON sh.id_shift = ah.id_shift
-            WHERE md.status_aktif = 'Aktif'
+            -- Yang dinonaktifkan tetap dibayar untuk hari yang masih ia
+            -- kerjakan pada periode ini, termasuk jam mengajar yang diparaf.
+            WHERE (md.status_aktif = 'Aktif'
+                OR EXISTS (SELECT 1 FROM absensi_harian x
+                           WHERE x.id_karyawan = md.id_unik AND x.tanggal >= ?1 AND x.tanggal <= ?2)
+                OR EXISTS (SELECT 1 FROM presensi_mapel x
+                           WHERE x.id_guru = md.id_unik AND x.tanggal >= ?1 AND x.tanggal <= ?2))
               -- Siswa TIDAK digaji. Mereka hidup di `master_data` yang sama
               -- dengan guru dan karyawan, sehingga tanpa baris ini setiap siswa
               -- aktif ikut masuk rekap dan setiap komponen tunjangan yang
@@ -1661,9 +1744,13 @@ pub async fn desktop_get_payroll_recap(
             let allowance = allowance + Decimal::from(rapel_total);
 
             let gross = basic_salary + overtime_salary + teaching_salary + allowance;
-            let (bpjs_emp, _, _) = PayrollCalculator::calculate_bpjs(gross, &bpjs_rules);
-            let (pph21, _) =
-                PayrollCalculator::calculate_pph21_ter(gross, &agg.ptkp_status, &tax_rules);
+            let (bpjs_emp, _, _, pph21, _) = PayrollCalculator::calculate_bpjs_and_pph21(
+                gross,
+                overtime_salary,
+                &agg.ptkp_status,
+                &bpjs_rules,
+                &tax_rules,
+            );
 
             let net = (gross - deduction - bpjs_emp - pph21).max(Decimal::ZERO);
             // Kasbon dipotong TERAKHIR dari gaji bersih yang tersisa, dengan
@@ -1767,6 +1854,27 @@ pub async fn desktop_create_payroll_run(
     {
         return Ok(existing);
     }
+    validasi_periode_payroll(&period_start, &period_end)?;
+    if let Some((id, start, end)) = conn
+        .query_row(
+            RUN_BERIRISAN_SQL,
+            params![period_start, period_end],
+            |row| {
+                Ok((
+                    row.get::<_, String>(0)?,
+                    row.get::<_, String>(1)?,
+                    row.get::<_, String>(2)?,
+                ))
+            },
+        )
+        .optional()
+        .map_err(|_| CommandError::internal())?
+    {
+        return Err(CommandError::new(
+            "PERIOD_OVERLAP",
+            pesan_run_beririsan(&id, &start, &end),
+        ));
+    }
 
     // Kalkulasi data payroll
     let recap =
@@ -1847,10 +1955,14 @@ pub async fn desktop_create_payroll_run(
         comp_breakdown.extend(rapel::komponen_rapel(rapel_ini));
 
         let gross = basic_salary + overtime_salary + teaching_salary + allowance;
-        let (bpjs_emp, bpjs_co, bpjs_breakdown) =
-            PayrollCalculator::calculate_bpjs(gross, &bpjs_rules);
-        let (pph21, tax_breakdown) =
-            PayrollCalculator::calculate_pph21_ter(gross, &row.ptkp_status, &tax_rules);
+        let (bpjs_emp, bpjs_co, bpjs_breakdown, pph21, tax_breakdown) =
+            PayrollCalculator::calculate_bpjs_and_pph21(
+                gross,
+                overtime_salary,
+                &row.ptkp_status,
+                &bpjs_rules,
+                &tax_rules,
+            );
 
         let net = (gross - deduction - bpjs_emp - pph21).max(Decimal::ZERO);
         // Kasbon TERAKHIR, sama dengan pratinjau. `breakdown.kasbon` adalah
@@ -2355,6 +2467,9 @@ pub async fn desktop_transition_payroll_status(
             ),
         ));
     }
+    if target == PayrollStatus::Approved && !penyetuju_sah(&created_by, &operator.username) {
+        return Err(CommandError::new("FORBIDDEN", PESAN_PENYETUJU_SAMA));
+    }
 
     // Akun pembayaran diperiksa SEBELUM status berubah: proses gaji yang
     // tercatat PAID tanpa jurnal tidak bisa diulang, karena PAID adalah status
@@ -2367,11 +2482,20 @@ pub async fn desktop_transition_payroll_status(
     let tx = conn.transaction().map_err(|_| CommandError::internal())?;
     let now = iso_now_tx(&tx);
 
-    tx.execute(
-        "UPDATE payroll_runs SET status = ?1, updated_at = ?2 WHERE id = ?3;",
-        params![target.as_str(), now, run_id],
-    )
-    .map_err(|_| CommandError::new("UPDATE_FAILED", "Gagal memperbarui status payroll."))?;
+    // Bersyarat status lama: status dibaca di luar transaksi, jadi klik ganda
+    // atau dua jendela bisa sama-sama lolos pemeriksaan di atas.
+    let berubah = tx
+        .execute(
+            "UPDATE payroll_runs SET status = ?1, updated_at = ?2 WHERE id = ?3 AND status = ?4;",
+            params![target.as_str(), now, run_id, current_status_str],
+        )
+        .map_err(|_| CommandError::new("UPDATE_FAILED", "Gagal memperbarui status payroll."))?;
+    if berubah == 0 {
+        return Err(CommandError::new(
+            "ILLEGAL_TRANSITION",
+            "Status proses gaji sudah berubah. Muat ulang halaman ini.",
+        ));
+    }
 
     let audit_id = new_payroll_id("audit");
     let notes_text = notes.unwrap_or_default();
@@ -2600,8 +2724,68 @@ fn load_bpjs_rules(conn: &Connection, period_end: &str) -> Result<Vec<BpjsRule>,
 
 #[cfg(test)]
 mod tests {
-    use super::{load_jp_rates, load_taught_sessions, new_payroll_id};
+    use super::{
+        load_jp_rates, load_taught_sessions, new_payroll_id, penyetuju_sah, periode_payroll_sah,
+        pesan_konfigurasi_gaji_tidak_sah, SalaryConfig,
+    };
     use std::collections::HashSet;
+
+    /// Vektor yang SAMA dieja di `payroll-calculator.test.ts`
+    /// (`aturan proses gaji`).
+    #[test]
+    fn aturan_periode_penyetuju_dan_konfigurasi_gaji() {
+        for (start, end, sah) in [
+            ("2026-10-01", "2026-10-31", true),
+            ("2026-10-01", "2026-10-01", true),
+            ("2026-10-31", "2026-10-01", false),
+            ("2026-1-5", "2026-10-31", false),
+            ("2026-02-30", "2026-03-01", false),
+        ] {
+            assert_eq!(periode_payroll_sah(start, end), sah, "{start} s.d. {end}");
+        }
+        assert!(!penyetuju_sah("admin", "Admin "));
+        assert!(penyetuju_sah("admin", "kepala"));
+
+        let konfigurasi = |jam: i64, jp: i64, ptkp: &str, tanggal: &str| SalaryConfig {
+            id: String::new(),
+            id_karyawan: "emp-1".to_string(),
+            rate_per_hour: jam,
+            rate_per_jp: jp,
+            ptkp_status: ptkp.to_string(),
+            effective_date: tanggal.to_string(),
+            created_by: String::new(),
+            created_at: String::new(),
+        };
+        for (jam, jp, ptkp, tanggal, pesan) in [
+            (25_000, 0, "TK/0", "2026-10-01", None),
+            (
+                -1,
+                0,
+                "TK/0",
+                "2026-10-01",
+                Some("Tarif per jam dan tarif per JP harus bilangan bulat, nol atau lebih."),
+            ),
+            (
+                25_000,
+                0,
+                "TK/9",
+                "2026-10-01",
+                Some("Status PTKP tidak dikenal."),
+            ),
+            (
+                25_000,
+                0,
+                "K/1",
+                "2026-13-01",
+                Some("Tanggal berlaku harus berupa tanggal YYYY-MM-DD."),
+            ),
+        ] {
+            assert_eq!(
+                pesan_konfigurasi_gaji_tidak_sah(&konfigurasi(jam, jp, ptkp, tanggal)),
+                pesan
+            );
+        }
+    }
 
     #[test]
     fn id_payroll_tidak_bertabrakan_dalam_satu_detik() {

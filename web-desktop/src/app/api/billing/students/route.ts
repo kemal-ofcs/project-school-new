@@ -1,5 +1,5 @@
 import type { NextRequest } from "next/server";
-import { requireWebPermission } from "@/lib/server/auth/authorize";
+import { requireAnyWebPermission } from "@/lib/server/auth/authorize";
 import {
   ensureServerDatabaseInitialized,
   getServerDatabase,
@@ -16,7 +16,11 @@ export const runtime = "nodejs";
 export async function POST(request: NextRequest) {
   try {
     assertSameOriginMutation(request);
-    await requireWebPermission(request, "billing.manage");
+    // Cermin `desktop_billing_students`: kasir butuh daftar siswa di tab Bayar.
+    await requireAnyWebPermission(request, [
+      "billing.manage",
+      "billing.collect",
+    ]);
     await ensureServerDatabaseInitialized();
     return noStoreJson(await students(getServerDatabase()));
   } catch (error) {

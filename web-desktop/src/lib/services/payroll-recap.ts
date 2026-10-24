@@ -5,10 +5,9 @@ import { pinjamanAktif } from "@/lib/services/loan";
 import {
   applyOvertimePolicy,
   type BpjsRule,
-  calculateBpjs,
+  calculateBpjsAndPph21,
   calculateComponents,
   calculateOvertimeIndex,
-  calculatePph21Ter,
   type JpRate,
   type OvertimeTierRule,
   type PayrollComponent,
@@ -320,7 +319,9 @@ export async function computePayrollRecap(
             COALESCE(sc.rate_per_hour, 0) AS rate_per_hour,
             COALESCE(sc.rate_per_jp, 0) AS rate_per_jp,
             COALESCE(sc.ptkp_status, 'TK/0') AS ptkp_status,
-            COUNT(CASE WHEN ah.status_kehadiran IN ('Hadir', 'PRESENT') THEN 1 END) AS total_hadir,
+            -- Hari, bukan baris: shift multi-sesi menulis beberapa baris per
+            -- tanggal, dan komponen PER_HADIR dibayar per hari.
+            COUNT(DISTINCT CASE WHEN ah.status_kehadiran IN ('Hadir', 'PRESENT') THEN ah.tanggal END) AS total_hadir,
             COALESCE(SUM(ah.menit_terlambat), 0) AS total_terlambat_menit,
             COALESCE(SUM(CASE WHEN (hl.tanggal IS NOT NULL OR COALESCE(instr(COALESCE(NULLIF(TRIM(sh.hari_kerja), ''), '1,2,3,4,5,6,7'), replace(strftime('%w', ah.tanggal), '0', '7')), 1) = 0) THEN 0 ELSE ah.jam_kerja END), 0) AS total_jam_kerja_menit,
             COALESCE(SUM(CASE WHEN (hl.tanggal IS NOT NULL OR COALESCE(instr(COALESCE(NULLIF(TRIM(sh.hari_kerja), ''), '1,2,3,4,5,6,7'), replace(strftime('%w', ah.tanggal), '0', '7')), 1) = 0) THEN 0 ELSE ah.lembur END), 0) AS total_lembur_menit,
@@ -350,7 +351,13 @@ export async function computePayrollRecap(
           -- mingguan dengan hari libur resmi untuk lembur). replace() mengubah
           -- 0 (Minggu) dari strftime('%w') menjadi 7; hari_kerja kosong = 7 hari.
           LEFT JOIN tbl_shift sh ON sh.id_shift = ah.id_shift
-          WHERE md.status_aktif = 'Aktif'
+          -- Yang dinonaktifkan tetap dibayar untuk hari yang masih ia kerjakan
+          -- pada periode ini, termasuk jam mengajar yang sudah diparaf.
+          WHERE (md.status_aktif = 'Aktif'
+              OR EXISTS (SELECT 1 FROM absensi_harian x
+                         WHERE x.id_karyawan = md.id_unik AND x.tanggal >= ? AND x.tanggal <= ?)
+              OR EXISTS (SELECT 1 FROM presensi_mapel x
+                         WHERE x.id_guru = md.id_unik AND x.tanggal >= ? AND x.tanggal <= ?))
             -- Siswa TIDAK digaji. Mereka hidup di master_data yang sama dengan
             -- guru dan karyawan, sehingga tanpa baris ini setiap siswa aktif
             -- ikut masuk rekap dan setiap komponen tunjangan yang berlaku untuk
@@ -361,7 +368,15 @@ export async function computePayrollRecap(
           GROUP BY md.id_unik
           ORDER BY md.nama ASC;
         `,
-      args: [periodEnd, periodStart, periodEnd],
+      args: [
+        periodEnd,
+        periodStart,
+        periodEnd,
+        periodStart,
+        periodEnd,
+        periodStart,
+        periodEnd,
+      ],
     }),
     // Kasbon dipotong per proses gaji; penundaan dan bulan mulai potong dinilai
     // terhadap bulan awal periode. Cerminan `loan::pinjaman_aktif`.
@@ -407,8 +422,8 @@ export async function computePayrollRecap(
     // seluruh jam pada tanggal libur memakai HARI_LIBUR. Keduanya dijumlahkan
     // lalu dikalikan rate per jam SEKALI, supaya pembulatannya identik dengan
     // `desktop_get_payroll_recap` di payroll/commands.rs.
-    const otIndex = calculateOvertimeIndex(otHours, overtimeTiers);
-    const holidayIndex = calculateOvertimeIndex(holidayHours, holidayTiers);
+    const otIndex = calculateOvertimeIndex(lemburMenit, overtimeTiers);
+    const holidayIndex = calculateOvertimeIndex(liburMenit, holidayTiers);
 
     // Uang diturunkan dari MENIT BULAT, bukan dari jam yang sudah dibagi.
     //
@@ -462,13 +477,17 @@ export async function computePayrollRecap(
 
     const gross = basicSalary + overtimeSalary + teaching.honor + allowance;
     const {
-      employee: bpjsEmployee,
-      company: bpjsCompany,
-      breakdown: bpjsBreakdown,
-    } = calculateBpjs(gross, bpjsRules);
-    const { pph21Amount, breakdown: taxBreakdown } = calculatePph21Ter(
+      bpjs: {
+        employee: bpjsEmployee,
+        company: bpjsCompany,
+        breakdown: bpjsBreakdown,
+      },
+      pph21: { pph21Amount, breakdown: taxBreakdown },
+    } = calculateBpjsAndPph21(
       gross,
+      overtimeSalary,
       ptkpStatus,
+      bpjsRules,
       taxRules,
     );
 

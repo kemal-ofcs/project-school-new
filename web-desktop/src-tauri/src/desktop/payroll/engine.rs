@@ -182,11 +182,10 @@ impl PayrollCalculator {
             let lebih_baik = match terpilih {
                 None => true,
                 Some(_) if khusus != terpilih_khusus => khusus,
-                Some(lama) => (
-                    &rate.effective_date,
-                    &rate.updated_at,
-                    &rate.id,
-                ) > (&lama.effective_date, &lama.updated_at, &lama.id),
+                Some(lama) => {
+                    (&rate.effective_date, &rate.updated_at, &rate.id)
+                        > (&lama.effective_date, &lama.updated_at, &lama.id)
+                }
             };
 
             if lebih_baik {
@@ -224,13 +223,20 @@ impl PayrollCalculator {
     ) -> TeachingTotals {
         let mut urut: Vec<&TaughtSession> = sessions.iter().collect();
         urut.sort_by(|a, b| {
-            (&a.tanggal, a.jam_awal, a.jam_akhir, &a.id_mapel, &a.id_presensi_mapel).cmp(&(
-                &b.tanggal,
-                b.jam_awal,
-                b.jam_akhir,
-                &b.id_mapel,
-                &b.id_presensi_mapel,
-            ))
+            (
+                &a.tanggal,
+                a.jam_awal,
+                a.jam_akhir,
+                &a.id_mapel,
+                &a.id_presensi_mapel,
+            )
+                .cmp(&(
+                    &b.tanggal,
+                    b.jam_awal,
+                    b.jam_akhir,
+                    &b.id_mapel,
+                    &b.id_presensi_mapel,
+                ))
         });
 
         let mut terpakai: HashSet<(String, u32)> = HashSet::new();
@@ -441,7 +447,8 @@ impl PayrollCalculator {
                     "category": ter_category,
                     "ptkp_status": ptkp_status,
                     "rate_percentage": rule.rate_percentage,
-                    "pph21_amount": pph21.to_i64().unwrap_or(0)
+                    "pph21_amount": pph21.to_i64().unwrap_or(0),
+                    "dasar_pengenaan": gross_i64
                 }),
             )
         } else {
@@ -452,12 +459,56 @@ impl PayrollCalculator {
                     "category": ter_category,
                     "ptkp_status": ptkp_status,
                     "rate_percentage": 0.0,
-                    "pph21_amount": 0
+                    "pph21_amount": 0,
+                    "dasar_pengenaan": gross_i64
                 }),
             )
         }
     }
+
+    /// Iuran BPJS dan PPh 21 satu slip, satu-satunya tempat kedua dasarnya
+    /// dieja.
+    ///
+    /// Dasar BPJS adalah bruto TANPA lembur, karena lembur bukan upah tetap.
+    /// Dasar PPh 21 adalah bruto penuh ditambah premi di `PREMI_KENA_PAJAK`.
+    /// Cerminan `calculateBpjsAndPph21` di `payroll-calculator.ts`.
+    ///
+    /// Mengembalikan `(bpjs karyawan, bpjs perusahaan, rincian bpjs, pph21,
+    /// rincian pajak)`.
+    pub fn calculate_bpjs_and_pph21(
+        gross_salary: Decimal,
+        overtime_salary: Decimal,
+        ptkp_status: &str,
+        bpjs_rules: &[BpjsRule],
+        tax_rules: &[TaxRule],
+    ) -> (
+        Decimal,
+        Decimal,
+        Vec<serde_json::Value>,
+        Decimal,
+        serde_json::Value,
+    ) {
+        let (bpjs_emp, bpjs_co, bpjs_breakdown) =
+            Self::calculate_bpjs(gross_salary - overtime_salary, bpjs_rules);
+        let premi: i64 = bpjs_breakdown
+            .iter()
+            .filter(|entry| {
+                entry["code"]
+                    .as_str()
+                    .is_some_and(|code| PREMI_KENA_PAJAK.contains(&code))
+            })
+            .filter_map(|entry| entry["nominal"].as_i64())
+            .sum();
+        let (pph21, tax_breakdown) =
+            Self::calculate_pph21_ter(gross_salary + Decimal::from(premi), ptkp_status, tax_rules);
+        (bpjs_emp, bpjs_co, bpjs_breakdown, pph21, tax_breakdown)
+    }
 }
+
+/// Premi BPJS tanggungan sekolah yang ikut penghasilan bruto PPh 21 (PP 58/2023
+/// Pasal 2). JHT dan JP perusahaan tidak termasuk. Cerminan `PREMI_KENA_PAJAK`
+/// di `payroll-calculator.ts`.
+pub const PREMI_KENA_PAJAK: &[&str] = &["JKK_CO", "JKM_CO", "BPJS_KES_CO"];
 
 #[cfg(test)]
 mod tests {
@@ -465,7 +516,8 @@ mod tests {
     // sebagai `payroll_admin`, dan penulisan ulang `crate::desktop` →
     // `crate::mobile` akan menunjuk modul yang namanya berbeda di sana.
     use super::super::models::{
-        ComponentSubject, JpRate, PayrollComponent, TaughtSession, TeachingTotals,
+        BpjsRule, ComponentSubject, JpRate, OvertimeTierRule, PayrollComponent, TaughtSession,
+        TaxRule, TeachingTotals,
     };
     use super::PayrollCalculator;
     use rust_decimal::Decimal;
@@ -596,11 +648,7 @@ mod tests {
                 std::slice::from_ref(&comp),
                 &subject,
             );
-            assert_eq!(
-                allowance,
-                Decimal::from(*harapan),
-                "calc_type: {calc_type}"
-            );
+            assert_eq!(allowance, Decimal::from(*harapan), "calc_type: {calc_type}");
         }
     }
 
@@ -832,7 +880,14 @@ mod tests {
     /// Gabungan jam — WAJIB identik dengan `summarizeTeaching` di TS.
     #[test]
     fn jam_yang_sama_pada_satu_tanggal_dihitung_sekali() {
-        let rates = vec![tarif("t1", "agama", None, 50_000, "2026-01-01", "2026-01-01")];
+        let rates = vec![tarif(
+            "t1",
+            "agama",
+            None,
+            50_000,
+            "2026-01-01",
+            "2026-01-01",
+        )];
 
         // Guru Agama mengajar tiga rombel pada jam 1-2 yang sama. Tiga sesi,
         // tetapi tetap dua jam pelajaran — dan dua kali honor, bukan enam.
@@ -907,5 +962,80 @@ mod tests {
             Decimal::from(3_438),
             "bentuk sekarang membulatkan menjauhi nol"
         );
+    }
+
+    fn jenjang(order: i64, start: f64, end: Option<f64>, multiplier: f64) -> OvertimeTierRule {
+        OvertimeTierRule {
+            id: format!("t{order}"),
+            rule_type: "HARI_KERJA".to_string(),
+            tier_order: order,
+            hour_start: start,
+            hour_end: end,
+            multiplier,
+            is_active: 1,
+        }
+    }
+
+    /// Vektor indeks lembur — WAJIB identik dengan `VEKTOR_INDEKS_LEMBUR` di
+    /// `payroll-calculator.test.ts`. `(menit, indeks x 100)` pada jenjang jam
+    /// pertama 1,5 lalu 2,0. 11 dan 41 menit adalah titik tengah sejati yang
+    /// dulu dibulatkan ke bawah oleh jam float di Web.
+    const VEKTOR_INDEKS_LEMBUR: &[(i64, i64)] =
+        &[(11, 28), (41, 103), (63, 160), (71, 187), (0, 0)];
+
+    #[test]
+    fn indeks_lembur_membulatkan_titik_tengah_menjauhi_nol() {
+        let tiers = [jenjang(1, 0.0, Some(1.0), 1.5), jenjang(2, 1.0, None, 2.0)];
+        for (menit, ratusan) in VEKTOR_INDEKS_LEMBUR {
+            let jam = Decimal::from(*menit) / Decimal::from(60);
+            assert_eq!(
+                PayrollCalculator::calculate_overtime_index(jam, &tiers),
+                Decimal::new(*ratusan, 2),
+                "{menit} menit"
+            );
+        }
+    }
+
+    /// Kembar `dasar BPJS tanpa lembur, dasar PPh 21 ditambah premi kena pajak`
+    /// di `payroll-calculator.test.ts`.
+    #[test]
+    fn dasar_bpjs_tanpa_lembur_dan_dasar_pph21_ditambah_premi() {
+        let bpjs = |code: &str, rate: f64, cap: Option<i64>| BpjsRule {
+            id: code.to_string(),
+            component_code: code.to_string(),
+            component_name: code.to_string(),
+            rate_percentage: rate,
+            wage_cap: cap,
+            effective_date: "2026-01-01".to_string(),
+        };
+        let rules = [
+            bpjs("JKK_CO", 0.24, None),
+            bpjs("JKM_CO", 0.3, None),
+            bpjs("BPJS_KES_CO", 4.0, Some(12_000_000)),
+            bpjs("BPJS_KES_EMP", 1.0, Some(12_000_000)),
+            bpjs("JHT_CO", 3.7, None),
+            bpjs("JHT_EMP", 2.0, None),
+        ];
+        let tax = |min: i64, max: Option<i64>, rate: f64| TaxRule {
+            id: format!("ter-{min}"),
+            category: "TER_A".to_string(),
+            bracket_min: min,
+            bracket_max: max,
+            rate_percentage: rate,
+            effective_date: "2026-01-01".to_string(),
+        };
+        let taxes = [tax(0, Some(5_100_000), 0.0), tax(5_100_001, None, 1.5)];
+
+        let (emp, co, _, pph21, rincian) = PayrollCalculator::calculate_bpjs_and_pph21(
+            Decimal::from(5_000_000),
+            Decimal::from(1_000_000),
+            "TK/0",
+            &rules,
+            &taxes,
+        );
+        assert_eq!(emp, Decimal::from(120_000));
+        assert_eq!(co, Decimal::from(329_600));
+        assert_eq!(pph21, Decimal::from(77_724));
+        assert_eq!(rincian["dasar_pengenaan"], 5_181_600);
     }
 }

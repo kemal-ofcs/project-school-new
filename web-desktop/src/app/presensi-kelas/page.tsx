@@ -173,6 +173,19 @@ export default function PresensiKelasPage() {
     selectedGuruRef.current = selectedGuru;
   });
 
+  // Rombel milik satu tahun ajaran, jadi pilihannya mengikuti tahun ajaran
+  // terpilih. Sesi yang sedang disunting tidak disentuh agar rombelnya tidak
+  // berpindah diam-diam.
+  const rombelTa = useMemo(
+    () => rombelList.filter((r) => String(r.id_tahun_ajaran) === selectedTa),
+    [rombelList, selectedTa],
+  );
+  useEffect(() => {
+    if (editingSessionId) return;
+    if (!rombelTa.some((r) => String(r.id_rombel) === selectedRombel))
+      setSelectedRombel(String(rombelTa[0]?.id_rombel ?? ""));
+  }, [rombelTa, selectedRombel, editingSessionId]);
+
   // Reconciliation states
   const [reconDate, setReconDate] = useState<string>(
     formatTanggalOperasional(new Date()),
@@ -757,6 +770,10 @@ export default function PresensiKelasPage() {
                   type="button"
                   onClick={() => {
                     const rentang = rentangJamKe(usulan.jam_ke);
+                    const taRombel = rombelList.find(
+                      (r) => String(r.id_rombel) === usulan.id_rombel,
+                    )?.id_tahun_ajaran;
+                    if (taRombel) setSelectedTa(String(taRombel));
                     setSelectedRombel(usulan.id_rombel);
                     setSelectedMapel(usulan.id_mapel);
                     setSelectedGuru(usulan.id_guru);
@@ -827,7 +844,7 @@ export default function PresensiKelasPage() {
                     onChange={(e) => setSelectedRombel(e.target.value)}
                     className="w-full rounded-xl border border-white/10 bg-slate-950 px-3 py-2 text-xs font-semibold text-white outline-none focus:border-sky-500"
                   >
-                    {rombelList.map((r) => (
+                    {rombelTa.map((r) => (
                       <option
                         key={String(r.id_rombel)}
                         value={String(r.id_rombel)}

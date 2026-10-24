@@ -437,3 +437,144 @@ describe("jenis perhitungan komponen", () => {
     expect(allowance).toBe(0);
   });
 });
+
+/**
+ * Vektor indeks lembur — WAJIB identik dengan `VEKTOR_INDEKS_LEMBUR` di
+ * `payroll/engine.rs`. `[menit, indeks x 100]` pada jenjang jam pertama 1,5
+ * lalu 2,0. 11 dan 41 menit adalah titik tengah sejati yang dulu dibulatkan ke
+ * bawah oleh jam float di Web.
+ */
+const VEKTOR_INDEKS_LEMBUR: Array<[menit: number, ratusan: number]> = [
+  [11, 28],
+  [41, 103],
+  [63, 160],
+  [71, 187],
+  [0, 0],
+];
+
+describe("indeks lembur", () => {
+  test("membulatkan titik tengah menjauhi nol", async () => {
+    const { calculateOvertimeIndex } = await import("./payroll-calculator");
+    const jenjang = (
+      order: number,
+      start: number,
+      end: number | null,
+      multiplier: number,
+    ) => ({
+      id: `t${order}`,
+      rule_type: "HARI_KERJA",
+      tier_order: order,
+      hour_start: start,
+      hour_end: end,
+      multiplier,
+      is_active: 1,
+    });
+    const tiers = [jenjang(1, 0, 1, 1.5), jenjang(2, 1, null, 2)];
+    for (const [menit, ratusan] of VEKTOR_INDEKS_LEMBUR) {
+      expect(calculateOvertimeIndex(menit, tiers)).toBe(ratusan / 100);
+    }
+  });
+});
+
+describe("dasar BPJS tanpa lembur, dasar PPh 21 ditambah premi kena pajak", () => {
+  // Kembar `dasar_bpjs_tanpa_lembur_dan_dasar_pph21_ditambah_premi` di
+  // `payroll/engine.rs`.
+  test("vektor yang sama dengan Rust", async () => {
+    const { calculateBpjsAndPph21 } = await import("./payroll-calculator");
+    const bpjs = (code: string, rate: number, cap: number | null) => ({
+      id: code,
+      component_code: code,
+      component_name: code,
+      rate_percentage: rate,
+      wage_cap: cap,
+      effective_date: "2026-01-01",
+    });
+    const tax = (min: number, max: number | null, rate: number) => ({
+      id: `ter-${min}`,
+      category: "TER_A",
+      bracket_min: min,
+      bracket_max: max,
+      rate_percentage: rate,
+      effective_date: "2026-01-01",
+    });
+    const hasil = calculateBpjsAndPph21(
+      5_000_000,
+      1_000_000,
+      "TK/0",
+      [
+        bpjs("JKK_CO", 0.24, null),
+        bpjs("JKM_CO", 0.3, null),
+        bpjs("BPJS_KES_CO", 4, 12_000_000),
+        bpjs("BPJS_KES_EMP", 1, 12_000_000),
+        bpjs("JHT_CO", 3.7, null),
+        bpjs("JHT_EMP", 2, null),
+      ],
+      [tax(0, 5_100_000, 0), tax(5_100_001, null, 1.5)],
+    );
+    expect(hasil.bpjs.employee).toBe(120_000);
+    expect(hasil.bpjs.company).toBe(329_600);
+    expect(hasil.pph21.pph21Amount).toBe(77_724);
+    expect(hasil.pph21.breakdown.dasar_pengenaan).toBe(5_181_600);
+  });
+});
+
+/**
+ * Vektor aturan proses gaji — WAJIB identik dengan
+ * `aturan_periode_penyetuju_dan_konfigurasi_gaji` di `payroll/commands.rs`.
+ */
+const VEKTOR_PERIODE: Array<[string, string, boolean]> = [
+  ["2026-10-01", "2026-10-31", true],
+  ["2026-10-01", "2026-10-01", true],
+  ["2026-10-31", "2026-10-01", false],
+  ["2026-1-5", "2026-10-31", false],
+  ["2026-02-30", "2026-03-01", false],
+];
+
+const VEKTOR_PENYETUJU: Array<[string, string, boolean]> = [
+  ["admin", "Admin ", false],
+  ["admin", "kepala", true],
+];
+
+const VEKTOR_KONFIGURASI: Array<
+  [number, number, string, string, string | null]
+> = [
+  [25000, 0, "TK/0", "2026-10-01", null],
+  [
+    -1,
+    0,
+    "TK/0",
+    "2026-10-01",
+    "Tarif per jam dan tarif per JP harus bilangan bulat, nol atau lebih.",
+  ],
+  [25000, 0, "TK/9", "2026-10-01", "Status PTKP tidak dikenal."],
+  [
+    25000,
+    0,
+    "K/1",
+    "2026-13-01",
+    "Tanggal berlaku harus berupa tanggal YYYY-MM-DD.",
+  ],
+];
+
+describe("aturan proses gaji", () => {
+  test("periode, penyetuju, dan konfigurasi gaji", async () => {
+    const { periodePayrollSah, penyetujuSah, pesanKonfigurasiGajiTidakSah } =
+      await import("@/lib/validations/payroll-policy");
+    for (const [start, end, sah] of VEKTOR_PERIODE) {
+      expect(periodePayrollSah(start, end)).toBe(sah);
+    }
+    for (const [pembuat, penyetuju, sah] of VEKTOR_PENYETUJU) {
+      expect(penyetujuSah(pembuat, penyetuju)).toBe(sah);
+    }
+    for (const [jam, jp, ptkp, tanggal, pesan] of VEKTOR_KONFIGURASI) {
+      expect(
+        pesanKonfigurasiGajiTidakSah({
+          rate_per_hour: jam,
+          rate_per_jp: jp,
+          ptkp_status: ptkp,
+          effective_date: tanggal,
+        }),
+      ).toBe(pesan);
+    }
+  });
+});

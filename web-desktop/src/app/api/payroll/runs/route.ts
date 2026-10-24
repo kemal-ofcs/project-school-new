@@ -1,4 +1,5 @@
 import type { NextRequest } from "next/server";
+import { AuthorizationError } from "@/lib/auth/permission-assertion";
 import type { PermissionKey } from "@/lib/rbac/catalog";
 import { requireWebPermission } from "@/lib/server/auth/authorize";
 import {
@@ -20,8 +21,21 @@ import {
 } from "@/lib/services/payroll-calculator";
 import { computePayrollRecap } from "@/lib/services/payroll-recap";
 import { AKUN_KAS } from "@/lib/validations/loan";
+import {
+  PESAN_PENYETUJU_SAMA,
+  PESAN_PERIODE_PAYROLL_TIDAK_SAH,
+  penyetujuSah,
+  periodePayrollSah,
+  pesanRunBeririsan,
+  RUN_BERIRISAN_SQL,
+} from "@/lib/validations/payroll-policy";
 
 export const runtime = "nodejs";
+
+/** Cerminan `new_payroll_id`: `Date.now()` saja bertabrakan dalam satu milidetik. */
+function newPayrollId(prefix: string): string {
+  return `${prefix}-${Math.floor(Date.now() / 1000)}-${crypto.randomUUID().slice(0, 12)}`;
+}
 
 // List (no runId) or single-run detail with items + audit logs (runId set).
 // Kept on one static path (no [id] segment) so this route stays compatible
@@ -104,6 +118,24 @@ export async function PUT(request: NextRequest) {
     if (existing.rows.length > 0) {
       return noStoreJson({ data: existing.rows[0] });
     }
+    if (!periodePayrollSah(body.periodStart, body.periodEnd)) {
+      throw new ApiRequestError(PESAN_PERIODE_PAYROLL_TIDAK_SAH, 400);
+    }
+    const beririsan = await client.execute({
+      sql: RUN_BERIRISAN_SQL,
+      args: [body.periodStart, body.periodEnd],
+    });
+    const runLain = beririsan.rows[0];
+    if (runLain) {
+      throw new ApiRequestError(
+        pesanRunBeririsan(
+          String(runLain.id),
+          String(runLain.period_start),
+          String(runLain.period_end),
+        ),
+        409,
+      );
+    }
 
     // Awalan `est_` pada baris rekap berarti "estimasi" HANYA selama ia
     // ditampilkan sebagai pratinjau. Begitu sampai di sini, nilainya DIBEKUKAN
@@ -118,7 +150,7 @@ export async function PUT(request: NextRequest) {
       body.periodEnd,
     );
 
-    const runId = `PR-${body.periodStart.replace(/-/g, "")}-${Date.now()}`;
+    const runId = newPayrollId(`PR-${body.periodStart.replace(/-/g, "")}`);
     const now = new Date().toISOString();
 
     let totalGross = 0;
@@ -169,7 +201,7 @@ export async function PUT(request: NextRequest) {
       };
     });
 
-    const auditId = `audit-${Date.now()}`;
+    const auditId = newPayrollId("audit");
 
     await client.batch(
       [
@@ -262,7 +294,7 @@ export async function PATCH(request: NextRequest) {
     const tx = await client.transaction("write");
     try {
       const currentResult = await tx.execute({
-        sql: "SELECT status FROM payroll_runs WHERE id = ? LIMIT 1;",
+        sql: "SELECT status, created_by FROM payroll_runs WHERE id = ? LIMIT 1;",
         args: [runId],
       });
       if (currentResult.rows.length === 0) {
@@ -274,6 +306,15 @@ export async function PATCH(request: NextRequest) {
           `Tidak dapat mengubah status dari ${currentStatus} ke ${target}.`,
           409,
         );
+      }
+      if (
+        target === "APPROVED" &&
+        !penyetujuSah(
+          String(currentResult.rows[0]?.created_by ?? ""),
+          actor.username,
+        )
+      ) {
+        throw new AuthorizationError(PESAN_PENYETUJU_SAMA, 403);
       }
       if (target === "PAID") {
         await assertAkunBayar(tx, akunBayar);
@@ -291,7 +332,7 @@ export async function PATCH(request: NextRequest) {
           ) VALUES (?, ?, 'TRANSITION_STATUS', ?, ?, ?, ?, ?);
         `,
         args: [
-          `audit-${Date.now()}`,
+          newPayrollId("audit"),
           runId,
           currentStatus,
           target,

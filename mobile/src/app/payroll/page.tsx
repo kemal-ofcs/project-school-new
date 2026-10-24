@@ -95,6 +95,7 @@ export default function MobilePayrollPortalPage() {
   // Administrasi payroll (modul `payroll_admin`, salinan modul Desktop).
   const canViewPayrollAdmin = hasPermission(user, "payroll.view");
   const canManagePayrollConfig = hasPermission(user, "payroll.config.manage");
+  const canExportPayroll = hasPermission(user, "payroll.export");
 
   const [activeTab, setActiveTab] = useState<"estimate" | "archive">(
     "estimate",
@@ -586,15 +587,17 @@ Status: Estimasi Real-Time ${companyName}`;
                     <Icon name="document" className="w-4 h-4" />
                     Lihat Rincian Slip Lengkap
                   </button>
-                  <button
-                    type="button"
-                    onClick={() => void handleShareSlip(estimateDetail)}
-                    disabled={sharing}
-                    className="w-full py-2.5 px-4 rounded-2xl bg-slate-800 hover:bg-slate-700 active:scale-98 text-slate-200 font-bold text-xs transition border border-slate-700 flex items-center justify-center gap-2"
-                  >
-                    <Icon name="share" className="w-3.5 h-3.5 text-sky-400" />
-                    {sharing ? "Membagikan..." : "Bagikan Ringkasan Slip"}
-                  </button>
+                  {canExportPayroll ? (
+                    <button
+                      type="button"
+                      onClick={() => void handleShareSlip(estimateDetail)}
+                      disabled={sharing}
+                      className="w-full py-2.5 px-4 rounded-2xl bg-slate-800 hover:bg-slate-700 active:scale-98 text-slate-200 font-bold text-xs transition border border-slate-700 flex items-center justify-center gap-2"
+                    >
+                      <Icon name="share" className="w-3.5 h-3.5 text-sky-400" />
+                      {sharing ? "Membagikan..." : "Bagikan Ringkasan Slip"}
+                    </button>
+                  ) : null}
                 </div>
               </div>
             ) : (
@@ -838,14 +841,16 @@ Status: Estimasi Real-Time ${companyName}`;
                     {IDR.format(estimateDetail.net_salary)}
                   </span>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => void handleShareSlip(estimateDetail)}
-                  disabled={sharing}
-                  className="px-3.5 py-2 rounded-xl bg-sky-500 hover:bg-sky-400 active:scale-95 text-slate-950 font-black text-xs transition"
-                >
-                  Bagikan Slip
-                </button>
+                {canExportPayroll ? (
+                  <button
+                    type="button"
+                    onClick={() => void handleShareSlip(estimateDetail)}
+                    disabled={sharing}
+                    className="px-3.5 py-2 rounded-xl bg-sky-500 hover:bg-sky-400 active:scale-95 text-slate-950 font-black text-xs transition"
+                  >
+                    Bagikan Slip
+                  </button>
+                ) : null}
               </div>
             </div>
           </Modal>

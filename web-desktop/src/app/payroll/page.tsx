@@ -9,6 +9,7 @@ import { FeedbackBanner } from "@/components/ui/FeedbackBanner";
 import { Icon } from "@/components/ui/Icon";
 import { Modal } from "@/components/ui/Modal";
 import { PageHeader } from "@/components/ui/PageHeader";
+import { formatTanggalOperasional } from "@/lib/attendance/time-policy";
 import { canAccessArea, hasPermission } from "@/lib/auth/access";
 import { useAuth } from "@/lib/context/AuthContext";
 import {
@@ -24,6 +25,21 @@ const IDR = new Intl.NumberFormat("id-ID", {
   maximumFractionDigits: 0,
 });
 
+// Tanggal kalender dihitung dari tanggal WIB sebagai teks. `toISOString()` pada
+// tanggal lokal memakai UTC, sehingga "awal bulan" jatuh di hari terakhir
+// bulan sebelumnya dan periode gaji membayar hari itu dua kali.
+function geserTanggal(tanggal: string, hari: number): string {
+  const d = new Date(`${tanggal}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + hari);
+  return d.toISOString().slice(0, 10);
+}
+
+function awalBulan(tanggal: string, geserBulan = 0): string {
+  const d = new Date(`${tanggal.slice(0, 7)}-01T00:00:00Z`);
+  d.setUTCMonth(d.getUTCMonth() + geserBulan);
+  return d.toISOString().slice(0, 10);
+}
+
 export default function PayrollDashboardPage() {
   // Penjaga anti klik ganda (Aturan 5). `useState` tidak cukup: pembaruannya
   // dijadwalkan, sehingga dua klik dalam satu tick React sama-sama membaca
@@ -35,14 +51,12 @@ export default function PayrollDashboardPage() {
   const router = useRouter();
   const { user, isAuthenticated, isLoading: authLoading } = useAuth();
 
-  const now = new Date();
-  const firstDay = new Date(now.getFullYear(), now.getMonth(), 1)
-    .toISOString()
-    .slice(0, 10);
-  const today = now.toISOString().slice(0, 10);
-
-  const [periodStart, setPeriodStart] = useState(firstDay);
-  const [periodEnd, setPeriodEnd] = useState(today);
+  const [periodStart, setPeriodStart] = useState(() =>
+    awalBulan(formatTanggalOperasional(Date.now())),
+  );
+  const [periodEnd, setPeriodEnd] = useState(() =>
+    formatTanggalOperasional(Date.now()),
+  );
   const [data, setData] = useState<PayrollRecapRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
@@ -122,38 +136,23 @@ export default function PayrollDashboardPage() {
   const setPresetRange = (
     preset: "today" | "week" | "thisMonth" | "lastMonth" | "last30",
   ) => {
-    const d = new Date();
-    const todayStr = d.toISOString().slice(0, 10);
+    const todayStr = formatTanggalOperasional(Date.now());
 
     if (preset === "today") {
       setPeriodStart(todayStr);
       setPeriodEnd(todayStr);
     } else if (preset === "week") {
-      const day = d.getDay();
-      const diff = d.getDate() - day + (day === 0 ? -6 : 1);
-      const monday = new Date(d.setDate(diff)).toISOString().slice(0, 10);
-      setPeriodStart(monday);
+      const day = new Date(`${todayStr}T00:00:00Z`).getUTCDay();
+      setPeriodStart(geserTanggal(todayStr, day === 0 ? -6 : 1 - day));
       setPeriodEnd(todayStr);
     } else if (preset === "thisMonth") {
-      const first = new Date(d.getFullYear(), d.getMonth(), 1)
-        .toISOString()
-        .slice(0, 10);
-      setPeriodStart(first);
+      setPeriodStart(awalBulan(todayStr));
       setPeriodEnd(todayStr);
     } else if (preset === "lastMonth") {
-      const firstLastMonth = new Date(d.getFullYear(), d.getMonth() - 1, 1)
-        .toISOString()
-        .slice(0, 10);
-      const lastDayLastMonth = new Date(d.getFullYear(), d.getMonth(), 0)
-        .toISOString()
-        .slice(0, 10);
-      setPeriodStart(firstLastMonth);
-      setPeriodEnd(lastDayLastMonth);
+      setPeriodStart(awalBulan(todayStr, -1));
+      setPeriodEnd(geserTanggal(awalBulan(todayStr), -1));
     } else if (preset === "last30") {
-      const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
-        .toISOString()
-        .slice(0, 10);
-      setPeriodStart(thirtyDaysAgo);
+      setPeriodStart(geserTanggal(todayStr, -30));
       setPeriodEnd(todayStr);
     }
   };

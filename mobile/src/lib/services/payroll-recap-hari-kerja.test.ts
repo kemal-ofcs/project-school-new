@@ -108,4 +108,31 @@ describe("rekap gaji dan libur mingguan shift", () => {
     expect(baris?.total_regular_hours).toBe(16);
     expect(baris?.total_holiday_hours).toBe(0);
   });
+
+  test("hari hadir dihitung per tanggal, dan yang nonaktif dibayar bila masih bekerja", async () => {
+    await client.batch(
+      [
+        // Sesi kedua pada Jumat yang sama (shift multi-sesi).
+        `INSERT INTO absensi_harian (tanggal, id_karyawan, nama, kelas_divisi, jam_masuk, jam_pulang,
+           status_kehadiran, status_absen, sumber, update_terakhir, jam_kerja, lembur,
+           id_shift, bulan, tahun, id_sesi, mode_tugas)
+         VALUES ('2026-10-16', 'K-01', 'Budi', 'TU', '18:00', '20:00', 'Hadir', 'Tepat Waktu',
+           'Scanner', 'x', 120, 0, 1, 'Oktober', 2026, 'S-JUMAT-2', 'NORMAL');`,
+        `INSERT INTO master_data (id_unik, kode_karyawan, nama, divisi, id_shift, jenis_personil, status_aktif)
+         VALUES ('K-02', 'K-02', 'Citra', 'TU', 1, 'Pegawai', 'Nonaktif'),
+                ('K-03', 'K-03', 'Dodi', 'TU', 1, 'Pegawai', 'Nonaktif');`,
+        `INSERT INTO absensi_harian (tanggal, id_karyawan, nama, kelas_divisi, jam_masuk, jam_pulang,
+           status_kehadiran, status_absen, sumber, update_terakhir, jam_kerja, lembur,
+           id_shift, bulan, tahun, id_sesi, mode_tugas)
+         VALUES ('2026-10-05', 'K-02', 'Citra', 'TU', '07:00', '15:00', 'Hadir', 'Tepat Waktu',
+           'Scanner', 'x', 480, 0, 1, 'Oktober', 2026, 'S-CITRA', 'NORMAL');`,
+      ],
+      "write",
+    );
+    const rekap = await computePayrollRecap(client, "2026-10-01", "2026-10-31");
+    const budi = rekap.find((baris) => baris.id_karyawan === "K-01");
+    expect(budi?.total_hadir).toBe(2);
+    expect(rekap.some((baris) => baris.id_karyawan === "K-02")).toBe(true);
+    expect(rekap.some((baris) => baris.id_karyawan === "K-03")).toBe(false);
+  });
 });

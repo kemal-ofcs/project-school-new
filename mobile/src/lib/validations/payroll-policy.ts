@@ -1,4 +1,5 @@
 import { normalizePersonnelRole } from "@/lib/contracts/scanner";
+import { isValidDate } from "@/lib/validations/accounting";
 
 /**
  * Kebijakan payroll yang dibaca DUA sisi: layar (Web/Desktop/Mobile) dan mesin
@@ -231,3 +232,82 @@ export function labelAppliesTo(
   }
   return namaPersonil ? namaPersonil(value) : value;
 }
+
+export const PESAN_PERIODE_PAYROLL_TIDAK_SAH =
+  "Periode gaji harus berupa tanggal YYYY-MM-DD, dan tanggal mulai tidak boleh sesudah tanggal selesai.";
+
+/** Cerminan `periode_payroll_sah` di `payroll/commands.rs`. */
+export function periodePayrollSah(start: string, end: string): boolean {
+  return isValidDate(start) && isValidDate(end) && start <= end;
+}
+
+/**
+ * Proses gaji bukan-REJECTED yang periodenya beririsan dengan `[?1, ?2]`. Dua
+ * run untuk hari yang sama membayar gaji, tunjangan tetap, kasbon, dan rapel
+ * dua kali. SQL-nya sama persis dengan `RUN_BERIRISAN_SQL` di Rust.
+ */
+export const RUN_BERIRISAN_SQL =
+  "SELECT id, period_start, period_end FROM payroll_runs WHERE status <> 'REJECTED' AND period_start <= ?2 AND period_end >= ?1 ORDER BY period_start, id LIMIT 1;";
+
+/** Cerminan `pesan_run_beririsan` di `payroll/commands.rs`. */
+export function pesanRunBeririsan(
+  id: string,
+  start: string,
+  end: string,
+): string {
+  return `Periode ini beririsan dengan proses gaji ${id} (${start} s.d. ${end}). Tolak proses itu dulu bila ingin menghitung ulang.`;
+}
+
+export const PESAN_PENYETUJU_SAMA =
+  "Proses gaji harus disetujui oleh pengguna selain pembuatnya.";
+
+/**
+ * Empat mata: pembuat run tidak boleh menyetujuinya sendiri. Cerminan
+ * `penyetuju_sah` di `payroll/commands.rs`.
+ */
+export function penyetujuSah(createdBy: string, approver: string): boolean {
+  return createdBy.trim().toLowerCase() !== approver.trim().toLowerCase();
+}
+
+/** Sama dengan CHECK `salary_configs.ptkp_status`. */
+export const PTKP_STATUSES = [
+  "TK/0",
+  "TK/1",
+  "TK/2",
+  "TK/3",
+  "K/0",
+  "K/1",
+  "K/2",
+  "K/3",
+];
+
+/**
+ * Pesan galat konfigurasi gaji, atau `null` bila sah. Cerminan
+ * `pesan_konfigurasi_gaji_tidak_sah` di `payroll/commands.rs`.
+ */
+export function pesanKonfigurasiGajiTidakSah(draft: {
+  rate_per_hour: unknown;
+  rate_per_jp: unknown;
+  ptkp_status: unknown;
+  effective_date: unknown;
+}): string | null {
+  const tarifSah = (value: unknown) =>
+    typeof value === "number" && Number.isSafeInteger(value) && value >= 0;
+  if (!tarifSah(draft.rate_per_hour) || !tarifSah(draft.rate_per_jp)) {
+    return "Tarif per jam dan tarif per JP harus bilangan bulat, nol atau lebih.";
+  }
+  if (!PTKP_STATUSES.includes(String(draft.ptkp_status))) {
+    return "Status PTKP tidak dikenal.";
+  }
+  if (!isValidDate(String(draft.effective_date))) {
+    return "Tanggal berlaku harus berupa tanggal YYYY-MM-DD.";
+  }
+  return null;
+}
+
+/** Penerima gaji harus ada dan bukan siswa. Sama dengan `PENERIMA_GAJI_SQL`. */
+export const PENERIMA_GAJI_SQL =
+  "SELECT 1 FROM master_data WHERE id_unik = ?1 AND LOWER(TRIM(COALESCE(jenis_personil, ''))) <> 'siswa' LIMIT 1;";
+
+export const PESAN_PENERIMA_GAJI_TIDAK_ADA =
+  "Karyawan tidak ditemukan atau berstatus siswa.";

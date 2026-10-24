@@ -494,11 +494,11 @@ export function validatePembayaran(
   if (keterangan && panjang(keterangan) > MAKS_KETERANGAN_BAYAR) {
     return { ok: false, error: "Keterangan maksimal 150 karakter." };
   }
-  const id_tagihan: string[] = [];
-  for (const id of draft.id_tagihan) {
-    const bersih = id.trim();
-    if (bersih && !id_tagihan.includes(bersih)) id_tagihan.push(bersih);
-  }
+  // `Set`, bukan `includes`: daftar kiriman tidak dibatasi sebelum di sini, dan
+  // pencarian kuadratik atas body 2 MB membekukan server Web.
+  const id_tagihan = [
+    ...new Set(draft.id_tagihan.map((id) => id.trim()).filter(Boolean)),
+  ];
   if (id_tagihan.length > MAKS_TAGIHAN_PER_KUITANSI) {
     return { ok: false, error: "Satu kuitansi paling banyak 100 tagihan." };
   }

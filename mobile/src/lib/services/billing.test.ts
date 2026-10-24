@@ -15,6 +15,7 @@ const {
   list,
   master,
   moveToDeposit,
+  PESAN_TITIPAN_TERPAKAI,
   pay,
   paymentDetail,
   payments,
@@ -99,6 +100,15 @@ describe("tagihan Web terhadap skema cloud asli", () => {
         id_akun_pendapatan: "akun-kas",
       }),
     ).rejects.toThrow("Akun pendapatan harus akun Pendapatan yang aktif.");
+    await expect(
+      saveJenis(client, {
+        id_jenis_tagihan: jt,
+        nama: "SPP",
+        periodik: "Sekali",
+        nominal_bawaan: 300_000,
+        id_akun_pendapatan: "akun-pendapatan-spp",
+      }),
+    ).rejects.toThrow("Cara penagihan tidak bisa diubah setelah jenis dibuat.");
     await saveTarif(client, {
       id_jenis_tagihan: jt,
       nama_unit: "SMP",
@@ -249,6 +259,10 @@ describe("pembayaran Web terhadap skema cloud asli", () => {
       id_tagihan: [juli],
     });
     expect((await account(client, "S-02")).titipan).toBe(0);
+    // Kelebihan kuitansi kedua sudah dipakai: membatalkannya ditolak.
+    await expect(
+      cancelPayment(client, "kepala", kwt2.id_pembayaran, "Salah input"),
+    ).rejects.toThrow(PESAN_TITIPAN_TERPAKAI);
     await expect(
       pay(client, "tu", {
         id_siswa: "S-02",
