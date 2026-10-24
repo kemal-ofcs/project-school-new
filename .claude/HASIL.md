@@ -1,7 +1,7 @@
 # HASIL.md — hasil `bun run check`
 
-- Waktu: 2026-10-23 22:56 WIB
-- Commit: ec084fc (working tree bersih)
+- Waktu: 2026-10-24 11:01 WIB
+- Commit: 863ac04 (working tree bersih)
 - Perintah: `bun run check` (root)
 - Exit code: 0
 - Status: **LULUS**
@@ -23,8 +23,8 @@ Tidak ada (seluruh 14 gerbang kualitas lulus).
 | `audit:confirm` | Lulus |
 | `audit:silent-catch` | Lulus |
 | `audit:list-bound` | Lulus |
-| `web-desktop` (`lint` + `typecheck` + `bun test` + `cargo test`) | Lulus (459 tests passed) |
-| `mobile` (`lint` + `typecheck` + `bun test` + `cargo test`) | Lulus (462 tests passed) |
+| `web-desktop` (`lint` + `typecheck` + `bun test` + `cargo test`) | Lulus (462 cargo tests passed) |
+| `mobile` (`lint` + `typecheck` + `bun test` + `cargo test`) | Lulus (465 cargo tests passed) |
 | `web-public` (`lint` + `typecheck` + `bun test`) | Lulus |
 
 ## Galat (maks 10, urutan kemunculan)
