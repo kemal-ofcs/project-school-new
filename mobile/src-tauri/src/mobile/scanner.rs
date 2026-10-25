@@ -30,6 +30,8 @@ struct Employee {
     status: String,
     token: String,
     personnel_type: Option<String>,
+    /// Kosong untuk guru/pegawai dan siswa yang NISN-nya belum diisi.
+    nisn: String,
 }
 
 #[derive(Clone)]
@@ -1049,8 +1051,15 @@ fn result_from_decision(
 ) -> Value {
     let mut message = if decision.allowed {
         format!(
-            "Jam {} {} ({}) berhasil dicatat.\nStatus: {}",
-            decision.scan_type, employee.name, employee.id, decision.detail
+            "Jam {} {}{} berhasil dicatat.\nStatus: {}",
+            decision.scan_type,
+            employee.name,
+            if employee.nisn.is_empty() {
+                String::new()
+            } else {
+                format!(" (NISN {})", employee.nisn)
+            },
+            decision.detail
         )
     } else {
         rejected_decision_message(decision.reason).to_owned()
@@ -1093,6 +1102,26 @@ fn result_from_decision(
         "modeTugas": session.mode,
         "idSesi": session_id,
     })
+}
+
+/// `true` bila `qrContent` berbentuk `id|token` dengan token milik `id_unik`.
+pub fn qr_token_matches(
+    state: &MobileState,
+    input: &Value,
+    id_unik: &str,
+) -> Result<bool, CommandError> {
+    let qr = input.get("qrContent").and_then(Value::as_str).unwrap_or("");
+    let parts = qr.trim().split('|').map(str::trim).collect::<Vec<_>>();
+    if id_unik.is_empty() || parts.len() != 2 || parts[1].is_empty() {
+        return Ok(false);
+    }
+    storage::database(&state.data_dir)?
+        .query_row(
+            "SELECT EXISTS(SELECT 1 FROM master_data WHERE id_unik = ?1 AND TRIM(COALESCE(token_absensi, '')) = ?2);",
+            params![id_unik, parts[1]],
+            |row| row.get(0),
+        )
+        .map_err(|_| CommandError::internal())
 }
 
 pub fn submit(
@@ -1166,8 +1195,10 @@ fn submit_internal(
     let employee = transaction
         .query_row(
             r#"
-      SELECT id_unik, nama, divisi, id_shift, status_aktif, token_absensi, jenis_personil
-      FROM master_data WHERE id_unik = ? OR kode_karyawan = ? LIMIT 1;
+      SELECT m.id_unik, m.nama, m.divisi, m.id_shift, m.status_aktif, m.token_absensi,
+             m.jenis_personil,
+             (SELECT s.nisn FROM siswa_data s WHERE s.id_siswa = m.id_unik LIMIT 1)
+      FROM master_data m WHERE m.id_unik = ? OR m.kode_karyawan = ? LIMIT 1;
       "#,
             params![parts[0], parts[0]],
             |row| {
@@ -1181,6 +1212,11 @@ fn submit_internal(
                     personnel_type: row
                         .get::<_, Option<String>>(6)?
                         .filter(|s| !s.trim().is_empty()),
+                    nisn: row
+                        .get::<_, Option<String>>(7)?
+                        .unwrap_or_default()
+                        .trim()
+                        .to_owned(),
                 })
             },
         )
@@ -2830,6 +2866,41 @@ mod tests {
             0,
             "bawaan mati wajib berarti tidak ada baris antrean sama sekali",
         );
+    }
+
+    /// Kembaran tes "pesan memakai NISN" di `attendance-processor.test.ts`.
+    #[test]
+    fn pesan_memakai_nisn_dan_foto_hanya_untuk_token_yang_cocok() {
+        use super::qr_token_matches;
+        let (_directory, state) = fixture();
+        seed_siswa_dengan_wali(&state);
+
+        let siswa = submit_at(
+            &state,
+            &json!({ "qrContent": "S001|TOKEN-SISWA" }),
+            "OP001",
+            moment("2026-09-02", "07:00:00"),
+        )
+        .expect("scan siswa");
+        let pesan = siswa.get("pesan").and_then(|v| v.as_str()).unwrap_or("");
+        assert!(pesan.contains("Siti Rahma (NISN 00123) berhasil"), "{pesan}");
+
+        let pegawai = submit_at(
+            &state,
+            &json!({ "qrContent": "K001|TOKEN-TEST" }),
+            "OP001",
+            moment("2026-09-02", "07:00:00"),
+        )
+        .expect("scan pegawai");
+        let pesan = pegawai.get("pesan").and_then(|v| v.as_str()).unwrap_or("");
+        assert!(!pesan.contains('('), "{pesan}");
+
+        let cocok = |qr: &str| {
+            qr_token_matches(&state, &json!({ "qrContent": qr }), "S001").expect("cek token")
+        };
+        assert!(cocok("S001|TOKEN-SISWA"));
+        assert!(!cocok("S001|TOKEN-SALAH"));
+        assert!(!cocok("S001"));
     }
 
     /// Sakelar hidup mengantrekan, dan hanya jenis yang dinyalakan.

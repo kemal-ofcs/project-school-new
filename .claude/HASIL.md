@@ -1,7 +1,7 @@
 # HASIL.md — hasil `bun run check`
 
-- Waktu: 2026-10-24 17:10 WIB
-- Commit: 1c968e9 (+ 84 berkas berubah, belum commit)
+- Waktu: 2026-10-25 19:22 WIB
+- Commit: c08d8fd (+ 1089 berkas berubah, belum commit)
 - Perintah: `bun run check` (root)
 - Exit code: 0
 - Status: **LULUS**
@@ -23,12 +23,12 @@ Tidak ada (seluruh 14 gerbang kualitas lulus).
 | `audit:confirm` | Lulus |
 | `audit:silent-catch` | Lulus |
 | `audit:list-bound` | Lulus |
-| `web-desktop` (`lint` + `typecheck` + `bun test` + `cargo test`) | Lulus |
-| `mobile` (`lint` + `typecheck` + `bun test` + `cargo test`) | Lulus (465 cargo tests passed) |
+| `web-desktop` (`lint` + `typecheck` + `bun test` + `cargo test`) | Lulus (463 cargo tests passed) |
+| `mobile` (`lint` + `typecheck` + `bun test` + `cargo test`) | Lulus (466 cargo tests passed) |
 | `web-public` (`lint` + `typecheck` + `bun test`) | Lulus |
 
 ## Galat (maks 10, urutan kemunculan)
 Tidak ada galat.
 
 ## Catatan
-Seluruh pengujian unit, integritas skema 4-layer, kontrak IPC, linter, typecheck, dan cargo test berhasil tanpa kegagalan.
+Seluruh pengujian unit, integritas skema 4-layer, kontrak IPC, linter, typecheck, dan cargo test (Desktop 463 tests & Mobile 466 tests) berhasil tanpa kegagalan.

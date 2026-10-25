@@ -39,7 +39,7 @@
           {
             "type": "command",
             "shell": "bash",
-            "command": "bash \"E:/Freelance/absensi-sppg-app/.claude/hooks/biome-format.sh\" >/dev/null 2>&1 || true",
+            "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/hooks/biome-format.sh\" >/dev/null 2>&1 || true",
             "timeout": 30,
             "statusMessage": "Formatting with biome..."
           }
