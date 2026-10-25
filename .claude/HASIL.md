@@ -1,14 +1,13 @@
 # HASIL.md — hasil `bun run check`
 
-- Waktu: 2026-10-25 19:22 WIB
-- Commit: c08d8fd (+ 1089 berkas berubah, belum commit)
+- Waktu: 2026-10-25 20:25 WIB
+- Commit: a0b3747 (+ 2 berkas berubah, belum commit)
 - Perintah: `bun run check` (root)
-- Exit code: 0
-- Status: **LULUS**
+- Exit code: 1
+- Status: **GAGAL**
 - Log penuh: `.claude/check.log`
 
 ## Gate yang gagal
-Tidak ada (seluruh 14 gerbang kualitas lulus).
 
 | Gate | Status |
 | :--- | :--- |
@@ -23,12 +22,21 @@ Tidak ada (seluruh 14 gerbang kualitas lulus).
 | `audit:confirm` | Lulus |
 | `audit:silent-catch` | Lulus |
 | `audit:list-bound` | Lulus |
-| `web-desktop` (`lint` + `typecheck` + `bun test` + `cargo test`) | Lulus (463 cargo tests passed) |
-| `mobile` (`lint` + `typecheck` + `bun test` + `cargo test`) | Lulus (466 cargo tests passed) |
-| `web-public` (`lint` + `typecheck` + `bun test`) | Lulus |
+| `web-desktop` (`lint` + `typecheck` + `bun test` + `cargo test`) | Lulus |
+| `mobile` (`lint` + `typecheck` + `bun test` + `cargo test`) | **GAGAL** |
+| `web-public` (`lint` + `typecheck` + `bun test`) | tidak sempat jalan |
 
 ## Galat (maks 10, urutan kemunculan)
-Tidak ada galat.
+1. `mobile/src-tauri/capabilities/default.json:1` — mobile (lint): Formatter would have printed formatted content
+2. `mobile/src/components/ScannerView.tsx:1` — mobile (lint): Formatter would have printed formatted content
+3. `mobile/src/components/inventory/InventarisWorkspace.tsx:1` — mobile (lint): Formatter would have printed formatted content
+4. `mobile/src/components/inventory/KolomTambahan.tsx:1` — mobile (lint): Formatter would have printed formatted content
+5. `mobile/src/lib/contracts/scanner.ts:1` — mobile (lint): Formatter would have printed formatted content
+6. `mobile/src/lib/db-migrations.ts:1` — mobile (lint): Formatter would have printed formatted content
+7. `mobile/src/lib/db-schema.ts:1` — mobile (lint): Formatter would have printed formatted content
+8. `mobile/src/lib/gateways/inventory.ts:1` — mobile (lint): Formatter would have printed formatted content
+9. `mobile/src/lib/rbac/catalog.ts:1` — mobile (lint): Formatter would have printed formatted content
+10. `mobile/src/lib/rbac/rbac-migration.test.ts:1` — mobile (lint): Formatter would have printed formatted content
 
 ## Catatan
-Seluruh pengujian unit, integritas skema 4-layer, kontrak IPC, linter, typecheck, dan cargo test (Desktop 463 tests & Mobile 466 tests) berhasil tanpa kegagalan.
+Workspace `mobile` gagal pada gate `lint` (`biome check .`) dengan total 16 berkas belum terformat sesuai konfigurasi biome mobile. Gerbang `web-public` tidak sempat jalan karena eksekusi terhenti di mobile.

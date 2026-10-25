@@ -3114,7 +3114,7 @@ export async function runDatabaseMigrations(client: Client) {
           VALUES (?, 'unit-jp-bell', ?);`,
     args: [UNIT_JP_BELL_MIGRATION_VERSION, now],
   });
-  // v61 — hapus barang salah input (ALTER-nya ada di daftar kolom di atas).
+  // v61: hapus barang salah input (ALTER-nya ada di daftar kolom di atas).
   await client.execute({
     sql: `INSERT OR IGNORE INTO schema_migration (version, name, applied_at)
           VALUES (?, 'inventory-item-delete', ?);`,
