@@ -62,6 +62,8 @@ const filesToCopy = [
   "components/inventory/UnitAset.tsx",
   // Kolom tambahan barang (v53): tambah, ganti nama, nonaktifkan.
   "components/inventory/KolomTambahan.tsx",
+  // Servis aset (v63): tab Servis, rincian barang, dan dialognya.
+  "components/inventory/Servis.tsx",
   // Pembukuan (K1): satu UI untuk kedua build, bergantung pada `Modal` dan
   // gaya `components/inventory/gaya.ts` yang juga disalin.
   "components/keuangan/KeuanganWorkspace.tsx",
@@ -83,6 +85,8 @@ const filesToCopy = [
   "components/keuangan/RekapTagihan.tsx",
   // Tutup buku / kunci periode (v45).
   "components/keuangan/TutupBukuPanel.tsx",
+  // Jurnal pengadaan dan hibah inventaris (v62), tab "Dari Inventaris".
+  "components/keuangan/JurnalInventaris.tsx",
   // Nilai akhir (N2a): tab Pengaturan Nilai dan Rekap Nilai Akhir.
   "components/nilai/PengaturanNilai.tsx",
   "components/nilai/RekapNilai.tsx",
