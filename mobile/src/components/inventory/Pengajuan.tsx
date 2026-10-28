@@ -193,8 +193,6 @@ export function RincianPengajuan({ pengajuan }: { pengajuan: Pengajuan }) {
   );
 }
 
-// Foto penerimaan
-
 function DialogFoto({
   idFoto,
   judul,
@@ -281,8 +279,6 @@ function TombolFoto({ penerimaan }: { penerimaan: PenerimaanPengajuan }) {
     </div>
   );
 }
-
-// Penerimaan
 
 type IsianTerima = {
   jumlah: string;
@@ -776,8 +772,6 @@ function LabelPenerimaan({
   );
 }
 
-// Formulir
-
 type IsianBaris = {
   kunci: number;
   idBarang: string;
@@ -1246,8 +1240,6 @@ function DialogAlasan({
   );
 }
 
-// Tab Pengajuan
-
 type Saringan = "perlu" | "semua" | StatusPengajuan;
 type Aksi =
   | { jenis: "baru" }
@@ -1582,8 +1574,6 @@ export function PanelPengajuan({
     </section>
   );
 }
-
-// Keuangan
 
 function DialogKeputusan({
   pengajuan,
