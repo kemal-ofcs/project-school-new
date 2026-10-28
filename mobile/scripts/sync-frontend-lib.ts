@@ -66,6 +66,8 @@ const filesToCopy = [
   "components/inventory/Servis.tsx",
   // Pengajuan pembelian (v64): tab Pengajuan dan bagian persetujuan di Keuangan.
   "components/inventory/Pengajuan.tsx",
+  // Pembelian cicilan (v65): isian syarat di pengajuan dan tab Cicilan.
+  "components/inventory/SyaratCicilan.tsx",
   // Pembukuan (K1): satu UI untuk kedua build, bergantung pada `Modal` dan
   // gaya `components/inventory/gaya.ts` yang juga disalin.
   "components/keuangan/KeuanganWorkspace.tsx",
@@ -74,6 +76,8 @@ const filesToCopy = [
   // Rapel gaji (v51): satu UI untuk Web/Desktop dan Mobile.
   "components/payroll/RapelWorkspace.tsx",
   "components/keuangan/PilihAkunBayar.tsx",
+  // Tab Cicilan di Keuangan (v65).
+  "components/keuangan/CicilanWorkspace.tsx",
   // Tagihan siswa (K3a).
   "components/keuangan/TagihanWorkspace.tsx",
   // Pembayaran dan kuitansi (K3b): tab Bayar, Kuitansi, Tinjauan, Seri, dan

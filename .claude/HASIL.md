@@ -1,7 +1,7 @@
 # HASIL.md — hasil `bun run check`
 
-- Waktu: 2026-10-28 19:28 WIB
-- Commit: dc4f89b (+ 1 berkas belum commit: inventaris-cicilan-prd.md)
+- Waktu: 2026-10-28 21:29 WIB
+- Commit: 011af21 (+ 91 berkas berubah, belum commit)
 - Perintah: `bun run check` (root)
 - Exit code: 0
 - Status: **LULUS**
@@ -29,7 +29,7 @@
 Tidak ada (0 galat).
 
 ## Catatan
-- Seluruh 11 audit integritas lolos (skema 4-layer, kontrak rute kanonik & snapshot, SQL runtime, ui-guard, page-guard, dialog, route-guard, confirm, silent-catch, dan list-bound).
-- Unit test Rust `web-desktop`: 485 passed; 0 failed.
-- Unit test Rust `mobile`: 488 passed; 0 failed.
+- Seluruh 11 audit integritas lolos (skema 4-layer 70 tabel snapshot, kontrak rute kanonik, SQL runtime, ui-guard, page-guard, dialog, route-guard, confirm, silent-catch, dan list-bound).
+- Unit test Rust `web-desktop`: 496 passed; 0 failed.
+- Unit test Rust `mobile`: 499 passed; 0 failed.
 - Seluruh pengujian TypeScript/Bun di `web-desktop`, `mobile`, dan `web-public` lulus (0 fail).

@@ -26,6 +26,8 @@ pub mod grades;
 pub mod hari_kerja;
 // Inventaris: SALINAN `desktop/inventory.rs` oleh sync-rust-modules.ts.
 pub mod inventory;
+// Pembelian cicilan: SALINAN `desktop/cicilan.rs`.
+pub mod cicilan;
 // Pengajuan pembelian: SALINAN `desktop/inventory_pengajuan.rs`.
 pub mod inventory_pengajuan;
 pub mod konten_gambar;

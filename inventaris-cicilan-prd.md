@@ -2,7 +2,7 @@
 
 **Produk:** Manajemen Sekolah (Web, Desktop Tauri v2, Mobile Android Tauri v2)
 **Versi dokumen:** 1.0 (final; keputusan §8 diambil User 28 Oktober 2026)
-**Status:** Semua keputusan diambil, belum diimplementasikan. Implementasi tetap lewat alur `kerjakan-fitur-lintas-platform` (rencana teknis lalu persetujuan sebelum kode).
+**Status:** Diimplementasikan 28 Oktober 2026 (rencana teknis disetujui; `bun run check` penuh menunggu). Penyimpangan dari dokumen ini ada di §11.
 **Tanggal:** 28 Oktober 2026
 **Dasar:** `inventaris-pengajuan-prd.md` (pengajuan pembelian v64, check lulus), `inventaris-lanjutan-prd.md` (jurnal pengadaan v62), pola kasbon K2 dan kuitansi K3b di ref 14.
 
@@ -430,3 +430,16 @@ Diputuskan User pada 28 Oktober 2026.
 | **C** | Syarat di pengajuan, ACC atas sidik syarat, penerimaan penuh + syarat final + ACC ulang, jurnal penerimaan berkredit Utang Cicilan, pembayaran/denda/pembatalan/tutup kontrak, tab Cicilan, Tinjauan, tanda Belum lunas | v65 |
 
 Implementasinya boleh dua langkah dalam satu skema, seperti v64: (1) tabel, sumber jurnal `Cicilan`, akun bawaan, syarat di pengajuan, dan ACC; (2) aktivasi saat penerimaan, pembayaran, laporan, dan tanda. Port ke `C:\dev\absensi-perusahaan` dikerjakan setelah check sekolah hijau, mengikuti pola port sebelumnya.
+
+## 11. Catatan implementasi
+
+Keputusan rencana teknis (28 Oktober 2026) yang mengubah isi dokumen di atas:
+
+- **Syarat final memakai event sendiri** `installment/activate` (berkunci `id_cicilan`), ditulis di transaksi yang sama dengan penerimaan, bukan diselipkan ke `inventory-receipt/create` (§6.1). Kunci `id_penerimaan` tidak bisa dipetakan ke kontrak, jadi jadwal final lokal bisa tertimpa versi Draf dari cloud selama event-nya tertunda.
+- **"Lebih bayar" tampil di bagian Perlu ditinjau tab Cicilan** (§6.3, §7.2). Keuangan tidak punya tab Tinjauan; Tinjauan yang ada milik halaman Tagihan siswa.
+- **Mutasi penerimaan yang dibatalkan sebelum ada pembayaran** mengembalikan kontrak ke Menunggu barang; penerimaan ulang boleh mengirim syarat final lagi, dan cloud menimpanya hanya selama kontrak belum punya pembayaran.
+- **Jatuh tempo DP** (baris ke-0) = tanggal pengajuan selama Draf, lalu tanggal terima saat aktivasi.
+- **Akun kontrak dipilih saat ACC** (§4.4), dari akun aktif berkelompok sama. Tiga akun bawaan baru bertanda `sistem: false`.
+- **Pembatalan "hanya yang terakhir" berlaku untuk jenis Bayar.** Denda boleh dibatalkan kapan saja karena tidak menggeser jadwal. Urutan pencatatan = `created_at` berpresisi milidetik, lalu `rowid`.
+- **Arus kas tidak berkelompok** di kode (§4.3): `Cicilan` hanya mendapat label "Pembayaran cicilan pembelian".
+

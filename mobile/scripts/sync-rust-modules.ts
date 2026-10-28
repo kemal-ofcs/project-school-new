@@ -30,6 +30,7 @@ const filesToSync = [
   // Inventaris: aturan stok dan validasi mutasi wajib identik dengan Desktop.
   "inventory.rs",
   "inventory_pengajuan.rs",
+  "cicilan.rs",
   // Foto konten situs publik: aturan unggah wajib identik dengan Desktop dan TS.
   "konten_gambar.rs",
   "nilai_akhir.rs",
