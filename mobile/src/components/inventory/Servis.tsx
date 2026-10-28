@@ -96,7 +96,7 @@ function namaServis(servis: ServisInventaris): string {
     : `${angka(servis.jumlah)} ${servis.nama_barang}`;
 }
 
-// ── Dialog ──────────────────────────────────────────────────────────────────
+// Dialog
 
 export function DialogServis({
   aksi,
@@ -481,7 +481,7 @@ export function DialogServis({
   );
 }
 
-// ── Daftar ──────────────────────────────────────────────────────────────────
+// Daftar
 
 function BarisServis({
   servis,

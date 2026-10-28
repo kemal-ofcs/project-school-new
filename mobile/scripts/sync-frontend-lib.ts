@@ -64,6 +64,8 @@ const filesToCopy = [
   "components/inventory/KolomTambahan.tsx",
   // Servis aset (v63): tab Servis, rincian barang, dan dialognya.
   "components/inventory/Servis.tsx",
+  // Pengajuan pembelian (v64): tab Pengajuan dan bagian persetujuan di Keuangan.
+  "components/inventory/Pengajuan.tsx",
   // Pembukuan (K1): satu UI untuk kedua build, bergantung pada `Modal` dan
   // gaya `components/inventory/gaya.ts` yang juga disalin.
   "components/keuangan/KeuanganWorkspace.tsx",

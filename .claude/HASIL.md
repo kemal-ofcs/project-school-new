@@ -1,7 +1,7 @@
 # HASIL.md — hasil `bun run check`
 
-- Waktu: 2026-10-26 22:22 WIB
-- Commit: e0371f4 (+ 74 berkas berubah, belum commit)
+- Waktu: 2026-10-28 15:31 WIB
+- Commit: 5feb9b8 (+ 76 berkas berubah, belum commit)
 - Perintah: `bun run check` (root)
 - Exit code: 0
 - Status: **LULUS**
@@ -29,7 +29,7 @@
 Tidak ada (0 galat).
 
 ## Catatan
-- Seluruh 11 audit integritas pra-pemeriksaan lolos (skema 4-layer, kontrak rute/snapshot/permission, SQL runtime, ui-guard, page-guard, dialog, route-guard, confirm, silent-catch, dan list-bound).
-- Unit test Rust `web-desktop`: 473 passed; 0 failed.
-- Unit test Rust `mobile`: 476 passed; 0 failed.
-- Seluruh rangkaian pengujian Bun test pada `web-desktop`, `mobile`, dan `web-public` lulus.
+- Seluruh 11 audit integritas lolos (skema 4-layer, kontrak rute kanonik & snapshot, SQL runtime, ui-guard, page-guard, dialog, route-guard, confirm, silent-catch, dan list-bound).
+- Unit test Rust `web-desktop`: 485 passed; 0 failed.
+- Unit test Rust `mobile`: 488 passed; 0 failed.
+- Seluruh pengujian TypeScript/Bun di `web-desktop`, `mobile`, dan `web-public` lulus (0 fail).
