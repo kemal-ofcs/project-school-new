@@ -2,7 +2,7 @@
 
 **Produk:** Manajemen Sekolah (Web, Desktop Tauri v2, Mobile Android Tauri v2)
 **Versi dokumen:** 1.1 (final; keputusan §6 diambil User 26 Oktober 2026)
-**Status:** Semua keputusan di §6 sudah diambil. Fase A diimplementasikan 26 Oktober 2026 dan lolos `bun run check` penuh (470 tes Rust web-desktop, 473 mobile). Fase B diimplementasikan 26 Oktober 2026 (menunggu `bun run check` penuh); keputusan rencananya: tab Servis tersendiri menggantikan saringan di tab Barang, hanya tanggal dibawa/penyedia/keluhan yang bisa diubah, tanggal tidak boleh setelah hari ini, mutasi kondisi hasil servis tidak bisa dibatalkan. Fase A sudah diport ke absensi-perusahaan; Fase B diport setelah check sekolah hijau. Setiap fase tetap melewati alur `kerjakan-fitur-lintas-platform`.
+**Status:** Semua keputusan di §6 sudah diambil. Fase A diimplementasikan 26 Oktober 2026 dan lolos `bun run check` penuh (470 tes Rust web-desktop, 473 mobile). Fase B diimplementasikan 26 Oktober 2026 dan lolos `bun run check` penuh (473 tes Rust web-desktop, 476 mobile); keputusan rencananya: tab Servis tersendiri menggantikan saringan di tab Barang, hanya tanggal dibawa/penyedia/keluhan yang bisa diubah, tanggal tidak boleh setelah hari ini, mutasi kondisi hasil servis tidak bisa dibatalkan. Fase A sudah diport ke absensi-perusahaan; Fase B diport setelah check sekolah hijau. Setiap fase tetap melewati alur `kerjakan-fitur-lintas-platform`.
 **Tanggal:** 26 Oktober 2026
 **Dasar:** `inventory-prd.md` (v2.2, seluruhnya sudah dikerjakan) dan `nilai-keuangan-prd.md` (K1–K4, tutup buku).
 
