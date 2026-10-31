@@ -40,6 +40,10 @@ const filesToCopy = [
   "components/BelSekolahRunner.tsx",
   "components/BelPerangkatPanel.tsx",
   "components/LivenessCapture.tsx",
+  // Konfirmasi sebelum menyimpan formulir, dipasang di kedua shell.
+  "components/KonfirmasiSimpan.tsx",
+  // Dropdown berpencarian untuk daftar panjang.
+  "components/ui/PilihCari.tsx",
   // UI inventaris: satu komponen untuk ketiga build. Hanya bergantung pada
   // kontrak `Modal` yang sama dan gateway tersinkron; pesan sukses/galat ditulis
   // di dalamnya karena `FeedbackBanner` kedua workspace berbeda props.

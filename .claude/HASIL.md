@@ -1,7 +1,7 @@
 # HASIL.md — hasil `bun run check`
 
-- Waktu: 2026-10-29 06:29 WIB
-- Commit: d8da880 (+ 13 berkas berubah, belum commit)
+- Waktu: 2026-10-31 13:41 WIB
+- Commit: 3b07a9d (+ 141 berkas berubah, belum commit)
 - Perintah: `bun run check` (root)
 - Exit code: 0
 - Status: **LULUS**
@@ -29,7 +29,7 @@
 Tidak ada (0 galat).
 
 ## Catatan
-- Seluruh 11 audit integritas lolos (skema 4-layer 70 tabel snapshot, kontrak rute kanonik, SQL runtime, ui-guard, page-guard, dialog, route-guard, confirm, silent-catch, dan list-bound).
+- Seluruh 11 audit integritas lolos (skema 4-layer 70 tabel snapshot, kontrak rute kanonik, SQL runtime, ui-guard, a11y, page-guard, dialog, route-guard, confirm, silent-catch, dan list-bound).
 - Unit test Rust `web-desktop`: 496 passed; 0 failed.
 - Unit test Rust `mobile`: 499 passed; 0 failed.
 - Seluruh pengujian TypeScript/Bun di `web-desktop`, `mobile`, dan `web-public` lulus (0 fail).

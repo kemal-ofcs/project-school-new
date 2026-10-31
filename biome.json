@@ -35,6 +35,12 @@
     "enabled": true,
     "rules": {
       "recommended": true,
+      "a11y": {
+        "noLabelWithoutControl": {
+          "level": "error",
+          "options": { "inputComponents": ["PilihCari"] }
+        }
+      },
       "complexity": {
         "noImportantStyles": "off"
       }

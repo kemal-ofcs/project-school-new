@@ -5,6 +5,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { BelPerangkatPanel } from "@/components/BelPerangkatPanel";
 import { FeedbackBanner } from "@/components/ui/FeedbackBanner";
 import { Icon } from "@/components/ui/Icon";
+import { PilihCari } from "@/components/ui/PilihCari";
 import { triggerHaptic } from "@/lib/client/haptics";
 import { getDaftarUnit } from "@/lib/gateways/academic";
 import {
@@ -161,7 +162,7 @@ export function JamPelajaranCard() {
             Semua unit = nilai sekolah, dipakai unit yang belum punya pengaturan
             sendiri.
           </p>
-          <select
+          <PilihCari
             id="jp-unit"
             value={unit}
             onChange={(event) => setUnit(event.target.value)}
@@ -173,7 +174,7 @@ export function JamPelajaranCard() {
                 {String(u.nama_unit)}
               </option>
             ))}
-          </select>
+          </PilihCari>
         </div>
       ) : null}
 

@@ -126,7 +126,9 @@ for (const workspace of WORKSPACES) {
       ),
     );
 
-    for (const cocok of sumber.matchAll(/<(input|select|textarea)\b/g)) {
+    for (const cocok of sumber.matchAll(
+      /<(input|select|textarea|PilihCari)\b/g,
+    )) {
       if (cocok.index === undefined) continue;
       const tag = pembukaTag(sumber, cocok.index);
 

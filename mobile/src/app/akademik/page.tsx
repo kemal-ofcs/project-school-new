@@ -20,6 +20,7 @@ import { MobileAppShell } from "@/components/MobileAppShell";
 import { FeedbackBanner } from "@/components/ui/FeedbackBanner";
 import { Icon } from "@/components/ui/Icon";
 import { Modal } from "@/components/ui/Modal";
+import { PilihCari } from "@/components/ui/PilihCari";
 import { canAccessArea, hasPermission } from "@/lib/auth/access";
 import { triggerHaptic } from "@/lib/client/haptics";
 import {
@@ -659,7 +660,7 @@ export default function AkademikMobilePage() {
 
       {tab === "rombel" || tab === "penugasan" ? (
         <div className="mb-3 grid grid-cols-1 gap-2">
-          <select
+          <PilihCari
             aria-label="Filter tahun ajaran"
             value={selectedTa}
             onChange={(e) => void changeTaFilter(e.target.value)}
@@ -674,9 +675,9 @@ export default function AkademikMobilePage() {
                 {Number(ta.is_aktif) === 1 ? " · aktif" : ""}
               </option>
             ))}
-          </select>
+          </PilihCari>
           {tab === "penugasan" ? (
-            <select
+            <PilihCari
               aria-label="Filter rombel"
               value={selectedRombel}
               onChange={(e) => void changeRombelFilter(e.target.value)}
@@ -690,7 +691,7 @@ export default function AkademikMobilePage() {
                   {String(r.nama_rombel)}
                 </option>
               ))}
-            </select>
+            </PilihCari>
           ) : null}
         </div>
       ) : null}

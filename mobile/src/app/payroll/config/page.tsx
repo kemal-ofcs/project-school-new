@@ -19,6 +19,7 @@ import {
 } from "@/components/payroll/ConfigShared";
 import { FeedbackBanner } from "@/components/ui/FeedbackBanner";
 import { Icon } from "@/components/ui/Icon";
+import { PilihCari } from "@/components/ui/PilihCari";
 import { hasPermission } from "@/lib/auth/access";
 import { triggerHaptic } from "@/lib/client/haptics";
 import { useAuth } from "@/lib/context/AuthContext";
@@ -755,7 +756,7 @@ export default function MobilePayrollConfigPage() {
                   placeholder="Saring nama / ID..."
                   className={CONFIG_INPUT_CLASS}
                 />
-                <select
+                <PilihCari
                   value={salaryDraft.id_karyawan}
                   onChange={(event) =>
                     setSalaryDraft((prev) =>
@@ -780,7 +781,7 @@ export default function MobilePayrollConfigPage() {
                       {emp.divisi ? String(emp.divisi) : "Divisi -"}
                     </option>
                   ))}
-                </select>
+                </PilihCari>
               </div>
             )}
 

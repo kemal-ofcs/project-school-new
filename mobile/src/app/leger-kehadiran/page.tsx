@@ -6,6 +6,7 @@ import { MobileAppShell } from "@/components/MobileAppShell";
 import { FeedbackBanner } from "@/components/ui/FeedbackBanner";
 import { Icon } from "@/components/ui/Icon";
 import { Modal } from "@/components/ui/Modal";
+import { PilihCari } from "@/components/ui/PilihCari";
 import { canAccessArea, hasPermission } from "@/lib/auth/access";
 import { triggerHaptic } from "@/lib/client/haptics";
 import { useAuth } from "@/lib/context/AuthContext";
@@ -292,7 +293,7 @@ export default function MobileLegerKehadiranPage() {
               <span className="block text-[11px] font-medium text-slate-400 mb-1">
                 Tahun Ajaran
               </span>
-              <select
+              <PilihCari
                 aria-label="Tahun ajaran"
                 value={selectedTa}
                 onChange={(e) => setSelectedTa(e.target.value)}
@@ -306,7 +307,7 @@ export default function MobileLegerKehadiranPage() {
                     {String(ta.tahun)}
                   </option>
                 ))}
-              </select>
+              </PilihCari>
             </div>
 
             <div>
@@ -329,7 +330,7 @@ export default function MobileLegerKehadiranPage() {
             <span className="block text-[11px] font-medium text-slate-400 mb-1">
               Rombongan Belajar
             </span>
-            <select
+            <PilihCari
               aria-label="Rombongan belajar"
               value={selectedRombel}
               onChange={(e) => setSelectedRombel(e.target.value)}
@@ -341,7 +342,7 @@ export default function MobileLegerKehadiranPage() {
                   {String(r.nama_rombel)}
                 </option>
               ))}
-            </select>
+            </PilihCari>
           </div>
         </div>
 

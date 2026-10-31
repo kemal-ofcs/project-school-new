@@ -6,6 +6,7 @@ import { MobileAppShell } from "@/components/MobileAppShell";
 import { FeedbackBanner } from "@/components/ui/FeedbackBanner";
 import { Icon } from "@/components/ui/Icon";
 import { Modal } from "@/components/ui/Modal";
+import { PilihCari } from "@/components/ui/PilihCari";
 import { canAccessArea, hasPermission } from "@/lib/auth/access";
 import { triggerHaptic } from "@/lib/client/haptics";
 import { useAuth } from "@/lib/context/AuthContext";
@@ -289,7 +290,7 @@ export default function MobileJurnalMengajarPage() {
               <span className="block text-[11px] font-medium text-slate-400 mb-1">
                 Rombel
               </span>
-              <select
+              <PilihCari
                 aria-label="Rombongan belajar"
                 value={selectedRombel}
                 onChange={(e) => setSelectedRombel(e.target.value)}
@@ -301,14 +302,14 @@ export default function MobileJurnalMengajarPage() {
                     {String(r.nama_rombel)}
                   </option>
                 ))}
-              </select>
+              </PilihCari>
             </div>
 
             <div>
               <span className="block text-[11px] font-medium text-slate-400 mb-1">
                 Mata Pelajaran
               </span>
-              <select
+              <PilihCari
                 aria-label="Mata pelajaran"
                 value={selectedMapel}
                 onChange={(e) => setSelectedMapel(e.target.value)}
@@ -320,7 +321,7 @@ export default function MobileJurnalMengajarPage() {
                     {String(m.nama_mapel)}
                   </option>
                 ))}
-              </select>
+              </PilihCari>
             </div>
           </div>
 
@@ -329,7 +330,7 @@ export default function MobileJurnalMengajarPage() {
               <span className="block text-[11px] font-medium text-slate-400 mb-1">
                 Guru Pengampu
               </span>
-              <select
+              <PilihCari
                 aria-label="Guru pengampu"
                 value={selectedGuru}
                 onChange={(e) => setSelectedGuru(e.target.value)}
@@ -341,7 +342,7 @@ export default function MobileJurnalMengajarPage() {
                     {String(g.nama || g.nama_guru)}
                   </option>
                 ))}
-              </select>
+              </PilihCari>
             </div>
 
             <div>

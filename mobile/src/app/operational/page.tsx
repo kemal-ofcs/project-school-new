@@ -14,6 +14,7 @@ import {
 import { PilihPersonil } from "@/components/operational/PilihPersonil";
 import { BackHeader } from "@/components/ui/HubRow";
 import { Icon } from "@/components/ui/Icon";
+import { PilihCari } from "@/components/ui/PilihCari";
 import { formatTanggalOperasional } from "@/lib/attendance/time-policy";
 import { canAccessArea, hasPermission } from "@/lib/auth/access";
 import { triggerHaptic } from "@/lib/client/haptics";
@@ -965,7 +966,7 @@ export default function OperationalPage() {
                 >
                   Shift Penugasan
                 </label>
-                <select
+                <PilihCari
                   id="bck-shift"
                   value={bckShiftId}
                   onChange={(e) => setBckShiftId(Number(e.target.value))}
@@ -977,7 +978,7 @@ export default function OperationalPage() {
                       {String(s.jam_pulang)})
                     </option>
                   ))}
-                </select>
+                </PilihCari>
               </div>
 
               {/* Alasan */}

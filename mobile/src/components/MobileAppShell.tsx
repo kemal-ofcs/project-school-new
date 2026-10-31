@@ -12,6 +12,7 @@ import { AutoPemberitahuanRunner } from "./AutoPemberitahuanRunner";
 import { AutoSyncRunner } from "./AutoSyncRunner";
 import { AutoWaSenderRunner } from "./AutoWaSenderRunner";
 import { BelSekolahRunner } from "./BelSekolahRunner";
+import { KonfirmasiSimpan } from "./KonfirmasiSimpan";
 import { LicenseNotice } from "./license/LicenseNotice";
 import { MobileBottomNav } from "./MobileBottomNav";
 import { MobileHeader } from "./MobileHeader";
@@ -81,6 +82,7 @@ export function MobileAppShell({
       <AutoWaSenderRunner />
       <AutoPemberitahuanRunner />
       <BelSekolahRunner />
+      <KonfirmasiSimpan />
       <MobileHeader />
       <LicenseNotice />
       <PullToRefresh

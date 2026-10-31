@@ -6,6 +6,7 @@ import { MobileAppShell } from "@/components/MobileAppShell";
 import { FeedbackBanner } from "@/components/ui/FeedbackBanner";
 import { Icon } from "@/components/ui/Icon";
 import { Modal } from "@/components/ui/Modal";
+import { PilihCari } from "@/components/ui/PilihCari";
 import { canAccessArea, hasPermission } from "@/lib/auth/access";
 import { triggerHaptic } from "@/lib/client/haptics";
 import { useAuth } from "@/lib/context/AuthContext";
@@ -829,7 +830,7 @@ export default function BimbinganKonselingMobilePage() {
               placeholder="Saring nama / NIS..."
               className={INPUT}
             />
-            <select
+            <PilihCari
               aria-label="Pilih siswa"
               value={caseForm.id_siswa}
               onChange={(event) =>
@@ -850,7 +851,7 @@ export default function BimbinganKonselingMobilePage() {
                   NIS {String(s.nis || "-")}
                 </option>
               ))}
-            </select>
+            </PilihCari>
           </div>
 
           <div className="grid grid-cols-2 gap-2">

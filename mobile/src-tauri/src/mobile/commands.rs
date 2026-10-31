@@ -2039,6 +2039,12 @@ pub fn desktop_get_attendance_audit(
     operational::get_attendance_audit(&state, tanggal)
 }
 
+/// Tanpa `require_permission`: layar login belum punya sesi.
+#[tauri::command]
+pub fn desktop_get_public_branding(state: State<'_, MobileState>) -> Result<Value, CommandError> {
+    operational::get_public_branding(&state)
+}
+
 #[tauri::command]
 pub fn desktop_get_company_profile(state: State<'_, MobileState>) -> Result<Value, CommandError> {
     require_permission(&state, "settings.manage")?;

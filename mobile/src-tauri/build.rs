@@ -168,6 +168,7 @@ const MOBILE_COMMANDS: &[&str] = &[
     "desktop_save_turso_config",
     "desktop_test_turso_connection",
     "desktop_clear_turso_config",
+    "desktop_get_public_branding",
     "desktop_get_company_profile",
     "desktop_update_company_profile",
     "mobile_get_my_payroll_slips",

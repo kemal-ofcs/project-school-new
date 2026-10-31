@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from "react";
 import { PersonnelPhotoField } from "@/components/PersonnelPhotoField";
 import { FeedbackBanner } from "@/components/ui/FeedbackBanner";
 import { Modal } from "@/components/ui/Modal";
+import { PilihCari } from "@/components/ui/PilihCari";
 import { triggerHaptic } from "@/lib/client/haptics";
 import {
   type KaryawanInput,
@@ -315,7 +316,7 @@ export function EmployeeFormModal({
           >
             Unit:
           </label>
-          <select
+          <PilihCari
             id="employee-unit"
             value={formData.unit ?? ""}
             onChange={(e) =>
@@ -329,7 +330,7 @@ export function EmployeeFormModal({
                 {String(u.nama_unit)}
               </option>
             ))}
-          </select>
+          </PilihCari>
         </div>
 
         {/* 6, 7, 8. Gender, Shift & Personil */}
@@ -363,7 +364,7 @@ export function EmployeeFormModal({
             >
               Shift Kerja:
             </label>
-            <select
+            <PilihCari
               id="employee-shift"
               value={formData.id_shift}
               onChange={(e) =>
@@ -382,7 +383,7 @@ export function EmployeeFormModal({
                   {String(s.jam_pulang ?? "15:00")})
                 </option>
               ))}
-            </select>
+            </PilihCari>
           </div>
           <div>
             <label

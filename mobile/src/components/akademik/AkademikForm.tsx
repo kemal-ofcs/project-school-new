@@ -1,5 +1,6 @@
 "use client";
 
+import { PilihCari } from "@/components/ui/PilihCari";
 import {
   PRESET_TINGKAT_TEMPLATES,
   parseUnitKeterangan,
@@ -611,7 +612,7 @@ export function AkademikFormFields({
             <label htmlFor="ak-jur-unit" className={LABEL}>
               Unit
             </label>
-            <select
+            <PilihCari
               id="ak-jur-unit"
               value={draft.id_unit}
               onChange={(e) => onChange({ ...draft, id_unit: e.target.value })}
@@ -623,7 +624,7 @@ export function AkademikFormFields({
                   {String(u.nama_unit)}
                 </option>
               ))}
-            </select>
+            </PilihCari>
             <p className="mt-1 text-[11px] text-slate-400">
               Formulir PMB hanya menawarkan jurusan ini kepada pendaftar unit
               tersebut.
@@ -650,7 +651,7 @@ export function AkademikFormFields({
               <label htmlFor="ak-rom-ta" className={LABEL}>
                 Tahun ajaran
               </label>
-              <select
+              <PilihCari
                 id="ak-rom-ta"
                 value={draft.id_tahun_ajaran}
                 onChange={(e) =>
@@ -668,7 +669,7 @@ export function AkademikFormFields({
                     {String(ta.nama_tahun)} ({String(ta.semester)})
                   </option>
                 ))}
-              </select>
+              </PilihCari>
             </div>
             <div>
               <label htmlFor="ak-rom-tingkat" className={LABEL}>
@@ -723,7 +724,7 @@ export function AkademikFormFields({
             <label htmlFor="ak-rom-unit" className={LABEL}>
               Unit
             </label>
-            <select
+            <PilihCari
               id="ak-rom-unit"
               value={draft.id_unit}
               onChange={(e) => onChange({ ...draft, id_unit: e.target.value })}
@@ -735,7 +736,7 @@ export function AkademikFormFields({
                   {String(u.nama_unit)}
                 </option>
               ))}
-            </select>
+            </PilihCari>
             <p className="mt-1 text-[11px] text-slate-400">
               Menentukan jam pelajaran dan jadwal bel yang berlaku.
             </p>
@@ -744,7 +745,7 @@ export function AkademikFormFields({
             <label htmlFor="ak-rom-jur" className={LABEL}>
               Jurusan
             </label>
-            <select
+            <PilihCari
               id="ak-rom-jur"
               value={draft.id_jurusan}
               onChange={(e) =>
@@ -758,13 +759,13 @@ export function AkademikFormFields({
                   {String(j.kode_jurusan)} · {String(j.nama_jurusan)}
                 </option>
               ))}
-            </select>
+            </PilihCari>
           </div>
           <div>
             <label htmlFor="ak-rom-wali" className={LABEL}>
               Wali kelas
             </label>
-            <select
+            <PilihCari
               id="ak-rom-wali"
               value={draft.id_wali_kelas}
               onChange={(e) =>
@@ -778,7 +779,7 @@ export function AkademikFormFields({
                   {String(g.nama || g.id_guru)}
                 </option>
               ))}
-            </select>
+            </PilihCari>
           </div>
           <div className="grid grid-cols-2 gap-2">
             <div>
@@ -890,7 +891,7 @@ export function AkademikFormFields({
             <label htmlFor="ak-map-unit" className={LABEL}>
               Unit
             </label>
-            <select
+            <PilihCari
               id="ak-map-unit"
               value={draft.id_unit}
               onChange={(e) => onChange({ ...draft, id_unit: e.target.value })}
@@ -902,7 +903,7 @@ export function AkademikFormFields({
                   {String(u.nama_unit)}
                 </option>
               ))}
-            </select>
+            </PilihCari>
             <p className="mt-1 text-[11px] text-slate-400">
               Kode mapel boleh sama di unit berbeda, misalnya IND untuk SMP dan
               SMK.
@@ -976,7 +977,7 @@ export function AkademikFormFields({
             <label htmlFor="ak-pen-rombel" className={LABEL}>
               Rombel
             </label>
-            <select
+            <PilihCari
               id="ak-pen-rombel"
               value={draft.id_rombel}
               onChange={(e) =>
@@ -991,13 +992,13 @@ export function AkademikFormFields({
                   {String(r.nama_rombel)}
                 </option>
               ))}
-            </select>
+            </PilihCari>
           </div>
           <div>
             <label htmlFor="ak-pen-mapel" className={LABEL}>
               Mata pelajaran
             </label>
-            <select
+            <PilihCari
               id="ak-pen-mapel"
               value={draft.id_mapel}
               onChange={(e) => onChange({ ...draft, id_mapel: e.target.value })}
@@ -1010,13 +1011,13 @@ export function AkademikFormFields({
                   {String(m.kode_mapel)} · {String(m.nama_mapel)}
                 </option>
               ))}
-            </select>
+            </PilihCari>
           </div>
           <div>
             <label htmlFor="ak-pen-guru" className={LABEL}>
               Guru pengampu
             </label>
-            <select
+            <PilihCari
               id="ak-pen-guru"
               value={draft.id_guru}
               onChange={(e) => onChange({ ...draft, id_guru: e.target.value })}
@@ -1029,7 +1030,7 @@ export function AkademikFormFields({
                   {String(g.nama || g.id_guru)}
                 </option>
               ))}
-            </select>
+            </PilihCari>
           </div>
         </>
       );

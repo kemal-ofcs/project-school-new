@@ -23,6 +23,7 @@ import {
 } from "@/components/personnel/UbahMassal";
 import { FeedbackBanner } from "@/components/ui/FeedbackBanner";
 import { Icon } from "@/components/ui/Icon";
+import { PilihCari } from "@/components/ui/PilihCari";
 import { canAccessArea, hasPermission } from "@/lib/auth/access";
 import { triggerHaptic } from "@/lib/client/haptics";
 import { useAuth } from "@/lib/context/AuthContext";
@@ -509,7 +510,7 @@ export default function KaryawanPage() {
 
         {/* Filter Unit — dropdown, bukan chip: jumlah unitnya ditentukan
             sekolah dan bisa jauh lebih banyak daripada tiga pilihan tetap. */}
-        <select
+        <PilihCari
           value={filterUnit}
           onChange={(e) => setFilterUnit(e.target.value)}
           aria-label="Saring berdasarkan unit"
@@ -522,7 +523,7 @@ export default function KaryawanPage() {
               {nama}
             </option>
           ))}
-        </select>
+        </PilihCari>
       </div>
 
       {/* ── Feedback Banners ── */}

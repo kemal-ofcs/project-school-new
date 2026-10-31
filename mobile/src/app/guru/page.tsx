@@ -22,6 +22,7 @@ import {
 import { FeedbackBanner } from "@/components/ui/FeedbackBanner";
 import { Icon } from "@/components/ui/Icon";
 import { Modal } from "@/components/ui/Modal";
+import { PilihCari } from "@/components/ui/PilihCari";
 import { canAccessArea, hasPermission } from "@/lib/auth/access";
 import { triggerHaptic } from "@/lib/client/haptics";
 import {
@@ -574,7 +575,7 @@ export default function GuruMobilePage() {
       </div>
 
       <div className="mb-4 flex gap-2 overflow-x-auto pb-2 scrollbar-none">
-        <select
+        <PilihCari
           value={filterUnit}
           onChange={(e) => setFilterUnit(e.target.value)}
           aria-label="Saring berdasarkan unit"
@@ -587,7 +588,7 @@ export default function GuruMobilePage() {
               {nama}
             </option>
           ))}
-        </select>
+        </PilihCari>
         <select
           value={filterStatus}
           onChange={(e) => setFilterStatus(e.target.value)}
@@ -809,7 +810,7 @@ export default function GuruMobilePage() {
             </div>
             <label className="text-[11px] font-semibold text-slate-300">
               Unit
-              <select
+              <PilihCari
                 value={form.unit ?? ""}
                 onChange={(e) =>
                   setForm((p) => ({ ...p, unit: e.target.value }))
@@ -822,7 +823,7 @@ export default function GuruMobilePage() {
                     {String(u.nama_unit)}
                   </option>
                 ))}
-              </select>
+              </PilihCari>
             </label>
             <label className="text-[11px] font-semibold text-slate-300">
               Nama Lengkap
@@ -942,7 +943,7 @@ export default function GuruMobilePage() {
             </label>
             <label className="text-[11px] font-semibold text-slate-300">
               Shift / Jam Scan
-              <select
+              <PilihCari
                 value={form.id_shift ?? ""}
                 disabled={shifts.length === 0}
                 onChange={(e) =>
@@ -967,7 +968,7 @@ export default function GuruMobilePage() {
                     {shiftLabel(s)}
                   </option>
                 ))}
-              </select>
+              </PilihCari>
               <span className="mt-1 block text-[10px] font-normal text-slate-400">
                 {shiftError ??
                   (shifts.length === 0

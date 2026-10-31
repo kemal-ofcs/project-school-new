@@ -457,6 +457,7 @@ export default function KeamananAbsensiPage() {
 
             <button
               type="button"
+              data-konfirmasi
               onClick={() => void handleSaveScanSecurity()}
               disabled={ipAllowlistBusy}
               className="mt-3 w-full rounded-xl bg-sky-400 py-2.5 text-xs font-black text-slate-950 transition active:scale-95 disabled:opacity-60"
@@ -639,6 +640,7 @@ export default function KeamananAbsensiPage() {
                 <button
                   type="button"
                   disabled={geofenceBusy}
+                  data-konfirmasi
                   onClick={handleSaveGeofence}
                   className="w-full rounded-xl bg-sky-400 py-2.5 text-xs font-black text-slate-950 shadow-md hover:bg-sky-300 active:scale-95 transition disabled:opacity-50"
                 >

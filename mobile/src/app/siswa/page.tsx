@@ -29,6 +29,7 @@ import {
 import { FeedbackBanner } from "@/components/ui/FeedbackBanner";
 import { Icon } from "@/components/ui/Icon";
 import { Modal } from "@/components/ui/Modal";
+import { PilihCari } from "@/components/ui/PilihCari";
 import { canAccessArea, hasPermission } from "@/lib/auth/access";
 import { triggerHaptic } from "@/lib/client/haptics";
 import { openWhatsAppChat } from "@/lib/client/open-url";
@@ -768,7 +769,7 @@ export default function SiswaMobilePage() {
       </div>
 
       <div className="mb-4 flex gap-2 overflow-x-auto pb-2 scrollbar-none">
-        <select
+        <PilihCari
           value={filterTahun ?? ""}
           onChange={(e) => setFilterTahun(e.target.value)}
           aria-label="Saring berdasarkan tahun ajaran"
@@ -785,8 +786,8 @@ export default function SiswaMobilePage() {
               {Number(t.is_aktif) === 1 ? " (aktif)" : ""}
             </option>
           ))}
-        </select>
-        <select
+        </PilihCari>
+        <PilihCari
           value={filterRombel}
           onChange={(e) => setFilterRombel(e.target.value)}
           aria-label="Saring berdasarkan rombel"
@@ -798,8 +799,8 @@ export default function SiswaMobilePage() {
               {labelRombel(r, tahunList)}
             </option>
           ))}
-        </select>
-        <select
+        </PilihCari>
+        <PilihCari
           value={filterUnit}
           onChange={(e) => setFilterUnit(e.target.value)}
           aria-label="Saring berdasarkan unit"
@@ -812,7 +813,7 @@ export default function SiswaMobilePage() {
               {nama}
             </option>
           ))}
-        </select>
+        </PilihCari>
         <select
           value={filterStatus}
           onChange={(e) => setFilterStatus(e.target.value)}
@@ -1076,7 +1077,7 @@ export default function SiswaMobilePage() {
             </div>
             <label className="text-[11px] font-semibold text-slate-300">
               Unit
-              <select
+              <PilihCari
                 value={form.unit ?? ""}
                 onChange={(e) =>
                   setForm((p) => ({ ...p, unit: e.target.value }))
@@ -1089,7 +1090,7 @@ export default function SiswaMobilePage() {
                     {String(u.nama_unit)}
                   </option>
                 ))}
-              </select>
+              </PilihCari>
             </label>
             <label className="text-[11px] font-semibold text-slate-300">
               Nama Lengkap
@@ -1126,7 +1127,7 @@ export default function SiswaMobilePage() {
             </div>
             <label className="text-[11px] font-semibold text-slate-300">
               Rombel
-              <select
+              <PilihCari
                 required
                 value={form.id_rombel}
                 onChange={(e) =>
@@ -1140,7 +1141,7 @@ export default function SiswaMobilePage() {
                     {labelRombel(r, tahunList)}
                   </option>
                 ))}
-              </select>
+              </PilihCari>
             </label>
             <div className="grid grid-cols-2 gap-3">
               <label className="text-[11px] font-semibold text-slate-300">
@@ -1211,7 +1212,7 @@ export default function SiswaMobilePage() {
             </label>
             <label className="text-[11px] font-semibold text-slate-300">
               Shift / Jam Scan
-              <select
+              <PilihCari
                 value={form.id_shift ?? ""}
                 disabled={shifts.length === 0}
                 onChange={(e) =>
@@ -1236,7 +1237,7 @@ export default function SiswaMobilePage() {
                     {shiftLabel(s)}
                   </option>
                 ))}
-              </select>
+              </PilihCari>
               <span className="mt-1 block text-[10px] font-normal text-slate-400">
                 {shiftError ??
                   (shifts.length === 0

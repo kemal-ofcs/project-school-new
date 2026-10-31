@@ -219,6 +219,7 @@ pub fn run() {
             mobile::commands::desktop_save_turso_config,
             mobile::commands::desktop_test_turso_connection,
             mobile::commands::desktop_clear_turso_config,
+            mobile::commands::desktop_get_public_branding,
             mobile::commands::desktop_get_company_profile,
             mobile::commands::desktop_update_company_profile,
             mobile::payroll::mobile_get_my_payroll_slips,

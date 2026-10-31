@@ -1096,6 +1096,7 @@ export function ScannerView() {
 
         {/* Manual QR Input Fallback */}
         <form
+          data-tanpa-konfirmasi
           onSubmit={(e) => {
             e.preventDefault();
             if (manualInput.trim()) {

@@ -106,6 +106,7 @@
     "allow-mobile-share-file",
     "allow-mobile-export-database-to-device",
     "allow-mobile-save-file-to-device",
+    "allow-desktop-get-public-branding",
     "allow-desktop-get-company-profile",
     "allow-desktop-update-company-profile",
     "allow-desktop-get-holidays",

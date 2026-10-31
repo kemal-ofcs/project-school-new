@@ -18,6 +18,7 @@ import {
 } from "@/components/payroll/ConfigShared";
 import { FeedbackBanner } from "@/components/ui/FeedbackBanner";
 import { Icon } from "@/components/ui/Icon";
+import { PilihCari } from "@/components/ui/PilihCari";
 import { hasPermission } from "@/lib/auth/access";
 import { triggerHaptic } from "@/lib/client/haptics";
 import { useAuth } from "@/lib/context/AuthContext";
@@ -340,7 +341,7 @@ export default function MobileJpRatesPage() {
               <label htmlFor="jp-rate-mapel" className={CONFIG_LABEL_CLASS}>
                 Mata pelajaran
               </label>
-              <select
+              <PilihCari
                 id="jp-rate-mapel"
                 value={draft.id_mapel}
                 onChange={(event) =>
@@ -360,14 +361,14 @@ export default function MobileJpRatesPage() {
                     {String(mapel.nama_mapel)}
                   </option>
                 ))}
-              </select>
+              </PilihCari>
             </div>
 
             <div>
               <label htmlFor="jp-rate-guru" className={CONFIG_LABEL_CLASS}>
                 Berlaku untuk
               </label>
-              <select
+              <PilihCari
                 id="jp-rate-guru"
                 value={draft.id_guru}
                 onChange={(event) =>
@@ -386,7 +387,7 @@ export default function MobileJpRatesPage() {
                     {String(guru.nama)}
                   </option>
                 ))}
-              </select>
+              </PilihCari>
               <p className="mt-1 text-[10px] leading-4 text-slate-500">
                 Pilih seorang guru untuk tarif khusus, misalnya guru senior
                 dengan honor lebih tinggi pada mapel yang sama.

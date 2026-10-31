@@ -6,6 +6,7 @@ import { MobileAppShell } from "@/components/MobileAppShell";
 import { WaTemplateDialog } from "@/components/notifikasi-wa/WaTemplateDialog";
 import { FeedbackBanner } from "@/components/ui/FeedbackBanner";
 import { Icon } from "@/components/ui/Icon";
+import { PilihCari } from "@/components/ui/PilihCari";
 import {
   formatJamOperasional,
   formatTanggalOperasional,
@@ -38,7 +39,10 @@ import {
 } from "@/lib/gateways/class-attendance";
 import { syncNow } from "@/lib/gateways/sync-status";
 import { getDaftarGuru } from "@/lib/gateways/teacher";
-import { useConfirmDialog } from "@/lib/hooks/useConfirmDialog";
+import {
+  PERTANYAAN_SIMPAN,
+  useConfirmDialog,
+} from "@/lib/hooks/useConfirmDialog";
 import { useHydrated } from "@/lib/hooks/useHydrated";
 import { normalizeOperatorPhone } from "@/lib/operators/contact";
 import {
@@ -494,22 +498,25 @@ export default function MobilePresensiKelasPage() {
 
     // Seluruh roster berstatus Hadir secara bawaan, jadi menyimpan tanpa
     // memeriksa akan menandai hadir siswa yang benar-benar tidak masuk.
-    // Peringatan ini tidak pernah mengubah status siapa pun — gurunya yang
+    // Peringatan ini tidak pernah mengubah status siapa pun, gurunya yang
     // memutuskan.
     const peringatan = buildPresentWithoutGateScanWarning(rosterItems);
-    if (
-      peringatan &&
-      !(await konfirmasi({
-        title: "Simpan presensi ini?",
-        description: peringatan,
-        preserved:
-          "Peringatan ini tidak mengubah status siapa pun — keputusannya tetap di tangan guru.",
-        confirmLabel: "Ya, simpan",
-        tone: "warning",
-      }))
-    ) {
-      return;
-    }
+    const setuju = await konfirmasi(
+      peringatan
+        ? {
+            title: "Simpan presensi ini?",
+            description: peringatan,
+            preserved:
+              "Peringatan ini tidak mengubah status siapa pun, keputusannya tetap di tangan guru.",
+            confirmLabel: "Ya, simpan",
+            tone: "warning",
+          }
+        : {
+            ...PERTANYAAN_SIMPAN,
+            description: "Apakah data yang dicatat sudah benar?",
+          },
+    );
+    if (!setuju) return;
 
     if (isSubmittingRef.current) return;
     isSubmittingRef.current = true;
@@ -865,7 +872,7 @@ export default function MobilePresensiKelasPage() {
                   >
                     Rombel
                   </label>
-                  <select
+                  <PilihCari
                     id="mobile-input-rombel"
                     value={selectedRombel}
                     onChange={(e) => setSelectedRombel(e.target.value)}
@@ -881,7 +888,7 @@ export default function MobilePresensiKelasPage() {
                         {String(r.nama_rombel)}
                       </option>
                     ))}
-                  </select>
+                  </PilihCari>
                 </div>
 
                 <div>
@@ -891,7 +898,7 @@ export default function MobilePresensiKelasPage() {
                   >
                     Mata Pelajaran
                   </label>
-                  <select
+                  <PilihCari
                     id="mobile-input-mapel"
                     value={selectedMapel}
                     onChange={(e) => setSelectedMapel(e.target.value)}
@@ -906,7 +913,7 @@ export default function MobilePresensiKelasPage() {
                         {String(m.nama_mapel)}
                       </option>
                     ))}
-                  </select>
+                  </PilihCari>
                 </div>
 
                 <div>
@@ -1006,7 +1013,7 @@ export default function MobilePresensiKelasPage() {
                   >
                     Guru Pengampu
                   </label>
-                  <select
+                  <PilihCari
                     id="mobile-input-guru"
                     value={selectedGuru}
                     onChange={(e) => setSelectedGuru(e.target.value)}
@@ -1021,7 +1028,7 @@ export default function MobilePresensiKelasPage() {
                         {String(g.nama_guru || g.nama || "Guru")}
                       </option>
                     ))}
-                  </select>
+                  </PilihCari>
                 </div>
               </div>
 
@@ -1195,7 +1202,7 @@ export default function MobilePresensiKelasPage() {
                 onChange={(e) => setReconDate(e.target.value)}
                 className="min-h-11 rounded-xl border border-white/10 bg-slate-950 px-3 text-xs font-semibold text-white outline-none"
               />
-              <select
+              <PilihCari
                 aria-label="Rombongan belajar rekonsiliasi"
                 value={reconRombel}
                 onChange={(e) => setReconRombel(e.target.value)}
@@ -1211,7 +1218,7 @@ export default function MobilePresensiKelasPage() {
                     {String(r.nama_rombel)}
                   </option>
                 ))}
-              </select>
+              </PilihCari>
               <button
                 type="button"
                 onClick={handleLoadReconciliation}

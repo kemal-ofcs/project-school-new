@@ -11,6 +11,7 @@ import {
 import { PembayaranPmb } from "@/components/pmb/PembayaranPmb";
 import { FeedbackBanner } from "@/components/ui/FeedbackBanner";
 import { Modal } from "@/components/ui/Modal";
+import { PilihCari } from "@/components/ui/PilihCari";
 import { canAccessArea, hasPermission } from "@/lib/auth/access";
 import { useAuth } from "@/lib/context/AuthContext";
 import { getDaftarRombel, getDaftarUnit } from "@/lib/gateways/academic";
@@ -400,7 +401,7 @@ export default function PmbMobilePage() {
             >
               Filter gelombang
             </label>
-            <select
+            <PilihCari
               className="mt-1 w-full rounded-xl border border-white/10 bg-slate-950 px-3 py-2 text-sm text-white"
               id={`${id}-gelombang`}
               onChange={(e) => setFilterGelombang(e.target.value)}
@@ -412,7 +413,7 @@ export default function PmbMobilePage() {
                   {item.nama}
                 </option>
               ))}
-            </select>
+            </PilihCari>
           </div>
           <div>
             <label
@@ -686,7 +687,7 @@ export default function PmbMobilePage() {
             >
               Rombel tujuan
             </label>
-            <select
+            <PilihCari
               className="mt-1 w-full rounded-xl border border-white/10 bg-slate-950 px-3 py-2 text-white"
               id={`${id}-rombel`}
               name="idRombel"
@@ -698,7 +699,7 @@ export default function PmbMobilePage() {
                   {item.nama_rombel}
                 </option>
               ))}
-            </select>
+            </PilihCari>
             {rombel.length === 0 ? (
               <p className="mt-1 text-amber-300 text-xs">
                 Daftar rombel belum termuat. Pastikan jaringan tersedia lalu
@@ -713,7 +714,7 @@ export default function PmbMobilePage() {
             >
               Unit
             </label>
-            <select
+            <PilihCari
               className="mt-1 w-full rounded-xl border border-white/10 bg-slate-950 px-3 py-2 text-white"
               defaultValue={
                 modalPromosi?.pilihan_unit &&
@@ -731,7 +732,7 @@ export default function PmbMobilePage() {
                   {nama}
                 </option>
               ))}
-            </select>
+            </PilihCari>
             {modalPromosi?.pilihan_unit &&
             daftarUnit.length > 0 &&
             !daftarUnit.includes(modalPromosi.pilihan_unit) ? (
