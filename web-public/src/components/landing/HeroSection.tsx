@@ -12,6 +12,8 @@ interface HeroSectionProps {
   namaSekolah: string;
   gelombangAktif: GelombangAktif | null;
   konten?: Record<string, string>;
+  hrefDaftar: string;
+  hrefProgram: string;
 }
 
 /**
@@ -23,6 +25,8 @@ export function HeroSection({
   namaSekolah,
   gelombangAktif,
   konten = {},
+  hrefDaftar,
+  hrefProgram,
 }: HeroSectionProps) {
   // Seluruh teksnya dari CMS. Tanpa teks contoh di kode: judul yang belum
   // diisi memakai nama sekolah (data, bukan tulisan kita), dan subjudul serta
@@ -123,7 +127,7 @@ export function HeroSection({
             size="lg"
             className="h-14 w-full justify-center rounded-full px-7 font-bold shadow-xl sm:w-auto"
           >
-            <Link href="/pmb">
+            <Link href={hrefDaftar}>
               <GraduationCap aria-hidden="true" className="mr-2 h-5 w-5" />
               <span>Daftar PMB Sekarang</span>
             </Link>
@@ -134,7 +138,7 @@ export function HeroSection({
             size="lg"
             className="h-14 w-full justify-center rounded-full border-white/30 bg-white/10 px-7 text-white hover:border-secondary-container hover:bg-white/20 hover:text-white sm:w-auto"
           >
-            <Link href="/program">
+            <Link href={hrefProgram}>
               <BookOpen aria-hidden="true" className="mr-2 h-5 w-5" />
               <span>Lihat Program Sekolah</span>
             </Link>

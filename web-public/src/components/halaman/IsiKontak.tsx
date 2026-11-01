@@ -1,22 +1,19 @@
 import { Clock, Globe, Mail, MapPin, MessageCircle, Phone } from "lucide-react";
-import type { Metadata } from "next";
 import { KepalaHalaman } from "@/components/KepalaHalaman";
 import { MediaSosial } from "@/components/MediaSosial";
 import { ProfilBelumLengkap } from "@/components/SiteChrome";
 import { StatusTidakTerbaca } from "@/components/StatusData";
-import { muatKontenHalaman } from "@/lib/server/content-data";
-import { muatProfilSekolah } from "@/lib/server/school-data";
+import {
+  muatKontenLingkup,
+  muatProfilLingkup,
+} from "@/lib/server/lingkup-data";
+import type { Lingkup } from "@/lib/services/halaman-unit";
 
-export const metadata: Metadata = {
-  title: "Kontak & Layanan",
-  description:
-    "Informasi kontak resmi, lokasi kampus, nomor WhatsApp layanan, dan jam operasional sekolah.",
-};
-
-export default async function HalamanKontak() {
-  const [hasilProfil, hasilKonten] = await Promise.all([
-    muatProfilSekolah(),
-    muatKontenHalaman("kontak"),
+/** Isi halaman Kontak, dipakai situs umum dan situs unit. */
+export async function IsiKontak({ lingkup }: { lingkup: Lingkup }) {
+  const [hasilProfil, konten] = await Promise.all([
+    muatProfilLingkup(lingkup),
+    muatKontenLingkup(lingkup, "kontak"),
   ]);
 
   if (hasilProfil.status !== "ok") {
@@ -31,7 +28,6 @@ export default async function HalamanKontak() {
   }
 
   const profil = hasilProfil.data;
-  const konten = hasilKonten.status === "ok" ? hasilKonten.data : {};
 
   const alamat = profil.alamat || konten["kontak.alamat"];
   const telepon = profil.telepon || konten["kontak.telepon"];
@@ -73,7 +69,10 @@ export default async function HalamanKontak() {
 
   return (
     <main>
-      <KepalaHalaman label="Pusat Informasi" judul="Hubungi Kami">
+      <KepalaHalaman
+        label={lingkup.unit?.nama ?? "Pusat Informasi"}
+        judul="Hubungi Kami"
+      >
         Kami siap menjelaskan proses belajar dan penerimaan siswa baru.
       </KepalaHalaman>
 

@@ -266,7 +266,7 @@ Mematuhi pedoman **W3C Mobile Accessibility Guidelines** dan standar **Apple iOS
 10. [Accessibility (a11y) & Keyboard Navigation](#10-accessibility-a11y--keyboard-navigation)
 11. [Desktop Enhancement (Dial Motion 3)](#11-desktop-enhancement-dial-motion-3)
 12. [Blueprint Beranda (2026-10-16)](#12-blueprint-beranda-2026-10-16)
-13. [Halaman Depan & Halaman Unit (2026-11-01)](#13-halaman-depan--halaman-unit-2026-11-01)
+13. [Halaman Depan & Situs per Unit (2026-11-01)](#13-halaman-depan--situs-per-unit-2026-11-01)
 
 ---
 
@@ -381,7 +381,7 @@ Format token dirancang 100% kompatibel dengan **Tailwind CSS v4** (`@theme inlin
 | ID Layar | Rute / Path | Tujuan Bisnis & Pengguna | Sumber Data Backend Turso | Caching Policy |
 | :--- | :--- | :--- | :--- | :--- |
 | **SCR-00** | `/` (Halaman Depan) | Pintu masuk situs: garis besar sekolah, foto bergerak, dan tombol menuju unit (bagian 13). | `company_profile`, `akademik_unit`, `pmb_gelombang`, `konten_publik` | Dinamis |
-| **SCR-01** | `/beranda` | Menghadirkan kesan pertama berwibawa, memaparkan profil unggulan, akreditasi, statistik prestasi, program keahlian, testimoni, dan mengonversi pengunjung ke PMB. | `company_profile`, `akademik_jurusan`, `pmb_gelombang` | `revalidate = 300` (ISR 5 Menit) |
+| **SCR-01** | `/<unit>` (Beranda Unit) | Menghadirkan kesan pertama berwibawa, memaparkan profil unggulan, akreditasi, statistik prestasi, program keahlian, testimoni, dan mengonversi pengunjung ke PMB. | `company_profile`, `akademik_jurusan`, `pmb_gelombang` | `revalidate = 300` (ISR 5 Menit) |
 | **SCR-02** | `/profil` | Menyajikan legalitas resmi sekolah, visi & misi, struktur pimpinan, sejarah, dan akreditasi BAN-SM. | `company_profile` (`readSchoolProfile`) | `revalidate = 300` |
 | **SCR-03** | `/program` | Menampilkan seluruh program studi/jurusan aktif beserta kode, silabus, prospek karir, dan keunggulan. | `akademik_jurusan` (`readProgramStudi`) | `revalidate = 300` |
 | **SCR-04** | `/pmb` | Pusat informasi pendaftaran: jadwal gelombang aktif, transparansi biaya pendaftaran, kuota, syarat berkas, dan alur pendaftaran 4 langkah. | `pmb_gelombang` (`readGelombangAktif`) | `revalidate = 0` (Real-time) |
@@ -660,32 +660,34 @@ Diturunkan dari blueprint desain beranda baru yang disetujui pemilik produk, dis
 
 ---
 
-## 13. HALAMAN DEPAN & HALAMAN UNIT (2026-11-01)
+## 13. HALAMAN DEPAN & SITUS PER UNIT (2026-11-01)
 
-Beranda pada bagian 12 pindah utuh ke `/beranda` dan isinya tidak berubah. Rute `/` kini halaman depan yang hanya memuat garis besar, atas keputusan pemilik produk.
+Rute `/` adalah halaman depan yang hanya memuat garis besar. Tombol unit membuka situs unit itu: beranda pada bagian 12 dan halaman dalamnya, dengan isi milik unit tersebut. Keputusan pemilik produk.
 
 ### 13.1 Alur
 | Rute | Isi | Dituju dari |
 | :--- | :--- | :--- |
-| `/` | Halaman depan | Logo di header |
-| `/<unit>` | Halaman satu unit | Tombol unit |
-| `/selengkapnya` | Kartu semua unit | Tombol Selengkapnya, tampil hanya bila unit lebih dari tiga |
-| `/beranda` | Beranda lengkap | Menu Beranda |
+| `/` | Halaman depan, isi Umum | Logo di header |
+| `/<unit>` | Beranda unit (bagian 12) | Tombol unit |
+| `/<unit>/profil`, `/program`, `/kontak` | Halaman dalam unit | Menu saat berada di situs unit |
+| `/profil`, `/program`, `/kontak` | Halaman dalam, isi Umum | Menu saat berada di halaman depan |
+| `/pmb`, `/berita` | Satu untuk semua unit | Menu di mana pun |
 
-Tiga tombol unit pertama mengikuti urutan di menu Akademik.
+Tombol unit di halaman depan maksimal tiga, mengikuti urutan di menu Akademik. Bila lebih, Selengkapnya membuka sisanya di tempat, tanpa pindah halaman.
 
 ### 13.2 Halaman Depan (`SorotanFoto`)
+Latar navy tetap `#00153f` di mode terang dan gelap, menyusup ke belakang header. Warna foto aktif merembes samar ke latar di desktop. Foto dibingkai garis amber dan membesar sangat pelan.
 - **Desktop (>= 1024px):** teks di kiri, foto besar di kanan (rasio kolom 9:11), lima gambar kecil selebar 20% di bawah keduanya. Bagian ini mengisi tepat satu layar, dan footer berada di bawahnya.
 - **HP dan tablet:** foto besar, teks, tombol, lalu deretan gambar kecil yang bisa digeser. Halaman tetap bisa digulir.
 - **Teks kiri:** nama instansi, unit/cabang, `profil.tagline`, `profil.deskripsi_singkat`, dan lencana gelombang bila sedang dibuka.
 - **Sumber foto:** koleksi `landing.sorotan_items`. Selama kosong, memakai foto hero, program, lalu fasilitas. Tanpa foto, panel navy berisi logo.
 
 ### 13.3 Gerak
-- Deretan bergeser ke kiri setiap 6 detik, dan foto besar mengikuti gambar paling kiri lewat crossfade CSS.
-- Berhenti lewat tombol jeda, saat kursor atau fokus berada di deretan, dan saat tab tidak terlihat.
-- Pengguna yang memilih "kurangi gerakan" mulai dalam keadaan dijeda.
+- Garis progres amber pada gambar aktif terisi selama 6 detik; selesainya memicu pergeseran deretan ke kiri, dan foto besar mengikuti lewat crossfade.
+- Berhenti lewat tombol jeda, saat kursor berada di deretan, dan saat fokus keyboard berada di deretan.
+- Pengguna yang memilih "kurangi gerakan" mulai dalam keadaan dijeda, tanpa animasi masuk dan tanpa pembesaran foto.
 - Hanya judul dan keterangan foto yang berganti. Nama, tombol, dan teks kiri tetap diam.
 
-### 13.4 Halaman Unit
-Foto, nama, akreditasi, tagline, deskripsi, tombol daftar dan WhatsApp, lalu visi, misi, sambutan, sejarah, dan jurusan. Isian yang kosong tidak dirender dan tidak diganti teks contoh. Program, fasilitas, dan ekstrakurikuler tidak dibagi per unit.
+### 13.4 Isi Situs Unit
+Kolom CMS-nya sama dengan isi Umum. Kolom yang kosong tidak dirender dan tidak diambil dari isi Umum, termasuk kontak dan pimpinan. Logo tetap satu karena tidak ada kolom logo per unit. Tombol daftar di situs unit membuka formulir dengan unit sudah terisi.
 

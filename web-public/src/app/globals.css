@@ -252,6 +252,45 @@ html[data-theme="dark"] {
   }
 }
 
+/*
+ * Halaman depan. `.garis-progres` adalah pewaktu pergantian foto, jadi ia tetap
+ * berjalan meski pengguna memilih "kurangi gerakan" lalu menekan tombol putar:
+ * pilihan itu sudah ditangani dengan memulai dalam keadaan dijeda.
+ */
+@keyframes isi-progres {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
+}
+/* Di dalam layer supaya utilitas `[animation-play-state:paused]` menang. */
+@layer components {
+  .garis-progres {
+    animation: isi-progres 6s linear forwards;
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .masuk-bertahap > *,
+  .foto-masuk {
+    animation: muncul 0.7s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+  }
+  .masuk-bertahap > :nth-child(2) {
+    animation-delay: 80ms;
+  }
+  .masuk-bertahap > :nth-child(3) {
+    animation-delay: 160ms;
+  }
+  .masuk-bertahap > :nth-child(4) {
+    animation-delay: 240ms;
+  }
+  .masuk-bertahap > :nth-child(5) {
+    animation-delay: 320ms;
+  }
+}
+
 body {
   background-color: var(--background);
   color: var(--foreground);

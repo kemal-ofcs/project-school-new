@@ -4,8 +4,8 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState, useTransition } from "react";
 import { CollectionRepeater } from "@/components/content/CollectionRepeater";
 import { FotoJurusanEditor } from "@/components/content/FotoJurusanEditor";
-import { HalamanUnitEditor } from "@/components/content/HalamanUnitEditor";
 import { HeroImageUploader } from "@/components/content/HeroImageUploader";
+import { PemilihUnitKonten } from "@/components/content/PemilihUnitKonten";
 import { MobileAppShell } from "@/components/MobileAppShell";
 import { FeedbackBanner } from "@/components/ui/FeedbackBanner";
 import { Icon } from "@/components/ui/Icon";
@@ -15,9 +15,11 @@ import { triggerHaptic } from "@/lib/client/haptics";
 import { optimizeImageFile } from "@/lib/client/image-optimizer";
 import {
   HALAMAN_CMS,
+  halamanKontenCms,
   KOLEKSI_LANDING,
   LANDING_PAGE_SUBSECTIONS,
   muatKoleksiLanding,
+  SUB_TAB_KHUSUS_UMUM,
   siapkanSimpanLanding,
 } from "@/lib/constants/landing-cms-fields";
 import { useAuth } from "@/lib/context/AuthContext";
@@ -43,9 +45,7 @@ export default function KontenMobilePage() {
   // Penjaga klik ganda mutasi (Audit UI Guard)
   const isSubmittingRef = useRef(false);
 
-  const [activeTab, setActiveTab] = useState<"berita" | "halaman" | "unit">(
-    "berita",
-  );
+  const [activeTab, setActiveTab] = useState<"berita" | "halaman">("berita");
   const [galat, setGalat] = useState<string | null>(null);
   const [kabar, setKabar] = useState<string | null>(null);
 
@@ -84,11 +84,15 @@ export default function KontenMobilePage() {
   const [pencarian, setPencarian] = useState("");
   const [isPending, startTransition] = useTransition();
 
-  // State Halaman
+  // State Halaman. `idUnit` kosong = Umum; tab di bawahnya sama untuk semua.
+  const [idUnit, setIdUnit] = useState("");
+  const [versiSimpan, setVersiSimpan] = useState(0);
+  const [isiAsli, setIsiAsli] = useState("");
   const [halamanTab, setHalamanTab] = useState<
     "profil" | "kontak" | "program" | "landing"
   >("profil");
-  const [landingSubTab, setLandingSubTab] = useState<string>("hero_stats");
+  const [landingSubTab, setLandingSubTab] =
+    useState<string>(SUB_TAB_KHUSUS_UMUM);
   const [contentMap, setContentMap] = useState<PageContentMap>({});
   // Item koleksi disimpan terurai; diserialisasi jadi JSON hanya saat menyimpan.
   const [koleksiItems, setKoleksiItems] = useState<
@@ -124,7 +128,9 @@ export default function KontenMobilePage() {
       const res = await ambilKontenHalaman(hal);
       const items = res.items || {};
       setContentMap(items);
-      setKoleksiItems(muatKoleksiLanding(items));
+      const koleksi = muatKoleksiLanding(items);
+      setKoleksiItems(koleksi);
+      setIsiAsli(JSON.stringify([items, koleksi]));
     } catch (err) {
       setGalat(
         err instanceof Error
@@ -138,11 +144,10 @@ export default function KontenMobilePage() {
 
   useEffect(() => {
     if (!authLoading && isAuthenticated && canAccessArea(user, "konten")) {
-      // Tab Halaman Unit memuat datanya sendiri di `HalamanUnitEditor`.
       if (activeTab === "berita") {
         void muatBerita();
-      } else if (activeTab === "halaman") {
-        void muatHalaman(halamanTab);
+      } else {
+        void muatHalaman(halamanKontenCms(idUnit, halamanTab));
       }
     }
   }, [
@@ -150,6 +155,7 @@ export default function KontenMobilePage() {
     isAuthenticated,
     user,
     activeTab,
+    idUnit,
     halamanTab,
     muatBerita,
     muatHalaman,
@@ -278,6 +284,13 @@ export default function KontenMobilePage() {
     }
   };
 
+  const subBagianLanding = idUnit
+    ? LANDING_PAGE_SUBSECTIONS.filter((s) => s.id !== SUB_TAB_KHUSUS_UMUM)
+    : LANDING_PAGE_SUBSECTIONS;
+  const subLandingAktif =
+    subBagianLanding.find((s) => s.id === landingSubTab) ?? subBagianLanding[0];
+  const koleksiAktif = KOLEKSI_LANDING[subLandingAktif.id];
+
   const handleSimpanHalaman = () => {
     if (isSubmittingRef.current) return;
     isSubmittingRef.current = true;
@@ -289,8 +302,13 @@ export default function KontenMobilePage() {
           halamanTab === "landing"
             ? siapkanSimpanLanding(contentMap, koleksiItems)
             : contentMap;
-        await simpanKontenHalaman(halamanTab, denganKoleksi);
+        await simpanKontenHalaman(
+          halamanKontenCms(idUnit, halamanTab),
+          denganKoleksi,
+        );
         setContentMap(denganKoleksi);
+        setIsiAsli(JSON.stringify([denganKoleksi, koleksiItems]));
+        setVersiSimpan((versi) => versi + 1);
         triggerHaptic("success");
         setKabar("Konten halaman berhasil diperbarui.");
       } catch (err) {
@@ -360,26 +378,10 @@ export default function KontenMobilePage() {
           >
             Halaman Publik
           </button>
-          <button
-            type="button"
-            onClick={() => {
-              triggerHaptic("light");
-              setActiveTab("unit");
-            }}
-            className={`flex-1 rounded-xl py-2 text-xs font-bold transition ${
-              activeTab === "unit"
-                ? "bg-sky-500 text-slate-950 shadow-md"
-                : "text-slate-400 hover:text-white"
-            }`}
-          >
-            Halaman Unit
-          </button>
         </div>
 
-        {activeTab === "unit" ? <HalamanUnitEditor /> : null}
-
         {/* Konten Tab Berita */}
-        {activeTab === "unit" ? null : activeTab === "berita" ? (
+        {activeTab === "berita" ? (
           <div className="space-y-4">
             <div className="flex items-center justify-between">
               <h2 className="text-sm font-bold text-white">Daftar Berita</h2>
@@ -516,13 +518,30 @@ export default function KontenMobilePage() {
         ) : (
           /* Konten Tab Halaman Publik */
           <div className="space-y-4">
+            <PemilihUnitKonten
+              idUnit={idUnit}
+              onPilih={setIdUnit}
+              adaPerubahan={
+                !loadingHalaman &&
+                JSON.stringify([contentMap, koleksiItems]) !== isiAsli
+              }
+              versi={versiSimpan}
+              onDisalin={() =>
+                void muatHalaman(halamanKontenCms(idUnit, halamanTab))
+              }
+              disabled={!canManage}
+            />
+
             <div className="flex overflow-x-auto gap-1.5 pb-1">
               {(
                 [
                   { id: "profil", label: "Profil" },
                   { id: "kontak", label: "Kontak" },
                   { id: "program", label: "Program" },
-                  { id: "landing", label: "Depan & Beranda" },
+                  {
+                    id: "landing",
+                    label: idUnit ? "Beranda Unit" : "Halaman Depan",
+                  },
                 ] as const
               ).map((sub) => (
                 <button
@@ -546,7 +565,7 @@ export default function KontenMobilePage() {
             {/* Sub-tab khusus Landing Page di Mobile */}
             {halamanTab === "landing" && (
               <div className="flex overflow-x-auto gap-1.5 pb-1">
-                {LANDING_PAGE_SUBSECTIONS.map((sub) => (
+                {subBagianLanding.map((sub) => (
                   <button
                     key={sub.id}
                     type="button"
@@ -555,7 +574,7 @@ export default function KontenMobilePage() {
                       setLandingSubTab(sub.id);
                     }}
                     className={`whitespace-nowrap rounded-xl px-2.5 py-1 text-[11px] font-bold transition ${
-                      landingSubTab === sub.id
+                      subLandingAktif.id === sub.id
                         ? "bg-sky-500 text-slate-950 shadow"
                         : "bg-slate-800 text-slate-400 hover:text-white"
                     }`}
@@ -574,11 +593,7 @@ export default function KontenMobilePage() {
               <div className="rounded-2xl border border-white/10 bg-slate-900 p-4 space-y-3">
                 {halamanTab === "landing"
                   ? (() => {
-                      const currentSub =
-                        LANDING_PAGE_SUBSECTIONS.find(
-                          (s) => s.id === landingSubTab,
-                        ) ?? LANDING_PAGE_SUBSECTIONS[0];
-                      return currentSub.fields.map((field) => {
+                      return subLandingAktif.fields.map((field) => {
                         const value = contentMap[field.key] ?? "";
                         return (
                           <div key={field.key}>
@@ -654,21 +669,19 @@ export default function KontenMobilePage() {
                     })()
                   : null}
 
-                {halamanTab === "landing" && KOLEKSI_LANDING[landingSubTab] ? (
+                {halamanTab === "landing" && koleksiAktif ? (
                   <CollectionRepeater
-                    label={KOLEKSI_LANDING[landingSubTab].label}
-                    description={KOLEKSI_LANDING[landingSubTab].description}
-                    kunci={KOLEKSI_LANDING[landingSubTab].kunci}
-                    fields={KOLEKSI_LANDING[landingSubTab].fields}
-                    items={
-                      koleksiItems[KOLEKSI_LANDING[landingSubTab].kunci] ?? []
-                    }
-                    maksItem={KOLEKSI_LANDING[landingSubTab].maksItem}
+                    label={koleksiAktif.label}
+                    description={koleksiAktif.description}
+                    kunci={koleksiAktif.kunci}
+                    fields={koleksiAktif.fields}
+                    items={koleksiItems[koleksiAktif.kunci] ?? []}
+                    maksItem={koleksiAktif.maksItem}
                     disabled={!canManage}
                     onChange={(items) =>
                       setKoleksiItems((prev) => ({
                         ...prev,
-                        [KOLEKSI_LANDING[landingSubTab].kunci]: items,
+                        [koleksiAktif.kunci]: items,
                       }))
                     }
                   />

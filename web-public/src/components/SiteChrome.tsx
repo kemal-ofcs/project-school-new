@@ -14,17 +14,29 @@ import { MobileNav } from "@/components/MobileNav";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import {
+  hrefDaftarLingkup,
+  LINGKUP_UMUM,
+  type Lingkup,
+} from "@/lib/services/halaman-unit";
 import type { SchoolProfile } from "@/lib/services/school-profile";
 import { namaTampil } from "@/lib/services/school-profile";
 
-export const NAVIGASI = [
-  { href: "/beranda", label: "Beranda" },
-  { href: "/profil", label: "Profil" },
-  { href: "/program", label: "Program" },
+/**
+ * Menu situs. Di situs unit, Beranda, Profil, Program, dan Kontak memakai isi
+ * unit itu; Pendaftaran dan Berita satu untuk semua karena gelombang, kuota, dan
+ * berita tidak dibagi per unit.
+ */
+const navigasiUntuk = (prefiks: string) => [
+  { href: prefiks || "/", label: "Beranda" },
+  { href: `${prefiks}/profil`, label: "Profil" },
+  { href: `${prefiks}/program`, label: "Program" },
   { href: "/pmb", label: "Pendaftaran" },
   { href: "/berita", label: "Berita" },
-  { href: "/kontak", label: "Kontak" },
-] as const;
+  { href: `${prefiks}/kontak`, label: "Kontak" },
+];
+
+export const NAVIGASI = navigasiUntuk("");
 
 /**
  * Konten situs yang dipakai header dan footer di setiap halaman: gabungan kunci
@@ -41,14 +53,18 @@ type KontenSitus = Record<string, string>;
 export function SiteHeader({
   profil,
   konten = {},
+  lingkup = LINGKUP_UMUM,
 }: {
   profil: SchoolProfile;
   konten?: KontenSitus;
+  lingkup?: Lingkup;
 }) {
   const akreditasi = konten["profil.akreditasi"];
   const subjudul = profil.namaCabang ?? konten["profil.tagline"];
 
   const nama = namaTampil(profil);
+  const navigasi = navigasiUntuk(lingkup.prefiks);
+  const hrefDaftar = hrefDaftarLingkup(lingkup);
 
   return (
     <header
@@ -102,7 +118,7 @@ export function SiteHeader({
           aria-label="Navigasi utama"
           className="hidden lg:flex items-center gap-6"
         >
-          {NAVIGASI.map((item) => (
+          {navigasi.map((item) => (
             <Link
               key={item.href}
               className="text-sm font-medium text-muted-foreground transition-colors hover:text-primary"
@@ -128,7 +144,7 @@ export function SiteHeader({
             size="default"
             className="hidden rounded-full sm:inline-flex"
           >
-            <Link href="/pmb">
+            <Link href={hrefDaftar}>
               <UserCheck className="h-4 w-4" />
               <span>Daftar PMB</span>
             </Link>
@@ -136,7 +152,8 @@ export function SiteHeader({
 
           {/* Mobile Navigation Drawer */}
           <MobileNav
-            navigasi={NAVIGASI}
+            navigasi={navigasi}
+            hrefDaftar={hrefDaftar}
             telepon={profil.telepon}
             nama={nama}
             sosial={
@@ -156,10 +173,13 @@ export function SiteHeader({
 export function SiteFooter({
   profil,
   konten = {},
+  lingkup = LINGKUP_UMUM,
 }: {
   profil: SchoolProfile;
   konten?: KontenSitus;
+  lingkup?: Lingkup;
 }) {
+  const { prefiks } = lingkup;
   const nama = namaTampil(profil);
   const tagline = konten["profil.tagline"];
   const deskripsi = konten["profil.deskripsi_singkat"];
@@ -219,7 +239,7 @@ export function SiteFooter({
               <li>
                 <Link
                   className="hover:text-primary transition-colors flex items-center gap-1.5"
-                  href="/profil"
+                  href={`${prefiks}/profil`}
                 >
                   <ChevronRight className="h-3.5 w-3.5" />
                   Profil & Sejarah
@@ -228,7 +248,7 @@ export function SiteFooter({
               <li>
                 <Link
                   className="hover:text-primary transition-colors flex items-center gap-1.5"
-                  href="/program"
+                  href={`${prefiks}/program`}
                 >
                   <ChevronRight className="h-3.5 w-3.5" />
                   Program & Fasilitas
@@ -291,7 +311,7 @@ export function SiteFooter({
               <li>
                 <Link
                   className="hover:text-primary transition-colors flex items-center gap-1.5"
-                  href="/kontak"
+                  href={`${prefiks}/kontak`}
                 >
                   <ChevronRight className="h-3.5 w-3.5" />
                   Konsultasi Beasiswa & Biaya

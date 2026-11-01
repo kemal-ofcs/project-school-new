@@ -36,6 +36,7 @@ interface ProgramsSectionProps {
   programStudi: ProgramStudi[];
   konten?: Record<string, string>;
   galeri?: TautanGaleriData | null;
+  hrefDaftar: string;
 }
 
 /**
@@ -47,6 +48,7 @@ export function ProgramsSection({
   programStudi,
   konten = {},
   galeri = null,
+  hrefDaftar,
 }: ProgramsSectionProps) {
   const [kategoriEkskul, setKategoriEkskul] = React.useState("Semua");
 
@@ -117,6 +119,7 @@ export function ProgramsSection({
               {programStudi.map((prodi) => (
                 <KartuJurusan
                   key={prodi.kode || prodi.nama}
+                  hrefDaftar={hrefDaftar}
                   prodi={prodi}
                   foto={fotoPerJurusan[prodi.kode] ?? ""}
                   adaFoto={adaFotoJurusan}
@@ -202,10 +205,12 @@ export function KartuJurusan({
   prodi,
   foto,
   adaFoto,
+  hrefDaftar,
 }: {
   prodi: ProgramStudi;
   foto: string;
   adaFoto: boolean;
+  hrefDaftar: string;
 }) {
   return (
     <SpotlightCard className="h-full">
@@ -243,7 +248,7 @@ export function KartuJurusan({
 
         <div className="pt-6 mt-4 border-t border-border/60 flex items-center justify-between text-xs font-semibold text-primary">
           <Link
-            href="/pmb"
+            href={hrefDaftar}
             className="inline-flex items-center gap-1.5 hover:underline"
           >
             <span>Pilih di PMB</span>

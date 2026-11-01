@@ -5,9 +5,11 @@ import { hasPermission } from "@/lib/auth/access";
 import {
   type CmsFieldConfig,
   HALAMAN_CMS,
+  halamanKontenCms,
   KOLEKSI_LANDING,
   LANDING_PAGE_SUBSECTIONS,
   muatKoleksiLanding,
+  SUB_TAB_KHUSUS_UMUM,
   siapkanSimpanLanding,
 } from "@/lib/constants/landing-cms-fields";
 import { useAuth } from "@/lib/context/AuthContext";
@@ -19,22 +21,28 @@ import {
 import { CollectionRepeater } from "./CollectionRepeater";
 import { FotoJurusanEditor } from "./FotoJurusanEditor";
 import { HeroImageUploader } from "./HeroImageUploader";
+import { PemilihUnitKonten } from "./PemilihUnitKonten";
 
 export function PageContentManager() {
   const { user } = useAuth();
   const canManage = hasPermission(user, "content.manage");
 
+  // Kosong = Umum. Tab di bawahnya sama untuk Umum dan setiap unit.
+  const [idUnit, setIdUnit] = useState("");
+  const [versiSimpan, setVersiSimpan] = useState(0);
   const [activeTab, setActiveTab] = useState<
     "profil" | "kontak" | "program" | "landing"
   >("profil");
   const [activeLandingSubTab, setActiveLandingSubTab] =
-    useState<string>("hero_stats");
+    useState<string>(SUB_TAB_KHUSUS_UMUM);
   const [contentMap, setContentMap] = useState<PageContentMap>({});
   // Item koleksi disimpan terurai sebagai array supaya repeater-nya bisa
   // menambah/menghapus/menggeser; baru diserialisasi jadi JSON saat disimpan.
   const [koleksiItems, setKoleksiItems] = useState<
     Record<string, Record<string, unknown>[]>
   >({});
+  // Isi saat dimuat atau disimpan, pembanding untuk peringatan pindah unit.
+  const [isiAsli, setIsiAsli] = useState("");
   const [loading, setLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
@@ -48,7 +56,9 @@ export function PageContentManager() {
       const res = await ambilKontenHalaman(halaman);
       const items = res.items || {};
       setContentMap(items);
-      setKoleksiItems(muatKoleksiLanding(items));
+      const koleksi = muatKoleksiLanding(items);
+      setKoleksiItems(koleksi);
+      setIsiAsli(JSON.stringify([items, koleksi]));
     } catch (err) {
       setErrorMessage(
         err instanceof Error ? err.message : "Gagal memuat konten halaman.",
@@ -59,8 +69,8 @@ export function PageContentManager() {
   }, []);
 
   useEffect(() => {
-    void muatKonten(activeTab);
-  }, [activeTab, muatKonten]);
+    void muatKonten(halamanKontenCms(idUnit, activeTab));
+  }, [idUnit, activeTab, muatKonten]);
 
   const handleFieldChange = (key: string, value: string) => {
     setContentMap((prev) => ({
@@ -81,8 +91,13 @@ export function PageContentManager() {
           activeTab === "landing"
             ? siapkanSimpanLanding(contentMap, koleksiItems)
             : contentMap;
-        await simpanKontenHalaman(activeTab, denganKoleksi);
+        await simpanKontenHalaman(
+          halamanKontenCms(idUnit, activeTab),
+          denganKoleksi,
+        );
         setContentMap(denganKoleksi);
+        setIsiAsli(JSON.stringify([denganKoleksi, koleksiItems]));
+        setVersiSimpan((versi) => versi + 1);
         setSuccessMessage(
           "Konten halaman berhasil disimpan ke database cloud.",
         );
@@ -96,9 +111,12 @@ export function PageContentManager() {
     });
   };
 
+  const subBagianLanding = idUnit
+    ? LANDING_PAGE_SUBSECTIONS.filter((s) => s.id !== SUB_TAB_KHUSUS_UMUM)
+    : LANDING_PAGE_SUBSECTIONS;
   const currentLandingSubSection =
-    LANDING_PAGE_SUBSECTIONS.find((s) => s.id === activeLandingSubTab) ??
-    LANDING_PAGE_SUBSECTIONS[0];
+    subBagianLanding.find((s) => s.id === activeLandingSubTab) ??
+    subBagianLanding[0];
 
   const currentTitle =
     activeTab === "landing"
@@ -122,6 +140,17 @@ export function PageContentManager() {
 
   return (
     <div className="space-y-6">
+      <PemilihUnitKonten
+        idUnit={idUnit}
+        onPilih={setIdUnit}
+        adaPerubahan={
+          !loading && JSON.stringify([contentMap, koleksiItems]) !== isiAsli
+        }
+        versi={versiSimpan}
+        onDisalin={() => void muatKonten(halamanKontenCms(idUnit, activeTab))}
+        disabled={!canManage}
+      />
+
       {/* Tab Switcher Utama */}
       <div className="flex border-b border-white/10 gap-2 overflow-x-auto pb-px">
         {(
@@ -129,7 +158,7 @@ export function PageContentManager() {
             { id: "profil", label: "Profil Sekolah" },
             { id: "kontak", label: "Kontak & Alamat" },
             { id: "program", label: "Program & Fasilitas Ringkasan" },
-            { id: "landing", label: "Halaman Depan & Beranda" },
+            { id: "landing", label: idUnit ? "Beranda Unit" : "Halaman Depan" },
           ] as const
         ).map((tab) => (
           <button
@@ -151,14 +180,14 @@ export function PageContentManager() {
       {/* Sub-tab Switcher Khusus Landing Page */}
       {activeTab === "landing" && (
         <div className="flex flex-wrap gap-2 p-1.5 rounded-2xl bg-slate-900/60 border border-white/10">
-          {LANDING_PAGE_SUBSECTIONS.map((sub) => (
+          {subBagianLanding.map((sub) => (
             <button
               key={sub.id}
               id={`subtab-landing-${sub.id}`}
               type="button"
               onClick={() => setActiveLandingSubTab(sub.id)}
               className={`rounded-xl px-4 py-2 text-xs font-bold transition ${
-                activeLandingSubTab === sub.id
+                currentLandingSubSection.id === sub.id
                   ? "bg-sky-500 text-slate-950 shadow-md"
                   : "text-slate-400 hover:bg-white/5 hover:text-white"
               }`}

@@ -1,30 +1,23 @@
+import type { SchoolProfile } from "@/lib/services/school-profile";
+import { namaTampil } from "@/lib/services/school-profile";
+
 /**
- * Halaman per unit di situs publik (`/smp`, `/universitas`, dan seterusnya).
+ * Situs per unit (`/smp`, `/smp/profil`, dan seterusnya).
  *
  * `akademik_unit` tidak punya kolom kode, jadi alamatnya diturunkan dari nama
- * unit. Isinya disimpan di `konten_publik` dengan nama halaman `unit:<id_unit>`,
- * sehingga mengganti nama unit mengubah alamat tanpa melepas isinya.
+ * unit. Isinya memakai kolom CMS yang sama dengan halaman umum, disimpan di
+ * `konten_publik` dengan nama halaman `unit:<id_unit>:<tab>`, sehingga mengganti
+ * nama unit mengubah alamat tanpa melepas isinya.
  *
- * `KUNCI_UNIT` adalah KONTRAK dengan `KOLOM_HALAMAN_UNIT` di
+ * Bentuk nama halamannya KONTRAK dengan `halamanKontenCms` di
  * `web-desktop/src/lib/constants/landing-cms-fields.ts` dan diuji di kedua sisi.
  */
-export const KUNCI_UNIT = {
-  foto: "unit.foto",
-  tagline: "unit.tagline",
-  deskripsi: "unit.deskripsi",
-  visi: "unit.visi",
-  misi: "unit.misi",
-  sejarah: "unit.sejarah",
-  sambutan: "unit.sambutan",
-  kepalaNama: "unit.kepala_nama",
-  kepalaJabatan: "unit.kepala_jabatan",
-  akreditasi: "unit.akreditasi",
-  whatsapp: "unit.whatsapp",
-} as const;
+export type TabKonten = "profil" | "kontak" | "program" | "landing";
 
-export const halamanKontenUnit = (idUnit: string) => `unit:${idUnit}`;
+export const halamanKontenUnit = (idUnit: string, tab: TabKonten) =>
+  `unit:${idUnit}:${tab}`;
 
-/** Jumlah tombol unit di halaman depan sebelum sisanya pindah ke Selengkapnya. */
+/** Jumlah tombol unit di halaman depan sebelum sisanya dilipat. */
 export const MAKS_TOMBOL_UNIT = 3;
 
 /**
@@ -34,13 +27,11 @@ export const MAKS_TOMBOL_UNIT = 3;
  */
 export const RUTE_TERPAKAI = new Set([
   "api",
-  "beranda",
   "berita",
   "kontak",
   "pmb",
   "profil",
   "program",
-  "selengkapnya",
   "wali",
 ]);
 
@@ -76,4 +67,53 @@ export function daftarHalamanUnit(
     terpakai.add(slug);
     return { idUnit, nama, slug };
   });
+}
+
+/**
+ * Di bagian situs mana sebuah halaman dirender. `prefiks` kosong = situs umum,
+ * `/smp` = situs unit itu.
+ */
+export interface Lingkup {
+  unit: HalamanUnit | null;
+  prefiks: string;
+}
+
+export const LINGKUP_UMUM: Lingkup = { unit: null, prefiks: "" };
+
+export const lingkupUnit = (unit: HalamanUnit): Lingkup => ({
+  unit,
+  prefiks: `/${unit.slug}`,
+});
+
+export const halamanKontenLingkup = (lingkup: Lingkup, tab: TabKonten) =>
+  lingkup.unit ? halamanKontenUnit(lingkup.unit.idUnit, tab) : tab;
+
+/** Tujuan tombol daftar: situs unit langsung membuka formulir unit itu. */
+export const hrefDaftarLingkup = (lingkup: Lingkup) =>
+  lingkup.unit ? `/pmb/daftar?unit=${lingkup.unit.slug}` : "/pmb";
+
+/**
+ * Identitas yang ditampilkan situs unit.
+ *
+ * Alamat, kontak, dan pimpinan milik yayasan SENGAJA tidak diwarisi: isian unit
+ * yang kosong disembunyikan, supaya data yayasan tidak terbaca seolah milik unit.
+ * Logo tetap satu karena CMS tidak punya kolom logo per unit.
+ */
+export function profilUnit(
+  profil: SchoolProfile,
+  unit: HalamanUnit,
+  kontak: Record<string, string | undefined>,
+  landing: Record<string, string | undefined>,
+): SchoolProfile {
+  return {
+    ...profil,
+    namaSekolah: unit.nama,
+    namaCabang: profil.namaSekolah ? namaTampil(profil) : null,
+    alamat: kontak["kontak.alamat"] || null,
+    telepon: kontak["kontak.telepon"] || null,
+    email: kontak["kontak.email"] || null,
+    situs: null,
+    namaPimpinan: landing["landing.sambutan_nama"] || null,
+    jabatanPimpinan: landing["landing.sambutan_jabatan"] || null,
+  };
 }

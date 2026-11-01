@@ -25,13 +25,20 @@ export interface NavItem {
 
 interface MobileNavProps {
   navigasi: readonly NavItem[];
+  hrefDaftar: string;
   telepon: string | null;
   nama: string;
   /** Ikon media sosial, dirender `SiteHeader` di server. */
   sosial?: React.ReactNode;
 }
 
-export function MobileNav({ navigasi, telepon, nama, sosial }: MobileNavProps) {
+export function MobileNav({
+  navigasi,
+  hrefDaftar,
+  telepon,
+  nama,
+  sosial,
+}: MobileNavProps) {
   const [sheetOpen, setSheetOpen] = React.useState(false);
 
   return (
@@ -91,7 +98,7 @@ export function MobileNav({ navigasi, telepon, nama, sosial }: MobileNavProps) {
               variant="secondary"
               className="w-full justify-center h-12"
             >
-              <Link href="/pmb" onClick={() => setSheetOpen(false)}>
+              <Link href={hrefDaftar} onClick={() => setSheetOpen(false)}>
                 <UserCheck className="h-4 w-4 mr-2" />
                 Daftar PMB Sekarang
               </Link>

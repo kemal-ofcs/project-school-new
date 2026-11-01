@@ -1,4 +1,3 @@
-import type { Metadata } from "next";
 import { KepalaHalaman } from "@/components/KepalaHalaman";
 import { FacilitiesSection } from "@/components/landing/FacilitiesSection";
 import { TautanGaleri } from "@/components/landing/FotoKartu";
@@ -8,28 +7,25 @@ import {
 } from "@/components/landing/ProgramsSection";
 import { DaftarKosong, StatusTidakTerbaca } from "@/components/StatusData";
 import { KataMuncul } from "@/components/visual/KataMuncul";
-import { muatKontenHalaman } from "@/lib/server/content-data";
+import { muatKontenLingkup } from "@/lib/server/lingkup-data";
+import { muatPilihanPmb } from "@/lib/server/pmb-data";
 import { muatProgramStudi } from "@/lib/server/school-data";
 import { tautanGaleri } from "@/lib/services/gambar-konten";
+import { hrefDaftarLingkup, type Lingkup } from "@/lib/services/halaman-unit";
 import {
   fotoJurusan,
   koleksiEkskul,
   koleksiFasilitas,
   koleksiProgram,
 } from "@/lib/services/landing-collections";
-
-export const metadata: Metadata = {
-  title: "Program Sekolah",
-  description:
-    "Program, fasilitas, dan kegiatan ekstrakurikuler yang tersedia di sekolah.",
-};
+import { jurusanUntukUnit } from "@/lib/validations/pmb";
 
 /**
  * Halaman Program menggabungkan tiga sumber:
  *
  * - jurusan dari `akademik_jurusan`, tabel yang sama yang dipakai sekolah untuk
  *   menempatkan siswa ke rombel, supaya situs tidak pernah menyangkal jurusan
- *   yang sudah menerima siswa;
+ *   yang sudah menerima siswa; situs unit hanya memuat jurusan unit itu;
  * - kartu program sekolah, fasilitas, dan ekstrakurikuler dari koleksi
  *   `landing.*_items` beserta fotonya, jadi admin mengisinya sekali;
  * - tiga ringkasan naratif dari menu Konten → Program & Fasilitas, sebagai
@@ -39,24 +35,29 @@ export const metadata: Metadata = {
  * kotak "belum ada program keahlian" adalah pesan untuk admin, bukan untuk
  * calon wali yang membaca halaman ini.
  */
-export default async function HalamanProgram() {
-  const [hasil, hasilProgram, hasilLanding, hasilKontak] = await Promise.all([
+export async function IsiProgram({ lingkup }: { lingkup: Lingkup }) {
+  const [hasil, hasilPilihan, konten, landing, kontak] = await Promise.all([
     muatProgramStudi(),
-    muatKontenHalaman("program"),
-    muatKontenHalaman("landing"),
-    muatKontenHalaman("kontak"),
+    muatPilihanPmb(),
+    muatKontenLingkup(lingkup, "program"),
+    muatKontenLingkup(lingkup, "landing"),
+    muatKontenLingkup(lingkup, "kontak"),
   ]);
-  const konten = hasilProgram.status === "ok" ? hasilProgram.data : {};
-  const landing = hasilLanding.status === "ok" ? hasilLanding.data : {};
-  const galeri = tautanGaleri(
-    hasilKontak.status === "ok" ? hasilKontak.data : {},
-  );
+  const galeri = tautanGaleri(kontak);
 
   const ringkasanKejuruan = konten["program.kejuruan_ringkasan"];
   const ringkasanFasilitas = konten["program.fasilitas_ringkasan"];
   const ringkasanEkskul = konten["program.ekstrakurikuler_ringkasan"];
 
-  const jurusan = hasil.status === "ok" ? hasil.data : [];
+  const semuaJurusan = hasil.status === "ok" ? hasil.data : [];
+  const namaJurusanUnit = new Set(
+    hasilPilihan.status === "ok" && lingkup.unit
+      ? jurusanUntukUnit(hasilPilihan.data, lingkup.unit.nama)
+      : [],
+  );
+  const jurusan = lingkup.unit
+    ? semuaJurusan.filter((prodi) => namaJurusanUnit.has(prodi.nama))
+    : semuaJurusan;
   const fotoPerJurusan = fotoJurusan(landing);
   const adaFotoJurusan = Object.keys(fotoPerJurusan).length > 0;
   const adaFasilitas = koleksiFasilitas(landing).length > 0;
@@ -77,7 +78,7 @@ export default async function HalamanProgram() {
   return (
     <main>
       <KepalaHalaman
-        label="Akademik"
+        label={lingkup.unit?.nama ?? "Akademik"}
         judul={jurusan.length > 0 ? "Program Keahlian" : "Program Sekolah"}
         lebar="max-w-7xl px-4 sm:px-6 lg:px-8"
       >
@@ -109,6 +110,7 @@ export default async function HalamanProgram() {
                   prodi={prodi}
                   foto={fotoPerJurusan[prodi.kode] ?? ""}
                   adaFoto={adaFotoJurusan}
+                  hrefDaftar={hrefDaftarLingkup(lingkup)}
                 />
               ))}
             </div>

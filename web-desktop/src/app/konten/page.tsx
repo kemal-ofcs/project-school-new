@@ -4,7 +4,6 @@ import { redirect } from "next/navigation";
 import { useState } from "react";
 import { AppShell } from "@/components/AppShell";
 import { ArticleManager } from "@/components/content/ArticleManager";
-import { HalamanUnitEditor } from "@/components/content/HalamanUnitEditor";
 import { PageContentManager } from "@/components/content/PageContentManager";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { canAccessArea } from "@/lib/auth/access";
@@ -12,9 +11,7 @@ import { useAuth } from "@/lib/context/AuthContext";
 
 export default function KontenPage() {
   const { user, isAuthenticated, isLoading: authLoading } = useAuth();
-  const [activeTab, setActiveTab] = useState<"berita" | "halaman" | "unit">(
-    "berita",
-  );
+  const [activeTab, setActiveTab] = useState<"berita" | "halaman">("berita");
 
   if (authLoading) {
     return (
@@ -69,28 +66,10 @@ export default function KontenPage() {
           >
             Konten Halaman Publik
           </button>
-          <button
-            id="tab-cms-unit"
-            type="button"
-            onClick={() => setActiveTab("unit")}
-            className={`pb-3 text-sm font-bold border-b-2 transition ${
-              activeTab === "unit"
-                ? "border-sky-400 text-sky-400"
-                : "border-transparent text-slate-400 hover:text-white"
-            }`}
-          >
-            Halaman Unit
-          </button>
         </div>
 
         {/* Konten Tab Aktif */}
-        {activeTab === "berita" ? (
-          <ArticleManager />
-        ) : activeTab === "halaman" ? (
-          <PageContentManager />
-        ) : (
-          <HalamanUnitEditor />
-        )}
+        {activeTab === "berita" ? <ArticleManager /> : <PageContentManager />}
       </div>
     </AppShell>
   );

@@ -5419,3 +5419,504 @@ test mobile::turso::tests::tutup_buku_cloud_mengisi_waktu_terima_dan_bisa_dibuka
 test mobile::tutup_buku::tests::versi_menunggu_dipakai_atau_ditolak ... ok
 test mobile::uks::tests::closed_and_synced_copies_are_pruned_after_thirty_days ... ok
 test mobile::uks::tests::cloud_values_validate_shape ... ok
+test mobile::uks::tests::closing_queues_one_wali_message_only_when_switched_on ... ok
+test mobile::uks::tests::jam_vectors ... ok
+test mobile::uks::tests::foreign_visit_requires_copy_and_list_reports_offline ... ok
+test mobile::turso::tests::sentinel_2023_memicu_skema_jenis_nilai ... ok
+test mobile::uks::tests::validation_vectors ... ok
+test mobile::wa_notification::tests::ambang_alfa_diurai_sesuai_vektor_typescript ... ok
+test mobile::uks::tests::medicine_overdraw_rolls_back_the_whole_visit ... ok
+test mobile::uks::tests::open_give_medicine_and_close_in_one_flow ... ok
+test mobile::wa_notification::tests::kunci_sakelar_notifikasi_sesuai_vektor ... ok
+test mobile::wa_notification::tests::cerminan_lokal_langsung_terbaca_scanner ... ok
+test mobile::wa_notification::tests::notifikasi_wali_dedupe_sekali_saja ... ok
+test mobile::wa_notification::tests::notifikasi_wali_hanya_untuk_siswa ... ok
+test mobile::wa_notification::tests::notifikasi_wali_menghormati_sakelar ... ok
+test mobile::wa_notification::tests::render_template_sesuai_vektor ... ok
+test mobile::wa_notification::tests::sakelar_notifikasi_bawaannya_mati ... ok
+test mobile::wa_notification::tests::sakelar_wa_bawaannya_mati_semua ... ok
+test mobile::wa_notification::tests::sakelar_wa_yang_dinyalakan_terbaca_hidup ... ok
+test mobile::wa_notification::tests::setelan_pengingat_otomatis_kembar ... ok
+test mobile::wa_notification::tests::pemangkasan_hanya_baris_selesai_dan_sudah_terkirim ... ok
+test mobile::wa_notification::tests::test_phone_normalization ... ok
+test mobile::wa_notification::tests::susun_pesan_memakai_template_tersimpan ... ok
+test mobile::wa_notification::tests::validasi_template_sesuai_vektor ... ok
+test mobile::wa_sender::tests::keputusan_baris_antrean ... ok
+test mobile::wa_sender::tests::penolakan_fonnte_dibaca_dari_badan_respons ... ok
+test mobile::wa_notification::tests::status_notifikasi_asing_ditolak_bukan_dinormalkan ... ok
+test mobile::wa_sender::tests::permintaan_per_provider ... ok
+test mobile::wa_sender::tests::status_setelah_gagal ... ok
+test mobile::wa_notification::tests::test_wa_notification_lifecycle ... ok
+test mobile::turso::tests::sentinel_lama_memicu_provisioning_ulang ... ok
+
+test result: ok. 499 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 190.76s
+
+     Running unittests src\main.rs (src-tauri\target\debug\deps\manajemen_sekolah_mobile-0a85e963fbe1e44a.exe)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests manajemen_sekolah_mobile_lib
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+$ bun run check:quick
+$ bun run lint && bun run typecheck && bun run test
+$ biome check .
+Checked 143 files in 890ms. No fixes applied.
+$ tsc --noEmit
+$ bun scripts/run-tests.ts
+bun test v1.3.14 (0d9b296a)
+
+src\lib\server\database-config.test.ts:
+(pass) mode lokal ditolak di sisi Web > provider local_file selalu ditolak, bahkan dengan URL yang sah [1.41ms]
+(pass) mode lokal ditolak di sisi Web > penolakan berlaku juga di lingkungan pengembangan [0.50ms]
+(pass) Turso Cloud > HTTPS dengan token diterima [4.33ms]
+(pass) Turso Cloud > tanpa token ditolak di production [1.87ms]
+(pass) Turso Cloud > HTTP ke alamat publik ditolak [0.95ms]
+(pass) server libSQL sendiri > HTTP ke jaringan privat diterima tanpa token [0.36ms]
+(pass) server libSQL sendiri > HTTPS publik tanpa token ditolak di production [0.26ms]
+(pass) server libSQL sendiri > HTTP ke alamat publik ditolak tanpa izin eksplisit [0.29ms]
+(pass) server libSQL sendiri > HTTP ke alamat publik diterima setelah izin eksplisit dinyatakan [0.20ms]
+(pass) nilai bawaan dan alias > provider yang tidak dikenal jatuh ke aturan paling ketat [0.47ms]
+(pass) nilai bawaan dan alias > alias SPPG_DATABASE_URL setara dengan TURSO_DATABASE_URL [0.41ms]
+(pass) nilai bawaan dan alias > KOS_* menang atas TURSO_* dan SPPG_* [1.58ms]
+(pass) nilai bawaan dan alias > KOS_ALLOW_INSECURE_DATABASE dibaca seperti nama lamanya [1.31ms]
+(pass) nilai bawaan dan alias > URL kosong ditolak di production [1.57ms]
+(pass) nilai bawaan dan alias > tanpa URL di pengembangan memakai berkas lokal [4.38ms]
+(pass) databaseConfigIssue > konfigurasi yang sah tidak punya masalah [0.63ms]
+(pass) databaseConfigIssue > production tanpa alamat menyebut variabel yang kurang [0.33ms]
+(pass) databaseConfigIssue > pesan tidak pernah memuat nilai alamat atau token [102.33ms]
+
+ 18 pass
+ 0 fail
+ 39 expect() calls
+Ran 18 tests across 1 file. [702.00ms]
+bun test v1.3.14 (0d9b296a)
+
+src\lib\validations\pmb-dapodik.test.ts:
+(pass) dataDapodikSchema > isian contoh lolos dan dinormalkan [84.13ms]
+(pass) dataDapodikSchema > isian wajib dan pilihan asing ditolak [22.95ms]
+(pass) isian orang tua bersyarat > NIK orang tua boleh kosong, tetapi bila diisi harus 16 angka [2.93ms]
+(pass) isian orang tua bersyarat > pekerjaan ayah tetap wajib bila nama ayah diisi [2.03ms]
+(pass) isian orang tua bersyarat > orang tua yang meninggal: penghasilan diisikan, pendidikan opsional [9.63ms]
+(pass) isian orang tua bersyarat > ayah tidak diketahui: seluruh isian ayah boleh kosong [2.48ms]
+(pass) isian orang tua bersyarat > isian wali selain nama wajib hanya bila tinggal bersama wali [2.72ms]
+(pass) isian orang tua bersyarat > isianWajibDapodik tidak pernah memuat NIK orang tua [0.22ms]
+(pass) ekspor format DAPODIK > judul dua baris mengikuti berkas DAPODIK [0.40ms]
+(pass) ekspor format DAPODIK > baris contoh sama dengan baris DAPODIK aslinya [33.47ms]
+
+ 10 pass
+ 0 fail
+ 43 expect() calls
+Ran 10 tests across 1 file. [1087.00ms]
+bun test v1.3.14 (0d9b296a)
+
+src\lib\services\landing-features.test.ts:
+(pass) Fitur Landing Page UI/UX Baru (Delta Verification) > Validasi Format dan Ukuran Unggahan Hero Background Image > menerima berkas JPEG, PNG, dan WebP di bawah batas ukuran [0.36ms]
+(pass) Fitur Landing Page UI/UX Baru (Delta Verification) > Validasi Format dan Ukuran Unggahan Hero Background Image > menolak format yang tidak diizinkan seperti GIF, BMP, SVG, PDF [1.06ms]
+(pass) Fitur Landing Page UI/UX Baru (Delta Verification) > Validasi Format dan Ukuran Unggahan Hero Background Image > menolak berkas yang melebihi 5 MB [0.33ms]
+(pass) Fitur Landing Page UI/UX Baru (Delta Verification) > Logika Pencarian dan Filter Jurusan / Ekskul > pencarian kosong mengembalikan seluruh jurusan [0.28ms]
+(pass) Fitur Landing Page UI/UX Baru (Delta Verification) > Logika Pencarian dan Filter Jurusan / Ekskul > pencarian mencocokkan nama, kode, atau deskripsi secara case-insensitive [1.15ms]
+(pass) Fitur Landing Page UI/UX Baru (Delta Verification) > Logika Pencarian dan Filter Jurusan / Ekskul > filter ekskul menyaring kategori dan kata kunci secara bersamaan [0.95ms]
+(pass) Fitur Landing Page UI/UX Baru (Delta Verification) > Logika Pencarian Cepat FAQ > pencarian faq mencocokkan pertanyaan maupun jawaban [0.48ms]
+(pass) Fitur Landing Page UI/UX Baru (Delta Verification) > Kalkulasi Waktu Mundur PMB (Countdown Math) > menghitung sisa hari, jam, menit secara akurat [0.96ms]
+(pass) Fitur Landing Page UI/UX Baru (Delta Verification) > Kalkulasi Waktu Mundur PMB (Countdown Math) > menandai expired jika target tanggal sudah lewat [0.30ms]
+
+ 9 pass
+ 0 fail
+ 33 expect() calls
+Ran 9 tests across 1 file. [379.00ms]
+bun test v1.3.14 (0d9b296a)
+
+src\lib\services\pmb.test.ts:
+(pass) readGelombangAktif > gelombang yang dibuka dan masih dalam rentang tanggal ditemukan [28.04ms]
+(pass) readGelombangAktif > gelombang nonaktif tidak dianggap terbuka [15.06ms]
+(pass) readGelombangAktif > gelombang yang sudah lewat tanggal tutupnya tidak dianggap terbuka [15.74ms]
+(pass) readGelombangAktif > gelombang yang belum dibuka tidak dianggap terbuka [20.08ms]
+(pass) tulisPendaftaran > menyimpan pendaftar dan mengembalikan nomornya [58.92ms]
+(pass) tulisPendaftaran > berkas tersimpan bersama pendaftarnya [28.33ms]
+(pass) tulisPendaftaran > berkas yang ditolak CHECK tidak menyisakan pendaftar setengah jadi [19.29ms]
+(pass) tulisPendaftaran > kuota yang sudah terpenuhi menolak pendaftaran baru [26.78ms]
+(pass) tulisPendaftaran > pendaftar yang ditolak tidak ikut menghabiskan kuota [21.65ms]
+(pass) tulisPendaftaran > nomor yang bentrok dicoba ulang, bukan dilempar [30.09ms]
+(pass) readStatusPendaftaran > nomor dan tanggal lahir yang cocok mengembalikan statusnya [15.24ms]
+(pass) readStatusPendaftaran > tanggal lahir yang salah menghasilkan null, sama seperti nomor yang tidak ada [19.79ms]
+(pass) readStatusPendaftaran > nomor dicocokkan tanpa peduli huruf besar/kecil [11.45ms]
+(pass) readStatusPendaftaran > status tidak pernah membawa isi berkas [11.34ms]
+(pass) GelombangTidakTerbukaError > membawa status HTTP-nya sendiri [0.30ms]
+(pass) data DAPODIK pendaftar (v49) > isian DAPODIK tersimpan sebagai JSON berversi [16.08ms]
+(pass) data DAPODIK pendaftar (v49) > database yang belum dimigrasi v49 dijawab belum siap, tidak menulis apa pun [26.79ms]
+(pass) biaya pendaftaran (v52) > gelombang berbiaya menyalin biaya dan menetapkan batas bayar WIB [13.08ms]
+(pass) biaya pendaftaran (v52) > gelombang tanpa biaya tidak punya batas bayar [19.45ms]
+(pass) biaya pendaftaran (v52) > pendaftar kedaluwarsa melepas kuotanya, yang masih menunggu tidak [17.57ms]
+(pass) biaya pendaftaran (v52) > database yang belum dimigrasi v52 dijawab belum siap [27.28ms]
+(pass) unit tujuan (v58) > unit aktif berurutan, jurusan membawa unitnya [9.55ms]
+(pass) unit tujuan (v58) > database belum v58 dijawab belum siap [7.96ms]
+(pass) unit tujuan (v58) > unit pendaftar tersimpan [8.46ms]
+
+ 24 pass
+ 0 fail
+ 46 expect() calls
+Ran 24 tests across 1 file. [1.75s]
+bun test v1.3.14 (0d9b296a)
+
+src\lib\services\landing-collections.test.ts:
+(pass) koleksi dinamis landing page > tanpa isi di database, setiap koleksi kosong — tidak ada teks contoh [12.07ms]
+(pass) koleksi dinamis landing page > JSON rusak diperlakukan sebagai belum diisi, bukan galat [0.55ms]
+(pass) koleksi dinamis landing page > hanya objek yang dihitung, dan jumlahnya dibatasi [68.99ms]
+(pass) koleksi dinamis landing page > baris yang ditambahkan lalu tidak diisi tidak ditampilkan [1.17ms]
+(pass) koleksi dinamis landing page > kunci bernomor lama dibaca ketika koleksinya belum ada [27.92ms]
+(pass) koleksi dinamis landing page > koleksi yang ada menang atas kunci bernomor lama [0.27ms]
+(pass) koleksi dinamis landing page > ekskul lama memakai akhiran `_cat`, bukan `_category` [1.02ms]
+(pass) koleksi dinamis landing page > FAQ dan tahapan PMB tidak punya lapis kunci lama [0.66ms]
+(pass) koleksi dinamis landing page > specs menerima array maupun teks berbaris-baris [2.37ms]
+(pass) koleksi dinamis landing page > nama kunci koleksi adalah kontrak dengan panel admin [0.17ms]
+(pass) foto halaman depan > pilihan admin dipakai, item tanpa foto dibuang [0.71ms]
+(pass) foto halaman depan > koleksi kosong memakai foto hero, program, lalu fasilitas [0.88ms]
+(pass) foto halaman depan > tanpa foto apa pun hasilnya kosong, dan jumlahnya dibatasi [2.82ms]
+(pass) foto halaman depan > foto yang sama tidak tampil dua kali [0.64ms]
+(pass) kartu program di slider beranda > tagar dipisah koma, `#` yang ikut diketik dibuang, dan tidak dobel [0.35ms]
+(pass) kartu program di slider beranda > program membaca subjudul dan tagar; item lama tanpa keduanya tetap terbaca [0.57ms]
+
+ 16 pass
+ 0 fail
+ 32 expect() calls
+Ran 16 tests across 1 file. [497.00ms]
+bun test v1.3.14 (0d9b296a)
+
+src\lib\services\content.test.ts:
+(pass) Tahap D: web-public Content Service & Fallback Contract > readPublishedArticles hanya mengambil artikel dengan status 'Terbit' [90.17ms]
+(pass) Tahap D: web-public Content Service & Fallback Contract > readArticleBySlug mengambil artikel terbit dan mengembalikan null jika draft/tidak ada [18.89ms]
+(pass) Tahap D: web-public Content Service & Fallback Contract > readPageContent hanya mengembalikan isi database [23.54ms]
+(pass) Tahap D: web-public Content Service & Fallback Contract > readPageContent mengambil landing.hero_image base64 secara utuh dan membuang spasi kosong [6.51ms]
+[web-public] konten halaman 'landing' gagal dibaca: 648 | }
+649 | function mapSqliteError(e) {
+650 |     if (e instanceof Database.SqliteError) {
+651 |         const extendedCode = e.code;
+652 |         const code = mapToBaseCode(e.rawCode);
+653 |         return new LibsqlError(e.message, code, extendedCode, e.rawCode, e);
+                     ^
+LibsqlError: SQLITE_ERROR: no such table: konten_publik
+ extendedCode: "SQLITE_ERROR",
+    rawCode: 1,
+       code: "SQLITE_ERROR"
+
+      at mapSqliteError (C:\dev\sekolah\web-public\node_modules\@libsql\client\lib-esm\sqlite3.js:653:16)
+      at executeStmt (C:\dev\sekolah\web-public\node_modules\@libsql\client\lib-esm\sqlite3.js:556:15)
+      at execute (C:\dev\sekolah\web-public\node_modules\@libsql\client\lib-esm\sqlite3.js:245:20)
+      at async readPageContent (C:\dev\sekolah\web-public\src\lib\services\content.ts:127:30)
+      at async <anonymous> (C:\dev\sekolah\web-public\src\lib\services\content.test.ts:133:18)
+
+(pass) Tahap D: web-public Content Service & Fallback Contract > readPageContent tanpa tabel mengembalikan objek kosong, bukan melempar [16.18ms]
+(pass) Tahap D: web-public Content Service & Fallback Contract > readArticleCoverBySlug menolak artikel Draft dan baris tanpa gambar [19.40ms]
+
+ 6 pass
+ 0 fail
+ 24 expect() calls
+Ran 6 tests across 1 file. [823.00ms]
+bun test v1.3.14 (0d9b296a)
+
+src\lib\services\school-profile.test.ts:
+(pass) readSchoolProfile > profil yang belum ada barisnya dilaporkan, bukan dibuatkan [21.70ms]
+(pass) readSchoolProfile > nilai placeholder template diperlakukan sebagai belum diisi [4.26ms]
+(pass) readSchoolProfile > profil terisi dibaca apa adanya [21.43ms]
+(pass) readSchoolProfile > kolom kosong dan spasi kosong menjadi null, bukan string kosong [5.84ms]
+(pass) readProgramStudi > hanya jurusan aktif, terurut nama [5.40ms]
+(pass) readProgramStudi > batas dihormati [10.78ms]
+(pass) readProgramStudi > tabel kosong menghasilkan daftar kosong, bukan error [5.39ms]
+
+ 7 pass
+ 0 fail
+ 22 expect() calls
+Ran 7 tests across 1 file. [509.00ms]
+bun test v1.3.14 (0d9b296a)
+
+src\lib\services\wali-tagihan.test.ts:
+(pass) portal wali: tagihan > tampil hanya bila modul ada dan sakelar menyala [62.67ms]
+(pass) portal wali: tagihan > sisa, titipan, dan kuitansi hanya milik siswa sesi [13.62ms]
+(pass) portal wali: tagihan > label dan format [7.28ms]
+
+ 3 pass
+ 0 fail
+ 11 expect() calls
+Ran 3 tests across 1 file. [641.00ms]
+bun test v1.3.14 (0d9b296a)
+
+src\lib\validations\database-endpoint.test.ts:
+(pass) isPrivateNetworkHost > mengenali seluruh rentang jaringan privat yang lazim di kantor [2.88ms]
+(pass) isPrivateNetworkHost > tidak menganggap alamat publik sebagai jaringan privat [29.03ms]
+(pass) reviewDatabaseEndpoint > menerima alamat LAN ber-HTTP untuk server sendiri [1.12ms]
+(pass) reviewDatabaseEndpoint > menolak HTTP publik untuk server sendiri sampai pengguna mengizinkannya [0.40ms]
+(pass) reviewDatabaseEndpoint > izin transport tidak berlaku untuk Turso terkelola [0.31ms]
+(pass) reviewDatabaseEndpoint > server sendiri ber-HTTPS publik tetap mewajibkan token [0.24ms]
+(pass) reviewDatabaseEndpoint > menerima ejaan libsql:// dan ws:// sebagai endpoint yang sama [0.96ms]
+(pass) reviewDatabaseEndpoint > menolak URL kosong, skema asing, dan kredensial tertanam [0.33ms]
+(pass) normalizeProvider > nilai asing jatuh ke provider dengan aturan paling ketat [0.26ms]
+(pass) normalizeProvider > deskripsi provider selalu tersedia [0.38ms]
+(pass) mode Database Lokal > tidak memerlukan endpoint sama sekali [0.13ms]
+(pass) mode Database Lokal > validator endpoint MENOLAK mode lokal, bukan meloloskannya [0.09ms]
+(pass) mode Database Lokal > alamat kosong pun tetap ditolak untuk mode lokal [0.05ms]
+
+ 13 pass
+ 0 fail
+ 47 expect() calls
+Ran 13 tests across 1 file. [235.00ms]
+bun test v1.3.14 (0d9b296a)
+
+src\lib\server\schema-readiness.test.ts:
+(pass) inspectSchemaReadiness > database kosong dilaporkan belum siap, bukan dibuatkan tabelnya [15.50ms]
+(pass) inspectSchemaReadiness > skema lengkap pada versi minimum dilaporkan siap [7.38ms]
+(pass) inspectSchemaReadiness > versi di atas minimum tetap diterima [7.33ms]
+(pass) inspectSchemaReadiness > versi di bawah minimum ditolak meski semua tabel ada [9.76ms]
+(pass) inspectSchemaReadiness > satu tabel hilang cukup untuk menolak [7.64ms]
+(pass) assertSchemaReady > menyebut tabel yang hilang di dalam pesannya [5.61ms]
+(pass) assertSchemaReady > menyebut versi yang kurang, dan tindakan yang menyelesaikannya [20.83ms]
+(pass) assertSchemaReady > tidak melempar saat skema siap [12.29ms]
+
+ 8 pass
+ 0 fail
+ 19 expect() calls
+Ran 8 tests across 1 file. [593.00ms]
+bun test v1.3.14 (0d9b296a)
+
+src\lib\validations\pmb-pembayaran.test.ts:
+(pass) pmb-pembayaran > rupiah titik ribuan [7.61ms]
+(pass) pmb-pembayaran > ubah status saat belum lunas [7.01ms]
+(pass) pmb-pembayaran > konfirmasi bayar [1.71ms]
+(pass) pmb-pembayaran > batal bayar [0.33ms]
+(pass) pmb-pembayaran > perpanjang bayar [0.52ms]
+(skip) pmb-pembayaran > konstanta SQL dieja sama persis di pmb_bayar.rs
+
+ 5 pass
+ 1 skip
+ 0 fail
+ 28 expect() calls
+Ran 6 tests across 1 file. [363.00ms]
+bun test v1.3.14 (0d9b296a)
+
+src\lib\services\rate-limit.test.ts:
+(pass) periksaRateLimit dan catatPercobaan > kunci baru diizinkan [32.93ms]
+(pass) periksaRateLimit dan catatPercobaan > percobaan di bawah ambang belum memblokir [5.86ms]
+(pass) periksaRateLimit dan catatPercobaan > ambang yang terlampaui memblokir, dengan sisa waktu yang masuk akal [14.19ms]
+(pass) periksaRateLimit dan catatPercobaan > kunci yang berbeda dihitung terpisah [16.13ms]
+(pass) periksaRateLimit dan catatPercobaan > jendela yang sudah lewat memulai hitungan dari nol [5.96ms]
+(pass) periksaRateLimit dan catatPercobaan > bersihkanPercobaan menghapus hitungannya [18.60ms]
+(pass) kunciRateLimit > alamat yang sama menghasilkan kunci yang sama [10.28ms]
+(pass) kunciRateLimit > alamat berbeda menghasilkan kunci berbeda [1.17ms]
+(pass) kunciRateLimit > ruang nama berbeda tidak saling mengunci [0.98ms]
+(pass) kunciRateLimit > alamat tidak tersimpan apa adanya di dalam kunci [2.54ms]
+
+ 10 pass
+ 0 fail
+ 16 expect() calls
+Ran 10 tests across 1 file. [590.00ms]
+bun test v1.3.14 (0d9b296a)
+
+src\lib\server\license-gate.test.ts:
+(pass) vonis lisensi situs publik > build yang tidak menegakkan lisensi selalu terbuka [3.59ms]
+(pass) vonis lisensi situs publik > tanpa lisensi: terblokir, dan situs tidak menulis apa pun [6.25ms]
+(pass) vonis lisensi situs publik > lisensi sah tetapi id instance belum ada: terblokir [7.47ms]
+(pass) vonis lisensi situs publik > lisensi aktif untuk database ini: terbuka [12.70ms]
+(pass) vonis lisensi situs publik > sewa habis: baca-saja [2.78ms]
+(pass) vonis lisensi situs publik > lisensi untuk database lain: terblokir [17.04ms]
+(pass) vonis lisensi situs publik > lisensi yang dikunci ke alamat: alamat situs publik wajib tercantum [7.40ms]
+[lisensi] Status lisensi tidak terbaca: 648 | }
+649 | function mapSqliteError(e) {
+650 |     if (e instanceof Database.SqliteError) {
+651 |         const extendedCode = e.code;
+652 |         const code = mapToBaseCode(e.rawCode);
+653 |         return new LibsqlError(e.message, code, extendedCode, e.rawCode, e);
+                     ^
+LibsqlError: SQLITE_ERROR: no such table: setting_gex_system
+ extendedCode: "SQLITE_ERROR",
+    rawCode: 1,
+       code: "SQLITE_ERROR"
+
+      at mapSqliteError (C:\dev\sekolah\web-public\node_modules\@libsql\client\lib-esm\sqlite3.js:653:16)
+      at executeStmt (C:\dev\sekolah\web-public\node_modules\@libsql\client\lib-esm\sqlite3.js:556:15)
+      at execute (C:\dev\sekolah\web-public\node_modules\@libsql\client\lib-esm\sqlite3.js:245:20)
+      at async readContextRow (C:\dev\sekolah\web-public\src\lib\server\license.ts:510:31)
+      at async loadLicenseContext (C:\dev\sekolah\web-public\src\lib\server\license.ts:546:19)
+      at async resolveWebLicense (C:\dev\sekolah\web-public\src\lib\server\license.ts:586:25)
+      at async vonisLisensiPublik (C:\dev\sekolah\web-public\src\lib\server\license-gate.ts:46:34)
+      at async <anonymous> (C:\dev\sekolah\web-public\src\lib\server\license-gate.test.ts:152:15)
+
+(pass) vonis lisensi situs publik > database yang tidak terbaca tidak dijadikan alasan memblokir [6.10ms]
+
+ 8 pass
+ 0 fail
+ 10 expect() calls
+Ran 8 tests across 1 file. [723.00ms]
+bun test v1.3.14 (0d9b296a)
+
+src\lib\operators\contact.test.ts:
+(pass) normalizeOperatorPhone > semua bentuk nomor Indonesia menjadi satu bentuk kanonik [0.73ms]
+(pass) normalizeOperatorPhone > nomor internasional dipertahankan bila memakai awalan + [0.18ms]
+(pass) normalizeOperatorPhone > masukan tanpa awalan yang dikenali ditolak [0.11ms]
+(pass) normalizeOperatorEmail > email disimpan lowercase agar cocok dengan index LOWER(email) [0.13ms]
+(pass) isValidOperatorEmail > menerima email wajar [0.36ms]
+(pass) isValidOperatorEmail > menolak bentuk yang tidak lengkap [0.25ms]
+(pass) isValidOperatorPhone > menerima panjang nomor yang wajar [0.15ms]
+(pass) isValidOperatorPhone > menolak nomor terlalu pendek atau kosong [0.08ms]
+(pass) assertOperatorContact > lolos untuk kontak lengkap [0.34ms]
+(pass) assertOperatorContact > pesan menyebut bidang yang kosong [0.31ms]
+(pass) penyamaran kontak > maskEmail menyembunyikan bagian lokal dan domain [0.54ms]
+(pass) penyamaran kontak > maskEmail aman untuk masukan kosong atau rusak [0.11ms]
+(pass) penyamaran kontak > maskPhone menyisakan awalan negara dan empat digit terakhir [0.36ms]
+(pass) penyamaran kontak > maskPhone mengembalikan string kosong untuk nomor tidak valid [0.06ms]
+
+ 14 pass
+ 0 fail
+ 36 expect() calls
+Ran 14 tests across 1 file. [402.00ms]
+bun test v1.3.14 (0d9b296a)
+
+src\proxy.test.ts:
+(pass) proxy situs publik > terbuka: diteruskan apa adanya, header internal tidak ada [5.98ms]
+(pass) proxy situs publik > header internal kiriman pengunjung dibuang [0.78ms]
+(pass) proxy situs publik > terblokir: halaman 503 tanpa alasan dan tanpa konten sekolah [3.14ms]
+(pass) proxy situs publik > terblokir: endpoint menjawab 503 JSON, bukan halaman HTML [2.15ms]
+(pass) proxy situs publik > baca-saja: halaman tetap tampil dan diberi tahu lewat header [0.97ms]
+(pass) proxy situs publik > baca-saja: pendaftaran PMB baru ditolak tanpa menyebut alasan [1.44ms]
+(pass) proxy situs publik > baca-saja: cek status PMB dan portal wali tetap dilayani [1.58ms]
+
+ 7 pass
+ 0 fail
+ 21 expect() calls
+Ran 7 tests across 1 file. [750.00ms]
+bun test v1.3.14 (0d9b296a)
+
+src\lib\validations\berkas-sekolah.test.ts:
+(pass) uraiBerkasSekolah > JPEG sah, nama dan isi dirapikan [1.58ms]
+(pass) uraiBerkasSekolah > PNG sah [0.19ms]
+(pass) uraiBerkasSekolah > WEBP sah [0.06ms]
+(pass) uraiBerkasSekolah > PDF sah [0.04ms]
+(pass) uraiBerkasSekolah > nama 180 huruf beraksen dihitung per karakter [0.07ms]
+(pass) uraiBerkasSekolah > jenis asing ditolak [0.04ms]
+(pass) uraiBerkasSekolah > jenis tidak dirapikan [0.02ms]
+(pass) uraiBerkasSekolah > nama kosong ditolak [0.02ms]
+(pass) uraiBerkasSekolah > nama 181 karakter ditolak [0.04ms]
+(pass) uraiBerkasSekolah > GIF ditolak [0.10ms]
+(pass) uraiBerkasSekolah > isi kosong ditolak [0.12ms]
+(pass) uraiBerkasSekolah > panjang base64 cacat ditolak [0.10ms]
+(pass) uraiBerkasSekolah > karakter asing di base64 ditolak [0.01ms]
+(pass) uraiBerkasSekolah > data URL utuh ditolak [0.01ms]
+(pass) uraiBerkasSekolah > padding di tengah ditolak [0.01ms]
+(pass) uraiBerkasSekolah > JPEG yang mengaku PDF ditolak [0.06ms]
+(pass) uraiBerkasSekolah > WEBP yang mengaku PNG ditolak [0.03ms]
+(pass) uraiBerkasSekolah > PDF yang mengaku JPEG ditolak [0.02ms]
+(pass) uraiBerkasSekolah > batas ukuran dihitung dari isi, bukan dari klien [5.85ms]
+(pass) uraiBerkasSekolah > skema menolak kunci asing dan tidak memercayai ukuranByte [13.07ms]
+(skip) kembaran Rust > konstanta SQL dieja sama persis
+(skip) kembaran Rust > daftar jenis, mime, dan batas sama
+
+ 20 pass
+ 2 skip
+ 0 fail
+ 22 expect() calls
+Ran 22 tests across 1 file. [783.00ms]
+bun test v1.3.14 (0d9b296a)
+
+src\lib\services\halaman-unit.test.ts:
+(pass) alamat halaman unit > nama menjadi alamat huruf kecil [6.11ms]
+(pass) alamat halaman unit > nama yang bentrok dengan rute lain diberi awalan [0.29ms]
+(pass) alamat halaman unit > nama kembar diberi nomor, unit pertama tetap memegang alamatnya [0.28ms]
+(pass) alamat halaman unit > nama tanpa huruf latin tetap mendapat alamat [0.47ms]
+(pass) alamat halaman unit > daftar rute terpakai sama dengan folder src/app [5.79ms]
+(pass) alamat halaman unit > kunci isian unit [0.28ms]
+
+ 6 pass
+ 0 fail
+ 6 expect() calls
+Ran 6 tests across 1 file. [407.00ms]
+bun test v1.3.14 (0d9b296a)
+
+src\lib\validations\pmb.test.ts:
+(pass) jurusanUntukUnit > hanya jurusan milik unit itu [7.90ms]
+(pass) jurusanUntukUnit > belum memilih unit = belum ada program [0.26ms]
+(pass) jurusanUntukUnit > jurusan tanpa unit berlaku di semua unit [0.24ms]
+(pass) jurusanUntukUnit > sekolah tanpa unit: semua jurusan tanpa unit [0.14ms]
+(pass) tolakPilihanPmb > pendaftar SD tidak diminta program keahlian [0.69ms]
+(pass) tolakPilihanPmb > pendaftar SMK wajib memilih program miliknya [0.20ms]
+(pass) tolakPilihanPmb > unit wajib bila sekolah punya unit aktif [0.31ms]
+(pass) tolakPilihanPmb > nilai asing ditolak [0.51ms]
+(pass) tolakPilihanPmb > sekolah tanpa unit dan tanpa jurusan menerima kosong [0.18ms]
+
+ 9 pass
+ 0 fail
+ 13 expect() calls
+Ran 9 tests across 1 file. [766.00ms]
+bun test v1.3.14 (0d9b296a)
+
+src\lib\services\gambar-konten.test.ts:
+(pass) foto koleksi dan jurusan hanya menerima id 32 hex [3.27ms]
+(pass) sumber gambar: id ke rute ber-cache, data URL lama apa adanya [0.37ms]
+(pass) tautan luar hanya http(s); galeri jatuh ke Instagram [0.49ms]
+
+ 3 pass
+ 0 fail
+ 15 expect() calls
+Ran 3 tests across 1 file. [379.00ms]
+bun test v1.3.14 (0d9b296a)
+
+src\lib\teks.test.ts:
+(pass) pecahButir membuang nomor/poin dan baris kosong [15.76ms]
+(pass) pecahPoin memecah paragraf bernomor dari CMS [0.96ms]
+(pass) tautanWhatsApp mengubah 0 di depan menjadi 62 dan menolak nomor kosong [0.30ms]
+
+ 3 pass
+ 0 fail
+ 11 expect() calls
+Ran 3 tests across 1 file. [250.00ms]
+bun test v1.3.14 (0d9b296a)
+
+src\lib\server\site-url.test.ts:
+(pass) resolveSiteUrl > variabel eksplisit menang [0.74ms]
+(pass) resolveSiteUrl > garis miring penutup dibuang [0.51ms]
+(pass) resolveSiteUrl > alamat tanpa skema dianggap https [0.22ms]
+(pass) resolveSiteUrl > cadangan memakai domain produksi Vercel, bukan preview [0.11ms]
+(pass) resolveSiteUrl > tanpa variabel apa pun jatuh ke localhost [0.09ms]
+
+ 5 pass
+ 0 fail
+ 5 expect() calls
+Ran 5 tests across 1 file. [324.00ms]
+bun test v1.3.14 (0d9b296a)
+
+src\lib\services\wali-auth.test.ts:
+(pass) buatKodeOtp > selalu enam digit [10.94ms]
+(pass) samarkanNomor > menyisakan empat digit terakhir saja [0.37ms]
+(pass) cariSiswaUntukOtp > cocok lewat NIS maupun NISN [53.89ms]
+(pass) cariSiswaUntukOtp > siswa yang sudah lulus tidak bisa dipakai masuk [16.86ms]
+(pass) cariSiswaUntukOtp > siswa tanpa nomor wali tidak bisa dipakai masuk [8.05ms]
+(pass) cariSiswaUntukOtp > nomor induk asing menghasilkan null [8.61ms]
+(pass) terbitkanOtp dan verifikasiOtp > kode yang benar diterima sekali saja [52.34ms]
+(pass) terbitkanOtp dan verifikasiOtp > kode asli tidak pernah tersimpan di database [13.84ms]
+(pass) terbitkanOtp dan verifikasiOtp > kode salah mengurangi sisa percobaan, lalu habis [16.95ms]
+(pass) terbitkanOtp dan verifikasiOtp > menerbitkan kode baru membatalkan kode lama [31.91ms]
+(pass) terbitkanOtp dan verifikasiOtp > kode tidak bisa diminta beruntun untuk siswa yang sama [32.21ms]
+(pass) terbitkanOtp dan verifikasiOtp > kode kedaluwarsa ditolak [9.86ms]
+(pass) terbitkanOtp dan verifikasiOtp > subjek yang berbeda tidak saling menerima kode [14.82ms]
+(pass) sesi wali > token yang sah mengembalikan id_siswa dari sesi [38.97ms]
+(pass) sesi wali > token mentah tidak tersimpan [58.51ms]
+(pass) sesi wali > token asing ditolak [11.46ms]
+(pass) sesi wali > sesi kedaluwarsa ditolak [28.79ms]
+(pass) sesi wali > siswa yang berubah status membuat sesi tidak sah [13.77ms]
+(pass) sesi wali > nomor wali yang berubah membuat sesi tidak sah [38.05ms]
+(pass) sesi wali > keluar mencabut sesi di server [14.16ms]
+(pass) kredensial kata sandi portal wali > hitungPasswordDefaultWali menghitung formula nisn/nis + unit uppercase [1.15ms]
+(pass) kredensial kata sandi portal wali > formula NISN + unit tidak lagi bisa dipakai masuk [663.43ms]
+(pass) kredensial kata sandi portal wali > password sementara terbitan sekolah bisa dipakai dan wajib diganti [1305.79ms]
+(pass) kredensial kata sandi portal wali > autentikasi dengan password salah ditolak [11.22ms]
+(pass) kredensial kata sandi portal wali > ganti password memperbarui kredensial dan menonaktifkan perluGantiPassword [3588.53ms]
+(pass) kredensial kata sandi portal wali > password baru tidak boleh berupa formula lama [487.66ms]
+(pass) kredensial kata sandi portal wali > setelah masuk lewat kode WhatsApp, password lama tidak diperlukan [2725.71ms]
+
+ 27 pass
+ 0 fail
+ 254 expect() calls
+Ran 27 tests across 1 file. [10.22s]

@@ -1,9 +1,7 @@
 import type { Metadata } from "next";
 import { Playfair_Display, Plus_Jakarta_Sans } from "next/font/google";
-import { SiteFooter, SiteHeader } from "@/components/SiteChrome";
 import { EfekDesktop } from "@/components/visual/EfekDesktop";
 import { SKRIP_GERBANG_EFEK } from "@/components/visual/gerbang-efek";
-import { muatKontenHalaman } from "@/lib/server/content-data";
 import { muatProfilSekolah } from "@/lib/server/school-data";
 import { namaTampil, profilKosong } from "@/lib/services/school-profile";
 import "./globals.css";
@@ -71,24 +69,9 @@ export async function generateMetadata(): Promise<Metadata> {
 export default async function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
-  const [hasil, hasilProfilCms, hasilKontakCms] = await Promise.all([
-    muatProfilSekolah(),
-    muatKontenHalaman("profil"),
-    muatKontenHalaman("kontak"),
-  ]);
-  // Header dan footer tampil di setiap halaman, jadi konten CMS-nya dimuat di
-  // sini sekali. Kegagalan membacanya tidak menghentikan halaman: bagian yang
-  // butuh kunci itu saja yang tidak dirender.
-  const kontenSitus = {
-    ...(hasilKontakCms.status === "ok" ? hasilKontakCms.data : {}),
-    ...(hasilProfilCms.status === "ok" ? hasilProfilCms.data : {}),
-  };
-  // Kerangka halaman tetap tampil meski profil tidak terbaca, supaya pengunjung
-  // masih bisa berpindah halaman. Isinya tidak dikarang: `profilKosong()`
-  // membuat setiap bagian opsional sekadar tidak dirender. Badan halaman yang
-  // menjelaskan apa yang sedang terjadi, bukan header.
-  const profil = hasil.status === "ok" ? hasil.data : profilKosong();
-
+  // Header dan footer ada di `(umum)/layout.tsx` dan `[unit]/layout.tsx`, karena
+  // situs unit memakai isi unitnya sendiri. Membaca alamat di sini untuk
+  // membedakannya akan mematikan cache lima menit seluruh situs.
   return (
     // `suppressHydrationWarning`: skrip gerbang di bawah memasang
     // `data-efek` pada <html> sebelum React mengambil alih halaman.
@@ -105,9 +88,7 @@ export default async function RootLayout({
       <body
         className={`${plusJakartaSans.variable} ${playfair.variable} font-sans flex min-h-dvh flex-col`}
       >
-        <SiteHeader profil={profil} konten={kontenSitus} />
-        <div className="flex-1">{children}</div>
-        <SiteFooter profil={profil} konten={kontenSitus} />
+        {children}
         <EfekDesktop />
       </body>
     </html>

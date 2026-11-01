@@ -8,12 +8,16 @@ import { tautanWhatsApp } from "@/lib/teks";
 
 interface StickyActionProps {
   nomorTelepon?: string | null;
+  hrefDaftar?: string;
 }
 
 export const PESAN_WA_PMB =
   "Halo Panitia PMB, saya ingin berkonsultasi mengenai pendaftaran siswa baru.";
 
-export function StickyAction({ nomorTelepon }: StickyActionProps) {
+export function StickyAction({
+  nomorTelepon,
+  hrefDaftar = "/pmb",
+}: StickyActionProps) {
   // Tanpa nomor di profil sekolah, tombol WhatsApp tidak tampil sama sekali.
   const waUrl = tautanWhatsApp(nomorTelepon, PESAN_WA_PMB);
 
@@ -60,7 +64,7 @@ export function StickyAction({ nomorTelepon }: StickyActionProps) {
             variant="secondary"
             className="flex-1 h-12 rounded-xl text-sm font-bold shadow-md active:scale-[0.98] justify-center"
           >
-            <Link href="/pmb">
+            <Link href={hrefDaftar}>
               <UserCheck className="h-5 w-5 mr-1.5" />
               <span>Daftar PMB Sekarang</span>
             </Link>

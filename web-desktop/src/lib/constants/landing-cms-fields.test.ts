@@ -1,8 +1,9 @@
 import { describe, expect, test } from "bun:test";
 import {
   HALAMAN_CMS,
+  halamanKontenCms,
   KOLEKSI_LANDING,
-  KOLOM_HALAMAN_UNIT,
+  kontenUntukSalinan,
   LANDING_PAGE_SUBSECTIONS,
   muatKoleksiLanding,
   siapkanSimpanLanding,
@@ -32,23 +33,20 @@ describe("CMS landing: koleksi dan perpindahan kunci lama", () => {
     );
   });
 
-  /** Kontrak dengan `KUNCI_UNIT` di situs publik, yang menguji set yang sama. */
-  test("kunci isian unit sama dengan yang dibaca situs publik", () => {
-    expect(KOLOM_HALAMAN_UNIT.map((k) => k.key).sort()).toEqual(
-      [
-        "unit.foto",
-        "unit.tagline",
-        "unit.deskripsi",
-        "unit.visi",
-        "unit.misi",
-        "unit.sejarah",
-        "unit.sambutan",
-        "unit.kepala_nama",
-        "unit.kepala_jabatan",
-        "unit.akreditasi",
-        "unit.whatsapp",
-      ].sort(),
-    );
+  /** Kontrak dengan `halamanKontenUnit` di situs publik, vektor yang sama. */
+  test("nama halaman konten", () => {
+    expect(halamanKontenCms("u1", "profil")).toBe("unit:u1:profil");
+    expect(halamanKontenCms("", "profil")).toBe("profil");
+  });
+
+  test("salinan dari Umum membuang isi kosong dan foto sorotan", () => {
+    expect(
+      kontenUntukSalinan({
+        "landing.hero_title": "Judul",
+        "landing.hero_badge": "  ",
+        "landing.sorotan_items": "[{}]",
+      }),
+    ).toEqual({ "landing.hero_title": "Judul" });
   });
 
   test("setiap koleksi terpasang pada sub-tab yang benar-benar ada", () => {

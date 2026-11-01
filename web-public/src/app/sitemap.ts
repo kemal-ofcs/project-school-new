@@ -24,21 +24,17 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     pilihan.status === "ok" ? daftarHalamanUnit(pilihan.data.unit) : [];
 
   return [
-    {
-      url: asal,
-      lastModified: diperbarui,
-      changeFrequency: "weekly" as const,
-      priority: 1,
-    },
-    ...[
-      ...NAVIGASI.map((item) => item.href),
-      "/selengkapnya",
-      ...unit.map((u) => `/${u.slug}`),
-    ].map((href) => ({
-      url: `${asal}${href}`,
-      lastModified: diperbarui,
-      changeFrequency: "weekly" as const,
-      priority: 0.7,
-    })),
-  ];
+    ...NAVIGASI.map((item) => item.href),
+    ...unit.flatMap((u) => [
+      `/${u.slug}`,
+      `/${u.slug}/profil`,
+      `/${u.slug}/program`,
+      `/${u.slug}/kontak`,
+    ]),
+  ].map((href) => ({
+    url: href === "/" ? asal : `${asal}${href}`,
+    lastModified: diperbarui,
+    changeFrequency: "weekly" as const,
+    priority: href === "/" ? 1 : 0.7,
+  }));
 }

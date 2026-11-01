@@ -20,6 +20,8 @@ interface PmbOverviewSectionProps {
   gelombangAktif: GelombangAktif | null;
   konten?: Record<string, string>;
   nomorTelepon?: string | null;
+  hrefDaftar: string;
+  hrefKontak: string;
 }
 
 /**
@@ -40,6 +42,8 @@ export function PmbOverviewSection({
   gelombangAktif,
   konten = {},
   nomorTelepon,
+  hrefDaftar,
+  hrefKontak,
 }: PmbOverviewSectionProps) {
   const waUrl = tautanWhatsApp(nomorTelepon, PESAN_WA_PMB);
   const eyebrow = konten["landing.pmb_eyebrow"];
@@ -121,7 +125,7 @@ export function PmbOverviewSection({
                   size="lg"
                   className="h-12 w-full sm:w-auto shadow-md font-bold justify-center"
                 >
-                  <Link href="/pmb/daftar">
+                  <Link href={hrefDaftar}>
                     <span>Isi Formulir Online</span>
                     <ArrowRight className="h-4 w-4 ml-1" />
                   </Link>
@@ -150,7 +154,7 @@ export function PmbOverviewSection({
               awal.
             </p>
             <Button asChild variant="outline" size="sm">
-              <Link href="/kontak">Hubungi Sekretariat PMB</Link>
+              <Link href={hrefKontak}>Hubungi Sekretariat PMB</Link>
             </Button>
           </div>
         )}
@@ -234,7 +238,7 @@ export function PmbOverviewSection({
                 </a>
               ) : null}
               <Link
-                href={gelombangAktif ? "/pmb/daftar" : "/kontak"}
+                href={gelombangAktif ? hrefDaftar : hrefKontak}
                 className="inline-flex h-12 items-center justify-center rounded-full bg-secondary-container px-6 text-sm font-bold text-secondary-container-foreground transition-opacity hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
               >
                 {gelombangAktif

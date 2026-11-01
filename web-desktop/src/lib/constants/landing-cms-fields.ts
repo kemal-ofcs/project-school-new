@@ -616,84 +616,39 @@ export const KOLEKSI_LANDING: Record<string, KoleksiLandingConfig> = {
   },
 };
 
-/**
- * Isian halaman per unit, sama untuk semua unit. Disimpan di `konten_publik`
- * dengan nama halaman dari `halamanKontenUnit`.
- *
- * Kuncinya KONTRAK dengan `web-public/src/lib/services/halaman-unit.ts` dan
- * diuji di kedua sisi.
- */
-export const KOLOM_HALAMAN_UNIT: CmsFieldConfig[] = [
-  { key: "unit.foto", label: "Foto Utama", type: "image", placeholder: "" },
-  {
-    key: "unit.tagline",
-    label: "Tagline Singkat",
-    type: "text",
-    placeholder: "Belajar sambil bermain",
-  },
-  {
-    key: "unit.deskripsi",
-    label: "Deskripsi Singkat",
-    type: "textarea",
-    rows: 3,
-    placeholder: "Gambaran singkat unit ini untuk calon wali.",
-  },
-  {
-    key: "unit.visi",
-    label: "Visi",
-    type: "textarea",
-    rows: 3,
-    placeholder: "Visi unit ini.",
-  },
-  {
-    key: "unit.misi",
-    label: "Misi",
-    type: "textarea",
-    rows: 4,
-    placeholder: "Satu butir per baris.",
-  },
-  {
-    key: "unit.sejarah",
-    label: "Sejarah Singkat",
-    type: "textarea",
-    rows: 4,
-    placeholder: "Sejarah singkat unit ini.",
-  },
-  {
-    key: "unit.sambutan",
-    label: "Sambutan",
-    type: "textarea",
-    rows: 4,
-    placeholder: "Sambutan kepala unit.",
-  },
-  {
-    key: "unit.kepala_nama",
-    label: "Nama Kepala Unit",
-    type: "text",
-    placeholder: "Nama lengkap dan gelar",
-  },
-  {
-    key: "unit.kepala_jabatan",
-    label: "Jabatan Kepala Unit",
-    type: "text",
-    placeholder: "Kepala Sekolah",
-  },
-  {
-    key: "unit.akreditasi",
-    label: "Status Akreditasi",
-    type: "text",
-    placeholder: "Terakreditasi A",
-  },
-  {
-    key: "unit.whatsapp",
-    label: "Nomor WhatsApp Unit",
-    type: "text",
-    placeholder: "0812xxxxxxxx",
-    description: "Kosongkan untuk memakai nomor telepon sekolah.",
-  },
+export type TabKontenCms = "profil" | "kontak" | "program" | "landing";
+
+export const TAB_KONTEN_CMS: TabKontenCms[] = [
+  "profil",
+  "kontak",
+  "program",
+  "landing",
 ];
 
-export const halamanKontenUnit = (idUnit: string) => `unit:${idUnit}`;
+/** Foto sorotan hanya dipakai halaman depan, yang isinya milik Umum. */
+export const SUB_TAB_KHUSUS_UMUM = "sorotan";
+
+/**
+ * Nama halaman `konten_publik`. `idUnit` kosong = Umum, yaitu isi CMS yang sudah
+ * ada sebelum situs per unit. Kolom dan kuncinya sama di setiap unit.
+ *
+ * KONTRAK dengan `halamanKontenUnit` di
+ * `web-public/src/lib/services/halaman-unit.ts`, diuji dengan vektor yang sama.
+ */
+export const halamanKontenCms = (idUnit: string, tab: TabKontenCms) =>
+  idUnit ? `unit:${idUnit}:${tab}` : tab;
+
+/** Isi Umum yang disalin ke unit: yang terisi saja, tanpa foto sorotan. */
+export function kontenUntukSalinan(
+  items: Record<string, string>,
+): Record<string, string> {
+  return Object.fromEntries(
+    Object.entries(items).filter(
+      ([kunci, nilai]) =>
+        kunci !== "landing.sorotan_items" && String(nilai ?? "").trim(),
+    ),
+  );
+}
 
 type ItemKoleksi = Record<string, unknown>;
 
