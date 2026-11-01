@@ -34,6 +34,7 @@ export const KUNCI_KOLEKSI = {
   fasilitas: "landing.fasilitas_items",
   pmbTahapan: "landing.pmb_tahapan_items",
   faq: "landing.faq_items",
+  sorotan: "landing.sorotan_items",
 } as const;
 
 type Konten = Record<string, string | undefined>;
@@ -259,6 +260,55 @@ export const koleksiFasilitas = (konten: Konten): ItemFasilitas[] =>
     specs: uraiSpecs(item.specs),
     foto: idFoto(item.foto),
   }));
+
+/** Foto bergerak di halaman depan. `foto` berisi nilai untuk `srcGambarKonten`. */
+export interface ItemSorotan {
+  foto: string;
+  judul: string;
+  keterangan: string;
+}
+
+export const MAKS_FOTO_SOROTAN = 8;
+
+/**
+ * Foto halaman depan: pilihan admin di koleksi sorotan. Selama koleksinya
+ * kosong, foto hero, program, dan fasilitas yang sudah ada dipakai supaya situs
+ * yang baru diperbarui tidak tampil tanpa foto.
+ */
+export function fotoSorotan(konten: Konten): ItemSorotan[] {
+  // Foto yang sama dipakai dua item hanya akan tampil berulang di deretan.
+  const rapikan = (daftar: ItemSorotan[]) =>
+    daftar
+      .filter(
+        (item, i) =>
+          item.foto && daftar.findIndex((x) => x.foto === item.foto) === i,
+      )
+      .slice(0, MAKS_FOTO_SOROTAN);
+
+  const pilihan = rapikan(
+    ambil(konten, KUNCI_KOLEKSI.sorotan, null, (item) => ({
+      foto: idFoto(item.foto),
+      judul: teks(item.title),
+      keterangan: teks(item.desc),
+    })),
+  );
+  if (pilihan.length > 0) return pilihan;
+
+  // Foto hero lama bisa berupa data URL, jadi nilainya tidak melewati `idFoto`.
+  return rapikan([
+    { foto: teks(konten["landing.hero_image"]), judul: "", keterangan: "" },
+    ...koleksiProgram(konten).map((item) => ({
+      foto: item.foto,
+      judul: item.title,
+      keterangan: item.subtitle || item.desc,
+    })),
+    ...koleksiFasilitas(konten).map((item) => ({
+      foto: item.foto,
+      judul: item.name,
+      keterangan: item.desc,
+    })),
+  ]);
+}
 
 export const koleksiTahapanPmb = (konten: Konten): ItemTahapan[] =>
   ambil(konten, KUNCI_KOLEKSI.pmbTahapan, null, (item) => ({

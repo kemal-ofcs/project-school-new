@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState, useTransition } from "react";
 import { CollectionRepeater } from "@/components/content/CollectionRepeater";
 import { FotoJurusanEditor } from "@/components/content/FotoJurusanEditor";
+import { HalamanUnitEditor } from "@/components/content/HalamanUnitEditor";
 import { HeroImageUploader } from "@/components/content/HeroImageUploader";
 import { MobileAppShell } from "@/components/MobileAppShell";
 import { FeedbackBanner } from "@/components/ui/FeedbackBanner";
@@ -42,7 +43,9 @@ export default function KontenMobilePage() {
   // Penjaga klik ganda mutasi (Audit UI Guard)
   const isSubmittingRef = useRef(false);
 
-  const [activeTab, setActiveTab] = useState<"berita" | "halaman">("berita");
+  const [activeTab, setActiveTab] = useState<"berita" | "halaman" | "unit">(
+    "berita",
+  );
   const [galat, setGalat] = useState<string | null>(null);
   const [kabar, setKabar] = useState<string | null>(null);
 
@@ -135,9 +138,10 @@ export default function KontenMobilePage() {
 
   useEffect(() => {
     if (!authLoading && isAuthenticated && canAccessArea(user, "konten")) {
+      // Tab Halaman Unit memuat datanya sendiri di `HalamanUnitEditor`.
       if (activeTab === "berita") {
         void muatBerita();
-      } else {
+      } else if (activeTab === "halaman") {
         void muatHalaman(halamanTab);
       }
     }
@@ -356,10 +360,26 @@ export default function KontenMobilePage() {
           >
             Halaman Publik
           </button>
+          <button
+            type="button"
+            onClick={() => {
+              triggerHaptic("light");
+              setActiveTab("unit");
+            }}
+            className={`flex-1 rounded-xl py-2 text-xs font-bold transition ${
+              activeTab === "unit"
+                ? "bg-sky-500 text-slate-950 shadow-md"
+                : "text-slate-400 hover:text-white"
+            }`}
+          >
+            Halaman Unit
+          </button>
         </div>
 
+        {activeTab === "unit" ? <HalamanUnitEditor /> : null}
+
         {/* Konten Tab Berita */}
-        {activeTab === "berita" ? (
+        {activeTab === "unit" ? null : activeTab === "berita" ? (
           <div className="space-y-4">
             <div className="flex items-center justify-between">
               <h2 className="text-sm font-bold text-white">Daftar Berita</h2>
@@ -502,7 +522,7 @@ export default function KontenMobilePage() {
                   { id: "profil", label: "Profil" },
                   { id: "kontak", label: "Kontak" },
                   { id: "program", label: "Program" },
-                  { id: "landing", label: "Landing" },
+                  { id: "landing", label: "Depan & Beranda" },
                 ] as const
               ).map((sub) => (
                 <button

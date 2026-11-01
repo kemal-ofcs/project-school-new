@@ -117,6 +117,7 @@ const filesToCopy = [
   "components/content/HeroImageUploader.tsx",
   "components/content/GambarKontenInput.tsx",
   "components/content/FotoJurusanEditor.tsx",
+  "components/content/HalamanUnitEditor.tsx",
   "components/pmb/DataDapodikPmb.tsx",
   // Data DAPODIK per siswa di halaman Siswa (v57): modal isian, lencana, ekspor.
   "components/siswa/DapodikSiswa.tsx",

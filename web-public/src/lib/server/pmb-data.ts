@@ -56,12 +56,13 @@ export type { GelombangAktif };
  * tidak bisa dipakai: server menuntut unit dan program yang sama saat kirim,
  * jadi formulir tanpa pilihan itu hanya akan ditolak di langkah terakhir.
  */
+const getPilihanPmb = cache(async (): Promise<PilihanPmb> => {
+  return readPilihanPmb(await getReadyPublicDatabase());
+});
+
 export async function muatPilihanPmb(): Promise<HasilMuat<PilihanPmb>> {
   try {
-    return {
-      status: "ok",
-      data: await readPilihanPmb(await getReadyPublicDatabase()),
-    };
+    return { status: "ok", data: await getPilihanPmb() };
   } catch (error) {
     console.error("[web-public] gagal membaca unit dan program PMB:", error);
     return petakanKegagalan(error);

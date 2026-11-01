@@ -240,6 +240,13 @@ export const LANDING_PAGE_SUBSECTIONS: CmsSubSectionConfig[] = [
     ],
   },
   {
+    id: "sorotan",
+    title: "Foto Sorotan",
+    description:
+      "Foto besar dan deretan gambar kecil yang bergerak di halaman depan situs. Selama daftar ini kosong, situs memakai foto hero, program, dan fasilitas.",
+    fields: [],
+  },
+  {
     id: "pillars_leader",
     title: "Sambutan Pimpinan",
     description:
@@ -516,6 +523,18 @@ export const KOLEKSI_LANDING: Record<string, KoleksiLandingConfig> = {
       peta: { label: "label", value: "value", sub: "sub" },
     },
   },
+  sorotan: {
+    kunci: "landing.sorotan_items",
+    label: "Foto Halaman Depan",
+    description:
+      "Pastikan foto yang menampilkan siswa sudah mendapat izin untuk dipublikasikan. Judul dan keterangan tampil di atas foto.",
+    maksItem: 8,
+    fields: [
+      { name: "foto", label: "Foto", type: "gambar" },
+      { name: "title", label: "Judul", placeholder: "Wisuda Angkatan 2026" },
+      { name: "desc", label: "Keterangan Singkat", type: "textarea" },
+    ],
+  },
   extracurricular: {
     kunci: "landing.ekskul_items",
     label: "Ekstrakurikuler",
@@ -596,6 +615,85 @@ export const KOLEKSI_LANDING: Record<string, KoleksiLandingConfig> = {
     ],
   },
 };
+
+/**
+ * Isian halaman per unit, sama untuk semua unit. Disimpan di `konten_publik`
+ * dengan nama halaman dari `halamanKontenUnit`.
+ *
+ * Kuncinya KONTRAK dengan `web-public/src/lib/services/halaman-unit.ts` dan
+ * diuji di kedua sisi.
+ */
+export const KOLOM_HALAMAN_UNIT: CmsFieldConfig[] = [
+  { key: "unit.foto", label: "Foto Utama", type: "image", placeholder: "" },
+  {
+    key: "unit.tagline",
+    label: "Tagline Singkat",
+    type: "text",
+    placeholder: "Belajar sambil bermain",
+  },
+  {
+    key: "unit.deskripsi",
+    label: "Deskripsi Singkat",
+    type: "textarea",
+    rows: 3,
+    placeholder: "Gambaran singkat unit ini untuk calon wali.",
+  },
+  {
+    key: "unit.visi",
+    label: "Visi",
+    type: "textarea",
+    rows: 3,
+    placeholder: "Visi unit ini.",
+  },
+  {
+    key: "unit.misi",
+    label: "Misi",
+    type: "textarea",
+    rows: 4,
+    placeholder: "Satu butir per baris.",
+  },
+  {
+    key: "unit.sejarah",
+    label: "Sejarah Singkat",
+    type: "textarea",
+    rows: 4,
+    placeholder: "Sejarah singkat unit ini.",
+  },
+  {
+    key: "unit.sambutan",
+    label: "Sambutan",
+    type: "textarea",
+    rows: 4,
+    placeholder: "Sambutan kepala unit.",
+  },
+  {
+    key: "unit.kepala_nama",
+    label: "Nama Kepala Unit",
+    type: "text",
+    placeholder: "Nama lengkap dan gelar",
+  },
+  {
+    key: "unit.kepala_jabatan",
+    label: "Jabatan Kepala Unit",
+    type: "text",
+    placeholder: "Kepala Sekolah",
+  },
+  {
+    key: "unit.akreditasi",
+    label: "Status Akreditasi",
+    type: "text",
+    placeholder: "Terakreditasi A",
+  },
+  {
+    key: "unit.whatsapp",
+    label: "Nomor WhatsApp Unit",
+    type: "text",
+    placeholder: "0812xxxxxxxx",
+    description: "Kosongkan untuk memakai nomor telepon sekolah.",
+  },
+];
+
+export const halamanKontenUnit = (idUnit: string) => `unit:${idUnit}`;
 
 type ItemKoleksi = Record<string, unknown>;
 

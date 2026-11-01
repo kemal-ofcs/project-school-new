@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 import {
   HALAMAN_CMS,
   KOLEKSI_LANDING,
+  KOLOM_HALAMAN_UNIT,
   LANDING_PAGE_SUBSECTIONS,
   muatKoleksiLanding,
   siapkanSimpanLanding,
@@ -26,6 +27,26 @@ describe("CMS landing: koleksi dan perpindahan kunci lama", () => {
         "landing.fasilitas_items",
         "landing.pmb_tahapan_items",
         "landing.faq_items",
+        "landing.sorotan_items",
+      ].sort(),
+    );
+  });
+
+  /** Kontrak dengan `KUNCI_UNIT` di situs publik, yang menguji set yang sama. */
+  test("kunci isian unit sama dengan yang dibaca situs publik", () => {
+    expect(KOLOM_HALAMAN_UNIT.map((k) => k.key).sort()).toEqual(
+      [
+        "unit.foto",
+        "unit.tagline",
+        "unit.deskripsi",
+        "unit.visi",
+        "unit.misi",
+        "unit.sejarah",
+        "unit.sambutan",
+        "unit.kepala_nama",
+        "unit.kepala_jabatan",
+        "unit.akreditasi",
+        "unit.whatsapp",
       ].sort(),
     );
   });

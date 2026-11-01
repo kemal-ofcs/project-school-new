@@ -247,9 +247,12 @@ function OrangTua({
 export function FormPendaftaran({
   pilihan,
   rekening,
+  unitAwal,
 }: {
   pilihan: PilihanPmb;
   rekening: RekeningPmb;
+  /** Nama unit dari tombol daftar di halaman unit; menang atas draf. */
+  unitAwal?: string;
 }) {
   const id = useId();
   const formRef = useRef<HTMLFormElement>(null);
@@ -264,7 +267,7 @@ export function FormPendaftaran({
   const [menyiapkan, setMenyiapkan] = useState<JenisBerkasSekolah | null>(null);
   // Terkendali karena daftar program bergantung pada unit (v58); nilainya
   // tetap terbaca `FormData` lewat atribut `name`.
-  const [unit, setUnit] = useState("");
+  const [unit, setUnit] = useState(unitAwal ?? "");
   const [program, setProgram] = useState("");
   const jurusan = jurusanUntukUnit(pilihan, unit || null);
   // Isian penentu aturan wajib orang tua dan wali; dibaca ulang setiap input.
@@ -315,13 +318,17 @@ export function FormPendaftaran({
           if (elemen.type !== "file") elemen.value = String(nilai);
         }
       }
-      setUnit(String(draf.pilihanUnit ?? ""));
-      setProgram(String(draf.pilihanJurusan ?? ""));
+      const unitDraf = String(draf.pilihanUnit ?? "");
+      setUnit(unitAwal || unitDraf);
+      // Program di draf milik unit lain tidak berlaku untuk unit yang dituju.
+      if (!unitAwal || unitAwal === unitDraf) {
+        setProgram(String(draf.pilihanJurusan ?? ""));
+      }
       setPenentu(draf);
     } catch {
       // Penyimpanan diblokir atau draf rusak: formulir tetap bisa diisi.
     }
-  }, []);
+  }, [unitAwal]);
 
   function simpanDraf() {
     const form = formRef.current;

@@ -18,7 +18,7 @@ import type { SchoolProfile } from "@/lib/services/school-profile";
 import { namaTampil } from "@/lib/services/school-profile";
 
 export const NAVIGASI = [
-  { href: "/", label: "Beranda" },
+  { href: "/beranda", label: "Beranda" },
   { href: "/profil", label: "Profil" },
   { href: "/program", label: "Program" },
   { href: "/pmb", label: "Pendaftaran" },
@@ -172,14 +172,24 @@ export function SiteFooter({
 
   return (
     <footer className="mt-20 border-t border-border bg-card text-card-foreground transition-colors duration-300">
-      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 pt-16 pb-12">
+      {/* Ruang bawah di HP: bilah Daftar PMB menutupi 68px terakhir halaman. */}
+      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 pt-16 pb-28 md:pb-12">
         <div className="grid grid-cols-1 gap-10 md:grid-cols-2 lg:grid-cols-4 pb-12 border-b border-border">
           {/* Kolom 1: Profil & Legalitas */}
           <div className="space-y-4">
             <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary text-primary-foreground shadow-sm">
-                <GraduationCap className="h-6 w-6" />
-              </div>
+              {profil.logoUrl ? (
+                // biome-ignore lint/performance/noImgElement: dynamic logo URL from database
+                <img
+                  alt=""
+                  className="h-10 w-10 rounded-md object-contain"
+                  src={profil.logoUrl}
+                />
+              ) : (
+                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary text-primary-foreground shadow-sm">
+                  <GraduationCap className="h-6 w-6" />
+                </div>
+              )}
               <div>
                 <h3 className="font-bold text-lg leading-tight">{nama}</h3>
                 {tagline ? (

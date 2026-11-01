@@ -8,6 +8,7 @@ import {
   muatPilihanPmb,
   muatRekeningPmb,
 } from "@/lib/server/pmb-data";
+import { daftarHalamanUnit } from "@/lib/services/halaman-unit";
 import { FormPendaftaran } from "./FormPendaftaran";
 
 export const metadata: Metadata = {
@@ -25,7 +26,11 @@ export const metadata: Metadata = {
  */
 export const revalidate = 0;
 
-export default async function HalamanDaftar() {
+export default async function HalamanDaftar({
+  searchParams,
+}: {
+  searchParams: Promise<{ unit?: string | string[] }>;
+}) {
   // Diperiksa SEBELUM formulir dirender, dengan alasan yang sama seperti
   // `revalidate = 0` di atas: orang yang mengisi seluruh formulir dan
   // mengunggah berkasnya tidak boleh baru tahu di akhir bahwa pendaftarannya
@@ -103,6 +108,11 @@ export default async function HalamanDaftar() {
   }
 
   const aktif = gelombang.data;
+  // Dibuka dari tombol daftar di halaman unit; alamat asing diabaikan.
+  const { unit: slugUnit } = await searchParams;
+  const unitAwal = daftarHalamanUnit(pilihan.data.unit).find(
+    (u) => u.slug === slugUnit,
+  )?.nama;
 
   return (
     <main className="mx-auto max-w-3xl px-6 py-14">
@@ -115,7 +125,11 @@ export default async function HalamanDaftar() {
       </p>
 
       <div className="mt-10">
-        <FormPendaftaran pilihan={pilihan.data} rekening={rekening} />
+        <FormPendaftaran
+          pilihan={pilihan.data}
+          rekening={rekening}
+          unitAwal={unitAwal}
+        />
       </div>
     </main>
   );

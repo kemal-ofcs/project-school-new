@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import {
   dariKunciBernomor,
+  fotoSorotan,
   KUNCI_KOLEKSI,
   KUNCI_LAMA,
   koleksiFaq,
@@ -8,6 +9,7 @@ import {
   koleksiProgram,
   koleksiStat,
   koleksiTahapanPmb,
+  MAKS_FOTO_SOROTAN,
   MAKS_ITEM_KOLEKSI,
   uraiKoleksi,
   uraiSpecs,
@@ -126,7 +128,62 @@ describe("koleksi dinamis landing page", () => {
       fasilitas: "landing.fasilitas_items",
       pmbTahapan: "landing.pmb_tahapan_items",
       faq: "landing.faq_items",
+      sorotan: "landing.sorotan_items",
     });
+  });
+});
+
+describe("foto halaman depan", () => {
+  const id = (huruf: string) => huruf.repeat(32);
+
+  test("pilihan admin dipakai, item tanpa foto dibuang", () => {
+    const hasil = fotoSorotan({
+      "landing.hero_image": id("a"),
+      "landing.sorotan_items": JSON.stringify([
+        { foto: id("b"), title: "Wisuda", desc: "Angkatan 2026" },
+        { title: "Tanpa foto" },
+      ]),
+    });
+    expect(hasil).toEqual([
+      { foto: id("b"), judul: "Wisuda", keterangan: "Angkatan 2026" },
+    ]);
+  });
+
+  test("koleksi kosong memakai foto hero, program, lalu fasilitas", () => {
+    const hasil = fotoSorotan({
+      "landing.hero_image": "data:image/jpeg;base64,abc",
+      "landing.program_items": JSON.stringify([
+        { foto: id("b"), title: "Tahfidz", subtitle: "Malam bina" },
+        { title: "Tanpa foto" },
+      ]),
+      "landing.fasilitas_items": JSON.stringify([
+        { foto: id("c"), name: "Lab", desc: "Komputer" },
+      ]),
+    });
+    expect(hasil.map((item) => item.foto)).toEqual([
+      "data:image/jpeg;base64,abc",
+      id("b"),
+      id("c"),
+    ]);
+    expect(hasil[1]?.keterangan).toBe("Malam bina");
+  });
+
+  test("tanpa foto apa pun hasilnya kosong, dan jumlahnya dibatasi", () => {
+    expect(fotoSorotan({})).toEqual([]);
+    const banyak = Array.from({ length: MAKS_FOTO_SOROTAN + 3 }, (_, i) => ({
+      foto: String(i).padStart(32, "0"),
+    }));
+    expect(
+      fotoSorotan({ "landing.sorotan_items": JSON.stringify(banyak) }),
+    ).toHaveLength(MAKS_FOTO_SOROTAN);
+  });
+
+  test("foto yang sama tidak tampil dua kali", () => {
+    const hasil = fotoSorotan({
+      "landing.hero_image": id("a"),
+      "landing.program_items": JSON.stringify([{ foto: id("a"), title: "X" }]),
+    });
+    expect(hasil).toHaveLength(1);
   });
 });
 

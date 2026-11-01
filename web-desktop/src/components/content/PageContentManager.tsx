@@ -129,7 +129,7 @@ export function PageContentManager() {
             { id: "profil", label: "Profil Sekolah" },
             { id: "kontak", label: "Kontak & Alamat" },
             { id: "program", label: "Program & Fasilitas Ringkasan" },
-            { id: "landing", label: "Landing Page (Beranda)" },
+            { id: "landing", label: "Halaman Depan & Beranda" },
           ] as const
         ).map((tab) => (
           <button
