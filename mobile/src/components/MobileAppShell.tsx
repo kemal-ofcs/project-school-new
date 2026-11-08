@@ -10,6 +10,7 @@ import {
 import { AutoAlfaRunner } from "./AutoAlfaRunner";
 import { AutoPemberitahuanRunner } from "./AutoPemberitahuanRunner";
 import { AutoSyncRunner } from "./AutoSyncRunner";
+import { AutoTelegramRunner } from "./AutoTelegramRunner";
 import { AutoWaSenderRunner } from "./AutoWaSenderRunner";
 import { BelSekolahRunner } from "./BelSekolahRunner";
 import { KonfirmasiSimpan } from "./KonfirmasiSimpan";
@@ -80,6 +81,7 @@ export function MobileAppShell({
       <AutoAlfaRunner />
       <AutoSyncRunner />
       <AutoWaSenderRunner />
+      <AutoTelegramRunner />
       <AutoPemberitahuanRunner />
       <BelSekolahRunner />
       <KonfirmasiSimpan />

@@ -27,8 +27,8 @@ Untuk server Windows tanpa Docker ada paket terpisah dengan panduannya sendiri
 3. Salin `.env.example` menjadi `.env`, lalu isi `KOS_SITE_ADDRESS`,
    `KOS_PUBLIC_ADDRESS`, dan `KOS_SETUP_TOKEN`. Pada paket berkas `.tar`,
    `KOS_WEB_IMAGE` dan `KOS_PUBLIC_IMAGE` sudah terisi. Pada jalur registry,
-   isi keduanya dengan alamat yang Anda terima.
-   Token bisa dibuat dengan `openssl rand -base64 32`.
+   isi keduanya dengan alamat yang Anda terima. Cara mendapatkan isinya ada di
+   bagian [Mengisi .env](#mengisi-env) di bawah.
 4. Jalankan `docker compose up -d`.
 5. Buka `https://<KOS_SITE_ADDRESS>/setup` di browser. Halaman itu menampilkan
    kode server, berawalan `S-`. Kirim kode itu kepada Kemal Office Studio untuk
@@ -40,6 +40,90 @@ Untuk server Windows tanpa Docker ada paket terpisah dengan panduannya sendiri
    terlupa.
 8. Kosongkan `KOS_SETUP_TOKEN` di `.env`, lalu jalankan `docker compose up -d`
    sekali lagi.
+
+## Mengisi .env
+
+### KOS_SITE_ADDRESS dan KOS_PUBLIC_ADDRESS
+
+Kedua isian ini adalah alamat yang nanti diketik di browser, tanpa `https://`.
+Isinya tergantung siapa yang membuka aplikasi.
+
+**Hanya di jaringan sekolah (WiFi atau LAN yang sama).** Pakai alamat IP
+server:
+
+1. Di terminal server, jalankan `hostname -I`. Angka pertama yang tampil,
+   misalnya `192.168.1.10`, adalah alamat IP server di jaringan.
+2. Isi:
+
+   ```
+   KOS_SITE_ADDRESS=192.168.1.10
+   KOS_PUBLIC_ADDRESS=192.168.1.10:8443
+   KOS_TLS=internal
+   ```
+
+   Situs publik memakai port `8443` karena kedua alamat harus berbeda, dan
+   `docker-compose.yml` sudah membuka port itu.
+
+Alamat IP ini bisa berubah setelah router atau server dinyalakan ulang, dan
+aplikasi tidak lagi terbuka di alamat lama. Supaya tetap, atur "DHCP
+reservation" untuk server ini di halaman router, atau beri alamat IP tetap di
+pengaturan jaringan servernya.
+
+**Dibuka dari internet.** Pakai nama domain milik sekolah:
+
+1. Di panel penyedia domain, buka pengaturan DNS dan buat dua A record yang
+   mengarah ke IP publik server, misalnya `admin` untuk aplikasi admin dan `@`
+   atau `www` untuk situs publik.
+2. Buka port 80 dan 443 (TCP) di firewall server (misalnya
+   `sudo ufw allow 80,443/tcp`) dan, bila server ada di jaringan sekolah,
+   teruskan kedua port itu dari router ke IP lokal server.
+3. Isi:
+
+   ```
+   KOS_SITE_ADDRESS=admin.sekolah.sch.id
+   KOS_PUBLIC_ADDRESS=www.sekolah.sch.id
+   KOS_TLS=email-pengelola@sekolah.sch.id
+   ```
+
+   Dengan alamat email di `KOS_TLS`, sertifikat HTTPS resmi diterbitkan
+   otomatis dan peringatan sertifikat tidak muncul.
+
+Server di jaringan sekolah butuh IP publik untuk cara ini. Bandingkan IP WAN
+di halaman router dengan hasil `curl ifconfig.me` di server. Bila berbeda,
+koneksi internetnya memakai CGNAT dan server tidak bisa dijangkau dari
+internet: minta IP publik ke penyedia internet, atau pasang di VPS.
+
+### KOS_SETUP_TOKEN
+
+Kata sandi sekali pakai untuk membuka halaman `/setup`. Token ini **bukan
+lisensi** dan **bukan password Superadmin**: Anda membuatnya sendiri, dan
+gunanya hanya supaya tidak ada orang lain yang mendahului Anda membuat akun
+Superadmin pertama. Isinya minimal 32 karakter acak.
+
+Cara membuatnya:
+
+1. Di terminal server, jalankan:
+
+   ```
+   openssl rand -base64 32
+   ```
+
+2. Muncul satu baris berisi 44 karakter acak, misalnya `q8Zr2mVx...=`.
+   Salin seluruh baris itu, termasuk tanda `=` di ujungnya bila ada.
+3. Tempel di `.env` setelah tanda `=`, tanpa spasi dan tanpa tanda petik:
+
+   ```
+   KOS_SETUP_TOKEN=q8Zr2mVx...=
+   ```
+
+4. Simpan juga token itu di catatan. Nanti token ini diketik ulang di halaman
+   `/setup`.
+
+Di halaman `/setup` ada tiga isian yang berbeda: **token** (isi dengan
+`KOS_SETUP_TOKEN` ini), **data Superadmin** (username dan password baru untuk
+login sehari-hari), dan **teks lisensi** (dari Kemal Office Studio). Setelah
+Superadmin dibuat, kosongkan lagi isian ini (langkah 8). Sejak itu, login cukup
+memakai username dan password Superadmin.
 
 ## Situs publik
 

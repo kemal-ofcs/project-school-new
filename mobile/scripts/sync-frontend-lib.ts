@@ -34,6 +34,7 @@ const filesToCopy = [
   "lib/db-migrations.ts",
   "components/AutoAlfaRunner.tsx",
   "components/AutoWaSenderRunner.tsx",
+  "components/AutoTelegramRunner.tsx",
   "components/AutoPemberitahuanRunner.tsx",
   "components/AutoSyncRunner.tsx",
   // Bel sekolah per perangkat (v60): runner di shell dan panel pengaturannya.

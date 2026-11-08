@@ -62,7 +62,7 @@ export type HasilMuat<T> =
  * skemanya belum lengkap atau sedang tidak terjangkau. Dua yang terakhir adalah
  * keadaan operasional yang memang harus dilayani halaman dengan anggun.
  */
-async function tolakBuildTanpaKonfigurasi(): Promise<void> {
+export async function tolakBuildTanpaKonfigurasi(): Promise<void> {
   // Image untuk server sendiri dibangun SEKALI tanpa database siapa pun, lalu
   // dipakai banyak sekolah. Tidak ada isi yang boleh dibekukan saat build:
   // `connection()` menghentikan prerender di sini, sehingga setiap halaman

@@ -1692,14 +1692,40 @@ pub fn delete_column(state: &MobileState, id_kolom: &str) -> Result<Value, Comma
     Ok(json!({ "sukses": true, "barang_dibersihkan": barang.len() }))
 }
 
-/// Barang yang boleh dihapus (`b` = `inventory_barang`): tanpa unit, dan
-/// setiap mutasinya sudah dibatalkan, sehingga barang itu tidak pernah
-/// meninggalkan stok maupun laporan. Cermin `BARANG_BISA_DIHAPUS_SQL` di
-/// `services/inventory.ts`.
-pub const BARANG_BISA_DIHAPUS_SQL: &str = "(NOT EXISTS (SELECT 1 FROM inventory_unit u WHERE u.id_barang = b.id_barang)
+/// Barang salah input (`b` = `inventory_barang`): tanpa unit, dan setiap
+/// mutasinya sudah dibatalkan, sehingga barang itu tidak pernah meninggalkan
+/// stok maupun laporan. Hanya kode barang seperti ini yang bebas dipakai lagi
+/// setelah dihapus. Cermin `BARANG_SALAH_INPUT_SQL` di `services/inventory.ts`.
+macro_rules! barang_salah_input_sql {
+    () => {
+        "(NOT EXISTS (SELECT 1 FROM inventory_unit u WHERE u.id_barang = b.id_barang)
     AND NOT EXISTS (SELECT 1 FROM inventory_mutasi m
         WHERE m.id_barang = b.id_barang AND m.alasan <> 'Pembatalan'
-          AND NOT EXISTS (SELECT 1 FROM inventory_mutasi x WHERE x.id_mutasi = 'batal-' || m.id_mutasi)))";
+          AND NOT EXISTS (SELECT 1 FROM inventory_mutasi x WHERE x.id_mutasi = 'batal-' || m.id_mutasi)))"
+    };
+}
+const BARANG_SALAH_INPUT_SQL: &str = barang_salah_input_sql!();
+
+/// Barang yang boleh dihapus: salah input, atau barang nonaktif yang sudah
+/// selesai dipakai (setiap saldonya 0, tanpa pinjaman yang belum kembali, tanpa
+/// servis terbuka). Peminjaman mengurangi stok, jadi stok 0 saja tidak cukup.
+/// Riwayatnya tetap terbaca karena barisnya hanya ditandai `dihapus_pada`.
+/// Cermin `BARANG_BISA_DIHAPUS_SQL` di `services/inventory.ts`.
+pub const BARANG_BISA_DIHAPUS_SQL: &str = concat!(
+    "(",
+    barang_salah_input_sql!(),
+    "
+    OR (b.status_aktif = 0
+      AND NOT EXISTS (SELECT 1 FROM inventory_saldo s WHERE s.id_barang = b.id_barang AND s.saldo <> 0)
+      AND NOT EXISTS (SELECT 1 FROM inventory_mutasi p
+          WHERE p.id_barang = b.id_barang AND p.alasan = 'Peminjaman'
+            AND NOT EXISTS (SELECT 1 FROM inventory_mutasi pb WHERE pb.id_mutasi = 'batal-' || p.id_mutasi)
+            AND p.jumlah > COALESCE((SELECT SUM(r.jumlah) FROM inventory_mutasi r
+                WHERE r.id_ref = p.id_mutasi AND r.alasan = 'Pengembalian'
+                  AND NOT EXISTS (SELECT 1 FROM inventory_mutasi rb WHERE rb.id_mutasi = 'batal-' || r.id_mutasi)), 0))
+      AND NOT EXISTS (SELECT 1 FROM inventory_servis v
+          WHERE v.id_barang = b.id_barang AND v.tanggal_selesai IS NULL AND v.dibatalkan_pada IS NULL)))"
+);
 
 /// Hapus barang salah input. Barisnya tetap ada bertanda `dihapus_pada`, sama
 /// dengan kolom tambahan: snapshot barang `delete_missing: false`, jadi baris
@@ -1729,7 +1755,7 @@ pub fn delete_item(state: &MobileState, id_barang: &str) -> Result<Value, Comman
     }
     if !bisa {
         return Err(invalid(
-            "Barang ini sudah punya riwayat stok atau unit. Batalkan mutasinya dulu, atau nonaktifkan barangnya.",
+            "Barang ini belum bisa dihapus: nonaktifkan dulu, habiskan stoknya, dan selesaikan pinjaman serta servisnya.",
         ));
     }
     transaction
@@ -2185,7 +2211,9 @@ pub(crate) fn save_item_tx(
     let kode_barang = match valid.kode_barang.clone() {
         Some(kode) => {
             if kode_dipakai(&transaction, &kode, &id_barang)? {
-                return Err(invalid("Kode barang sudah dipakai barang lain."));
+                return Err(invalid(
+                    "Kode barang sudah dipakai barang lain, termasuk barang yang sudah dihapus.",
+                ));
             }
             kode
         }
@@ -2261,6 +2289,8 @@ pub(crate) fn save_item_tx(
     Ok((id_barang, kode_barang))
 }
 
+/// Kode barang terhapus yang punya riwayat tetap dicadangkan, supaya laporan
+/// lama dan barang baru tidak berbagi satu kode. Cermin `kodeDipakai`.
 fn kode_dipakai(
     transaction: &Transaction<'_>,
     kode: &str,
@@ -2268,9 +2298,11 @@ fn kode_dipakai(
 ) -> Result<bool, CommandError> {
     transaction
         .query_row(
-            "SELECT EXISTS(SELECT 1 FROM inventory_barang
-                           WHERE LOWER(kode_barang) = LOWER(?) AND id_barang <> ?
-                             AND dihapus_pada IS NULL);",
+            &format!(
+                "SELECT EXISTS(SELECT 1 FROM inventory_barang b
+                               WHERE LOWER(b.kode_barang) = LOWER(?) AND b.id_barang <> ?
+                                 AND (b.dihapus_pada IS NULL OR NOT {BARANG_SALAH_INPUT_SQL}));"
+            ),
             params![kode, id_barang],
             |row| row.get(0),
         )
@@ -6480,7 +6512,7 @@ mod tests {
         assert!(delete_item(&state, &id_barang)
             .unwrap_err()
             .message
-            .starts_with("Barang ini sudah punya riwayat stok"));
+            .starts_with("Barang ini belum bisa dihapus"));
         cancel_mutation(&state, "admin", masuk["id_mutasi"].as_str().unwrap(), "Salah input").unwrap();
         delete_item(&state, &id_barang).unwrap();
 
@@ -6527,6 +6559,81 @@ mod tests {
             )
             .unwrap();
         assert!(delete_item(&state, &id_barang).is_err());
+    }
+
+    /// Kembar tes "barang nonaktif yang habis dipakai bisa dihapus, kodenya
+    /// tetap dicadangkan" di `services/inventory.test.ts`.
+    #[test]
+    fn delete_inactive_item_once_used_up_keeps_its_code() {
+        let (_directory, state) = setup_state();
+        let id_barang = insert_item(&state, "Habis Pakai", false);
+        let connection = storage::database(&state.data_dir).unwrap();
+        let set_aktif = |aktif: i64| {
+            connection
+                .execute(
+                    "UPDATE inventory_barang SET status_aktif = ? WHERE id_barang = ?;",
+                    params![aktif, id_barang],
+                )
+                .unwrap();
+        };
+        let ditolak = || {
+            assert!(delete_item(&state, &id_barang)
+                .unwrap_err()
+                .message
+                .starts_with("Barang ini belum bisa dihapus"));
+        };
+        insert_raw_mutation(&state, "mts-awal", &id_barang, "Masuk", 10);
+        let id_pinjam = pinjamkan(&state, &id_barang, 4);
+        insert_raw_mutation(&state, "mts-pakai", &id_barang, "Keluar", 6);
+        set_aktif(0);
+        // Stok 0, tetapi 4 masih dipinjam.
+        ditolak();
+
+        // Barang nonaktif tidak menerima barang masuk, termasuk pengembalian.
+        set_aktif(1);
+        kembalikan(&state, &id_barang, &id_pinjam, 4).unwrap();
+        set_aktif(0);
+        ditolak();
+
+        insert_raw_mutation(&state, "mts-habis", &id_barang, "Keluar", 4);
+        connection
+            .execute(
+                "INSERT INTO inventory_servis (id_servis, id_barang, jumlah, tempat, kondisi_awal,
+                   tanggal_mulai, keluhan, dibuka_oleh)
+                 VALUES ('srv-1', ?, 1, 'Gudang', 'Rusak Ringan', '2026-10-01', 'Retak', 'uji');",
+                params![id_barang],
+            )
+            .unwrap();
+        ditolak();
+        connection
+            .execute(
+                "UPDATE inventory_servis SET dibatalkan_pada = datetime('now') WHERE id_servis = 'srv-1';",
+                [],
+            )
+            .unwrap();
+
+        set_aktif(1);
+        ditolak();
+        set_aktif(0);
+        delete_item(&state, &id_barang).unwrap();
+
+        assert!(list_inventory(&state).unwrap()["barang"]
+            .as_array()
+            .unwrap()
+            .is_empty());
+        let galat = save_item(
+            &state,
+            json!({"kode_barang": "BRG-0001", "nama_barang": "Pengganti", "tipe": "Habis Pakai", "satuan": "pcs"}),
+        )
+        .unwrap_err();
+        assert!(galat.message.starts_with("Kode barang sudah dipakai barang lain"));
+        // Nomor otomatis melompati kode yang dicadangkan.
+        let baru = save_item(
+            &state,
+            json!({"nama_barang": "Pengganti", "tipe": "Habis Pakai", "satuan": "pcs"}),
+        )
+        .unwrap();
+        assert_ne!(baru["kode_barang"], "BRG-0001");
     }
 
     #[test]

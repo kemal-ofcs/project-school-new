@@ -4,7 +4,11 @@ import { cache } from "react";
 import type { RekeningPmb } from "@/components/pmb/InfoBayarPmb";
 import { getPageContent } from "@/lib/server/content-data";
 import { getReadyPublicDatabase } from "@/lib/server/db";
-import { type HasilMuat, petakanKegagalan } from "@/lib/server/school-data";
+import {
+  type HasilMuat,
+  petakanKegagalan,
+  tolakBuildTanpaKonfigurasi,
+} from "@/lib/server/school-data";
 import {
   type GelombangAktif,
   readGelombangAktif,
@@ -41,6 +45,7 @@ export const getGelombangAktif = cache(
 export async function muatGelombangAktif(): Promise<
   HasilMuat<GelombangAktif | null>
 > {
+  await tolakBuildTanpaKonfigurasi();
   try {
     return { status: "ok", data: await getGelombangAktif() };
   } catch (error) {
@@ -61,6 +66,7 @@ const getPilihanPmb = cache(async (): Promise<PilihanPmb> => {
 });
 
 export async function muatPilihanPmb(): Promise<HasilMuat<PilihanPmb>> {
+  await tolakBuildTanpaKonfigurasi();
   try {
     return { status: "ok", data: await getPilihanPmb() };
   } catch (error) {
@@ -74,6 +80,7 @@ export async function muatPilihanPmb(): Promise<HasilMuat<PilihanPmb>> {
  * blok bayar tetap tampil dengan instruksi bayar di loket.
  */
 export async function muatRekeningPmb(): Promise<RekeningPmb> {
+  await tolakBuildTanpaKonfigurasi();
   try {
     const konten = await getPageContent("landing");
     return {

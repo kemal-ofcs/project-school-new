@@ -1289,7 +1289,8 @@ function DaftarBarang({
 
 /**
  * Nonaktifkan untuk barang yang sudah tidak dipakai (riwayatnya tetap ada);
- * hapus hanya untuk barang salah input, yang diperiksa lagi oleh backend.
+ * hapus untuk barang salah input atau barang nonaktif yang habis dipakai,
+ * diperiksa lagi oleh backend.
  */
 function AksiBarang({
   barang,
@@ -1331,17 +1332,18 @@ function AksiBarang({
       </div>
       {canDelete && !barang.bisa_dihapus ? (
         <p className="text-xs text-slate-400">
-          Hapus hanya untuk barang salah input. Barang ini punya riwayat stok
-          atau unit, jadi batalkan mutasinya dulu atau cukup nonaktifkan.
+          {barang.status_aktif
+            ? "Untuk menghapus barang yang sudah pernah dipakai, nonaktifkan dulu dan pastikan stoknya 0."
+            : "Barang ini bisa dihapus setelah stoknya 0 dan semua pinjaman serta servisnya selesai."}
         </p>
       ) : null}
       {konfirmasi ? (
         <div className="space-y-2 rounded-lg border border-rose-500/30 bg-rose-500/20 p-3 text-rose-100">
           <p className="font-semibold">Hapus {barang.nama_barang} permanen?</p>
           <p>
-            Barang ini hilang dari daftar, label, dan impor di semua perangkat,
-            dan kodenya {barang.kode_barang} boleh dipakai barang lain. Kalau
-            masih ragu, pilih Nonaktifkan.
+            Barang ini hilang dari daftar, label, dan impor di semua perangkat.
+            Riwayat mutasinya tetap ada di laporan. Kalau masih ragu, biarkan
+            nonaktif.
           </p>
           <div>
             <label htmlFor={idKetik} className={LABEL}>

@@ -366,7 +366,7 @@ export const PERMISSION_CATALOG = [
   },
   {
     key: "inventory.item.delete",
-    name: "Hapus Barang Salah Input",
+    name: "Hapus Barang Inventaris",
     group: "Sarpras",
   },
   {

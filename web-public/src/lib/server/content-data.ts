@@ -2,7 +2,11 @@ import "server-only";
 
 import { cache } from "react";
 import { getReadyPublicDatabase } from "@/lib/server/db";
-import { type HasilMuat, petakanKegagalan } from "@/lib/server/school-data";
+import {
+  type HasilMuat,
+  petakanKegagalan,
+  tolakBuildTanpaKonfigurasi,
+} from "@/lib/server/school-data";
 import {
   type PublicArticleDetail,
   type PublicArticleItem,
@@ -37,6 +41,7 @@ export const getPageContent = cache(
 export async function muatBeritaPublik(
   limit = 20,
 ): Promise<HasilMuat<PublicArticleItem[]>> {
+  await tolakBuildTanpaKonfigurasi();
   try {
     const data = await getPublishedArticles(limit);
     return { status: "ok", data };
@@ -49,6 +54,7 @@ export async function muatBeritaPublik(
 export async function muatDetailBerita(
   slug: string,
 ): Promise<HasilMuat<PublicArticleDetail | null>> {
+  await tolakBuildTanpaKonfigurasi();
   try {
     const data = await getArticleBySlug(slug);
     return { status: "ok", data };
@@ -61,6 +67,7 @@ export async function muatDetailBerita(
 export async function muatKontenHalaman(
   halaman: string,
 ): Promise<HasilMuat<Record<string, string>>> {
+  await tolakBuildTanpaKonfigurasi();
   try {
     const data = await getPageContent(halaman);
     return { status: "ok", data };

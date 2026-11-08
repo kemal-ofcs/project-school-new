@@ -47,6 +47,8 @@ pub mod portability;
 pub mod rapel;
 pub mod share;
 pub mod teaching_journal;
+// Notifikasi grup Telegram (v66): SALINAN `desktop/telegram.rs` oleh sync-rust-modules.ts.
+pub mod telegram;
 // Buku Kunjungan UKS: SALINAN `desktop/uks.rs` oleh sync-rust-modules.ts.
 pub mod uks;
 pub mod wa_notification;

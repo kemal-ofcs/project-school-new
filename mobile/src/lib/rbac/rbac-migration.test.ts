@@ -183,6 +183,8 @@ describe("dynamic RBAC migration", () => {
       64,
       // v65 — pembelian cicilan (`keu_cicilan`, sumber jurnal `Cicilan`).
       65,
+      // v66 — notifikasi grup Telegram (`notifikasi_telegram`, cloud-only).
+      66,
     ]);
 
     const sessionColumns = await client.execute(

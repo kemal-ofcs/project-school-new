@@ -51,6 +51,7 @@ beforeEach(async () => {
       "DELETE FROM inventory_barang;",
       "DELETE FROM inventory_unit;",
       "DELETE FROM inventory_kolom;",
+      "DELETE FROM inventory_servis;",
       "DELETE FROM setting_gex_system WHERE key = 'inventory_kode_prefix';",
     ],
     "write",
@@ -871,8 +872,9 @@ describe("hapus permanen kolom tambahan Web", () => {
   });
 });
 
-// Kembar `delete_item_only_when_every_mutation_is_cancelled` dan
-// `delete_item_refuses_items_with_units` di inventory.rs.
+// Kembar `delete_item_only_when_every_mutation_is_cancelled`,
+// `delete_item_refuses_items_with_units`, dan
+// `delete_inactive_item_once_used_up_keeps_its_code` di inventory.rs.
 describe("hapus barang Web", () => {
   test("hanya bila setiap mutasinya dibatalkan, lalu kodenya bebas", async () => {
     const idBarang = await barangBaru();
@@ -884,7 +886,7 @@ describe("hapus barang Web", () => {
       tempat_tujuan: "Gudang",
     });
     await expect(deleteItem(client, idBarang)).rejects.toThrow(
-      "Barang ini sudah punya riwayat stok",
+      "Barang ini belum bisa dihapus",
     );
     await cancelMutation(client, "admin", masuk.id_mutasi, "Salah input");
     expect(await deleteItem(client, idBarang)).toEqual({ sukses: true });
@@ -924,6 +926,85 @@ describe("hapus barang Web", () => {
       args: [idBarang],
     });
     await expect(deleteItem(client, idBarang)).rejects.toThrow();
+  });
+
+  test("barang nonaktif yang habis dipakai bisa dihapus, kodenya tetap dicadangkan", async () => {
+    const idBarang = await barangBaru();
+    const setAktif = (aktif: number) =>
+      client.execute({
+        sql: "UPDATE inventory_barang SET status_aktif = ? WHERE id_barang = ?;",
+        args: [aktif, idBarang],
+      });
+    await mutasiMentah("mts-awal", idBarang, "Masuk", 10);
+    const { id_mutasi: idPinjam } = await recordMutation(client, "admin", {
+      id_barang: idBarang,
+      jenis: "Keluar",
+      alasan: "Peminjaman",
+      jumlah: 4,
+      tempat_asal: "Gudang",
+      penerima_tipe: "Unit",
+      penerima_nama: "Lab IPA",
+      keperluan: "KBM",
+    });
+    await mutasiMentah("mts-pakai", idBarang, "Keluar", 6);
+    await setAktif(0);
+    // Stok 0, tetapi 4 masih dipinjam.
+    await expect(deleteItem(client, idBarang)).rejects.toThrow(
+      "Barang ini belum bisa dihapus",
+    );
+
+    // Barang nonaktif tidak menerima barang masuk, termasuk pengembalian.
+    await setAktif(1);
+    await recordMutation(client, "admin", {
+      id_barang: idBarang,
+      jenis: "Masuk",
+      alasan: "Pengembalian",
+      jumlah: 4,
+      tempat_tujuan: "Gudang",
+      id_ref: idPinjam,
+    });
+    await setAktif(0);
+    await expect(deleteItem(client, idBarang)).rejects.toThrow(
+      "Barang ini belum bisa dihapus",
+    );
+
+    await mutasiMentah("mts-habis", idBarang, "Keluar", 4);
+    await client.execute({
+      sql: `INSERT INTO inventory_servis (id_servis, id_barang, jumlah, tempat, kondisi_awal,
+              tanggal_mulai, keluhan, dibuka_oleh)
+            VALUES ('srv-1', ?, 1, 'Gudang', 'Rusak Ringan', '2026-10-01', 'Retak', 'uji');`,
+      args: [idBarang],
+    });
+    await expect(deleteItem(client, idBarang)).rejects.toThrow(
+      "Barang ini belum bisa dihapus",
+    );
+    await client.execute(
+      "UPDATE inventory_servis SET dibatalkan_pada = datetime('now') WHERE id_servis = 'srv-1';",
+    );
+
+    await setAktif(1);
+    await expect(deleteItem(client, idBarang)).rejects.toThrow(
+      "Barang ini belum bisa dihapus",
+    );
+    await setAktif(0);
+    expect(await deleteItem(client, idBarang)).toEqual({ sukses: true });
+
+    expect((await listInventory(client)).barang).toEqual([]);
+    await expect(
+      saveItem(client, {
+        kode_barang: "BRG-0001",
+        nama_barang: "Pengganti",
+        tipe: "Habis Pakai",
+        satuan: "pcs",
+      }),
+    ).rejects.toThrow("Kode barang sudah dipakai barang lain");
+    // Nomor otomatis melompati kode yang dicadangkan.
+    const baru = await saveItem(client, {
+      nama_barang: "Pengganti",
+      tipe: "Habis Pakai",
+      satuan: "pcs",
+    });
+    expect(baru.kode_barang).not.toBe("BRG-0001");
   });
 });
 

@@ -167,6 +167,22 @@ function lingkunganBuild(workspace: string): NodeJS.ProcessEnv {
  * Nilai rahasia dari semua `.env` pengembang: token, password, dan alamat.
  * Dipakai untuk menyisir paket; hanya NAMA kuncinya yang pernah dicetak.
  */
+/**
+ * `http://localhost:3000` sama di setiap mesin dan tertulis di kode sebagai
+ * alamat cadangan (`site-url.ts`), jadi bukan rahasia. Alamat loopback yang
+ * membawa kredensial atau query (`?authToken=`) tetap diperiksa.
+ */
+export function alamatLoopbackPolos(nilai: string) {
+  if (!URL.canParse(nilai)) return false;
+  const url = new URL(nilai);
+  return (
+    ["localhost", "127.0.0.1", "[::1]"].includes(url.hostname) &&
+    !url.username &&
+    !url.password &&
+    !url.search
+  );
+}
+
 function rahasiaPengembang() {
   const rahasia = new Map<string, string>();
   for (const workspace of ["web-desktop", "web-public", "mobile"]) {
@@ -177,7 +193,8 @@ function rahasiaPengembang() {
         if (
           nilai &&
           nilai.length >= 12 &&
-          /TOKEN|PASSWORD|SECRET|_KEY|_URL$/.test(kunci)
+          /TOKEN|PASSWORD|SECRET|_KEY|_URL$/.test(kunci) &&
+          !alamatLoopbackPolos(nilai)
         ) {
           rahasia.set(nilai, `${kunci} (${workspace})`);
         }

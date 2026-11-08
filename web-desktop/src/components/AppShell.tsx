@@ -5,6 +5,7 @@ import { AppSidebar } from "./AppSidebar";
 import { AutoAlfaRunner } from "./AutoAlfaRunner";
 import { AutoPemberitahuanRunner } from "./AutoPemberitahuanRunner";
 import { AutoSyncRunner } from "./AutoSyncRunner";
+import { AutoTelegramRunner } from "./AutoTelegramRunner";
 import { AutoWaSenderRunner } from "./AutoWaSenderRunner";
 import { BelSekolahRunner } from "./BelSekolahRunner";
 import { HeaderBar } from "./HeaderBar";
@@ -29,6 +30,7 @@ export function AppShell({
       <AutoAlfaRunner />
       <AutoSyncRunner />
       <AutoWaSenderRunner />
+      <AutoTelegramRunner />
       <AutoPemberitahuanRunner />
       <BelSekolahRunner />
       <KonfirmasiSimpan />

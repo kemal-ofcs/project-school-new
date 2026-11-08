@@ -311,14 +311,32 @@ export async function deleteColumn(
 }
 
 /**
- * Barang yang boleh dihapus (`b` = `inventory_barang`): tanpa unit, dan setiap
- * mutasinya sudah dibatalkan. Cermin `BARANG_BISA_DIHAPUS_SQL` di
- * `inventory.rs`.
+ * Barang salah input (`b` = `inventory_barang`): tanpa unit, dan setiap
+ * mutasinya sudah dibatalkan. Hanya kode barang seperti ini yang bebas dipakai
+ * lagi setelah dihapus. Cermin `BARANG_SALAH_INPUT_SQL` di `inventory.rs`.
  */
-const BARANG_BISA_DIHAPUS_SQL = `(NOT EXISTS (SELECT 1 FROM inventory_unit u WHERE u.id_barang = b.id_barang)
+const BARANG_SALAH_INPUT_SQL = `(NOT EXISTS (SELECT 1 FROM inventory_unit u WHERE u.id_barang = b.id_barang)
     AND NOT EXISTS (SELECT 1 FROM inventory_mutasi m
         WHERE m.id_barang = b.id_barang AND m.alasan <> 'Pembatalan'
           AND NOT EXISTS (SELECT 1 FROM inventory_mutasi x WHERE x.id_mutasi = 'batal-' || m.id_mutasi)))`;
+
+/**
+ * Barang yang boleh dihapus: salah input, atau barang nonaktif yang sudah
+ * selesai dipakai (setiap saldonya 0, tanpa pinjaman yang belum kembali, tanpa
+ * servis terbuka). Peminjaman mengurangi stok, jadi stok 0 saja tidak cukup.
+ * Cermin `BARANG_BISA_DIHAPUS_SQL` di `inventory.rs`.
+ */
+const BARANG_BISA_DIHAPUS_SQL = `(${BARANG_SALAH_INPUT_SQL}
+    OR (b.status_aktif = 0
+      AND NOT EXISTS (SELECT 1 FROM inventory_saldo s WHERE s.id_barang = b.id_barang AND s.saldo <> 0)
+      AND NOT EXISTS (SELECT 1 FROM inventory_mutasi p
+          WHERE p.id_barang = b.id_barang AND p.alasan = 'Peminjaman'
+            AND NOT EXISTS (SELECT 1 FROM inventory_mutasi pb WHERE pb.id_mutasi = 'batal-' || p.id_mutasi)
+            AND p.jumlah > COALESCE((SELECT SUM(r.jumlah) FROM inventory_mutasi r
+                WHERE r.id_ref = p.id_mutasi AND r.alasan = 'Pengembalian'
+                  AND NOT EXISTS (SELECT 1 FROM inventory_mutasi rb WHERE rb.id_mutasi = 'batal-' || r.id_mutasi)), 0))
+      AND NOT EXISTS (SELECT 1 FROM inventory_servis v
+          WHERE v.id_barang = b.id_barang AND v.tanggal_selesai IS NULL AND v.dibatalkan_pada IS NULL)))`;
 
 /** Cermin `delete_item`: tandai `dihapus_pada`, barisnya tidak dibuang. */
 export async function deleteItem(
@@ -337,7 +355,7 @@ export async function deleteItem(
     if (row.dihapus_pada !== null) throw new Error("Barang ini sudah dihapus.");
     if (Number(row.bisa) !== 1) {
       throw new Error(
-        "Barang ini sudah punya riwayat stok atau unit. Batalkan mutasinya dulu, atau nonaktifkan barangnya.",
+        "Barang ini belum bisa dihapus: nonaktifkan dulu, habiskan stoknya, dan selesaikan pinjaman serta servisnya.",
       );
     }
     await tx.execute({
@@ -569,11 +587,15 @@ export async function listRecipients(
   };
 }
 
+/**
+ * Kode barang terhapus yang punya riwayat tetap dicadangkan, supaya laporan
+ * lama dan barang baru tidak berbagi satu kode. Cermin `kode_dipakai`.
+ */
 async function kodeDipakai(tx: Transaction, kode: string, idBarang: string) {
   const result = await tx.execute({
-    sql: `SELECT EXISTS(SELECT 1 FROM inventory_barang
-                        WHERE LOWER(kode_barang) = LOWER(?) AND id_barang <> ?
-                          AND dihapus_pada IS NULL) AS ada;`,
+    sql: `SELECT EXISTS(SELECT 1 FROM inventory_barang b
+                        WHERE LOWER(b.kode_barang) = LOWER(?) AND b.id_barang <> ?
+                          AND (b.dihapus_pada IS NULL OR NOT ${BARANG_SALAH_INPUT_SQL})) AS ada;`,
     args: [kode, idBarang],
   });
   return Number(result.rows[0]?.ada) === 1;
@@ -638,7 +660,9 @@ export async function saveItemTx(
   let kode = valid.kode_barang;
   if (kode !== null) {
     if (await kodeDipakai(tx, kode, idBarang)) {
-      throw new Error("Kode barang sudah dipakai barang lain.");
+      throw new Error(
+        "Kode barang sudah dipakai barang lain, termasuk barang yang sudah dihapus.",
+      );
     }
   } else {
     const prefixes = await readKodePrefixes(tx);

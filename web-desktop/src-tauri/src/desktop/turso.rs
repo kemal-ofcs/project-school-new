@@ -3277,7 +3277,7 @@ impl TursoClient {
                 ('inventory.record', 'Catat Barang Masuk, Keluar & Pindah', 'Sarpras', 'Mencatat barang masuk, pemakaian, dan perpindahan tempat atau kondisi.', 1, 1002),
                 ('inventory.adjust', 'Koreksi & Batalkan Mutasi Inventaris', 'Sarpras', 'Membatalkan mutasi, stock opname, dan menghapus stok rusak, hilang, atau kedaluwarsa.', 1, 1003),
                 ('inventory.column.delete', 'Hapus Permanen Kolom Tambahan', 'Sarpras', 'Menghapus kolom tambahan barang beserta seluruh isinya secara permanen.', 1, 1004),
-                ('inventory.item.delete', 'Hapus Barang Salah Input', 'Sarpras', 'Menghapus barang yang belum pernah punya stok atau unit, atau yang semua mutasinya sudah dibatalkan.', 1, 1005),
+                ('inventory.item.delete', 'Hapus Barang Inventaris', 'Sarpras', 'Menghapus barang salah input, atau barang nonaktif yang stoknya 0 tanpa pinjaman dan servis terbuka.', 1, 1005),
                 ('uks.view', 'Lihat Buku Kunjungan UKS', 'UKS', 'Melihat riwayat dan rekap kunjungan UKS, termasuk keluhan siswa.', 1, 1100),
                 ('uks.record', 'Catat Kunjungan UKS & Obat', 'UKS', 'Mencatat dan menutup kunjungan UKS serta mengeluarkan obat untuknya.', 1, 1101),
                 ('uks.delete', 'Hapus Kunjungan UKS', 'UKS', 'Menghapus catatan kunjungan UKS.', 1, 1102),
@@ -4192,6 +4192,37 @@ impl TursoClient {
                 );"#,
                 vec![],
             ),
+            // ── v66: notifikasi grup Telegram (cloud-only, `telegram.rs`) ──
+            // Token bot hanya di sini, tidak pernah tersalin ke perangkat.
+            // `kejadian` tanpa CHECK: barisnya hanya ditulis pengirim, dan
+            // kejadian fase berikutnya tidak perlu membangun ulang tabel.
+            Statement::new(
+                r#"CREATE TABLE IF NOT EXISTS app_telegram_setting (
+                    kunci TEXT PRIMARY KEY,
+                    nilai TEXT NOT NULL,
+                    updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+                );"#,
+                vec![],
+            ),
+            Statement::new(
+                r#"CREATE TABLE IF NOT EXISTS notifikasi_telegram (
+                    id_notifikasi TEXT PRIMARY KEY,
+                    kejadian TEXT NOT NULL,
+                    isi_pesan TEXT NOT NULL,
+                    status TEXT NOT NULL DEFAULT 'Menunggu' CHECK (status IN ('Menunggu', 'Terkirim', 'Gagal', 'Dibatalkan')),
+                    attempt_count INTEGER NOT NULL DEFAULT 0,
+                    last_error TEXT,
+                    klaim_oleh TEXT,
+                    klaim_sampai TEXT,
+                    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+                    sent_at TEXT
+                );"#,
+                vec![],
+            ),
+            Statement::new(
+                "CREATE INDEX IF NOT EXISTS idx_notifikasi_telegram_status ON notifikasi_telegram(status, created_at);",
+                vec![],
+            ),
             Statement::new("CREATE UNIQUE INDEX IF NOT EXISTS idx_berita_slug ON berita(slug);", vec![]),
             Statement::new("CREATE INDEX IF NOT EXISTS idx_berita_status_terbit ON berita(status, tanggal_terbit DESC);", vec![]),
             Statement::new("CREATE INDEX IF NOT EXISTS idx_konten_publik_halaman ON konten_publik(halaman);", vec![]),
@@ -4264,7 +4295,8 @@ impl TursoClient {
                 (62, 'journal-source-inventory', datetime('now')),
                 (63, 'inventory-service', datetime('now')),
                 (64, 'inventory-request', datetime('now')),
-                (65, 'inventory-installment', datetime('now'));"#,
+                (65, 'inventory-installment', datetime('now')),
+                (66, 'telegram-notification', datetime('now'));"#,
                 vec![],
             ),
         ];
@@ -4861,6 +4893,12 @@ impl TursoClient {
             vec![],
         )
         .await?;
+        // Notifikasi grup Telegram (v66).
+        self.query_one(
+            "INSERT OR IGNORE INTO schema_migration (version, name, applied_at) VALUES (-2042, 'telegram-notification-v1', datetime('now'));",
+            vec![],
+        )
+        .await?;
 
         Ok(())
     }
@@ -5172,7 +5210,7 @@ impl TursoClient {
                 // Sentinel WAJIB dinaikkan setiap kali ensure_schema menambah
                 // tabel atau kolom — nilainya di sini dan pada INSERT di atas
                 // harus selalu sama.
-                "SELECT COUNT(*) AS total FROM schema_migration WHERE version = -2041;",
+                "SELECT COUNT(*) AS total FROM schema_migration WHERE version = -2042;",
                 vec![],
             )
             .await
@@ -17474,7 +17512,7 @@ mod tests {
             connection
                 .execute_batch(
                     "DROP TABLE riwayat_identitas_karyawan;
-                     DELETE FROM schema_migration WHERE version IN (-2017, -2018, -2019, -2020, -2021, -2022, -2023, -2024, -2025, -2026, -2027, -2028, -2029, -2030, -2031, -2032, -2033, -2034, -2035, -2036, -2037, -2038, -2039, -2040, -2041);",
+                     DELETE FROM schema_migration WHERE version IN (-2017, -2018, -2019, -2020, -2021, -2022, -2023, -2024, -2025, -2026, -2027, -2028, -2029, -2030, -2031, -2032, -2033, -2034, -2035, -2036, -2037, -2038, -2039, -2040, -2041, -2042);",
                 )
                 .expect("siapkan database lama");
 
@@ -17510,7 +17548,7 @@ mod tests {
             connection
                 .execute_batch(
                     "DROP TABLE inventory_unit;
-                     DELETE FROM schema_migration WHERE version IN (-2018, -2019, -2020, -2021, -2022, -2023, -2024, -2025, -2026, -2027, -2028, -2029, -2030, -2031, -2032, -2033, -2034, -2035, -2036, -2037, -2038, -2039, -2040, -2041);",
+                     DELETE FROM schema_migration WHERE version IN (-2018, -2019, -2020, -2021, -2022, -2023, -2024, -2025, -2026, -2027, -2028, -2029, -2030, -2031, -2032, -2033, -2034, -2035, -2036, -2037, -2038, -2039, -2040, -2041, -2042);",
                 )
                 .expect("siapkan database lama");
 
@@ -17547,7 +17585,7 @@ mod tests {
                 .execute_batch(
                     "DROP TABLE personil_wajah;
                      ALTER TABLE absensi_foto DROP COLUMN wajah_vonis;
-                     DELETE FROM schema_migration WHERE version IN (-2019, -2020, -2021, -2022, -2023, -2024, -2025, -2026, -2027, -2028, -2029, -2030, -2031, -2032, -2033, -2034, -2035, -2036, -2037, -2038, -2039, -2040, -2041);",
+                     DELETE FROM schema_migration WHERE version IN (-2019, -2020, -2021, -2022, -2023, -2024, -2025, -2026, -2027, -2028, -2029, -2030, -2031, -2032, -2033, -2034, -2035, -2036, -2037, -2038, -2039, -2040, -2041, -2042);",
                 )
                 .expect("siapkan database lama");
 
@@ -17586,7 +17624,7 @@ mod tests {
                     "DROP TABLE keu_akun;
                      DROP TABLE keu_jurnal;
                      DROP TABLE keu_jurnal_baris;
-                     DELETE FROM schema_migration WHERE version IN (-2020, -2021, -2022, -2023, -2024, -2025, -2026, -2027, -2028, -2029, -2030, -2031, -2032, -2033, -2034, -2035, -2036, -2037, -2038, -2039, -2040, -2041);",
+                     DELETE FROM schema_migration WHERE version IN (-2020, -2021, -2022, -2023, -2024, -2025, -2026, -2027, -2028, -2029, -2030, -2031, -2032, -2033, -2034, -2035, -2036, -2037, -2038, -2039, -2040, -2041, -2042);",
                 )
                 .expect("siapkan database lama");
 
@@ -17699,7 +17737,7 @@ mod tests {
                     "DROP TABLE keu_pinjaman;
                      DROP TABLE keu_pinjaman_mutasi;
                      DROP TABLE keu_pinjaman_tunda;
-                     DELETE FROM schema_migration WHERE version IN (-2021, -2022, -2023, -2024, -2025, -2026, -2027, -2028, -2029, -2030, -2031, -2032, -2033, -2034, -2035, -2036, -2037, -2038, -2039, -2040, -2041);",
+                     DELETE FROM schema_migration WHERE version IN (-2021, -2022, -2023, -2024, -2025, -2026, -2027, -2028, -2029, -2030, -2031, -2032, -2033, -2034, -2035, -2036, -2037, -2038, -2039, -2040, -2041, -2042);",
                 )
                 .expect("siapkan database lama");
 
@@ -17736,7 +17774,7 @@ mod tests {
                 .execute_batch(
                     "DROP TABLE keu_tagihan;
                      DROP TABLE keu_tagihan_batal;
-                     DELETE FROM schema_migration WHERE version IN (-2022, -2023, -2024, -2025, -2026, -2027, -2028, -2029, -2030, -2031, -2032, -2033, -2034, -2035, -2036, -2037, -2038, -2039, -2040, -2041);",
+                     DELETE FROM schema_migration WHERE version IN (-2022, -2023, -2024, -2025, -2026, -2027, -2028, -2029, -2030, -2031, -2032, -2033, -2034, -2035, -2036, -2037, -2038, -2039, -2040, -2041, -2042);",
                 )
                 .expect("siapkan database lama");
             client.ensure_schema_current().await.expect("skema mutakhir");
@@ -17774,7 +17812,7 @@ mod tests {
                      DROP TABLE keu_pembayaran;
                      DROP TABLE keu_pembayaran_alokasi;
                      DROP TABLE keu_pembayaran_batal;
-                     DELETE FROM schema_migration WHERE version IN (-2023, -2024, -2025, -2026, -2027, -2028, -2029, -2030, -2031, -2032, -2033, -2034, -2035, -2036, -2037, -2038, -2039, -2040, -2041);",
+                     DELETE FROM schema_migration WHERE version IN (-2023, -2024, -2025, -2026, -2027, -2028, -2029, -2030, -2031, -2032, -2033, -2034, -2035, -2036, -2037, -2038, -2039, -2040, -2041, -2042);",
                 )
                 .expect("siapkan database lama");
             client.ensure_schema_current().await.expect("skema mutakhir");
@@ -17810,7 +17848,7 @@ mod tests {
                 .execute_batch(
                     "DROP TABLE nilai_jenis;
                      ALTER TABLE nilai_penilaian DROP COLUMN id_jenis;
-                     DELETE FROM schema_migration WHERE version IN (-2024, -2025, -2026, -2027, -2028, -2029, -2030, -2031, -2032, -2033, -2034, -2035, -2036, -2037, -2038, -2039, -2040, -2041);",
+                     DELETE FROM schema_migration WHERE version IN (-2024, -2025, -2026, -2027, -2028, -2029, -2030, -2031, -2032, -2033, -2034, -2035, -2036, -2037, -2038, -2039, -2040, -2041, -2042);",
                 )
                 .expect("siapkan database lama");
             client.ensure_schema_current().await.expect("skema mutakhir");

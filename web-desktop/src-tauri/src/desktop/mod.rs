@@ -36,6 +36,7 @@ pub mod berkas_sekolah;
 pub mod portability;
 pub mod rapel;
 pub mod teaching_journal;
+pub mod telegram;
 pub mod uks;
 pub mod wa_notification;
 pub mod wa_sender;

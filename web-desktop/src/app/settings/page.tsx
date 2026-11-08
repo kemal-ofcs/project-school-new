@@ -14,6 +14,7 @@ import { KeamananAbsensiCard } from "@/components/settings/KeamananAbsensiCard";
 import { KeamananPemindaiCard } from "@/components/settings/KeamananPemindaiCard";
 import { KonfigurasiDatabaseCard } from "@/components/settings/KonfigurasiDatabaseCard";
 import { LogoAplikasiCard } from "@/components/settings/LogoAplikasiCard";
+import { NotifikasiTelegramCard } from "@/components/settings/NotifikasiTelegramCard";
 import { NotifikasiWaCard } from "@/components/settings/NotifikasiWaCard";
 import { OtomasiAlfaCard } from "@/components/settings/OtomasiAlfaCard";
 import { ProfilInstansiCard } from "@/components/settings/ProfilInstansiCard";
@@ -91,6 +92,7 @@ import { syncAppNameCache } from "@/lib/hooks/useAppName";
 import { syncCompanyNameCache } from "@/lib/hooks/useCompanyName";
 import { useConfirmDialog } from "@/lib/hooks/useConfirmDialog";
 import { useHydrated } from "@/lib/hooks/useHydrated";
+import { useLicenseStatus } from "@/lib/hooks/useLicenseStatus";
 import { useOnlineStatus } from "@/lib/hooks/useOnlineStatus";
 import { isDesktopRuntime } from "@/lib/runtime/app-runtime";
 import {
@@ -141,6 +143,25 @@ interface FeedbackMessage {
   type: "success" | "error";
 }
 
+const SETTINGS_TABS = [
+  { id: "umum", icon: "settings", label: "Umum" },
+  { id: "akun", icon: "lock", label: "Akun & Keamanan" },
+  { id: "absensi", icon: "scanner", label: "Absensi" },
+  { id: "notifikasi", icon: "whatsapp", label: "Email & WhatsApp" },
+  { id: "data", icon: "database", label: "Data & Sinkronisasi" },
+  { id: "lisensi", icon: "document", label: "Lisensi" },
+] as const;
+
+type SettingsTab = (typeof SETTINGS_TABS)[number]["id"];
+
+// Dibaca dari `window`, bukan `useSearchParams`: halaman ini ikut `output:
+// "export"` dan pertama kali merender layar muat, jadi tidak ada beda hidrasi.
+function readTabFromUrl(): SettingsTab {
+  if (typeof window === "undefined") return "umum";
+  const tab = new URLSearchParams(window.location.search).get("tab");
+  return SETTINGS_TABS.find(({ id }) => id === tab)?.id ?? "umum";
+}
+
 export default function SettingsPage() {
   // Penjaga anti klik ganda (Aturan 5). `useState` tidak cukup: pembaruannya
   // dijadwalkan, sehingga dua klik dalam satu tick React sama-sama membaca
@@ -154,6 +175,8 @@ export default function SettingsPage() {
   const isOnline = useOnlineStatus();
   const logoUrl = useAppLogo();
   const { user, isAuthenticated, isLoading: authLoading } = useAuth();
+  const { status: licenseStatus } = useLicenseStatus();
+  const [selectedTab, setSelectedTab] = useState<SettingsTab>(readTabFromUrl);
   const [feedback, setFeedback] = useState<FeedbackMessage | null>(null);
   const [syncStatus, setSyncStatus] = useState<SyncStatus | null>(null);
   const [conflicts, setConflicts] = useState<SyncConflict[]>([]);
@@ -1178,12 +1201,36 @@ export default function SettingsPage() {
   if (!isAuthenticated) redirect("/login");
   if (!canAccessArea(user, "settings")) redirect("/forbidden");
 
+  const isSuperadmin = Boolean(user?.isSuperadmin);
+  const canManage = hasPermission(user, "settings.manage");
+  const showSyncCard =
+    isDesktopSyncAvailable() && hasPermission(user, "sync.view");
+  const visibleTabs = SETTINGS_TABS.filter(({ id }) => {
+    if (id === "absensi") {
+      return isSuperadmin || canManage || hasPermission(user, "alfa.trigger");
+    }
+    if (id === "notifikasi") return canManage;
+    if (id === "data") return isSuperadmin || showSyncCard;
+    // LicenseCard tidak merender apa pun pada build Web tanpa penegakan lisensi.
+    if (id === "lisensi") return isSuperadmin && Boolean(licenseStatus);
+    return true;
+  });
+  const activeTab = visibleTabs.some(({ id }) => id === selectedTab)
+    ? selectedTab
+    : "umum";
+
+  const selectTab = (tab: SettingsTab) => {
+    setSelectedTab(tab);
+    window.history.replaceState(null, "", `?tab=${tab}`);
+    window.scrollTo(0, 0);
+  };
+
   return (
-    <AppShell contentClassName="mx-auto w-full max-w-6xl gap-7 px-4 py-6 sm:px-6 lg:px-8 lg:py-9">
+    <AppShell contentClassName="mx-auto w-full max-w-7xl gap-7 px-4 py-6 sm:px-6 lg:px-8 lg:py-9">
       <PageHeader
         eyebrow="Identitas & preferensi aplikasi"
         title="Pengaturan aplikasi"
-        description="Kelola identitas visual dan lihat status runtime. Pengaturan operasional lain akan ditambahkan bertahap tanpa mengubah fondasi data yang ada."
+        description="Kelola identitas, keamanan akun, aturan absensi, notifikasi, dan data aplikasi."
         actions={
           <StatusBadge tone={isOnline ? "info" : "warning"}>
             <Icon name={isOnline ? "wifi" : "wifi-off"} className="size-3.5" />
@@ -1216,168 +1263,222 @@ export default function SettingsPage() {
         </div>
       ) : null}
 
-      <div className="grid gap-6 lg:grid-cols-[1.15fr_0.85fr]">
-        <LogoAplikasiCard
-          logoUrl={logoUrl}
-          logoBusy={logoBusy}
-          handleLogoUpload={handleLogoUpload}
-          handleResetLogo={handleResetLogo}
-        />
+      <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-[13rem_minmax(0,1fr)]">
+        <div
+          role="tablist"
+          aria-label="Bagian pengaturan"
+          className="flex gap-1 overflow-x-auto rounded-2xl border border-white/10 bg-slate-950/40 p-1.5 lg:sticky lg:top-20 lg:flex-col"
+        >
+          {visibleTabs.map(({ id, icon, label }) => (
+            <button
+              key={id}
+              type="button"
+              role="tab"
+              id={`settings-tab-${id}`}
+              aria-selected={activeTab === id}
+              aria-controls="settings-panel"
+              onClick={() => selectTab(id)}
+              className={`flex min-h-11 shrink-0 items-center gap-2.5 whitespace-nowrap rounded-xl px-3 text-left text-sm font-bold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300 ${
+                activeTab === id
+                  ? "bg-sky-400 text-slate-950"
+                  : "text-slate-300 hover:bg-white/[0.07] hover:text-white"
+              }`}
+            >
+              <Icon name={icon} className="size-4 shrink-0" />
+              {label}
+            </button>
+          ))}
+        </div>
 
-        <TemaVisualCard isOnline={isOnline} />
-      </div>
+        {/* Panel disembunyikan dengan `hidden`, bukan dilepas: isian yang belum
+            disimpan di kartu lain tetap ada saat berpindah bagian. */}
+        <div
+          role="tabpanel"
+          id="settings-panel"
+          aria-labelledby={`settings-tab-${activeTab}`}
+          className="flex min-w-0 flex-col gap-7"
+        >
+          <div hidden={activeTab !== "umum"} className="flex flex-col gap-7">
+            <div className="grid gap-6 2xl:grid-cols-[1.15fr_0.85fr]">
+              <LogoAplikasiCard
+                logoUrl={logoUrl}
+                logoBusy={logoBusy}
+                handleLogoUpload={handleLogoUpload}
+                handleResetLogo={handleResetLogo}
+              />
 
-      {/* Keamanan akun sendiri: tidak dijaga izin apa pun, karena setiap
-          operator berhak mengamankan akunnya — termasuk role paling terbatas. */}
-      <TwoFactorCard />
-      <PasswordRecoveryCard />
-      <LicenseCard />
+              <TemaVisualCard isOnline={isOnline} />
+            </div>
 
-      {hasPermission(user, "settings.manage") ? <MailSettingsCard /> : null}
+            {canManage ? (
+              <section className="app-panel rounded-3xl p-5 sm:p-7">
+                <h2 className="text-base font-black text-white">
+                  Jam Pelajaran
+                </h2>
+                <p className="mt-1 max-w-2xl text-sm leading-6 text-slate-400">
+                  Jadwal bel dan jumlah jam pelajaran kini dikelola di halaman
+                  Akademik, tab Jam Pelajaran, bersebelahan dengan Jadwal
+                  Mengajar yang memakainya.
+                </p>
+                <Link
+                  href="/akademik"
+                  className="mt-4 inline-flex min-h-11 items-center rounded-xl border border-slate-700 bg-slate-800 px-4 text-sm font-semibold text-slate-200 transition hover:bg-slate-700"
+                >
+                  Buka halaman Akademik
+                </Link>
+              </section>
+            ) : null}
 
-      {hasPermission(user, "settings.manage") ? (
-        <section className="app-panel rounded-3xl p-5 sm:p-7">
-          <h2 className="text-base font-black text-white">Jam Pelajaran</h2>
-          <p className="mt-1 max-w-2xl text-sm leading-6 text-slate-400">
-            Jadwal bel dan jumlah jam pelajaran kini dikelola di halaman
-            Akademik, tab Jam Pelajaran, bersebelahan dengan Jadwal Mengajar
-            yang memakainya.
-          </p>
-          <Link
-            href="/akademik"
-            className="mt-4 inline-flex min-h-11 items-center rounded-xl border border-slate-700 bg-slate-800 px-4 text-sm font-semibold text-slate-200 transition hover:bg-slate-700"
-          >
-            Buka halaman Akademik
-          </Link>
-        </section>
-      ) : null}
+            {canManage ? (
+              <ProfilInstansiCard
+                appDisplayName={appDisplayName}
+                setAppDisplayName={setAppDisplayName}
+                companyProfile={companyProfile}
+                setCompanyProfile={setCompanyProfile}
+                companyProfileBusy={companyProfileBusy}
+                handleCompanyProfileSubmit={handleCompanyProfileSubmit}
+                handleCompanyLogoUpload={handleCompanyLogoUpload}
+                handleSignatureUpload={handleSignatureUpload}
+              />
+            ) : null}
+          </div>
 
-      {hasPermission(user, "settings.manage") ? (
-        <ProfilInstansiCard
-          appDisplayName={appDisplayName}
-          setAppDisplayName={setAppDisplayName}
-          companyProfile={companyProfile}
-          setCompanyProfile={setCompanyProfile}
-          companyProfileBusy={companyProfileBusy}
-          handleCompanyProfileSubmit={handleCompanyProfileSubmit}
-          handleCompanyLogoUpload={handleCompanyLogoUpload}
-          handleSignatureUpload={handleSignatureUpload}
-        />
-      ) : null}
+          {/* Keamanan akun sendiri: tidak dijaga izin apa pun, karena setiap
+          operator berhak mengamankan akunnya, termasuk role paling terbatas. */}
+          <div hidden={activeTab !== "akun"} className="flex flex-col gap-7">
+            <TwoFactorCard />
+            <PasswordRecoveryCard />
+          </div>
 
-      {user?.isSuperadmin ? (
-        <KonfigurasiDatabaseCard
-          tursoUrl={tursoUrl}
-          setTursoUrl={setTursoUrl}
-          tursoProvider={tursoProvider}
-          setTursoProvider={setTursoProvider}
-          tursoAllowInsecure={tursoAllowInsecure}
-          setTursoAllowInsecure={setTursoAllowInsecure}
-          tursoToken={tursoToken}
-          setTursoToken={setTursoToken}
-          showTursoToken={showTursoToken}
-          setShowTursoToken={setShowTursoToken}
-          tursoTestStatus={tursoTestStatus}
-          setTursoTestStatus={setTursoTestStatus}
-          tursoBusy={tursoBusy}
-          tursoTesting={tursoTesting}
-          tursoEndpoint={tursoEndpoint}
-          tursoProviderInfo={tursoProviderInfo}
-          handleTursoSave={handleTursoSave}
-          handleTursoTest={handleTursoTest}
-          handleTursoClear={handleTursoClear}
-        />
-      ) : null}
+          <div hidden={activeTab !== "absensi"} className="flex flex-col gap-7">
+            {isSuperadmin ? (
+              <KeamananAbsensiCard
+                scanPhotoEnabled={scanPhotoEnabled}
+                setScanPhotoEnabled={setScanPhotoEnabled}
+                scanIpEnabled={scanIpEnabled}
+                setScanIpEnabled={setScanIpEnabled}
+                faceVerifyEnabled={faceVerifyEnabled}
+                setFaceVerifyEnabled={setFaceVerifyEnabled}
+                faceMode={faceMode}
+                setFaceMode={setFaceMode}
+                faceThreshold={faceThreshold}
+                setFaceThreshold={setFaceThreshold}
+                ipAllowlist={ipAllowlist}
+                ipAllowlistDraft={ipAllowlistDraft}
+                setIpAllowlistDraft={setIpAllowlistDraft}
+                ipDeviceAddresses={ipDeviceAddresses}
+                ipAllowlistBusy={ipAllowlistBusy}
+                handleScanSecuritySubmit={handleScanSecuritySubmit}
+              />
+            ) : null}
 
-      {/* Cadangan berkas hanya ada artinya bila databasenya memang berada di
+            {isSuperadmin ? (
+              <GeofencingCard
+                geofence={geofence}
+                setGeofence={setGeofence}
+                geofenceBusy={geofenceBusy}
+                currentDeviceCoords={currentDeviceCoords}
+                isOnline={isOnline}
+                useCurrentLocation={useCurrentLocation}
+                handleGeofenceSubmit={handleGeofenceSubmit}
+              />
+            ) : null}
+
+            {isSuperadmin ? (
+              <KeamananPemindaiCard
+                scannerSafety={scannerSafety}
+                setScannerSafety={setScannerSafety}
+                scannerSafetyBusy={scannerSafetyBusy}
+                handleScannerSafetySubmit={handleScannerSafetySubmit}
+              />
+            ) : null}
+
+            {canManage || hasPermission(user, "alfa.trigger") ? (
+              <OtomasiAlfaCard
+                user={user}
+                autoAlfaEnabled={autoAlfaEnabled}
+                autoAlfaBusy={autoAlfaBusy}
+                alfaTriggerBusy={alfaTriggerBusy}
+                handleAutoAlfaToggle={handleAutoAlfaToggle}
+                handleTriggerAlfaNow={handleTriggerAlfaNow}
+              />
+            ) : null}
+          </div>
+
+          {canManage ? (
+            <div
+              hidden={activeTab !== "notifikasi"}
+              className="flex flex-col gap-7"
+            >
+              <MailSettingsCard />
+              <NotifikasiWaCard
+                user={user}
+                config={waConfig}
+                busy={waConfigBusy}
+                onSave={handleWaConfigSave}
+              />
+              {isSuperadmin ? <NotifikasiTelegramCard /> : null}
+            </div>
+          ) : null}
+
+          <div hidden={activeTab !== "data"} className="flex flex-col gap-7">
+            {isSuperadmin ? (
+              <KonfigurasiDatabaseCard
+                tursoUrl={tursoUrl}
+                setTursoUrl={setTursoUrl}
+                tursoProvider={tursoProvider}
+                setTursoProvider={setTursoProvider}
+                tursoAllowInsecure={tursoAllowInsecure}
+                setTursoAllowInsecure={setTursoAllowInsecure}
+                tursoToken={tursoToken}
+                setTursoToken={setTursoToken}
+                showTursoToken={showTursoToken}
+                setShowTursoToken={setShowTursoToken}
+                tursoTestStatus={tursoTestStatus}
+                setTursoTestStatus={setTursoTestStatus}
+                tursoBusy={tursoBusy}
+                tursoTesting={tursoTesting}
+                tursoEndpoint={tursoEndpoint}
+                tursoProviderInfo={tursoProviderInfo}
+                handleTursoSave={handleTursoSave}
+                handleTursoTest={handleTursoTest}
+                handleTursoClear={handleTursoClear}
+              />
+            ) : null}
+
+            {/* Cadangan berkas hanya ada artinya bila databasenya memang berada di
           perangkat ini. Pada Web datanya di database remote, dan seluruh
           perintah portabilitas adalah command Tauri yang tidak terdaftar di
-          sana — menampilkan kartunya hanya menjanjikan tombol yang pasti
+          sana; menampilkan kartunya hanya menjanjikan tombol yang pasti
           gagal. isHydrated menjaga agar render server dan render pertama di
           peramban tetap sama. */}
-      {isHydrated && user?.isSuperadmin && isDesktopRuntime() ? (
-        <DatabaseBackupCard provider={tursoProvider} />
-      ) : null}
+            {isHydrated && isSuperadmin && isDesktopRuntime() ? (
+              <DatabaseBackupCard provider={tursoProvider} />
+            ) : null}
 
-      {user?.isSuperadmin ? (
-        <KeamananAbsensiCard
-          scanPhotoEnabled={scanPhotoEnabled}
-          setScanPhotoEnabled={setScanPhotoEnabled}
-          scanIpEnabled={scanIpEnabled}
-          setScanIpEnabled={setScanIpEnabled}
-          faceVerifyEnabled={faceVerifyEnabled}
-          setFaceVerifyEnabled={setFaceVerifyEnabled}
-          faceMode={faceMode}
-          setFaceMode={setFaceMode}
-          faceThreshold={faceThreshold}
-          setFaceThreshold={setFaceThreshold}
-          ipAllowlist={ipAllowlist}
-          ipAllowlistDraft={ipAllowlistDraft}
-          setIpAllowlistDraft={setIpAllowlistDraft}
-          ipDeviceAddresses={ipDeviceAddresses}
-          ipAllowlistBusy={ipAllowlistBusy}
-          handleScanSecuritySubmit={handleScanSecuritySubmit}
-        />
-      ) : null}
+            {showSyncCard ? (
+              <SinkronisasiDesktopCard
+                user={user}
+                syncStatus={syncStatus}
+                conflicts={conflicts}
+                syncBusy={syncBusy}
+                autoSyncError={autoSyncError}
+                isOnline={isOnline}
+                refreshSync={refreshSync}
+                retryFailed={retryFailed}
+                clearFailed={clearFailed}
+                resolveConflicts={resolveConflicts}
+                resolveConflictsLocal={resolveConflictsLocal}
+                resyncSettings={resyncSettings}
+              />
+            ) : null}
+          </div>
 
-      {user?.isSuperadmin ? (
-        <GeofencingCard
-          geofence={geofence}
-          setGeofence={setGeofence}
-          geofenceBusy={geofenceBusy}
-          currentDeviceCoords={currentDeviceCoords}
-          isOnline={isOnline}
-          useCurrentLocation={useCurrentLocation}
-          handleGeofenceSubmit={handleGeofenceSubmit}
-        />
-      ) : null}
-
-      {user?.isSuperadmin ? (
-        <KeamananPemindaiCard
-          scannerSafety={scannerSafety}
-          setScannerSafety={setScannerSafety}
-          scannerSafetyBusy={scannerSafetyBusy}
-          handleScannerSafetySubmit={handleScannerSafetySubmit}
-        />
-      ) : null}
-
-      {hasPermission(user, "settings.manage") ||
-      hasPermission(user, "alfa.trigger") ? (
-        <OtomasiAlfaCard
-          user={user}
-          autoAlfaEnabled={autoAlfaEnabled}
-          autoAlfaBusy={autoAlfaBusy}
-          alfaTriggerBusy={alfaTriggerBusy}
-          handleAutoAlfaToggle={handleAutoAlfaToggle}
-          handleTriggerAlfaNow={handleTriggerAlfaNow}
-        />
-      ) : null}
-
-      {hasPermission(user, "settings.manage") ? (
-        <NotifikasiWaCard
-          user={user}
-          config={waConfig}
-          busy={waConfigBusy}
-          onSave={handleWaConfigSave}
-        />
-      ) : null}
-
-      {isDesktopSyncAvailable() && hasPermission(user, "sync.view") ? (
-        <SinkronisasiDesktopCard
-          user={user}
-          syncStatus={syncStatus}
-          conflicts={conflicts}
-          syncBusy={syncBusy}
-          autoSyncError={autoSyncError}
-          isOnline={isOnline}
-          refreshSync={refreshSync}
-          retryFailed={retryFailed}
-          clearFailed={clearFailed}
-          resolveConflicts={resolveConflicts}
-          resolveConflictsLocal={resolveConflictsLocal}
-          resyncSettings={resyncSettings}
-        />
-      ) : null}
+          <div hidden={activeTab !== "lisensi"}>
+            <LicenseCard />
+          </div>
+        </div>
+      </div>
 
       {alfaModalResult ? (
         <Modal
