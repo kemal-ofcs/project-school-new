@@ -302,6 +302,18 @@ describe("aturan murni Telegram", () => {
         oleh: "x",
       }),
     ).toBeNull();
+    const kecil = {
+      ...isi,
+      status: "APPROVED",
+      totalBersih: 9_000_000,
+      oleh: "Kepala Sekolah",
+    };
+    expect(pesanGajiStatus({ ...kecil, pegawai: 2 })).toBe(
+      "💼 Proses gaji 01/10/2026–31/10/2026 disetujui\n2 pegawai\nOleh: Kepala Sekolah",
+    );
+    expect(pesanGajiStatus({ ...kecil, pegawai: 3 })).toBe(
+      "💼 Proses gaji 01/10/2026–31/10/2026 disetujui\n3 pegawai · total bersih Rp9.000.000\nOleh: Kepala Sekolah",
+    );
   });
 
   test("pemetaan kejadian", () => {

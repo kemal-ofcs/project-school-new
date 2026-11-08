@@ -392,8 +392,13 @@ pub fn pesan_buka_buku(sampai_tanggal: &str, oleh: &str, alasan: &str) -> String
 }
 
 /// Cermin `permintaanKirim`. Teks polos, tanpa `parse_mode`: tanpa escape.
+/// Cermin `MIN_PEGAWAI_NOMINAL_GAJI`: di bawahnya total bersih praktis sama
+/// dengan gaji perorangan, jadi pesan hanya menyebut jumlah pegawai.
+pub const MIN_PEGAWAI_NOMINAL_GAJI: i64 = 3;
+
 /// Cermin `pesanGajiStatus`. Status di luar daftar tidak menghasilkan pesan.
-/// Hanya jumlah pegawai dan total bersih: tanpa nama, slip, potongan, kasbon.
+/// Hanya jumlah pegawai dan total bersih (disembunyikan di bawah
+/// `MIN_PEGAWAI_NOMINAL_GAJI`): tanpa nama, slip, potongan, kasbon.
 pub fn pesan_gaji_status(
     status: &str,
     periode_awal: &str,
@@ -416,10 +421,14 @@ pub fn pesan_gaji_status(
             tanggal_tampil(periode_awal),
             tanggal_tampil(periode_akhir)
         ),
-        format!(
-            "{pegawai} pegawai · total bersih {}",
-            format_rupiah(total_bersih)
-        ),
+        if pegawai < MIN_PEGAWAI_NOMINAL_GAJI {
+            format!("{pegawai} pegawai")
+        } else {
+            format!(
+                "{pegawai} pegawai · total bersih {}",
+                format_rupiah(total_bersih)
+            )
+        },
         format!("Oleh: {oleh}"),
     ];
     if status == "REJECTED" && !catatan.trim().is_empty() {
@@ -1364,6 +1373,14 @@ mod tests {
         assert_eq!(
             pesan_gaji_status("SUBMITTED", "2026-10-01", "2026-10-31", 42, 1, "x", ""),
             None
+        );
+        assert_eq!(
+            pesan_gaji_status("APPROVED", "2026-10-01", "2026-10-31", 2, 9_000_000, "Kepala Sekolah", ""),
+            Some("💼 Proses gaji 01/10/2026–31/10/2026 disetujui\n2 pegawai\nOleh: Kepala Sekolah".to_owned())
+        );
+        assert_eq!(
+            pesan_gaji_status("APPROVED", "2026-10-01", "2026-10-31", 3, 9_000_000, "Kepala Sekolah", ""),
+            Some("💼 Proses gaji 01/10/2026–31/10/2026 disetujui\n3 pegawai · total bersih Rp9.000.000\nOleh: Kepala Sekolah".to_owned())
         );
     }
 

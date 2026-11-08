@@ -411,6 +411,12 @@ export function pesanBukaBuku(
   return baris.join("\n");
 }
 
+/**
+ * Di bawah angka ini total bersih praktis sama dengan gaji perorangan, jadi
+ * pesan hanya menyebut jumlah pegawai. Cermin `MIN_PEGAWAI_NOMINAL_GAJI`.
+ */
+export const MIN_PEGAWAI_NOMINAL_GAJI = 3;
+
 const FRASA_STATUS_GAJI: Record<string, string> = {
   REVIEWED: "menunggu persetujuan",
   APPROVED: "disetujui",
@@ -430,14 +436,17 @@ export interface IsiGajiStatus {
 
 /**
  * Cermin `pesan_gaji_status`. Status di luar daftar tidak menghasilkan pesan.
- * Hanya jumlah pegawai dan total bersih: tanpa nama, slip, potongan, kasbon.
+ * Hanya jumlah pegawai dan total bersih (total disembunyikan bila pegawainya
+ * kurang dari `MIN_PEGAWAI_NOMINAL_GAJI`): tanpa nama, slip, potongan, kasbon.
  */
 export function pesanGajiStatus(isi: IsiGajiStatus): string | null {
   const frasa = FRASA_STATUS_GAJI[isi.status];
   if (!frasa) return null;
   const baris = [
     `💼 Proses gaji ${tanggalTampil(isi.periodeAwal)}–${tanggalTampil(isi.periodeAkhir)} ${frasa}`,
-    `${isi.pegawai} pegawai · total bersih ${formatRupiah(isi.totalBersih)}`,
+    isi.pegawai < MIN_PEGAWAI_NOMINAL_GAJI
+      ? `${isi.pegawai} pegawai`
+      : `${isi.pegawai} pegawai · total bersih ${formatRupiah(isi.totalBersih)}`,
     `Oleh: ${isi.oleh}`,
   ];
   if (isi.status === "REJECTED" && isi.catatan.trim() !== "") {
