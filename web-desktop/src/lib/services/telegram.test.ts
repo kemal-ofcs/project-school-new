@@ -16,9 +16,12 @@ const { initDatabaseSchema } = await import("@/lib/db-schema");
 const { drainTelegram, getTelegramConfig, saveTelegramConfig } = await import(
   "./telegram"
 );
-const { TELEGRAM_SQL_JAM_WIB, TELEGRAM_SQL_STOK_MENIPIS } = await import(
-  "@/lib/validations/telegram"
-);
+const {
+  TELEGRAM_SQL_JAM_WIB,
+  TELEGRAM_SQL_PEMBAYARAN,
+  TELEGRAM_SQL_PEMBAYARAN_BATAL,
+  TELEGRAM_SQL_STOK_MENIPIS,
+} = await import("@/lib/validations/telegram");
 
 const TOKEN = "123456789:AAHdqTcvCH1vGWJxfSeofSAs0K5PALDsaw0";
 const fetchAsli = globalThis.fetch;
@@ -43,6 +46,12 @@ beforeEach(async () => {
       "DELETE FROM inventory_pengajuan;",
       "DELETE FROM inventory_pengajuan_baris;",
       "DELETE FROM inventory_barang;",
+      "DELETE FROM keu_pinjaman;",
+      "DELETE FROM keu_tutup_buku;",
+      "DELETE FROM keu_pembayaran;",
+      "DELETE FROM keu_pembayaran_batal;",
+      "DELETE FROM payroll_audit_logs;",
+      "DELETE FROM payroll_runs;",
     ],
     "write",
   );
@@ -68,6 +77,7 @@ async function aktifkan(kirim: Record<string, string> = {}) {
     aktif: "1",
     "grup:inventaris": "-100111",
     "grup:keuangan": "-222",
+    "grup:pimpinan": "-333",
     "kirim:pengajuan_baru": "1",
     "kirim:pengajuan_putus": "1",
     "kirim:stok_menipis": "0",
@@ -211,12 +221,144 @@ describe("pengirim Telegram", () => {
   });
 });
 
+describe("kejadian keuangan", () => {
+  test("kasbon baru dan tutup/buka buku ke grup Keuangan, tanpa nama karyawan", async () => {
+    await aktifkan({ "kirim:kasbon_baru": "1", "kirim:tutup_buku": "1" });
+    await client.batch(
+      [
+        `INSERT INTO keu_pinjaman (id_pinjaman, id_karyawan, nama_karyawan, pokok, cicilan, mulai_potong,
+           status, tanggal_pengajuan, diajukan_oleh, created_at)
+         VALUES ('k1', 'kar-1', 'Siti Rahma', 2000000, 500000, '2026-12', 'Diajukan', '2026-11-08', 'siti', datetime('now', '-5 minutes')),
+                ('k2', 'kar-2', 'Andi', 1000000, 250000, '2026-12', 'Disetujui', '2026-11-08', 'andi', datetime('now', '-5 minutes'));`,
+        `INSERT INTO keu_tutup_buku (id_tutup, sampai_tanggal, dibuat_oleh, kode_perangkat, waktu_perangkat, saldo_json, status, created_at)
+         VALUES ('t1', '2026-09-30', 'bendahara', 'web', '2026-11-08 08:00:00', '{}', 'Aktif', datetime('now', '-5 minutes')),
+                ('t0', '2026-08-31', 'bendahara', 'web', '2026-09-01 08:00:00', '{}', 'Dibuka', datetime('now', '-60 days'));`,
+        `UPDATE keu_tutup_buku SET alasan_buka = 'Salah input', dibuka_oleh = 'kepala',
+           dibuka_pada = datetime('now', '+7 hours', '-2 minutes') WHERE id_tutup = 't0';`,
+      ],
+      "write",
+    );
+    const hasil = await drainTelegram(client, "uji", { jedaMs: 0 });
+    expect(hasil.terkirim).toBe(3);
+    expect(kiriman.every((item) => item.body.chat_id === "-222")).toBe(true);
+    const teks = kiriman.map((item) => String(item.body.text));
+    expect(teks).toContain(
+      "💰 Pengajuan kasbon baru\nPokok: Rp2.000.000\nCicilan: Rp500.000 per bulan, mulai potong gaji Desember 2026\nMenunggu keputusan di aplikasi.",
+    );
+    expect(teks.join("\n")).not.toContain("Siti");
+    expect(teks).toContain(
+      "🔒 Buku ditutup sampai 30/09/2026\nOleh: bendahara",
+    );
+    expect(teks).toContain(
+      "🔓 Buku dibuka kembali (tutup sampai 31/08/2026)\nOleh: kepala\nAlasan: Salah input",
+    );
+  });
+
+  test("SQL rekap pembayaran: kuitansi batal tidak dihitung masuk", async () => {
+    await client.batch(
+      [
+        `INSERT INTO keu_pembayaran (id_pembayaran, id_siswa, nama_siswa, tanggal, seri, nomor_urut, nomor, metode, total, dibuat_oleh)
+         VALUES ('p1', 's1', 'A', '2026-11-07', 'W', 1, 'KW-1', 'Tunai', 100000, 'kasir'),
+                ('p2', 's2', 'B', '2026-11-07', 'W', 2, 'KW-2', 'Transfer', 250000, 'kasir'),
+                ('p3', 's3', 'C', '2026-11-07', 'W', 3, 'KW-3', 'Tunai', 50000, 'kasir'),
+                ('p4', 's4', 'D', '2026-11-06', 'W', 4, 'KW-4', 'Tunai', 75000, 'kasir');`,
+        `INSERT INTO keu_pembayaran_batal (id_pembayaran, alasan, dibatalkan_oleh, created_at)
+         VALUES ('p3', 'Salah siswa', 'kasir', '2026-11-07 03:00:00');`,
+      ],
+      "write",
+    );
+    const masuk = await client.execute({
+      sql: TELEGRAM_SQL_PEMBAYARAN,
+      args: ["2026-11-07"],
+    });
+    expect(
+      masuk.rows.map((row) => [
+        row.metode,
+        Number(row.jumlah),
+        Number(row.total),
+      ]),
+    ).toEqual([
+      ["Tunai", 1, 100000],
+      ["Transfer", 1, 250000],
+    ]);
+    const batal = await client.execute({
+      sql: TELEGRAM_SQL_PEMBAYARAN_BATAL,
+      args: ["2026-11-07"],
+    });
+    expect(Number(batal.rows[0]?.jumlah)).toBe(1);
+    expect(Number(batal.rows[0]?.total)).toBe(50000);
+  });
+});
+
+describe("kejadian pimpinan", () => {
+  test("status gaji ke grup Pimpinan: hanya angka agregat, SUBMITTED tidak dikirim", async () => {
+    await aktifkan({ "kirim:gaji_status": "1" });
+    await client.batch(
+      [
+        `INSERT INTO payroll_runs (id, idempotency_key, period_start, period_end, status,
+           total_gross_payout, total_net_payout, total_employees, created_by)
+         VALUES ('run1', 'k-run1', '2026-10-01', '2026-10-31', 'REVIEWED', 200000000, 187400000, 42, 'staf');`,
+        `INSERT INTO payroll_items (id, payroll_run_id, id_karyawan, nama_karyawan, divisi, total_regular_hours,
+           total_overtime_hours, total_overtime_index, rate_per_hour, basic_salary, overtime_salary,
+           gross_salary, net_salary, breakdown_snapshot)
+         VALUES ('it1', 'run1', 'kar-1', 'Siti Rahma', 'Guru', 160, 0, 0, 25000, 4000000, 0, 4000000, 3800000, '{}');`,
+        `INSERT INTO payroll_audit_logs (id, payroll_run_id, action, old_status, new_status, performed_by, notes, created_at)
+         VALUES ('a1', 'run1', 'TRANSITION_STATUS', 'DRAFT', 'SUBMITTED', 'staf', '', strftime('%Y-%m-%dT%H:%M:%SZ', 'now', '-3 minutes')),
+                ('a2', 'run1', 'TRANSITION_STATUS', 'SUBMITTED', 'REVIEWED', 'bendahara', '', strftime('%Y-%m-%dT%H:%M:%SZ', 'now', '-2 minutes')),
+                ('a0', 'run1', 'TRANSITION_STATUS', 'DRAFT', 'REVIEWED', 'bendahara', '', strftime('%Y-%m-%dT%H:%M:%SZ', 'now', '-2 hours'));`,
+      ],
+      "write",
+    );
+    const hasil = await drainTelegram(client, "uji", { jedaMs: 0 });
+    expect(hasil.terkirim).toBe(1);
+    expect(kiriman[0]?.body).toMatchObject({
+      chat_id: "-333",
+      text: "💼 Proses gaji 01/10/2026–31/10/2026 menunggu persetujuan\n42 pegawai · total bersih Rp187.400.000\nOleh: bendahara",
+    });
+    expect(String(kiriman[0]?.body.text)).not.toContain("Siti");
+  });
+
+  test("buku dibuka kembali: satu pesan ke Keuangan dan satu ke Pimpinan", async () => {
+    await aktifkan({
+      "kirim:tutup_buku": "1",
+      "kirim:buka_buku_pimpinan": "1",
+    });
+    await client.execute(
+      `INSERT INTO keu_tutup_buku (id_tutup, sampai_tanggal, dibuat_oleh, kode_perangkat, waktu_perangkat, saldo_json,
+         status, alasan_buka, dibuka_oleh, dibuka_pada, created_at)
+       VALUES ('t9', '2026-08-31', 'bendahara', 'web', '2026-09-01 08:00:00', '{}', 'Dibuka', 'Salah input', 'kepala',
+         datetime('now', '+7 hours', '-2 minutes'), datetime('now', '-60 days'));`,
+    );
+    await drainTelegram(client, "uji", { jedaMs: 0 });
+    expect(kiriman.map((item) => item.body.chat_id).sort()).toEqual([
+      "-222",
+      "-333",
+    ]);
+    const id = await client.execute(
+      "SELECT id_notifikasi FROM notifikasi_telegram ORDER BY id_notifikasi;",
+    );
+    expect(id.rows.map((row) => row.id_notifikasi)).toEqual([
+      "buka-pimpinan:t9",
+      "buka:t9",
+    ]);
+  });
+});
+
 describe("konfigurasi Telegram", () => {
   const draft = {
     aktif: true,
     botToken: "",
-    grup: { inventaris: " -100111 ", keuangan: "" },
-    kirim: { pengajuan_baru: true, pengajuan_putus: true, stok_menipis: false },
+    grup: { inventaris: " -100111 ", keuangan: "", pimpinan: "" },
+    kirim: {
+      pengajuan_baru: true,
+      pengajuan_putus: true,
+      stok_menipis: false,
+      pembayaran_harian: false,
+      kasbon_baru: false,
+      tutup_buku: false,
+      gaji_status: false,
+      buka_buku_pimpinan: false,
+    },
   };
 
   test("aktif tanpa token ditolak", async () => {
@@ -234,7 +376,7 @@ describe("konfigurasi Telegram", () => {
       aktif: true,
       tokenTersimpan: true,
       tokenAkhir: "saw0",
-      grup: { inventaris: "-100111", keuangan: "" },
+      grup: { inventaris: "-100111", keuangan: "", pimpinan: "" },
     });
     expect(JSON.stringify(config)).not.toContain(TOKEN);
     const sejak = await client.execute(
@@ -252,7 +394,7 @@ describe("konfigurasi Telegram", () => {
       saveTelegramConfig(client, {
         ...draft,
         botToken: TOKEN,
-        grup: { inventaris: "t.me/abc", keuangan: "" },
+        grup: { inventaris: "t.me/abc", keuangan: "", pimpinan: "" },
       }),
     ).rejects.toThrow("Id grup Inventaris tidak valid");
   });

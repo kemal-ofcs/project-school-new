@@ -22,15 +22,12 @@ import {
   type TelegramConfig,
 } from "@/lib/validations/telegram";
 
-const GRUP_KOSONG: Record<BidangTelegram, string> = {
-  inventaris: "",
-  keuangan: "",
-};
-const KIRIM_MATI: Record<KejadianTelegram, boolean> = {
-  pengajuan_baru: false,
-  pengajuan_putus: false,
-  stok_menipis: false,
-};
+const GRUP_KOSONG = Object.fromEntries(
+  TELEGRAM_BIDANG.map((bidang) => [bidang, ""]),
+) as Record<BidangTelegram, string>;
+const KIRIM_MATI = Object.fromEntries(
+  TELEGRAM_KEJADIAN.map((kejadian) => [kejadian, false]),
+) as Record<KejadianTelegram, boolean>;
 
 function nadaStatus(status: string) {
   if (status === "Terkirim") return "success" as const;
@@ -260,7 +257,7 @@ export function NotifikasiTelegramCard() {
           ) : null}
         </div>
 
-        <div className="grid gap-4 sm:grid-cols-2">
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {TELEGRAM_BIDANG.map((bidang) => (
             <div key={bidang} className="grid gap-1.5">
               <label

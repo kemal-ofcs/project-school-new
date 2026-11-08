@@ -6,9 +6,14 @@ import {
   grupDariUpdates,
   normalisasiChatId,
   permintaanKirim,
+  pesanBukaBuku,
+  pesanGajiStatus,
+  pesanKasbonBaru,
   pesanPengajuanBaru,
   pesanPengajuanPutus,
+  pesanRekapPembayaran,
   pesanStokMenipis,
+  pesanTutupBuku,
   potong,
   samarkanToken,
   tokenBotValid,
@@ -209,7 +214,102 @@ describe("aturan murni Telegram", () => {
     expect(grupDariUpdates({ ok: false })).toEqual([]);
   });
 
+  test("isi pesan keuangan", () => {
+    const metode = (nama: string, jumlah: number, total: number) => ({
+      metode: nama,
+      jumlah,
+      total,
+    });
+    expect(
+      pesanRekapPembayaran("2026-11-07", [], { jumlah: 0, total: 0 }),
+    ).toBeNull();
+    expect(
+      pesanRekapPembayaran(
+        "2026-11-07",
+        [
+          metode("Tunai", 20, 6_000_000),
+          metode("Transfer", 15, 6_000_000),
+          metode("Titipan", 2, 450_000),
+        ],
+        { jumlah: 1, total: 300_000 },
+      ),
+    ).toBe(
+      "🧾 Rekap pembayaran 07/11/2026\nMasuk: 37 kuitansi, Rp12.450.000\n• Tunai: 20 kuitansi, Rp6.000.000\n• Transfer: 15 kuitansi, Rp6.000.000\n• Titipan: 2 kuitansi, Rp450.000\nDibatalkan: 1 kuitansi, Rp300.000",
+    );
+    expect(
+      pesanRekapPembayaran("2026-11-07", [], { jumlah: 2, total: 500_000 }),
+    ).toBe(
+      "🧾 Rekap pembayaran 07/11/2026\nMasuk: 0 kuitansi, Rp0\nDibatalkan: 2 kuitansi, Rp500.000",
+    );
+    expect(pesanKasbonBaru(2_000_000, 500_000, "2026-12")).toBe(
+      "💰 Pengajuan kasbon baru\nPokok: Rp2.000.000\nCicilan: Rp500.000 per bulan, mulai potong gaji Desember 2026\nMenunggu keputusan di aplikasi.",
+    );
+    expect(pesanTutupBuku("2026-09-30", "Bendahara", false)).toBe(
+      "🔒 Buku ditutup sampai 30/09/2026\nOleh: Bendahara",
+    );
+    expect(pesanTutupBuku("2026-09-30", "Bendahara", true)).toBe(
+      "🔒 Buku ditutup sampai 30/09/2026\nOleh: Bendahara\nBentrok dengan tutup buku lain, menunggu keputusan di aplikasi.",
+    );
+    expect(pesanBukaBuku("2026-09-30", "Kepala TU", "Salah input jurnal")).toBe(
+      "🔓 Buku dibuka kembali (tutup sampai 30/09/2026)\nOleh: Kepala TU\nAlasan: Salah input jurnal",
+    );
+    expect(pesanBukaBuku("2026-09-30", "Kepala TU", " ")).toBe(
+      "🔓 Buku dibuka kembali (tutup sampai 30/09/2026)\nOleh: Kepala TU",
+    );
+  });
+
+  test("isi pesan gaji", () => {
+    const isi = {
+      status: "REVIEWED",
+      periodeAwal: "2026-10-01",
+      periodeAkhir: "2026-10-31",
+      pegawai: 42,
+      totalBersih: 187_400_000,
+      oleh: "Bendahara",
+      catatan: "",
+    };
+    expect(pesanGajiStatus(isi)).toBe(
+      "💼 Proses gaji 01/10/2026–31/10/2026 menunggu persetujuan\n42 pegawai · total bersih Rp187.400.000\nOleh: Bendahara",
+    );
+    expect(
+      pesanGajiStatus({
+        ...isi,
+        status: "PAID",
+        periodeAwal: "2026-09-26",
+        periodeAkhir: "2026-10-25",
+        pegawai: 40,
+        totalBersih: 150_000_000,
+        catatan: "transfer",
+      }),
+    ).toBe(
+      "💼 Proses gaji 26/09/2026–25/10/2026 sudah dibayar\n40 pegawai · total bersih Rp150.000.000\nOleh: Bendahara",
+    );
+    expect(
+      pesanGajiStatus({
+        ...isi,
+        status: "REJECTED",
+        oleh: "Kepala Sekolah",
+        catatan: "Lembur belum diverifikasi",
+      }),
+    ).toBe(
+      "💼 Proses gaji 01/10/2026–31/10/2026 ditolak\n42 pegawai · total bersih Rp187.400.000\nOleh: Kepala Sekolah\nAlasan: Lembur belum diverifikasi",
+    );
+    expect(
+      pesanGajiStatus({
+        ...isi,
+        status: "SUBMITTED",
+        totalBersih: 1,
+        oleh: "x",
+      }),
+    ).toBeNull();
+  });
+
   test("pemetaan kejadian", () => {
+    expect(BIDANG_KEJADIAN.gaji_status).toBe("pimpinan");
+    expect(BIDANG_KEJADIAN.buka_buku_pimpinan).toBe("pimpinan");
+    expect(BIDANG_KEJADIAN.pembayaran_harian).toBe("keuangan");
+    expect(BIDANG_KEJADIAN.kasbon_baru).toBe("keuangan");
+    expect(BIDANG_KEJADIAN.tutup_buku).toBe("keuangan");
     expect(BIDANG_KEJADIAN.pengajuan_baru).toBe("keuangan");
     expect(BIDANG_KEJADIAN.pengajuan_putus).toBe("inventaris");
     expect(BIDANG_KEJADIAN.stok_menipis).toBe("inventaris");

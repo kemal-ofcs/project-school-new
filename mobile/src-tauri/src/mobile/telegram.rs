@@ -23,20 +23,32 @@ use serde_json::{json, Value};
 
 use super::{
     accounting::format_rupiah,
+    billing::label_periode,
     inventory::format_jumlah,
     models::CommandError,
     turso::{Statement, TursoClient},
+    tutup_buku::tanggal_tampil,
     wa_sender::status_after_failure,
 };
 
-pub const BIDANG: [&str; 2] = ["inventaris", "keuangan"];
-pub const KEJADIAN: [&str; 3] = ["pengajuan_baru", "pengajuan_putus", "stok_menipis"];
+pub const BIDANG: [&str; 3] = ["inventaris", "keuangan", "pimpinan"];
+pub const KEJADIAN: [&str; 8] = [
+    "pengajuan_baru",
+    "pengajuan_putus",
+    "stok_menipis",
+    "pembayaran_harian",
+    "kasbon_baru",
+    "tutup_buku",
+    "gaji_status",
+    "buka_buku_pimpinan",
+];
 
 /// Grup tujuan setiap kejadian. Cermin `BIDANG_KEJADIAN`.
 pub fn bidang_kejadian(kejadian: &str) -> Option<&'static str> {
     match kejadian {
-        "pengajuan_baru" => Some("keuangan"),
+        "pengajuan_baru" | "pembayaran_harian" | "kasbon_baru" | "tutup_buku" => Some("keuangan"),
         "pengajuan_putus" | "stok_menipis" => Some("inventaris"),
+        "gaji_status" | "buka_buku_pimpinan" => Some("pimpinan"),
         _ => None,
     }
 }
@@ -44,6 +56,7 @@ pub fn bidang_kejadian(kejadian: &str) -> Option<&'static str> {
 fn label_bidang(bidang: &str) -> &'static str {
     match bidang {
         "keuangan" => "Keuangan",
+        "pimpinan" => "Pimpinan",
         _ => "Inventaris",
     }
 }
@@ -96,7 +109,68 @@ ORDER BY nama_barang COLLATE NOCASE
 -- batas: satu baris per barang aktif yang stoknya di bawah minimum
 ;";
 
-const SQL_JAM_WIB: &str = "SELECT date('now', '+7 hours') AS tanggal, CAST(strftime('%H', 'now', '+7 hours') AS INTEGER) AS jam;";
+const SQL_PEMBAYARAN: &str =
+    "SELECT p.metode, COUNT(*) AS jumlah, COALESCE(SUM(p.total), 0) AS total
+FROM keu_pembayaran p
+WHERE p.tanggal = ?
+  AND NOT EXISTS (SELECT 1 FROM keu_pembayaran_batal b WHERE b.id_pembayaran = p.id_pembayaran)
+GROUP BY p.metode
+ORDER BY CASE p.metode WHEN 'Tunai' THEN 1 WHEN 'Transfer' THEN 2 ELSE 3 END
+-- batas: agregat, paling banyak satu baris per metode
+;";
+
+const SQL_PEMBAYARAN_BATAL: &str = "SELECT COUNT(*) AS jumlah, COALESCE(SUM(p.total), 0) AS total
+FROM keu_pembayaran_batal b
+JOIN keu_pembayaran p ON p.id_pembayaran = b.id_pembayaran
+WHERE date(b.created_at, '+7 hours') = ?
+-- batas: agregat, selalu satu baris
+;";
+
+const SQL_KASBON_BARU: &str = "SELECT k.id_pinjaman, k.pokok, k.cicilan, k.mulai_potong
+FROM keu_pinjaman k
+WHERE k.created_at >= ? AND k.created_at >= datetime('now', '-7 days')
+  AND k.status = 'Diajukan'
+  AND NOT EXISTS (SELECT 1 FROM notifikasi_telegram n WHERE n.id_notifikasi = 'kasbon:' || k.id_pinjaman)
+ORDER BY k.created_at
+LIMIT 50;";
+
+const SQL_TUTUP_BUKU: &str = "SELECT t.id_tutup, t.sampai_tanggal, t.status, COALESCE(o.nama_operator, t.dibuat_oleh) AS oleh
+FROM keu_tutup_buku t
+LEFT JOIN master_operator o ON o.username = t.dibuat_oleh
+WHERE t.created_at >= ? AND t.created_at >= datetime('now', '-7 days')
+  AND t.status IN ('Aktif', 'Menunggu')
+  AND NOT EXISTS (SELECT 1 FROM notifikasi_telegram n WHERE n.id_notifikasi = 'tutup:' || t.id_tutup)
+ORDER BY t.created_at
+LIMIT 50;";
+
+const SQL_BUKA_BUKU: &str = "SELECT t.id_tutup, t.sampai_tanggal, COALESCE(o.nama_operator, t.dibuka_oleh) AS oleh, t.alasan_buka
+FROM keu_tutup_buku t
+LEFT JOIN master_operator o ON o.username = t.dibuka_oleh
+WHERE t.status = 'Dibuka'
+  AND t.dibuka_pada >= datetime(?, '+7 hours') AND t.dibuka_pada >= datetime('now', '+7 hours', '-7 days')
+  AND NOT EXISTS (SELECT 1 FROM notifikasi_telegram n WHERE n.id_notifikasi = ? || t.id_tutup)
+ORDER BY t.dibuka_pada
+LIMIT 50;";
+
+const SQL_GAJI_STATUS: &str = "SELECT a.id, a.new_status, a.notes, r.period_start, r.period_end,
+       r.total_employees, r.total_net_payout,
+       COALESCE(o.nama_operator, a.performed_by) AS oleh
+FROM payroll_audit_logs a
+JOIN payroll_runs r ON r.id = a.payroll_run_id
+LEFT JOIN master_operator o ON o.username = a.performed_by
+WHERE a.action = 'TRANSITION_STATUS'
+  AND a.new_status IN ('REVIEWED', 'APPROVED', 'PAID', 'REJECTED')
+  AND datetime(a.created_at) >= datetime(?) AND datetime(a.created_at) >= datetime('now', '-7 days')
+  AND NOT EXISTS (SELECT 1 FROM notifikasi_telegram n WHERE n.id_notifikasi = 'gaji:' || a.id)
+ORDER BY datetime(a.created_at), a.id
+LIMIT 50;";
+
+/// Awalan id pesan "buku dibuka kembali": satu pembukaan menjadi dua pesan,
+/// ke Keuangan dan ke Pimpinan. Cermin `AWALAN_BUKA*`.
+const AWALAN_BUKA: &str = "buka:";
+const AWALAN_BUKA_PIMPINAN: &str = "buka-pimpinan:";
+
+const SQL_JAM_WIB: &str = "SELECT date('now', '+7 hours') AS tanggal, date('now', '+7 hours', '-1 day') AS kemarin, CAST(strftime('%H', 'now', '+7 hours') AS INTEGER) AS jam;";
 
 // ── Aturan murni ────────────────────────────────────────────────────────────
 
@@ -234,7 +308,126 @@ pub fn pesan_stok_menipis(daftar: &[BarisStok]) -> Option<String> {
     Some(baris.join("\n"))
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RekapMetode {
+    pub metode: String,
+    pub jumlah: i64,
+    pub total: i64,
+}
+
+/// Cermin `pesanRekapPembayaran`. Tanpa pembayaran maupun pembatalan tidak ada
+/// pesan. `batal` = (jumlah kuitansi, total).
+pub fn pesan_rekap_pembayaran(
+    tanggal: &str,
+    metode: &[RekapMetode],
+    batal: (i64, i64),
+) -> Option<String> {
+    if metode.is_empty() && batal.0 == 0 {
+        return None;
+    }
+    let jumlah: i64 = metode.iter().map(|item| item.jumlah).sum();
+    let total: i64 = metode.iter().map(|item| item.total).sum();
+    let mut baris = vec![
+        format!("🧾 Rekap pembayaran {}", tanggal_tampil(tanggal)),
+        format!("Masuk: {jumlah} kuitansi, {}", format_rupiah(total)),
+    ];
+    for item in metode {
+        baris.push(format!(
+            "• {}: {} kuitansi, {}",
+            item.metode,
+            item.jumlah,
+            format_rupiah(item.total)
+        ));
+    }
+    if batal.0 > 0 {
+        baris.push(format!(
+            "Dibatalkan: {} kuitansi, {}",
+            batal.0,
+            format_rupiah(batal.1)
+        ));
+    }
+    Some(baris.join("\n"))
+}
+
+/// Cermin `pesanKasbonBaru`. Sengaja tanpa nama karyawan maupun pengaju.
+pub fn pesan_kasbon_baru(pokok: i64, cicilan: i64, mulai_potong: &str) -> String {
+    [
+        "💰 Pengajuan kasbon baru".to_owned(),
+        format!("Pokok: {}", format_rupiah(pokok)),
+        format!(
+            "Cicilan: {} per bulan, mulai potong gaji {}",
+            format_rupiah(cicilan),
+            label_periode(mulai_potong)
+        ),
+        "Menunggu keputusan di aplikasi.".to_owned(),
+    ]
+    .join("\n")
+}
+
+/// Cermin `pesanTutupBuku`.
+pub fn pesan_tutup_buku(sampai_tanggal: &str, oleh: &str, menunggu: bool) -> String {
+    let mut baris = vec![
+        format!("🔒 Buku ditutup sampai {}", tanggal_tampil(sampai_tanggal)),
+        format!("Oleh: {oleh}"),
+    ];
+    if menunggu {
+        baris.push("Bentrok dengan tutup buku lain, menunggu keputusan di aplikasi.".to_owned());
+    }
+    baris.join("\n")
+}
+
+/// Cermin `pesanBukaBuku`.
+pub fn pesan_buka_buku(sampai_tanggal: &str, oleh: &str, alasan: &str) -> String {
+    let mut baris = vec![
+        format!(
+            "🔓 Buku dibuka kembali (tutup sampai {})",
+            tanggal_tampil(sampai_tanggal)
+        ),
+        format!("Oleh: {oleh}"),
+    ];
+    if !alasan.trim().is_empty() {
+        baris.push(format!("Alasan: {}", potong(alasan, 300)));
+    }
+    baris.join("\n")
+}
+
 /// Cermin `permintaanKirim`. Teks polos, tanpa `parse_mode`: tanpa escape.
+/// Cermin `pesanGajiStatus`. Status di luar daftar tidak menghasilkan pesan.
+/// Hanya jumlah pegawai dan total bersih: tanpa nama, slip, potongan, kasbon.
+pub fn pesan_gaji_status(
+    status: &str,
+    periode_awal: &str,
+    periode_akhir: &str,
+    pegawai: i64,
+    total_bersih: i64,
+    oleh: &str,
+    catatan: &str,
+) -> Option<String> {
+    let frasa = match status {
+        "REVIEWED" => "menunggu persetujuan",
+        "APPROVED" => "disetujui",
+        "PAID" => "sudah dibayar",
+        "REJECTED" => "ditolak",
+        _ => return None,
+    };
+    let mut baris = vec![
+        format!(
+            "💼 Proses gaji {}–{} {frasa}",
+            tanggal_tampil(periode_awal),
+            tanggal_tampil(periode_akhir)
+        ),
+        format!(
+            "{pegawai} pegawai · total bersih {}",
+            format_rupiah(total_bersih)
+        ),
+        format!("Oleh: {oleh}"),
+    ];
+    if status == "REJECTED" && !catatan.trim().is_empty() {
+        baris.push(format!("Alasan: {}", potong(catatan, 300)));
+    }
+    Some(baris.join("\n"))
+}
+
 pub fn permintaan_kirim(token: &str, chat_id: &str, teks: &str) -> (String, Value) {
     (
         format!("https://api.telegram.org/bot{token}/sendMessage"),
@@ -692,25 +885,115 @@ async fn catat_kejadian(turso: &TursoClient, pengaturan: &Pengaturan) -> Result<
             antrekan(turso, &id, "pengajuan_putus", &isi).await?;
         }
     }
-    if pengaturan.siap("stok_menipis") {
-        let jam = turso.query_one(SQL_JAM_WIB, vec![]).await?.to_objects();
-        let Some(jam) = jam.first() else {
-            return Ok(());
-        };
-        let id = format!("stok:{}", text(jam, "tanggal"));
-        if int(jam, "jam") < JAM_RINGKASAN_STOK {
-            return Ok(());
-        }
-        let sudah = turso
-            .query_one(
-                "SELECT 1 AS ada FROM notifikasi_telegram WHERE id_notifikasi = ? LIMIT 1;",
-                vec![json!(id)],
-            )
+    if pengaturan.siap("kasbon_baru") {
+        let rows = turso
+            .query_one(SQL_KASBON_BARU, vec![json!(sejak)])
             .await?
             .to_objects();
-        if !sudah.is_empty() {
-            return Ok(());
+        for row in rows {
+            let isi = pesan_kasbon_baru(
+                int(&row, "pokok"),
+                int(&row, "cicilan"),
+                &text(&row, "mulai_potong"),
+            );
+            let id = format!("kasbon:{}", text(&row, "id_pinjaman"));
+            antrekan(turso, &id, "kasbon_baru", &isi).await?;
         }
+    }
+    if pengaturan.siap("tutup_buku") {
+        let rows = turso
+            .query_one(SQL_TUTUP_BUKU, vec![json!(sejak)])
+            .await?
+            .to_objects();
+        for row in rows {
+            let isi = pesan_tutup_buku(
+                &text(&row, "sampai_tanggal"),
+                &text(&row, "oleh"),
+                text(&row, "status") == "Menunggu",
+            );
+            let id = format!("tutup:{}", text(&row, "id_tutup"));
+            antrekan(turso, &id, "tutup_buku", &isi).await?;
+        }
+        catat_buka_buku(turso, &sejak, AWALAN_BUKA, "tutup_buku").await?;
+    }
+    if pengaturan.siap("buka_buku_pimpinan") {
+        catat_buka_buku(turso, &sejak, AWALAN_BUKA_PIMPINAN, "buka_buku_pimpinan").await?;
+    }
+    if pengaturan.siap("gaji_status") {
+        let rows = turso
+            .query_one(SQL_GAJI_STATUS, vec![json!(sejak)])
+            .await?
+            .to_objects();
+        for row in rows {
+            let isi = pesan_gaji_status(
+                &text(&row, "new_status"),
+                &text(&row, "period_start"),
+                &text(&row, "period_end"),
+                int(&row, "total_employees"),
+                int(&row, "total_net_payout"),
+                &text(&row, "oleh"),
+                &text(&row, "notes"),
+            );
+            if let Some(isi) = isi {
+                let id = format!("gaji:{}", text(&row, "id"));
+                antrekan(turso, &id, "gaji_status", &isi).await?;
+            }
+        }
+    }
+    catat_harian(turso, pengaturan).await
+}
+
+/// Cermin `catatBukaBuku`: awalan id menentukan grup tujuannya.
+async fn catat_buka_buku(
+    turso: &TursoClient,
+    sejak: &str,
+    awalan: &str,
+    kejadian: &str,
+) -> Result<(), CommandError> {
+    let rows = turso
+        .query_one(SQL_BUKA_BUKU, vec![json!(sejak), json!(awalan)])
+        .await?
+        .to_objects();
+    for row in rows {
+        let isi = pesan_buka_buku(
+            &text(&row, "sampai_tanggal"),
+            &text(&row, "oleh"),
+            &text(&row, "alasan_buka"),
+        );
+        let id = format!("{awalan}{}", text(&row, "id_tutup"));
+        antrekan(turso, &id, kejadian, &isi).await?;
+    }
+    Ok(())
+}
+
+async fn belum_tercatat(turso: &TursoClient, id: &str) -> Result<bool, CommandError> {
+    Ok(turso
+        .query_one(
+            "SELECT 1 AS ada FROM notifikasi_telegram WHERE id_notifikasi = ? LIMIT 1;",
+            vec![json!(id)],
+        )
+        .await?
+        .to_objects()
+        .is_empty())
+}
+
+/// Cermin `catatHarian`: ringkasan sekali per tanggal, mulai 07.00 WIB.
+async fn catat_harian(turso: &TursoClient, pengaturan: &Pengaturan) -> Result<(), CommandError> {
+    let stok = pengaturan.siap("stok_menipis");
+    let bayar = pengaturan.siap("pembayaran_harian");
+    if !stok && !bayar {
+        return Ok(());
+    }
+    let jam = turso.query_one(SQL_JAM_WIB, vec![]).await?.to_objects();
+    let Some(jam) = jam.first() else {
+        return Ok(());
+    };
+    if int(jam, "jam") < JAM_RINGKASAN_STOK {
+        return Ok(());
+    }
+
+    let id_stok = format!("stok:{}", text(jam, "tanggal"));
+    if stok && belum_tercatat(turso, &id_stok).await? {
         let daftar: Vec<BarisStok> = turso
             .query_one(SQL_STOK_MENIPIS, vec![])
             .await?
@@ -726,7 +1009,33 @@ async fn catat_kejadian(turso: &TursoClient, pengaturan: &Pengaturan) -> Result<
             })
             .collect();
         if let Some(isi) = pesan_stok_menipis(&daftar) {
-            antrekan(turso, &id, "stok_menipis", &isi).await?;
+            antrekan(turso, &id_stok, "stok_menipis", &isi).await?;
+        }
+    }
+
+    let kemarin = text(jam, "kemarin");
+    let id_bayar = format!("bayar:{kemarin}");
+    if bayar && belum_tercatat(turso, &id_bayar).await? {
+        let metode: Vec<RekapMetode> = turso
+            .query_one(SQL_PEMBAYARAN, vec![json!(kemarin)])
+            .await?
+            .to_objects()
+            .iter()
+            .map(|row| RekapMetode {
+                metode: text(row, "metode"),
+                jumlah: int(row, "jumlah"),
+                total: int(row, "total"),
+            })
+            .collect();
+        let batal = turso
+            .query_one(SQL_PEMBAYARAN_BATAL, vec![json!(kemarin)])
+            .await?
+            .to_objects()
+            .first()
+            .map(|row| (int(row, "jumlah"), int(row, "total")))
+            .unwrap_or((0, 0));
+        if let Some(isi) = pesan_rekap_pembayaran(&kemarin, &metode, batal) {
+            antrekan(turso, &id_bayar, "pembayaran_harian", &isi).await?;
         }
     }
     Ok(())
@@ -990,11 +1299,84 @@ mod tests {
         assert!(grup_dari_updates(&json!({ "ok": false })).is_empty());
     }
 
+    // Vektor yang sama diuji di `validations/telegram.test.ts`.
+    #[test]
+    fn isi_pesan_keuangan() {
+        let metode = |nama: &str, jumlah: i64, total: i64| RekapMetode {
+            metode: nama.to_owned(),
+            jumlah,
+            total,
+        };
+        assert_eq!(pesan_rekap_pembayaran("2026-11-07", &[], (0, 0)), None);
+        assert_eq!(
+            pesan_rekap_pembayaran(
+                "2026-11-07",
+                &[
+                    metode("Tunai", 20, 6_000_000),
+                    metode("Transfer", 15, 6_000_000),
+                    metode("Titipan", 2, 450_000)
+                ],
+                (1, 300_000),
+            ),
+            Some("🧾 Rekap pembayaran 07/11/2026\nMasuk: 37 kuitansi, Rp12.450.000\n• Tunai: 20 kuitansi, Rp6.000.000\n• Transfer: 15 kuitansi, Rp6.000.000\n• Titipan: 2 kuitansi, Rp450.000\nDibatalkan: 1 kuitansi, Rp300.000".to_owned())
+        );
+        assert_eq!(
+            pesan_rekap_pembayaran("2026-11-07", &[], (2, 500_000)),
+            Some("🧾 Rekap pembayaran 07/11/2026\nMasuk: 0 kuitansi, Rp0\nDibatalkan: 2 kuitansi, Rp500.000".to_owned())
+        );
+        assert_eq!(
+            pesan_kasbon_baru(2_000_000, 500_000, "2026-12"),
+            "💰 Pengajuan kasbon baru\nPokok: Rp2.000.000\nCicilan: Rp500.000 per bulan, mulai potong gaji Desember 2026\nMenunggu keputusan di aplikasi."
+        );
+        assert_eq!(
+            pesan_tutup_buku("2026-09-30", "Bendahara", false),
+            "🔒 Buku ditutup sampai 30/09/2026\nOleh: Bendahara"
+        );
+        assert_eq!(
+            pesan_tutup_buku("2026-09-30", "Bendahara", true),
+            "🔒 Buku ditutup sampai 30/09/2026\nOleh: Bendahara\nBentrok dengan tutup buku lain, menunggu keputusan di aplikasi."
+        );
+        assert_eq!(
+            pesan_buka_buku("2026-09-30", "Kepala TU", "Salah input jurnal"),
+            "🔓 Buku dibuka kembali (tutup sampai 30/09/2026)\nOleh: Kepala TU\nAlasan: Salah input jurnal"
+        );
+        assert_eq!(
+            pesan_buka_buku("2026-09-30", "Kepala TU", " "),
+            "🔓 Buku dibuka kembali (tutup sampai 30/09/2026)\nOleh: Kepala TU"
+        );
+    }
+
+    // Vektor yang sama diuji di `validations/telegram.test.ts`.
+    #[test]
+    fn isi_pesan_gaji() {
+        assert_eq!(
+            pesan_gaji_status("REVIEWED", "2026-10-01", "2026-10-31", 42, 187_400_000, "Bendahara", ""),
+            Some("💼 Proses gaji 01/10/2026–31/10/2026 menunggu persetujuan\n42 pegawai · total bersih Rp187.400.000\nOleh: Bendahara".to_owned())
+        );
+        assert_eq!(
+            pesan_gaji_status("PAID", "2026-09-26", "2026-10-25", 40, 150_000_000, "Bendahara", "transfer"),
+            Some("💼 Proses gaji 26/09/2026–25/10/2026 sudah dibayar\n40 pegawai · total bersih Rp150.000.000\nOleh: Bendahara".to_owned())
+        );
+        assert_eq!(
+            pesan_gaji_status("REJECTED", "2026-10-01", "2026-10-31", 42, 187_400_000, "Kepala Sekolah", "Lembur belum diverifikasi"),
+            Some("💼 Proses gaji 01/10/2026–31/10/2026 ditolak\n42 pegawai · total bersih Rp187.400.000\nOleh: Kepala Sekolah\nAlasan: Lembur belum diverifikasi".to_owned())
+        );
+        assert_eq!(
+            pesan_gaji_status("SUBMITTED", "2026-10-01", "2026-10-31", 42, 1, "x", ""),
+            None
+        );
+    }
+
     #[test]
     fn pemetaan_kejadian() {
         assert_eq!(bidang_kejadian("pengajuan_baru"), Some("keuangan"));
         assert_eq!(bidang_kejadian("pengajuan_putus"), Some("inventaris"));
         assert_eq!(bidang_kejadian("stok_menipis"), Some("inventaris"));
+        assert_eq!(bidang_kejadian("pembayaran_harian"), Some("keuangan"));
+        assert_eq!(bidang_kejadian("kasbon_baru"), Some("keuangan"));
+        assert_eq!(bidang_kejadian("tutup_buku"), Some("keuangan"));
+        assert_eq!(bidang_kejadian("gaji_status"), Some("pimpinan"));
+        assert_eq!(bidang_kejadian("buka_buku_pimpinan"), Some("pimpinan"));
         assert_eq!(bidang_kejadian("gaji"), None);
     }
 
@@ -1003,8 +1385,12 @@ mod tests {
         let sah = json!({
             "aktif": true,
             "botToken": "",
-            "grup": { "inventaris": "-100111", "keuangan": "" },
-            "kirim": { "pengajuan_baru": true, "pengajuan_putus": false, "stok_menipis": true },
+            "grup": { "inventaris": "-100111", "keuangan": "", "pimpinan": "-100333" },
+            "kirim": {
+                "pengajuan_baru": true, "pengajuan_putus": false, "stok_menipis": true,
+                "pembayaran_harian": false, "kasbon_baru": true, "tutup_buku": false,
+                "gaji_status": true, "buka_buku_pimpinan": false,
+            },
         });
         let draft = baca_draft(&sah).unwrap();
         assert!(draft.aktif);
@@ -1012,7 +1398,8 @@ mod tests {
             draft.grup,
             vec![
                 ("inventaris", "-100111".to_owned()),
-                ("keuangan", String::new())
+                ("keuangan", String::new()),
+                ("pimpinan", "-100333".to_owned())
             ]
         );
         assert_eq!(
@@ -1020,7 +1407,12 @@ mod tests {
             vec![
                 ("pengajuan_baru", true),
                 ("pengajuan_putus", false),
-                ("stok_menipis", true)
+                ("stok_menipis", true),
+                ("pembayaran_harian", false),
+                ("kasbon_baru", true),
+                ("tutup_buku", false),
+                ("gaji_status", true),
+                ("buka_buku_pimpinan", false)
             ]
         );
 

@@ -1,24 +1,19 @@
 # ANTISLOP.md — hasil antislop
 
-- Waktu: 2026-11-07 20:51 WIB
-- Commit: fecd81e (+ 23 berkas berubah, belum commit)
-- Berkas disunting: 1
+- Waktu: 2026-11-08 08:13 WIB
+- Commit: c7f0b48 (+ 13 berkas berubah, belum commit)
+- Berkas disunting: 0
 
 ## Disunting
-- `web-desktop/src/app/settings/page.tsx` — komentar — ganti em dash `—` dengan koma dan titik koma
+- Tidak ada berkas yang perlu disunting (semua berkas dalam cakupan sudah rapi).
 
 ## Dilewati
-- `mobile/**` — salinan mobile yang dihasilkan skrip sync
+- `mobile/**` — salinan mobile yang dihasilkan skrip sinkronisasi
 - `*.test.ts` — berkas pengujian dan fixture data
-- `web-desktop/src-tauri/src/desktop/inventory.rs` — komentar ringkas dan faktual
-- `web-desktop/src-tauri/src/desktop/turso.rs` — deskripsi RBAC katalog ringkas
-- `web-desktop/src/components/inventory/InventarisWorkspace.tsx` — teks UI alami, tanpa slop
-- `web-desktop/src/lib/rbac/catalog.ts` — nama permission sarpras faktual
-- `web-desktop/src/lib/services/inventory.ts` — komentar arsitektur ringkas
-- `scripts/build-paket.ts` — skrip build, komentar ringkas faktual
-- `web-public/src/lib/server/content-data.ts` — logika data server
-- `web-public/src/lib/server/pmb-data.ts` — logika data server
-- `web-public/src/lib/server/school-data.ts` — logika data server
-- `deploy/**` — dokumentasi dan template env deployment
+- `CLAUDE.md` — panduan proyek
+- `web-desktop/src-tauri/src/desktop/telegram.rs` — komentar ringkas dan faktual
+- `web-desktop/src/components/settings/NotifikasiTelegramCard.tsx` — teks UI alami, tanpa slop
+- `web-desktop/src/lib/services/telegram.ts` — komentar arsitektur ringkas
+- `web-desktop/src/lib/validations/telegram.ts` — format pesan dan kueri SQL faktual
 
 ## Perlu tindakan

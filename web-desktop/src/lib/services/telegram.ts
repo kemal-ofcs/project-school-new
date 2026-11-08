@@ -5,14 +5,20 @@ import { z } from "zod";
 import { ApiRequestError } from "@/lib/server/http/api-response";
 import { statusSetelahGagal } from "@/lib/services/wa-sender";
 import {
+  AWALAN_BUKA,
+  AWALAN_BUKA_PIMPINAN,
   type BarisStokMenipis,
   BIDANG_KEJADIAN,
   type BidangTelegram,
   galatTelegram,
   grupDariUpdates,
+  idGajiStatus,
+  idKasbonBaru,
   idPengajuanBaru,
   idPengajuanPutus,
+  idRekapPembayaran,
   idStokMenipis,
+  idTutupBuku,
   JAM_RINGKASAN_STOK,
   type KejadianTelegram,
   KUNCI_AKTIF,
@@ -23,9 +29,14 @@ import {
   LABEL_BIDANG,
   normalisasiChatId,
   permintaanKirim,
+  pesanBukaBuku,
+  pesanGajiStatus,
+  pesanKasbonBaru,
   pesanPengajuanBaru,
   pesanPengajuanPutus,
+  pesanRekapPembayaran,
   pesanStokMenipis,
+  pesanTutupBuku,
   potong,
   samarkanToken,
   TELEGRAM_BATCH,
@@ -33,10 +44,16 @@ import {
   TELEGRAM_INSERT_ANTREAN_SQL,
   TELEGRAM_KEJADIAN,
   TELEGRAM_RIWAYAT,
+  TELEGRAM_SQL_BUKA_BUKU,
+  TELEGRAM_SQL_GAJI_STATUS,
   TELEGRAM_SQL_JAM_WIB,
+  TELEGRAM_SQL_KASBON_BARU,
+  TELEGRAM_SQL_PEMBAYARAN,
+  TELEGRAM_SQL_PEMBAYARAN_BATAL,
   TELEGRAM_SQL_PENGAJUAN_BARU,
   TELEGRAM_SQL_PENGAJUAN_PUTUS,
   TELEGRAM_SQL_STOK_MENIPIS,
+  TELEGRAM_SQL_TUTUP_BUKU,
   TELEGRAM_UPSERT_SETTING_SQL,
   type TelegramConfig,
   type TelegramConfigDraft,
@@ -61,13 +78,22 @@ export const telegramDraftSchema = z
     aktif: z.boolean(),
     botToken: z.string().max(100),
     grup: z
-      .object({ inventaris: chatIdSchema, keuangan: chatIdSchema })
+      .object({
+        inventaris: chatIdSchema,
+        keuangan: chatIdSchema,
+        pimpinan: chatIdSchema,
+      })
       .strict(),
     kirim: z
       .object({
         pengajuan_baru: z.boolean(),
         pengajuan_putus: z.boolean(),
         stok_menipis: z.boolean(),
+        pembayaran_harian: z.boolean(),
+        kasbon_baru: z.boolean(),
+        tutup_buku: z.boolean(),
+        gaji_status: z.boolean(),
+        buka_buku_pimpinan: z.boolean(),
       })
       .strict(),
   })
@@ -343,15 +369,117 @@ async function catatKejadian(client: Client, pengaturan: Pengaturan) {
       );
     }
   }
-  if (pengaturan.siap("stok_menipis")) {
-    const jam = (await client.execute(TELEGRAM_SQL_JAM_WIB)).rows[0];
-    if (!jam || Number(jam.jam) < JAM_RINGKASAN_STOK) return;
-    const id = idStokMenipis(teks(jam.tanggal));
-    const sudah = await client.execute({
-      sql: "SELECT 1 AS ada FROM notifikasi_telegram WHERE id_notifikasi = ? LIMIT 1;",
-      args: [id],
+  if (pengaturan.siap("kasbon_baru")) {
+    const hasil = await client.execute({
+      sql: TELEGRAM_SQL_KASBON_BARU,
+      args: [sejak],
     });
-    if (sudah.rows.length > 0) return;
+    for (const row of hasil.rows) {
+      await antrekan(
+        client,
+        idKasbonBaru(teks(row.id_pinjaman)),
+        "kasbon_baru",
+        pesanKasbonBaru(
+          Number(row.pokok ?? 0),
+          Number(row.cicilan ?? 0),
+          teks(row.mulai_potong),
+        ),
+      );
+    }
+  }
+  if (pengaturan.siap("tutup_buku")) {
+    const tutup = await client.execute({
+      sql: TELEGRAM_SQL_TUTUP_BUKU,
+      args: [sejak],
+    });
+    for (const row of tutup.rows) {
+      await antrekan(
+        client,
+        idTutupBuku(teks(row.id_tutup)),
+        "tutup_buku",
+        pesanTutupBuku(
+          teks(row.sampai_tanggal),
+          teks(row.oleh),
+          teks(row.status) === "Menunggu",
+        ),
+      );
+    }
+    await catatBukaBuku(client, sejak, AWALAN_BUKA, "tutup_buku");
+  }
+  if (pengaturan.siap("buka_buku_pimpinan")) {
+    await catatBukaBuku(
+      client,
+      sejak,
+      AWALAN_BUKA_PIMPINAN,
+      "buka_buku_pimpinan",
+    );
+  }
+  if (pengaturan.siap("gaji_status")) {
+    const hasil = await client.execute({
+      sql: TELEGRAM_SQL_GAJI_STATUS,
+      args: [sejak],
+    });
+    for (const row of hasil.rows) {
+      const isi = pesanGajiStatus({
+        status: teks(row.new_status),
+        periodeAwal: teks(row.period_start),
+        periodeAkhir: teks(row.period_end),
+        pegawai: Number(row.total_employees ?? 0),
+        totalBersih: Number(row.total_net_payout ?? 0),
+        oleh: teks(row.oleh),
+        catatan: teks(row.notes),
+      });
+      if (isi !== null) {
+        await antrekan(client, idGajiStatus(teks(row.id)), "gaji_status", isi);
+      }
+    }
+  }
+  await catatHarian(client, pengaturan);
+}
+
+/** Cermin `catat_buka_buku`: awalan id menentukan grup tujuannya. */
+async function catatBukaBuku(
+  client: Client,
+  sejak: string,
+  awalan: string,
+  kejadian: KejadianTelegram,
+) {
+  const buka = await client.execute({
+    sql: TELEGRAM_SQL_BUKA_BUKU,
+    args: [sejak, awalan],
+  });
+  for (const row of buka.rows) {
+    await antrekan(
+      client,
+      `${awalan}${teks(row.id_tutup)}`,
+      kejadian,
+      pesanBukaBuku(
+        teks(row.sampai_tanggal),
+        teks(row.oleh),
+        teks(row.alasan_buka),
+      ),
+    );
+  }
+}
+
+async function belumTercatat(client: Client, id: string) {
+  const sudah = await client.execute({
+    sql: "SELECT 1 AS ada FROM notifikasi_telegram WHERE id_notifikasi = ? LIMIT 1;",
+    args: [id],
+  });
+  return sudah.rows.length === 0;
+}
+
+/** Cermin `catat_harian`: ringkasan sekali per tanggal, mulai 07.00 WIB. */
+async function catatHarian(client: Client, pengaturan: Pengaturan) {
+  const stok = pengaturan.siap("stok_menipis");
+  const bayar = pengaturan.siap("pembayaran_harian");
+  if (!stok && !bayar) return;
+  const jam = (await client.execute(TELEGRAM_SQL_JAM_WIB)).rows[0];
+  if (!jam || Number(jam.jam) < JAM_RINGKASAN_STOK) return;
+
+  const idStok = idStokMenipis(teks(jam.tanggal));
+  if (stok && (await belumTercatat(client, idStok))) {
     const daftar: BarisStokMenipis[] = (
       await client.execute(TELEGRAM_SQL_STOK_MENIPIS)
     ).rows.map((row) => ({
@@ -363,7 +491,32 @@ async function catatKejadian(client: Client, pengaturan: Pengaturan) {
       minimum: Number(row.stok_minimum ?? 0),
     }));
     const isi = pesanStokMenipis(daftar);
-    if (isi !== null) await antrekan(client, id, "stok_menipis", isi);
+    if (isi !== null) await antrekan(client, idStok, "stok_menipis", isi);
+  }
+
+  const kemarin = teks(jam.kemarin);
+  const idBayar = idRekapPembayaran(kemarin);
+  if (bayar && (await belumTercatat(client, idBayar))) {
+    const metode = (
+      await client.execute({ sql: TELEGRAM_SQL_PEMBAYARAN, args: [kemarin] })
+    ).rows.map((row) => ({
+      metode: teks(row.metode),
+      jumlah: Number(row.jumlah ?? 0),
+      total: Number(row.total ?? 0),
+    }));
+    const batal = (
+      await client.execute({
+        sql: TELEGRAM_SQL_PEMBAYARAN_BATAL,
+        args: [kemarin],
+      })
+    ).rows[0];
+    const isi = pesanRekapPembayaran(kemarin, metode, {
+      jumlah: Number(batal?.jumlah ?? 0),
+      total: Number(batal?.total ?? 0),
+    });
+    if (isi !== null) {
+      await antrekan(client, idBayar, "pembayaran_harian", isi);
+    }
   }
 }
 

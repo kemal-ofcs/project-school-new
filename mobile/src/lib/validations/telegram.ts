@@ -13,15 +13,22 @@
  */
 
 import { formatRupiah } from "@/lib/validations/accounting";
+import { labelPeriode } from "@/lib/validations/billing";
 import { formatJumlah } from "@/lib/validations/inventory";
+import { tanggalTampil } from "@/lib/validations/tutup-buku";
 
-export const TELEGRAM_BIDANG = ["inventaris", "keuangan"] as const;
+export const TELEGRAM_BIDANG = ["inventaris", "keuangan", "pimpinan"] as const;
 export type BidangTelegram = (typeof TELEGRAM_BIDANG)[number];
 
 export const TELEGRAM_KEJADIAN = [
   "pengajuan_baru",
   "pengajuan_putus",
   "stok_menipis",
+  "pembayaran_harian",
+  "kasbon_baru",
+  "tutup_buku",
+  "gaji_status",
+  "buka_buku_pimpinan",
 ] as const;
 export type KejadianTelegram = (typeof TELEGRAM_KEJADIAN)[number];
 
@@ -33,17 +40,28 @@ export const BIDANG_KEJADIAN: Record<KejadianTelegram, BidangTelegram> = {
   pengajuan_baru: "keuangan",
   pengajuan_putus: "inventaris",
   stok_menipis: "inventaris",
+  pembayaran_harian: "keuangan",
+  kasbon_baru: "keuangan",
+  tutup_buku: "keuangan",
+  gaji_status: "pimpinan",
+  buka_buku_pimpinan: "pimpinan",
 };
 
 export const LABEL_BIDANG: Record<BidangTelegram, string> = {
   inventaris: "Inventaris",
   keuangan: "Keuangan",
+  pimpinan: "Pimpinan",
 };
 
 export const LABEL_KEJADIAN: Record<KejadianTelegram, string> = {
   pengajuan_baru: "Pengajuan pembelian baru",
   pengajuan_putus: "Pengajuan disetujui atau ditolak",
   stok_menipis: "Ringkasan stok di bawah minimum (sekali sehari)",
+  pembayaran_harian: "Rekap pembayaran tagihan kemarin (sekali sehari)",
+  kasbon_baru: "Pengajuan kasbon baru (tanpa nama karyawan)",
+  tutup_buku: "Tutup buku dan buka kembali",
+  gaji_status: "Status proses gaji (hanya jumlah pegawai dan total)",
+  buka_buku_pimpinan: "Buku dibuka kembali",
 };
 
 /** Kunci `app_telegram_setting`. Cermin konstanta `KUNCI_*` di Rust. */
@@ -53,7 +71,7 @@ export const KUNCI_AKTIF_SEJAK = "aktif_sejak";
 export const kunciGrup = (bidang: BidangTelegram) => `grup:${bidang}`;
 export const kunciKirim = (kejadian: KejadianTelegram) => `kirim:${kejadian}`;
 
-/** Ringkasan stok dikirim mulai jam ini (WIB), sekali per tanggal. */
+/** Ringkasan stok dan rekap pembayaran dikirim mulai jam ini (WIB), sekali per tanggal. */
 export const JAM_RINGKASAN_STOK = 7;
 export const MAKS_BARIS_STOK = 30;
 /** Baris antrean per siklus; batas Telegram ±20 pesan/menit per grup. */
@@ -110,8 +128,80 @@ ORDER BY nama_barang COLLATE NOCASE
 -- batas: satu baris per barang aktif yang stoknya di bawah minimum
 ;`;
 
+/**
+ * Rekap pembayaran KEMARIN (`?` = tanggal kemarin WIB): saat dikirim pukul
+ * 07.00 harinya sudah lengkap. Kuitansi yang dibatalkan tidak dihitung masuk.
+ */
+export const TELEGRAM_SQL_PEMBAYARAN = `SELECT p.metode, COUNT(*) AS jumlah, COALESCE(SUM(p.total), 0) AS total
+FROM keu_pembayaran p
+WHERE p.tanggal = ?
+  AND NOT EXISTS (SELECT 1 FROM keu_pembayaran_batal b WHERE b.id_pembayaran = p.id_pembayaran)
+GROUP BY p.metode
+ORDER BY CASE p.metode WHEN 'Tunai' THEN 1 WHEN 'Transfer' THEN 2 ELSE 3 END
+-- batas: agregat, paling banyak satu baris per metode
+;`;
+
+/** Kuitansi yang DIBATALKAN kemarin (WIB), berapa pun tanggal kuitansinya. */
+export const TELEGRAM_SQL_PEMBAYARAN_BATAL = `SELECT COUNT(*) AS jumlah, COALESCE(SUM(p.total), 0) AS total
+FROM keu_pembayaran_batal b
+JOIN keu_pembayaran p ON p.id_pembayaran = b.id_pembayaran
+WHERE date(b.created_at, '+7 hours') = ?
+-- batas: agregat, selalu satu baris
+;`;
+
+/** Kasbon lahir `Diajukan`; yang sudah diputus sebelum terlihat tidak dikirim. */
+export const TELEGRAM_SQL_KASBON_BARU = `SELECT k.id_pinjaman, k.pokok, k.cicilan, k.mulai_potong
+FROM keu_pinjaman k
+WHERE k.created_at >= ? AND k.created_at >= datetime('now', '-7 days')
+  AND k.status = 'Diajukan'
+  AND NOT EXISTS (SELECT 1 FROM notifikasi_telegram n WHERE n.id_notifikasi = 'kasbon:' || k.id_pinjaman)
+ORDER BY k.created_at
+LIMIT 50;`;
+
+/** Tutup buku baru; `Menunggu` = bentrok dengan tutup buku perangkat lain. */
+export const TELEGRAM_SQL_TUTUP_BUKU = `SELECT t.id_tutup, t.sampai_tanggal, t.status, COALESCE(o.nama_operator, t.dibuat_oleh) AS oleh
+FROM keu_tutup_buku t
+LEFT JOIN master_operator o ON o.username = t.dibuat_oleh
+WHERE t.created_at >= ? AND t.created_at >= datetime('now', '-7 days')
+  AND t.status IN ('Aktif', 'Menunggu')
+  AND NOT EXISTS (SELECT 1 FROM notifikasi_telegram n WHERE n.id_notifikasi = 'tutup:' || t.id_tutup)
+ORDER BY t.created_at
+LIMIT 50;`;
+
+/**
+ * `dibuka_pada` disimpan WIB, `aktif_sejak` UTC. Parameter kedua = awalan id
+ * (`AWALAN_BUKA` ke Keuangan, `AWALAN_BUKA_PIMPINAN` ke Pimpinan): satu
+ * pembukaan menjadi dua pesan berbeda id.
+ */
+export const TELEGRAM_SQL_BUKA_BUKU = `SELECT t.id_tutup, t.sampai_tanggal, COALESCE(o.nama_operator, t.dibuka_oleh) AS oleh, t.alasan_buka
+FROM keu_tutup_buku t
+LEFT JOIN master_operator o ON o.username = t.dibuka_oleh
+WHERE t.status = 'Dibuka'
+  AND t.dibuka_pada >= datetime(?, '+7 hours') AND t.dibuka_pada >= datetime('now', '+7 hours', '-7 days')
+  AND NOT EXISTS (SELECT 1 FROM notifikasi_telegram n WHERE n.id_notifikasi = ? || t.id_tutup)
+ORDER BY t.dibuka_pada
+LIMIT 50;`;
+
+/**
+ * Perubahan status proses gaji dari `payroll_audit_logs` (satu baris = satu
+ * pesan). Hanya angka agregat dari `payroll_runs`: rincian per pegawai tidak
+ * pernah dibaca. Waktu log berformat ISO, jadi dinormalkan lewat `datetime()`.
+ */
+export const TELEGRAM_SQL_GAJI_STATUS = `SELECT a.id, a.new_status, a.notes, r.period_start, r.period_end,
+       r.total_employees, r.total_net_payout,
+       COALESCE(o.nama_operator, a.performed_by) AS oleh
+FROM payroll_audit_logs a
+JOIN payroll_runs r ON r.id = a.payroll_run_id
+LEFT JOIN master_operator o ON o.username = a.performed_by
+WHERE a.action = 'TRANSITION_STATUS'
+  AND a.new_status IN ('REVIEWED', 'APPROVED', 'PAID', 'REJECTED')
+  AND datetime(a.created_at) >= datetime(?) AND datetime(a.created_at) >= datetime('now', '-7 days')
+  AND NOT EXISTS (SELECT 1 FROM notifikasi_telegram n WHERE n.id_notifikasi = 'gaji:' || a.id)
+ORDER BY datetime(a.created_at), a.id
+LIMIT 50;`;
+
 export const TELEGRAM_SQL_JAM_WIB =
-  "SELECT date('now', '+7 hours') AS tanggal, CAST(strftime('%H', 'now', '+7 hours') AS INTEGER) AS jam;";
+  "SELECT date('now', '+7 hours') AS tanggal, date('now', '+7 hours', '-1 day') AS kemarin, CAST(strftime('%H', 'now', '+7 hours') AS INTEGER) AS jam;";
 
 export function idPengajuanBaru(idPengajuan: string) {
   return `pgj-baru:${idPengajuan}`;
@@ -121,6 +211,20 @@ export function idPengajuanPutus(idPengajuan: string) {
 }
 export function idStokMenipis(tanggal: string) {
   return `stok:${tanggal}`;
+}
+export function idRekapPembayaran(tanggal: string) {
+  return `bayar:${tanggal}`;
+}
+export function idKasbonBaru(idPinjaman: string) {
+  return `kasbon:${idPinjaman}`;
+}
+export function idTutupBuku(idTutup: string) {
+  return `tutup:${idTutup}`;
+}
+export const AWALAN_BUKA = "buka:";
+export const AWALAN_BUKA_PIMPINAN = "buka-pimpinan:";
+export function idGajiStatus(idLog: string) {
+  return `gaji:${idLog}`;
 }
 
 /** Cermin `token_bot_valid`: `<id bot>:<rahasia>` dari BotFather. */
@@ -223,6 +327,121 @@ export function pesanStokMenipis(daftar: BarisStokMenipis[]): string | null {
   }
   if (daftar.length > MAKS_BARIS_STOK) {
     baris.push(`dan ${daftar.length - MAKS_BARIS_STOK} barang lainnya.`);
+  }
+  return baris.join("\n");
+}
+
+export interface RekapMetode {
+  metode: string;
+  jumlah: number;
+  total: number;
+}
+
+/**
+ * Cermin `pesan_rekap_pembayaran`. Tanpa pembayaran maupun pembatalan tidak
+ * ada pesan.
+ */
+export function pesanRekapPembayaran(
+  tanggal: string,
+  metode: RekapMetode[],
+  batal: { jumlah: number; total: number },
+): string | null {
+  if (metode.length === 0 && batal.jumlah === 0) return null;
+  const jumlah = metode.reduce((sum, item) => sum + item.jumlah, 0);
+  const total = metode.reduce((sum, item) => sum + item.total, 0);
+  const baris = [
+    `🧾 Rekap pembayaran ${tanggalTampil(tanggal)}`,
+    `Masuk: ${jumlah} kuitansi, ${formatRupiah(total)}`,
+    ...metode.map(
+      (item) =>
+        `• ${item.metode}: ${item.jumlah} kuitansi, ${formatRupiah(item.total)}`,
+    ),
+  ];
+  if (batal.jumlah > 0) {
+    baris.push(
+      `Dibatalkan: ${batal.jumlah} kuitansi, ${formatRupiah(batal.total)}`,
+    );
+  }
+  return baris.join("\n");
+}
+
+/** Cermin `pesan_kasbon_baru`. Sengaja tanpa nama karyawan maupun pengaju. */
+export function pesanKasbonBaru(
+  pokok: number,
+  cicilan: number,
+  mulaiPotong: string,
+): string {
+  return [
+    "💰 Pengajuan kasbon baru",
+    `Pokok: ${formatRupiah(pokok)}`,
+    `Cicilan: ${formatRupiah(cicilan)} per bulan, mulai potong gaji ${labelPeriode(mulaiPotong)}`,
+    "Menunggu keputusan di aplikasi.",
+  ].join("\n");
+}
+
+/** Cermin `pesan_tutup_buku`. */
+export function pesanTutupBuku(
+  sampaiTanggal: string,
+  oleh: string,
+  menunggu: boolean,
+): string {
+  const baris = [
+    `🔒 Buku ditutup sampai ${tanggalTampil(sampaiTanggal)}`,
+    `Oleh: ${oleh}`,
+  ];
+  if (menunggu) {
+    baris.push(
+      "Bentrok dengan tutup buku lain, menunggu keputusan di aplikasi.",
+    );
+  }
+  return baris.join("\n");
+}
+
+/** Cermin `pesan_buka_buku`. */
+export function pesanBukaBuku(
+  sampaiTanggal: string,
+  oleh: string,
+  alasan: string,
+): string {
+  const baris = [
+    `🔓 Buku dibuka kembali (tutup sampai ${tanggalTampil(sampaiTanggal)})`,
+    `Oleh: ${oleh}`,
+  ];
+  if (alasan.trim() !== "") baris.push(`Alasan: ${potong(alasan, 300)}`);
+  return baris.join("\n");
+}
+
+const FRASA_STATUS_GAJI: Record<string, string> = {
+  REVIEWED: "menunggu persetujuan",
+  APPROVED: "disetujui",
+  PAID: "sudah dibayar",
+  REJECTED: "ditolak",
+};
+
+export interface IsiGajiStatus {
+  status: string;
+  periodeAwal: string;
+  periodeAkhir: string;
+  pegawai: number;
+  totalBersih: number;
+  oleh: string;
+  catatan: string;
+}
+
+/**
+ * Cermin `pesan_gaji_status`. Status di luar daftar tidak menghasilkan pesan.
+ * Hanya jumlah pegawai dan total bersih: tanpa nama, slip, potongan, kasbon.
+ */
+export function pesanGajiStatus(isi: IsiGajiStatus): string | null {
+  const frasa = FRASA_STATUS_GAJI[isi.status];
+  if (!frasa) return null;
+  const baris = [
+    `💼 Proses gaji ${tanggalTampil(isi.periodeAwal)}–${tanggalTampil(isi.periodeAkhir)} ${frasa}`,
+    `${isi.pegawai} pegawai · total bersih ${formatRupiah(isi.totalBersih)}`,
+    `Oleh: ${isi.oleh}`,
+  ];
+  if (isi.status === "REJECTED" && isi.catatan.trim() !== "") {
+    baris.push(`Alasan: ${potong(isi.catatan, 300)}`);
   }
   return baris.join("\n");
 }

@@ -1,7 +1,7 @@
 # HASIL.md — hasil `bun run check`
 
-- Waktu: 2026-11-07 21:12 WIB
-- Commit: fecd81e (+ 24 berkas berubah, belum commit)
+- Waktu: 2026-11-08 08:41 WIB
+- Commit: c7f0b48 (+ 21 berkas berubah, belum commit)
 - Perintah: `bun run check` (root)
 - Exit code: 0
 - Status: **LULUS**
@@ -14,6 +14,6 @@ Tidak ada (semua gate lulus).
 Tidak ada galat.
 
 ## Catatan
-- Seluruh gerbang audit root (skema, kontrak, SQL, UI guard, a11y, page guard, dialog, route guard, confirm, silent catch, list bound) berhasil lulus.
-- Seluruh typecheck, lint, dan unit test di ketiga workspace (`web-desktop`, `mobile`, `web-public`) berhasil lulus.
-- Pengujian Rust (`cargo test`) pada workspace `web-desktop` dan `mobile` lulus 100% (500 tests passed).
+- Seluruh 11 gerbang audit integritas root (skema, kontrak sync, SQL, UI guard, a11y, dialog, route guard, confirm, silent catch, list bound) berhasil lulus.
+- Seluruh typecheck TypeScript, lint Biome, dan unit test Bun di ketiga workspace (`web-desktop`, `mobile`, `web-public`) berhasil lulus.
+- Pengujian Rust (`cargo test`) pada kedua workspace `web-desktop` dan `mobile` lulus 100% (510 tests passed).
