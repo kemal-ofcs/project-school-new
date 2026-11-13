@@ -1,4 +1,5 @@
 import type { NextRequest } from "next/server";
+import { z } from "zod";
 import { requireWebPermission } from "@/lib/server/auth/authorize";
 import {
   ensureServerDatabaseInitialized,
@@ -17,10 +18,28 @@ import {
   isStudentPersonnel,
   normalizeAppliesTo,
   PAYROLL_CALC_TYPES,
-  type PayrollCalcType,
 } from "@/lib/validations/payroll-policy";
 
 export const runtime = "nodejs";
+
+/**
+ * Draft komponen; cermin `PayrollComponent` di `payroll/models.rs`.
+ * `created_at` boleh terbawa dari baris yang sedang disunting, tetapi
+ * diabaikan. Potongan tidak pernah menjadi dasar BPJS (v67, Q-3 (a)).
+ */
+const componentDraftSchema = z
+  .object({
+    id: z.string().max(128).optional(),
+    name: z.string().trim().min(1).max(255),
+    category: z.enum(["ALLOWANCE", "DEDUCTION"]),
+    calc_type: z.enum(PAYROLL_CALC_TYPES),
+    default_value: z.number().min(0).default(0),
+    applies_to: z.string().max(255).default(""),
+    is_active: z.union([z.literal(0), z.literal(1)]).default(1),
+    dasar_bpjs: z.union([z.literal(0), z.literal(1)]).default(0),
+    created_at: z.string().nullable().optional(),
+  })
+  .strict();
 
 export async function POST(request: NextRequest) {
   try {
@@ -44,39 +63,22 @@ export async function PUT(request: NextRequest) {
     await ensureServerDatabaseInitialized();
     const client = getServerDatabase();
 
-    const body = await readJsonBody<{ draft?: Record<string, unknown> }>(
-      request,
-    );
-    const draft = body.draft;
-    if (!draft || !draft.name || !draft.category || !draft.calc_type) {
+    const body = await readJsonBody<{ draft?: unknown }>(request);
+    const parsed = componentDraftSchema.safeParse(body.draft);
+    if (!parsed.success) {
       throw new ApiRequestError(
-        "name, category, dan calc_type wajib diisi.",
+        "Data komponen tidak valid: nama, kategori, dan jenis perhitungan wajib diisi dengan nilai yang dikenal.",
         400,
       );
     }
-
-    const compId =
-      typeof draft.id === "string" && draft.id.trim()
-        ? draft.id.trim()
-        : `comp-${Date.now()}`;
+    const draft = parsed.data;
+    const compId = draft.id?.trim() ? draft.id.trim() : `comp-${Date.now()}`;
 
     // Penerima komponen: "ALL" atau satu personil yang benar-benar ada dan
     // bukan siswa. Cerminan validasi di `desktop_save_payroll_component`.
     // Tanpa ini, id yang salah ketik tersimpan sebagai komponen yang tidak
-    // pernah berlaku untuk siapa pun — tanpa pesan, dan hanya terlihat sebagai
+    // pernah berlaku untuk siapa pun (tanpa pesan), dan hanya terlihat sebagai
     // tunjangan yang "hilang" di slip orangnya.
-    // Jenis perhitungan divalidasi SEBELUM menyentuh database: nilai asing
-    // ditolak CHECK constraint dengan pesan SQLite yang tidak bisa dipahami
-    // pengguna. Cerminan validasi di `desktop_save_payroll_component`.
-    if (
-      !PAYROLL_CALC_TYPES.includes(String(draft.calc_type) as PayrollCalcType)
-    ) {
-      throw new ApiRequestError(
-        "Jenis perhitungan komponen tidak dikenal.",
-        400,
-      );
-    }
-
     const appliesTo = normalizeAppliesTo(draft.applies_to);
     // Bentuk kelompok tidak diverifikasi ke master data: divisi atau status
     // yang hari ini belum dipakai siapa pun boleh didaftarkan lebih dulu, dan
@@ -110,24 +112,26 @@ export async function PUT(request: NextRequest) {
     await client.execute({
       sql: `
         INSERT INTO payroll_components (
-          id, name, category, calc_type, default_value, applies_to, is_active
-        ) VALUES (?, ?, ?, ?, ?, ?, ?)
+          id, name, category, calc_type, default_value, applies_to, is_active, dasar_bpjs
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT(id) DO UPDATE SET
           name = excluded.name,
           category = excluded.category,
           calc_type = excluded.calc_type,
           default_value = excluded.default_value,
           applies_to = excluded.applies_to,
-          is_active = excluded.is_active;
+          is_active = excluded.is_active,
+          dasar_bpjs = excluded.dasar_bpjs;
       `,
       args: [
         compId,
-        String(draft.name),
-        String(draft.category),
-        String(draft.calc_type),
-        Number(draft.default_value || 0),
+        draft.name,
+        draft.category,
+        draft.calc_type,
+        draft.default_value,
         appliesTo,
-        Number(draft.is_active ?? 1),
+        draft.is_active,
+        draft.category === "ALLOWANCE" ? draft.dasar_bpjs : 0,
       ],
     });
 

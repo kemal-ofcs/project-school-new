@@ -89,6 +89,9 @@ pub struct PayrollComponent {
     pub applies_to: String, // "ALL" | id_karyawan
     #[serde(default = "default_active")]
     pub is_active: i64,
+    /// Tunjangan tetap yang menjadi dasar BPJS (v67, Q-3 (a)); bawaan 0.
+    #[serde(default)]
+    pub dasar_bpjs: i64,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -262,8 +265,14 @@ pub struct PayrollRecapRow {
     /// `est_total_deduction` dan mengurangi `est_net_salary`.
     pub est_kasbon: i64,
     /// Rapel gaji yang ikut dibayar; sudah termasuk di `est_total_allowance`
-    /// dan karenanya di bruto, PPh 21, dan BPJS bulan ini.
+    /// dan karenanya di bruto dan PPh 21 bulan ini (bukan dasar BPJS).
     pub est_rapel: i64,
+    /// PTKP yang berlaku 1 Januari (Q-4), dari `pajak::KOLOM_PAJAK_SQL`.
+    pub ptkp_awal_tahun: String,
+    /// `tanggal_selesai_aktif` bila personil sudah nonaktif.
+    pub keluar_pada: Option<String>,
+    /// Isi `breakdown_snapshot.pajak` yang akan dibekukan (`pajak::HasilPph`).
+    pub pajak: serde_json::Value,
 }
 
 /// Satu orang, dilihat dari sudut pandang penyaringan komponen payroll.

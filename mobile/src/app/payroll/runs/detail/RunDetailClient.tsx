@@ -21,6 +21,7 @@ import {
   transitionPayrollStatus,
 } from "@/lib/gateways/payroll";
 import { subscribeSyncCompleted } from "@/lib/gateways/sync-status";
+import { catatanPajakRun, keteranganPph } from "@/lib/validations/pajak";
 import { penyetujuSah } from "@/lib/validations/payroll-policy";
 
 /*
@@ -335,6 +336,15 @@ export default function RunDetailClient() {
             </div>
           ) : (
             <ul className="flex flex-col gap-2">
+              {catatanPajakRun(
+                items.map((item) => item.breakdown_snapshot),
+              ) && (
+                <li className="rounded-xl border border-amber-300/20 bg-amber-300/10 px-3 py-2 text-[11px] text-amber-100">
+                  {catatanPajakRun(
+                    items.map((item) => item.breakdown_snapshot),
+                  )}
+                </li>
+              )}
               {items.map((item) => (
                 <li
                   key={item.id}
@@ -391,6 +401,13 @@ export default function RunDetailClient() {
                       <dt className="text-slate-500">PPh 21</dt>
                       <dd className="font-mono font-bold text-rose-300">
                         {IDR.format(item.pph21_amount)}
+                      </dd>
+                      <dd className="mt-0.5 text-[10px] text-slate-400">
+                        {keteranganPph(
+                          item.breakdown_snapshot,
+                          item.pph21_amount,
+                          item.ptkp_status,
+                        )}
                       </dd>
                     </div>
                   </dl>

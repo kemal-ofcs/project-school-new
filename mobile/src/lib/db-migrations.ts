@@ -82,6 +82,7 @@ const INVENTORY_SERVICE_MIGRATION_VERSION = 63;
 const INVENTORY_REQUEST_MIGRATION_VERSION = 64;
 const INVENTORY_INSTALLMENT_MIGRATION_VERSION = 65;
 const TELEGRAM_NOTIFICATION_MIGRATION_VERSION = 66;
+const PAYROLL_TAX_PERIOD_MIGRATION_VERSION = 67;
 
 /**
  * Bentuk `akademik_jam_pelajaran` sejak v60: jenis `Pulang`, cakupan unit +
@@ -1080,7 +1081,8 @@ export async function runDatabaseMigrations(client: Client) {
       default_value REAL NOT NULL DEFAULT 0 CHECK (default_value >= 0),
       applies_to TEXT NOT NULL DEFAULT 'ALL',
       is_active INTEGER NOT NULL DEFAULT 1 CHECK (is_active IN (0, 1)),
-      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      dasar_bpjs INTEGER NOT NULL DEFAULT 0 CHECK (dasar_bpjs IN (0, 1))
     );
   `);
 
@@ -3402,5 +3404,82 @@ export async function runDatabaseMigrations(client: Client) {
     sql: `INSERT OR IGNORE INTO schema_migration (version, name, applied_at)
           VALUES (?, 'telegram-notification', ?);`,
     args: [TELEGRAM_NOTIFICATION_MIGRATION_VERSION, now],
+  });
+
+  // v67: PPh 21 dan BPJS per masa pajak (HRIS Fase 0, `prd-hris.md` §6.5).
+  // Kembar `ensure_pajak_masa_v67` di `turso.rs`. Kolom SESUDAH rebuild
+  // `payroll_components` di atas, yang daftar kolomnya eksplisit.
+  if (!(await hasColumn(client, "payroll_components", "dasar_bpjs"))) {
+    await client.execute(
+      "ALTER TABLE payroll_components ADD COLUMN dasar_bpjs INTEGER NOT NULL DEFAULT 0 CHECK (dasar_bpjs IN (0, 1));",
+    );
+  }
+  // Koreksi TER B/C dan batas JP seed lama, sekali per database dan hanya
+  // baris yang belum disunting admin (Q-7 (a)). Lapis baru sudah ditanam seed
+  // di atas (`INSERT OR IGNORE`).
+  const koreksiTarif = await client.execute({
+    sql: "SELECT COUNT(*) AS total FROM schema_migration WHERE version = ?;",
+    args: [PAYROLL_TAX_PERIOD_MIGRATION_VERSION],
+  });
+  if (Number(koreksiTarif.rows[0]?.total ?? 0) === 0) {
+    await client.batch(
+      [
+        ...koreksiPajakArgs().map((args) => ({ sql: KOREKSI_PAJAK_SQL, args })),
+        ...koreksiJpArgs().map((args) => ({ sql: KOREKSI_JP_SQL, args })),
+      ],
+      "write",
+    );
+  }
+  await client.execute({
+    sql: `INSERT OR IGNORE INTO schema_migration (version, name, applied_at)
+          VALUES (?, 'payroll-pajak-masa', ?);`,
+    args: [PAYROLL_TAX_PERIOD_MIGRATION_VERSION, now],
+  });
+}
+
+/** Cermin `KOREKSI_PAJAK_SQL` di `payroll_seed.rs` (v67). */
+export const KOREKSI_PAJAK_SQL =
+  "UPDATE tax_rules SET bracket_min = ?1, bracket_max = ?2, rate_percentage = ?3 WHERE id = ?4 AND bracket_min = ?5 AND bracket_max IS ?6 AND rate_percentage = ?7;";
+
+/** Cermin `KOREKSI_JP_SQL` di `payroll_seed.rs` (v67). */
+export const KOREKSI_JP_SQL =
+  "UPDATE bpjs_rules SET wage_cap = ?1, effective_date = ?2 WHERE component_code = ?3 AND wage_cap = ?4;";
+
+type NilaiSeed = string | number | null;
+
+function barisSeed(nama: string, id: string): NilaiSeed[] {
+  const baris = TARIF_PAYROLL_BAWAAN.tabel
+    .find((tabel) => tabel.nama === nama)
+    ?.baris.find((b) => b[0] === id);
+  if (!baris) throw new Error(`koreksi tanpa seed baru: ${id}`);
+  return baris as NilaiSeed[];
+}
+
+/** Cermin `koreksi_pajak_args`: nilai baru dari seed, nilai lama dari JSON. */
+export function koreksiPajakArgs(): NilaiSeed[][] {
+  return TARIF_PAYROLL_BAWAAN.koreksi_v67.pajak_lama.map((lama) => {
+    const baru = barisSeed("tax_rules", lama.id);
+    return [
+      baru[2],
+      baru[3],
+      baru[4],
+      lama.id,
+      lama.bracket_min,
+      lama.bracket_max,
+      lama.rate_percentage,
+    ];
+  });
+}
+
+/** Cermin `koreksi_jp_args` untuk `JP_EMP` dan `JP_CO`. */
+export function koreksiJpArgs(): NilaiSeed[][] {
+  return ["bpjs_jp_emp", "bpjs_jp_co"].map((id) => {
+    const baru = barisSeed("bpjs_rules", id);
+    return [
+      baru[4],
+      baru[5],
+      baru[1],
+      TARIF_PAYROLL_BAWAAN.koreksi_v67.jp_wage_cap_lama,
+    ];
   });
 }

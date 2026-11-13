@@ -1,19 +1,22 @@
 # ANTISLOP.md — hasil antislop
 
-- Waktu: 2026-11-08 08:13 WIB
-- Commit: c7f0b48 (+ 13 berkas berubah, belum commit)
-- Berkas disunting: 0
+- Waktu: 14 November 2026, 00:44 WIB
+- Commit: fe84fa8 (+ berkas berubah, belum commit)
+- Berkas disunting: 5
 
 ## Disunting
-- Tidak ada berkas yang perlu disunting (semua berkas dalam cakupan sudah rapi).
+- `web-desktop/src/lib/validations/pajak.ts` — komentar — rapikan pembatas dekoratif berulang menjadi komentar baris tunggal
+- `web-desktop/src-tauri/src/desktop/payroll/pajak.rs` — komentar — rapikan pembatas dekoratif berulang menjadi komentar baris tunggal
+- `web-desktop/src-tauri/src/desktop/payroll/engine.rs` — komentar — ganti em dash pada doc comments dengan koma sesuai R-02
+- `web-desktop/src/lib/services/payroll-calculator.ts` — komentar — ganti em dash pada doc comments dengan koma sesuai R-02
+- `web-desktop/src/app/api/payroll/config/components/route.ts` — komentar — ganti em dash pada komentar penjelasan dengan tanda kurung sesuai R-02
 
 ## Dilewati
-- `mobile/**` — salinan mobile yang dihasilkan skrip sinkronisasi
-- `*.test.ts` — berkas pengujian dan fixture data
-- `CLAUDE.md` — panduan proyek
-- `web-desktop/src-tauri/src/desktop/telegram.rs` — komentar ringkas dan faktual
-- `web-desktop/src/components/settings/NotifikasiTelegramCard.tsx` — teks UI alami, tanpa slop
-- `web-desktop/src/lib/services/telegram.ts` — komentar arsitektur ringkas
-- `web-desktop/src/lib/validations/telegram.ts` — format pesan dan kueri SQL faktual
+- `CLAUDE.md`, `.agents/`, `.claude/` — konfigurasi panduan agent
+- `*.test.ts`, `*.test.tsx`, modul tes Rust — berkas dan fungsi pengujian
+- `*.json` (`pajak-bawaan.json`, `pajak.vektor.json`, `tarif-payroll-bawaan.json`) — berkas data dan vektor
+- `prd-hris.md` — dokumen spesifikasi produk
+- Salinan `mobile/**` — turunan sinkronisasi dari `web-desktop`
 
 ## Perlu tindakan
+Sync mobile sudah dijalankan ulang (`bun run sync:mobile`).

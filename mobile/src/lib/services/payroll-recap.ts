@@ -3,11 +3,12 @@ import "server-only";
 import type { Client } from "@libsql/client";
 import { pinjamanAktif } from "@/lib/services/loan";
 import {
+  adaKomponenTetap,
   applyOvertimePolicy,
   type BpjsRule,
-  calculateBpjsAndPph21,
   calculateComponents,
   calculateOvertimeIndex,
+  hitungPajakMasa,
   type JpRate,
   type OvertimeTierRule,
   type PayrollComponent,
@@ -19,6 +20,17 @@ import {
 import { rapelMenunggu } from "@/lib/services/payroll-rapel";
 import { rentangJamKe } from "@/lib/validations/class-attendance";
 import { komponenKasbon, potongKasbon } from "@/lib/validations/loan";
+import {
+  daftarStatusTidakTetap,
+  type HasilPph,
+  type ItemPembanding,
+  KOLOM_PAJAK_SQL,
+  KUNCI_STATUS_TIDAK_TETAP,
+  masa,
+  RUN_TAHUN_SQL,
+  ringkasPembanding,
+  statusPph,
+} from "@/lib/validations/pajak";
 import {
   type ComponentSubject,
   isTeacherPersonnel,
@@ -80,6 +92,12 @@ export interface PayrollRecapRow {
   est_kasbon: number;
   /** Rapel yang ikut dibayar; sudah termasuk di `est_total_allowance` dan bruto. */
   est_rapel: number;
+  /** PTKP yang berlaku 1 Januari (Q-4), dari `KOLOM_PAJAK_SQL`. */
+  ptkp_awal_tahun: string;
+  /** `tanggal_selesai_aktif` bila personil sudah nonaktif. */
+  keluar_pada: string | null;
+  /** Isi `breakdown_snapshot.pajak` yang akan dibekukan. */
+  pajak: HasilPph;
   // Extra fields (not part of the Rust PayrollRecapRow response shape, but
   // needed by run creation to build payroll_items without recomputing).
   breakdown_snapshot: string;
@@ -180,11 +198,36 @@ async function loadJpRates(client: Client): Promise<JpRate[]> {
   }));
 }
 
+/** Item run pembanding per personil (`RUN_TAHUN_SQL`); cermin `load_pembanding`. */
+async function loadPembanding(
+  client: Client,
+  periodStart: string,
+): Promise<Map<string, ItemPembanding[]>> {
+  const result = await client.execute({
+    sql: RUN_TAHUN_SQL,
+    args: [periodStart],
+  });
+  const hasil = new Map<string, ItemPembanding[]>();
+  for (const row of result.rows) {
+    const id = String(row.id_karyawan);
+    const daftar = hasil.get(id) ?? [];
+    daftar.push({
+      masa: String(row.masa),
+      gross_salary: Number(row.gross_salary ?? 0),
+      overtime_salary: Number(row.overtime_salary ?? 0),
+      pph21_amount: Number(row.pph21_amount ?? 0),
+      breakdown_snapshot: String(row.breakdown_snapshot ?? ""),
+    });
+    hasil.set(id, daftar);
+  }
+  return hasil;
+}
+
 async function loadPayrollComponents(
   client: Client,
 ): Promise<PayrollComponent[]> {
   const result = await client.execute(
-    `SELECT id, name, category, calc_type, default_value, applies_to, is_active
+    `SELECT id, name, category, calc_type, default_value, applies_to, is_active, dasar_bpjs
      FROM payroll_components
      WHERE is_active = 1
      ORDER BY category, name ASC;`,
@@ -197,6 +240,7 @@ async function loadPayrollComponents(
     default_value: Number(row.default_value),
     applies_to: String(row.applies_to),
     is_active: Number(row.is_active),
+    dasar_bpjs: Number(row.dasar_bpjs ?? 0),
   }));
 }
 
@@ -287,6 +331,8 @@ export async function computePayrollRecap(
     aggResult,
     kasbonAktif,
     rapelAktif,
+    tidakTetapRow,
+    pembandingPerOrang,
   ] = await Promise.all([
     loadOvertimeTiers(client, "HARI_KERJA"),
     // Jenjang lembur hari libur dikonfigurasi terpisah oleh user di menu
@@ -331,7 +377,9 @@ export async function computePayrollRecap(
             -- dipakai ketika lembur seseorang dimatikan: menit ini pindah ke jam
             -- reguler supaya hari itu tetap dibayar. Lihat applyOvertimePolicy.
             COALESCE(SUM(CASE WHEN (hl.tanggal IS NOT NULL OR COALESCE(instr(COALESCE(NULLIF(TRIM(sh.hari_kerja), ''), '1,2,3,4,5,6,7'), replace(strftime('%w', ah.tanggal), '0', '7')), 1) = 0)
-              THEN COALESCE(ah.jam_kerja, 0) ELSE 0 END), 0) AS total_libur_jam_kerja_menit
+              THEN COALESCE(ah.jam_kerja, 0) ELSE 0 END), 0) AS total_libur_jam_kerja_menit,
+            -- ?1/?2 bernomor; tanda tanya polos sesudahnya mulai dari 3.
+            ${KOLOM_PAJAK_SQL}
           FROM master_data md
           LEFT JOIN guru_data g ON g.id_guru = md.id_unik
           LEFT JOIN salary_configs sc ON sc.id_karyawan = md.id_unik
@@ -369,6 +417,8 @@ export async function computePayrollRecap(
           ORDER BY md.nama ASC;
         `,
       args: [
+        periodStart,
+        periodEnd,
         periodEnd,
         periodStart,
         periodEnd,
@@ -384,7 +434,18 @@ export async function computePayrollRecap(
     // Rapel yang belum dipegang proses gaji mana pun ikut dibayar sebagai
     // tunjangan. Cerminan `rapel::rapel_menunggu`.
     rapelMenunggu(client),
+    // PPh 21 dan BPJS per masa (v67): status tidak tetap dari Pengaturan,
+    // run lain di masa/tahun yang sama sebagai pembanding.
+    client.execute({
+      sql: "SELECT value FROM setting_gex_system WHERE key = ? LIMIT 1;",
+      args: [KUNCI_STATUS_TIDAK_TETAP],
+    }),
+    loadPembanding(client, periodStart),
   ]);
+  const tidakTetap = daftarStatusTidakTetap(
+    tidakTetapRow.rows[0] ? String(tidakTetapRow.rows[0].value ?? "") : null,
+  );
+  const masaRun = masa(periodStart);
 
   const teacherOvertime = parseTeacherOvertimeSetting(
     teacherOvertimeRow.rows[0]
@@ -469,6 +530,7 @@ export async function computePayrollRecap(
     const {
       allowance: allowanceKomponen,
       deduction,
+      dasarBpjs,
       breakdown: compBreakdown,
     } = calculateComponents(basicSalary, components, subject);
     const rapel = rapelAktif.get(idKaryawan) ?? [];
@@ -476,20 +538,36 @@ export async function computePayrollRecap(
     const allowance = allowanceKomponen + rapelTotal;
 
     const gross = basicSalary + overtimeSalary + teaching.honor + allowance;
-    const {
-      bpjs: {
-        employee: bpjsEmployee,
-        company: bpjsCompany,
-        breakdown: bpjsBreakdown,
-      },
-      pph21: { pph21Amount, breakdown: taxBreakdown },
-    } = calculateBpjsAndPph21(
+    const statusPajak = statusPph(subject.status_kepegawaian, tidakTetap);
+    const ptkpAwalTahun = String(row.ptkp_awal_tahun || "TK/0");
+    const keluarPada =
+      row.keluar_pada === null || row.keluar_pada === undefined
+        ? null
+        : String(row.keluar_pada);
+    const pajakMasa = hitungPajakMasa(
       gross,
-      overtimeSalary,
-      ptkpStatus,
+      basicSalary + dasarBpjs,
+      adaKomponenTetap(compBreakdown),
+      {
+        period_start: periodStart,
+        period_end: periodEnd,
+        status: statusPajak,
+        ptkp_awal_tahun: ptkpAwalTahun,
+        keluar_pada: keluarPada,
+        hari: subject.total_hadir,
+        pembanding: ringkasPembanding(
+          pembandingPerOrang.get(idKaryawan) ?? [],
+          masaRun,
+          statusPajak,
+        ),
+      },
       bpjsRules,
       taxRules,
     );
+    const bpjsEmployee = pajakMasa.bpjs.karyawan;
+    const bpjsCompany = pajakMasa.bpjs.perusahaan;
+    // PPh negatif (pengembalian di masa terakhir, Q-5) menambah bersih.
+    const pph21Amount = pajakMasa.pph.pph;
 
     const netSebelumKasbon = Math.max(
       0,
@@ -520,8 +598,10 @@ export async function computePayrollRecap(
         ...komponenRapel(rapel),
         ...komponenKasbon(kasbon.rincian),
       ],
-      bpjs: bpjsBreakdown,
-      tax: taxBreakdown,
+      bpjs: pajakMasa.bpjs.rincian,
+      bpjs_masa: pajakMasa.bpjsMasa,
+      tax: pajakMasa.tax,
+      pajak: pajakMasa.pph,
       kasbon: kasbon.rincian,
       rapel: rincianRapelJson(rapel),
       calculated_at: new Date().toISOString(),
@@ -555,6 +635,9 @@ export async function computePayrollRecap(
       est_net_salary: net,
       est_kasbon: kasbon.total,
       est_rapel: rapelTotal,
+      ptkp_awal_tahun: ptkpAwalTahun,
+      keluar_pada: keluarPada,
+      pajak: pajakMasa.pph,
       breakdown_snapshot: breakdownSnapshot,
       bpjs_company_total: bpjsCompany,
     };

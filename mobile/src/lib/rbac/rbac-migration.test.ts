@@ -185,6 +185,8 @@ describe("dynamic RBAC migration", () => {
       65,
       // v66 — notifikasi grup Telegram (`notifikasi_telegram`, cloud-only).
       66,
+      // v67 — PPh 21 dan BPJS per masa pajak (`payroll_components.dasar_bpjs`).
+      67,
     ]);
 
     const sessionColumns = await client.execute(

@@ -399,6 +399,7 @@ describe("jenis perhitungan komponen", () => {
             default_value: nilai,
             applies_to: "ALL",
             is_active: 1,
+            dasar_bpjs: 0,
           },
         ],
         subject,
@@ -423,6 +424,7 @@ describe("jenis perhitungan komponen", () => {
           default_value: 5000,
           applies_to: "ALL",
           is_active: 1,
+          dasar_bpjs: 0,
         },
       ],
       {
@@ -476,45 +478,102 @@ describe("indeks lembur", () => {
   });
 });
 
-describe("dasar BPJS tanpa lembur, dasar PPh 21 ditambah premi kena pajak", () => {
-  // Kembar `dasar_bpjs_tanpa_lembur_dan_dasar_pph21_ditambah_premi` di
-  // `payroll/engine.rs`.
+describe("dasar BPJS hanya gaji pokok dan tunjangan tetap (VS3)", () => {
+  // Kembar `dasar_bpjs_hanya_gaji_pokok_dan_tunjangan_tetap` di
+  // `payroll/engine.rs`: gaji pokok 4.000.000, honor JP 3.000.000, tunjangan
+  // jabatan 500.000 bertanda, uang hadir 500.000 tanpa tanda.
   test("vektor yang sama dengan Rust", async () => {
-    const { calculateBpjsAndPph21 } = await import("./payroll-calculator");
-    const bpjs = (code: string, rate: number, cap: number | null) => ({
-      id: code,
-      component_code: code,
-      component_name: code,
-      rate_percentage: rate,
-      wage_cap: cap,
-      effective_date: "2026-01-01",
-    });
-    const tax = (min: number, max: number | null, rate: number) => ({
-      id: `ter-${min}`,
-      category: "TER_A",
-      bracket_min: min,
-      bracket_max: max,
-      rate_percentage: rate,
-      effective_date: "2026-01-01",
-    });
-    const hasil = calculateBpjsAndPph21(
-      5_000_000,
-      1_000_000,
-      "TK/0",
-      [
-        bpjs("JKK_CO", 0.24, null),
-        bpjs("JKM_CO", 0.3, null),
-        bpjs("BPJS_KES_CO", 4, 12_000_000),
-        bpjs("BPJS_KES_EMP", 1, 12_000_000),
-        bpjs("JHT_CO", 3.7, null),
-        bpjs("JHT_EMP", 2, null),
-      ],
-      [tax(0, 5_100_000, 0), tax(5_100_001, null, 1.5)],
+    const { adaKomponenTetap, calculateComponents, hitungPajakMasa } =
+      await import("./payroll-calculator");
+    const { PEMBANDING_KOSONG, STATUS_TETAP } = await import(
+      "@/lib/validations/pajak"
     );
-    expect(hasil.bpjs.employee).toBe(120_000);
-    expect(hasil.bpjs.company).toBe(329_600);
-    expect(hasil.pph21.pph21Amount).toBe(77_724);
-    expect(hasil.pph21.breakdown.dasar_pengenaan).toBe(5_181_600);
+    const { default: TARIF } = await import(
+      "@/lib/validations/tarif-payroll-bawaan.json"
+    );
+    const seed = (nama: string) =>
+      (TARIF.tabel.find((t) => t.nama === nama)?.baris ?? []) as (
+        | string
+        | number
+        | null
+      )[][];
+    const bpjsRules = seed("bpjs_rules").map((b) => ({
+      id: String(b[0]),
+      component_code: String(b[1]),
+      component_name: String(b[2]),
+      rate_percentage: Number(b[3]),
+      wage_cap: b[4] === null ? null : Number(b[4]),
+      effective_date: String(b[5]),
+    }));
+    const taxRules = seed("tax_rules").map((b) => ({
+      id: String(b[0]),
+      category: String(b[1]),
+      bracket_min: Number(b[2]),
+      bracket_max: b[3] === null ? null : Number(b[3]),
+      rate_percentage: Number(b[4]),
+      effective_date: String(b[5]),
+    }));
+    const komponen = (
+      id: string,
+      calc_type: string,
+      default_value: number,
+      dasar_bpjs: number,
+    ) => ({
+      id,
+      name: id,
+      category: "ALLOWANCE",
+      calc_type,
+      default_value,
+      applies_to: "ALL",
+      is_active: 1,
+      dasar_bpjs,
+    });
+    const basic = 4_000_000;
+    const { allowance, dasarBpjs, breakdown } = calculateComponents(
+      basic,
+      [
+        komponen("jabatan", "FIXED", 500_000, 1),
+        komponen("hadir", "PER_HADIR", 25_000, 0),
+      ],
+      {
+        id_karyawan: "g1",
+        jenis_personil: "",
+        status_kepegawaian: "",
+        divisi: "",
+        total_teaching_jp: 0,
+        total_hadir: 20,
+      },
+    );
+    expect([allowance, dasarBpjs, adaKomponenTetap(breakdown)]).toEqual([
+      1_000_000,
+      500_000,
+      true,
+    ]);
+    const hasil = hitungPajakMasa(
+      basic + 3_000_000 + allowance,
+      basic + dasarBpjs,
+      true,
+      {
+        period_start: "2026-01-01",
+        period_end: "2026-01-31",
+        status: STATUS_TETAP,
+        ptkp_awal_tahun: "TK/0",
+        keluar_pada: null,
+        hari: 20,
+        pembanding: { ...PEMBANDING_KOSONG, bpjs_masa: {} },
+      },
+      bpjsRules,
+      taxRules,
+    );
+    expect([
+      hasil.bpjs.dasar_run,
+      hasil.bpjs.karyawan,
+      hasil.pph.premi,
+      hasil.pph.bruto_pajak,
+      hasil.pph.tarif,
+      hasil.pph.pph,
+      hasil.pph.tanda,
+    ]).toEqual([4_500_000, 180_000, 217_800, 8_217_800, 150, 123_267, []]);
   });
 });
 

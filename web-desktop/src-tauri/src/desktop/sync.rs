@@ -20,7 +20,7 @@ use super::{
 /// `CURRENT_SCHEMA_VERSION` di `web-desktop/src/lib/db-schema.ts` setiap kali
 /// migrasi baru ditambahkan, karena keduanya membaca tabel `schema_migration`
 /// yang sama di Turso.
-pub const CLIENT_SCHEMA_VERSION: i64 = 66;
+pub const CLIENT_SCHEMA_VERSION: i64 = 67;
 
 /// Hanya `cloud > client` yang berbahaya; `cloud <= client` adalah kondisi normal.
 fn is_client_schema_outdated(cloud_version: i64) -> bool {
@@ -489,6 +489,7 @@ const SNAPSHOT_TABLES: &[SnapshotTable] = &[
             "default_value",
             "applies_to",
             "is_active",
+            "dasar_bpjs",
         ],
         conflict_column: "id",
         entity_column: "id",
@@ -3686,7 +3687,7 @@ fn ensure_unsynced_payroll_data_enqueued(state: &DesktopState) -> Result<(), Com
 
     // 5. Payroll Components
     if let Ok(mut stmt) = transaction.prepare(
-        "SELECT id, name, category, calc_type, default_value, applies_to, is_active
+        "SELECT id, name, category, calc_type, default_value, applies_to, is_active, dasar_bpjs
          FROM payroll_components
          WHERE id NOT IN (
              SELECT entity_key FROM desktop_sync_outbox WHERE domain = 'payroll' AND operation = 'payroll-component'
@@ -3704,12 +3705,13 @@ fn ensure_unsynced_payroll_data_enqueued(state: &DesktopState) -> Result<(), Com
                     row.get::<_, f64>(4)?,
                     row.get::<_, String>(5)?,
                     row.get::<_, i64>(6)?,
+                    row.get::<_, i64>(7)?,
                 ))
             })
             .and_then(|mapped| mapped.collect::<Result<Vec<_>, _>>())
         {
             drop(stmt);
-            for (id, name, category, calc_type, default_value, applies_to, is_active) in rows {
+            for (id, name, category, calc_type, default_value, applies_to, is_active, dasar_bpjs) in rows {
                 let payload = json!({
                     "id": id,
                     "name": name,
@@ -3718,6 +3720,7 @@ fn ensure_unsynced_payroll_data_enqueued(state: &DesktopState) -> Result<(), Com
                     "default_value": default_value,
                     "applies_to": applies_to,
                     "is_active": is_active,
+                    "dasar_bpjs": dasar_bpjs,
                 });
                 let _ = enqueue(&transaction, &client_id, "payroll", "payroll-component", &id, &payload, None);
             }

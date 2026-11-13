@@ -22,6 +22,7 @@ import {
   transitionPayrollStatus,
 } from "@/lib/gateways/payroll";
 import { useHydrated } from "@/lib/hooks/useHydrated";
+import { catatanPajakRun, keteranganPph } from "@/lib/validations/pajak";
 import { penyetujuSah } from "@/lib/validations/payroll-policy";
 
 const IDR = new Intl.NumberFormat("id-ID", {
@@ -309,6 +310,12 @@ export default function RunDetailClient() {
         </div>
 
         {/* Tab Content: Items */}
+        {activeTab === "items" &&
+          catatanPajakRun(items.map((it) => it.breakdown_snapshot)) && (
+            <p className="mb-3 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-100">
+              {catatanPajakRun(items.map((it) => it.breakdown_snapshot))}
+            </p>
+          )}
         {activeTab === "items" && (
           <div className="overflow-x-auto rounded-xl border border-slate-800 bg-slate-900/60 shadow-lg">
             <table className="w-full text-left text-sm text-slate-300">
@@ -377,6 +384,13 @@ export default function RunDetailClient() {
                       </td>
                       <td className="py-3 px-4 text-right font-mono text-rose-400">
                         {IDR.format(it.pph21_amount)}
+                        <div className="mt-0.5 font-sans text-[11px] text-slate-400">
+                          {keteranganPph(
+                            it.breakdown_snapshot,
+                            it.pph21_amount,
+                            it.ptkp_status,
+                          )}
+                        </div>
                       </td>
                       <td className="py-3 px-4 text-right font-mono font-bold text-emerald-400">
                         {IDR.format(it.net_salary)}

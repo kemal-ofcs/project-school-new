@@ -82,6 +82,7 @@ export default function PayrollConfigPage() {
     default_value: 0,
     applies_to: "ALL",
     is_active: 1,
+    dasar_bpjs: 0,
   });
 
   const [feedback, setFeedback] = useState<{
@@ -592,6 +593,7 @@ export default function PayrollConfigPage() {
                     default_value: 0,
                     applies_to: "ALL",
                     is_active: 1,
+                    dasar_bpjs: 0,
                   });
                   setModalCompOpen(true);
                 }}
@@ -1003,6 +1005,30 @@ export default function PayrollConfigPage() {
                   />
                 </label>
               </div>
+
+              {draftComp.category === "ALLOWANCE" && (
+                <label className="flex items-start gap-2 text-sm text-slate-300">
+                  <input
+                    type="checkbox"
+                    checked={draftComp.dasar_bpjs === 1}
+                    onChange={(e) =>
+                      setDraftComp((prev) => ({
+                        ...prev,
+                        dasar_bpjs: e.target.checked ? 1 : 0,
+                      }))
+                    }
+                    className="mt-0.5 h-4 w-4 accent-sky-600"
+                  />
+                  <span>
+                    Tunjangan tetap (ikut dasar BPJS)
+                    <span className="block text-xs text-slate-500">
+                      Centang untuk tunjangan yang dibayar tetap setiap bulan,
+                      misalnya tunjangan jabatan. Honor JP dan uang hadir jangan
+                      dicentang.
+                    </span>
+                  </span>
+                </label>
+              )}
 
               <div className="flex justify-end gap-3 pt-4 border-t border-slate-700">
                 <button

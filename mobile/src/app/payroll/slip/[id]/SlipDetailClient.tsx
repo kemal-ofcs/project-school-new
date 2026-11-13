@@ -17,6 +17,7 @@ import {
 } from "@/lib/gateways/payroll";
 import { useCompanyName } from "@/lib/hooks/useCompanyName";
 import { useHydrated } from "@/lib/hooks/useHydrated";
+import { bacaPajakSnapshot, labelPph } from "@/lib/validations/pajak";
 
 interface ComponentItem {
   id: string;
@@ -319,13 +320,21 @@ Status: LUNAS / DIBAYAR`;
                     </span>
                   </div>
                 ))}
-                {slip.pph21_amount > 0 && (
+                {slip.pph21_amount !== 0 && (
                   <div className="flex justify-between items-center pt-1.5">
                     <span className="text-slate-400">
-                      PPh 21 (TER {slip.ptkp_status})
+                      {labelPph(
+                        bacaPajakSnapshot(slip.breakdown_snapshot || "{}"),
+                        slip.pph21_amount,
+                        slip.ptkp_status,
+                      )}
                     </span>
-                    <span className="font-mono font-semibold text-rose-400">
-                      -{IDR.format(slip.pph21_amount)}
+                    {/* Pengembalian PPh masa terakhir menambah gaji bersih. */}
+                    <span
+                      className={`font-mono font-semibold ${slip.pph21_amount < 0 ? "text-emerald-400" : "text-rose-400"}`}
+                    >
+                      {slip.pph21_amount < 0 ? "+" : "-"}
+                      {IDR.format(Math.abs(slip.pph21_amount))}
                     </span>
                   </div>
                 )}

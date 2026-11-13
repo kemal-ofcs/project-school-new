@@ -17,6 +17,7 @@ import {
   parseOptionalNumber,
   todayLocal,
 } from "@/components/payroll/ConfigShared";
+import { CatatanBatasJp } from "@/components/payroll/KonstantaPajak";
 import { FeedbackBanner } from "@/components/ui/FeedbackBanner";
 import { Icon } from "@/components/ui/Icon";
 import { hasPermission } from "@/lib/auth/access";
@@ -262,6 +263,8 @@ export default function MobileBpjsRulesPage() {
           loading={loading}
           onReload={() => void loadRules()}
         />
+
+        <CatatanBatasJp />
 
         {feedback ? (
           <FeedbackBanner

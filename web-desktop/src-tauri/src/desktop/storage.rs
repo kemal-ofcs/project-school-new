@@ -1500,7 +1500,8 @@ pub fn initialize(path: &Path) -> Result<(), String> {
         default_value REAL NOT NULL DEFAULT 0 CHECK (default_value >= 0),
         applies_to TEXT NOT NULL DEFAULT 'ALL',
         is_active INTEGER NOT NULL DEFAULT 1 CHECK (is_active IN (0, 1)),
-        created_at TEXT NOT NULL DEFAULT (datetime('now'))
+        created_at TEXT NOT NULL DEFAULT (datetime('now')),
+        dasar_bpjs INTEGER NOT NULL DEFAULT 0 CHECK (dasar_bpjs IN (0, 1))
       );
       CREATE TABLE IF NOT EXISTS tax_rules (
         id TEXT PRIMARY KEY,
@@ -1978,6 +1979,14 @@ pub fn initialize(path: &Path) -> Result<(), String> {
     ] {
         ensure_column(&connection, "notifikasi_wa", column, sql)?;
     }
+    // v67: tunjangan tetap = dasar BPJS (HRIS Fase 0, Q-3 (a)). Juga SETELAH
+    // rebuild `payroll_components` di atas, yang daftar kolomnya eksplisit.
+    ensure_column(
+        &connection,
+        "payroll_components",
+        "dasar_bpjs",
+        "ALTER TABLE payroll_components ADD COLUMN dasar_bpjs INTEGER NOT NULL DEFAULT 0 CHECK (dasar_bpjs IN (0, 1));",
+    )?;
 
     // v17: melepas UNIQUE dari tabel akademik yang ikut sinkronisasi. Cerminan
     // `TursoClient::rebuild_without_unique` — lihat alasan lengkapnya di sana.

@@ -83,6 +83,8 @@ const filesToCopy = [
   "components/keuangan/KasbonWorkspace.tsx",
   // Rapel gaji (v51): satu UI untuk Web/Desktop dan Mobile.
   "components/payroll/RapelWorkspace.tsx",
+  // Konstanta PPh 21 dan catatan batas JP (v67), identik di kedua build.
+  "components/payroll/KonstantaPajak.tsx",
   "components/keuangan/PilihAkunBayar.tsx",
   // Tab Cicilan di Keuangan (v65).
   "components/keuangan/CicilanWorkspace.tsx",

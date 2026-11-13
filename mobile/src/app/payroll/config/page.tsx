@@ -108,6 +108,8 @@ interface ComponentDraft {
   value: string;
   applies_to: string;
   is_active: number;
+  /** 1 = tunjangan tetap, ikut dasar BPJS (v67). */
+  dasar_bpjs: number;
 }
 
 type DeleteTarget =
@@ -352,6 +354,7 @@ export default function MobilePayrollConfigPage() {
       value: "0",
       applies_to: "ALL",
       is_active: 1,
+      dasar_bpjs: 0,
     });
   };
 
@@ -365,6 +368,7 @@ export default function MobilePayrollConfigPage() {
       value: String(comp.default_value),
       applies_to: comp.applies_to || "ALL",
       is_active: comp.is_active,
+      dasar_bpjs: Number(comp.dasar_bpjs ?? 0),
     });
   };
 
@@ -400,6 +404,10 @@ export default function MobilePayrollConfigPage() {
         default_value: value,
         applies_to: componentDraft.applies_to,
         is_active: componentDraft.is_active,
+        dasar_bpjs:
+          componentDraft.category === "ALLOWANCE"
+            ? componentDraft.dasar_bpjs
+            : 0,
       });
       triggerHaptic("success");
       setComponentDraft(null);
@@ -1052,6 +1060,34 @@ export default function MobilePayrollConfigPage() {
                 className={`${CONFIG_INPUT_CLASS} font-mono`}
               />
             </div>
+
+            {componentDraft.category === "ALLOWANCE" && (
+              <label
+                htmlFor="component-dasar-bpjs"
+                className="flex min-h-11 items-start gap-2 text-xs text-slate-300"
+              >
+                <input
+                  id="component-dasar-bpjs"
+                  type="checkbox"
+                  checked={componentDraft.dasar_bpjs === 1}
+                  onChange={(event) =>
+                    setComponentDraft((prev) =>
+                      prev
+                        ? { ...prev, dasar_bpjs: event.target.checked ? 1 : 0 }
+                        : prev,
+                    )
+                  }
+                  className="mt-0.5 h-5 w-5 accent-sky-500"
+                />
+                <span>
+                  Tunjangan tetap (ikut dasar BPJS)
+                  <span className="block text-[11px] text-slate-500">
+                    Centang untuk tunjangan yang dibayar tetap setiap bulan.
+                    Honor JP dan uang hadir jangan dicentang.
+                  </span>
+                </span>
+              </label>
+            )}
           </>
         ) : null}
       </ConfigFormModal>

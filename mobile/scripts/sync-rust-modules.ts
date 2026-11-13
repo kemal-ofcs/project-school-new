@@ -165,7 +165,14 @@ for (const file of filesToSync) {
 // gateway `payroll.ts` yang sama dipakai kedua build tanpa cabang baru.
 // Seluruh command-nya didaftarkan di Mobile, jadi berkas ini TIDAK masuk
 // `dibiarkanTakTerpakai` — `dead_code` tetap menjaganya.
-const payrollAdminFiles = ["mod.rs", "commands.rs", "engine.rs", "models.rs"];
+// `pajak.rs` (v67): PPh 21 dan BPJS per masa, kembar `validations/pajak.ts`.
+const payrollAdminFiles = [
+  "mod.rs",
+  "commands.rs",
+  "engine.rs",
+  "models.rs",
+  "pajak.rs",
+];
 const payrollAdminDest = join(mobileDir, "payroll_admin");
 mkdirSync(payrollAdminDest, { recursive: true });
 for (const file of payrollAdminFiles) {

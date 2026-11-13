@@ -313,7 +313,9 @@ pub fn susun_jurnal_payroll(items: &[ItemPayroll], id_akun_bayar: &str) -> Vec<(
         (AKUN_BEBAN_GAJI, gross, 0),
         (AKUN_BEBAN_BPJS, bpjs_perusahaan, 0),
         (id_akun_bayar, 0, net),
-        (AKUN_UTANG_PPH21, 0, pph21),
+        // Total negatif = pengembalian PPh masa terakhir (v67, Q-5): debit utang,
+        // bukan potongan gaji.
+        (AKUN_UTANG_PPH21, (-pph21).max(0), pph21.max(0)),
         (AKUN_UTANG_BPJS, 0, bpjs_karyawan + bpjs_perusahaan),
         (AKUN_PIUTANG_KARYAWAN, 0, kasbon),
         (
@@ -1490,6 +1492,17 @@ mod tests {
                 baris("akun-utang-bpjs", 0, 750_000),
                 baris("akun-piutang-karyawan", 0, 500_000),
                 baris("akun-potongan-gaji", 0, 250_000),
+            ]
+        );
+        // Pengembalian PPh 3.620.000 (V3 Agustus) menambah gaji bersih dan
+        // masuk DEBIT utang PPh 21. Kembar `loan.test.ts`.
+        assert_eq!(
+            susun_jurnal_payroll(&[item(17_500_000, 21_020_000, -3_620_000, 100_000, 0, 0)], "akun-kas"),
+            vec![
+                baris("akun-beban-gaji", 17_500_000, 0),
+                baris("akun-kas", 0, 21_020_000),
+                baris("akun-utang-pph21", 3_620_000, 0),
+                baris("akun-utang-bpjs", 0, 100_000),
             ]
         );
         assert_eq!(

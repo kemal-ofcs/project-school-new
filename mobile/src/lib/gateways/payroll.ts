@@ -1,9 +1,10 @@
 "use client";
 
 import { requestWebApi } from "@/lib/client/api-client";
-import { requestSyncNow } from "@/lib/gateways/sync-status";
+import { requestSyncNow, syncNow } from "@/lib/gateways/sync-status";
 import { isDesktopRuntime, isMobileRuntime } from "@/lib/runtime/app-runtime";
 import { invokeDesktop } from "@/lib/runtime/desktop-commands";
+import type { HasilPph } from "@/lib/validations/pajak";
 import type { PayrollCalcType } from "@/lib/validations/payroll-policy";
 
 function kickDesktopSync() {
@@ -44,6 +45,8 @@ export interface PayrollComponentRow {
   default_value: number;
   applies_to: string;
   is_active: number;
+  /** 1 = tunjangan tetap, ikut dasar BPJS (v67); potongan selalu 0. */
+  dasar_bpjs: number;
 }
 
 export interface TaxRuleRow {
@@ -98,6 +101,8 @@ export interface PayrollRecapRow {
   est_bpjs_employee: number;
   est_pph21: number;
   est_net_salary: number;
+  /** Rincian PPh 21 per masa yang akan dibekukan (v67). */
+  pajak: HasilPph;
 }
 
 export interface PayrollRunRow {
@@ -571,6 +576,14 @@ export async function createPayrollRun(
   periodEnd: string,
 ): Promise<PayrollRunRow> {
   if (isDesktopRuntime()) {
+    // PPh 21 dan BPJS per masa membaca run lain di bulan dan tahun yang sama
+    // dari SQLite lokal (v67, §6.3). Tarik dulu run perangkat lain; bila
+    // offline, run tetap dibuat dan masa terakhir yang mengoreksi.
+    try {
+      await syncNow();
+    } catch {
+      // Sengaja diteruskan: offline-first.
+    }
     const result = await invokeDesktop<PayrollRunRow>(
       "desktop_create_payroll_run",
       {

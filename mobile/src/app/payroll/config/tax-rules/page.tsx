@@ -17,6 +17,7 @@ import {
   parseOptionalNumber,
   todayLocal,
 } from "@/components/payroll/ConfigShared";
+import { KartuKonstantaPajak } from "@/components/payroll/KonstantaPajak";
 import { FeedbackBanner } from "@/components/ui/FeedbackBanner";
 import { Icon } from "@/components/ui/Icon";
 import { hasPermission } from "@/lib/auth/access";
@@ -285,6 +286,8 @@ export default function MobileTaxRulesPage() {
           loading={loading}
           onReload={() => void loadRules()}
         />
+
+        <KartuKonstantaPajak />
 
         {feedback ? (
           <FeedbackBanner

@@ -12,6 +12,31 @@ use super::models::{
     BpjsRule, ComponentSubject, JpRate, OvertimeTierRule, PayrollComponent, TaughtSession, TaxRule,
     TeachingTotals,
 };
+use super::pajak::{self, HasilBpjs, HasilPph, MasukanPph, Pembanding};
+
+/// Konteks masa pajak satu personil (HRIS Fase 0, §6.3): periode run,
+/// status, PTKP awal tahun, tanggal keluar, dan ringkasan run pembanding.
+pub struct KonteksPajak<'a> {
+    pub period_start: &'a str,
+    pub period_end: &'a str,
+    /// `pajak::status_pph` atas `guru_data.status_kepegawaian`.
+    pub status: &'static str,
+    pub ptkp_awal_tahun: &'a str,
+    pub keluar_pada: Option<&'a str>,
+    /// `total_hadir`, untuk TER harian pegawai tidak tetap.
+    pub hari: i64,
+    pub pembanding: &'a Pembanding,
+}
+
+/// BPJS dan PPh 21 satu slip per masa pajak.
+pub struct PajakMasa {
+    pub bpjs: HasilBpjs,
+    pub pph: HasilPph,
+    /// Kunci `breakdown_snapshot.tax` bentuk lama, untuk slip lama.
+    pub tax: serde_json::Value,
+    /// Kunci `breakdown_snapshot.bpjs_masa`.
+    pub bpjs_masa: serde_json::Value,
+}
 
 /// Bentuk kanonik `master_data.jenis_personil`.
 ///
@@ -316,14 +341,18 @@ impl PayrollCalculator {
         value == subject.id_karyawan
     }
 
-    /// Menghitung tunjangan dan potongan dinamis
+    /// Menghitung tunjangan dan potongan dinamis.
+    ///
+    /// Mengembalikan `(tunjangan, potongan, tunjangan bertanda dasar_bpjs,
+    /// rincian)`. Yang ketiga ikut dasar BPJS (tunjangan tetap, Q-3 (a)).
     pub fn calculate_components(
         basic_salary: Decimal,
         components: &[PayrollComponent],
         subject: &ComponentSubject,
-    ) -> (Decimal, Decimal, Vec<serde_json::Value>) {
+    ) -> (Decimal, Decimal, Decimal, Vec<serde_json::Value>) {
         let mut total_allowance = Decimal::ZERO;
         let mut total_deduction = Decimal::ZERO;
+        let mut dasar_bpjs = Decimal::ZERO;
         let mut breakdown = Vec::new();
 
         for comp in components {
@@ -352,6 +381,9 @@ impl PayrollCalculator {
 
             if comp.category == "ALLOWANCE" {
                 total_allowance += nominal;
+                if comp.dasar_bpjs == 1 {
+                    dasar_bpjs += nominal;
+                }
             } else {
                 total_deduction += nominal;
             }
@@ -366,154 +398,90 @@ impl PayrollCalculator {
             }));
         }
 
-        (total_allowance, total_deduction, breakdown)
+        (total_allowance, total_deduction, dasar_bpjs, breakdown)
     }
 
-    /// Menghitung BPJS Ketenagakerjaan & Kesehatan
-    pub fn calculate_bpjs(
-        gross_salary: Decimal,
+    /// BPJS dan PPh 21 satu slip per masa pajak, satu-satunya tempat
+    /// keduanya dieja, dipakai pratinjau rekap dan pembekuan run.
+    ///
+    /// Dasar BPJS = gaji pokok jam + tunjangan bertanda `dasar_bpjs` (Q-3
+    /// (a)): honor JP, komponen tanpa tanda, rapel, dan lembur tidak ikut.
+    /// Dasar PPh 21 = bruto penuh + premi `pajak::KODE_PREMI` run ini. Run
+    /// lain di bulan yang sama dan, di masa terakhir, setahun ikut lewat
+    /// `pembanding`. Cerminan `hitungPajakMasa` di `payroll-calculator.ts`.
+    pub fn calculate_pajak_masa(
+        gross: Decimal,
+        dasar_bpjs: Decimal,
+        komponen_tetap: bool,
+        konteks: &KonteksPajak,
         bpjs_rules: &[BpjsRule],
-    ) -> (Decimal, Decimal, Vec<serde_json::Value>) {
-        let mut total_emp = Decimal::ZERO;
-        let mut total_co = Decimal::ZERO;
-        let mut breakdown = Vec::new();
-
-        for rule in bpjs_rules {
-            let basis = match rule.wage_cap {
-                Some(cap) if cap > 0 => {
-                    let cap_dec = Decimal::from(cap);
-                    gross_salary.min(cap_dec)
-                }
-                _ => gross_salary,
-            };
-
-            let rate = Decimal::from_f64_retain(rule.rate_percentage).unwrap_or(Decimal::ZERO);
-            let nominal = (basis * (rate / Decimal::from(100)))
-                .round_dp_with_strategy(0, RoundingStrategy::MidpointAwayFromZero);
-
-            let is_employee = rule.component_code.ends_with("_EMP");
-            if is_employee {
-                total_emp += nominal;
-            } else {
-                total_co += nominal;
-            }
-
-            breakdown.push(json!({
-                "code": rule.component_code,
-                "name": rule.component_name,
-                "rate": rule.rate_percentage,
-                "wage_cap": rule.wage_cap,
-                "nominal": nominal.to_i64().unwrap_or(0),
-                "is_employee": is_employee
-            }));
-        }
-
-        (total_emp, total_co, breakdown)
-    }
-
-    /// Menghitung PPh 21 Metode TER (PMK 168/2023)
-    pub fn calculate_pph21_ter(
-        gross_salary: Decimal,
-        ptkp_status: &str,
         tax_rules: &[TaxRule],
-    ) -> (Decimal, serde_json::Value) {
-        // Tentukan Kategori TER berdasarkan PTKP
-        let ter_category = match ptkp_status.trim().to_uppercase().as_str() {
-            "TK/0" | "TK/1" | "K/0" => "TER_A",
-            "TK/2" | "TK/3" | "K/1" | "K/2" => "TER_B",
-            "K/3" => "TER_C",
-            _ => "TER_A",
+    ) -> PajakMasa {
+        let pembanding = konteks.pembanding;
+        let bpjs = pajak::hitung_bpjs_masa(
+            dasar_bpjs.to_i64().unwrap_or(0),
+            pembanding.dasar_bpjs_masa,
+            bpjs_rules,
+            &pembanding.bpjs_masa,
+        );
+        let kode = |daftar: &[&str]| {
+            pajak::jumlah_kode(bpjs.rincian.iter().map(|r| (r.code.as_str(), r.nominal)), daftar)
         };
-
-        let gross_i64 = gross_salary.to_i64().unwrap_or(0);
-
-        // Cari bracket TER yang cocok
-        let matching_rule = tax_rules.iter().find(|rule| {
-            if rule.category != ter_category {
-                return false;
-            }
-            let min_ok = gross_i64 >= rule.bracket_min;
-            let max_ok = match rule.bracket_max {
-                Some(max) => gross_i64 <= max,
-                None => true,
-            };
-            min_ok && max_ok
+        let terakhir = konteks.status == pajak::STATUS_TETAP
+            && pajak::masa_terakhir(&pajak::masa(konteks.period_start), konteks.keluar_pada);
+        let pph = pajak::hitung_pph(
+            &MasukanPph {
+                period_start: konteks.period_start.to_owned(),
+                period_end: konteks.period_end.to_owned(),
+                status: konteks.status.to_owned(),
+                ptkp_status: konteks.ptkp_awal_tahun.to_owned(),
+                gross: gross.to_i64().unwrap_or(0),
+                premi: kode(&pajak::KODE_PREMI),
+                hari: konteks.hari,
+                keluar_pada: konteks.keluar_pada.map(str::to_owned),
+                bruto_masa_sebelum: pembanding.bruto_masa,
+                pph_masa_sebelum: pembanding.pph_masa,
+                bruto_tahun_sebelum: pembanding.bruto_tahun,
+                pph_tahun_sebelum: pembanding.pph_tahun,
+                iuran_pensiun_sebelum: pembanding.iuran_pensiun_tahun,
+                iuran_pensiun_run: kode(&pajak::KODE_IURAN_PENSIUN),
+                masa_berbruto_lain: pembanding.masa_berbruto_lain,
+                rumus_lama: pembanding.rumus_lama_masa || (terakhir && pembanding.rumus_lama_tahun),
+                status_pajak_berubah: terakhir && pembanding.status_berubah,
+                // Komponen FIXED tetap per run, ditandai bila bulan ini sudah
+                // punya run lain.
+                komponen_per_run: pembanding.run_masa > 0 && komponen_tetap,
+            },
+            tax_rules,
+        );
+        let tax = json!({
+            "method": pph.metode,
+            "category": pph.kategori,
+            "ptkp_status": konteks.ptkp_awal_tahun,
+            "rate_percentage": pph.tarif.map(|t| Decimal::new(t, 2).to_f64().unwrap_or(0.0)),
+            "pph21_amount": pph.pph,
+            "dasar_pengenaan": pph.bruto_pajak
         });
-
-        if let Some(rule) = matching_rule {
-            let rate = Decimal::from_f64_retain(rule.rate_percentage).unwrap_or(Decimal::ZERO);
-            let pph21 = (gross_salary * (rate / Decimal::from(100)))
-                .round_dp_with_strategy(0, RoundingStrategy::MidpointAwayFromZero);
-
-            (
-                pph21,
-                json!({
-                    "method": "TER",
-                    "category": ter_category,
-                    "ptkp_status": ptkp_status,
-                    "rate_percentage": rule.rate_percentage,
-                    "pph21_amount": pph21.to_i64().unwrap_or(0),
-                    "dasar_pengenaan": gross_i64
-                }),
-            )
-        } else {
-            (
-                Decimal::ZERO,
-                json!({
-                    "method": "TER",
-                    "category": ter_category,
-                    "ptkp_status": ptkp_status,
-                    "rate_percentage": 0.0,
-                    "pph21_amount": 0,
-                    "dasar_pengenaan": gross_i64
-                }),
-            )
+        let bpjs_masa = json!({
+            "dasar_run": bpjs.dasar_run,
+            "dasar_masa": bpjs.dasar_masa,
+            "tanda": bpjs.tanda,
+        });
+        PajakMasa {
+            bpjs,
+            pph,
+            tax,
+            bpjs_masa,
         }
-    }
-
-    /// Iuran BPJS dan PPh 21 satu slip, satu-satunya tempat kedua dasarnya
-    /// dieja.
-    ///
-    /// Dasar BPJS adalah bruto TANPA lembur, karena lembur bukan upah tetap.
-    /// Dasar PPh 21 adalah bruto penuh ditambah premi di `PREMI_KENA_PAJAK`.
-    /// Cerminan `calculateBpjsAndPph21` di `payroll-calculator.ts`.
-    ///
-    /// Mengembalikan `(bpjs karyawan, bpjs perusahaan, rincian bpjs, pph21,
-    /// rincian pajak)`.
-    pub fn calculate_bpjs_and_pph21(
-        gross_salary: Decimal,
-        overtime_salary: Decimal,
-        ptkp_status: &str,
-        bpjs_rules: &[BpjsRule],
-        tax_rules: &[TaxRule],
-    ) -> (
-        Decimal,
-        Decimal,
-        Vec<serde_json::Value>,
-        Decimal,
-        serde_json::Value,
-    ) {
-        let (bpjs_emp, bpjs_co, bpjs_breakdown) =
-            Self::calculate_bpjs(gross_salary - overtime_salary, bpjs_rules);
-        let premi: i64 = bpjs_breakdown
-            .iter()
-            .filter(|entry| {
-                entry["code"]
-                    .as_str()
-                    .is_some_and(|code| PREMI_KENA_PAJAK.contains(&code))
-            })
-            .filter_map(|entry| entry["nominal"].as_i64())
-            .sum();
-        let (pph21, tax_breakdown) =
-            Self::calculate_pph21_ter(gross_salary + Decimal::from(premi), ptkp_status, tax_rules);
-        (bpjs_emp, bpjs_co, bpjs_breakdown, pph21, tax_breakdown)
     }
 }
 
-/// Premi BPJS tanggungan sekolah yang ikut penghasilan bruto PPh 21 (PP 58/2023
-/// Pasal 2). JHT dan JP perusahaan tidak termasuk. Cerminan `PREMI_KENA_PAJAK`
-/// di `payroll-calculator.ts`.
-pub const PREMI_KENA_PAJAK: &[&str] = &["JKK_CO", "JKM_CO", "BPJS_KES_CO"];
+/// Ada komponen FIXED bernominal di rincian (tanda `komponen_per_run`).
+pub fn ada_komponen_tetap(rincian: &[serde_json::Value]) -> bool {
+    rincian
+        .iter()
+        .any(|c| c["calc_type"] == "FIXED" && c["nominal"].as_i64().unwrap_or(0) > 0)
+}
 
 #[cfg(test)]
 mod tests {
@@ -647,8 +615,9 @@ mod tests {
                 default_value: *nilai,
                 applies_to: "ALL".to_string(),
                 is_active: 1,
+                dasar_bpjs: 0,
             };
-            let (allowance, _, _) = PayrollCalculator::calculate_components(
+            let (allowance, _, _, _) = PayrollCalculator::calculate_components(
                 Decimal::from(2_000_000),
                 std::slice::from_ref(&comp),
                 &subject,
@@ -676,8 +645,9 @@ mod tests {
             default_value: 5_000.0,
             applies_to: "ALL".to_string(),
             is_active: 1,
+            dasar_bpjs: 0,
         };
-        let (allowance, _, _) = PayrollCalculator::calculate_components(
+        let (allowance, _, _, _) = PayrollCalculator::calculate_components(
             Decimal::ZERO,
             std::slice::from_ref(&comp),
             &subject,
@@ -1001,46 +971,95 @@ mod tests {
         }
     }
 
-    /// Kembar `dasar BPJS tanpa lembur, dasar PPh 21 ditambah premi kena pajak`
-    /// di `payroll-calculator.test.ts`.
+    /// VS3 (`prd-hris.md` §6.2) di tingkat slip, kembar `hitungPajakMasa`
+    /// di `payroll-calculator.test.ts`. Gaji pokok 4.000.000, honor JP
+    /// 3.000.000, tunjangan jabatan 500.000 bertanda `dasar_bpjs`, uang hadir
+    /// 500.000 tanpa tanda: dasar BPJS 4.500.000, bruto pajak 8.000.000 +
+    /// premi 217.800, TER A 1,5%.
     #[test]
-    fn dasar_bpjs_tanpa_lembur_dan_dasar_pph21_ditambah_premi() {
-        let bpjs = |code: &str, rate: f64, cap: Option<i64>| BpjsRule {
-            id: code.to_string(),
-            component_code: code.to_string(),
-            component_name: code.to_string(),
-            rate_percentage: rate,
-            wage_cap: cap,
-            effective_date: "2026-01-01".to_string(),
+    fn dasar_bpjs_hanya_gaji_pokok_dan_tunjangan_tetap() {
+        let seed = |nama: &str| {
+            super::super::super::payroll_seed::tarif_bawaan()
+                .tabel
+                .iter()
+                .find(|t| t.nama == nama)
+                .expect("tabel seed")
+                .baris
+                .clone()
         };
-        let rules = [
-            bpjs("JKK_CO", 0.24, None),
-            bpjs("JKM_CO", 0.3, None),
-            bpjs("BPJS_KES_CO", 4.0, Some(12_000_000)),
-            bpjs("BPJS_KES_EMP", 1.0, Some(12_000_000)),
-            bpjs("JHT_CO", 3.7, None),
-            bpjs("JHT_EMP", 2.0, None),
+        let bpjs_rules: Vec<BpjsRule> = seed("bpjs_rules")
+            .iter()
+            .map(|b| BpjsRule {
+                id: b[0].as_str().unwrap_or_default().to_string(),
+                component_code: b[1].as_str().unwrap_or_default().to_string(),
+                component_name: b[2].as_str().unwrap_or_default().to_string(),
+                rate_percentage: b[3].as_f64().unwrap_or_default(),
+                wage_cap: b[4].as_i64(),
+                effective_date: b[5].as_str().unwrap_or_default().to_string(),
+            })
+            .collect();
+        let tax_rules: Vec<TaxRule> = seed("tax_rules")
+            .iter()
+            .map(|b| TaxRule {
+                id: b[0].as_str().unwrap_or_default().to_string(),
+                category: b[1].as_str().unwrap_or_default().to_string(),
+                bracket_min: b[2].as_i64().unwrap_or_default(),
+                bracket_max: b[3].as_i64(),
+                rate_percentage: b[4].as_f64().unwrap_or_default(),
+                effective_date: b[5].as_str().unwrap_or_default().to_string(),
+            })
+            .collect();
+        let komponen = |id: &str, calc_type: &str, nilai: f64, dasar_bpjs: i64| PayrollComponent {
+            id: id.to_string(),
+            name: id.to_string(),
+            category: "ALLOWANCE".to_string(),
+            calc_type: calc_type.to_string(),
+            default_value: nilai,
+            applies_to: "ALL".to_string(),
+            is_active: 1,
+            dasar_bpjs,
+        };
+        let components = [
+            komponen("jabatan", "FIXED", 500_000.0, 1),
+            komponen("hadir", "PER_HADIR", 25_000.0, 0),
         ];
-        let tax = |min: i64, max: Option<i64>, rate: f64| TaxRule {
-            id: format!("ter-{min}"),
-            category: "TER_A".to_string(),
-            bracket_min: min,
-            bracket_max: max,
-            rate_percentage: rate,
-            effective_date: "2026-01-01".to_string(),
+        let subject = ComponentSubject {
+            id_karyawan: "g1".to_string(),
+            total_hadir: 20,
+            ..Default::default()
         };
-        let taxes = [tax(0, Some(5_100_000), 0.0), tax(5_100_001, None, 1.5)];
+        let basic = Decimal::from(4_000_000);
+        let (allowance, _, dasar_tunjangan, rincian) =
+            PayrollCalculator::calculate_components(basic, &components, &subject);
+        assert_eq!(allowance, Decimal::from(1_000_000));
+        assert_eq!(dasar_tunjangan, Decimal::from(500_000));
+        assert!(super::ada_komponen_tetap(&rincian));
 
-        let (emp, co, _, pph21, rincian) = PayrollCalculator::calculate_bpjs_and_pph21(
-            Decimal::from(5_000_000),
-            Decimal::from(1_000_000),
-            "TK/0",
-            &rules,
-            &taxes,
+        let pembanding = super::super::pajak::Pembanding::default();
+        let konteks = super::KonteksPajak {
+            period_start: "2026-01-01",
+            period_end: "2026-01-31",
+            status: super::super::pajak::STATUS_TETAP,
+            ptkp_awal_tahun: "TK/0",
+            keluar_pada: None,
+            hari: 20,
+            pembanding: &pembanding,
+        };
+        let gross = basic + Decimal::from(3_000_000) + allowance;
+        let hasil = PayrollCalculator::calculate_pajak_masa(
+            gross,
+            basic + dasar_tunjangan,
+            true,
+            &konteks,
+            &bpjs_rules,
+            &tax_rules,
         );
-        assert_eq!(emp, Decimal::from(120_000));
-        assert_eq!(co, Decimal::from(329_600));
-        assert_eq!(pph21, Decimal::from(77_724));
-        assert_eq!(rincian["dasar_pengenaan"], 5_181_600);
+        assert_eq!(hasil.bpjs.dasar_run, 4_500_000);
+        assert_eq!(hasil.bpjs.karyawan, 180_000);
+        assert_eq!(hasil.pph.premi, 217_800);
+        assert_eq!(hasil.pph.bruto_pajak, 8_217_800);
+        assert_eq!(hasil.pph.tarif, Some(150));
+        assert_eq!(hasil.pph.pph, 123_267);
+        assert!(hasil.pph.tanda.is_empty(), "run pertama bulan ini tanpa tanda");
     }
 }
