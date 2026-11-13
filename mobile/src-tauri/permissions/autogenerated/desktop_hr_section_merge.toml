@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-desktop-hr-section-merge"
+description = "Enables the desktop_hr_section_merge command without any pre-configured scope."
+commands.allow = ["desktop_hr_section_merge"]
+
+[[permission]]
+identifier = "deny-desktop-hr-section-merge"
+description = "Denies the desktop_hr_section_merge command without any pre-configured scope."
+commands.deny = ["desktop_hr_section_merge"]

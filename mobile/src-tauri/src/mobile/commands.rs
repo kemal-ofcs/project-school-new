@@ -17,7 +17,7 @@ use super::{
         CommandError, MobileLoginResult, MobileRuntimeStatus, MobileSession, MobileSyncStatus,
         OperatorUser, SessionMode,
     },
-    operational, portability, rapel,
+    hris, operational, portability, rapel,
     scanner, secrets, storage, sync, teaching_journal, turso, uks, wa_notification,
 };
 
@@ -3077,6 +3077,45 @@ pub fn desktop_payroll_rapel_cancel(
 ) -> Result<Value, CommandError> {
     let operator = require_permission(&state, "payroll.rapel.manage")?;
     rapel::cancel(&state, &operator.username, &id_rapel, &alasan)
+}
+
+/// Pegawai, bagian, jabatan, dan turunannya untuk halaman Kepegawaian dan
+/// pemilih organisasi di form Karyawan/Guru.
+#[tauri::command]
+pub fn desktop_hr_org(state: State<'_, MobileState>) -> Result<Value, CommandError> {
+    require_any_permission(&state, &["employees.view", "teachers.view"])?;
+    hris::org(&state)
+}
+
+/// Bagian baru atau ganti nama/aktif; ganti nama menulis ulang riwayat anggota.
+#[tauri::command]
+pub fn desktop_hr_section_save(
+    state: State<'_, MobileState>,
+    draft: Value,
+) -> Result<Value, CommandError> {
+    require_permission(&state, "hr.org.manage")?;
+    hris::simpan_bagian(&state, draft)
+}
+
+/// Gabungkan dua bagian (Q-38): anggota dan nama lama pindah ke tujuan.
+#[tauri::command]
+pub fn desktop_hr_section_merge(
+    state: State<'_, MobileState>,
+    id_asal: String,
+    id_tujuan: String,
+) -> Result<Value, CommandError> {
+    require_permission(&state, "hr.org.manage")?;
+    hris::gabung_bagian(&state, &id_asal, &id_tujuan)
+}
+
+/// Jabatan baru atau ganti nama/aktif.
+#[tauri::command]
+pub fn desktop_hr_position_save(
+    state: State<'_, MobileState>,
+    draft: Value,
+) -> Result<Value, CommandError> {
+    require_permission(&state, "hr.org.manage")?;
+    hris::simpan_jabatan(&state, draft)
 }
 
 /// Jenis tagihan, tarif, serta pilihan unit/rombel/tahun ajaran untuk

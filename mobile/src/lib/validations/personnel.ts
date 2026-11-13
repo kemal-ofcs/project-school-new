@@ -222,6 +222,12 @@ export function draftGuruDariBaris(item: Record<string, unknown>): GuruInput {
     status_aktif: item.status_aktif ? String(item.status_aktif) : "Aktif",
     unit: item.unit ? String(item.unit) : "",
     email: item.email ? String(item.email) : "",
+    id_bagian: item.id_bagian ? String(item.id_bagian) : "",
+    id_jabatan: item.id_jabatan ? String(item.id_jabatan) : "",
+    id_atasan: item.id_atasan ? String(item.id_atasan) : "",
+    tanggal_mulai_aktif: item.tanggal_mulai_aktif
+      ? String(item.tanggal_mulai_aktif)
+      : "",
   };
 }
 
@@ -246,5 +252,10 @@ export function draftKaryawanDariBaris(
     tanggal_selesai_aktif: String(row.tanggal_selesai_aktif || ""),
     unit: String(row.unit || ""),
     email: String(row.email || ""),
+    // Organisasi (v68): selalu dibawa, sehingga simpan dari form atau suntingan
+    // massal memakai nama master sekarang.
+    id_bagian: String(row.id_bagian || ""),
+    id_jabatan: String(row.id_jabatan || ""),
+    id_atasan: String(row.id_atasan || ""),
   };
 }

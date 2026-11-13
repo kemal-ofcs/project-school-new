@@ -444,6 +444,52 @@ export const PERMISSION_CATALOG = [
     name: "Batalkan Tagihan & Kuitansi",
     group: "Keuangan",
   },
+  // HRIS Fase 1 (`prd-hris.md` §19.4).
+  {
+    key: "hr.org.manage",
+    name: "Kelola Organisasi Kepegawaian",
+    group: "Kepegawaian",
+  },
+  {
+    key: "hr.contract.manage",
+    name: "Kelola Kontrak & Status Kepegawaian",
+    group: "Kepegawaian",
+  },
+  {
+    key: "hr.duty.manage",
+    name: "Kelola Tugas Tambahan",
+    group: "Kepegawaian",
+  },
+  {
+    key: "hr.personal.view",
+    name: "Lihat Data Pribadi Pegawai",
+    group: "Kepegawaian",
+  },
+  {
+    key: "hr.personal.manage",
+    name: "Ubah Data Pribadi Pegawai",
+    group: "Kepegawaian",
+  },
+  {
+    key: "hr.finance.view",
+    name: "Lihat Data Keuangan Pegawai",
+    group: "Kepegawaian",
+  },
+  {
+    key: "hr.finance.manage",
+    name: "Ubah Data Keuangan Pegawai",
+    group: "Kepegawaian",
+  },
+  {
+    key: "hr.document.view",
+    name: "Lihat Dokumen Pegawai",
+    group: "Kepegawaian",
+  },
+  {
+    key: "hr.document.manage",
+    name: "Kelola Dokumen Pegawai",
+    group: "Kepegawaian",
+  },
 ] as const;
 
 export type PermissionKey = (typeof PERMISSION_CATALOG)[number]["key"];
@@ -545,6 +591,24 @@ export const SENSITIVE_MUTATION_PERMISSIONS = new Set<PermissionKey>([
   // Membatalkan pembayaran cicilan membalik jurnalnya, dan menutup kontrak
   // membuat sisa utangnya hanya bisa dibereskan dengan jurnal manual.
   "installment.cancel",
+  // Rekening, NPWP, dan BPJS pegawai menentukan ke mana gaji dibayar dan atas
+  // nama siapa pajaknya dilaporkan.
+  "hr.finance.manage",
+]);
+
+/**
+ * Izin data rahasia pegawai (Q-33): tidak sensitif, tetapi juga tidak ikut
+ * paket bawaan Admin, yang memuat setiap izin tidak sensitif. NIK, rekening,
+ * dan pindaian KTP diberikan sadar lewat Role & Akses atau role Kepegawaian.
+ * `hr.finance.manage` ada di `SENSITIVE_MUTATION_PERMISSIONS`. Cermin
+ * `ADMIN_DEFAULT_EXCLUDED_PERMISSIONS` di `turso.rs`.
+ */
+export const CONFIDENTIAL_PERMISSIONS = new Set<PermissionKey>([
+  "hr.personal.view",
+  "hr.personal.manage",
+  "hr.finance.view",
+  "hr.document.view",
+  "hr.document.manage",
 ]);
 
 export const SYSTEM_ROLE_KEYS = [
@@ -552,6 +616,10 @@ export const SYSTEM_ROLE_KEYS = [
   "admin",
   "operator",
   "scanner",
+  // HRIS Fase 1 (Q-34). Kepala TU dan Guru Piket lahir di Fase 2.
+  "yayasan",
+  "kepala-sekolah",
+  "kepegawaian",
 ] as const;
 
 export type SystemRoleKey = (typeof SYSTEM_ROLE_KEYS)[number];
@@ -564,7 +632,8 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<
     ({ key }) =>
       !SUPERADMIN_ONLY_PERMISSIONS.has(key) &&
       key !== "diagnostics.view" &&
-      !SENSITIVE_MUTATION_PERMISSIONS.has(key),
+      !SENSITIVE_MUTATION_PERMISSIONS.has(key) &&
+      !CONFIDENTIAL_PERMISSIONS.has(key),
   ).map(({ key }) => key),
   operator: [
     "home.view",
@@ -589,6 +658,37 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<
     "inventory.view",
   ],
   scanner: ["home.view", "scanner.use", "sync.view"],
+  // Cermin `ROLE_HRIS_BAWAAN` di `turso.rs`.
+  yayasan: [
+    "home.view",
+    "employees.view",
+    "teachers.view",
+    "hr.org.manage",
+    "hr.contract.manage",
+    "hr.duty.manage",
+  ],
+  "kepala-sekolah": [
+    "home.view",
+    "employees.view",
+    "teachers.view",
+    "hr.duty.manage",
+  ],
+  kepegawaian: [
+    "home.view",
+    "employees.view",
+    "employees.manage",
+    "teachers.view",
+    "teachers.manage",
+    "hr.org.manage",
+    "hr.contract.manage",
+    "hr.duty.manage",
+    "hr.personal.view",
+    "hr.personal.manage",
+    "hr.finance.view",
+    "hr.finance.manage",
+    "hr.document.view",
+    "hr.document.manage",
+  ],
 };
 
 export function normalizeRoleKey(value: string) {

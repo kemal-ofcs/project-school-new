@@ -14,6 +14,7 @@ import {
   type KolomMassal,
   terapkanKolomMassal,
 } from "@/components/personnel/aturanUbahMassal";
+import { IsianOrganisasi } from "@/components/personnel/IsianOrganisasi";
 import { PersonnelAvatar } from "@/components/personnel/PersonnelAvatar";
 import {
   type TerapkanMassal,
@@ -72,6 +73,10 @@ function emptyForm(idShift?: number): GuruInput {
     id_shift: idShift,
     status_aktif: "Aktif",
     unit: "",
+    id_bagian: "",
+    id_jabatan: "",
+    id_atasan: "",
+    tanggal_mulai_aktif: "",
   };
 }
 
@@ -824,6 +829,35 @@ export default function GuruMobilePage() {
                   </option>
                 ))}
               </PilihCari>
+            </label>
+            <IsianOrganisasi
+              idAwalan="guru"
+              idKaryawan={form.id_guru ?? ""}
+              nilai={{
+                id_bagian: form.id_bagian ?? "",
+                id_jabatan: form.id_jabatan ?? "",
+                id_atasan: form.id_atasan ?? "",
+              }}
+              onChange={({ id_bagian, id_jabatan, id_atasan }) =>
+                setForm((p) => ({ ...p, id_bagian, id_jabatan, id_atasan }))
+              }
+              bawaanGuru={!isEditing}
+              className="mt-1 w-full rounded-xl border border-white/10 bg-slate-800/60 px-3 py-2 text-sm text-white outline-none focus:border-indigo-500"
+              labelClassName="text-[11px] font-semibold text-slate-300"
+            />
+            <label className="text-[11px] font-semibold text-slate-300">
+              TMT (Tanggal Mulai Tugas)
+              <input
+                type="date"
+                value={form.tanggal_mulai_aktif ?? ""}
+                onChange={(e) =>
+                  setForm((p) => ({
+                    ...p,
+                    tanggal_mulai_aktif: e.target.value,
+                  }))
+                }
+                className="mt-1 w-full rounded-xl border border-white/10 bg-slate-800/60 px-3 py-2 text-sm text-white outline-none focus:border-indigo-500"
+              />
             </label>
             <label className="text-[11px] font-semibold text-slate-300">
               Nama Lengkap

@@ -628,7 +628,13 @@ pub fn initialize(path: &Path) -> Result<(), String> {
         -- dan ketiga halaman itu menulis ke tabel ini.
         unit TEXT,
         -- Email guru dan karyawan (v56), boleh kosong.
-        email TEXT
+        email TEXT,
+        -- Organisasi (v68): rujukan `hr_bagian`/`hr_jabatan` dan atasan
+        -- langsung (`id_unik` pegawai lain). Teks `divisi`/`jabatan_status`
+        -- tetap diisi nama sekarang. Kosong untuk siswa.
+        id_bagian TEXT,
+        id_jabatan TEXT,
+        id_atasan TEXT
       );
       CREATE TABLE IF NOT EXISTS id_card (
         id_card_id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -1608,6 +1614,75 @@ pub fn initialize(path: &Path) -> Result<(), String> {
       );
       CREATE INDEX IF NOT EXISTS idx_payroll_rapel_karyawan ON payroll_rapel(id_karyawan);
       CREATE INDEX IF NOT EXISTS idx_payroll_rapel_item ON payroll_rapel(id_item_asal);
+      -- Organisasi, tugas tambahan, dan kontrak (v68, HRIS Fase 1,
+      -- `prd-hris.md` §19.3). Bagian/jabatan tidak pernah dihapus, hanya
+      -- dinonaktifkan; kontrak append-only. Tanpa UNIQUE selain PK: nama unik
+      -- ditegakkan aplikasi. DDL WAJIB identik dengan `turso.rs` dan
+      -- `db-migrations.ts`.
+      CREATE TABLE IF NOT EXISTS hr_bagian (
+        id_bagian TEXT PRIMARY KEY,
+        nama TEXT NOT NULL,
+        is_aktif INTEGER NOT NULL DEFAULT 1 CHECK (is_aktif IN (0, 1)),
+        created_at TEXT NOT NULL DEFAULT (datetime('now')),
+        updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+      );
+      CREATE TABLE IF NOT EXISTS hr_bagian_nama (
+        id_nama TEXT PRIMARY KEY,
+        id_bagian TEXT NOT NULL,
+        nama TEXT NOT NULL,
+        created_at TEXT NOT NULL DEFAULT (datetime('now'))
+      );
+      CREATE INDEX IF NOT EXISTS idx_hr_bagian_nama_bagian ON hr_bagian_nama(id_bagian);
+      CREATE TABLE IF NOT EXISTS hr_jabatan (
+        id_jabatan TEXT PRIMARY KEY,
+        nama TEXT NOT NULL,
+        is_aktif INTEGER NOT NULL DEFAULT 1 CHECK (is_aktif IN (0, 1)),
+        created_at TEXT NOT NULL DEFAULT (datetime('now')),
+        updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+      );
+      CREATE TABLE IF NOT EXISTS hr_tugas_jenis (
+        id_jenis TEXT PRIMARY KEY,
+        nama TEXT NOT NULL,
+        ekuivalen_jp INTEGER NOT NULL DEFAULT 0 CHECK (ekuivalen_jp BETWEEN 0 AND 40),
+        is_aktif INTEGER NOT NULL DEFAULT 1 CHECK (is_aktif IN (0, 1)),
+        created_at TEXT NOT NULL DEFAULT (datetime('now')),
+        updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+      );
+      CREATE TABLE IF NOT EXISTS hr_tugas_tambahan (
+        id_tugas TEXT PRIMARY KEY,
+        id_karyawan TEXT NOT NULL,
+        id_jenis TEXT NOT NULL,
+        unit TEXT,
+        tahun_ajaran TEXT NOT NULL,
+        id_rombel TEXT,
+        nomor_sk TEXT,
+        tanggal_sk TEXT,
+        ekuivalen_jp INTEGER CHECK (ekuivalen_jp IS NULL OR ekuivalen_jp BETWEEN 0 AND 40),
+        tanggal_mulai TEXT NOT NULL,
+        tanggal_selesai TEXT,
+        dicatat_oleh TEXT,
+        dibatalkan_pada TEXT,
+        dibatalkan_oleh TEXT,
+        alasan_batal TEXT,
+        created_at TEXT NOT NULL DEFAULT (datetime('now')),
+        updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+      );
+      CREATE INDEX IF NOT EXISTS idx_hr_tugas_karyawan ON hr_tugas_tambahan(id_karyawan);
+      CREATE INDEX IF NOT EXISTS idx_hr_tugas_tahun ON hr_tugas_tambahan(tahun_ajaran);
+      CREATE TABLE IF NOT EXISTS hr_kontrak (
+        id_kontrak TEXT PRIMARY KEY,
+        id_karyawan TEXT NOT NULL,
+        status TEXT NOT NULL CHECK (status IN ('GTY', 'PTY', 'GTT', 'PTT', 'Honorer', 'PNS', 'PPPK', 'Pembatalan')),
+        id_ref TEXT,
+        nomor TEXT,
+        tanggal_mulai TEXT NOT NULL,
+        tanggal_selesai TEXT,
+        percobaan_selesai TEXT,
+        catatan TEXT,
+        dicatat_oleh TEXT,
+        created_at TEXT NOT NULL DEFAULT (datetime('now'))
+      );
+      CREATE INDEX IF NOT EXISTS idx_hr_kontrak_karyawan ON hr_kontrak(id_karyawan);
       CREATE TABLE IF NOT EXISTS akademik_tahun_ajaran (
         id_tahun_ajaran TEXT PRIMARY KEY,
         nama_tahun TEXT NOT NULL,
@@ -2080,6 +2155,14 @@ pub fn initialize(path: &Path) -> Result<(), String> {
         "email",
         "ALTER TABLE master_data ADD COLUMN email TEXT;",
     )?;
+    // Organisasi pegawai (v68).
+    for (column, sql) in [
+        ("id_bagian", "ALTER TABLE master_data ADD COLUMN id_bagian TEXT;"),
+        ("id_jabatan", "ALTER TABLE master_data ADD COLUMN id_jabatan TEXT;"),
+        ("id_atasan", "ALTER TABLE master_data ADD COLUMN id_atasan TEXT;"),
+    ] {
+        ensure_column(&connection, "master_data", column, sql)?;
+    }
 
     // Jenis penilaian dinamis (v43). Nullable: baris lama menurunkan jenisnya
     // dari kolom `jenis` (`nilai_akhir::id_jenis_efektif`).
@@ -2474,6 +2557,13 @@ pub(crate) const CLOUD_MIRRORED_TABLES: &[&str] = &[
     "payroll_runs",
     // v51 — rapel gaji, milik lembaga database asalnya.
     "payroll_rapel",
+    // v68 — organisasi, tugas tambahan, dan kontrak pegawai.
+    "hr_bagian",
+    "hr_bagian_nama",
+    "hr_jabatan",
+    "hr_tugas_jenis",
+    "hr_tugas_tambahan",
+    "hr_kontrak",
     "payroll_components",
     "salary_configs",
     "overtime_tier_rules",

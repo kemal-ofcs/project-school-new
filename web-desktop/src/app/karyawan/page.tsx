@@ -17,6 +17,7 @@ import {
   type KolomMassal,
   terapkanKolomMassal,
 } from "@/components/personnel/aturanUbahMassal";
+import { IsianOrganisasi } from "@/components/personnel/IsianOrganisasi";
 import { PersonnelAvatar } from "@/components/personnel/PersonnelAvatar";
 import { PersonnelPortrait } from "@/components/personnel/PersonnelPortrait";
 import {
@@ -48,6 +49,7 @@ import {
   toggleStatusKaryawan,
   updateKaryawan,
 } from "@/lib/gateways/employee";
+import { muatOrgKepegawaian, type OrgKepegawaian } from "@/lib/gateways/hris";
 import { getDaftarIdCard } from "@/lib/gateways/id-card";
 import { simpanFotoPersonilBaru } from "@/lib/gateways/personnel-photo";
 import { getDaftarShift } from "@/lib/gateways/shift";
@@ -107,8 +109,8 @@ export default function KaryawanPage() {
     id_unik: "",
     kode_karyawan: "",
     nama: "",
-    divisi: "Operational",
-    jabatan_status: "Staff",
+    divisi: "",
+    jabatan_status: "",
     no_hp: "",
     lp: "L",
     id_shift: 1,
@@ -119,7 +121,17 @@ export default function KaryawanPage() {
     tanggal_mulai_aktif: new Date().toLocaleDateString("en-CA"),
     tanggal_selesai_aktif: "",
     email: "",
+    id_bagian: "",
+    id_jabatan: "",
+    id_atasan: "",
   });
+  // Master bagian/jabatan untuk suntingan massal (HRIS Fase 1a).
+  const [orgMaster, setOrgMaster] = useState<OrgKepegawaian | null>(null);
+  useEffect(() => {
+    muatOrgKepegawaian()
+      .then(setOrgMaster)
+      .catch(() => setOrgMaster(null));
+  }, []);
   const [alertMsg, setAlertMsg] = useState<string | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
@@ -232,8 +244,11 @@ export default function KaryawanPage() {
       id_unik: identifiers.idUnik,
       kode_karyawan: identifiers.kodeKaryawan,
       nama: "",
-      divisi: "Operational",
-      jabatan_status: "Staff",
+      divisi: "",
+      jabatan_status: "",
+      id_bagian: "",
+      id_jabatan: "",
+      id_atasan: "",
       no_hp: "",
       lp: "L",
       id_shift: Number(shiftList[0]?.id_shift || 1),
@@ -264,8 +279,20 @@ export default function KaryawanPage() {
 
   const kolomMassal = useMemo<KolomMassal[]>(
     () => [
-      { key: "divisi", label: "Divisi", jenis: "teks" },
-      { key: "jabatan_status", label: "Jabatan", jenis: "teks" },
+      {
+        key: "id_bagian",
+        label: "Bagian",
+        opsi: (orgMaster?.bagian ?? [])
+          .filter((b) => b.is_aktif === 1)
+          .map((b) => ({ value: b.id_bagian, label: b.nama })),
+      },
+      {
+        key: "id_jabatan",
+        label: "Jabatan",
+        opsi: (orgMaster?.jabatan ?? [])
+          .filter((j) => j.is_aktif === 1)
+          .map((j) => ({ value: j.id_jabatan, label: j.nama })),
+      },
       {
         key: "unit",
         label: "Unit",
@@ -298,7 +325,7 @@ export default function KaryawanPage() {
         jenis: "tanggal",
       },
     ],
-    [unitList, shiftList],
+    [unitList, shiftList, orgMaster],
   );
 
   const namaKaryawan = (id: string) =>
@@ -1304,26 +1331,28 @@ export default function KaryawanPage() {
               />
             </div>
 
-            {/* Divisi & Jabatan */}
+            {/* Bagian, Jabatan, Atasan (master Kepegawaian) & Unit */}
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              <div>
-                <label
-                  htmlFor="employee-division"
-                  className="text-slate-400 block mb-1 font-semibold"
-                >
-                  Divisi:
-                </label>
-                <input
-                  id="employee-division"
-                  type="text"
-                  value={formData.divisi}
-                  onChange={(e) =>
-                    setFormData({ ...formData, divisi: e.target.value })
-                  }
-                  aria-invalid={!!formErrors.divisi}
-                  className="min-h-10 w-full rounded-xl border border-slate-800 bg-slate-950 px-3 text-white outline-none focus:border-sky-500"
-                />
-              </div>
+              <IsianOrganisasi
+                idAwalan="employee"
+                idKaryawan={editId ?? formData.id_unik}
+                nilai={{
+                  id_bagian: formData.id_bagian ?? "",
+                  id_jabatan: formData.id_jabatan ?? "",
+                  id_atasan: formData.id_atasan ?? "",
+                }}
+                onChange={(org) =>
+                  setFormData((lama) => ({
+                    ...lama,
+                    ...org,
+                    divisi: org.divisi || lama.divisi,
+                    jabatan_status: org.jabatan_status || lama.jabatan_status,
+                  }))
+                }
+                bagianWajib={!isEditing}
+                className="min-h-10 w-full rounded-xl border border-slate-800 bg-slate-950 px-3 text-white outline-none focus:border-sky-500"
+                labelClassName="text-slate-400 block mb-1 font-semibold"
+              />
               <div>
                 <label
                   htmlFor="employee-unit"
@@ -1346,23 +1375,6 @@ export default function KaryawanPage() {
                     </option>
                   ))}
                 </PilihCari>
-              </div>
-              <div>
-                <label
-                  htmlFor="employee-position"
-                  className="text-slate-400 block mb-1 font-semibold"
-                >
-                  Jabatan:
-                </label>
-                <input
-                  id="employee-position"
-                  type="text"
-                  value={formData.jabatan_status}
-                  onChange={(e) =>
-                    setFormData({ ...formData, jabatan_status: e.target.value })
-                  }
-                  className="min-h-10 w-full rounded-xl border border-slate-800 bg-slate-950 px-3 text-white outline-none focus:border-sky-500"
-                />
               </div>
             </div>
 
@@ -1533,7 +1545,7 @@ export default function KaryawanPage() {
                   htmlFor="employee-start-date"
                   className="mb-1 block text-slate-400 font-semibold"
                 >
-                  Tanggal Mulai Aktif:
+                  TMT (Tanggal Mulai Tugas):
                 </label>
                 <input
                   id="employee-start-date"

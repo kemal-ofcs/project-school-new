@@ -18,6 +18,8 @@ export interface OperatorRecord {
   roleName: string;
   isSuperadmin: boolean;
   status: "Aktif" | "Nonaktif";
+  /** Personil yang ditautkan (A-2, v68); kosong = tanpa tautan. */
+  idKaryawan: string;
 }
 
 export interface OperatorDraft {
@@ -29,4 +31,6 @@ export interface OperatorDraft {
   password?: string;
   roleId: number;
   status: "Aktif" | "Nonaktif";
+  /** `undefined` = jangan ubah, "" = lepas tautan. */
+  idKaryawan?: string;
 }

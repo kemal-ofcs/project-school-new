@@ -19,6 +19,12 @@ export const NAVIGATION: readonly NavigationItem[] = [
   },
   { area: "history", href: "/history", icon: "clock", label: "Riwayat" },
   { area: "karyawan", href: "/karyawan", icon: "user", label: "Karyawan" },
+  {
+    area: "kepegawaian",
+    href: "/kepegawaian",
+    icon: "user",
+    label: "Kepegawaian",
+  },
   { area: "idcards", href: "/id-cards", icon: "user", label: "ID Card" },
   { area: "shift", href: "/shift", icon: "clock", label: "Shift" },
   {
@@ -220,6 +226,7 @@ export const NAVIGATION_GROUPS: readonly NavigationGroupSpec[] = [
     label: "Personil",
     hrefs: [
       "/karyawan",
+      "/kepegawaian",
       "/guru",
       "/siswa",
       "/id-cards",

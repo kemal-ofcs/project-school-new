@@ -13,6 +13,10 @@ import { StatusBadge } from "@/components/ui/StatusBadge";
 import { hasPermission } from "@/lib/auth/access";
 import { useAuth } from "@/lib/context/AuthContext";
 import {
+  muatOrgKepegawaian,
+  type PegawaiKepegawaian,
+} from "@/lib/gateways/hris";
+import {
   createOperator,
   createRole,
   deleteMasterOperator,
@@ -47,6 +51,7 @@ const EMPTY_OPERATOR: OperatorDraft = {
   password: "",
   roleId: 0,
   status: "Aktif",
+  idKaryawan: "",
 };
 
 const EDITABLE_PERMISSION_GROUPS = PERMISSION_CATALOG.filter(
@@ -186,6 +191,7 @@ export default function MasterOperatorPage() {
       password: "",
       roleId: operator.roleId,
       status: operator.status,
+      idKaryawan: operator.idKaryawan,
     });
     setOperatorModal(true);
   };
@@ -488,6 +494,21 @@ function OperatorFormModal({
   // mengubahnya bukan sekadar mengganti satu kolom. Web tetap boleh
   // mengubahnya karena jalur servernya memang menyimpan.
   const lockIdentity = Boolean(editingOperator) && isDesktopRuntime();
+  // Tautan akun ke personil (A-2): pegawai aktif, bukan siswa.
+  const [pegawai, setPegawai] = useState<PegawaiKepegawaian[]>([]);
+  useEffect(() => {
+    let aktif = true;
+    muatOrgKepegawaian()
+      .then((org) => {
+        if (aktif) setPegawai(org.pegawai);
+      })
+      .catch(() => {
+        if (aktif) setPegawai([]);
+      });
+    return () => {
+      aktif = false;
+    };
+  }, []);
   return (
     <Modal
       title={editingOperator ? "Edit operator" : "Tambah operator"}
@@ -656,6 +677,30 @@ function OperatorFormModal({
                 <option value="Nonaktif">Nonaktif</option>
               ) : null}
             </select>
+          </FormField>
+          <FormField label="Personil (opsional)" htmlFor="operator-personil">
+            <PilihCari
+              id="operator-personil"
+              value={draft.idKaryawan ?? ""}
+              onChange={(event) =>
+                onChange({ ...draft, idKaryawan: event.target.value })
+              }
+              className="app-input"
+            >
+              <option value="">Tidak ditautkan</option>
+              {pegawai
+                .filter(
+                  (p) =>
+                    p.status_aktif === "Aktif" ||
+                    p.id_unik === draft.idKaryawan,
+                )
+                .map((p) => (
+                  <option key={p.id_unik} value={p.id_unik}>
+                    {p.nama}
+                    {p.kode_karyawan ? ` (${p.kode_karyawan})` : ""}
+                  </option>
+                ))}
+            </PilihCari>
           </FormField>
         </div>
         <ModalActions saving={saving} onCancel={onClose} />

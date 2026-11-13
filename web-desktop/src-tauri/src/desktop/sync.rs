@@ -20,7 +20,7 @@ use super::{
 /// `CURRENT_SCHEMA_VERSION` di `web-desktop/src/lib/db-schema.ts` setiap kali
 /// migrasi baru ditambahkan, karena keduanya membaca tabel `schema_migration`
 /// yang sama di Turso.
-pub const CLIENT_SCHEMA_VERSION: i64 = 67;
+pub const CLIENT_SCHEMA_VERSION: i64 = 68;
 
 /// Hanya `cloud > client` yang berbahaya; `cloud <= client` adalah kondisi normal.
 fn is_client_schema_outdated(cloud_version: i64) -> bool {
@@ -104,6 +104,9 @@ const SNAPSHOT_TABLES: &[SnapshotTable] = &[
             "status_backup",
             "unit",
             "email",
+            "id_bagian",
+            "id_jabatan",
+            "id_atasan",
         ],
         conflict_column: "id_unik",
         entity_column: "id_unik",
@@ -1600,6 +1603,119 @@ const SNAPSHOT_TABLES: &[SnapshotTable] = &[
         entity_column: "id_pembayaran",
         delete_missing: false,
     },
+    // v68 — organisasi, tugas tambahan, dan kontrak (HRIS Fase 1). Baris
+    // tidak pernah dihapus: master dinonaktifkan, tugas dibatalkan, kontrak
+    // append-only (pembatalan = baris `Pembatalan`).
+    SnapshotTable {
+        payload_key: "hrBagian",
+        domain: "hr-section",
+        table: "hr_bagian",
+        columns: &[
+            "id_bagian",
+            "nama",
+            "is_aktif",
+            "created_at",
+            "updated_at",
+        ],
+        conflict_column: "id_bagian",
+        entity_column: "id_bagian",
+        delete_missing: false,
+    },
+    SnapshotTable {
+        // Domain sendiri: barisnya menumpang event `hr-section/*`, dan cache
+        // revisi per (domain, kunci) tidak boleh bertabrakan dengan bagiannya.
+        payload_key: "hrBagianNama",
+        domain: "hr-section-name",
+        table: "hr_bagian_nama",
+        columns: &[
+            "id_nama",
+            "id_bagian",
+            "nama",
+            "created_at",
+        ],
+        conflict_column: "id_nama",
+        entity_column: "id_nama",
+        delete_missing: false,
+    },
+    SnapshotTable {
+        payload_key: "hrJabatan",
+        domain: "hr-position",
+        table: "hr_jabatan",
+        columns: &[
+            "id_jabatan",
+            "nama",
+            "is_aktif",
+            "created_at",
+            "updated_at",
+        ],
+        conflict_column: "id_jabatan",
+        entity_column: "id_jabatan",
+        delete_missing: false,
+    },
+    SnapshotTable {
+        payload_key: "hrTugasJenis",
+        domain: "hr-duty-type",
+        table: "hr_tugas_jenis",
+        columns: &[
+            "id_jenis",
+            "nama",
+            "ekuivalen_jp",
+            "is_aktif",
+            "created_at",
+            "updated_at",
+        ],
+        conflict_column: "id_jenis",
+        entity_column: "id_jenis",
+        delete_missing: false,
+    },
+    SnapshotTable {
+        payload_key: "hrTugasTambahan",
+        domain: "hr-duty",
+        table: "hr_tugas_tambahan",
+        columns: &[
+            "id_tugas",
+            "id_karyawan",
+            "id_jenis",
+            "unit",
+            "tahun_ajaran",
+            "id_rombel",
+            "nomor_sk",
+            "tanggal_sk",
+            "ekuivalen_jp",
+            "tanggal_mulai",
+            "tanggal_selesai",
+            "dicatat_oleh",
+            "dibatalkan_pada",
+            "dibatalkan_oleh",
+            "alasan_batal",
+            "created_at",
+            "updated_at",
+        ],
+        conflict_column: "id_tugas",
+        entity_column: "id_tugas",
+        delete_missing: false,
+    },
+    SnapshotTable {
+        payload_key: "hrKontrak",
+        domain: "hr-contract",
+        table: "hr_kontrak",
+        columns: &[
+            "id_kontrak",
+            "id_karyawan",
+            "status",
+            "id_ref",
+            "nomor",
+            "tanggal_mulai",
+            "tanggal_selesai",
+            "percobaan_selesai",
+            "catatan",
+            "dicatat_oleh",
+            "created_at",
+        ],
+        conflict_column: "id_kontrak",
+        entity_column: "id_kontrak",
+        delete_missing: false,
+    },
 ];
 
 pub(crate) const CANONICAL_SYNC_ROUTES: &[(&str, &str)] = &[
@@ -1698,6 +1814,10 @@ pub(crate) const CANONICAL_SYNC_ROUTES: &[(&str, &str)] = &[
     ("billing-type", "save"),
     ("face-template", "delete"),
     ("face-template", "save"),
+    // v68 — organisasi pegawai (HRIS Fase 1a).
+    ("hr-position", "save"),
+    ("hr-section", "merge"),
+    ("hr-section", "save"),
     ("uks-visit", "delete"),
     ("uks-visit", "save"),
     ("log-scan", "delete"),
@@ -2512,7 +2632,10 @@ pub fn enqueue_employee_snapshot(
           'tanggal_selesai_aktif', COALESCE(tanggal_selesai_aktif, ''),
           'status_backup', COALESCE(status_backup, 'NORMAL'),
           'unit', COALESCE(unit, ''),
-          'email', email
+          'email', email,
+          -- Organisasi (v68): NULL = tidak dibawa (cloud memetakan teksnya),
+          -- '' = dikosongkan.
+          'id_bagian', id_bagian, 'id_jabatan', id_jabatan, 'id_atasan', id_atasan
         ) FROM master_data WHERE id_unik = ?;
         "#,
             params![employee_id],

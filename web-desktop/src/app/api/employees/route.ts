@@ -68,6 +68,15 @@ function parseDraft(value: unknown): KaryawanInput {
         ? draft.tanggal_selesai_aktif
         : undefined,
     unit: typeof draft.unit === "string" ? draft.unit.trim() : undefined,
+    // Organisasi (v68): kunci absen = form lama, kosong = tidak dipilih.
+    id_bagian:
+      typeof draft.id_bagian === "string" ? draft.id_bagian.trim() : undefined,
+    id_jabatan:
+      typeof draft.id_jabatan === "string"
+        ? draft.id_jabatan.trim()
+        : undefined,
+    id_atasan:
+      typeof draft.id_atasan === "string" ? draft.id_atasan.trim() : undefined,
     email:
       typeof draft.email === "string"
         ? normalizeOperatorEmail(draft.email)

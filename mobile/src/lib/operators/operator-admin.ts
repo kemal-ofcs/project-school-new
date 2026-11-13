@@ -11,6 +11,7 @@ import {
   generateRecoveryCodes,
   normalizeRecoveryCode,
 } from "@/lib/security/totp";
+import { PEGAWAI_SQL } from "@/lib/validations/hris";
 
 export function validateOperatorDraft(draft: OperatorDraft) {
   const code = draft.kodeOperator.trim().toUpperCase();
@@ -58,6 +59,34 @@ export async function assertOperatorPhoneUnique(
   }
 }
 
+/**
+ * Tautan akun ke personil (A-2, v68): pegawai terdaftar (bukan siswa), satu
+ * personil hanya untuk satu akun AKTIF. Cermin `assert_personil_akun`.
+ */
+export async function assertPersonilAkun(
+  client: Client,
+  idKaryawan: string,
+  status: string,
+  excludeId = 0,
+) {
+  if (!idKaryawan) return;
+  const pegawai = await client.execute({
+    sql: `SELECT 1 FROM master_data m WHERE m.id_unik = ? AND ${PEGAWAI_SQL};`,
+    args: [idKaryawan],
+  });
+  if (pegawai.rows.length === 0) {
+    throw new Error("Personil yang ditautkan harus pegawai yang terdaftar.");
+  }
+  if (status !== "Aktif") return;
+  const dipakai = await client.execute({
+    sql: "SELECT 1 FROM master_operator WHERE id_karyawan = ? AND id <> ? AND COALESCE(status, 'Aktif') = 'Aktif' LIMIT 1;",
+    args: [idKaryawan, excludeId],
+  });
+  if (dipakai.rows.length > 0) {
+    throw new Error("Personil itu sudah ditautkan ke akun aktif lain.");
+  }
+}
+
 function toOperatorRecord(row: Record<string, unknown>): OperatorRecord {
   return {
     id: Number(row.id),
@@ -72,6 +101,7 @@ function toOperatorRecord(row: Record<string, unknown>): OperatorRecord {
     roleName: String(row.nama_role),
     isSuperadmin: Number(row.is_superadmin) === 1,
     status: String(row.status) === "Nonaktif" ? "Nonaktif" : "Aktif",
+    idKaryawan: row.id_karyawan == null ? "" : String(row.id_karyawan),
   };
 }
 
@@ -79,6 +109,7 @@ export async function listOperators(client: Client) {
   const result = await client.execute(`
     SELECT
       m.id, m.kode_operator, m.nama_operator, m.username, m.email, m.no_hp,
+      m.id_karyawan,
       COALESCE(m.totp_enabled, 0) AS totp_enabled,
       m.role_id, m.status,
       r.role_key, r.nama_role, r.is_superadmin
@@ -125,13 +156,15 @@ export async function insertOperator(
     throw new Error("Role Superadmin tidak dapat ditambahkan secara manual.");
   }
   await assertOperatorPhoneUnique(client, draft.noHp);
+  const idKaryawan = draft.idKaryawan?.trim() ?? "";
+  await assertPersonilAkun(client, idKaryawan, draft.status);
 
   const result = await client.execute({
     sql: `
       INSERT INTO master_operator (
         kode_operator, nama_operator, username, email, no_hp,
-        password_hash, role, role_id, status, created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+        password_hash, role, role_id, status, created_at, updated_at, id_karyawan
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULLIF(?, ''));
     `,
     args: [
       draft.kodeOperator.trim().toUpperCase(),
@@ -145,6 +178,7 @@ export async function insertOperator(
       draft.status,
       new Date().toISOString(),
       new Date().toISOString(),
+      idKaryawan,
     ],
   });
   return { success: true, id: Number(result.lastInsertRowid) };
@@ -331,6 +365,14 @@ export async function editOperator(
     throw new Error("Operator tidak dapat dinaikkan menjadi Superadmin.");
   }
   await assertOperatorPhoneUnique(client, draft.noHp, operatorId);
+  // Diperiksa juga saat akun diaktifkan kembali dengan tautan lamanya.
+  const tersimpan = await client.execute({
+    sql: "SELECT COALESCE(id_karyawan, '') AS id_karyawan FROM master_operator WHERE id = ?;",
+    args: [operatorId],
+  });
+  const idKaryawan =
+    draft.idKaryawan?.trim() ?? String(tersimpan.rows[0]?.id_karyawan ?? "");
+  await assertPersonilAkun(client, idKaryawan, draft.status, operatorId);
 
   const updates = [
     "kode_operator = ?",
@@ -357,6 +399,10 @@ export async function editOperator(
   if (draft.password) {
     updates.push("password_hash = ?");
     args.push(await hashPassword(draft.password));
+  }
+  if (draft.idKaryawan !== undefined) {
+    updates.push("id_karyawan = NULLIF(?, '')");
+    args.push(idKaryawan);
   }
   args.push(operatorId);
   await client.execute({

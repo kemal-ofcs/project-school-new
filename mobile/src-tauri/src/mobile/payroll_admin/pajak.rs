@@ -534,7 +534,7 @@ pub fn hitung_bpjs_masa(
 /// dari hasil yang sama (`masa` = bulan `period_start`, Q-1). ?1 =
 /// `period_start` run yang dihitung; run itu sendiri belum tertulis.
 /// Cermin `RUN_TAHUN_SQL` di `validations/pajak.ts`.
-pub const RUN_TAHUN_SQL: &str = "SELECT pi.id_karyawan AS id_karyawan, substr(pr.period_start, 1, 7) AS masa, pi.gross_salary AS gross_salary, pi.overtime_salary AS overtime_salary, pi.pph21_amount AS pph21_amount, pi.breakdown_snapshot AS breakdown_snapshot FROM payroll_items pi JOIN payroll_runs pr ON pr.id = pi.payroll_run_id WHERE pr.status <> 'REJECTED' AND substr(pr.period_start, 1, 4) = substr(?1, 1, 4) AND substr(pr.period_start, 1, 7) <= substr(?1, 1, 7) ORDER BY pi.id_karyawan, pr.period_start, pr.id;";
+pub const RUN_TAHUN_SQL: &str = "SELECT pi.id_karyawan AS id_karyawan, substr(pr.period_start, 1, 7) AS masa, pi.gross_salary AS gross_salary, pi.overtime_salary AS overtime_salary, pi.pph21_amount AS pph21_amount, pi.breakdown_snapshot AS breakdown_snapshot FROM payroll_items pi JOIN payroll_runs pr ON pr.id = pi.payroll_run_id WHERE pr.status <> 'REJECTED' AND substr(pr.period_start, 1, 4) = substr(?1, 1, 4) AND substr(pr.period_start, 1, 7) <= substr(?1, 1, 7) ORDER BY pi.id_karyawan, pr.period_start, pr.id\n-- batas: item setahun sampai masa ini, dibatasi jumlah personil kali dua belas bulan\n;";
 
 /// Kolom rekap untuk pajak, disisipkan ke SELECT rekap (`md` = `master_data`,
 /// ?1/?2 = awal/akhir periode). PTKP awal tahun (Q-4): konfigurasi yang

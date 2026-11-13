@@ -9,6 +9,7 @@ import {
 import { runDatabaseMigrations } from "@/lib/db-migrations";
 import { initDatabaseSchema, isDatabaseSchemaReady } from "@/lib/db-schema";
 import {
+  CONFIDENTIAL_PERMISSIONS,
   DEFAULT_ROLE_PERMISSIONS,
   PERMISSION_CATALOG,
   SENSITIVE_MUTATION_PERMISSIONS,
@@ -67,9 +68,12 @@ describe("dynamic RBAC migration", () => {
     );
     expect(roles.rows.map((row) => String(row.role_key))).toEqual([
       "admin",
+      "kepala-sekolah",
+      "kepegawaian",
       "operator",
       "scanner",
       "superadmin",
+      "yayasan",
     ]);
 
     const operator = await client.execute(`
@@ -187,6 +191,8 @@ describe("dynamic RBAC migration", () => {
       66,
       // v67 — PPh 21 dan BPJS per masa pajak (`payroll_components.dasar_bpjs`).
       67,
+      // v68 — organisasi, kontrak, dan data kepegawaian (HRIS Fase 1, `hr_*`).
+      68,
     ]);
 
     const sessionColumns = await client.execute(
@@ -243,8 +249,38 @@ describe("dynamic RBAC migration", () => {
         ...SUPERADMIN_ONLY_PERMISSIONS,
         "diagnostics.view",
         ...SENSITIVE_MUTATION_PERMISSIONS,
+        ...CONFIDENTIAL_PERMISSIONS,
       ].sort(),
     );
+  });
+
+  test("paket role HRIS di Rust sama dengan TS", async () => {
+    const workspace = fileURLToPath(new URL("../../../", import.meta.url));
+    let sumber = "";
+    for (const path of [
+      `${workspace}src-tauri/src/desktop/turso.rs`,
+      `${workspace}src-tauri/src/mobile/turso.rs`,
+    ]) {
+      const file = Bun.file(path);
+      if (await file.exists()) sumber = await file.text();
+    }
+    const blok = sumber.match(
+      /ROLE_HRIS_BAWAAN: &\[\(&str, &\[&str\]\)\] = &\[([\s\S]*?)\n\];/,
+    )?.[1];
+    expect(blok).toBeDefined();
+    const rust = Object.fromEntries(
+      [...(blok ?? "").matchAll(/\(\s*"([^"]+)",\s*&\[([^\]]*)\]/g)].map(
+        (m) => [
+          m[1],
+          [...(m[2] ?? "").matchAll(/"([^"]+)"/g)].map((x) => x[1]),
+        ],
+      ),
+    );
+    expect(rust).toEqual({
+      yayasan: [...DEFAULT_ROLE_PERMISSIONS.yayasan],
+      "kepala-sekolah": [...DEFAULT_ROLE_PERMISSIONS["kepala-sekolah"]],
+      kepegawaian: [...DEFAULT_ROLE_PERMISSIONS.kepegawaian],
+    });
   });
 
   test("sakelar keamanan absensi role bertahan saat dibuat dan disunting", async () => {

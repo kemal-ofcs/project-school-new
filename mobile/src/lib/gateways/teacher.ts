@@ -21,6 +21,12 @@ export interface GuruInput {
   unit?: string;
   /** `undefined` = jangan ubah, "" = kosongkan. Lihat `emailPersonil`. */
   email?: string;
+  /** Organisasi (v68, Q-19); absen = impor/form lama, teks tidak diubah. */
+  id_bagian?: string;
+  id_jabatan?: string;
+  id_atasan?: string;
+  /** TMT (Q-20); absen = jangan ubah. */
+  tanggal_mulai_aktif?: string;
   is_edit?: boolean;
 }
 

@@ -1625,7 +1625,8 @@ pub fn list_teachers(state: &DesktopState) -> Result<Value, CommandError> {
                g.created_at, g.updated_at,
                m.kode_karyawan, m.nama, m.divisi, m.jabatan_status, m.no_hp, m.lp,
                m.status_aktif, m.id_shift, m.token_absensi, m.qr_code, m.status_qr, m.unit,
-               m.email
+               m.email, COALESCE(m.id_bagian, ''), COALESCE(m.id_jabatan, ''),
+               COALESCE(m.id_atasan, ''), COALESCE(m.tanggal_mulai_aktif, '')
         FROM guru_data g
         JOIN master_data m ON m.id_unik = g.id_guru
         ORDER BY m.nama ASC;
@@ -1656,6 +1657,10 @@ pub fn list_teachers(state: &DesktopState) -> Result<Value, CommandError> {
                 "status_qr": row.get::<_, Option<String>>(18)?,
                 "unit": row.get::<_, Option<String>>(19)?,
                 "email": row.get::<_, Option<String>>(20)?,
+                "id_bagian": row.get::<_, String>(21)?,
+                "id_jabatan": row.get::<_, String>(22)?,
+                "id_atasan": row.get::<_, String>(23)?,
+                "tanggal_mulai_aktif": row.get::<_, String>(24)?,
             }))
         })
         .map_err(|_| CommandError::internal())?
@@ -1788,17 +1793,33 @@ pub fn save_teacher(state: &DesktopState, draft: &Value) -> Result<Value, Comman
     let client_id = sync::ensure_client_id(state)?;
     let (token, qr_code, token_is_new) = ensure_scan_token(&tx, &client_id, &id)?;
 
+    // Bagian dan jabatan guru bisa dipilih (Q-19, v68). Tanpa pilihan, guru
+    // baru tetap 'Tenaga Pengajar'/'Guru' dan guru lama mempertahankan teksnya.
+    let org_form = draft.get("id_bagian").is_some();
+    let org = super::hris::periksa_organisasi(&tx, &id, draft, false)?;
+    let divisi_baru = Some(org.divisi.as_str())
+        .filter(|_| !org.id_bagian.is_empty())
+        .unwrap_or("Tenaga Pengajar");
+    let jabatan_baru = Some(org.jabatan_status.as_str())
+        .filter(|_| !org.id_jabatan.is_empty())
+        .unwrap_or("Guru");
+    // TMT (Q-20) = `tanggal_mulai_aktif`; tanpa kunci (impor lama) = jangan ubah.
+    let tmt = optional_text(draft, "tanggal_mulai_aktif").unwrap_or_default();
+
     // 1. Simpan ke master_data untuk terminal scan dan kartu nama
     tx.execute(
         r#"
         INSERT INTO master_data (
             id_unik, kode_karyawan, nama, divisi, jabatan_status, no_hp, lp,
             id_shift, status_aktif, tanggal_daftar, catatan, token_absensi, qr_code,
-            status_qr, jenis_personil, unit, status_backup, email
-        ) VALUES (?1, ?2, ?3, 'Tenaga Pengajar', 'Guru', ?4, ?5, COALESCE(?6, 1), ?7, date('now','+7 hours'), 'Data PTK Sekolah', ?8, ?9, 'Generated', 'GURU', NULLIF(?10, ''), 'NORMAL', NULLIF(?12, ''))
+            status_qr, jenis_personil, unit, status_backup, email, tanggal_mulai_aktif
+        ) VALUES (?1, ?2, ?3, ?13, ?14, ?4, ?5, COALESCE(?6, 1), ?7, date('now','+7 hours'), 'Data PTK Sekolah', ?8, ?9, 'Generated', 'GURU', NULLIF(?10, ''), 'NORMAL', NULLIF(?12, ''), NULLIF(?17, ''))
         ON CONFLICT(id_unik) DO UPDATE SET
             kode_karyawan = excluded.kode_karyawan,
             nama = excluded.nama,
+            divisi = CASE WHEN ?15 THEN excluded.divisi ELSE master_data.divisi END,
+            jabatan_status = CASE WHEN ?16 THEN excluded.jabatan_status ELSE master_data.jabatan_status END,
+            tanggal_mulai_aktif = CASE WHEN ?18 THEN NULLIF(?17, '') ELSE master_data.tanggal_mulai_aktif END,
             no_hp = excluded.no_hp,
             lp = excluded.lp,
             id_shift = COALESCE(?6, master_data.id_shift),
@@ -1826,10 +1847,19 @@ pub fn save_teacher(state: &DesktopState, draft: &Value) -> Result<Value, Comman
             qr_code,
             unit,
             email.is_some(),
-            email.unwrap_or_default()
+            email.unwrap_or_default(),
+            divisi_baru,
+            jabatan_baru,
+            !org.id_bagian.is_empty(),
+            !org.id_jabatan.is_empty(),
+            tmt,
+            draft.get("tanggal_mulai_aktif").is_some()
         ],
     )
     .map_err(|e| CommandError::new("DB_ERROR", format!("Gagal menyimpan identitas personil guru: {e}")))?;
+    if org_form {
+        super::hris::tulis_organisasi(&tx, &id, &org)?;
+    }
 
     // 2. Simpan ke guru_data
     tx.execute(
@@ -1853,7 +1883,7 @@ pub fn save_teacher(state: &DesktopState, draft: &Value) -> Result<Value, Comman
     tx.execute(
         r#"
         INSERT INTO id_card (id_unik, nama, divisi, idcard_status, tanggal_generate)
-        SELECT ?1, ?2, 'Tenaga Pengajar', 'Belum', date('now','+7 hours')
+        SELECT ?1, ?2, (SELECT divisi FROM master_data WHERE id_unik = ?1), 'Belum', date('now','+7 hours')
         WHERE NOT EXISTS (SELECT 1 FROM id_card WHERE id_unik = ?1);
         "#,
         params![id, nama],
@@ -1865,7 +1895,7 @@ pub fn save_teacher(state: &DesktopState, draft: &Value) -> Result<Value, Comman
         )
     })?;
     tx.execute(
-        "UPDATE id_card SET nama = ?1, divisi = 'Tenaga Pengajar' WHERE id_unik = ?2;",
+        "UPDATE id_card SET nama = ?1, divisi = (SELECT divisi FROM master_data WHERE id_unik = ?2) WHERE id_unik = ?2;",
         params![nama, id],
     )
     .map_err(|e| {

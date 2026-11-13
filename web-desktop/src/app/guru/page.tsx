@@ -15,6 +15,7 @@ import {
   type KolomMassal,
   terapkanKolomMassal,
 } from "@/components/personnel/aturanUbahMassal";
+import { IsianOrganisasi } from "@/components/personnel/IsianOrganisasi";
 import { PersonnelAvatar } from "@/components/personnel/PersonnelAvatar";
 import {
   type TerapkanMassal,
@@ -98,6 +99,10 @@ export default function GuruPage() {
     lp: "L",
     id_shift: 1,
     status_aktif: "Aktif",
+    id_bagian: "",
+    id_jabatan: "",
+    id_atasan: "",
+    tanggal_mulai_aktif: "",
   });
 
   // QR Modal State
@@ -215,6 +220,10 @@ export default function GuruPage() {
       id_shift: shiftList[0] ? Number(shiftList[0].id_shift) : 1,
       status_aktif: "Aktif",
       unit: "",
+      id_bagian: "",
+      id_jabatan: "",
+      id_atasan: "",
+      tanggal_mulai_aktif: "",
     });
     setIsEditing(false);
     setFotoBaru(null);
@@ -983,6 +992,46 @@ export default function GuruPage() {
                     </option>
                   ))}
                 </PilihCari>
+              </div>
+              <IsianOrganisasi
+                idAwalan="guru"
+                idKaryawan={formData.id_guru ?? ""}
+                nilai={{
+                  id_bagian: formData.id_bagian ?? "",
+                  id_jabatan: formData.id_jabatan ?? "",
+                  id_atasan: formData.id_atasan ?? "",
+                }}
+                onChange={({ id_bagian, id_jabatan, id_atasan }) =>
+                  setFormData((lama) => ({
+                    ...lama,
+                    id_bagian,
+                    id_jabatan,
+                    id_atasan,
+                  }))
+                }
+                bawaanGuru={!isEditing}
+                className="mt-1 w-full rounded-xl border border-white/10 bg-slate-900 px-3 py-2 text-sm text-slate-100 focus:border-sky-500 focus:outline-none"
+                labelClassName="block text-xs font-semibold text-slate-300"
+              />
+              <div>
+                <label
+                  htmlFor="guru-tmt"
+                  className="block text-xs font-semibold text-slate-300"
+                >
+                  TMT (Tanggal Mulai Tugas)
+                </label>
+                <input
+                  id="guru-tmt"
+                  type="date"
+                  value={formData.tanggal_mulai_aktif ?? ""}
+                  onChange={(e) =>
+                    setFormData({
+                      ...formData,
+                      tanggal_mulai_aktif: e.target.value,
+                    })
+                  }
+                  className="mt-1 w-full rounded-xl border border-white/10 bg-slate-900 px-3 py-2 text-sm text-slate-100 focus:border-sky-500 focus:outline-none"
+                />
                 {unitList.length === 0 ? (
                   <p className="mt-1 text-xs text-slate-500">
                     Belum ada unit. Tambahkan lewat Akademik → Unit.

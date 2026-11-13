@@ -2,6 +2,12 @@ import "server-only";
 
 import { formatTanggalOperasional } from "@/lib/attendance/time-policy";
 import { db, ensureDbInitialized } from "@/lib/db";
+import { periksaOrganisasi, tulisOrganisasi } from "@/lib/services/hris";
+import {
+  normalisasiNama,
+  PETA_BAGIAN_SQL,
+  PETA_JABATAN_SQL,
+} from "@/lib/validations/hris";
 
 export interface KaryawanInput {
   id_unik: string;
@@ -22,6 +28,49 @@ export interface KaryawanInput {
   unit?: string;
   /** `undefined` = jangan ubah, "" = kosongkan. Lihat `emailPersonil`. */
   email?: string;
+  /** Organisasi (v68); kunci absen = form lama, teks `divisi` berlaku. */
+  id_bagian?: string;
+  id_jabatan?: string;
+  id_atasan?: string;
+}
+
+/**
+ * Teks divisi/jabatan baris impor → master, termasuk nama lama; yang tidak
+ * dikenal menolak barisnya (Q-21). Jabatan kosong = "Staff" tanpa master.
+ * Cerminan `peta_organisasi_impor` di `operational.rs`.
+ */
+async function petaOrganisasiImpor(data: KaryawanInput) {
+  const divisi = normalisasiNama(data.divisi);
+  const bagian = (await db.execute({ sql: PETA_BAGIAN_SQL, args: [divisi] }))
+    .rows[0];
+  if (!bagian) {
+    return {
+      galat: `Divisi '${divisi}' belum terdaftar di Kepegawaian → Organisasi.`,
+    };
+  }
+  const jabatan = normalisasiNama(data.jabatan_status ?? "");
+  let idJabatan = "";
+  let jabatanStatus = "Staff";
+  if (jabatan) {
+    const j = (await db.execute({ sql: PETA_JABATAN_SQL, args: [jabatan] }))
+      .rows[0];
+    if (!j) {
+      return {
+        galat: `Jabatan '${jabatan}' belum terdaftar di Kepegawaian → Organisasi.`,
+      };
+    }
+    idJabatan = String(j.id_jabatan);
+    jabatanStatus = String(j.nama);
+  }
+  return {
+    org: {
+      id_bagian: String(bagian.id_bagian),
+      divisi: String(bagian.nama),
+      id_jabatan: idJabatan,
+      jabatan_status: jabatanStatus,
+      id_atasan: "",
+    },
+  };
 }
 
 export function generateRandomToken(length = 8): string {
@@ -55,19 +104,33 @@ export async function importKaryawanMassal(drafts: KaryawanInput[]) {
   // diam-diam: indeks draft dan alasannya dikembalikan supaya operator tahu
   // baris Excel mana yang harus diperbaiki. Cerminan `import_employees` (Rust).
   const gagal: { index: number; pesan: string }[] = [];
-  const accepted = drafts.filter((draft, index) => {
+  const peta = await Promise.all(drafts.map(petaOrganisasiImpor));
+  const accepted = drafts.flatMap((draft, index) => {
     if (existingIds.has(draft.id_unik)) {
       gagal.push({ index, pesan: `ID '${draft.id_unik}' sudah ada.` });
-      return false;
+      return [];
     }
     if (existingCodes.has(draft.kode_karyawan)) {
       gagal.push({
         index,
         pesan: `Kode karyawan '${draft.kode_karyawan}' sudah dipakai.`,
       });
-      return false;
+      return [];
     }
-    return true;
+    const hasil = peta[index];
+    if (!hasil?.org) {
+      gagal.push({ index, pesan: hasil?.galat ?? "Divisi tidak dikenal." });
+      return [];
+    }
+    return [
+      {
+        ...draft,
+        divisi: hasil.org.divisi,
+        jabatan_status: hasil.org.jabatan_status,
+        id_bagian: hasil.org.id_bagian,
+        id_jabatan: hasil.org.id_jabatan,
+      },
+    ];
   });
   const requestedShiftIds = [
     ...new Set(accepted.map((draft) => draft.id_shift)),
@@ -128,6 +191,10 @@ export async function importKaryawanMassal(drafts: KaryawanInput[]) {
             VALUES (?, ?, ?, 'Belum', ?);`,
           args: [data.id_unik, data.nama, data.divisi, today],
         },
+        {
+          sql: "UPDATE master_data SET id_bagian = NULLIF(?2, ''), id_jabatan = NULLIF(?3, '') WHERE id_unik = ?1;",
+          args: [data.id_unik, data.id_bagian ?? "", data.id_jabatan ?? ""],
+        },
       ];
     });
     await db.batch(statements, "write");
@@ -154,7 +221,8 @@ export async function getDaftarKaryawan(filter?: {
       m.no_hp, m.lp, m.id_shift, m.status_aktif, m.tanggal_daftar,
       m.catatan, m.status_qr, m.jenis_personil, m.tanggal_mulai_aktif,
       m.tanggal_selesai_aktif, m.status_backup, s.nama_shift,
-      c.idcard_status, c.idcard_pdf_url, c.link_qr_png, m.unit, m.email
+      c.idcard_status, c.idcard_pdf_url, c.link_qr_png, m.unit, m.email,
+      m.id_bagian, m.id_jabatan, m.id_atasan
     FROM master_data m
     LEFT JOIN tbl_shift s ON m.id_shift = s.id_shift
     LEFT JOIN id_card c ON m.id_unik = c.id_unik
@@ -206,7 +274,8 @@ export async function getKaryawanById(id_unik: string) {
         m.catatan, m.status_qr, m.jenis_personil, m.tanggal_mulai_aktif,
         m.tanggal_selesai_aktif, m.status_backup, s.nama_shift,
         c.idcard_status, c.idcard_pdf_url, c.link_qr_png,
-        c.idcard_last_generate, m.unit, m.email
+        c.idcard_last_generate, m.unit, m.email,
+        m.id_bagian, m.id_jabatan, m.id_atasan
       FROM master_data m
       LEFT JOIN tbl_shift s ON m.id_shift = s.id_shift
       LEFT JOIN id_card c ON m.id_unik = c.id_unik
@@ -254,8 +323,17 @@ export async function pesanBentrokIdentitasKaryawan(
   return `Kode Karyawan '${kode}' sudah dipakai ${String(row.nama)} (${String(row.id_unik)}). Kode Karyawan harus unik.`;
 }
 
-export async function tambahKaryawan(data: KaryawanInput) {
+export async function tambahKaryawan(masukan: KaryawanInput) {
   await ensureDbInitialized();
+  // Form v68 membawa `id_bagian`; bagian wajib untuk pegawai baru (Q-19).
+  // Cerminan `create_employee`.
+  const orgForm = masukan.id_bagian !== undefined;
+  const org = await periksaOrganisasi(db, masukan.id_unik, masukan, orgForm);
+  const data = {
+    ...masukan,
+    divisi: org.divisi,
+    jabatan_status: org.jabatan_status || masukan.jabatan_status,
+  };
 
   const tokenAbsensi = generateRandomToken(10);
   const qrCodePayload = `${data.id_unik}|${tokenAbsensi}`;
@@ -302,15 +380,27 @@ export async function tambahKaryawan(data: KaryawanInput) {
     `,
     args: [data.id_unik, data.nama, data.divisi, today, data.id_unik],
   });
+  if (orgForm) await tulisOrganisasi(db, data.id_unik, org);
 
   return { sukses: true, id_unik: data.id_unik, token_absensi: tokenAbsensi };
 }
 
 export async function updateKaryawan(
   id_unik: string,
-  data: Partial<KaryawanInput>,
+  masukan: Partial<KaryawanInput>,
 ) {
   await ensureDbInitialized();
+  // Kosong saat edit = teks lama tetap berlaku. Cerminan `update_employee`.
+  const orgForm = masukan.id_bagian !== undefined;
+  const org = orgForm
+    ? await periksaOrganisasi(db, id_unik, masukan, false)
+    : null;
+  const data: Partial<KaryawanInput> = {
+    ...masukan,
+    ...(org?.id_bagian ? { divisi: org.divisi } : {}),
+    ...(org?.id_jabatan ? { jabatan_status: org.jabatan_status } : {}),
+  };
+  if (org) await tulisOrganisasi(db, id_unik, org);
 
   const updates: string[] = [];
   const args: (string | number | boolean | null)[] = [];

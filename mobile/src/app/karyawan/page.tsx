@@ -34,6 +34,7 @@ import {
   toggleStatusKaryawan,
   updateKaryawan,
 } from "@/lib/gateways/employee";
+import { muatOrgKepegawaian, type OrgKepegawaian } from "@/lib/gateways/hris";
 import { getDaftarShift } from "@/lib/gateways/shift";
 import { subscribeSyncCompleted } from "@/lib/gateways/sync-status";
 import { useDebounce } from "@/lib/hooks/useDebounce";
@@ -254,10 +255,29 @@ export default function KaryawanPage() {
   );
 
   // ─── Ubah massal ───────────────────────────────────────────────────────────
+  // Bagian/jabatan dari master Kepegawaian (HRIS Fase 1a), bukan teks bebas.
+  const [orgMaster, setOrgMaster] = useState<OrgKepegawaian | null>(null);
+  useEffect(() => {
+    muatOrgKepegawaian()
+      .then(setOrgMaster)
+      .catch(() => setOrgMaster(null));
+  }, []);
   const kolomMassal = useMemo<KolomMassal[]>(
     () => [
-      { key: "divisi", label: "Divisi", jenis: "teks" },
-      { key: "jabatan_status", label: "Jabatan", jenis: "teks" },
+      {
+        key: "id_bagian",
+        label: "Bagian",
+        opsi: (orgMaster?.bagian ?? [])
+          .filter((b) => b.is_aktif === 1)
+          .map((b) => ({ value: b.id_bagian, label: b.nama })),
+      },
+      {
+        key: "id_jabatan",
+        label: "Jabatan",
+        opsi: (orgMaster?.jabatan ?? [])
+          .filter((j) => j.is_aktif === 1)
+          .map((j) => ({ value: j.id_jabatan, label: j.nama })),
+      },
       {
         key: "unit",
         label: "Unit",
@@ -290,7 +310,7 @@ export default function KaryawanPage() {
         jenis: "tanggal",
       },
     ],
-    [units, shifts],
+    [units, shifts, orgMaster],
   );
 
   const namaKaryawan = (id: string) =>

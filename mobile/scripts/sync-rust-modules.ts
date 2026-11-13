@@ -47,6 +47,8 @@ const filesToSync = [
   "wa_sender.rs",
   // Notifikasi grup Telegram (v66): aturan dan SQL wajib identik dengan Desktop dan TS.
   "telegram.rs",
+  // HRIS Fase 1 (v68): organisasi pegawai, aturan dan SQL kembar `validations/hris.ts`.
+  "hris.rs",
   "commands.rs",
   // Tarif default payroll: satu sumber untuk SQLite lokal dan Turso cloud, di
   // kedua workspace. Perbedaan sekecil apa pun di sini membuat baris seed lokal

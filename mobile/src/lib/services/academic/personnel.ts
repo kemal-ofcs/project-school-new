@@ -2,6 +2,7 @@ import "server-only";
 
 import { db, ensureDbInitialized } from "@/lib/db";
 import { ApiRequestError } from "@/lib/server/http/api-response";
+import { periksaOrganisasi } from "@/lib/services/hris";
 import {
   assertUniqueValue,
   chosenShift,
@@ -27,7 +28,7 @@ export async function getTeachers() {
            g.created_at, g.updated_at,
            m.kode_karyawan, m.nama, m.divisi, m.jabatan_status, m.no_hp, m.lp,
            m.status_aktif, m.id_shift, m.token_absensi, m.qr_code, m.status_qr, m.unit,
-           m.email
+           m.email, m.id_bagian, m.id_jabatan, m.id_atasan, m.tanggal_mulai_aktif
     FROM guru_data g
     JOIN master_data m ON m.id_unik = g.id_guru
     ORDER BY m.nama ASC;
@@ -52,6 +53,12 @@ export async function saveTeacher(draft: {
   unit?: string;
   /** `undefined` = jangan ubah, "" = kosongkan. Lihat `emailPersonil`. */
   email?: string;
+  /** Organisasi (v68, Q-19); kunci absen = form lama, teks tidak diubah. */
+  id_bagian?: string;
+  id_jabatan?: string;
+  id_atasan?: string;
+  /** TMT (Q-20); `undefined` = jangan ubah. */
+  tanggal_mulai_aktif?: string;
   is_edit?: boolean;
 }) {
   await ensureDbInitialized();
@@ -112,6 +119,12 @@ export async function saveTeacher(draft: {
   });
   const idShift = await chosenShift(draft.id_shift);
   const { token, qrCode } = await ensureScanToken(id);
+  // Cermin `save_teacher`: tanpa pilihan, guru baru 'Tenaga Pengajar'/'Guru'
+  // dan guru lama mempertahankan teksnya.
+  const orgForm = draft.id_bagian !== undefined;
+  const org = await periksaOrganisasi(db, id, draft, false);
+  const divisiBaru = org.id_bagian ? org.divisi : "Tenaga Pengajar";
+  const jabatanBaru = org.id_jabatan ? org.jabatan_status : "Guru";
 
   // Kedua tulisan dijalankan sebagai satu batch "write": kegagalan di tengah
   // akan meninggalkan baris `master_data` yatim yang bisa scan di gerbang tanpa
@@ -123,11 +136,14 @@ export async function saveTeacher(draft: {
       INSERT INTO master_data (
         id_unik, kode_karyawan, nama, divisi, jabatan_status, no_hp, lp,
         id_shift, status_aktif, tanggal_daftar, catatan, token_absensi, qr_code,
-        status_qr, jenis_personil, unit, status_backup, email
-      ) VALUES (?, ?, ?, 'Tenaga Pengajar', 'Guru', ?, ?, COALESCE(?, 1), ?, date('now','+7 hours'), 'Data PTK Sekolah', ?, ?, 'Generated', 'GURU', NULLIF(?, ''), 'NORMAL', NULLIF(?, ''))
+        status_qr, jenis_personil, unit, status_backup, email, tanggal_mulai_aktif
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, COALESCE(?, 1), ?, date('now','+7 hours'), 'Data PTK Sekolah', ?, ?, 'Generated', 'GURU', NULLIF(?, ''), 'NORMAL', NULLIF(?, ''), NULLIF(?, ''))
       ON CONFLICT(id_unik) DO UPDATE SET
         kode_karyawan = excluded.kode_karyawan,
         nama = excluded.nama,
+        divisi = CASE WHEN ? THEN excluded.divisi ELSE master_data.divisi END,
+        jabatan_status = CASE WHEN ? THEN excluded.jabatan_status ELSE master_data.jabatan_status END,
+        tanggal_mulai_aktif = CASE WHEN ? THEN NULLIF(?, '') ELSE master_data.tanggal_mulai_aktif END,
         no_hp = excluded.no_hp,
         lp = excluded.lp,
         id_shift = COALESCE(?, master_data.id_shift),
@@ -146,6 +162,8 @@ export async function saveTeacher(draft: {
           id,
           kode,
           draft.nama,
+          divisiBaru,
+          jabatanBaru,
           draft.no_hp || null,
           draft.lp || "L",
           idShift,
@@ -154,6 +172,11 @@ export async function saveTeacher(draft: {
           qrCode,
           draft.unit || "",
           draft.email ?? "",
+          draft.tanggal_mulai_aktif ?? "",
+          org.id_bagian !== "",
+          org.id_jabatan !== "",
+          draft.tanggal_mulai_aktif !== undefined,
+          draft.tanggal_mulai_aktif ?? "",
           idShift,
           draft.unit || "",
           draft.email !== undefined,
@@ -185,15 +208,23 @@ export async function saveTeacher(draft: {
       {
         sql: `
       INSERT INTO id_card (id_unik, nama, divisi, idcard_status, tanggal_generate)
-      SELECT ?, ?, 'Tenaga Pengajar', 'Belum', date('now','+7 hours')
+      SELECT ?, ?, (SELECT divisi FROM master_data WHERE id_unik = ?), 'Belum', date('now','+7 hours')
       WHERE NOT EXISTS (SELECT 1 FROM id_card WHERE id_unik = ?);
     `,
-        args: [id, draft.nama, id],
+        args: [id, draft.nama, id, id],
       },
       {
-        sql: "UPDATE id_card SET nama = ?, divisi = 'Tenaga Pengajar' WHERE id_unik = ?;",
-        args: [draft.nama, id],
+        sql: "UPDATE id_card SET nama = ?, divisi = (SELECT divisi FROM master_data WHERE id_unik = ?) WHERE id_unik = ?;",
+        args: [draft.nama, id, id],
       },
+      ...(orgForm
+        ? [
+            {
+              sql: "UPDATE master_data SET id_bagian = NULLIF(?2, ''), id_jabatan = NULLIF(?3, ''), id_atasan = NULLIF(?4, '') WHERE id_unik = ?1;",
+              args: [id, org.id_bagian, org.id_jabatan, org.id_atasan],
+            },
+          ]
+        : []),
     ],
     "write",
   );

@@ -39,6 +39,10 @@ export async function POST(request: NextRequest) {
         status_aktif?: string;
         unit?: string;
         email?: string | null;
+        id_bagian?: string;
+        id_jabatan?: string;
+        id_atasan?: string;
+        tanggal_mulai_aktif?: string;
         is_edit?: boolean;
       };
       id?: string;

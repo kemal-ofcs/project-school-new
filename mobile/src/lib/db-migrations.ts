@@ -9,6 +9,7 @@ import {
   SQL_BUANG_BERKAS_PMB_TERPINDAH,
   SQL_PINDAH_BERKAS_PMB,
 } from "@/lib/validations/berkas-sekolah";
+import { MIGRASI_ORGANISASI_SQL } from "@/lib/validations/hris";
 import {
   JENIS_NILAI_BAWAAN,
   SEED_JENIS_SQL,
@@ -83,6 +84,7 @@ const INVENTORY_REQUEST_MIGRATION_VERSION = 64;
 const INVENTORY_INSTALLMENT_MIGRATION_VERSION = 65;
 const TELEGRAM_NOTIFICATION_MIGRATION_VERSION = 66;
 const PAYROLL_TAX_PERIOD_MIGRATION_VERSION = 67;
+const HRIS_ORG_MIGRATION_VERSION = 68;
 
 /**
  * Bentuk `akademik_jam_pelajaran` sejak v60: jenis `Pulang`, cakupan unit +
@@ -194,6 +196,26 @@ const SYSTEM_ROLES = [
     key: "scanner",
     name: "Scanner",
     description: "Petugas terminal QR sesuai matriks permission.",
+    isSuperadmin: 0,
+  },
+  // HRIS Fase 1 (Q-34), cermin seed `app_role` di `turso.rs`.
+  {
+    key: "yayasan",
+    name: "Yayasan",
+    description:
+      "Pengurus yayasan: organisasi, kontrak, dan tugas tambahan pegawai.",
+    isSuperadmin: 0,
+  },
+  {
+    key: "kepala-sekolah",
+    name: "Kepala Sekolah",
+    description: "Kepala sekolah: data pegawai dan tugas tambahan.",
+    isSuperadmin: 0,
+  },
+  {
+    key: "kepegawaian",
+    name: "Kepegawaian",
+    description: "Petugas kepegawaian: data, kontrak, dan dokumen pegawai.",
     isSuperadmin: 0,
   },
 ] as const;
@@ -3434,6 +3456,243 @@ export async function runDatabaseMigrations(client: Client) {
     sql: `INSERT OR IGNORE INTO schema_migration (version, name, applied_at)
           VALUES (?, 'payroll-pajak-masa', ?);`,
     args: [PAYROLL_TAX_PERIOD_MIGRATION_VERSION, now],
+  });
+
+  // v68: organisasi, tugas tambahan, kontrak, dan data kepegawaian (HRIS
+  // Fase 1, `prd-hris.md` §19.3). DDL WAJIB identik dengan `storage.rs`
+  // (enam tabel tersinkron) dan `turso.rs` (kedua belas). Kolom SESUDAH
+  // rebuild apa pun di atas yang menyalin daftar kolom eksplisit.
+  await client.execute(`
+    CREATE TABLE IF NOT EXISTS hr_bagian (
+      id_bagian TEXT PRIMARY KEY,
+      nama TEXT NOT NULL,
+      is_aktif INTEGER NOT NULL DEFAULT 1 CHECK (is_aktif IN (0, 1)),
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+  `);
+  await client.execute(`
+    CREATE TABLE IF NOT EXISTS hr_bagian_nama (
+      id_nama TEXT PRIMARY KEY,
+      id_bagian TEXT NOT NULL,
+      nama TEXT NOT NULL,
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+  `);
+  await client.execute(`
+    CREATE TABLE IF NOT EXISTS hr_jabatan (
+      id_jabatan TEXT PRIMARY KEY,
+      nama TEXT NOT NULL,
+      is_aktif INTEGER NOT NULL DEFAULT 1 CHECK (is_aktif IN (0, 1)),
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+  `);
+  await client.execute(`
+    CREATE TABLE IF NOT EXISTS hr_tugas_jenis (
+      id_jenis TEXT PRIMARY KEY,
+      nama TEXT NOT NULL,
+      ekuivalen_jp INTEGER NOT NULL DEFAULT 0 CHECK (ekuivalen_jp BETWEEN 0 AND 40),
+      is_aktif INTEGER NOT NULL DEFAULT 1 CHECK (is_aktif IN (0, 1)),
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+  `);
+  await client.execute(`
+    CREATE TABLE IF NOT EXISTS hr_tugas_tambahan (
+      id_tugas TEXT PRIMARY KEY,
+      id_karyawan TEXT NOT NULL,
+      id_jenis TEXT NOT NULL,
+      unit TEXT,
+      tahun_ajaran TEXT NOT NULL,
+      id_rombel TEXT,
+      nomor_sk TEXT,
+      tanggal_sk TEXT,
+      ekuivalen_jp INTEGER CHECK (ekuivalen_jp IS NULL OR ekuivalen_jp BETWEEN 0 AND 40),
+      tanggal_mulai TEXT NOT NULL,
+      tanggal_selesai TEXT,
+      dicatat_oleh TEXT,
+      dibatalkan_pada TEXT,
+      dibatalkan_oleh TEXT,
+      alasan_batal TEXT,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+  `);
+  await client.execute(`
+    CREATE TABLE IF NOT EXISTS hr_kontrak (
+      id_kontrak TEXT PRIMARY KEY,
+      id_karyawan TEXT NOT NULL,
+      status TEXT NOT NULL CHECK (status IN ('GTY', 'PTY', 'GTT', 'PTT', 'Honorer', 'PNS', 'PPPK', 'Pembatalan')),
+      id_ref TEXT,
+      nomor TEXT,
+      tanggal_mulai TEXT NOT NULL,
+      tanggal_selesai TEXT,
+      percobaan_selesai TEXT,
+      catatan TEXT,
+      dicatat_oleh TEXT,
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+  `);
+  await client.execute(`
+    CREATE TABLE IF NOT EXISTS hr_profil (
+      id_karyawan TEXT PRIMARY KEY,
+      nik TEXT,
+      no_kk TEXT,
+      tempat_lahir TEXT,
+      tanggal_lahir TEXT,
+      agama TEXT CHECK (agama IS NULL OR agama IN ('Islam', 'Kristen', 'Katolik', 'Hindu', 'Buddha', 'Konghucu', 'Lainnya')),
+      status_nikah TEXT CHECK (status_nikah IS NULL OR status_nikah IN ('Belum Kawin', 'Kawin', 'Cerai Hidup', 'Cerai Mati')),
+      nama_ibu_kandung TEXT,
+      alamat_ktp TEXT,
+      alamat_domisili TEXT,
+      darurat_nama TEXT,
+      darurat_hubungan TEXT,
+      darurat_hp TEXT,
+      bank TEXT,
+      no_rekening TEXT,
+      nama_rekening TEXT,
+      npwp TEXT,
+      bpjs_kesehatan TEXT,
+      bpjs_ketenagakerjaan TEXT,
+      pribadi_diubah_oleh TEXT,
+      pribadi_diubah_pada TEXT,
+      keuangan_diubah_oleh TEXT,
+      keuangan_diubah_pada TEXT
+    );
+  `);
+  await client.execute(`
+    CREATE TABLE IF NOT EXISTS hr_pendidikan (
+      id_pendidikan TEXT PRIMARY KEY,
+      id_karyawan TEXT NOT NULL,
+      jenjang TEXT NOT NULL CHECK (jenjang IN ('SD', 'SMP', 'SMA/SMK', 'D1', 'D2', 'D3', 'D4', 'S1', 'S2', 'S3')),
+      prodi TEXT,
+      perguruan_tinggi TEXT,
+      tahun_lulus INTEGER,
+      linier INTEGER NOT NULL DEFAULT 0 CHECK (linier IN (0, 1)),
+      catatan TEXT,
+      dicatat_oleh TEXT,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+  `);
+  await client.execute(`
+    CREATE TABLE IF NOT EXISTS hr_sertifikasi (
+      id_sertifikasi TEXT PRIMARY KEY,
+      id_karyawan TEXT NOT NULL,
+      nomor_sertifikat TEXT,
+      nrg TEXT,
+      tahun INTEGER,
+      bidang_studi TEXT,
+      catatan TEXT,
+      dicatat_oleh TEXT,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+  `);
+  await client.execute(`
+    CREATE TABLE IF NOT EXISTS hr_dokumen_jenis (
+      id_jenis TEXT PRIMARY KEY,
+      nama TEXT NOT NULL,
+      is_aktif INTEGER NOT NULL DEFAULT 1 CHECK (is_aktif IN (0, 1)),
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+  `);
+  await client.execute(`
+    CREATE TABLE IF NOT EXISTS hr_dokumen (
+      id_dokumen TEXT PRIMARY KEY,
+      id_karyawan TEXT NOT NULL,
+      id_jenis TEXT NOT NULL,
+      nomor TEXT,
+      tanggal_terbit TEXT,
+      tanggal_kedaluwarsa TEXT,
+      catatan TEXT,
+      dicatat_oleh TEXT,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+  `);
+  await client.execute(`
+    CREATE TABLE IF NOT EXISTS hr_dokumen_berkas (
+      id_berkas TEXT PRIMARY KEY,
+      id_dokumen TEXT NOT NULL,
+      urutan INTEGER NOT NULL CHECK (urutan BETWEEN 1 AND 5),
+      nama_berkas TEXT,
+      mime_type TEXT NOT NULL CHECK (mime_type IN ('image/jpeg', 'image/png', 'image/webp', 'application/pdf')),
+      data_base64 TEXT NOT NULL,
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+  `);
+  await client.execute(
+    "CREATE INDEX IF NOT EXISTS idx_hr_bagian_nama_bagian ON hr_bagian_nama(id_bagian);",
+  );
+  await client.execute(
+    "CREATE INDEX IF NOT EXISTS idx_hr_tugas_karyawan ON hr_tugas_tambahan(id_karyawan);",
+  );
+  await client.execute(
+    "CREATE INDEX IF NOT EXISTS idx_hr_tugas_tahun ON hr_tugas_tambahan(tahun_ajaran);",
+  );
+  await client.execute(
+    "CREATE INDEX IF NOT EXISTS idx_hr_kontrak_karyawan ON hr_kontrak(id_karyawan);",
+  );
+  await client.execute(
+    "CREATE INDEX IF NOT EXISTS idx_hr_pendidikan_karyawan ON hr_pendidikan(id_karyawan);",
+  );
+  await client.execute(
+    "CREATE INDEX IF NOT EXISTS idx_hr_sertifikasi_karyawan ON hr_sertifikasi(id_karyawan);",
+  );
+  await client.execute(
+    "CREATE INDEX IF NOT EXISTS idx_hr_dokumen_karyawan ON hr_dokumen(id_karyawan);",
+  );
+  await client.execute(
+    "CREATE INDEX IF NOT EXISTS idx_hr_dokumen_kedaluwarsa ON hr_dokumen(tanggal_kedaluwarsa);",
+  );
+  await client.execute(
+    "CREATE INDEX IF NOT EXISTS idx_hr_dokumen_berkas_dokumen ON hr_dokumen_berkas(id_dokumen);",
+  );
+  for (const [table, column, sql] of [
+    [
+      "master_data",
+      "id_bagian",
+      "ALTER TABLE master_data ADD COLUMN id_bagian TEXT;",
+    ],
+    [
+      "master_data",
+      "id_jabatan",
+      "ALTER TABLE master_data ADD COLUMN id_jabatan TEXT;",
+    ],
+    [
+      "master_data",
+      "id_atasan",
+      "ALTER TABLE master_data ADD COLUMN id_atasan TEXT;",
+    ],
+    [
+      "master_operator",
+      "id_karyawan",
+      "ALTER TABLE master_operator ADD COLUMN id_karyawan TEXT;",
+    ],
+  ] as const) {
+    if (!(await hasColumn(client, table, column))) await client.execute(sql);
+  }
+  // Teks divisi/jabatan menjadi master + seed jenis tugas dan dokumen. SEKALI
+  // per database (dijaga baris versi 68 yang ditulis sesudahnya): diulang
+  // setelah ganti nama, ia melahirkan bagian kembar. Kembar
+  // `ensure_hris_organisasi_v68` di `turso.rs`.
+  const organisasi = await client.execute({
+    sql: "SELECT COUNT(*) AS total FROM schema_migration WHERE version = ?;",
+    args: [HRIS_ORG_MIGRATION_VERSION],
+  });
+  if (Number(organisasi.rows[0]?.total ?? 0) === 0) {
+    await client.batch(
+      MIGRASI_ORGANISASI_SQL.map((sql) => ({ sql, args: [] })),
+      "write",
+    );
+  }
+  await client.execute({
+    sql: `INSERT OR IGNORE INTO schema_migration (version, name, applied_at)
+          VALUES (?, 'hris-org', ?);`,
+    args: [HRIS_ORG_MIGRATION_VERSION, now],
   });
 }
 

@@ -2,8 +2,8 @@ import type { Client } from "@libsql/client";
 import { BRANDING } from "@/lib/constants/branding";
 import { runDatabaseMigrations } from "./db-migrations";
 
-export const CURRENT_SCHEMA_VERSION = 67;
-export const REQUIRED_TABLE_COUNT = 104;
+export const CURRENT_SCHEMA_VERSION = 68;
+export const REQUIRED_TABLE_COUNT = 116;
 
 export async function isDatabaseSchemaReady(client: Client) {
   try {
@@ -47,7 +47,9 @@ export async function isDatabaseSchemaReady(client: Client) {
             'keu_seri_perangkat', 'keu_pembayaran', 'keu_pembayaran_alokasi', 'keu_pembayaran_batal',
             'nilai_jenis', 'keu_tutup_buku', 'konten_gambar', 'payroll_rapel',
             'inventory_kolom', 'siswa_dapodik', 'siswa_berkas',
-            'app_telegram_setting', 'notifikasi_telegram'
+            'app_telegram_setting', 'notifikasi_telegram',
+            'hr_bagian', 'hr_bagian_nama', 'hr_jabatan', 'hr_tugas_jenis', 'hr_tugas_tambahan', 'hr_kontrak',
+            'hr_profil', 'hr_pendidikan', 'hr_sertifikasi', 'hr_dokumen_jenis', 'hr_dokumen', 'hr_dokumen_berkas'
           )
         ) AS table_count;
     `);
@@ -92,7 +94,12 @@ export async function initDatabaseSchema(client: Client) {
         unit TEXT,
         -- Email personil (v56), boleh kosong. Di sini, bukan di guru_data,
         -- karena halaman Guru dan Karyawan sama-sama menulisnya.
-        email TEXT
+        email TEXT,
+        -- Organisasi (v68): rujukan hr_bagian/hr_jabatan dan atasan langsung.
+        -- Teks divisi/jabatan_status tetap diisi nama sekarang. Kosong untuk siswa.
+        id_bagian TEXT,
+        id_jabatan TEXT,
+        id_atasan TEXT
       );
     `);
 

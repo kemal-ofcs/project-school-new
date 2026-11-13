@@ -3,6 +3,7 @@
 import type React from "react";
 import { useEffect, useRef, useState } from "react";
 import { PersonnelPhotoField } from "@/components/PersonnelPhotoField";
+import { IsianOrganisasi } from "@/components/personnel/IsianOrganisasi";
 import { FeedbackBanner } from "@/components/ui/FeedbackBanner";
 import { Modal } from "@/components/ui/Modal";
 import { PilihCari } from "@/components/ui/PilihCari";
@@ -31,7 +32,10 @@ const DEFAULT_FORM: KaryawanInput = {
   kode_karyawan: "",
   nama: "",
   divisi: "",
-  jabatan_status: "Staff",
+  jabatan_status: "",
+  id_bagian: "",
+  id_jabatan: "",
+  id_atasan: "",
   no_hp: "",
   lp: "L",
   id_shift: 1,
@@ -266,46 +270,28 @@ export function EmployeeFormModal({
           />
         </div>
 
-        {/* 4 & 5. Divisi & Jabatan */}
+        {/* 4 & 5. Bagian, Jabatan, Atasan (master Kepegawaian, v68) */}
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-          <div>
-            <label
-              htmlFor="employee-division"
-              className="text-slate-400 block mb-1 font-semibold"
-            >
-              Divisi:
-            </label>
-            <input
-              id="employee-division"
-              type="text"
-              value={formData.divisi}
-              onChange={(e) =>
-                setFormData((prev) => ({ ...prev, divisi: e.target.value }))
-              }
-              aria-invalid={!!formErrors.divisi}
-              className={inputClass(!!formErrors.divisi)}
-            />
-          </div>
-          <div>
-            <label
-              htmlFor="employee-position"
-              className="text-slate-400 block mb-1 font-semibold"
-            >
-              Jabatan:
-            </label>
-            <input
-              id="employee-position"
-              type="text"
-              value={formData.jabatan_status ?? ""}
-              onChange={(e) =>
-                setFormData((prev) => ({
-                  ...prev,
-                  jabatan_status: e.target.value,
-                }))
-              }
-              className={inputClass()}
-            />
-          </div>
+          <IsianOrganisasi
+            idAwalan="employee"
+            idKaryawan={formData.id_unik}
+            nilai={{
+              id_bagian: formData.id_bagian ?? "",
+              id_jabatan: formData.id_jabatan ?? "",
+              id_atasan: formData.id_atasan ?? "",
+            }}
+            onChange={(org) =>
+              setFormData((prev) => ({
+                ...prev,
+                ...org,
+                divisi: org.divisi || prev.divisi,
+                jabatan_status: org.jabatan_status || prev.jabatan_status,
+              }))
+            }
+            bagianWajib={!isEditing}
+            className={inputClass(!!formErrors.divisi)}
+            labelClassName="text-slate-400 block mb-1 font-semibold"
+          />
         </div>
 
         {/* Unit satuan pendidikan — dibaca dari menu Akademik → Unit. */}
@@ -510,7 +496,7 @@ export function EmployeeFormModal({
               htmlFor="employee-start-date"
               className="mb-1 block text-slate-400 font-semibold"
             >
-              Tanggal Mulai Aktif:
+              TMT (Tanggal Mulai Tugas):
             </label>
             <input
               id="employee-start-date"

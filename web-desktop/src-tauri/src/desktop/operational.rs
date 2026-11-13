@@ -6,7 +6,7 @@ use serde_json::{json, Map, Value};
 use sha2::{Digest, Sha256};
 
 use super::{
-    config::DesktopState, face_match, models::CommandError, scanner, storage, sync, turso,
+    config::DesktopState, face_match, hris, models::CommandError, scanner, storage, sync, turso,
 };
 
 fn text<'a>(value: &'a Value, key: &str) -> &'a str {
@@ -109,7 +109,8 @@ pub fn list_employees(state: &DesktopState, filter: &Value) -> Result<Value, Com
         m.catatan, m.status_qr, m.jenis_personil, m.tanggal_mulai_aktif,
         m.tanggal_selesai_aktif, m.status_backup, s.nama_shift,
         c.idcard_status, c.idcard_pdf_url, c.link_qr_png,
-        m.token_absensi, m.qr_code, m.unit, m.email
+        m.token_absensi, m.qr_code, m.unit, m.email,
+        COALESCE(m.id_bagian, ''), COALESCE(m.id_jabatan, ''), COALESCE(m.id_atasan, '')
       FROM master_data m
       LEFT JOIN tbl_shift s ON m.id_shift = s.id_shift
       LEFT JOIN id_card c ON m.id_unik = c.id_unik
@@ -156,6 +157,9 @@ pub fn list_employees(state: &DesktopState, filter: &Value) -> Result<Value, Com
                 "qr_code": row.get::<_, Option<String>>(21)?,
                 "unit": row.get::<_, Option<String>>(22)?,
                 "email": row.get::<_, Option<String>>(23)?,
+                "id_bagian": row.get::<_, String>(24)?,
+                "id_jabatan": row.get::<_, String>(25)?,
+                "id_atasan": row.get::<_, String>(26)?,
             }))
         })
         .map_err(|_| CommandError::internal())?;
@@ -179,9 +183,8 @@ pub fn create_employee(state: &DesktopState, draft: &Value) -> Result<Value, Com
     let id = text(draft, "id_unik");
     let code = text(draft, "kode_karyawan");
     let name = text(draft, "nama");
-    let division = text(draft, "divisi");
     let shift_id = integer(draft, "id_shift", 0);
-    if id.is_empty() || code.is_empty() || name.len() < 2 || division.is_empty() || shift_id == 0 {
+    if id.is_empty() || code.is_empty() || name.len() < 2 || shift_id == 0 {
         return Err(CommandError::new(
             "OPERATIONAL_VALIDATION_FAILED",
             "Data karyawan belum lengkap atau tidak valid.",
@@ -201,17 +204,34 @@ pub fn create_employee(state: &DesktopState, draft: &Value) -> Result<Value, Com
     } else {
         today.to_owned()
     };
+    let transaction = connection
+        .transaction()
+        .map_err(|_| CommandError::internal())?;
+    // Form v68 selalu membawa kunci `id_bagian`, dan bagian wajib untuk
+    // pegawai baru dari form (Q-19). Pemanggil lain tetap memakai teks.
+    let org_form = draft.get("id_bagian").is_some();
+    let org = hris::periksa_organisasi(&transaction, id, draft, org_form)?;
+    let division = org.divisi.as_str();
+    if division.is_empty() {
+        return Err(CommandError::new(
+            "OPERATIONAL_VALIDATION_FAILED",
+            "Data karyawan belum lengkap atau tidak valid.",
+        ));
+    }
     let mut payload = draft.as_object().cloned().unwrap_or_else(Map::new);
     payload.insert("id_unik".into(), Value::String(id.to_string()));
     payload.insert("token_absensi".into(), Value::String(token.clone()));
     payload.insert("qr_code".into(), Value::String(qr_code.clone()));
     payload.insert("status_qr".into(), Value::String("Generated".into()));
     payload.insert("email".into(), Value::String(email.clone()));
+    payload.insert("divisi".into(), Value::String(org.divisi.clone()));
+    payload.insert("jabatan_status".into(), Value::String(org.jabatan_status.clone()));
+    if org_form {
+        payload.insert("id_bagian".into(), Value::String(org.id_bagian.clone()));
+        payload.insert("id_jabatan".into(), Value::String(org.id_jabatan.clone()));
+        payload.insert("id_atasan".into(), Value::String(org.id_atasan.clone()));
+    }
     let payload = Value::Object(payload);
-
-    let transaction = connection
-        .transaction()
-        .map_err(|_| CommandError::internal())?;
     assert_employee_identity_free(&transaction, id, code, None)?;
     transaction
         .execute(
@@ -228,7 +248,7 @@ pub fn create_employee(state: &DesktopState, draft: &Value) -> Result<Value, Com
                 code,
                 name,
                 division,
-                text(draft, "jabatan_status"),
+                org.jabatan_status,
                 text(draft, "no_hp"),
                 text(draft, "lp"),
                 shift_id,
@@ -272,6 +292,9 @@ pub fn create_employee(state: &DesktopState, draft: &Value) -> Result<Value, Com
             params![id, name, division, today, id],
         )
         .map_err(|_| CommandError::internal())?;
+    if org_form {
+        hris::tulis_organisasi(&transaction, id, &org)?;
+    }
     let now = storage::now_epoch_seconds();
     transaction
         .execute(
@@ -320,18 +343,27 @@ pub fn import_employees(state: &DesktopState, drafts: &[Value]) -> Result<Value,
         let id = text(draft, "id_unik");
         let code = text(draft, "kode_karyawan");
         let name = text(draft, "nama");
-        let division = text(draft, "divisi");
         let shift_id = integer(draft, "id_shift", 1);
 
         if id.is_empty()
             || code.is_empty()
             || name.len() < 2
-            || division.is_empty()
+            || text(draft, "divisi").is_empty()
             || shift_id == 0
         {
             gagal.push(json!({ "index": index, "pesan": "Data karyawan belum lengkap atau tidak valid." }));
             continue;
         }
+        // Teks Excel dipetakan ke master, termasuk nama lama; yang tidak
+        // dikenal menolak barisnya (Q-21), tidak membuat bagian baru.
+        let org = match peta_organisasi_impor(&transaction, draft) {
+            Ok(org) => org,
+            Err(pesan) => {
+                gagal.push(json!({ "index": index, "pesan": pesan }));
+                continue;
+            }
+        };
+        let division = org.divisi.as_str();
 
         let ada = |kolom: &str, nilai: &str| -> bool {
             transaction
@@ -380,6 +412,10 @@ pub fn import_employees(state: &DesktopState, drafts: &[Value]) -> Result<Value,
         payload.insert("token_absensi".into(), Value::String(token.clone()));
         payload.insert("qr_code".into(), Value::String(qr_code.clone()));
         payload.insert("email".into(), Value::String(email.clone()));
+        payload.insert("divisi".into(), Value::String(org.divisi.clone()));
+        payload.insert("jabatan_status".into(), Value::String(org.jabatan_status.clone()));
+        payload.insert("id_bagian".into(), Value::String(org.id_bagian.clone()));
+        payload.insert("id_jabatan".into(), Value::String(org.id_jabatan.clone()));
         let payload = Value::Object(payload);
 
         let insert_res = transaction.execute(
@@ -396,11 +432,7 @@ pub fn import_employees(state: &DesktopState, drafts: &[Value]) -> Result<Value,
                 code,
                 name,
                 division,
-                if text(draft, "jabatan_status").is_empty() {
-                    "Staff"
-                } else {
-                    text(draft, "jabatan_status")
-                },
+                org.jabatan_status,
                 text(draft, "no_hp"),
                 if text(draft, "lp").to_uppercase() == "P" {
                     "P"
@@ -438,6 +470,7 @@ pub fn import_employees(state: &DesktopState, drafts: &[Value]) -> Result<Value,
             "INSERT INTO id_card (id_unik, nama, divisi, idcard_status, tanggal_generate) SELECT ?, ?, ?, 'Belum', ? WHERE NOT EXISTS (SELECT 1 FROM id_card WHERE id_unik = ?);",
             params![id, name, division, reg_date, id],
         );
+        hris::tulis_organisasi(&transaction, id, &org)?;
 
         let _ = transaction.execute(
             r#"
@@ -459,6 +492,38 @@ pub fn import_employees(state: &DesktopState, drafts: &[Value]) -> Result<Value,
         "berhasil": berhasil,
         "gagal": gagal,
     }))
+}
+
+/// Teks divisi/jabatan baris impor → master (`PETA_*_SQL`, termasuk nama
+/// lama). Jabatan kosong = "Staff" tanpa master, seperti impor lama.
+/// Cerminan `petaOrganisasiImpor` di `employee.ts`.
+fn peta_organisasi_impor(
+    transaction: &Transaction<'_>,
+    draft: &Value,
+) -> Result<hris::OrganisasiValid, String> {
+    let divisi = hris::normalisasi_nama(text(draft, "divisi"));
+    let (id_bagian, nama_bagian): (String, String) = transaction
+        .query_row(hris::PETA_BAGIAN_SQL, params![divisi], |row| Ok((row.get(0)?, row.get(1)?)))
+        .optional()
+        .map_err(|_| "Gagal membaca daftar bagian.".to_owned())?
+        .ok_or_else(|| format!("Divisi '{divisi}' belum terdaftar di Kepegawaian → Organisasi."))?;
+    let jabatan = hris::normalisasi_nama(text(draft, "jabatan_status"));
+    let (id_jabatan, jabatan_status) = if jabatan.is_empty() {
+        (String::new(), "Staff".to_owned())
+    } else {
+        transaction
+            .query_row(hris::PETA_JABATAN_SQL, params![jabatan], |row| Ok((row.get(0)?, row.get(1)?)))
+            .optional()
+            .map_err(|_| "Gagal membaca daftar jabatan.".to_owned())?
+            .ok_or_else(|| format!("Jabatan '{jabatan}' belum terdaftar di Kepegawaian → Organisasi."))?
+    };
+    Ok(hris::OrganisasiValid {
+        id_bagian,
+        divisi: nama_bagian,
+        id_jabatan,
+        jabatan_status,
+        id_atasan: String::new(),
+    })
 }
 
 pub fn update_employee(
@@ -492,6 +557,9 @@ pub fn update_employee(
     // mengirim field ini tidak menghapus tanggal yang sudah tersimpan.
     let tanggal_daftar = text(draft, "tanggal_daftar");
     let email = turso::email_personil(draft)?;
+    // Form v68 membawa `id_bagian`; kosong saat edit = teks lama tetap berlaku.
+    let org_form = draft.get("id_bagian").is_some();
+    let org = hris::periksa_organisasi(&transaction, id, draft, false)?;
 
     transaction
         .execute(
@@ -520,8 +588,8 @@ pub fn update_employee(
             params![
                 text(draft, "kode_karyawan"),
                 text(draft, "nama"),
-                text(draft, "divisi"),
-                text(draft, "jabatan_status"),
+                org.divisi,
+                org.jabatan_status,
                 text(draft, "no_hp"),
                 text(draft, "lp"),
                 integer(draft, "id_shift", 0),
@@ -539,8 +607,11 @@ pub fn update_employee(
             ],
         )
         .map_err(|_| CommandError::internal())?;
+    if org_form {
+        hris::tulis_organisasi(&transaction, id, &org)?;
+    }
     let nama = text(draft, "nama");
-    let divisi = text(draft, "divisi");
+    let divisi = org.divisi.as_str();
     transaction
         .execute(
             "UPDATE id_card SET nama = ?, divisi = ? WHERE id_unik = ?;",
@@ -589,7 +660,8 @@ pub fn update_employee(
         SELECT kode_karyawan, nama, divisi, jabatan_status, no_hp, lp,
                id_shift, status_aktif, tanggal_daftar, catatan, token_absensi,
                qr_code, status_qr, jenis_personil, tanggal_mulai_aktif,
-               tanggal_selesai_aktif, status_backup, unit, email
+               tanggal_selesai_aktif, status_backup, unit, email,
+               id_bagian, id_jabatan, id_atasan
         FROM master_data WHERE id_unik = ? LIMIT 1;
         "#,
         params![id],
@@ -615,6 +687,9 @@ pub fn update_employee(
                 "status_backup": row.get::<_, Option<String>>(16)?,
                 "unit": row.get::<_, Option<String>>(17)?,
                 "email": row.get::<_, Option<String>>(18)?,
+                "id_bagian": row.get::<_, Option<String>>(19)?,
+                "id_jabatan": row.get::<_, Option<String>>(20)?,
+                "id_atasan": row.get::<_, Option<String>>(21)?,
             }))
         },
     ) {
@@ -4783,6 +4858,13 @@ mod tests_identitas_karyawan {
     fn impor_melaporkan_indeks_baris_yang_bentrok() {
         let (_dir, state) = fixture();
         create_employee(&state, &karyawan("K-01", "001", "Ani")).expect("karyawan lama");
+        storage::database(&state.data_dir)
+            .expect("db")
+            .execute_batch(
+                "INSERT INTO hr_bagian (id_bagian, nama) VALUES ('bag-dapur', 'Dapur');
+                 INSERT INTO hr_bagian_nama (id_nama, id_bagian, nama) VALUES ('bag-dapur:6461707572', 'bag-dapur', 'Dapur');",
+            )
+            .expect("bagian");
 
         let hasil = import_employees(
             &state,

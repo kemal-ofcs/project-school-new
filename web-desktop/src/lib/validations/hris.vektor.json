@@ -1,0 +1,170 @@
+{
+  "nama": [
+    {
+      "masuk": "  Tata   Usaha ",
+      "normal": "Tata Usaha",
+      "kunci": "tata usaha",
+      "galat": null
+    },
+    {
+      "masuk": "Kurikulum\tSMP",
+      "normal": "Kurikulum SMP",
+      "kunci": "kurikulum smp",
+      "galat": null
+    },
+    { "masuk": "TU", "normal": "TU", "kunci": "tu", "galat": null },
+    {
+      "masuk": "A",
+      "normal": "A",
+      "kunci": "a",
+      "galat": "Nama bagian minimal 2 karakter."
+    },
+    {
+      "masuk": "   ",
+      "normal": "",
+      "kunci": "",
+      "galat": "Nama bagian minimal 2 karakter."
+    },
+    {
+      "masuk": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+      "normal": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+      "kunci": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+      "galat": "Nama bagian maksimal 60 karakter."
+    }
+  ],
+  "id_nama": [
+    { "id_bagian": "bag-1", "nama": "TU SMP", "hasil": "bag-1:747520736d70" },
+    { "id_bagian": "bag-2", "nama": "Élan", "hasil": "bag-2:c3896c616e" }
+  ],
+  "atasan": [
+    { "id": "a", "atasan_baru": "", "peta": {}, "galat": null },
+    {
+      "id": "a",
+      "atasan_baru": "a",
+      "peta": {},
+      "galat": "Atasan tidak boleh dirinya sendiri."
+    },
+    {
+      "id": "a",
+      "atasan_baru": "b",
+      "peta": { "b": "c", "c": "a" },
+      "galat": "Atasan ini membuat rantai atasan yang berputar."
+    },
+    {
+      "id": "a",
+      "atasan_baru": "b",
+      "peta": { "b": "c", "c": "d" },
+      "galat": null
+    },
+    {
+      "id": "a",
+      "atasan_baru": "b",
+      "peta": { "b": "c", "c": "b" },
+      "galat": null
+    },
+    {
+      "id": "a",
+      "atasan_baru": "b",
+      "peta": { "b": "", "a": "x" },
+      "galat": null
+    }
+  ],
+  "siklus": [
+    { "peta": { "a": "b", "b": "a", "c": "a", "d": "" }, "hasil": ["a", "b"] },
+    { "peta": { "x": "x", "y": "z" }, "hasil": ["x"] },
+    { "peta": {}, "hasil": [] }
+  ],
+  "susun": [
+    {
+      "pegawai": [
+        {
+          "id_unik": "p1",
+          "divisi": "Tata Usaha",
+          "id_bagian": "b1",
+          "id_jabatan": "j1",
+          "id_atasan": ""
+        },
+        {
+          "id_unik": "p2",
+          "divisi": "TU",
+          "id_bagian": "",
+          "id_jabatan": "",
+          "id_atasan": "p1"
+        },
+        {
+          "id_unik": "p3",
+          "divisi": " Satpam ",
+          "id_bagian": "",
+          "id_jabatan": "j1",
+          "id_atasan": "p4"
+        },
+        {
+          "id_unik": "p4",
+          "divisi": "satpam",
+          "id_bagian": "",
+          "id_jabatan": "",
+          "id_atasan": "p3"
+        },
+        {
+          "id_unik": "p5",
+          "divisi": "Dapur",
+          "id_bagian": "",
+          "id_jabatan": "",
+          "id_atasan": ""
+        }
+      ],
+      "bagian": [
+        { "id": "b1", "nama": "Tata Usaha", "is_aktif": 1 },
+        { "id": "b2", "nama": "tata  usaha", "is_aktif": 1 },
+        { "id": "b3", "nama": "Gudang", "is_aktif": 0 }
+      ],
+      "nama_lama": [
+        { "id_bagian": "b1", "nama": "TU" },
+        { "id_bagian": "b1", "nama": "Tata Usaha" }
+      ],
+      "jabatan": [{ "id": "j1", "nama": "Staf", "is_aktif": 1 }],
+      "hasil": {
+        "bagian": [
+          {
+            "id_bagian": "b1",
+            "nama": "Tata Usaha",
+            "is_aktif": 1,
+            "anggota": 1,
+            "nama_lama": ["TU"],
+            "nama_ganda": true
+          },
+          {
+            "id_bagian": "b2",
+            "nama": "tata  usaha",
+            "is_aktif": 1,
+            "anggota": 0,
+            "nama_lama": [],
+            "nama_ganda": true
+          },
+          {
+            "id_bagian": "b3",
+            "nama": "Gudang",
+            "is_aktif": 0,
+            "anggota": 0,
+            "nama_lama": [],
+            "nama_ganda": false
+          }
+        ],
+        "jabatan": [
+          {
+            "id_jabatan": "j1",
+            "nama": "Staf",
+            "is_aktif": 1,
+            "anggota": 2,
+            "nama_ganda": false
+          }
+        ],
+        "tanpa_master": [
+          { "divisi": "Dapur", "jumlah": 1 },
+          { "divisi": "Satpam", "jumlah": 2 }
+        ],
+        "atasan_siklus": ["p3", "p4"]
+      }
+    }
+  ]
+}

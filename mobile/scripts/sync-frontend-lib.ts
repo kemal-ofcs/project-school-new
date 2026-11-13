@@ -85,6 +85,8 @@ const filesToCopy = [
   "components/payroll/RapelWorkspace.tsx",
   // Konstanta PPh 21 dan catatan batas JP (v67), identik di kedua build.
   "components/payroll/KonstantaPajak.tsx",
+  // HRIS Fase 1a: pilihan bagian, jabatan, dan atasan di form Karyawan dan Guru.
+  "components/personnel/IsianOrganisasi.tsx",
   "components/keuangan/PilihAkunBayar.tsx",
   // Tab Cicilan di Keuangan (v65).
   "components/keuangan/CicilanWorkspace.tsx",

@@ -35,7 +35,8 @@ export type AppArea =
   | "uks"
   | "keuangan"
   | "kasbon"
-  | "tagihan";
+  | "tagihan"
+  | "kepegawaian";
 
 export interface AccessSubject {
   isSuperadmin: boolean;
@@ -43,7 +44,7 @@ export interface AccessSubject {
 }
 
 const AREA_PERMISSION: Record<
-  Exclude<AppArea, "operational">,
+  Exclude<AppArea, "operational" | "kepegawaian">,
   PermissionKey
 > = {
   home: "home.view",
@@ -97,6 +98,14 @@ export function canAccessArea(
   subject: AccessSubject | null | undefined,
   area: AppArea,
 ) {
+  // Halaman Kepegawaian memuat guru DAN tendik; tiap tab memeriksa izinnya
+  // sendiri, dan backend memeriksa ulang dari sesi.
+  if (area === "kepegawaian") {
+    return (
+      hasPermission(subject, "employees.view") ||
+      hasPermission(subject, "teachers.view")
+    );
+  }
   if (area === "operational") {
     return (
       hasPermission(subject, "corrections.view") ||
