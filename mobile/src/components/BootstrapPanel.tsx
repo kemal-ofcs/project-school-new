@@ -454,7 +454,7 @@ export function BootstrapPanel({
                 {summary.facts.map((fact) => (
                   <div
                     key={fact.label}
-                    className="flex items-baseline justify-between gap-3"
+                    className="flex min-w-0 items-baseline justify-between gap-3"
                   >
                     <dt className="shrink-0 text-[10px] font-bold uppercase tracking-wider opacity-70">
                       {fact.label}

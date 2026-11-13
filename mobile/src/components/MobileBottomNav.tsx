@@ -21,6 +21,14 @@ interface NavItem {
   activePrefixes?: string[];
 }
 
+function tabMatches(pathname: string, item: NavItem) {
+  return item.href === "/dashboard"
+    ? pathname === "/dashboard" || pathname === "/"
+    : (item.activePrefixes ?? [item.href]).some((prefix) =>
+        pathname.startsWith(prefix),
+      );
+}
+
 export function MobileBottomNav() {
   const pathname = usePathname();
   const { user } = useAuth();
@@ -99,7 +107,9 @@ export function MobileBottomNav() {
       ],
     });
   }
-  navItems.push({ href: "/settings", icon: "settings", label: "Pengaturan" });
+  // Semua modul, termasuk Pengaturan, bisa dicari di sini. Pengaturan juga
+  // terbuka dari pill nama operator di header.
+  navItems.push({ href: "/menu", icon: "menu", label: "Menu" });
 
   return (
     <nav
@@ -108,12 +118,14 @@ export function MobileBottomNav() {
     >
       <div className="mx-auto flex w-full max-w-lg items-center justify-around px-2">
         {navItems.map((item) => {
+          // Modul yang dibuka dari halaman Menu tidak punya tab sendiri, jadi Menu yang menyala.
           const isActive =
-            item.href === "/dashboard"
-              ? pathname === "/dashboard" || pathname === "/"
-              : (item.activePrefixes ?? [item.href]).some((prefix) =>
-                  pathname.startsWith(prefix),
-                );
+            item.href === "/menu"
+              ? !navItems.some(
+                  (other) =>
+                    other.href !== "/menu" && tabMatches(pathname, other),
+                )
+              : tabMatches(pathname, item);
 
           if (item.isElevated) {
             return (

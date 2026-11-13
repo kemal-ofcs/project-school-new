@@ -14,11 +14,14 @@ export type IconName =
   | "document"
   | "globe"
   | "download"
+  | "eye"
   | "history"
   | "home"
   | "id-card"
   | "logout"
   | "lock"
+  | "menu"
+  | "monitor"
   | "moon"
   | "palette"
   | "phone"
@@ -108,6 +111,12 @@ const paths: Record<IconName, ReactNode> = {
     </>
   ),
   x: <path d="M18 6 6 18M6 6l12 12" />,
+  eye: (
+    <>
+      <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z" />
+      <circle cx="12" cy="12" r="3" />
+    </>
+  ),
   download: (
     <>
       <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
@@ -138,6 +147,14 @@ const paths: Record<IconName, ReactNode> = {
     <>
       <rect x="5" y="10" width="14" height="11" rx="2" />
       <path d="M8 10V7a4 4 0 0 1 8 0v3" />
+    </>
+  ),
+  menu: <path d="M4 6h16M4 12h16M4 18h16" />,
+  monitor: (
+    <>
+      <rect width="20" height="14" x="2" y="3" rx="2" />
+      <line x1="8" x2="16" y1="21" y2="21" />
+      <line x1="12" x2="12" y1="17" y2="21" />
     </>
   ),
   moon: <path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8Z" />,

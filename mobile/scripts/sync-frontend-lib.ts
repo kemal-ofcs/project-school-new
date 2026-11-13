@@ -45,6 +45,9 @@ const filesToCopy = [
   "components/KonfirmasiSimpan.tsx",
   // Dropdown berpencarian untuk daftar panjang.
   "components/ui/PilihCari.tsx",
+  // Daftar dan kelompok menu sidebar, dipakai ulang halaman Menu Mobile.
+  // Ikonnya wajib ada di `Icon` Mobile (komponen itu tidak ikut disalin).
+  "components/navigation-items.ts",
   // UI inventaris: satu komponen untuk ketiga build. Hanya bergantung pada
   // kontrak `Modal` yang sama dan gateway tersinkron; pesan sukses/galat ditulis
   // di dalamnya karena `FeedbackBanner` kedua workspace berbeda props.
