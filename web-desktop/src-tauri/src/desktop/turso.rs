@@ -25,6 +25,8 @@ use super::{
     hris,
     // Pengajuan cuti/izin (v69): handler dan seed jenis kembar penulisan lokal.
     hr_pengajuan,
+    // Pegawai keluar (v70): status Nonaktif tetap bila `id_keluar` terisi.
+    hr_keluar,
     // Jenis penilaian: bobot dan jenis bawaan dicek dengan aturan lokal.
     nilai_akhir,
     // Payload tutup buku dicek dengan aturan yang sama dengan lokal.
@@ -11261,9 +11263,12 @@ async fn apply_event_to_turso(
                 // jadi baris pertamanya selalu lewat cabang INSERT — dulu
                 // tersimpan `jenis_personil = NULL`, lalu pull berikutnya
                 // menimpa `'SISWA'`/`'GURU'` di perangkat asalnya.
+                // Pegawai keluar (v70, Q-80): event lama bernilai 'Aktif' dari
+                // perangkat yang luring sebelum Berlakukan tidak menghidupkannya
+                // lagi. Tidak menolak: cloud tidak menolak karena urutan tiba.
                 turso
                     .query_one(
-                        r#"INSERT INTO master_data (
+                        format!(r#"INSERT INTO master_data (
                             id_unik, kode_karyawan, nama, divisi, jabatan_status, no_hp,
                             lp, id_shift, status_aktif, catatan, jenis_personil,
                             tanggal_mulai_aktif, tanggal_selesai_aktif, unit, status_backup, email,
@@ -11280,11 +11285,13 @@ async fn apply_event_to_turso(
                             no_hp = excluded.no_hp,
                             lp = excluded.lp,
                             id_shift = excluded.id_shift,
-                            status_aktif = excluded.status_aktif,
+                            status_aktif = {status},
                             catatan = excluded.catatan,
                             jenis_personil = excluded.jenis_personil,
                             tanggal_mulai_aktif = excluded.tanggal_mulai_aktif,
-                            tanggal_selesai_aktif = excluded.tanggal_selesai_aktif;"#,
+                            tanggal_selesai_aktif = {selesai};"#,
+                            status = hr_keluar::status_aktif_keluar("excluded.status_aktif"),
+                            selesai = hr_keluar::tanggal_selesai_keluar("excluded.tanggal_selesai_aktif")),
                         vec![
                             json!(id_unik),
                             json!(kode_karyawan),
@@ -11356,7 +11363,7 @@ async fn apply_event_to_turso(
                     }
                 });
             if !id_unik.is_empty() {
-                let sql = r#"
+                let sql = format!(r#"
                     INSERT INTO master_data (
                         id_unik, kode_karyawan, nama, divisi, jabatan_status, no_hp, lp,
                         id_shift, status_aktif, tanggal_daftar, catatan, token_absensi,
@@ -11373,7 +11380,7 @@ async fn apply_event_to_turso(
                         no_hp = excluded.no_hp,
                         lp = excluded.lp,
                         id_shift = excluded.id_shift,
-                        status_aktif = excluded.status_aktif,
+                        status_aktif = {status},
                         tanggal_daftar = excluded.tanggal_daftar,
                         catatan = excluded.catatan,
                         token_absensi = excluded.token_absensi,
@@ -11381,9 +11388,11 @@ async fn apply_event_to_turso(
                         status_qr = excluded.status_qr,
                         jenis_personil = excluded.jenis_personil,
                         tanggal_mulai_aktif = excluded.tanggal_mulai_aktif,
-                        tanggal_selesai_aktif = excluded.tanggal_selesai_aktif,
+                        tanggal_selesai_aktif = {selesai},
                         status_backup = excluded.status_backup;
-                "#;
+                "#,
+                    status = hr_keluar::status_aktif_keluar("excluded.status_aktif"),
+                    selesai = hr_keluar::tanggal_selesai_keluar("excluded.tanggal_selesai_aktif"));
                 turso
                     .query_one(
                         sql,
@@ -11448,7 +11457,10 @@ async fn apply_event_to_turso(
             if !id_unik.is_empty() {
                 turso
                     .query_one(
-                        "UPDATE master_data SET status_aktif = ? WHERE id_unik = ?;",
+                        format!(
+                            "UPDATE master_data SET status_aktif = {} WHERE id_unik = ?;",
+                            hr_keluar::status_aktif_keluar("?")
+                        ),
                         vec![json!(status), json!(id_unik)],
                     )
                     .await?;
@@ -14049,8 +14061,14 @@ async fn apply_event_to_turso(
                 .filter(|v| !v.is_empty())
                 .unwrap_or(entity_key);
             if !id.is_empty() {
+                // Profil pegawai keluar disimpan untuk surat dan rekap lama
+                // (Q-90). Tidak menolak supaya outbox tidak macet; hapusnya
+                // dilewati saja.
                 turso
-                    .query_one("DELETE FROM guru_data WHERE id_guru = ?;", vec![json!(id)])
+                    .query_one(
+                        "DELETE FROM guru_data WHERE id_guru = ?1 AND NOT EXISTS (SELECT 1 FROM master_data m WHERE m.id_unik = ?1 AND COALESCE(m.id_keluar, '') <> '');",
+                        vec![json!(id)],
+                    )
                     .await?;
             }
         }
@@ -18187,6 +18205,102 @@ mod tests {
                 )
                 .expect("baris siswa ada di cloud");
             assert_eq!(jenis.as_deref(), Some("SISWA"));
+        });
+    }
+
+    /// Pegawai keluar (HRIS Fase 4b, Q-80): event `employee/update` dan
+    /// `employee/status` lama bernilai 'Aktif' dari perangkat yang luring
+    /// sebelum Berlakukan tidak menghidupkannya lagi, dan `teacher/delete`
+    /// tidak menghapus profil gurunya. Event untuk pegawai lain tetap jalan.
+    #[test]
+    fn event_lama_aktif_tidak_menghidupkan_pegawai_keluar() {
+        let runtime = tokio::runtime::Builder::new_current_thread()
+            .build()
+            .expect("runtime uji");
+        runtime.block_on(async {
+            let dir = tempfile::tempdir().expect("direktori sementara");
+            let hub = dir.path().join("sppg-hub.db");
+            TursoClient::local_file(
+                Url::parse(LOCAL_FILE_ORIGIN).expect("origin lokal"),
+                &hub,
+                Client::new(),
+            )
+            .ensure_schema()
+            .await
+            .expect("provisioning lokal");
+            let connection = rusqlite::Connection::open(&hub).expect("buka hub");
+            connection
+                .execute_batch(
+                    "INSERT INTO master_data (id_unik, kode_karyawan, nama, divisi, id_shift, jenis_personil, status_aktif, tanggal_selesai_aktif, id_keluar) VALUES
+                       ('P1', 'K1', 'Ani', 'Guru', 1, 'GURU', 'Nonaktif', '2026-06-30', 'klr-1'),
+                       ('P2', 'K2', 'Budi', 'Guru', 1, 'GURU', 'Nonaktif', NULL, NULL);
+                     INSERT INTO guru_data (id_guru, nip, status_kepegawaian, created_at, updated_at) VALUES ('P1', '1', 'GTY', 'x', 'x');",
+                )
+                .expect("data uji");
+            let jalankan = |collector: StatementCollector| {
+                for statement in collector.finish().expect("mutasi") {
+                    let args = statement
+                        .args
+                        .iter()
+                        .map(|arg| match arg {
+                            Value::Null => rusqlite::types::Value::Null,
+                            Value::Number(n) => n
+                                .as_i64()
+                                .map(rusqlite::types::Value::Integer)
+                                .unwrap_or(rusqlite::types::Value::Null),
+                            Value::Bool(b) => rusqlite::types::Value::Integer(i64::from(*b)),
+                            Value::String(s) => rusqlite::types::Value::Text(s.clone()),
+                            other => rusqlite::types::Value::Text(other.to_string()),
+                        })
+                        .collect::<Vec<_>>();
+                    connection
+                        .execute(&statement.sql, rusqlite::params_from_iter(args))
+                        .expect("mutasi dijalankan pada skema cloud");
+                }
+            };
+            for id in ["P1", "P2"] {
+                let lama = json!({
+                    "id_unik": id, "kode_karyawan": format!("K{id}"), "nama": "Nama Lama",
+                    "divisi": "Guru", "lp": "L", "id_shift": 1, "status_aktif": "Aktif",
+                    "jenis_personil": "GURU", "tanggal_selesai_aktif": "", "id_keluar": ""
+                });
+                for operasi in ["update", "create"] {
+                    let collector = StatementCollector::default();
+                    apply_event_to_turso(&collector, "employee", operasi, id, &lama)
+                        .await
+                        .expect("event diterapkan");
+                    jalankan(collector);
+                }
+                let collector = StatementCollector::default();
+                apply_event_to_turso(&collector, "employee", "status", id, &json!({ "status_aktif": "Aktif" }))
+                    .await
+                    .expect("status diterapkan");
+                jalankan(collector);
+                let collector = StatementCollector::default();
+                apply_event_to_turso(&collector, "teacher", "delete", id, &json!({ "id_guru": id }))
+                    .await
+                    .expect("hapus guru diterapkan");
+                jalankan(collector);
+            }
+            let baris = |id: &str| -> (String, Option<String>, Option<String>, String) {
+                connection
+                    .query_row(
+                        "SELECT status_aktif, tanggal_selesai_aktif, id_keluar, nama FROM master_data WHERE id_unik = ?1;",
+                        [id],
+                        |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?)),
+                    )
+                    .expect("pegawai")
+            };
+            assert_eq!(
+                baris("P1"),
+                ("Nonaktif".into(), Some("2026-06-30".into()), Some("klr-1".into()), "Nama Lama".into()),
+                "status dan tanggal selesai tetap, isian lain tetap ditulis"
+            );
+            assert_eq!(baris("P2").0, "Aktif", "nonaktif manual tetap bisa diaktifkan");
+            let guru: i64 = connection
+                .query_row("SELECT COUNT(*) FROM guru_data WHERE id_guru = 'P1';", [], |r| r.get(0))
+                .expect("guru");
+            assert_eq!(guru, 1, "profil guru keluar tidak dihapus");
         });
     }
 

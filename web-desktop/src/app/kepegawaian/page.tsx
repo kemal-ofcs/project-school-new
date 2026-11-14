@@ -23,6 +23,7 @@ import { OrganisasiTugasKontrak } from "@/components/kepegawaian/OrganisasiTugas
 import { PengaturanSurat } from "@/components/kepegawaian/PengaturanSurat";
 import { RincianPegawai } from "@/components/kepegawaian/RincianPegawai";
 import { TabBebanMengajar } from "@/components/kepegawaian/TabBebanMengajar";
+import { type AwalKeluar, TabKeluar } from "@/components/kepegawaian/TabKeluar";
 import { TabKontrak } from "@/components/kepegawaian/TabKontrak";
 import { TabLaporanPtk } from "@/components/kepegawaian/TabLaporanPtk";
 import { TabSurat } from "@/components/kepegawaian/TabSurat";
@@ -54,7 +55,8 @@ type Tab =
   | "organisasi"
   | "ptk"
   | "beban"
-  | "surat";
+  | "surat"
+  | "keluar";
 
 const TAB: { kunci: Tab; label: string }[] = [
   { kunci: "daftar", label: "Daftar" },
@@ -65,6 +67,7 @@ const TAB: { kunci: Tab; label: string }[] = [
   { kunci: "ptk", label: "Laporan PTK" },
   { kunci: "beban", label: "Beban Mengajar" },
   { kunci: "surat", label: "Surat" },
+  { kunci: "keluar", label: "Keluar" },
 ];
 
 /** Tab yang hanya untuk pemegang `teachers.view` (area juga lolos lewat `employees.view`). */
@@ -89,6 +92,8 @@ export default function KepegawaianPage() {
   const [org, setOrg] = useState<OrgKepegawaian | null>(null);
   const [galat, setGalat] = useState<string | null>(null);
   const [pesan, setPesan] = useState<string | null>(null);
+  const [awalKeluar, setAwalKeluar] = useState<AwalKeluar | null>(null);
+  const awalTerpakai = useCallback(() => setAwalKeluar(null), []);
 
   if (!isLoading && isAuthenticated && !canAccessArea(user, "kepegawaian")) {
     redirect("/forbidden");
@@ -108,6 +113,9 @@ export default function KepegawaianPage() {
   }, [isAuthenticated, muat]);
 
   const bolehUbah = hasPermission(user, "hr.org.manage");
+  const lihatKeluar =
+    hasPermission(user, "hr.offboard.view") ||
+    hasPermission(user, "hr.offboard.manage");
 
   return (
     <AppShell contentClassName="mx-auto w-full max-w-6xl space-y-6 px-4 py-6 sm:px-6 md:py-8 lg:px-8">
@@ -136,7 +144,8 @@ export default function KepegawaianPage() {
             (!TAB_GURU.includes(kunci) ||
               hasPermission(user, "teachers.view")) &&
             (!TAB_SURAT.includes(kunci) ||
-              hasPermission(user, "hr.duty.manage")),
+              hasPermission(user, "hr.duty.manage")) &&
+            (kunci !== "keluar" || lihatKeluar),
         ).map(({ kunci, label }) => (
           <button
             key={kunci}
@@ -164,7 +173,22 @@ export default function KepegawaianPage() {
         {!org ? (
           <p className="text-sm text-slate-400">Memuat data kepegawaian…</p>
         ) : tab === "daftar" ? (
-          <TabDaftar org={org} onGalat={setGalat} />
+          <TabDaftar
+            org={org}
+            onGalat={setGalat}
+            onMulaiKeluar={(awal) => {
+              setAwalKeluar(awal);
+              setTab("keluar");
+            }}
+          />
+        ) : tab === "keluar" ? (
+          <TabKeluar
+            org={org}
+            awal={awalKeluar}
+            boleh={(izin) => hasPermission(user, izin)}
+            onAwalTerpakai={awalTerpakai}
+            onPesan={setPesan}
+          />
         ) : tab === "struktur" ? (
           <TabStruktur org={org} />
         ) : tab === "kontrak" ? (
@@ -211,9 +235,11 @@ export default function KepegawaianPage() {
 function TabDaftar({
   org,
   onGalat,
+  onMulaiKeluar,
 }: {
   org: OrgKepegawaian;
   onGalat: (pesan: string) => void;
+  onMulaiKeluar: (awal: AwalKeluar) => void;
 }) {
   const { user } = useAuth();
   const [cetak, setCetak] = useState<PermintaanSurat | null>(null);
@@ -377,6 +403,15 @@ function TabDaftar({
             setRincian(null);
             setCetak(permintaan);
           }}
+          onMulaiKeluar={
+            hasPermission(user, "hr.offboard.manage")
+              ? (idSp) => {
+                  const p = rincian;
+                  setRincian(null);
+                  onMulaiKeluar({ id_karyawan: p.id_unik, id_sp: idSp });
+                }
+              : undefined
+          }
           onCetakKeterangan={
             hasPermission(user, "hr.duty.manage")
               ? async () => {

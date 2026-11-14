@@ -1589,6 +1589,16 @@ pub async fn desktop_get_payroll_recap(
     period_end: String,
 ) -> Result<Vec<PayrollRecapRow>, CommandError> {
     require_permission(&state, "payroll.view")?;
+    rekap_gaji(&state, period_start, period_end)
+}
+
+/// Badan `desktop_get_payroll_recap` tanpa gerbang izin, dipisah supaya bisa
+/// diuji tanpa `tauri::State`.
+pub(crate) fn rekap_gaji(
+    state: &MobileState,
+    period_start: String,
+    period_end: String,
+) -> Result<Vec<PayrollRecapRow>, CommandError> {
     validasi_periode_payroll(&period_start, &period_end)?;
     let conn = storage::database(&state.data_dir)?;
 
@@ -1676,7 +1686,10 @@ pub async fn desktop_get_payroll_recap(
                 OR EXISTS (SELECT 1 FROM absensi_harian x
                            WHERE x.id_karyawan = md.id_unik AND x.tanggal >= ?1 AND x.tanggal <= ?2)
                 OR EXISTS (SELECT 1 FROM presensi_mapel x
-                           WHERE x.id_guru = md.id_unik AND x.tanggal >= ?1 AND x.tanggal <= ?2))
+                           WHERE x.id_guru = md.id_unik AND x.tanggal >= ?1 AND x.tanggal <= ?2)
+                -- Pegawai keluar ikut periode yang memuat hari terakhirnya
+                -- walau tanpa absensi (HRIS Fase 4b, Q-85).
+                {keluar_di_periode})
               -- Siswa TIDAK digaji. Mereka hidup di `master_data` yang sama
               -- dengan guru dan karyawan, sehingga tanpa baris ini setiap siswa
               -- aktif ikut masuk rekap dan setiap komponen tunjangan yang
@@ -1687,7 +1700,8 @@ pub async fn desktop_get_payroll_recap(
             GROUP BY md.id_unik
             ORDER BY md.nama ASC;
             "#,
-        kolom_pajak = pajak::KOLOM_PAJAK_SQL
+        kolom_pajak = pajak::KOLOM_PAJAK_SQL,
+        keluar_di_periode = crate::mobile::hr_keluar::KELUAR_DI_PERIODE_SQL
     );
     let mut stmt = conn
         .prepare(&rekap_sql)
@@ -2944,6 +2958,42 @@ mod tests {
         pesan_konfigurasi_gaji_tidak_sah, SalaryConfig,
     };
     use std::collections::HashSet;
+
+    /// HRIS Fase 4b (Q-85): pegawai keluar ikut rekap periode yang memuat hari
+    /// terakhirnya walau tanpa absensi, memicu Pasal 17 masa terakhir, lalu
+    /// tidak masuk periode berikutnya. Nonaktif manual tanpa absensi tetap
+    /// tidak ikut. Pasangan TS: `payroll-recap-keluar.test.ts`.
+    #[test]
+    fn rekap_gaji_memuat_pegawai_keluar_di_periode_terakhirnya() {
+        use crate::mobile::config::MobileState;
+        let dir = tempfile::tempdir().expect("tempdir");
+        crate::mobile::storage::initialize(dir.path()).expect("skema lokal");
+        let state = MobileState {
+            server_origin: std::sync::RwLock::new("http://localhost:3000".to_string()),
+            offline_max_age_hours: 24,
+            data_dir: dir.path().to_path_buf(),
+            http: reqwest::Client::new(),
+            turso_config: std::sync::RwLock::new(None),
+            session: std::sync::Mutex::new(None),
+            vault_lock: std::sync::Mutex::new(()),
+        };
+        crate::mobile::storage::database(dir.path())
+            .expect("db")
+            .execute_batch(
+                "INSERT INTO master_data (id_unik, kode_karyawan, nama, divisi, id_shift, jenis_personil, status_aktif, tanggal_selesai_aktif, id_keluar) VALUES
+                   ('P1', 'K1', 'Ani', 'TU', 1, 'Pegawai', 'Nonaktif', '2026-06-20', 'klr-1'),
+                   ('P2', 'K2', 'Budi', 'TU', 1, 'Pegawai', 'Nonaktif', '2026-06-20', NULL);",
+            )
+            .expect("pegawai");
+        let rekap = |mulai: &str, akhir: &str| {
+            super::rekap_gaji(&state, mulai.to_owned(), akhir.to_owned()).expect("rekap")
+        };
+        let juni = rekap("2026-06-01", "2026-06-30");
+        let ids: Vec<&str> = juni.iter().map(|r| r.id_karyawan.as_str()).collect();
+        assert_eq!(ids, vec!["P1"], "keluar ikut, nonaktif manual tanpa absensi tidak");
+        assert_eq!(juni[0].pajak["metode"], super::pajak::METODE_PASAL_17_TERAKHIR);
+        assert!(rekap("2026-07-01", "2026-07-31").is_empty(), "sesudah periode keluar tidak ikut lagi");
+    }
 
     /// Vektor yang SAMA dieja di `payroll-calculator.test.ts`
     /// (`aturan proses gaji`).

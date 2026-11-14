@@ -2204,6 +2204,21 @@ fn jatah_pegawai(
     Ok(Some((info, jadwal, periode)))
 }
 
+/// Periode jatah cuti yang memuat `tanggal` (checklist keluar, HRIS Fase 4b),
+/// dihitung seolah hari ini = `tanggal`. Cermin `sisaCutiPada`.
+pub fn sisa_cuti_pada(
+    connection: &rusqlite::Connection,
+    id: &str,
+    tanggal: &str,
+) -> Result<Option<PeriodeCuti>, CommandError> {
+    let peta = peta_aturan(connection)?;
+    Ok(jatah_pegawai(connection, &peta, id, tanggal)?.and_then(|(_, _, periode)| {
+        periode
+            .into_iter()
+            .find(|p| p.mulai.as_str() <= tanggal && tanggal <= p.selesai.as_str())
+    }))
+}
+
 /// `desktop_hr_leave_balance`: aturan kedua kelompok; dengan `id_karyawan`
 /// juga jatah per periode, penyesuaian, riwayat pengajuan, dan (bila rentang
 /// dibawa) jumlah tanggal wajibnya untuk form Ajukan.

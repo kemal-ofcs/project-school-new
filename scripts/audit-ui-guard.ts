@@ -54,7 +54,7 @@ const WORKSPACES = ["web-desktop", "mobile"];
  * lewat.
  */
 const AWALAN_MUTASI =
-  /^(save|create|update|delete|cancel|queue|submit|insert|edit|generate|import|reset|approve|revoke|assign|toggle|purge|drain|backfill|freeze|remove|add|send|apply|restore|promote|link|unlink|bulk|simpan|hapus|ubah|buat|batalkan|jadikan|kirim|tambah|aktifkan|nonaktifkan|pulihkan|setujui|tolak|pindah|daftarkan|unggah|terbitkan)[A-Z]/;
+  /^(save|create|update|delete|cancel|queue|submit|insert|edit|generate|import|reset|approve|revoke|assign|toggle|purge|drain|backfill|freeze|remove|add|send|apply|restore|promote|link|unlink|bulk|simpan|hapus|ubah|buat|batalkan|jadikan|kirim|tambah|aktifkan|nonaktifkan|pulihkan|setujui|tolak|pindah|daftarkan|unggah|terbitkan|berlakukan)[A-Z]/;
 
 const PENJAGA = "isSubmittingRef";
 

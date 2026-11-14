@@ -21,6 +21,7 @@ import {
 } from "@/lib/services/payroll-calculator";
 import { rapelMenunggu } from "@/lib/services/payroll-rapel";
 import { rentangJamKe } from "@/lib/validations/class-attendance";
+import { KELUAR_DI_PERIODE_SQL } from "@/lib/validations/hr-keluar";
 import { komponenKasbon, potongKasbon } from "@/lib/validations/loan";
 import {
   daftarStatusTidakTetap,
@@ -421,7 +422,10 @@ export async function computePayrollRecap(
               OR EXISTS (SELECT 1 FROM absensi_harian x
                          WHERE x.id_karyawan = md.id_unik AND x.tanggal >= ? AND x.tanggal <= ?)
               OR EXISTS (SELECT 1 FROM presensi_mapel x
-                         WHERE x.id_guru = md.id_unik AND x.tanggal >= ? AND x.tanggal <= ?))
+                         WHERE x.id_guru = md.id_unik AND x.tanggal >= ? AND x.tanggal <= ?)
+              -- Pegawai keluar ikut periode yang memuat hari terakhirnya walau
+              -- tanpa absensi (HRIS Fase 4b, Q-85). ?1 = awal periode.
+              ${KELUAR_DI_PERIODE_SQL})
             -- Siswa TIDAK digaji. Mereka hidup di master_data yang sama dengan
             -- guru dan karyawan, sehingga tanpa baris ini setiap siswa aktif
             -- ikut masuk rekap dan setiap komponen tunjangan yang berlaku untuk

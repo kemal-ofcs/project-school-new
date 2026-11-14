@@ -5,8 +5,11 @@ import { isDesktopRuntime } from "@/lib/runtime/app-runtime";
 import { invokeDesktop, kickDesktopSync } from "@/lib/runtime/desktop-commands";
 import type { DataBeban, SetupSurat } from "@/lib/validations/hr-beban";
 import type {
+  DaftarKeluar,
   DaftarSp,
   HasilSimpanSp,
+  KeluarDraft,
+  RincianKeluar,
   SpDraft,
 } from "@/lib/validations/hr-keluar";
 import type {
@@ -441,5 +444,65 @@ export function cabutSuratPeringatan(idSp: string, alasan: string) {
     { idSp, alasan },
     "/api/kepegawaian/warnings/revoke",
     { id_sp: idSp, alasan },
+  );
+}
+
+// HRIS Fase 4b: pegawai keluar, cloud-only. Sesudah Berlakukan/Batalkan
+// pemanggil menjalankan `syncNow()` supaya `master_data` perangkat ikut.
+
+export function muatDaftarKeluar(): Promise<DaftarKeluar> {
+  return cloud(
+    "desktop_hr_offboardings",
+    {},
+    "/api/kepegawaian/offboarding/query",
+    {},
+  );
+}
+
+/** Rincian proses (`idKeluar`) atau pratinjau pegawai + hari terakhir. */
+export function muatRincianKeluar(masukan: {
+  idKeluar?: string;
+  idKaryawan?: string;
+  tanggalTerakhir?: string;
+}): Promise<RincianKeluar> {
+  return cloud(
+    "desktop_hr_offboarding",
+    masukan,
+    "/api/kepegawaian/offboarding/detail",
+    {
+      id_keluar: masukan.idKeluar ?? "",
+      id_karyawan: masukan.idKaryawan ?? "",
+      tanggal_terakhir: masukan.tanggalTerakhir ?? "",
+    },
+  );
+}
+
+/** Catat (`id_keluar` kosong) atau ubah proses yang belum berlaku. */
+export function simpanKeluar(
+  draft: KeluarDraft,
+): Promise<{ sukses: true; id_keluar: string }> {
+  return cloud(
+    "desktop_hr_offboarding_save",
+    { draft },
+    "/api/kepegawaian/offboarding/save",
+    draft,
+  );
+}
+
+export function berlakukanKeluar(idKeluar: string) {
+  return cloud(
+    "desktop_hr_offboarding_apply",
+    { idKeluar },
+    "/api/kepegawaian/offboarding/apply",
+    { id_keluar: idKeluar },
+  );
+}
+
+export function batalkanKeluar(idKeluar: string, alasan: string) {
+  return cloud(
+    "desktop_hr_offboarding_cancel",
+    { idKeluar, alasan },
+    "/api/kepegawaian/offboarding/cancel",
+    { id_keluar: idKeluar, alasan },
   );
 }

@@ -871,6 +871,18 @@ async function jatahPegawai(
   };
 }
 
+/**
+ * Cermin `sisa_cuti_pada`: periode jatah yang memuat `tanggal`, dihitung
+ * seolah hari ini = `tanggal` (checklist keluar, HRIS Fase 4b).
+ */
+export async function sisaCutiPada(db: Db, id: string, tanggal: string) {
+  const jatah = await jatahPegawai(db, await petaAturan(db), id, tanggal);
+  return (
+    jatah?.periode.find((p) => p.mulai <= tanggal && tanggal <= p.selesai) ??
+    null
+  );
+}
+
 const PESAN_BUKAN_PEGAWAI = "Jatah cuti hanya untuk pegawai (guru dan tendik).";
 
 async function hariIniWib(db: Db) {

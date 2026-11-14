@@ -104,6 +104,7 @@ export function RincianPegawai({
   onClose,
   onCetakKeterangan,
   onCetak,
+  onMulaiKeluar,
 }: {
   pegawai: PegawaiKepegawaian;
   org: OrgKepegawaian;
@@ -113,6 +114,8 @@ export function RincianPegawai({
   onCetakKeterangan?: () => void;
   /** Cetak SP: pemanggil menutup rincian lalu membuka dialog cetak. */
   onCetak: (permintaan: PermintaanSurat) => void;
+  /** SP3 berlaku: pemanggil menutup rincian lalu membuka tab Keluar (4b). */
+  onMulaiKeluar?: (idSp: string) => void;
 }) {
   const { user } = useAuth();
   const boleh = (izin: Parameters<typeof hasPermission>[1]) =>
@@ -266,6 +269,7 @@ export function RincianPegawai({
               pegawai={pegawai}
               boleh={boleh}
               onCetak={onCetak}
+              onMulaiKeluar={onMulaiKeluar}
             />
           ) : tab === "dokumen" ? (
             <DokumenPegawai

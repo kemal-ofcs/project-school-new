@@ -4,6 +4,11 @@ import { db, ensureDbInitialized } from "@/lib/db";
 import { ApiRequestError } from "@/lib/server/http/api-response";
 import { periksaOrganisasi } from "@/lib/services/hris";
 import {
+  KELUAR_LOKAL_SQL,
+  PESAN_HAPUS_GURU_KELUAR,
+  statusAktifKeluar,
+} from "@/lib/validations/hr-keluar";
+import {
   BERKONTRAK_SQL,
   CERMIN_STATUS_SQL,
   nomorIdentitas,
@@ -34,7 +39,9 @@ export async function getTeachers() {
            m.kode_karyawan, m.nama, m.divisi, m.jabatan_status, m.no_hp, m.lp,
            m.status_aktif, m.id_shift, m.token_absensi, m.qr_code, m.status_qr, m.unit,
            m.email, m.id_bagian, m.id_jabatan, m.id_atasan, m.tanggal_mulai_aktif,
-           ${BERKONTRAK_SQL} AS berkontrak
+           ${BERKONTRAK_SQL} AS berkontrak,
+           COALESCE(m.id_keluar, '') AS id_keluar,
+           COALESCE(m.tanggal_selesai_aktif, '') AS tanggal_selesai_aktif
     FROM guru_data g
     JOIN master_data m ON m.id_unik = g.id_guru
     ORDER BY m.nama ASC;
@@ -156,7 +163,7 @@ export async function saveTeacher(draft: {
         no_hp = excluded.no_hp,
         lp = excluded.lp,
         id_shift = COALESCE(?, master_data.id_shift),
-        status_aktif = excluded.status_aktif,
+        status_aktif = ${statusAktifKeluar("excluded.status_aktif")},
         token_absensi = excluded.token_absensi,
         qr_code = excluded.qr_code,
         status_qr = excluded.status_qr,
@@ -245,6 +252,10 @@ export async function saveTeacher(draft: {
 
 export async function deleteTeacher(id: string) {
   await ensureDbInitialized();
+  // Q-90: profil guru yang sudah keluar disimpan untuk surat dan rekap lama.
+  const keluar = await db.execute({ sql: KELUAR_LOKAL_SQL, args: [id] });
+  if (keluar.rows.length > 0)
+    throw new ApiRequestError(PESAN_HAPUS_GURU_KELUAR, 400);
   // Profil dihapus dan identitas gerbangnya dinonaktifkan dalam satu batch:
   // kegagalan di antara keduanya menyisakan baris `master_data` yang masih
   // `Aktif` sehingga orangnya tetap diterima terminal pemindai.

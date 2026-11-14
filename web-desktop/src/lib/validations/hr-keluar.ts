@@ -295,6 +295,174 @@ export const UBAH_SP_SQL =
 export const CABUT_SP_SQL =
   "UPDATE hr_sp SET dicabut_oleh = ?2, dicabut_pada = datetime('now'), alasan_cabut = ?3 WHERE id_sp = ?1 AND dicabut_pada IS NULL;";
 
+// ── Pegawai keluar: aturan murni (§22.2.2), cermin `desktop/hr_keluar.rs` ──
+
+export const MAKS_TEKS_KELUAR = 1000;
+
+export type StatusKeluar =
+  | "Dibatalkan"
+  | "Berlaku"
+  | "Jatuh tempo"
+  | "Dijadwalkan";
+
+/** Cermin `status_keluar`. Tidak disimpan. */
+export function statusKeluar(
+  tanggalTerakhir: string,
+  berlaku: boolean,
+  dibatalkan: boolean,
+  hariIni: string,
+): StatusKeluar {
+  if (dibatalkan) return "Dibatalkan";
+  if (berlaku) return "Berlaku";
+  return tanggalTerakhir <= hariIni ? "Jatuh tempo" : "Dijadwalkan";
+}
+
+export interface KeluarSah {
+  id_keluar: string | null;
+  id_karyawan: string;
+  id_alasan: string;
+  id_sp: string | null;
+  tanggal_pemberitahuan: string | null;
+  tanggal_terakhir: string;
+  keterangan: string | null;
+  kartu_ditarik: boolean;
+  catatan_checklist: string | null;
+}
+
+/**
+ * Cermin `validasi_keluar`. Hanya bentuk isian; status pegawai, tanggal masuk,
+ * alasan aktif, dan wewenang diperiksa pemanggil. Hari terakhir boleh di masa
+ * depan.
+ */
+export function validasiKeluar(draft: Draft): Hasil<KeluarSah> {
+  const id_karyawan = isian(draft, "id_karyawan");
+  if (!id_karyawan) return gagal("Pegawai wajib dipilih.");
+  const id_alasan = isian(draft, "id_alasan");
+  if (!id_alasan) return gagal("Alasan keluar wajib dipilih.");
+  const tanggal_terakhir = isian(draft, "tanggal_terakhir");
+  if (!tanggal_terakhir || !tanggalValid(tanggal_terakhir))
+    return gagal("Hari terakhir bekerja tidak valid.");
+  const tanggal_pemberitahuan = isian(draft, "tanggal_pemberitahuan");
+  if (tanggal_pemberitahuan) {
+    if (!tanggalValid(tanggal_pemberitahuan))
+      return gagal("Tanggal pemberitahuan tidak valid.");
+    if (tanggal_pemberitahuan > tanggal_terakhir)
+      return gagal(
+        "Tanggal pemberitahuan tidak boleh sesudah hari terakhir bekerja.",
+      );
+  }
+  const keterangan = teksOpsional(
+    draft,
+    "keterangan",
+    "Keterangan",
+    MAKS_TEKS_KELUAR,
+  );
+  if (!keterangan.ok) return keterangan;
+  const catatan = teksOpsional(
+    draft,
+    "catatan_checklist",
+    "Catatan checklist",
+    MAKS_TEKS_KELUAR,
+  );
+  if (!catatan.ok) return catatan;
+  return ok({
+    id_keluar: isian(draft, "id_keluar"),
+    id_karyawan,
+    id_alasan,
+    id_sp: isian(draft, "id_sp"),
+    tanggal_pemberitahuan,
+    tanggal_terakhir,
+    keterangan: keterangan.nilai,
+    kartu_ditarik: draft.kartu_ditarik === true,
+    catatan_checklist: catatan.nilai,
+  });
+}
+
+/** Cermin `status_aktif_keluar`: potongan SQL melawan zombie (Q-80). */
+export const statusAktifKeluar = (baru: string) =>
+  STATUS_AKTIF_KELUAR_SQL.replace("{baru}", baru);
+/** Cermin `tanggal_selesai_keluar`. */
+export const tanggalSelesaiKeluar = (baru: string) =>
+  TANGGAL_SELESAI_KELUAR_SQL.replace("{baru}", baru);
+
+// ── SQL keluar, dieja harfiah sama di `desktop/hr_keluar.rs` ──
+// Checklist: `?1` = id pegawai, `?2` = hari terakhir bekerja.
+
+export const PESAN_SUDAH_KELUAR =
+  "Pegawai ini sudah keluar. Batalkan proses keluarnya di Kepegawaian untuk mengaktifkannya lagi.";
+export const PESAN_HAPUS_GURU_KELUAR =
+  "Guru ini sudah keluar, jadi datanya disimpan untuk surat keterangan dan rekap lama. Proses keluarnya diurus di Kepegawaian, tab Keluar.";
+export const PESAN_SESI_KELUAR =
+  "Akun ini tertaut ke pegawai yang sudah keluar dan tidak bisa dipakai lagi. Hubungi Superadmin.";
+export const PESAN_SUPERADMIN_TERAKHIR =
+  "Pegawai ini tertaut ke akun Superadmin aktif terakhir. Pindahkan peran Superadmin ke akun lain lebih dulu.";
+export const PESAN_BLOKIR_JADWAL =
+  "Masih ada jadwal mengajar aktif di semester yang berlanjut sesudah hari terakhir. Alihkan ke guru lain di Jadwal dulu.";
+export const PESAN_BLOKIR_WALI =
+  "Masih menjadi wali kelas di semester yang berlanjut sesudah hari terakhir. Ganti wali kelasnya di Rombel dulu.";
+export const PESAN_KELUAR_BERLAKU = "Proses keluar ini sudah berlaku.";
+export const PESAN_KELUAR_DIBATALKAN = "Proses keluar ini sudah dibatalkan.";
+export const PESAN_BELUM_JATUH_TEMPO =
+  "Proses keluar baru bisa diberlakukan mulai hari terakhir bekerja.";
+export const PESAN_KELUAR_TERBUKA =
+  "Pegawai ini sudah punya proses keluar yang belum dibatalkan.";
+export const STATUS_AKTIF_KELUAR_SQL =
+  "CASE WHEN COALESCE(master_data.id_keluar, '') <> '' THEN 'Nonaktif' ELSE {baru} END";
+export const TANGGAL_SELESAI_KELUAR_SQL =
+  "CASE WHEN COALESCE(master_data.id_keluar, '') <> '' THEN master_data.tanggal_selesai_aktif ELSE {baru} END";
+export const KELUAR_DI_PERIODE_SQL =
+  "OR (md.id_keluar IS NOT NULL AND md.tanggal_selesai_aktif >= ?1)";
+export const KELUAR_LOKAL_SQL =
+  "SELECT COALESCE(id_keluar, '') FROM master_data WHERE id_unik = ?1 AND COALESCE(id_keluar, '') <> '' LIMIT 1;";
+export const JADWAL_AKTIF_KELUAR_SQL =
+  "SELECT j.id_jadwal, j.hari, j.jam_ke, COALESCE(r.nama_rombel, j.id_rombel) AS nama_rombel, COALESCE(mp.nama_mapel, j.id_mapel) AS nama_mapel, t.nama_tahun, t.semester FROM jadwal_mengajar j JOIN akademik_tahun_ajaran t ON t.id_tahun_ajaran = j.id_tahun_ajaran LEFT JOIN akademik_rombel r ON r.id_rombel = j.id_rombel LEFT JOIN akademik_mapel mp ON mp.id_mapel = j.id_mapel WHERE j.id_guru = ?1 AND j.is_aktif = 1 AND t.tanggal_selesai > ?2 ORDER BY t.tanggal_mulai, j.hari, CAST(j.jam_ke AS INTEGER), j.jam_ke, j.id_jadwal LIMIT 200;";
+export const WALI_KELUAR_SQL =
+  "SELECT r.id_rombel, r.nama_rombel, t.nama_tahun, t.semester FROM akademik_rombel r JOIN akademik_tahun_ajaran t ON t.id_tahun_ajaran = r.id_tahun_ajaran WHERE r.id_wali_kelas = ?1 AND r.is_aktif = 1 AND t.tanggal_selesai > ?2 ORDER BY t.tanggal_mulai, r.nama_rombel, r.id_rombel LIMIT 50;";
+export const TUGAS_KELUAR_SQL =
+  "SELECT t.id_tugas, COALESCE(j.nama, t.id_jenis) AS nama_jenis, t.tahun_ajaran, t.tanggal_mulai, COALESCE(t.tanggal_selesai, '') AS tanggal_selesai FROM hr_tugas_tambahan t LEFT JOIN hr_tugas_jenis j ON j.id_jenis = t.id_jenis WHERE t.id_karyawan = ?1 AND t.dibatalkan_pada IS NULL AND t.id_jenis <> 'tgs-wali-kelas' AND (COALESCE(t.tanggal_selesai, '') = '' OR t.tanggal_selesai > ?2) ORDER BY t.tanggal_mulai, t.id_tugas LIMIT 50;";
+export const PINJAMAN_PERSONIL_SQL =
+  "SELECT * FROM (SELECT p.id_mutasi, b.nama_barang, b.kode_barang, b.satuan, p.tanggal, p.jumlah, COALESCE((SELECT SUM(r.jumlah) FROM inventory_mutasi r WHERE r.id_ref = p.id_mutasi AND r.alasan = 'Pengembalian' AND NOT EXISTS (SELECT 1 FROM inventory_mutasi rb WHERE rb.id_mutasi = 'batal-' || r.id_mutasi)), 0) AS kembali, b.desimal FROM inventory_mutasi p JOIN inventory_barang b ON b.id_barang = p.id_barang WHERE p.alasan = 'Peminjaman' AND p.penerima_tipe = 'Personil' AND p.penerima_id = ?1 AND NOT EXISTS (SELECT 1 FROM inventory_mutasi pb WHERE pb.id_mutasi = 'batal-' || p.id_mutasi)) WHERE jumlah > kembali ORDER BY tanggal, id_mutasi LIMIT 200;";
+export const KASBON_KELUAR_SQL =
+  "SELECT * FROM (SELECT p.id_pinjaman, p.pokok, p.cicilan, COALESCE(p.tanggal_cair, '') AS tanggal_cair, p.pokok - COALESCE((SELECT SUM(m.jumlah) FROM keu_pinjaman_mutasi m WHERE m.id_pinjaman = p.id_pinjaman AND m.jenis IN ('Angsuran Gaji', 'Pelunasan Tunai')), 0) - COALESCE((SELECT SUM(CAST(json_extract(k.value, '$.jumlah') AS INTEGER)) FROM payroll_items i JOIN payroll_runs r ON r.id = i.payroll_run_id, json_each(i.breakdown_snapshot, '$.kasbon') k WHERE r.status NOT IN ('PAID', 'REJECTED') AND json_extract(k.value, '$.id_pinjaman') = p.id_pinjaman), 0) AS sisa FROM keu_pinjaman p WHERE p.id_karyawan = ?1 AND p.status = 'Disetujui') WHERE sisa > 0 ORDER BY tanggal_cair, id_pinjaman LIMIT 50;";
+export const RAPEL_KELUAR_SQL =
+  "SELECT rp.id_rapel, rp.jumlah, rp.period_start, rp.period_end FROM payroll_rapel rp WHERE rp.id_karyawan = ?1 AND rp.dibatalkan_pada IS NULL AND NOT EXISTS (SELECT 1 FROM payroll_items i JOIN payroll_runs r ON r.id = i.payroll_run_id, json_each(CASE WHEN json_valid(i.breakdown_snapshot) THEN i.breakdown_snapshot ELSE '{}' END, '$.rapel') k WHERE i.id_karyawan = rp.id_karyawan AND r.status <> 'REJECTED' AND json_extract(k.value, '$.id_rapel') = rp.id_rapel) ORDER BY rp.period_start, rp.id_rapel LIMIT 50;";
+export const PENGAJUAN_SESUDAH_SQL =
+  "SELECT p.id_pengajuan, p.tanggal_mulai, p.tanggal_selesai, COALESCE(j.nama, p.id_jenis) AS nama_jenis FROM hr_pengajuan p LEFT JOIN hr_jenis_pengajuan j ON j.id_jenis = p.id_jenis WHERE p.id_karyawan = ?1 AND p.tanggal_selesai > ?2 AND NOT EXISTS (SELECT 1 FROM hr_pengajuan_keputusan b WHERE b.id_pengajuan = p.id_pengajuan AND b.jenis = 'Batal') AND COALESCE((SELECT k.jenis FROM hr_pengajuan_keputusan k WHERE k.id_pengajuan = p.id_pengajuan AND k.sidik = p.sidik AND k.jenis IN ('Setujui', 'Tolak', 'Setujui Urgent') ORDER BY k.diterima_cloud IS NULL, k.diterima_cloud, k.waktu_perangkat, k.id_keputusan LIMIT 1), '') <> 'Tolak' ORDER BY p.tanggal_mulai, p.id_pengajuan LIMIT 50;";
+export const JP_PENGGANTI_SESUDAH_SQL =
+  "SELECT h.id_penanganan, h.tanggal, COALESCE(h.jam_ke, '') AS jam_ke, COALESCE(mg.nama, p.id_karyawan) AS nama_guru FROM hr_jp_penanganan h JOIN hr_pengajuan p ON p.id_pengajuan = h.id_pengajuan LEFT JOIN master_data mg ON mg.id_unik = p.id_karyawan WHERE h.id_guru_pengganti = ?1 AND h.tanggal > ?2 AND NOT EXISTS (SELECT 1 FROM hr_pengajuan_keputusan b WHERE b.id_pengajuan = p.id_pengajuan AND b.jenis = 'Batal') AND COALESCE((SELECT k.jenis FROM hr_pengajuan_keputusan k WHERE k.id_pengajuan = p.id_pengajuan AND k.sidik = p.sidik AND k.jenis IN ('Setujui', 'Tolak', 'Setujui Urgent') ORDER BY k.diterima_cloud IS NULL, k.diterima_cloud, k.waktu_perangkat, k.id_keputusan LIMIT 1), '') <> 'Tolak' ORDER BY h.tanggal, h.id_penanganan LIMIT 100;";
+export const RUN_MASA_TERAKHIR_SQL =
+  "SELECT id, period_start, period_end, status FROM payroll_runs WHERE status <> 'REJECTED' AND period_end >= ?2 AND substr(period_end, 1, 7) = substr(?2, 1, 7) ORDER BY period_start, id LIMIT 20;";
+export const ALFA_SESUDAH_SQL =
+  "SELECT COUNT(*) AS jumlah FROM absensi_harian WHERE id_karyawan = ?1 AND tanggal > ?2 AND sumber = 'Generate Sistem';";
+export const AKUN_TERTAUT_SQL =
+  "SELECT m.id, m.username, m.nama_operator, COALESCE(m.status, 'Aktif') AS status, COALESCE(r.is_superadmin, 0) AS is_superadmin FROM master_operator m LEFT JOIN app_role r ON r.id = m.role_id WHERE m.id_karyawan = ?1 ORDER BY m.username LIMIT 20;";
+export const SUPERADMIN_AKTIF_SQL =
+  "SELECT COUNT(*) AS jumlah FROM master_operator m JOIN app_role r ON r.id = m.role_id WHERE r.is_superadmin = 1 AND COALESCE(m.status, 'Aktif') = 'Aktif';";
+export const PEGAWAI_KELUAR_SQL =
+  "SELECT m.id_unik, m.nama, COALESCE(m.status_aktif, 'Aktif') AS status_aktif, COALESCE(m.tanggal_daftar, '') AS tanggal_daftar, COALESCE(m.unit, '') AS unit, COALESCE(m.id_keluar, '') AS id_keluar FROM master_data m WHERE m.id_unik = ?1 AND LOWER(TRIM(COALESCE(m.jenis_personil, ''))) <> 'siswa' AND NOT EXISTS (SELECT 1 FROM siswa_data sd WHERE sd.id_siswa = m.id_unik) LIMIT 1;";
+export const ALASAN_KELUAR_SQL =
+  "SELECT id_alasan, nama, pengali_up, pengali_upmk, uph, kompensasi_pkwt, uang_pisah, is_aktif, COALESCE(dasar_hukum, '') AS dasar_hukum FROM hr_keluar_alasan ORDER BY is_aktif DESC, nama, id_alasan LIMIT 100;";
+export const ALASAN_SATU_SQL =
+  "SELECT id_alasan, nama, is_aktif FROM hr_keluar_alasan WHERE id_alasan = ?1 LIMIT 1;";
+export const DAFTAR_KELUAR_SQL =
+  "SELECT k.id_keluar, k.id_karyawan, COALESCE(m.nama, k.id_karyawan) AS nama, COALESCE(m.unit, '') AS unit, k.id_alasan, COALESCE(k.alasan_nama, '') AS alasan_nama, COALESCE(k.id_sp, '') AS id_sp, COALESCE(k.status_kepegawaian, '') AS status_kepegawaian, COALESCE(k.tanggal_pemberitahuan, '') AS tanggal_pemberitahuan, k.tanggal_terakhir, COALESCE(k.keterangan, '') AS keterangan, COALESCE(k.masa_kerja_mulai, '') AS masa_kerja_mulai, k.kartu_ditarik, COALESCE(k.catatan_checklist, '') AS catatan_checklist, k.dicatat_oleh, k.created_at, COALESCE(k.diubah_oleh, '') AS diubah_oleh, COALESCE(k.diubah_pada, '') AS diubah_pada, COALESCE(k.berlaku_oleh, '') AS berlaku_oleh, COALESCE(k.berlaku_pada, '') AS berlaku_pada, COALESCE(k.dibatalkan_oleh, '') AS dibatalkan_oleh, COALESCE(k.dibatalkan_pada, '') AS dibatalkan_pada, COALESCE(k.alasan_batal, '') AS alasan_batal FROM hr_keluar k LEFT JOIN master_data m ON m.id_unik = k.id_karyawan ORDER BY k.tanggal_terakhir DESC, k.created_at DESC, k.id_keluar LIMIT 500;";
+export const KELUAR_SATU_SQL =
+  "SELECT k.id_keluar, k.id_karyawan, COALESCE(m.nama, k.id_karyawan) AS nama, COALESCE(m.unit, '') AS unit, k.id_alasan, COALESCE(k.alasan_nama, '') AS alasan_nama, COALESCE(k.id_sp, '') AS id_sp, COALESCE(k.status_kepegawaian, '') AS status_kepegawaian, COALESCE(k.tanggal_pemberitahuan, '') AS tanggal_pemberitahuan, k.tanggal_terakhir, COALESCE(k.keterangan, '') AS keterangan, COALESCE(k.masa_kerja_mulai, '') AS masa_kerja_mulai, k.kartu_ditarik, COALESCE(k.catatan_checklist, '') AS catatan_checklist, k.dicatat_oleh, k.created_at, COALESCE(k.diubah_oleh, '') AS diubah_oleh, COALESCE(k.diubah_pada, '') AS diubah_pada, COALESCE(k.berlaku_oleh, '') AS berlaku_oleh, COALESCE(k.berlaku_pada, '') AS berlaku_pada, COALESCE(k.dibatalkan_oleh, '') AS dibatalkan_oleh, COALESCE(k.dibatalkan_pada, '') AS dibatalkan_pada, COALESCE(k.alasan_batal, '') AS alasan_batal FROM hr_keluar k LEFT JOIN master_data m ON m.id_unik = k.id_karyawan WHERE k.id_keluar = ?1 LIMIT 1;";
+export const SIMPAN_KELUAR_SQL =
+  "INSERT INTO hr_keluar (id_keluar, id_karyawan, id_alasan, alasan_nama, id_sp, status_kepegawaian, tanggal_pemberitahuan, tanggal_terakhir, keterangan, masa_kerja_mulai, kartu_ditarik, catatan_checklist, dicatat_oleh, created_at) SELECT ?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, datetime('now') WHERE NOT EXISTS (SELECT 1 FROM hr_keluar x WHERE x.id_karyawan = ?2 AND x.dibatalkan_pada IS NULL);";
+export const UBAH_KELUAR_SQL =
+  "UPDATE hr_keluar SET id_alasan = ?3, alasan_nama = ?4, id_sp = ?5, status_kepegawaian = ?6, tanggal_pemberitahuan = ?7, tanggal_terakhir = ?8, keterangan = ?9, masa_kerja_mulai = ?10, kartu_ditarik = ?11, catatan_checklist = ?12, diubah_oleh = ?13, diubah_pada = datetime('now') WHERE id_keluar = ?1 AND id_karyawan = ?2 AND berlaku_pada IS NULL AND dibatalkan_pada IS NULL;";
+export const BERLAKUKAN_SQL = [
+  "UPDATE hr_keluar SET berlaku_oleh = ?2, berlaku_pada = datetime('now'), checklist_saat_berlaku = ?3 WHERE id_keluar = ?1 AND id_karyawan = ?4 AND berlaku_pada IS NULL AND dibatalkan_pada IS NULL AND tanggal_terakhir <= date('now', '+7 hours') AND NOT EXISTS (SELECT 1 FROM jadwal_mengajar j JOIN akademik_tahun_ajaran t ON t.id_tahun_ajaran = j.id_tahun_ajaran WHERE j.id_guru = ?4 AND j.is_aktif = 1 AND t.tanggal_selesai > hr_keluar.tanggal_terakhir) AND NOT EXISTS (SELECT 1 FROM akademik_rombel r JOIN akademik_tahun_ajaran t ON t.id_tahun_ajaran = r.id_tahun_ajaran WHERE r.id_wali_kelas = ?4 AND r.is_aktif = 1 AND t.tanggal_selesai > hr_keluar.tanggal_terakhir);",
+  "UPDATE master_data SET status_aktif = 'Nonaktif', tanggal_selesai_aktif = (SELECT k.tanggal_terakhir FROM hr_keluar k WHERE k.id_keluar = ?1), id_keluar = ?1 WHERE id_unik = ?4 AND EXISTS (SELECT 1 FROM hr_keluar k WHERE k.id_keluar = ?1 AND k.id_karyawan = ?4 AND k.berlaku_pada IS NOT NULL AND k.dibatalkan_pada IS NULL);",
+  "UPDATE master_operator SET status = 'Nonaktif', updated_at = datetime('now') WHERE id_karyawan = ?4 AND COALESCE(status, 'Aktif') = 'Aktif' AND EXISTS (SELECT 1 FROM hr_keluar k WHERE k.id_keluar = ?1 AND k.id_karyawan = ?4 AND k.berlaku_pada IS NOT NULL AND k.dibatalkan_pada IS NULL);",
+  "UPDATE app_session SET revoked_at = datetime('now'), revoked_reason = 'pegawai-keluar' WHERE revoked_at IS NULL AND operator_id IN (SELECT id FROM master_operator WHERE id_karyawan = ?4) AND EXISTS (SELECT 1 FROM hr_keluar k WHERE k.id_keluar = ?1 AND k.id_karyawan = ?4 AND k.berlaku_pada IS NOT NULL AND k.dibatalkan_pada IS NULL);",
+] as const;
+export const BATALKAN_SQL = [
+  "UPDATE master_data SET status_aktif = 'Aktif', tanggal_selesai_aktif = NULL, id_keluar = NULL WHERE id_keluar = ?1 AND EXISTS (SELECT 1 FROM hr_keluar k WHERE k.id_keluar = ?1 AND k.dibatalkan_pada IS NULL);",
+  "UPDATE hr_keluar SET dibatalkan_oleh = ?2, dibatalkan_pada = datetime('now'), alasan_batal = ?3 WHERE id_keluar = ?1 AND dibatalkan_pada IS NULL;",
+] as const;
+
 // ── Bentuk rute dan command ──
 
 const teksBebas = (maks: number) => z.string().max(maks).default("");
@@ -365,4 +533,146 @@ export interface HasilSimpanSp {
   sukses: true;
   id_sp: string;
   nomor_kembar: boolean;
+}
+
+// ── Bentuk rute dan command: pegawai keluar (4b) ──
+
+/** Body `offboarding/save`, cermin `draft` `desktop_hr_offboarding_save`. */
+export const keluarDraftSchema = z
+  .object({
+    id_keluar: teksBebas(40),
+    id_karyawan: z.string().min(1).max(80),
+    id_alasan: z.string().min(1).max(40),
+    id_sp: teksBebas(40),
+    tanggal_pemberitahuan: teksBebas(20),
+    tanggal_terakhir: z.string().max(20),
+    keterangan: teksBebas(MAKS_TEKS_KELUAR + 100),
+    kartu_ditarik: z.boolean().default(false),
+    catatan_checklist: teksBebas(MAKS_TEKS_KELUAR + 100),
+  })
+  .strict();
+export type KeluarDraft = z.input<typeof keluarDraftSchema>;
+
+/** Rincian (`id_keluar`) atau pratinjau (`id_karyawan` + `tanggal_terakhir`). */
+export const keluarRincianSchema = z
+  .object({
+    id_keluar: teksBebas(40),
+    id_karyawan: teksBebas(80),
+    tanggal_terakhir: teksBebas(20),
+  })
+  .strict();
+
+export const keluarIdSchema = z
+  .object({ id_keluar: z.string().min(1).max(40) })
+  .strict();
+
+export const keluarBatalSchema = z
+  .object({
+    id_keluar: z.string().min(1).max(40),
+    alasan: z.string().max(MAKS_TEKS_KELUAR + 100),
+  })
+  .strict();
+
+export interface KeluarBaris {
+  id_keluar: string;
+  id_karyawan: string;
+  nama: string;
+  unit: string;
+  id_alasan: string;
+  alasan_nama: string;
+  id_sp: string;
+  status_kepegawaian: string;
+  tanggal_pemberitahuan: string;
+  tanggal_terakhir: string;
+  keterangan: string;
+  masa_kerja_mulai: string;
+  kartu_ditarik: boolean;
+  catatan_checklist: string;
+  dicatat_oleh: string;
+  created_at: string;
+  diubah_oleh: string;
+  diubah_pada: string;
+  berlaku_oleh: string;
+  berlaku_pada: string;
+  dibatalkan_oleh: string;
+  dibatalkan_pada: string;
+  alasan_batal: string;
+  status: StatusKeluar;
+}
+
+export interface AlasanKeluar {
+  id_alasan: string;
+  nama: string;
+  pengali_up: number;
+  pengali_upmk: number;
+  uph: boolean;
+  kompensasi_pkwt: boolean;
+  uang_pisah: boolean;
+  is_aktif: boolean;
+  dasar_hukum: string;
+}
+
+export interface DaftarKeluar {
+  keluar: KeluarBaris[];
+  alasan: AlasanKeluar[];
+  hari_ini: string;
+}
+
+type Baris = Record<string, string>;
+
+export interface ChecklistKeluar {
+  /** Jumlah butir memblokir (jadwal + wali). */
+  blokir: number;
+  jadwal: Baris[];
+  wali: Baris[];
+  tugas: Baris[];
+  barang: Baris[];
+  kasbon: {
+    id_pinjaman: string;
+    tanggal_cair: string;
+    pokok: number;
+    cicilan: number;
+    sisa: number;
+  }[];
+  sisa_kasbon: number;
+  /** Periode jatah yang memuat hari terakhir; `null` = tanpa periode. */
+  sisa_cuti: {
+    mulai: string;
+    selesai: string;
+    sisa: number;
+    sebelum_berhak: boolean;
+  } | null;
+  rapel: {
+    id_rapel: string;
+    period_start: string;
+    period_end: string;
+    jumlah: number;
+  }[];
+  pengajuan: Baris[];
+  jp_pengganti: Baris[];
+  run_masa_terakhir: Baris[];
+  alfa_sesudah: number;
+  akun: {
+    id: number;
+    username: string;
+    nama_operator: string;
+    status: string;
+    is_superadmin: boolean;
+  }[];
+}
+
+export interface RincianKeluar {
+  keluar: KeluarBaris | null;
+  pegawai: {
+    id_unik: string;
+    nama: string;
+    status_aktif: string;
+    tanggal_daftar: string;
+    unit: string;
+    id_keluar: string;
+  };
+  status_kepegawaian: string;
+  checklist: ChecklistKeluar;
+  alasan: AlasanKeluar[];
+  hari_ini: string;
 }

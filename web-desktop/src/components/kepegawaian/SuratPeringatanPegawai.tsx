@@ -55,12 +55,15 @@ export function SuratPeringatanPegawai({
   pegawai,
   boleh,
   onCetak,
+  onMulaiKeluar,
 }: {
   pegawai: PegawaiKepegawaian;
   boleh: (
     izin: "hr.warning.manage" | "hr.warning.sp3" | "hr.warning.cancel",
   ) => boolean;
   onCetak: (permintaan: PermintaanSurat) => void;
+  /** Hanya bila sesi memegang `hr.offboard.manage` (4b). */
+  onMulaiKeluar?: (idSp: string) => void;
 }) {
   const id = pegawai.id_unik;
   const [data, setData] = useState<DaftarSp | null>(null);
@@ -122,10 +125,23 @@ export function SuratPeringatanPegawai({
         </p>
       ) : null}
       {sp3 ? (
-        <p className={PERINGATAN}>
-          SP3 berlaku sampai {sp3.berlaku_sampai}. Langkah berikutnya adalah
-          proses keluar pegawai.
-        </p>
+        <div
+          className={`${PERINGATAN} flex flex-wrap items-center justify-between gap-2`}
+        >
+          <p>
+            SP3 berlaku sampai {sp3.berlaku_sampai}. Langkah berikutnya adalah
+            proses keluar pegawai.
+          </p>
+          {onMulaiKeluar && pegawai.status_aktif === "Aktif" ? (
+            <button
+              type="button"
+              className={TOMBOL}
+              onClick={() => onMulaiKeluar(sp3.id_sp)}
+            >
+              Mulai proses keluar
+            </button>
+          ) : null}
+        </div>
       ) : null}
       <div className="flex flex-wrap items-center justify-between gap-2">
         <p className="text-sm text-slate-300">

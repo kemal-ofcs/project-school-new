@@ -50,8 +50,20 @@ pub(crate) fn require_any_permission(
     state: &DesktopState,
     permissions: &[&str],
 ) -> Result<OperatorUser, CommandError> {
-    let mut session = state.session.lock().map_err(|_| CommandError::internal())?;
-    let session = session.as_mut().ok_or_else(|| {
+    let mut guard = state.session.lock().map_err(|_| CommandError::internal())?;
+    // Pegawai keluar (HRIS Fase 4b, Q-80): akun yang tertaut ke pegawai
+    // ber-`id_keluar` di SQLite perangkat tidak bisa dipakai lagi, termasuk
+    // Superadmin dan sesi luring. Sesinya dibuang supaya layar kembali login.
+    if let Some(aktif) = guard.as_ref() {
+        if let Err(galat) = hr_keluar::tolak_sesi_keluar(
+            &storage::database(&state.data_dir)?,
+            aktif.operator.id_karyawan.as_deref(),
+        ) {
+            *guard = None;
+            return Err(galat);
+        }
+    }
+    let session = guard.as_mut().ok_or_else(|| {
         CommandError::new(
             "DESKTOP_SESSION_MISSING",
             "Session Desktop tidak tersedia. Silakan login kembali.",
@@ -625,6 +637,21 @@ pub async fn desktop_login(
             Some(&error.code),
         );
         return Err(error);
+    }
+    // Vault luring akun yang tertaut ke pegawai keluar tidak dipakai lagi
+    // (HRIS Fase 4b, temuan 3). Jalur daring sudah ditolak cloud karena
+    // akunnya dinonaktifkan saat Berlakukan.
+    if let Err(error) = hr_keluar::tolak_sesi_keluar(
+        &storage::database(&state.data_dir)?,
+        credential.operator.id_karyawan.as_deref(),
+    ) {
+        storage::audit(
+            &state.data_dir,
+            Some(credential.operator.id),
+            "login-offline-blocked-pegawai-keluar",
+            None,
+        );
+        return Err(CommandError::new("LOGIN_REJECTED", error.message));
     }
 
     storage::clear_login_failures(&state.data_dir, &identifier)?;
@@ -3438,6 +3465,94 @@ pub async fn desktop_hr_warning_revoke(
 ) -> Result<Value, CommandError> {
     let operator = require_permission(&state, "hr.warning.cancel")?;
     hr_keluar::cabut_sp(&klien_cloud(&state)?, &operator, &id_sp, &alasan)
+        .await
+        .map_err(hris_cloud::luring)
+}
+
+/// Sisa cuti pada hari terakhir dari SQLite perangkat (tabel pengajuan
+/// tersinkron); koneksi dibuka dan ditutup di dalam, tidak melewati `await`.
+fn sisa_cuti_lokal(
+    state: &DesktopState,
+) -> impl FnOnce(&str, &str) -> Result<Value, CommandError> + '_ {
+    move |id, tanggal| {
+        let connection = storage::database(&state.data_dir)?;
+        Ok(json!(super::hr_pengajuan::sisa_cuti_pada(&connection, id, tanggal)?))
+    }
+}
+
+/// Daftar proses pegawai keluar (cloud-only, HRIS Fase 4b) dengan status
+/// turunan, beserta alasan keluar.
+#[tauri::command]
+pub async fn desktop_hr_offboardings(
+    state: State<'_, DesktopState>,
+) -> Result<Value, CommandError> {
+    require_any_permission(&state, &["hr.offboard.view", "hr.offboard.manage"])?;
+    hr_keluar::daftar_keluar(&klien_cloud(&state)?)
+        .await
+        .map_err(hris_cloud::luring)
+}
+
+/// Rincian satu proses keluar, atau pratinjau untuk pegawai dan hari terakhir
+/// tertentu, beserta checklist.
+#[tauri::command]
+pub async fn desktop_hr_offboarding(
+    state: State<'_, DesktopState>,
+    id_keluar: Option<String>,
+    id_karyawan: Option<String>,
+    tanggal_terakhir: Option<String>,
+) -> Result<Value, CommandError> {
+    require_any_permission(&state, &["hr.offboard.view", "hr.offboard.manage"])?;
+    hr_keluar::rincian_keluar(
+        &klien_cloud(&state)?,
+        id_keluar.as_deref(),
+        id_karyawan.as_deref(),
+        tanggal_terakhir.as_deref(),
+        sisa_cuti_lokal(&state),
+    )
+    .await
+    .map_err(hris_cloud::luring)
+}
+
+/// Catat atau ubah proses keluar yang belum berlaku; cakupan unit dan "bukan
+/// diri sendiri" dari sesi.
+#[tauri::command]
+pub async fn desktop_hr_offboarding_save(
+    state: State<'_, DesktopState>,
+    draft: Value,
+) -> Result<Value, CommandError> {
+    let operator = require_permission(&state, "hr.offboard.manage")?;
+    hr_keluar::simpan_keluar(&klien_cloud(&state)?, &operator, &draft)
+        .await
+        .map_err(hris_cloud::luring)
+}
+
+/// Berlakukan proses keluar: satu batch cloud menonaktifkan pegawai dan akun
+/// tertautnya serta mencabut sesi Web-nya.
+#[tauri::command]
+pub async fn desktop_hr_offboarding_apply(
+    state: State<'_, DesktopState>,
+    id_keluar: String,
+) -> Result<Value, CommandError> {
+    let operator = require_permission(&state, "hr.offboard.decide")?;
+    hr_keluar::berlakukan_keluar(
+        &klien_cloud(&state)?,
+        &operator,
+        &id_keluar,
+        sisa_cuti_lokal(&state),
+    )
+    .await
+    .map_err(hris_cloud::luring)
+}
+
+/// Batalkan proses keluar dengan alasan; pegawai aktif kembali, akunnya tidak.
+#[tauri::command]
+pub async fn desktop_hr_offboarding_cancel(
+    state: State<'_, DesktopState>,
+    id_keluar: String,
+    alasan: String,
+) -> Result<Value, CommandError> {
+    let operator = require_permission(&state, "hr.offboard.decide")?;
+    hr_keluar::batalkan_keluar(&klien_cloud(&state)?, &operator, &id_keluar, &alasan)
         .await
         .map_err(hris_cloud::luring)
 }

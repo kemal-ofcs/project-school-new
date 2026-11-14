@@ -4206,3 +4206,150 @@ di Web dan WebView2 Desktop termasuk pesan nomor kembar, simpan masa SP di tab
 Organisasi dan pola SP di Pengaturan surat lalu sinkron ke perangkat lain, dan
 perangkat v69 yang berhenti sinkron sampai diperbarui. Yang sudah dirender
 adalah HTML hasil templat dengan media cetak di Edge.
+
+### 22.12 Sudah dibangun: sub-fase 4b (15 Nov 2026)
+
+Langkah 6–11 §22.7 dibangun. Batas 4b tercapai: proses keluar bisa dicatat,
+diubah, diberlakukan, dan dibatalkan di Web/Desktop, tanpa angka pesangon
+(kolom upah di `hr_keluar` tetap 0 sampai 4c). Tanpa tabel, kolom, versi skema,
+sentinel, izin, atau rute sync baru.
+
+- **Aturan kembar** di modul 4a (`desktop/hr_keluar.rs` ↔
+  `validations/hr-keluar.ts`): `status_keluar` (Dibatalkan → Berlaku → Jatuh
+  tempo → Dijadwalkan, tidak disimpan) dan `validasi_keluar` (hari terakhir
+  boleh di masa depan, pemberitahuan ≤ hari terakhir, keterangan dan catatan
+  checklist ≤ 1.000 karakter); vektor `status_keluar` (6) dan
+  `validasi_keluar` (13) di `hr-keluar.vektor.json`.
+- **Checklist dari cloud** (`checklist_keluar` ↔ `checklistKeluar`), SQL kembar
+  dicek harfiah Desktop + Mobile: memblokir `JADWAL_AKTIF_KELUAR_SQL` dan
+  `WALI_KELUAR_SQL` (semester `tanggal_selesai` > hari terakhir); tanda
+  `TUGAS_KELUAR_SQL`, `PINJAMAN_PERSONIL_SQL`, `KASBON_KELUAR_SQL`,
+  `RAPEL_KELUAR_SQL`, `PENGAJUAN_SESUDAH_SQL`, `JP_PENGGANTI_SESUDAH_SQL`,
+  `RUN_MASA_TERAKHIR_SQL`, sisa cuti (`sisa_cuti_pada` ↔ `sisaCutiPada`,
+  periode jatah yang memuat hari terakhir); info `AKUN_TERTAUT_SQL` dan
+  `ALFA_SESUDAH_SQL`. Potongan predikat diperiksa tes sebagai salinan harfiah
+  sumbernya: "belum kembali" `inventory::list_loans`, `BAYAR_SQL`/`PENDING_SQL`
+  `loan.rs` + `loan.ts`, `MENUNGGU_SQL` `rapel.rs` + `payroll-rapel.ts`, dan
+  "Menunggu atau berlaku" `PENGAJUAN_AKTIF_ORANG_SQL` (juga ada di
+  `PENANGANAN_SQL`).
+- **Catat/ubah** (`SIMPAN_KELUAR_SQL` dengan `WHERE NOT EXISTS` proses terbuka
+  di statement yang sama; `UBAH_KELUAR_SQL` hanya bila belum berlaku/batal):
+  pegawai aktif, bukan diri sendiri, dalam cakupan unit (unit `master_data`
+  kini), hari terakhir ≥ tanggal masuk, alasan aktif; `status_kepegawaian` =
+  `STATUS_KINI_SQL` pada hari terakhir, `masa_kerja_mulai` = `tanggal_daftar`.
+- **Berlakukan** (`BERLAKUKAN_SQL`, empat statement satu batch, semuanya
+  `?1..?4`): statement pertama memeriksa ulang blokir jadwal/wali dan
+  `tanggal_terakhir <= date('now', '+7 hours')`; tiga sisanya (`master_data`
+  Nonaktif + `tanggal_selesai_aktif` + `id_keluar`, `master_operator`
+  Nonaktif, `app_session.revoked_at`) hanya jalan bila proses itu berlaku dan
+  tidak dibatalkan. Ditolak untuk akun sesi sendiri dan Superadmin aktif
+  terakhir. Potret checklist disimpan di `checklist_saat_berlaku`. Bila batch
+  tidak memberlakukan (blokir muncul di antara pemeriksaan dan batch), butirnya
+  dilaporkan. **Batalkan** (`BATALKAN_SQL`): alasan wajib, kapan saja;
+  `master_data` dikembalikan hanya `WHERE id_keluar = ?1`, akun tidak.
+- **Zombie (Q-80)**: `STATUS_AKTIF_KELUAR_SQL`/`TANGGAL_SELESAI_KELUAR_SQL`
+  (`status_aktif_keluar` ↔ `statusAktifKeluar`) di handler cloud
+  `employee/create|update|status`, Web `updateKaryawan`,
+  `toggleStatusKaryawan`, `saveTeacher`, dan lokal `update_employee`,
+  `save_teacher`. Lokal menolak "Aktif" untuk pegawai ber-`id_keluar`
+  (`tolak_aktifkan_keluar`, `PESAN_SUDAH_KELUAR`) di `update_employee`,
+  `set_employee_status`, `save_teacher`. Hapus guru ditolak lokal dan Web
+  (`PESAN_HAPUS_GURU_KELUAR`); handler cloud `teacher/delete` melewati DELETE.
+- **Penjaga sesi**: `require_any_permission` dan login luring memanggil
+  `tolak_sesi_keluar` (`KELUAR_LOKAL_SQL` di SQLite perangkat); semua akun
+  termasuk Superadmin, personil yang belum ada di perangkat lolos.
+- **Gaji terakhir**: `KELUAR_DI_PERIODE_SQL` disisipkan ke predikat rekap
+  `payroll/commands.rs` (pratinjau dan pembekuan memakai fungsi yang sama) dan
+  `computePayrollRecap`.
+- **Command dan rute**: `desktop_hr_offboardings`, `desktop_hr_offboarding`
+  (`hr.offboard.view` atau `.manage`), `desktop_hr_offboarding_save`
+  (`.manage`), `desktop_hr_offboarding_apply`, `desktop_hr_offboarding_cancel`
+  (`.decide`) ↔ `POST /api/kepegawaian/offboarding/query|detail|save|apply|cancel`
+  (Zod `.strict()`); gateway `muatDaftarKeluar`, `muatRincianKeluar`,
+  `simpanKeluar`, `berlakukanKeluar`, `batalkanKeluar`.
+- **Layar**: tab **Keluar** di `/kepegawaian` (`TabKeluar.tsx`): saring status,
+  Catat proses keluar dengan "Periksa checklist" (pratinjau), rincian dengan
+  checklist (blokir merah, tanda kuning), Ubah, Berlakukan (konfirmasi menyebut
+  scan ditolak, akun nonaktif + sesi Web dicabut, jumlah Alfa sistem sesudah
+  hari terakhir), Batalkan; `syncNow()` sesudah Berlakukan/Batalkan. Tombol
+  **Mulai proses keluar** di tab SP saat SP3 berlaku (pemegang
+  `hr.offboard.manage`, pegawai aktif) membuka form dengan alasan
+  `klr-pelanggaran` dan `id_sp`. Halaman Karyawan dan Guru: tanda "Keluar
+  <tanggal>", toggle status karyawan diganti tanda itu, Hapus guru menampilkan
+  pesan, isian status keaktifan di form terkunci, teks konfirmasi Hapus guru
+  menunjuk tab Keluar. Daftar karyawan/guru (Rust dan TS) membawa `id_keluar`.
+
+Angka (dihitung ulang dari kode; `audit:contract` sebagai acuan):
+
+| | Sebelum | Sesudah |
+| :-- | :-- | :-- |
+| Skema / sentinel | v70 / `-2046` | sama |
+| `REQUIRED_TABLE_COUNT` | 126 | 126 |
+| Tabel snapshot / rute kanonik | 81 / 145 | 81 / 145 |
+| Permission | 127 | 127 |
+| Command Desktop / Mobile | 414 / 419 | 419 / 424 |
+| Rute Web (`src/app/api/**/route.ts`) | 304 | 309 |
+
+Gerbang (oleh Claude, per berkas/per nama; `bun run check` dan suite Rust penuh
+belum, sesuai keputusan pemilik):
+
+| # | Gerbang | Hasil |
+| :-- | :-- | :-- |
+| 6 | `hr-keluar.test.ts` (SQL harfiah Desktop + Mobile, salinan predikat dari sumbernya, vektor status/validasi keluar) di kedua workspace; `audit:sql` | Lulus: 7 tes di Desktop dan 7 di salinan Mobile; `cargo test hr_keluar_vektor` |
+| 7 | `cargo test hr_keluar` (`local_file`: diri sendiri, proses terbuka ganda, blokir jadwal lalu wali, akun sesi sendiri, Berlakukan, tekan ganda + batch diulang tidak mengubah pemberlaku, akun + sesi Web dicabut, ubah sesudah berlaku ditolak, Batalkan mengembalikan pegawai bukan akun, catat ulang; Superadmin terakhir ditolak); `services/hr-keluar.test.ts` data sama di database Web | Lulus: Rust 9 tes Desktop dan 9 Mobile; TS 3 tes, tiga kali berturut-turut |
+| 8 | `cargo test event_lama_aktif_tidak_menghidupkan_pegawai_keluar` (event `employee/update`, `create`, `status` 'Aktif' + `teacher/delete`; nonaktif manual tetap bisa diaktifkan); `hr_keluar_penjaga_sesi_lokal` (Aktifkan, ubah karyawan, Hapus guru lokal); potongan Web di `services/hr-keluar.test.ts` | Lulus Desktop dan Mobile |
+| 9 | `hr_keluar_penjaga_sesi_lokal` (sesi tertaut pegawai keluar ditolak dan dibuang termasuk Superadmin; nonaktif manual dan personil tak dikenal lolos) | Lulus |
+| 10 | `cargo test rekap_gaji_memuat_pegawai_keluar_di_periode_terakhirnya` (ikut Juni tanpa absensi, `PASAL_17_TERAKHIR`, tidak ikut Juli, nonaktif manual tidak ikut); `payroll-recap-keluar.test.ts` data sama; `payroll-recap-hari-kerja.test.ts` | Lulus Desktop dan Mobile; TS 1 + 4 tes |
+| 11 | `tsc` kedua workspace; Biome berkas yang diubah; `audit:schema`, `audit:contract`, `audit:sql`, `audit:ui-guard`, `audit:a11y`, `audit:page-guard`, `audit:dialog`, `audit:route-guard`, `audit:confirm`, `audit:silent-catch`, `audit:list-bound` | Lulus semua |
+
+Tes Rust lain yang disentuh, per filter: `desktop::operational::` 9,
+`desktop::academic::` 13, `desktop::commands::` 11,
+`desktop::payroll::commands::` 9, `desktop::hr_pengajuan::` 14,
+`personil_baru_lewat_event` 1; TS `hr-pengajuan*.test.ts` 14. Semua lulus.
+
+Keputusan yang diambil di tengah jalan:
+
+- **Sisa cuti di Desktop dibaca dari SQLite perangkat**, butir lain dari cloud.
+  `jatah_cuti` hanya punya pembaca rusqlite (jadwal shift, libur, whitelist),
+  dan tabel pengajuan serta penyesuaian tersinkron; Web membacanya dari
+  database yang sama. Ditambahkan `sisa_cuti_pada` ↔ `sisaCutiPada` di
+  `hr_pengajuan`.
+- **`ALFA_SESUDAH_SQL`**: jumlah Alfa sistem sesudah hari terakhir ikut
+  checklist supaya dialog Berlakukan bisa menyebutnya (§22.9).
+- **Cakupan unit keluar** memakai unit `master_data` saat ini, karena
+  `hr_keluar` tidak punya kolom unit (berbeda dari `hr_sp.unit`).
+- **`RUN_MASA_TERAKHIR_SQL` tidak disaring per pegawai**: run masa terakhir
+  yang tidak memuat pegawai itu juga perlu ditolak dan dibuat ulang.
+- **Sesi yang ditolak dibuang** (`DESKTOP_SESSION_MISSING`) supaya perintah
+  berikutnya juga gagal dan layar kembali login; login luring menjawab
+  `LOGIN_REJECTED` dengan `PESAN_SESI_KELUAR`.
+- **`desktop_get_payroll_recap` dipisah** menjadi command tipis +
+  `rekap_gaji(&DesktopState, ..)` supaya bisa diuji tanpa `tauri::State`;
+  perilaku dan izinnya tidak berubah.
+- **Awalan `berlakukan` ditambahkan ke `AWALAN_MUTASI` `audit-ui-guard.ts`**
+  (audit menjadi lebih ketat).
+- **Tes predikat `hr-keluar.test.ts` membaca berkas kanonik `web-desktop`**
+  dari root repo, supaya salinan Mobile tes itu memeriksa hal yang sama.
+
+Penyimpangan dari §22 untuk ditinjau:
+
+- **Web tidak menolak "Aktifkan"** pegawai keluar, hanya mempertahankan status
+  dan tanggal selesai lewat potongan SQL (sesuai teks §22.2.2 untuk Web).
+  Penolakan berpesan hanya di lokal Desktop/Mobile; di layar Web tombolnya
+  diganti tanda "Keluar <tanggal>" dan isian status terkunci, jadi pengguna
+  Web tidak melihat "berhasil" palsu dari layar biasa.
+- **Tambah dan impor karyawan (Web dan lokal) tidak diubah**: keduanya INSERT
+  murni dan menolak ID yang sudah ada, jadi tidak bisa menyentuh pegawai
+  ber-`id_keluar`.
+- **Handler cloud `teacher/delete` tidak menolak** (outbox akan macet), hanya
+  melewati DELETE untuk pegawai ber-`id_keluar`; penolakan berpesan ada di
+  lokal dan Web.
+- **Paragraf `CLAUDE.md`** untuk Fase 4 ditunda ke 4c (langkah 15).
+
+Belum diuji di browser/perangkat: alur layar tab Keluar (catat, periksa
+checklist, ubah, Berlakukan dengan konfirmasi, Batalkan, pesan luring tanpa
+koneksi), tombol Mulai proses keluar dari tab SP, tanda "Keluar <tanggal>" dan
+penguncian di halaman Karyawan dan Guru Web/Desktop, `syncNow()` sesudah
+Berlakukan yang menarik `master_data` ke Desktop, penolakan scan di terminal
+sesudah sinkron, penjaga sesi dan login luring di perangkat sungguhan, dan
+pesan penolakan Aktifkan di halaman Karyawan Mobile.

@@ -48,6 +48,7 @@ import {
 } from "@/lib/gateways/teacher";
 import { useConfirmDialog } from "@/lib/hooks/useConfirmDialog";
 import { useStatusFotoPersonil } from "@/lib/hooks/useStatusFotoPersonil";
+import { PESAN_HAPUS_GURU_KELUAR } from "@/lib/validations/hr-keluar";
 import {
   draftGuruDariBaris,
   opsiFilterUnit,
@@ -86,6 +87,8 @@ export default function GuruPage() {
   const [isEditing, setIsEditing] = useState(false);
   // Guru berkontrak: status mengikuti kontrak (Kepegawaian → Kontrak).
   const [statusTerkunci, setStatusTerkunci] = useState(false);
+  // Pegawai keluar (HRIS 4b): status keaktifan diurus di Kepegawaian → Keluar.
+  const [sudahKeluar, setSudahKeluar] = useState(false);
   const [unitList, setUnitList] = useState<Record<string, unknown>[]>([]);
   const [formData, setFormData] = useState<GuruInput>({
     id_guru: "",
@@ -229,6 +232,7 @@ export default function GuruPage() {
     });
     setIsEditing(false);
     setStatusTerkunci(false);
+    setSudahKeluar(false);
     setFotoBaru(null);
     setShowModal(true);
   };
@@ -236,6 +240,7 @@ export default function GuruPage() {
   const handleOpenEdit = (item: Record<string, unknown>) => {
     setIsEditing(true);
     setStatusTerkunci(Boolean(Number(item.berkontrak ?? 0)));
+    setSudahKeluar(String(item.id_keluar ?? "") !== "");
     setFormData(draftGuruDariBaris(item));
     setShowModal(true);
   };
@@ -341,7 +346,7 @@ export default function GuruPage() {
     const ok = await konfirmasi({
       title: "Hapus profil guru ini?",
       description:
-        "Profil guru dinonaktifkan dan hilang dari daftar. Penghapusannya ikut tersinkronisasi ke seluruh perangkat.",
+        "Hapus hanya untuk data yang salah input. Guru yang berhenti bekerja dicatat di Kepegawaian → tab Keluar supaya datanya tetap ada untuk surat keterangan. Profil yang dihapus hilang dari daftar dan penghapusannya tersinkron ke seluruh perangkat.",
       preserved:
         "Riwayat absensi, jurnal mengajar, dan presensi kelas yang pernah ia catat tetap tersimpan.",
       confirmLabel: "Ya, hapus",
@@ -834,6 +839,12 @@ export default function GuruPage() {
                                 Nonaktif
                               </span>
                             )}
+                            {item.id_keluar ? (
+                              <span className="text-[11px] font-semibold text-rose-300">
+                                Keluar{" "}
+                                {String(item.tanggal_selesai_aktif || "")}
+                              </span>
+                            ) : null}
                           </div>
                         </td>
                         <td className="px-6 py-4">
@@ -886,8 +897,16 @@ export default function GuruPage() {
                                 </button>
                                 <button
                                   type="button"
-                                  onClick={() => void handleDelete(id)}
-                                  className="rounded-lg bg-rose-500/10 p-2 text-rose-400 hover:bg-rose-500/20"
+                                  aria-disabled={Boolean(item.id_keluar)}
+                                  onClick={() =>
+                                    item.id_keluar
+                                      ? setFeedback({
+                                          tone: "error",
+                                          message: PESAN_HAPUS_GURU_KELUAR,
+                                        })
+                                      : void handleDelete(id)
+                                  }
+                                  className={`rounded-lg bg-rose-500/10 p-2 text-rose-400 hover:bg-rose-500/20${item.id_keluar ? " opacity-40" : ""}`}
                                   title="Hapus Guru"
                                 >
                                   <Icon name="trash" className="size-4" />
@@ -1263,6 +1282,10 @@ export default function GuruPage() {
                   </label>
                   <select
                     id="guru-status-aktif"
+                    disabled={sudahKeluar}
+                    aria-describedby={
+                      sudahKeluar ? "guru-status-keluar" : undefined
+                    }
                     value={formData.status_aktif || "Aktif"}
                     onChange={(e) =>
                       setFormData({ ...formData, status_aktif: e.target.value })
@@ -1282,6 +1305,15 @@ export default function GuruPage() {
                       Nonaktif
                     </option>
                   </select>
+                  {sudahKeluar ? (
+                    <p
+                      id="guru-status-keluar"
+                      className="mt-1 text-xs text-slate-400"
+                    >
+                      Guru ini sudah keluar. Batalkan proses keluarnya di
+                      Kepegawaian untuk mengaktifkannya lagi.
+                    </p>
+                  ) : null}
                 </div>
               </div>
 

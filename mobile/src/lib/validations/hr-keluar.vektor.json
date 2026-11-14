@@ -648,5 +648,248 @@
       "boleh_sp3": false,
       "galat": null
     }
+  ],
+  "status_keluar": [
+    {
+      "nama": "sebelum hari terakhir",
+      "tanggal_terakhir": "2026-03-31",
+      "berlaku": false,
+      "dibatalkan": false,
+      "hari_ini": "2026-03-30",
+      "hasil": "Dijadwalkan"
+    },
+    {
+      "nama": "tepat hari terakhir",
+      "tanggal_terakhir": "2026-03-31",
+      "berlaku": false,
+      "dibatalkan": false,
+      "hari_ini": "2026-03-31",
+      "hasil": "Jatuh tempo"
+    },
+    {
+      "nama": "lewat hari terakhir",
+      "tanggal_terakhir": "2026-03-31",
+      "berlaku": false,
+      "dibatalkan": false,
+      "hari_ini": "2026-05-02",
+      "hasil": "Jatuh tempo"
+    },
+    {
+      "nama": "berlaku",
+      "tanggal_terakhir": "2026-03-31",
+      "berlaku": true,
+      "dibatalkan": false,
+      "hari_ini": "2026-04-02",
+      "hasil": "Berlaku"
+    },
+    {
+      "nama": "dijadwalkan lalu dibatalkan",
+      "tanggal_terakhir": "2026-03-31",
+      "berlaku": false,
+      "dibatalkan": true,
+      "hari_ini": "2026-03-01",
+      "hasil": "Dibatalkan"
+    },
+    {
+      "nama": "berlaku lalu dibatalkan",
+      "tanggal_terakhir": "2026-03-31",
+      "berlaku": true,
+      "dibatalkan": true,
+      "hari_ini": "2026-04-02",
+      "hasil": "Dibatalkan"
+    }
+  ],
+  "validasi_keluar": [
+    {
+      "nama": "minimal",
+      "draft": {
+        "id_karyawan": " P1 ",
+        "id_alasan": "klr-resign",
+        "tanggal_terakhir": "2026-03-31"
+      },
+      "hasil": {
+        "id_keluar": null,
+        "id_karyawan": "P1",
+        "id_alasan": "klr-resign",
+        "id_sp": null,
+        "tanggal_pemberitahuan": null,
+        "tanggal_terakhir": "2026-03-31",
+        "keterangan": null,
+        "kartu_ditarik": false,
+        "catatan_checklist": null
+      },
+      "galat": null
+    },
+    {
+      "nama": "lengkap",
+      "draft": {
+        "id_karyawan": " P1 ",
+        "id_alasan": "klr-resign",
+        "tanggal_terakhir": "2026-03-31",
+        "id_keluar": "klr-1",
+        "id_sp": "sp-9",
+        "tanggal_pemberitahuan": "2026-03-01",
+        "keterangan": " Pindah kota ",
+        "kartu_ditarik": true,
+        "catatan_checklist": "Laptop sudah kembali"
+      },
+      "hasil": {
+        "id_keluar": "klr-1",
+        "id_karyawan": "P1",
+        "id_alasan": "klr-resign",
+        "id_sp": "sp-9",
+        "tanggal_pemberitahuan": "2026-03-01",
+        "tanggal_terakhir": "2026-03-31",
+        "keterangan": "Pindah kota",
+        "kartu_ditarik": true,
+        "catatan_checklist": "Laptop sudah kembali"
+      },
+      "galat": null
+    },
+    {
+      "nama": "hari terakhir di masa depan boleh",
+      "draft": {
+        "id_karyawan": " P1 ",
+        "id_alasan": "klr-resign",
+        "tanggal_terakhir": "2099-12-31"
+      },
+      "hasil": {
+        "id_keluar": null,
+        "id_karyawan": "P1",
+        "id_alasan": "klr-resign",
+        "id_sp": null,
+        "tanggal_pemberitahuan": null,
+        "tanggal_terakhir": "2099-12-31",
+        "keterangan": null,
+        "kartu_ditarik": false,
+        "catatan_checklist": null
+      },
+      "galat": null
+    },
+    {
+      "nama": "pemberitahuan sama dengan hari terakhir",
+      "draft": {
+        "id_karyawan": " P1 ",
+        "id_alasan": "klr-resign",
+        "tanggal_terakhir": "2026-03-31",
+        "tanggal_pemberitahuan": "2026-03-31"
+      },
+      "hasil": {
+        "id_keluar": null,
+        "id_karyawan": "P1",
+        "id_alasan": "klr-resign",
+        "id_sp": null,
+        "tanggal_pemberitahuan": "2026-03-31",
+        "tanggal_terakhir": "2026-03-31",
+        "keterangan": null,
+        "kartu_ditarik": false,
+        "catatan_checklist": null
+      },
+      "galat": null
+    },
+    {
+      "nama": "kartu bukan boolean diabaikan",
+      "draft": {
+        "id_karyawan": " P1 ",
+        "id_alasan": "klr-resign",
+        "tanggal_terakhir": "2026-03-31",
+        "kartu_ditarik": "ya"
+      },
+      "hasil": {
+        "id_keluar": null,
+        "id_karyawan": "P1",
+        "id_alasan": "klr-resign",
+        "id_sp": null,
+        "tanggal_pemberitahuan": null,
+        "tanggal_terakhir": "2026-03-31",
+        "keterangan": null,
+        "kartu_ditarik": false,
+        "catatan_checklist": null
+      },
+      "galat": null
+    },
+    {
+      "nama": "tanpa pegawai",
+      "draft": {
+        "id_karyawan": "  ",
+        "id_alasan": "klr-resign",
+        "tanggal_terakhir": "2026-03-31"
+      },
+      "hasil": null,
+      "galat": "Pegawai wajib dipilih."
+    },
+    {
+      "nama": "tanpa alasan",
+      "draft": {
+        "id_karyawan": " P1 ",
+        "tanggal_terakhir": "2026-03-31"
+      },
+      "hasil": null,
+      "galat": "Alasan keluar wajib dipilih."
+    },
+    {
+      "nama": "hari terakhir rusak",
+      "draft": {
+        "id_karyawan": " P1 ",
+        "id_alasan": "klr-resign",
+        "tanggal_terakhir": "2026-02-30"
+      },
+      "hasil": null,
+      "galat": "Hari terakhir bekerja tidak valid."
+    },
+    {
+      "nama": "hari terakhir kosong",
+      "draft": {
+        "id_karyawan": " P1 ",
+        "id_alasan": "klr-resign",
+        "tanggal_terakhir": ""
+      },
+      "hasil": null,
+      "galat": "Hari terakhir bekerja tidak valid."
+    },
+    {
+      "nama": "pemberitahuan rusak",
+      "draft": {
+        "id_karyawan": " P1 ",
+        "id_alasan": "klr-resign",
+        "tanggal_terakhir": "2026-03-31",
+        "tanggal_pemberitahuan": "31-03-2026"
+      },
+      "hasil": null,
+      "galat": "Tanggal pemberitahuan tidak valid."
+    },
+    {
+      "nama": "pemberitahuan sesudah hari terakhir",
+      "draft": {
+        "id_karyawan": " P1 ",
+        "id_alasan": "klr-resign",
+        "tanggal_terakhir": "2026-03-31",
+        "tanggal_pemberitahuan": "2026-04-01"
+      },
+      "hasil": null,
+      "galat": "Tanggal pemberitahuan tidak boleh sesudah hari terakhir bekerja."
+    },
+    {
+      "nama": "keterangan terlalu panjang",
+      "draft": {
+        "id_karyawan": " P1 ",
+        "id_alasan": "klr-resign",
+        "tanggal_terakhir": "2026-03-31",
+        "keterangan": "ééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééé"
+      },
+      "hasil": null,
+      "galat": "Keterangan maksimal 1000 karakter."
+    },
+    {
+      "nama": "catatan terlalu panjang",
+      "draft": {
+        "id_karyawan": " P1 ",
+        "id_alasan": "klr-resign",
+        "tanggal_terakhir": "2026-03-31",
+        "catatan_checklist": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+      },
+      "hasil": null,
+      "galat": "Catatan checklist maksimal 1000 karakter."
+    }
   ]
 }

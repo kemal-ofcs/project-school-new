@@ -110,7 +110,8 @@ pub fn list_employees(state: &DesktopState, filter: &Value) -> Result<Value, Com
         m.tanggal_selesai_aktif, m.status_backup, s.nama_shift,
         c.idcard_status, c.idcard_pdf_url, c.link_qr_png,
         m.token_absensi, m.qr_code, m.unit, m.email,
-        COALESCE(m.id_bagian, ''), COALESCE(m.id_jabatan, ''), COALESCE(m.id_atasan, '')
+        COALESCE(m.id_bagian, ''), COALESCE(m.id_jabatan, ''), COALESCE(m.id_atasan, ''),
+        COALESCE(m.id_keluar, '')
       FROM master_data m
       LEFT JOIN tbl_shift s ON m.id_shift = s.id_shift
       LEFT JOIN id_card c ON m.id_unik = c.id_unik
@@ -160,6 +161,8 @@ pub fn list_employees(state: &DesktopState, filter: &Value) -> Result<Value, Com
                 "id_bagian": row.get::<_, String>(24)?,
                 "id_jabatan": row.get::<_, String>(25)?,
                 "id_atasan": row.get::<_, String>(26)?,
+                // Pegawai keluar (v70): tanda "Keluar <tanggal>" di layar.
+                "id_keluar": row.get::<_, String>(27)?,
             }))
         })
         .map_err(|_| CommandError::internal())?;
@@ -544,6 +547,9 @@ pub fn update_employee(
         .map_err(|_| CommandError::internal())?;
     let revision = base_revision(&transaction, "employee", id);
     assert_employee_identity_free(&transaction, id, text(draft, "kode_karyawan"), Some(id))?;
+    // Pegawai keluar (v70): mengaktifkan ditolak; isian status dan tanggal
+    // selesai dari draft diabaikan lewat potongan SQL di bawah.
+    super::hr_keluar::tolak_aktifkan_keluar(&transaction, id, Some(text(draft, "status_aktif")))?;
 
     let jenis_personil = if text(draft, "jenis_personil").is_empty() {
         "Pegawai"
@@ -563,7 +569,7 @@ pub fn update_employee(
 
     transaction
         .execute(
-            r#"
+            &format!(r#"
       UPDATE master_data SET
         kode_karyawan = COALESCE(NULLIF(?, ''), kode_karyawan),
         nama = COALESCE(NULLIF(?, ''), nama),
@@ -572,11 +578,11 @@ pub fn update_employee(
         no_hp = ?,
         lp = COALESCE(NULLIF(?, ''), lp),
         id_shift = CASE WHEN ? > 0 THEN ? ELSE id_shift END,
-        status_aktif = COALESCE(NULLIF(?, ''), status_aktif),
+        status_aktif = {status},
         catatan = ?,
         jenis_personil = ?,
         tanggal_mulai_aktif = ?,
-        tanggal_selesai_aktif = ?,
+        tanggal_selesai_aktif = {selesai},
         tanggal_daftar = COALESCE(NULLIF(?, ''), tanggal_daftar),
         -- Kosong berarti "jangan ubah", sama seperti kolom di atas: klien lama
         -- yang belum mengirim `unit` tidak boleh menghapus unit tersimpan.
@@ -585,6 +591,9 @@ pub fn update_employee(
         email = CASE WHEN ? THEN NULLIF(?, '') ELSE email END
       WHERE id_unik = ?;
       "#,
+                status = super::hr_keluar::status_aktif_keluar("COALESCE(NULLIF(?, ''), status_aktif)"),
+                selesai = super::hr_keluar::tanggal_selesai_keluar("?")
+            ),
             params![
                 text(draft, "kode_karyawan"),
                 text(draft, "nama"),
@@ -726,6 +735,7 @@ pub fn set_employee_status(
         .transaction()
         .map_err(|_| CommandError::internal())?;
     let revision = base_revision(&transaction, "employee", id);
+    super::hr_keluar::tolak_aktifkan_keluar(&transaction, id, Some(status))?;
     transaction
         .execute(
             "UPDATE master_data SET status_aktif = ? WHERE id_unik = ?;",

@@ -1630,7 +1630,8 @@ pub fn list_teachers(state: &DesktopState) -> Result<Value, CommandError> {
                m.status_aktif, m.id_shift, m.token_absensi, m.qr_code, m.status_qr, m.unit,
                m.email, COALESCE(m.id_bagian, ''), COALESCE(m.id_jabatan, ''),
                COALESCE(m.id_atasan, ''), COALESCE(m.tanggal_mulai_aktif, ''),
-               {berkontrak} AS berkontrak
+               {berkontrak} AS berkontrak,
+               COALESCE(m.id_keluar, ''), COALESCE(m.tanggal_selesai_aktif, '')
         FROM guru_data g
         JOIN master_data m ON m.id_unik = g.id_guru
         ORDER BY m.nama ASC;
@@ -1667,6 +1668,9 @@ pub fn list_teachers(state: &DesktopState) -> Result<Value, CommandError> {
                 "id_atasan": row.get::<_, String>(23)?,
                 "tanggal_mulai_aktif": row.get::<_, String>(24)?,
                 "berkontrak": row.get::<_, i64>(25)? == 1,
+                // Pegawai keluar (v70): tanda "Keluar <tanggal>", Hapus ditolak.
+                "id_keluar": row.get::<_, String>(26)?,
+                "tanggal_selesai_aktif": row.get::<_, String>(27)?,
             }))
         })
         .map_err(|_| CommandError::internal())?
@@ -1714,6 +1718,8 @@ pub fn save_teacher(state: &DesktopState, draft: &Value) -> Result<Value, Comman
     let no_hp = optional_text(draft, "no_hp");
     let lp = optional_text(draft, "lp").unwrap_or_else(|| "L".to_owned());
     let id_shift = chosen_shift(&tx, draft)?;
+    // Pegawai keluar (v70): mengaktifkan ditolak, status lain tetap Nonaktif.
+    super::hr_keluar::tolak_aktifkan_keluar(&tx, &id, optional_text(draft, "status_aktif").as_deref())?;
     let status_aktif = optional_text(draft, "status_aktif").unwrap_or_else(|| "Aktif".to_owned());
     let email = super::turso::email_personil(draft)?;
 
@@ -1821,7 +1827,7 @@ pub fn save_teacher(state: &DesktopState, draft: &Value) -> Result<Value, Comman
 
     // 1. Simpan ke master_data untuk terminal scan dan kartu nama
     tx.execute(
-        r#"
+        &format!(r#"
         INSERT INTO master_data (
             id_unik, kode_karyawan, nama, divisi, jabatan_status, no_hp, lp,
             id_shift, status_aktif, tanggal_daftar, catatan, token_absensi, qr_code,
@@ -1836,7 +1842,7 @@ pub fn save_teacher(state: &DesktopState, draft: &Value) -> Result<Value, Comman
             no_hp = excluded.no_hp,
             lp = excluded.lp,
             id_shift = COALESCE(?6, master_data.id_shift),
-            status_aktif = excluded.status_aktif,
+            status_aktif = {status},
             token_absensi = excluded.token_absensi,
             qr_code = excluded.qr_code,
             status_qr = excluded.status_qr,
@@ -1848,6 +1854,8 @@ pub fn save_teacher(state: &DesktopState, draft: &Value) -> Result<Value, Comman
             -- Tanpa kunci `email` (impor berkas lama) = jangan ubah; kosong = hapus.
             email = CASE WHEN ?11 THEN NULLIF(?12, '') ELSE master_data.email END;
         "#,
+            status = super::hr_keluar::status_aktif_keluar("excluded.status_aktif")
+        ),
         params![
             id,
             kode_karyawan,
@@ -1950,6 +1958,10 @@ pub fn save_teacher(state: &DesktopState, draft: &Value) -> Result<Value, Comman
 pub fn delete_teacher(state: &DesktopState, id: &str) -> Result<Value, CommandError> {
     let mut conn = storage::database(&state.data_dir)?;
     let tx = conn.transaction().map_err(|_| CommandError::internal())?;
+    // Q-90: profil guru yang sudah keluar disimpan untuk surat dan rekap lama.
+    if super::hr_keluar::sudah_keluar_lokal(&tx, id)? {
+        return Err(CommandError::new("VALIDATION_ERROR", super::hr_keluar::PESAN_HAPUS_GURU_KELUAR));
+    }
 
     tx.execute("DELETE FROM guru_data WHERE id_guru = ?1;", params![id])
         .map_err(|e| CommandError::new("DB_ERROR", format!("Gagal menghapus profil guru: {e}")))?;

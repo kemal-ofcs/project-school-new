@@ -57,6 +57,7 @@ import { subscribeSyncCompleted } from "@/lib/gateways/sync-status";
 import { useHydrated } from "@/lib/hooks/useHydrated";
 import { useStatusFotoPersonil } from "@/lib/hooks/useStatusFotoPersonil";
 import { formatDisplayDate } from "@/lib/utils/date-display";
+import { PESAN_SUDAH_KELUAR } from "@/lib/validations/hr-keluar";
 import {
   draftKaryawanDariBaris,
   opsiFilterUnit,
@@ -105,6 +106,9 @@ export default function KaryawanPage() {
   const [showModal, setShowModal] = useState<boolean>(false);
   const [isEditing, setIsEditing] = useState<boolean>(false);
   const [editId, setEditId] = useState<string | null>(null);
+  const editKeluar = karyawanList.some(
+    (k) => isEditing && k.id_unik === editId && Boolean(k.id_keluar),
+  );
   const [formData, setFormData] = useState<KaryawanInput>({
     id_unik: "",
     kode_karyawan: "",
@@ -414,6 +418,12 @@ export default function KaryawanPage() {
   };
 
   const handleToggleStatus = async (id_unik: string, currentStatus: string) => {
+    // Pegawai keluar (HRIS 4b) diaktifkan lagi hanya lewat Batalkan di
+    // Kepegawaian; backend juga menolak/mempertahankan statusnya.
+    if (karyawanList.some((k) => k.id_unik === id_unik && k.id_keluar)) {
+      setErrorMsg(PESAN_SUDAH_KELUAR);
+      return;
+    }
     if (isSubmittingRef.current) return;
     isSubmittingRef.current = true;
     const nextStatus = currentStatus === "Aktif" ? "Nonaktif" : "Aktif";
@@ -909,7 +919,15 @@ export default function KaryawanPage() {
                       </td>
                       {/* 9. Status Aktif */}
                       <td className="p-3.5 whitespace-nowrap">
-                        {canManage ? (
+                        {row.id_keluar ? (
+                          <span
+                            title={PESAN_SUDAH_KELUAR}
+                            className="px-2 py-0.5 rounded text-[10px] font-bold text-rose-300"
+                          >
+                            Keluar{" "}
+                            {formatDisplayDate(row.tanggal_selesai_aktif)}
+                          </span>
+                        ) : canManage ? (
                           <button
                             type="button"
                             onClick={() =>
@@ -1481,6 +1499,8 @@ export default function KaryawanPage() {
                 </label>
                 <select
                   id="employee-status"
+                  disabled={editKeluar}
+                  title={editKeluar ? PESAN_SUDAH_KELUAR : undefined}
                   value={formData.status_aktif || "Aktif"}
                   onChange={(e) =>
                     setFormData({

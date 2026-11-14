@@ -4,6 +4,10 @@ import { formatTanggalOperasional } from "@/lib/attendance/time-policy";
 import { db, ensureDbInitialized } from "@/lib/db";
 import { periksaOrganisasi, tulisOrganisasi } from "@/lib/services/hris";
 import {
+  statusAktifKeluar,
+  tanggalSelesaiKeluar,
+} from "@/lib/validations/hr-keluar";
+import {
   normalisasiNama,
   PETA_BAGIAN_SQL,
   PETA_JABATAN_SQL,
@@ -222,7 +226,7 @@ export async function getDaftarKaryawan(filter?: {
       m.catatan, m.status_qr, m.jenis_personil, m.tanggal_mulai_aktif,
       m.tanggal_selesai_aktif, m.status_backup, s.nama_shift,
       c.idcard_status, c.idcard_pdf_url, c.link_qr_png, m.unit, m.email,
-      m.id_bagian, m.id_jabatan, m.id_atasan
+      m.id_bagian, m.id_jabatan, m.id_atasan, COALESCE(m.id_keluar, '') AS id_keluar
     FROM master_data m
     LEFT JOIN tbl_shift s ON m.id_shift = s.id_shift
     LEFT JOIN id_card c ON m.id_unik = c.id_unik
@@ -433,8 +437,10 @@ export async function updateKaryawan(
     updates.push("id_shift = ?");
     args.push(data.id_shift);
   }
+  // Pegawai keluar (v70, Q-80): status dan tanggal selesai tetap selama
+  // `id_keluar` terisi. Potongan SQL kembar `hr_keluar::status_aktif_keluar`.
   if (data.status_aktif !== undefined) {
-    updates.push("status_aktif = ?");
+    updates.push(`status_aktif = ${statusAktifKeluar("?")}`);
     args.push(data.status_aktif);
   }
   if (data.catatan !== undefined) {
@@ -450,7 +456,7 @@ export async function updateKaryawan(
     args.push(data.tanggal_mulai_aktif);
   }
   if (data.tanggal_selesai_aktif !== undefined) {
-    updates.push("tanggal_selesai_aktif = ?");
+    updates.push(`tanggal_selesai_aktif = ${tanggalSelesaiKeluar("?")}`);
     args.push(data.tanggal_selesai_aktif);
   }
   if (data.unit !== undefined) {
@@ -589,7 +595,7 @@ export async function toggleStatusKaryawan(
   await ensureDbInitialized();
 
   await db.execute({
-    sql: "UPDATE master_data SET status_aktif = ? WHERE id_unik = ?;",
+    sql: `UPDATE master_data SET status_aktif = ${statusAktifKeluar("?")} WHERE id_unik = ?;`,
     args: [status_aktif, id_unik],
   });
 

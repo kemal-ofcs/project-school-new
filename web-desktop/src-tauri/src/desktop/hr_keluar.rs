@@ -460,6 +460,521 @@ pub async fn cabut_sp(client: &TursoClient, operator: &OperatorUser, id_sp: &str
     Ok(json!({ "sukses": true }))
 }
 
+// ── Pegawai keluar: aturan murni (§22.2.2) ──
+
+pub const MAKS_TEKS_KELUAR: usize = 1000;
+
+pub const PESAN_SUDAH_KELUAR: &str =
+    "Pegawai ini sudah keluar. Batalkan proses keluarnya di Kepegawaian untuk mengaktifkannya lagi.";
+pub const PESAN_HAPUS_GURU_KELUAR: &str =
+    "Guru ini sudah keluar, jadi datanya disimpan untuk surat keterangan dan rekap lama. Proses keluarnya diurus di Kepegawaian, tab Keluar.";
+pub const PESAN_SESI_KELUAR: &str =
+    "Akun ini tertaut ke pegawai yang sudah keluar dan tidak bisa dipakai lagi. Hubungi Superadmin.";
+pub const PESAN_SUPERADMIN_TERAKHIR: &str =
+    "Pegawai ini tertaut ke akun Superadmin aktif terakhir. Pindahkan peran Superadmin ke akun lain lebih dulu.";
+pub const PESAN_BLOKIR_JADWAL: &str =
+    "Masih ada jadwal mengajar aktif di semester yang berlanjut sesudah hari terakhir. Alihkan ke guru lain di Jadwal dulu.";
+pub const PESAN_BLOKIR_WALI: &str =
+    "Masih menjadi wali kelas di semester yang berlanjut sesudah hari terakhir. Ganti wali kelasnya di Rombel dulu.";
+pub const PESAN_KELUAR_BERLAKU: &str = "Proses keluar ini sudah berlaku.";
+pub const PESAN_KELUAR_DIBATALKAN: &str = "Proses keluar ini sudah dibatalkan.";
+pub const PESAN_BELUM_JATUH_TEMPO: &str = "Proses keluar baru bisa diberlakukan mulai hari terakhir bekerja.";
+pub const PESAN_KELUAR_TERBUKA: &str = "Pegawai ini sudah punya proses keluar yang belum dibatalkan.";
+
+/// Cermin `statusKeluar`. Tidak disimpan.
+pub fn status_keluar(tanggal_terakhir: &str, berlaku: bool, dibatalkan: bool, hari_ini: &str) -> &'static str {
+    if dibatalkan {
+        "Dibatalkan"
+    } else if berlaku {
+        "Berlaku"
+    } else if tanggal_terakhir <= hari_ini {
+        "Jatuh tempo"
+    } else {
+        "Dijadwalkan"
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct KeluarSah {
+    pub id_keluar: Option<String>,
+    pub id_karyawan: String,
+    pub id_alasan: String,
+    pub id_sp: Option<String>,
+    pub tanggal_pemberitahuan: Option<String>,
+    pub tanggal_terakhir: String,
+    pub keterangan: Option<String>,
+    pub kartu_ditarik: bool,
+    pub catatan_checklist: Option<String>,
+}
+
+/// Cermin `validasiKeluar`. Hanya bentuk isian; status pegawai, tanggal
+/// masuk, alasan aktif, dan wewenang diperiksa pemanggil. Hari terakhir boleh
+/// di masa depan.
+pub fn validasi_keluar(draft: &Value) -> Result<KeluarSah, String> {
+    let id_karyawan = payload_text(draft, "id_karyawan").ok_or("Pegawai wajib dipilih.")?;
+    let id_alasan = payload_text(draft, "id_alasan").ok_or("Alasan keluar wajib dipilih.")?;
+    let tanggal_terakhir = payload_text(draft, "tanggal_terakhir")
+        .filter(|t| tanggal_valid(t))
+        .ok_or("Hari terakhir bekerja tidak valid.")?;
+    let tanggal_pemberitahuan = payload_text(draft, "tanggal_pemberitahuan");
+    if let Some(t) = &tanggal_pemberitahuan {
+        if !tanggal_valid(t) {
+            return Err("Tanggal pemberitahuan tidak valid.".into());
+        }
+        if *t > tanggal_terakhir {
+            return Err("Tanggal pemberitahuan tidak boleh sesudah hari terakhir bekerja.".into());
+        }
+    }
+    Ok(KeluarSah {
+        id_keluar: payload_text(draft, "id_keluar"),
+        id_karyawan,
+        id_alasan,
+        id_sp: payload_text(draft, "id_sp"),
+        tanggal_pemberitahuan,
+        tanggal_terakhir,
+        keterangan: teks_opsional(draft, "keterangan", "Keterangan", MAKS_TEKS_KELUAR)?,
+        kartu_ditarik: draft.get("kartu_ditarik").and_then(Value::as_bool).unwrap_or(false),
+        catatan_checklist: teks_opsional(draft, "catatan_checklist", "Catatan checklist", MAKS_TEKS_KELUAR)?,
+    })
+}
+
+// ── Normalisasi zombie (Q-80) dan gaji terakhir (§22.2.4) ──
+
+/// Status yang boleh ditulis penulis `master_data` mana pun: selama
+/// `id_keluar` terisi, tetap Nonaktif. `{baru}` = nilai kiriman. Cermin
+/// `statusAktifKeluar`.
+pub const STATUS_AKTIF_KELUAR_SQL: &str =
+    "CASE WHEN COALESCE(master_data.id_keluar, '') <> '' THEN 'Nonaktif' ELSE {baru} END";
+/// Padanan untuk `tanggal_selesai_aktif`. Cermin `tanggalSelesaiKeluar`.
+pub const TANGGAL_SELESAI_KELUAR_SQL: &str =
+    "CASE WHEN COALESCE(master_data.id_keluar, '') <> '' THEN master_data.tanggal_selesai_aktif ELSE {baru} END";
+
+pub fn status_aktif_keluar(baru: &str) -> String {
+    STATUS_AKTIF_KELUAR_SQL.replace("{baru}", baru)
+}
+
+pub fn tanggal_selesai_keluar(baru: &str) -> String {
+    TANGGAL_SELESAI_KELUAR_SQL.replace("{baru}", baru)
+}
+
+/// Pegawai keluar ikut rekap gaji periode yang memuat hari terakhirnya walau
+/// tanpa absensi (`?1` = awal periode). Disisipkan harfiah di predikat rekap
+/// `payroll/commands.rs` dan `payroll-recap.ts`.
+pub const KELUAR_DI_PERIODE_SQL: &str = "OR (md.id_keluar IS NOT NULL AND md.tanggal_selesai_aktif >= ?1)";
+
+/// `master_data` lokal ber-`id_keluar` (penjaga sesi dan penulis lokal).
+pub const KELUAR_LOKAL_SQL: &str =
+    "SELECT COALESCE(id_keluar, '') FROM master_data WHERE id_unik = ?1 AND COALESCE(id_keluar, '') <> '' LIMIT 1;";
+
+/// Pegawai lokal yang sudah keluar; personil yang belum ada di perangkat = tidak.
+pub fn sudah_keluar_lokal(connection: &rusqlite::Connection, id_karyawan: &str) -> Result<bool, CommandError> {
+    use rusqlite::OptionalExtension;
+    let id = id_karyawan.trim();
+    if id.is_empty() {
+        return Ok(false);
+    }
+    connection
+        .query_row(KELUAR_LOKAL_SQL, [id], |r| r.get::<_, String>(0))
+        .optional()
+        .map(|v| v.is_some())
+        .map_err(|_| CommandError::internal())
+}
+
+/// Penulis lokal: mengaktifkan pegawai ber-`id_keluar` ditolak (§22.2.2).
+pub fn tolak_aktifkan_keluar(
+    connection: &rusqlite::Connection,
+    id_karyawan: &str,
+    status_baru: Option<&str>,
+) -> Result<(), CommandError> {
+    if status_baru == Some("Aktif") && sudah_keluar_lokal(connection, id_karyawan)? {
+        return Err(galat(PESAN_SUDAH_KELUAR));
+    }
+    Ok(())
+}
+
+/// Penjaga sesi Desktop/Mobile (temuan 3): akun yang tertaut ke pegawai
+/// keluar di SQLite perangkat ditolak, termasuk Superadmin.
+pub fn tolak_sesi_keluar(connection: &rusqlite::Connection, id_karyawan: Option<&str>) -> Result<(), CommandError> {
+    if sudah_keluar_lokal(connection, id_karyawan.unwrap_or(""))? {
+        return Err(CommandError::new("DESKTOP_SESSION_MISSING", PESAN_SESI_KELUAR));
+    }
+    Ok(())
+}
+
+// ── SQL keluar, dieja harfiah sama di `validations/hr-keluar.ts` ──
+// Checklist: `?1` = id pegawai, `?2` = hari terakhir bekerja.
+
+/// Memblokir: jadwal aktif di semester yang berlanjut sesudah hari terakhir.
+pub const JADWAL_AKTIF_KELUAR_SQL: &str = "SELECT j.id_jadwal, j.hari, j.jam_ke, COALESCE(r.nama_rombel, j.id_rombel) AS nama_rombel, COALESCE(mp.nama_mapel, j.id_mapel) AS nama_mapel, t.nama_tahun, t.semester FROM jadwal_mengajar j JOIN akademik_tahun_ajaran t ON t.id_tahun_ajaran = j.id_tahun_ajaran LEFT JOIN akademik_rombel r ON r.id_rombel = j.id_rombel LEFT JOIN akademik_mapel mp ON mp.id_mapel = j.id_mapel WHERE j.id_guru = ?1 AND j.is_aktif = 1 AND t.tanggal_selesai > ?2 ORDER BY t.tanggal_mulai, j.hari, CAST(j.jam_ke AS INTEGER), j.jam_ke, j.id_jadwal LIMIT 200;";
+/// Memblokir: wali rombel aktif di semester yang berlanjut sesudah hari terakhir.
+pub const WALI_KELUAR_SQL: &str = "SELECT r.id_rombel, r.nama_rombel, t.nama_tahun, t.semester FROM akademik_rombel r JOIN akademik_tahun_ajaran t ON t.id_tahun_ajaran = r.id_tahun_ajaran WHERE r.id_wali_kelas = ?1 AND r.is_aktif = 1 AND t.tanggal_selesai > ?2 ORDER BY t.tanggal_mulai, r.nama_rombel, r.id_rombel LIMIT 50;";
+/// Tanda: tugas tambahan yang masih berjalan sesudah hari terakhir.
+pub const TUGAS_KELUAR_SQL: &str = "SELECT t.id_tugas, COALESCE(j.nama, t.id_jenis) AS nama_jenis, t.tahun_ajaran, t.tanggal_mulai, COALESCE(t.tanggal_selesai, '') AS tanggal_selesai FROM hr_tugas_tambahan t LEFT JOIN hr_tugas_jenis j ON j.id_jenis = t.id_jenis WHERE t.id_karyawan = ?1 AND t.dibatalkan_pada IS NULL AND t.id_jenis <> 'tgs-wali-kelas' AND (COALESCE(t.tanggal_selesai, '') = '' OR t.tanggal_selesai > ?2) ORDER BY t.tanggal_mulai, t.id_tugas LIMIT 50;";
+/// Tanda: barang dipinjam belum kembali penuh. Predikat "belum kembali"
+/// salinan harfiah `inventory::list_loans`.
+pub const PINJAMAN_PERSONIL_SQL: &str = "SELECT * FROM (SELECT p.id_mutasi, b.nama_barang, b.kode_barang, b.satuan, p.tanggal, p.jumlah, COALESCE((SELECT SUM(r.jumlah) FROM inventory_mutasi r WHERE r.id_ref = p.id_mutasi AND r.alasan = 'Pengembalian' AND NOT EXISTS (SELECT 1 FROM inventory_mutasi rb WHERE rb.id_mutasi = 'batal-' || r.id_mutasi)), 0) AS kembali, b.desimal FROM inventory_mutasi p JOIN inventory_barang b ON b.id_barang = p.id_barang WHERE p.alasan = 'Peminjaman' AND p.penerima_tipe = 'Personil' AND p.penerima_id = ?1 AND NOT EXISTS (SELECT 1 FROM inventory_mutasi pb WHERE pb.id_mutasi = 'batal-' || p.id_mutasi)) WHERE jumlah > kembali ORDER BY tanggal, id_mutasi LIMIT 200;";
+/// Tanda: kasbon Disetujui dengan sisa efektif (`pokok − BAYAR − PENDING`,
+/// salinan harfiah `loan.rs`) > 0.
+pub const KASBON_KELUAR_SQL: &str = "SELECT * FROM (SELECT p.id_pinjaman, p.pokok, p.cicilan, COALESCE(p.tanggal_cair, '') AS tanggal_cair, p.pokok - COALESCE((SELECT SUM(m.jumlah) FROM keu_pinjaman_mutasi m WHERE m.id_pinjaman = p.id_pinjaman AND m.jenis IN ('Angsuran Gaji', 'Pelunasan Tunai')), 0) - COALESCE((SELECT SUM(CAST(json_extract(k.value, '$.jumlah') AS INTEGER)) FROM payroll_items i JOIN payroll_runs r ON r.id = i.payroll_run_id, json_each(i.breakdown_snapshot, '$.kasbon') k WHERE r.status NOT IN ('PAID', 'REJECTED') AND json_extract(k.value, '$.id_pinjaman') = p.id_pinjaman), 0) AS sisa FROM keu_pinjaman p WHERE p.id_karyawan = ?1 AND p.status = 'Disetujui') WHERE sisa > 0 ORDER BY tanggal_cair, id_pinjaman LIMIT 50;";
+/// Tanda: rapel Menunggu (predikat salinan harfiah `rapel::MENUNGGU_SQL`).
+pub const RAPEL_KELUAR_SQL: &str = "SELECT rp.id_rapel, rp.jumlah, rp.period_start, rp.period_end FROM payroll_rapel rp WHERE rp.id_karyawan = ?1 AND rp.dibatalkan_pada IS NULL AND NOT EXISTS (SELECT 1 FROM payroll_items i JOIN payroll_runs r ON r.id = i.payroll_run_id, json_each(CASE WHEN json_valid(i.breakdown_snapshot) THEN i.breakdown_snapshot ELSE '{}' END, '$.rapel') k WHERE i.id_karyawan = rp.id_karyawan AND r.status <> 'REJECTED' AND json_extract(k.value, '$.id_rapel') = rp.id_rapel) ORDER BY rp.period_start, rp.id_rapel LIMIT 50;";
+/// Tanda: pengajuan Menunggu atau berlaku sesudah hari terakhir (predikat
+/// salinan harfiah `PENGAJUAN_AKTIF_ORANG_SQL`).
+pub const PENGAJUAN_SESUDAH_SQL: &str = "SELECT p.id_pengajuan, p.tanggal_mulai, p.tanggal_selesai, COALESCE(j.nama, p.id_jenis) AS nama_jenis FROM hr_pengajuan p LEFT JOIN hr_jenis_pengajuan j ON j.id_jenis = p.id_jenis WHERE p.id_karyawan = ?1 AND p.tanggal_selesai > ?2 AND NOT EXISTS (SELECT 1 FROM hr_pengajuan_keputusan b WHERE b.id_pengajuan = p.id_pengajuan AND b.jenis = 'Batal') AND COALESCE((SELECT k.jenis FROM hr_pengajuan_keputusan k WHERE k.id_pengajuan = p.id_pengajuan AND k.sidik = p.sidik AND k.jenis IN ('Setujui', 'Tolak', 'Setujui Urgent') ORDER BY k.diterima_cloud IS NULL, k.diterima_cloud, k.waktu_perangkat, k.id_keputusan LIMIT 1), '') <> 'Tolak' ORDER BY p.tanggal_mulai, p.id_pengajuan LIMIT 50;";
+/// Tanda: JP yang ia gantikan sesudah hari terakhir (predikat `PENANGANAN_SQL`).
+pub const JP_PENGGANTI_SESUDAH_SQL: &str = "SELECT h.id_penanganan, h.tanggal, COALESCE(h.jam_ke, '') AS jam_ke, COALESCE(mg.nama, p.id_karyawan) AS nama_guru FROM hr_jp_penanganan h JOIN hr_pengajuan p ON p.id_pengajuan = h.id_pengajuan LEFT JOIN master_data mg ON mg.id_unik = p.id_karyawan WHERE h.id_guru_pengganti = ?1 AND h.tanggal > ?2 AND NOT EXISTS (SELECT 1 FROM hr_pengajuan_keputusan b WHERE b.id_pengajuan = p.id_pengajuan AND b.jenis = 'Batal') AND COALESCE((SELECT k.jenis FROM hr_pengajuan_keputusan k WHERE k.id_pengajuan = p.id_pengajuan AND k.sidik = p.sidik AND k.jenis IN ('Setujui', 'Tolak', 'Setujui Urgent') ORDER BY k.diterima_cloud IS NULL, k.diterima_cloud, k.waktu_perangkat, k.id_keputusan LIMIT 1), '') <> 'Tolak' ORDER BY h.tanggal, h.id_penanganan LIMIT 100;";
+/// Tanda (temuan 5): run masa terakhir yang sudah dibuat memakai TER biasa.
+pub const RUN_MASA_TERAKHIR_SQL: &str = "SELECT id, period_start, period_end, status FROM payroll_runs WHERE status <> 'REJECTED' AND period_end >= ?2 AND substr(period_end, 1, 7) = substr(?2, 1, 7) ORDER BY period_start, id LIMIT 20;";
+/// Alfa sistem sesudah hari terakhir: disebut di dialog Berlakukan, tidak dihapus.
+pub const ALFA_SESUDAH_SQL: &str = "SELECT COUNT(*) AS jumlah FROM absensi_harian WHERE id_karyawan = ?1 AND tanggal > ?2 AND sumber = 'Generate Sistem';";
+/// Akun operator tertaut: dinonaktifkan otomatis saat Berlakukan.
+pub const AKUN_TERTAUT_SQL: &str = "SELECT m.id, m.username, m.nama_operator, COALESCE(m.status, 'Aktif') AS status, COALESCE(r.is_superadmin, 0) AS is_superadmin FROM master_operator m LEFT JOIN app_role r ON r.id = m.role_id WHERE m.id_karyawan = ?1 ORDER BY m.username LIMIT 20;";
+pub const SUPERADMIN_AKTIF_SQL: &str = "SELECT COUNT(*) AS jumlah FROM master_operator m JOIN app_role r ON r.id = m.role_id WHERE r.is_superadmin = 1 AND COALESCE(m.status, 'Aktif') = 'Aktif';";
+
+pub const PEGAWAI_KELUAR_SQL: &str = "SELECT m.id_unik, m.nama, COALESCE(m.status_aktif, 'Aktif') AS status_aktif, COALESCE(m.tanggal_daftar, '') AS tanggal_daftar, COALESCE(m.unit, '') AS unit, COALESCE(m.id_keluar, '') AS id_keluar FROM master_data m WHERE m.id_unik = ?1 AND LOWER(TRIM(COALESCE(m.jenis_personil, ''))) <> 'siswa' AND NOT EXISTS (SELECT 1 FROM siswa_data sd WHERE sd.id_siswa = m.id_unik) LIMIT 1;";
+pub const ALASAN_KELUAR_SQL: &str = "SELECT id_alasan, nama, pengali_up, pengali_upmk, uph, kompensasi_pkwt, uang_pisah, is_aktif, COALESCE(dasar_hukum, '') AS dasar_hukum FROM hr_keluar_alasan ORDER BY is_aktif DESC, nama, id_alasan LIMIT 100;";
+pub const ALASAN_SATU_SQL: &str = "SELECT id_alasan, nama, is_aktif FROM hr_keluar_alasan WHERE id_alasan = ?1 LIMIT 1;";
+pub const DAFTAR_KELUAR_SQL: &str = "SELECT k.id_keluar, k.id_karyawan, COALESCE(m.nama, k.id_karyawan) AS nama, COALESCE(m.unit, '') AS unit, k.id_alasan, COALESCE(k.alasan_nama, '') AS alasan_nama, COALESCE(k.id_sp, '') AS id_sp, COALESCE(k.status_kepegawaian, '') AS status_kepegawaian, COALESCE(k.tanggal_pemberitahuan, '') AS tanggal_pemberitahuan, k.tanggal_terakhir, COALESCE(k.keterangan, '') AS keterangan, COALESCE(k.masa_kerja_mulai, '') AS masa_kerja_mulai, k.kartu_ditarik, COALESCE(k.catatan_checklist, '') AS catatan_checklist, k.dicatat_oleh, k.created_at, COALESCE(k.diubah_oleh, '') AS diubah_oleh, COALESCE(k.diubah_pada, '') AS diubah_pada, COALESCE(k.berlaku_oleh, '') AS berlaku_oleh, COALESCE(k.berlaku_pada, '') AS berlaku_pada, COALESCE(k.dibatalkan_oleh, '') AS dibatalkan_oleh, COALESCE(k.dibatalkan_pada, '') AS dibatalkan_pada, COALESCE(k.alasan_batal, '') AS alasan_batal FROM hr_keluar k LEFT JOIN master_data m ON m.id_unik = k.id_karyawan ORDER BY k.tanggal_terakhir DESC, k.created_at DESC, k.id_keluar LIMIT 500;";
+pub const KELUAR_SATU_SQL: &str = "SELECT k.id_keluar, k.id_karyawan, COALESCE(m.nama, k.id_karyawan) AS nama, COALESCE(m.unit, '') AS unit, k.id_alasan, COALESCE(k.alasan_nama, '') AS alasan_nama, COALESCE(k.id_sp, '') AS id_sp, COALESCE(k.status_kepegawaian, '') AS status_kepegawaian, COALESCE(k.tanggal_pemberitahuan, '') AS tanggal_pemberitahuan, k.tanggal_terakhir, COALESCE(k.keterangan, '') AS keterangan, COALESCE(k.masa_kerja_mulai, '') AS masa_kerja_mulai, k.kartu_ditarik, COALESCE(k.catatan_checklist, '') AS catatan_checklist, k.dicatat_oleh, k.created_at, COALESCE(k.diubah_oleh, '') AS diubah_oleh, COALESCE(k.diubah_pada, '') AS diubah_pada, COALESCE(k.berlaku_oleh, '') AS berlaku_oleh, COALESCE(k.berlaku_pada, '') AS berlaku_pada, COALESCE(k.dibatalkan_oleh, '') AS dibatalkan_oleh, COALESCE(k.dibatalkan_pada, '') AS dibatalkan_pada, COALESCE(k.alasan_batal, '') AS alasan_batal FROM hr_keluar k LEFT JOIN master_data m ON m.id_unik = k.id_karyawan WHERE k.id_keluar = ?1 LIMIT 1;";
+/// Proses baru hanya bila pegawai belum punya proses yang tidak dibatalkan;
+/// dijaga di transaksi cloud yang sama.
+pub const SIMPAN_KELUAR_SQL: &str = "INSERT INTO hr_keluar (id_keluar, id_karyawan, id_alasan, alasan_nama, id_sp, status_kepegawaian, tanggal_pemberitahuan, tanggal_terakhir, keterangan, masa_kerja_mulai, kartu_ditarik, catatan_checklist, dicatat_oleh, created_at) SELECT ?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, datetime('now') WHERE NOT EXISTS (SELECT 1 FROM hr_keluar x WHERE x.id_karyawan = ?2 AND x.dibatalkan_pada IS NULL);";
+/// Ubah hanya selama belum berlaku dan belum dibatalkan.
+pub const UBAH_KELUAR_SQL: &str = "UPDATE hr_keluar SET id_alasan = ?3, alasan_nama = ?4, id_sp = ?5, status_kepegawaian = ?6, tanggal_pemberitahuan = ?7, tanggal_terakhir = ?8, keterangan = ?9, masa_kerja_mulai = ?10, kartu_ditarik = ?11, catatan_checklist = ?12, diubah_oleh = ?13, diubah_pada = datetime('now') WHERE id_keluar = ?1 AND id_karyawan = ?2 AND berlaku_pada IS NULL AND dibatalkan_pada IS NULL;";
+
+/// Berlakukan dalam satu batch (`?1` id keluar, `?2` operator, `?3` potret
+/// checklist, `?4` id pegawai). Statement pertama memeriksa ulang blokir;
+/// statement berikutnya hanya berjalan bila proses itu sudah berlaku dan
+/// tidak dibatalkan, jadi tekan ganda tidak menggandakan apa pun.
+pub const BERLAKUKAN_SQL: [&str; 4] = [
+    "UPDATE hr_keluar SET berlaku_oleh = ?2, berlaku_pada = datetime('now'), checklist_saat_berlaku = ?3 WHERE id_keluar = ?1 AND id_karyawan = ?4 AND berlaku_pada IS NULL AND dibatalkan_pada IS NULL AND tanggal_terakhir <= date('now', '+7 hours') AND NOT EXISTS (SELECT 1 FROM jadwal_mengajar j JOIN akademik_tahun_ajaran t ON t.id_tahun_ajaran = j.id_tahun_ajaran WHERE j.id_guru = ?4 AND j.is_aktif = 1 AND t.tanggal_selesai > hr_keluar.tanggal_terakhir) AND NOT EXISTS (SELECT 1 FROM akademik_rombel r JOIN akademik_tahun_ajaran t ON t.id_tahun_ajaran = r.id_tahun_ajaran WHERE r.id_wali_kelas = ?4 AND r.is_aktif = 1 AND t.tanggal_selesai > hr_keluar.tanggal_terakhir);",
+    "UPDATE master_data SET status_aktif = 'Nonaktif', tanggal_selesai_aktif = (SELECT k.tanggal_terakhir FROM hr_keluar k WHERE k.id_keluar = ?1), id_keluar = ?1 WHERE id_unik = ?4 AND EXISTS (SELECT 1 FROM hr_keluar k WHERE k.id_keluar = ?1 AND k.id_karyawan = ?4 AND k.berlaku_pada IS NOT NULL AND k.dibatalkan_pada IS NULL);",
+    "UPDATE master_operator SET status = 'Nonaktif', updated_at = datetime('now') WHERE id_karyawan = ?4 AND COALESCE(status, 'Aktif') = 'Aktif' AND EXISTS (SELECT 1 FROM hr_keluar k WHERE k.id_keluar = ?1 AND k.id_karyawan = ?4 AND k.berlaku_pada IS NOT NULL AND k.dibatalkan_pada IS NULL);",
+    "UPDATE app_session SET revoked_at = datetime('now'), revoked_reason = 'pegawai-keluar' WHERE revoked_at IS NULL AND operator_id IN (SELECT id FROM master_operator WHERE id_karyawan = ?4) AND EXISTS (SELECT 1 FROM hr_keluar k WHERE k.id_keluar = ?1 AND k.id_karyawan = ?4 AND k.berlaku_pada IS NOT NULL AND k.dibatalkan_pada IS NULL);",
+];
+/// Batalkan (`?1` id keluar, `?2` operator, `?3` alasan): `master_data`
+/// dikembalikan hanya bila proses ITU yang menonaktifkannya; akun operator
+/// tidak diaktifkan lagi (Q-79). Statement pertama hanya memakai `?1`.
+pub const BATALKAN_SQL: [&str; 2] = [
+    "UPDATE master_data SET status_aktif = 'Aktif', tanggal_selesai_aktif = NULL, id_keluar = NULL WHERE id_keluar = ?1 AND EXISTS (SELECT 1 FROM hr_keluar k WHERE k.id_keluar = ?1 AND k.dibatalkan_pada IS NULL);",
+    "UPDATE hr_keluar SET dibatalkan_oleh = ?2, dibatalkan_pada = datetime('now'), alasan_batal = ?3 WHERE id_keluar = ?1 AND dibatalkan_pada IS NULL;",
+];
+
+// ── Pegawai keluar: akses cloud ──
+
+fn dengan_status_keluar(b: &mut Value, hari_ini: &str) {
+    let status = status_keluar(
+        &teks(b, "tanggal_terakhir"),
+        !teks(b, "berlaku_pada").is_empty(),
+        !teks(b, "dibatalkan_pada").is_empty(),
+        hari_ini,
+    );
+    b["status"] = json!(status);
+    b["kartu_ditarik"] = json!(angka(b, "kartu_ditarik") == 1);
+}
+
+/// `desktop_hr_offboardings`: semua proses keluar dengan status turunan,
+/// beserta daftar alasan.
+pub async fn daftar_keluar(client: &TursoClient) -> Result<Value, CommandError> {
+    client.ensure_schema_current().await?;
+    let hari_ini = hari_ini(client).await?;
+    let mut keluar = baris(client, DAFTAR_KELUAR_SQL, vec![]).await?;
+    for b in &mut keluar {
+        dengan_status_keluar(b, &hari_ini);
+    }
+    Ok(json!({
+        "keluar": keluar,
+        "alasan": alasan_json(client).await?,
+        "hari_ini": hari_ini,
+    }))
+}
+
+async fn alasan_json(client: &TursoClient) -> Result<Vec<Value>, CommandError> {
+    let mut alasan = baris(client, ALASAN_KELUAR_SQL, vec![]).await?;
+    for a in &mut alasan {
+        for kunci in ["pengali_up", "pengali_upmk"] {
+            a[kunci] = json!(angka(a, kunci));
+        }
+        for kunci in ["uph", "kompensasi_pkwt", "uang_pisah", "is_aktif"] {
+            a[kunci] = json!(angka(a, kunci) == 1);
+        }
+    }
+    Ok(alasan)
+}
+
+/// Checklist keluar dari cloud (§22.2.2). `sisa_cuti` dihitung pemanggil:
+/// Desktop dari SQLite perangkat, Web dari database yang sama.
+pub async fn checklist_keluar(
+    client: &TursoClient,
+    id_karyawan: &str,
+    tanggal_terakhir: &str,
+    sisa_cuti: Value,
+) -> Result<Value, CommandError> {
+    let args = || vec![json!(id_karyawan), json!(tanggal_terakhir)];
+    let jadwal = baris(client, JADWAL_AKTIF_KELUAR_SQL, args()).await?;
+    let wali = baris(client, WALI_KELUAR_SQL, args()).await?;
+    let mut kasbon = baris(client, KASBON_KELUAR_SQL, vec![json!(id_karyawan)]).await?;
+    for k in &mut kasbon {
+        for kunci in ["pokok", "cicilan", "sisa"] {
+            k[kunci] = json!(angka(k, kunci));
+        }
+    }
+    let sisa_kasbon: i64 = kasbon.iter().map(|k| angka(k, "sisa")).sum();
+    let mut rapel = baris(client, RAPEL_KELUAR_SQL, vec![json!(id_karyawan)]).await?;
+    for r in &mut rapel {
+        r["jumlah"] = json!(angka(r, "jumlah"));
+    }
+    let mut akun = baris(client, AKUN_TERTAUT_SQL, vec![json!(id_karyawan)]).await?;
+    for a in &mut akun {
+        a["id"] = json!(angka(a, "id"));
+        a["is_superadmin"] = json!(angka(a, "is_superadmin") == 1);
+    }
+    let alfa = satu(client, ALFA_SESUDAH_SQL, args()).await?.map_or(0, |b| angka(&b, "jumlah"));
+    Ok(json!({
+        "blokir": jadwal.len() + wali.len(),
+        "jadwal": jadwal,
+        "wali": wali,
+        "tugas": baris(client, TUGAS_KELUAR_SQL, args()).await?,
+        "barang": baris(client, PINJAMAN_PERSONIL_SQL, vec![json!(id_karyawan)]).await?,
+        "kasbon": kasbon,
+        "sisa_kasbon": sisa_kasbon,
+        "sisa_cuti": sisa_cuti,
+        "rapel": rapel,
+        "pengajuan": baris(client, PENGAJUAN_SESUDAH_SQL, args()).await?,
+        "jp_pengganti": baris(client, JP_PENGGANTI_SESUDAH_SQL, args()).await?,
+        "run_masa_terakhir": baris(client, RUN_MASA_TERAKHIR_SQL, args()).await?,
+        "alfa_sesudah": alfa,
+        "akun": akun,
+    }))
+}
+
+/// Status kepegawaian kini pada `tanggal` (`hris::STATUS_KINI_SQL` dipakai utuh).
+async fn status_kini(client: &TursoClient, id_karyawan: &str, tanggal: &str) -> Result<String, CommandError> {
+    Ok(baris(client, super::hris::STATUS_KINI_SQL, vec![json!(tanggal)])
+        .await?
+        .into_iter()
+        .find(|b| teks(b, "id_unik") == id_karyawan)
+        .map(|b| teks(&b, "status"))
+        .unwrap_or_default())
+}
+
+async fn header_keluar(client: &TursoClient, id_keluar: &str) -> Result<Value, CommandError> {
+    satu(client, KELUAR_SATU_SQL, vec![json!(id_keluar.trim())])
+        .await?
+        .ok_or_else(|| galat("Proses keluar tidak ditemukan."))
+}
+
+/// Cakupan unit dan "bukan diri sendiri" dari sesi, dengan unit pegawai kini.
+async fn wewenang_keluar(client: &TursoClient, operator: &OperatorUser, id_karyawan: &str) -> Result<(), CommandError> {
+    let unit = satu(client, PEGAWAI_KELUAR_SQL, vec![json!(id_karyawan)])
+        .await?
+        .map(|b| teks(&b, "unit"))
+        .unwrap_or_default();
+    wewenang(client, operator, id_karyawan, &unit, "").await
+}
+
+/// `desktop_hr_offboarding`: rincian proses (`id_keluar`) atau pratinjau
+/// (`id_karyawan` + `tanggal_terakhir`) beserta checklist.
+pub async fn rincian_keluar(
+    client: &TursoClient,
+    id_keluar: Option<&str>,
+    id_karyawan: Option<&str>,
+    tanggal_terakhir: Option<&str>,
+    sisa_cuti: impl FnOnce(&str, &str) -> Result<Value, CommandError>,
+) -> Result<Value, CommandError> {
+    client.ensure_schema_current().await?;
+    let hari_ini = hari_ini(client).await?;
+    let (header, id, tanggal) = match id_keluar.map(str::trim).filter(|t| !t.is_empty()) {
+        Some(id_keluar) => {
+            let mut h = header_keluar(client, id_keluar).await?;
+            dengan_status_keluar(&mut h, &hari_ini);
+            let id = teks(&h, "id_karyawan");
+            let tanggal = teks(&h, "tanggal_terakhir");
+            (Some(h), id, tanggal)
+        }
+        None => {
+            let id = id_karyawan.map(str::trim).filter(|t| !t.is_empty()).ok_or_else(|| galat("Pegawai wajib dipilih."))?;
+            let tanggal = tanggal_terakhir
+                .map(str::trim)
+                .filter(|t| tanggal_valid(t))
+                .ok_or_else(|| galat("Hari terakhir bekerja tidak valid."))?;
+            (None, id.to_owned(), tanggal.to_owned())
+        }
+    };
+    let pegawai = satu(client, PEGAWAI_KELUAR_SQL, vec![json!(id)])
+        .await?
+        .ok_or_else(|| galat(super::hris_cloud::PESAN_PEGAWAI_BELUM_DI_CLOUD))?;
+    let cuti = sisa_cuti(&id, &tanggal)?;
+    Ok(json!({
+        "keluar": header,
+        "pegawai": pegawai,
+        "status_kepegawaian": status_kini(client, &id, &tanggal).await?,
+        "checklist": checklist_keluar(client, &id, &tanggal, cuti).await?,
+        "alasan": alasan_json(client).await?,
+        "hari_ini": hari_ini,
+    }))
+}
+
+/// `desktop_hr_offboarding_save`: catat atau ubah proses yang belum berlaku.
+/// `master_data` tidak berubah: pegawai tetap scan, ikut Alfa dan gaji.
+pub async fn simpan_keluar(client: &TursoClient, operator: &OperatorUser, draft: &Value) -> Result<Value, CommandError> {
+    client.ensure_schema_current().await?;
+    let sah = validasi_keluar(draft).map_err(galat)?;
+    let pegawai = satu(client, PEGAWAI_KELUAR_SQL, vec![json!(sah.id_karyawan)])
+        .await?
+        .ok_or_else(|| galat(super::hris_cloud::PESAN_PEGAWAI_BELUM_DI_CLOUD))?;
+    wewenang(client, operator, &sah.id_karyawan, &teks(&pegawai, "unit"), "").await?;
+    if let Some(id_keluar) = &sah.id_keluar {
+        let lama = header_keluar(client, id_keluar).await?;
+        if teks(&lama, "id_karyawan") != sah.id_karyawan {
+            return Err(galat("Pegawai pada proses keluar tidak bisa diganti."));
+        }
+        if !teks(&lama, "dibatalkan_pada").is_empty() {
+            return Err(galat(PESAN_KELUAR_DIBATALKAN));
+        }
+        if !teks(&lama, "berlaku_pada").is_empty() {
+            return Err(galat(PESAN_KELUAR_BERLAKU));
+        }
+    } else if teks(&pegawai, "status_aktif") != "Aktif" {
+        return Err(galat("Proses keluar hanya untuk pegawai aktif."));
+    }
+    let masuk = teks(&pegawai, "tanggal_daftar");
+    if !masuk.is_empty() && sah.tanggal_terakhir < masuk {
+        return Err(galat("Hari terakhir bekerja tidak boleh sebelum tanggal masuk pegawai."));
+    }
+    let alasan = satu(client, ALASAN_SATU_SQL, vec![json!(sah.id_alasan)])
+        .await?
+        .ok_or_else(|| galat("Alasan keluar tidak ditemukan."))?;
+    if angka(&alasan, "is_aktif") != 1 {
+        return Err(galat("Alasan keluar sudah nonaktif."));
+    }
+    let id = sah.id_keluar.clone().unwrap_or_else(|| new_id("klr-"));
+    let args = vec![
+        json!(id),
+        json!(sah.id_karyawan),
+        json!(sah.id_alasan),
+        json!(teks(&alasan, "nama")),
+        json!(sah.id_sp),
+        json!(status_kini(client, &sah.id_karyawan, &sah.tanggal_terakhir).await?),
+        json!(sah.tanggal_pemberitahuan),
+        json!(sah.tanggal_terakhir),
+        json!(sah.keterangan),
+        json!(Some(masuk).filter(|m| !m.is_empty())),
+        json!(i64::from(sah.kartu_ditarik)),
+        json!(sah.catatan_checklist),
+        json!(operator.username),
+    ];
+    let sql = if sah.id_keluar.is_some() { UBAH_KELUAR_SQL } else { SIMPAN_KELUAR_SQL };
+    let hasil = client.execute_pipeline(vec![Statement::new(sql, args)]).await?;
+    if hasil.first().map_or(0, |h| h.rows_affected) == 0 {
+        return Err(galat(if sah.id_keluar.is_some() {
+            PESAN_KELUAR_BERLAKU
+        } else {
+            PESAN_KELUAR_TERBUKA
+        }));
+    }
+    Ok(json!({ "sukses": true, "id_keluar": id }))
+}
+
+/// `desktop_hr_offboarding_apply`: Berlakukan dalam satu batch cloud.
+pub async fn berlakukan_keluar(
+    client: &TursoClient,
+    operator: &OperatorUser,
+    id_keluar: &str,
+    sisa_cuti: impl FnOnce(&str, &str) -> Result<Value, CommandError>,
+) -> Result<Value, CommandError> {
+    client.ensure_schema_current().await?;
+    let hari_ini = hari_ini(client).await?;
+    let header = header_keluar(client, id_keluar).await?;
+    let id_keluar = teks(&header, "id_keluar");
+    let id_karyawan = teks(&header, "id_karyawan");
+    let tanggal = teks(&header, "tanggal_terakhir");
+    wewenang_keluar(client, operator, &id_karyawan).await?;
+    match status_keluar(
+        &tanggal,
+        !teks(&header, "berlaku_pada").is_empty(),
+        !teks(&header, "dibatalkan_pada").is_empty(),
+        &hari_ini,
+    ) {
+        "Jatuh tempo" => {}
+        "Dijadwalkan" => return Err(galat(PESAN_BELUM_JATUH_TEMPO)),
+        "Berlaku" => return Err(galat(PESAN_KELUAR_BERLAKU)),
+        _ => return Err(galat(PESAN_KELUAR_DIBATALKAN)),
+    }
+    let cuti = sisa_cuti(&id_karyawan, &tanggal)?;
+    let potret = checklist_keluar(client, &id_karyawan, &tanggal, cuti).await?;
+    periksa_blokir(&potret)?;
+    let akun = potret["akun"].as_array().cloned().unwrap_or_default();
+    if akun.iter().any(|a| angka(a, "id") == operator.id) {
+        return Err(galat(PESAN_DIRI_SENDIRI));
+    }
+    let super_tertaut = akun
+        .iter()
+        .filter(|a| a["is_superadmin"] == json!(true) && teks(a, "status") == "Aktif")
+        .count() as i64;
+    if super_tertaut > 0 {
+        let total = satu(client, SUPERADMIN_AKTIF_SQL, vec![]).await?.map_or(0, |b| angka(&b, "jumlah"));
+        if total <= super_tertaut {
+            return Err(galat(PESAN_SUPERADMIN_TERAKHIR));
+        }
+    }
+    let args = vec![json!(id_keluar), json!(operator.username), json!(potret.to_string()), json!(id_karyawan)];
+    client
+        .execute_atomic(BERLAKUKAN_SQL.iter().map(|sql| Statement::new(*sql, args.clone())).collect())
+        .await?;
+    // Blokir yang muncul di antara pemeriksaan dan batch membuat statement
+    // pertama tidak menyentuh apa pun; laporkan butirnya.
+    let sesudah = header_keluar(client, &id_keluar).await?;
+    if teks(&sesudah, "berlaku_pada").is_empty() {
+        periksa_blokir(&checklist_keluar(client, &id_karyawan, &tanggal, Value::Null).await?)?;
+        return Err(galat(if teks(&sesudah, "dibatalkan_pada").is_empty() {
+            PESAN_BELUM_JATUH_TEMPO
+        } else {
+            PESAN_KELUAR_DIBATALKAN
+        }));
+    }
+    Ok(json!({ "sukses": true }))
+}
+
+fn periksa_blokir(checklist: &Value) -> Result<(), CommandError> {
+    let ada = |kunci: &str| checklist[kunci].as_array().is_some_and(|d| !d.is_empty());
+    if ada("jadwal") {
+        return Err(galat(PESAN_BLOKIR_JADWAL));
+    }
+    if ada("wali") {
+        return Err(galat(PESAN_BLOKIR_WALI));
+    }
+    Ok(())
+}
+
+/// `desktop_hr_offboarding_cancel`: alasan wajib, kapan saja.
+pub async fn batalkan_keluar(
+    client: &TursoClient,
+    operator: &OperatorUser,
+    id_keluar: &str,
+    alasan: &str,
+) -> Result<Value, CommandError> {
+    let alasan = teks_wajib(&json!({ "alasan": alasan }), "alasan", "Alasan pembatalan", MAKS_TEKS_KELUAR).map_err(galat)?;
+    client.ensure_schema_current().await?;
+    let header = header_keluar(client, id_keluar).await?;
+    let id_keluar = teks(&header, "id_keluar");
+    wewenang_keluar(client, operator, &teks(&header, "id_karyawan")).await?;
+    if !teks(&header, "dibatalkan_pada").is_empty() {
+        return Err(galat(PESAN_KELUAR_DIBATALKAN));
+    }
+    let args = [json!(id_keluar), json!(operator.username), json!(alasan)];
+    client
+        .execute_atomic(vec![
+            Statement::new(BATALKAN_SQL[0], args[..1].to_vec()),
+            Statement::new(BATALKAN_SQL[1], args.to_vec()),
+        ])
+        .await?;
+    if teks(&header_keluar(client, &id_keluar).await?, "dibatalkan_pada").is_empty() {
+        return Err(galat(PESAN_KELUAR_DIBATALKAN));
+    }
+    Ok(json!({ "sukses": true }))
+}
+
 #[cfg(test)]
 mod tests {
     //! Vektor sama dengan `validations/hr-keluar.test.ts`.
@@ -641,5 +1156,234 @@ mod tests {
             assert_eq!(daftar["sp"][0]["status"], json!("Dicabut"));
             assert_eq!(daftar["usulan"]["tingkat"], json!("SP1"));
         });
+    }
+
+    #[test]
+    fn hr_keluar_vektor_status_dan_validasi_keluar() {
+        let v = vektor();
+        for k in v["status_keluar"].as_array().expect("status_keluar") {
+            let hasil = status_keluar(
+                k["tanggal_terakhir"].as_str().unwrap(),
+                k["berlaku"].as_bool().unwrap(),
+                k["dibatalkan"].as_bool().unwrap(),
+                k["hari_ini"].as_str().unwrap(),
+            );
+            assert_eq!(hasil, k["hasil"].as_str().unwrap(), "{}", k["nama"]);
+        }
+        for k in v["validasi_keluar"].as_array().expect("validasi_keluar") {
+            let hasil = validasi_keluar(&k["draft"]);
+            match k["galat"].as_str() {
+                Some(pesan) => assert_eq!(hasil.err().as_deref(), Some(pesan), "{}", k["nama"]),
+                None => assert_eq!(json!(hasil.expect("sah")), k["hasil"], "{}", k["nama"]),
+            }
+        }
+        assert_eq!(
+            status_aktif_keluar("?"),
+            "CASE WHEN COALESCE(master_data.id_keluar, '') <> '' THEN 'Nonaktif' ELSE ? END"
+        );
+    }
+
+    fn hub_uji() -> (tempfile::TempDir, TursoClient, std::path::PathBuf) {
+        let dir = tempfile::tempdir().expect("direktori sementara");
+        let hub = dir.path().join("sppg-hub.db");
+        let client = TursoClient::local_file(
+            url::Url::parse("https://hr-keluar.sppg.invalid").expect("origin uji"),
+            &hub,
+            reqwest::Client::new(),
+        );
+        (dir, client, hub)
+    }
+
+    /// Alur 4b di cloud (`local_file` di atas `ensure_schema`): satu proses
+    /// terbuka per pegawai, blokir jadwal lalu wali, Berlakukan menonaktifkan
+    /// pegawai + akun + sesi Web, tekan ganda ditolak tanpa menggandakan, dan
+    /// Batalkan mengembalikan pegawai tetapi tidak akunnya.
+    #[test]
+    fn hr_keluar_berlakukan_dan_batalkan_cloud() {
+        let runtime = tokio::runtime::Builder::new_current_thread().build().expect("runtime uji");
+        runtime.block_on(async {
+            let (_dir, client, hub) = hub_uji();
+            client.ensure_schema().await.expect("provisioning lokal");
+            let c = rusqlite::Connection::open(&hub).expect("buka hub");
+            c.execute_batch(
+                "INSERT INTO master_data (id_unik, kode_karyawan, nama, divisi, id_shift, jenis_personil, unit, tanggal_daftar, status_aktif) VALUES
+                   ('P1', 'K1', 'Ani', 'Guru', 1, 'GURU', 'SMP', '2020-01-01', 'Aktif'),
+                   ('KS', 'K3', 'Kepala SMP', 'Guru', 1, 'GURU', 'SMP', '2020-01-01', 'Aktif');
+                 INSERT INTO akademik_tahun_ajaran (id_tahun_ajaran, nama_tahun, semester, tanggal_mulai, tanggal_selesai, is_aktif, created_at, updated_at) VALUES
+                   ('T1', '2025/2026', 'Genap', '2026-01-01', '2026-06-30', 0, 'x', 'x'),
+                   ('T2', '2026/2027', 'Ganjil', '2026-07-01', '2026-12-31', 1, 'x', 'x');
+                 INSERT INTO akademik_rombel (id_rombel, id_tahun_ajaran, tingkat, nama_rombel, id_wali_kelas, is_aktif) VALUES
+                   ('R1', 'T1', 7, '7A lama', 'P1', 1), ('R2', 'T2', 8, '8A', 'P1', 1);
+                 INSERT INTO jadwal_mengajar (id_jadwal, id_tahun_ajaran, id_rombel, id_mapel, id_guru, hari, jam_ke, is_aktif, created_at, updated_at) VALUES
+                   ('J1', 'T1', 'R1', 'M1', 'P1', 1, '1', 1, 'x', 'x'), ('J2', 'T2', 'R2', 'M1', 'P1', 1, '2', 1, 'x', 'x');
+                 INSERT INTO master_operator (id, kode_operator, nama_operator, username, password_hash, role, status, id_karyawan) VALUES
+                   (10, 'OP10', 'Ani', 'ani', 'x', 'Operator', 'Aktif', 'P1');
+                 INSERT INTO app_session (session_id, token_hash, operator_id, permission_revision, created_at, expires_at, last_seen_at) VALUES
+                   ('s1', 'h1', 10, 1, 'x', '2999-01-01', 'x');",
+            )
+            .expect("data uji");
+            let galat_dari = |h: Result<Value, CommandError>| h.err().map(|e| e.message).unwrap_or_default();
+            let kepeg = operator(Some("KS"), &["hr.offboard.manage"]);
+            let draft = json!({ "id_karyawan": "P1", "id_alasan": "klr-resign", "tanggal_terakhir": "2026-06-30" });
+
+            assert_eq!(galat_dari(simpan_keluar(&client, &kepeg, &json!({ "id_karyawan": "KS", "id_alasan": "klr-resign", "tanggal_terakhir": "2026-06-30" })).await), PESAN_DIRI_SENDIRI);
+            let id = simpan_keluar(&client, &kepeg, &draft).await.expect("catat")["id_keluar"].as_str().expect("id").to_owned();
+            assert_eq!(galat_dari(simpan_keluar(&client, &kepeg, &draft).await), PESAN_KELUAR_TERBUKA);
+            let status: String = c
+                .query_row("SELECT status_aktif FROM master_data WHERE id_unik = 'P1';", [], |r| r.get(0))
+                .expect("status");
+            assert_eq!(status, "Aktif", "selama belum berlaku master_data tidak berubah");
+
+            let rincian = rincian_keluar(&client, Some(&id), None, None, |_, _| Ok(Value::Null)).await.expect("rincian");
+            assert_eq!(rincian["keluar"]["status"], json!("Jatuh tempo"));
+            assert_eq!(rincian["checklist"]["blokir"], json!(2), "jadwal T2 dan wali R2; T1 berakhir pada hari terakhir");
+            assert_eq!(rincian["checklist"]["akun"][0]["username"], json!("ani"));
+
+            let yayasan = operator(None, &["hr.offboard.decide", "hr.scope.all"]);
+            let tanpa_cuti = |_: &str, _: &str| Ok(Value::Null);
+            assert_eq!(galat_dari(berlakukan_keluar(&client, &yayasan, &id, tanpa_cuti).await), PESAN_BLOKIR_JADWAL);
+            c.execute("UPDATE jadwal_mengajar SET is_aktif = 0 WHERE id_jadwal = 'J2';", []).expect("alihkan jadwal");
+            assert_eq!(galat_dari(berlakukan_keluar(&client, &yayasan, &id, tanpa_cuti).await), PESAN_BLOKIR_WALI);
+            c.execute("UPDATE akademik_rombel SET id_wali_kelas = 'KS' WHERE id_rombel = 'R2';", []).expect("ganti wali");
+            let akun_sendiri = OperatorUser { id: 10, ..operator(None, &["hr.offboard.decide", "hr.scope.all"]) };
+            assert_eq!(galat_dari(berlakukan_keluar(&client, &akun_sendiri, &id, tanpa_cuti).await), PESAN_DIRI_SENDIRI);
+            berlakukan_keluar(&client, &yayasan, &id, tanpa_cuti).await.expect("berlakukan");
+            assert_eq!(galat_dari(berlakukan_keluar(&client, &yayasan, &id, tanpa_cuti).await), PESAN_KELUAR_BERLAKU);
+            // Batch yang sama dijalankan ulang (tekan ganda lolos pemeriksaan) tidak mengubah apa pun.
+            let args = vec![json!(id), json!("lain"), json!("{}"), json!("P1")];
+            client
+                .execute_atomic(BERLAKUKAN_SQL.iter().map(|sql| Statement::new(*sql, args.clone())).collect())
+                .await
+                .expect("ulang");
+
+            let (status, selesai, id_keluar): (String, String, String) = c
+                .query_row("SELECT status_aktif, tanggal_selesai_aktif, id_keluar FROM master_data WHERE id_unik = 'P1';", [], |r| {
+                    Ok((r.get(0)?, r.get(1)?, r.get(2)?))
+                })
+                .expect("pegawai");
+            assert_eq!((status.as_str(), selesai.as_str(), id_keluar.as_str()), ("Nonaktif", "2026-06-30", id.as_str()));
+            let (akun, sesi): (String, i64) = c
+                .query_row(
+                    "SELECT (SELECT status FROM master_operator WHERE id = 10), (SELECT COUNT(*) FROM app_session WHERE revoked_at IS NOT NULL);",
+                    [],
+                    |r| Ok((r.get(0)?, r.get(1)?)),
+                )
+                .expect("akun");
+            assert_eq!((akun.as_str(), sesi), ("Nonaktif", 1));
+            let (oleh, potret): (String, String) = c
+                .query_row("SELECT berlaku_oleh, checklist_saat_berlaku FROM hr_keluar WHERE id_keluar = ?1;", [&id], |r| {
+                    Ok((r.get(0)?, r.get(1)?))
+                })
+                .expect("potret");
+            assert_eq!(oleh, "uji", "tekan ulang tidak menimpa pemberlaku");
+            assert!(potret.contains("\"akun\""));
+            let mut ubah = draft.clone();
+            ubah["id_keluar"] = json!(id);
+            assert_eq!(galat_dari(simpan_keluar(&client, &kepeg, &ubah).await), PESAN_KELUAR_BERLAKU);
+
+            assert_eq!(galat_dari(batalkan_keluar(&client, &yayasan, &id, " ").await), "Alasan pembatalan wajib diisi.");
+            batalkan_keluar(&client, &yayasan, &id, "Batal resign").await.expect("batal");
+            assert_eq!(galat_dari(batalkan_keluar(&client, &yayasan, &id, "Lagi").await), PESAN_KELUAR_DIBATALKAN);
+            let (status, id_keluar, akun): (String, Option<String>, String) = c
+                .query_row(
+                    "SELECT m.status_aktif, m.id_keluar, (SELECT status FROM master_operator WHERE id = 10) FROM master_data m WHERE m.id_unik = 'P1';",
+                    [],
+                    |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)),
+                )
+                .expect("sesudah batal");
+            assert_eq!((status.as_str(), id_keluar, akun.as_str()), ("Aktif", None, "Nonaktif"));
+            let daftar = daftar_keluar(&client).await.expect("daftar");
+            assert_eq!(daftar["keluar"][0]["status"], json!("Dibatalkan"));
+            assert_eq!(daftar["alasan"].as_array().map(Vec::len), Some(9));
+            // Proses baru boleh dicatat lagi sesudah yang lama dibatalkan.
+            simpan_keluar(&client, &kepeg, &draft).await.expect("catat ulang");
+        });
+    }
+
+    /// Superadmin aktif terakhir tidak bisa dikeluarkan lewat pegawai tertautnya.
+    #[test]
+    fn hr_keluar_superadmin_terakhir_ditolak() {
+        let runtime = tokio::runtime::Builder::new_current_thread().build().expect("runtime uji");
+        runtime.block_on(async {
+            let (_dir, client, hub) = hub_uji();
+            client.ensure_schema().await.expect("provisioning lokal");
+            let c = rusqlite::Connection::open(&hub).expect("buka hub");
+            c.execute_batch(
+                "UPDATE master_operator SET status = 'Nonaktif';
+                 INSERT INTO master_data (id_unik, kode_karyawan, nama, divisi, id_shift, jenis_personil, unit, tanggal_daftar, status_aktif) VALUES
+                   ('P9', 'K9', 'Budi', 'TU', 1, 'Pegawai', 'SMP', '2020-01-01', 'Aktif');
+                 INSERT INTO master_operator (id, kode_operator, nama_operator, username, password_hash, role, role_id, status, id_karyawan)
+                   SELECT 20, 'OP20', 'Budi', 'budi', 'x', 'Admin', id, 'Aktif', 'P9' FROM app_role WHERE is_superadmin = 1 LIMIT 1;",
+            )
+            .expect("data uji");
+            let yayasan = operator(None, &["hr.offboard.manage", "hr.offboard.decide", "hr.scope.all"]);
+            let id = simpan_keluar(&client, &yayasan, &json!({ "id_karyawan": "P9", "id_alasan": "klr-resign", "tanggal_terakhir": "2026-06-30" }))
+                .await
+                .expect("catat")["id_keluar"]
+                .as_str()
+                .expect("id")
+                .to_owned();
+            let hasil = berlakukan_keluar(&client, &yayasan, &id, |_, _| Ok(Value::Null)).await;
+            assert_eq!(hasil.err().map(|e| e.message).as_deref(), Some(PESAN_SUPERADMIN_TERAKHIR));
+        });
+    }
+
+    /// Penjaga sesi dan penulis lokal: hanya `id_keluar` yang menolak;
+    /// personil yang belum ada di perangkat lolos.
+    #[test]
+    fn hr_keluar_penjaga_sesi_lokal() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        super::super::storage::initialize(dir.path()).expect("skema lokal");
+        let c = super::super::storage::database(dir.path()).expect("db");
+        c.execute_batch(
+            "INSERT INTO master_data (id_unik, kode_karyawan, nama, divisi, id_shift, status_aktif, id_keluar, tanggal_selesai_aktif) VALUES
+               ('P1', 'K1', 'Ani', 'Guru', 1, 'Nonaktif', 'klr-1', '2026-06-30'),
+               ('P2', 'K2', 'Budi', 'Guru', 1, 'Nonaktif', NULL, NULL);",
+        )
+        .expect("data");
+        assert_eq!(tolak_sesi_keluar(&c, Some("P1")).err().map(|e| e.message).as_deref(), Some(PESAN_SESI_KELUAR));
+        assert!(tolak_sesi_keluar(&c, Some("P2")).is_ok(), "nonaktif manual tidak mengunci akun");
+        assert!(tolak_sesi_keluar(&c, Some("TIDAK-ADA")).is_ok());
+        assert!(tolak_sesi_keluar(&c, None).is_ok());
+        assert_eq!(tolak_aktifkan_keluar(&c, "P1", Some("Aktif")).err().map(|e| e.message).as_deref(), Some(PESAN_SUDAH_KELUAR));
+        assert!(tolak_aktifkan_keluar(&c, "P1", Some("Nonaktif")).is_ok());
+        assert!(tolak_aktifkan_keluar(&c, "P2", Some("Aktif")).is_ok());
+
+        let state = super::super::config::DesktopState {
+            server_origin: std::sync::RwLock::new("http://localhost:3000".to_string()),
+            offline_max_age_hours: 24,
+            data_dir: dir.path().to_path_buf(),
+            http: reqwest::Client::new(),
+            turso_config: std::sync::RwLock::new(None),
+            session: std::sync::Mutex::new(None),
+            vault_lock: std::sync::Mutex::new(()),
+        };
+        let sesi = |id: Option<&str>, superadmin: bool| super::super::models::DesktopSession {
+            operator: OperatorUser { is_superadmin: superadmin, ..operator(id, &["employees.view"]) },
+            mode: super::super::models::SessionMode::Offline,
+            license: super::super::license::LicenseGrant::default(),
+        };
+        *state.session.lock().unwrap() = Some(sesi(Some("P2"), false));
+        assert!(super::super::commands::require_any_permission(&state, &["employees.view"]).is_ok());
+        *state.session.lock().unwrap() = Some(sesi(Some("P1"), true));
+        let galat = super::super::commands::require_any_permission(&state, &["employees.view"]).expect_err("ditolak");
+        assert_eq!(galat.message, PESAN_SESI_KELUAR);
+        assert!(state.session.lock().unwrap().is_none(), "sesi dibuang supaya layar kembali login");
+
+        // Penulis lokal: Aktifkan dan Hapus guru ditolak; ubah biasa jalan
+        // dengan status dan tanggal selesai yang tetap.
+        let pesan = |h: Result<Value, CommandError>| h.err().map(|e| e.message).unwrap_or_default();
+        assert_eq!(pesan(super::super::operational::set_employee_status(&state, "P1", "Aktif")), PESAN_SUDAH_KELUAR);
+        assert_eq!(pesan(super::super::academic::delete_teacher(&state, "P1")), PESAN_HAPUS_GURU_KELUAR);
+        let ubah = |status: &str| json!({ "kode_karyawan": "K1", "nama": "Ani Baru", "status_aktif": status, "tanggal_selesai_aktif": "" });
+        assert_eq!(pesan(super::super::operational::update_employee(&state, "P1", &ubah("Aktif"))), PESAN_SUDAH_KELUAR);
+        super::super::operational::update_employee(&state, "P1", &ubah("Nonaktif")).expect("ubah nama");
+        let (nama, status, selesai): (String, String, String) = c
+            .query_row("SELECT nama, status_aktif, tanggal_selesai_aktif FROM master_data WHERE id_unik = 'P1';", [], |r| {
+                Ok((r.get(0)?, r.get(1)?, r.get(2)?))
+            })
+            .expect("pegawai");
+        assert_eq!((nama.as_str(), status.as_str(), selesai.as_str()), ("Ani Baru", "Nonaktif", "2026-06-30"));
+        super::super::operational::set_employee_status(&state, "P2", "Aktif").expect("nonaktif manual boleh diaktifkan");
     }
 }
