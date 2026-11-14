@@ -159,14 +159,17 @@ function seededPermissions(source: string) {
     /INSERT OR IGNORE INTO app_permission[\s\S]*?VALUES([\s\S]*?);/,
   )?.[1];
   if (!block) return [];
-  return [...block.matchAll(/\(\s*'([a-z_]+\.[a-z_.]+)'/g)].map(
+  return [...block.matchAll(/\(\s*'([a-z_]+\.[a-z0-9_.]+)'/g)].map(
     (match) => match[1] as string,
   );
 }
 
-/** Kunci permission dari katalog TypeScript. */
+/**
+ * Kunci permission dari katalog TypeScript. Angka diterima di belakang titik
+ * pertama (`hr.warning.sp3`); tanpanya kunci itu lolos dari pemeriksaan.
+ */
 function catalogPermissions(source: string) {
-  return [...source.matchAll(/key:\s*"([a-z_]+\.[a-z_.]+)"/g)].map(
+  return [...source.matchAll(/key:\s*"([a-z_]+\.[a-z0-9_.]+)"/g)].map(
     (match) => match[1] as string,
   );
 }
