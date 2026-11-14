@@ -24,6 +24,8 @@ pub mod class_attendance;
 pub mod face_match;
 pub mod grades;
 pub mod hari_kerja;
+// Rekap beban mengajar (HRIS Fase 3a): SALINAN `desktop/hr_beban.rs`.
+pub mod hr_beban;
 // Pengajuan cuti/izin (HRIS Fase 2): SALINAN `desktop/hr_pengajuan.rs`.
 pub mod hr_pengajuan;
 pub mod hris;

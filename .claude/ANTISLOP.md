@@ -1,13 +1,11 @@
 # ANTISLOP.md — hasil antislop
 
-- Waktu: 14 November 2026, 15:56 WIB
-- Commit: 8b38ffb (+ berkas berubah, belum commit)
-- Berkas disunting: 3
+- Waktu: 15 November 2026, 00:18 WIB
+- Commit: fc14532 (+ berkas berubah, belum commit)
+- Berkas disunting: 1
 
 ## Disunting
-- `web-desktop/src-tauri/src/desktop/storage.rs` — komentar — ganti em dash pada penanda versi v69 sesuai R-02
-- `web-desktop/src-tauri/src/desktop/hr_pengajuan.rs` — komentar — rapikan pembatas dekoratif berulang menjadi komentar baris tunggal
-- `web-desktop/src/lib/validations/hr-pengajuan.ts` — komentar — rapikan pembatas dekoratif berulang menjadi komentar baris tunggal
+- `web-desktop/src/components/kepegawaian/TabBebanMengajar.tsx` — teks UI — rapikan format rentang batas beban mengajar menjadi tanda hubung standar
 
 ## Dilewati
 - `CLAUDE.md`, `.agents/`, `.claude/` — konfigurasi panduan agent
