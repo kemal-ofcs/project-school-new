@@ -87,6 +87,8 @@ const filesToCopy = [
   "components/payroll/KonstantaPajak.tsx",
   // HRIS Fase 1a: pilihan bagian, jabatan, dan atasan di form Karyawan dan Guru.
   "components/personnel/IsianOrganisasi.tsx",
+  // HRIS Fase 2c: Jam Kosong guru piket, satu UI untuk kedua build (Q-50).
+  "components/kepegawaian/JamKosongWorkspace.tsx",
   "components/keuangan/PilihAkunBayar.tsx",
   // Tab Cicilan di Keuangan (v65).
   "components/keuangan/CicilanWorkspace.tsx",

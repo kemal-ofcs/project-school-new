@@ -37,6 +37,7 @@ import {
   type StudentAttendanceDetailItem,
   saveClassAttendance,
 } from "@/lib/gateways/class-attendance";
+import { type JpTersusun, muatGantiSaya } from "@/lib/gateways/hr-pengajuan";
 import { syncNow } from "@/lib/gateways/sync-status";
 import { getDaftarGuru } from "@/lib/gateways/teacher";
 import {
@@ -62,6 +63,9 @@ import {
 } from "@/lib/validations/class-attendance";
 
 type TabKey = "input" | "reconciliation" | "history";
+
+/** Usulan sesi: jadwal sendiri, atau JP yang digantikan (nama guru asli). */
+type UsulanSesi = TeachingScheduleRow & { menggantikan?: string };
 
 export default function MobilePresensiKelasPage() {
   const isHydrated = useHydrated();
@@ -143,7 +147,7 @@ export default function MobilePresensiKelasPage() {
   // sekarang dibaca dari perangkat dalam zona WIB, sama seperti tanggal bawaan
   // layar ini; tidak ada yang disimpan dari nilai itu.
   const [guruSaya, setGuruSaya] = useState("");
-  const [usulan, setUsulan] = useState<TeachingScheduleRow | null>(null);
+  const [usulan, setUsulan] = useState<UsulanSesi | null>(null);
   const [materiPokok, setMateriPokok] = useState<string>("");
   // Catatan umum sesi WAJIB ikut dimuat dan dikirim ulang saat menyunting:
   // penyimpanan menulis `catatan` apa adanya, jadi form tanpa kolom ini akan
@@ -242,10 +246,14 @@ export default function MobilePresensiKelasPage() {
         setSelectedRombel(String(rombelData[0]?.id_rombel));
       if (mapelData.length > 0 && !selectedMapelRef.current)
         setSelectedMapel(String(mapelData[0]?.id_mapel));
-      // Aturan pencocokan guru sama dengan halaman Web.
-      const guruLogin = guruData.find(
-        (g) => g.id_guru === user?.id || g.id_guru === user?.kode_operator,
-      );
+      // Aturan pencocokan guru sama dengan halaman Web: tautan akun ke
+      // personil (A-2) lebih dulu, tebakan lama untuk akun tak tertaut.
+      const tautan = (user?.idKaryawan ?? "").trim();
+      const guruLogin =
+        (tautan ? guruData.find((g) => g.id_guru === tautan) : undefined) ??
+        guruData.find(
+          (g) => g.id_guru === user?.id || g.id_guru === user?.kode_operator,
+        );
       if (guruLogin) {
         setGuruSaya(String(guruLogin.id_guru));
         if (!selectedGuruRef.current)
@@ -264,18 +272,36 @@ export default function MobilePresensiKelasPage() {
     if (!guruSaya || lessonPeriods.length === 0) return;
     let batal = false;
     const sekarang = new Date();
-    getJadwalMengajar({
-      id_guru: guruSaya,
-      tanggal: formatTanggalOperasional(sekarang),
-    })
-      .then((rows) => {
+    const hariIniOperasional = formatTanggalOperasional(sekarang);
+    Promise.all([
+      getJadwalMengajar({ id_guru: guruSaya, tanggal: hariIniOperasional }),
+      // JP yang ia gantikan hari ini (§20.2.5); gagal dimuat = tanpa usulan
+      // pengganti, jadwal sendiri tetap diusulkan.
+      muatGantiSaya().catch(() => ({ jp: [] as JpTersusun[] })),
+    ])
+      .then(([rows, ganti]) => {
         if (batal) return;
-        const hari = hariDariTanggal(formatTanggalOperasional(sekarang));
+        const hari = hariDariTanggal(hariIniOperasional);
         const pukul = formatJamOperasional(sekarang).slice(0, 5);
+        const gantiRows: UsulanSesi[] = ganti.jp.map((j) => ({
+          id_jadwal: j.id_jadwal,
+          id_tahun_ajaran: "",
+          id_rombel: j.id_rombel,
+          id_mapel: j.id_mapel,
+          id_guru: guruSaya,
+          hari: hari ?? 0,
+          jam_ke: j.jam_ke,
+          is_aktif: 1,
+          created_at: "",
+          updated_at: "",
+          nama_rombel: j.nama_rombel,
+          nama_mapel: j.nama_mapel,
+          menggantikan: j.nama_guru || j.id_karyawan,
+        }));
         // Guru bisa mengajar di dua unit, jadi setiap baris dinilai dengan
         // jadwal bel unit rombelnya sendiri.
         setUsulan(
-          rows
+          [...gantiRows, ...rows]
             .filter((row) => row.is_aktif === 1)
             .find((row) => {
               const unit =
@@ -808,6 +834,9 @@ export default function MobilePresensiKelasPage() {
                     : ""}{" "}
                   · {usulan.nama_mapel || usulan.id_mapel} ·{" "}
                   {usulan.nama_rombel || usulan.id_rombel}
+                  {usulan.menggantikan
+                    ? ` · menggantikan ${usulan.menggantikan}`
+                    : ""}
                 </p>
                 <button
                   type="button"
