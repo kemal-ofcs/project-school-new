@@ -490,6 +490,47 @@ export const PERMISSION_CATALOG = [
     name: "Kelola Dokumen Pegawai",
     group: "Kepegawaian",
   },
+  // HRIS Fase 2 (`prd-hris.md` §20.4).
+  {
+    key: "hr.request.view",
+    name: "Lihat Pengajuan Cuti & Izin",
+    group: "Kepegawaian",
+  },
+  {
+    key: "hr.request.submit",
+    name: "Ajukan Cuti & Izin Pegawai",
+    group: "Kepegawaian",
+  },
+  {
+    key: "hr.request.urgent",
+    name: "Setujui Pengajuan Urgent",
+    group: "Kepegawaian",
+  },
+  {
+    key: "hr.request.decide",
+    name: "Putuskan Cuti & Izin",
+    group: "Kepegawaian",
+  },
+  {
+    key: "hr.request.decide_major",
+    name: "Putuskan Cuti Panjang",
+    group: "Kepegawaian",
+  },
+  {
+    key: "hr.scope.all",
+    name: "Semua Unit Kepegawaian",
+    group: "Kepegawaian",
+  },
+  {
+    key: "hr.substitute.manage",
+    name: "Tangani Jam Kosong",
+    group: "Kepegawaian",
+  },
+  {
+    key: "hr.leave.adjust",
+    name: "Sesuaikan Jatah Cuti",
+    group: "Kepegawaian",
+  },
 ] as const;
 
 export type PermissionKey = (typeof PERMISSION_CATALOG)[number]["key"];
@@ -594,6 +635,13 @@ export const SENSITIVE_MUTATION_PERMISSIONS = new Set<PermissionKey>([
   // Rekening, NPWP, dan BPJS pegawai menentukan ke mana gaji dibayar dan atas
   // nama siapa pajaknya dilaporkan.
   "hr.finance.manage",
+  // HRIS Fase 2 (§20.4): memutus dan menyesuaikan jatah membayar hari
+  // yang tidak hadir; urgent = menyetujui sekaligus (Q-49).
+  "hr.request.urgent",
+  "hr.request.decide",
+  "hr.request.decide_major",
+  "hr.scope.all",
+  "hr.leave.adjust",
 ]);
 
 /**
@@ -616,10 +664,12 @@ export const SYSTEM_ROLE_KEYS = [
   "admin",
   "operator",
   "scanner",
-  // HRIS Fase 1 (Q-34). Kepala TU dan Guru Piket lahir di Fase 2.
+  // HRIS Fase 1 (Q-34); Kepala TU dan Guru Piket di Fase 2 (§20.4).
   "yayasan",
   "kepala-sekolah",
   "kepegawaian",
+  "kepala-tu",
+  "guru-piket",
 ] as const;
 
 export type SystemRoleKey = (typeof SYSTEM_ROLE_KEYS)[number];
@@ -666,12 +716,22 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<
     "hr.org.manage",
     "hr.contract.manage",
     "hr.duty.manage",
+    "hr.request.view",
+    "hr.request.submit",
+    "hr.request.decide",
+    "hr.request.decide_major",
+    "hr.scope.all",
   ],
   "kepala-sekolah": [
     "home.view",
     "employees.view",
     "teachers.view",
     "hr.duty.manage",
+    "hr.request.view",
+    "hr.request.submit",
+    "hr.request.urgent",
+    "hr.request.decide",
+    "hr.substitute.manage",
   ],
   kepegawaian: [
     "home.view",
@@ -688,7 +748,20 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<
     "hr.finance.manage",
     "hr.document.view",
     "hr.document.manage",
+    "hr.request.view",
+    "hr.request.submit",
+    "hr.substitute.manage",
+    "hr.leave.adjust",
   ],
+  "kepala-tu": [
+    "home.view",
+    "employees.view",
+    "hr.request.view",
+    "hr.request.submit",
+    "hr.request.urgent",
+    "hr.request.decide",
+  ],
+  "guru-piket": ["home.view", "sync.view", "hr.substitute.manage"],
 };
 
 export function normalizeRoleKey(value: string) {

@@ -479,9 +479,26 @@ mod tests {
             permission_revision: 4,
             require_scan_photo: false,
             require_scan_ip_allowlist: false,
+            id_karyawan: None,
             totp_enabled: false,
             login_at: None,
         }
+    }
+
+    /// Vault luring yang dibuat sebelum v69 tidak punya `idKaryawan`; ia
+    /// tetap terbaca sebagai akun tak tertaut (HRIS Fase 2, Q-53).
+    #[test]
+    fn vault_lama_tanpa_id_karyawan_tetap_terbaca() {
+        let mut lama = serde_json::to_value(test_operator()).expect("operator");
+        lama.as_object_mut().expect("objek").remove("idKaryawan");
+        let dibaca: OperatorUser = serde_json::from_value(lama).expect("vault lama");
+        assert_eq!(dibaca.id_karyawan, None);
+        let mut baru = test_operator();
+        baru.id_karyawan = Some("KRY-1".into());
+        let json = serde_json::to_value(&baru).expect("operator baru");
+        assert_eq!(json["idKaryawan"], "KRY-1");
+        let dibaca: OperatorUser = serde_json::from_value(json).expect("vault baru");
+        assert_eq!(dibaca.id_karyawan.as_deref(), Some("KRY-1"));
     }
 
     #[test]

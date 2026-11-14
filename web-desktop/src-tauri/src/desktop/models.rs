@@ -39,6 +39,12 @@ pub struct OperatorUser {
     /// Role ini hanya boleh melakukan scan dari alamat IP yang terdaftar.
     #[serde(default)]
     pub require_scan_ip_allowlist: bool,
+    /// Personil yang ditautkan ke akun ini (A-2, HRIS Fase 2 §20.2.10):
+    /// dasar "tidak untuk diri sendiri", cakupan unit, dan "guru saya" di
+    /// presensi kelas. `serde(default)`: vault luring lama tanpa field ini
+    /// tetap terbaca dan berarti akun tak tertaut sampai login daring (Q-53).
+    #[serde(default)]
+    pub id_karyawan: Option<String>,
     pub login_at: Option<String>,
 }
 

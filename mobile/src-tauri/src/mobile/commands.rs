@@ -17,7 +17,7 @@ use super::{
         CommandError, MobileLoginResult, MobileRuntimeStatus, MobileSession, MobileSyncStatus,
         OperatorUser, SessionMode,
     },
-    hris, hris_cloud, operational, portability, rapel,
+    hr_pengajuan, hris, hris_cloud, operational, portability, rapel,
     scanner, secrets, storage, sync, teaching_journal, turso, uks, wa_notification,
 };
 
@@ -3375,6 +3375,55 @@ pub async fn desktop_hr_ptk_report(state: State<'_, MobileState>) -> Result<Valu
     hris_cloud::laporan_ptk(&klien_cloud(&state)?).await.map_err(hris_cloud::luring)
 }
 
+/// Pengajuan cuti/izin dalam rentang (+ yang belum diputus siapa pun),
+/// beserta status, tanda, jenis, pegawai, dan unit sesi.
+#[tauri::command]
+pub fn desktop_hr_requests(
+    state: State<'_, MobileState>,
+    dari: String,
+    sampai: String,
+) -> Result<Value, CommandError> {
+    let operator = require_permission(&state, "hr.request.view")?;
+    hr_pengajuan::requests(&state, &operator, &dari, &sampai)
+}
+
+/// Ajukan atau sunting pengajuan; urgent butuh `hr.request.urgent` dan
+/// cakupan unit, keduanya dibaca dari sesi.
+#[tauri::command]
+pub fn desktop_hr_request_save(
+    state: State<'_, MobileState>,
+    draft: Value,
+) -> Result<Value, CommandError> {
+    let operator = require_permission(&state, "hr.request.submit")?;
+    hr_pengajuan::simpan(&state, &operator, draft)
+}
+
+/// Setujui, Tolak, Diketahui, atau Batal. Izin pemutus jenis, cakupan unit,
+/// dan "bukan untuk diri sendiri" dinilai dari sesi.
+#[tauri::command]
+pub fn desktop_hr_request_decide(
+    state: State<'_, MobileState>,
+    id_pengajuan: String,
+    aksi: String,
+    alasan: String,
+) -> Result<Value, CommandError> {
+    let operator = require_any_permission(
+        &state,
+        &["hr.request.submit", "hr.request.decide", "hr.request.decide_major"],
+    )?;
+    hr_pengajuan::putuskan(&state, &operator, &id_pengajuan, &aksi, &alasan)
+}
+
+/// Jenis pengajuan baru atau sunting (tab Organisasi).
+#[tauri::command]
+pub fn desktop_hr_request_types_save(
+    state: State<'_, MobileState>,
+    draft: Value,
+) -> Result<Value, CommandError> {
+    require_permission(&state, "hr.org.manage")?;
+    hr_pengajuan::simpan_jenis(&state, draft)
+}
+
 /// Jenis tagihan, tarif, serta pilihan unit/rombel/tahun ajaran untuk
 /// menerbitkan, dengan izin tagihan (bukan `academic.view`).
 #[tauri::command]
@@ -5153,6 +5202,7 @@ mod tests_offline_login {
             permission_revision: 1,
             require_scan_photo: false,
             require_scan_ip_allowlist: false,
+            id_karyawan: None,
             totp_enabled,
             login_at: None,
         }

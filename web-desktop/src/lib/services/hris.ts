@@ -3,6 +3,7 @@ import "server-only";
 import type { Client, ResultSet, Row, Transaction } from "@libsql/client";
 import type { z } from "zod";
 import { ApiRequestError } from "@/lib/server/http/api-response";
+import { type BarisJenis, JENIS_SQL } from "@/lib/validations/hr-pengajuan";
 import {
   AMBIL_BERKAS_SQL,
   ATURAN_PERCOBAAN,
@@ -176,6 +177,9 @@ export async function getOrg(client: Client): Promise<OrgKepegawaian> {
     ),
     pegawai: daftar,
     jenis_tugas: await jenisTugas(client),
+    jenis_pengajuan: (await client.execute(JENIS_SQL)).rows.map(
+      (r) => ({ ...r }) as unknown as BarisJenis,
+    ),
     pengaturan: await pengaturanKontrak(client),
   };
 }

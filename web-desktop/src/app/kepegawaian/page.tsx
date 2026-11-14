@@ -11,6 +11,7 @@ import {
 import { AppShell } from "@/components/AppShell";
 import { masaKerja } from "@/components/kepegawaian/gaya";
 import { JenisDokumenOrganisasi } from "@/components/kepegawaian/JenisDokumenOrganisasi";
+import { JenisPengajuanOrganisasi } from "@/components/kepegawaian/JenisPengajuanOrganisasi";
 import { OrganisasiTugasKontrak } from "@/components/kepegawaian/OrganisasiTugasKontrak";
 import { RincianPegawai } from "@/components/kepegawaian/RincianPegawai";
 import { TabKontrak } from "@/components/kepegawaian/TabKontrak";
@@ -648,6 +649,13 @@ function TabOrganisasi({
       </section>
 
       <OrganisasiTugasKontrak
+        org={org}
+        bolehUbah={bolehUbah}
+        onBerhasil={onBerhasil}
+        onGalat={onGalat}
+      />
+
+      <JenisPengajuanOrganisasi
         org={org}
         bolehUbah={bolehUbah}
         onBerhasil={onBerhasil}

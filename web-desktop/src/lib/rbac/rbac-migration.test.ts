@@ -68,7 +68,9 @@ describe("dynamic RBAC migration", () => {
     );
     expect(roles.rows.map((row) => String(row.role_key))).toEqual([
       "admin",
+      "guru-piket",
       "kepala-sekolah",
+      "kepala-tu",
       "kepegawaian",
       "operator",
       "scanner",
@@ -193,6 +195,8 @@ describe("dynamic RBAC migration", () => {
       67,
       // v68 — organisasi, kontrak, dan data kepegawaian (HRIS Fase 1, `hr_*`).
       68,
+      // v69 — pengajuan cuti/izin dan keputusannya (HRIS Fase 2, `hr_pengajuan*`).
+      69,
     ]);
 
     const sessionColumns = await client.execute(
@@ -280,6 +284,8 @@ describe("dynamic RBAC migration", () => {
       yayasan: [...DEFAULT_ROLE_PERMISSIONS.yayasan],
       "kepala-sekolah": [...DEFAULT_ROLE_PERMISSIONS["kepala-sekolah"]],
       kepegawaian: [...DEFAULT_ROLE_PERMISSIONS.kepegawaian],
+      "kepala-tu": [...DEFAULT_ROLE_PERMISSIONS["kepala-tu"]],
+      "guru-piket": [...DEFAULT_ROLE_PERMISSIONS["guru-piket"]],
     });
   });
 

@@ -68,6 +68,7 @@ export async function readSessionRecord(
         m.role_id, r.role_key, r.nama_role, r.is_superadmin,
         COALESCE(r.require_scan_photo, 0) AS require_scan_photo,
         COALESCE(r.require_scan_ip_allowlist, 0) AS require_scan_ip_allowlist,
+        COALESCE(m.id_karyawan, '') AS id_karyawan,
         s.created_at
       FROM app_session s
       JOIN master_operator m ON m.id = s.operator_id
@@ -121,6 +122,7 @@ export async function readSessionRecord(
     // memaksa operator login ulang.
     requireScanPhoto: Number(row.require_scan_photo ?? 0) === 1,
     requireScanIpAllowlist: Number(row.require_scan_ip_allowlist ?? 0) === 1,
+    idKaryawan: String(row.id_karyawan ?? "").trim() || null,
     loginAt: String(row.created_at),
   };
 }

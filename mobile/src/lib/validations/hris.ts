@@ -15,6 +15,7 @@ import {
   ukuranBase64,
 } from "./berkas-sekolah";
 import { tanggalValid } from "./hari-kerja";
+import type { BarisJenis } from "./hr-pengajuan";
 
 export const NAMA_MAKS = 60;
 
@@ -231,6 +232,8 @@ export interface OrgKepegawaian extends SusunanOrg {
   /** `status_kepegawaian` di sini = status kini (`STATUS_KINI_SQL`, hari ini WIB). */
   pegawai: PegawaiKepegawaian[];
   jenis_tugas: JenisTugas[];
+  /** Jenis pengajuan cuti/izin (HRIS Fase 2), disunting di tab Organisasi. */
+  jenis_pengajuan: BarisJenis[];
   pengaturan: PengaturanKontrak;
 }
 

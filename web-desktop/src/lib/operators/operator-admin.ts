@@ -13,6 +13,11 @@ import {
 } from "@/lib/security/totp";
 import { PEGAWAI_SQL } from "@/lib/validations/hris";
 
+/** Pola `role-admin.ts`: revisi naik satu, sesi Desktop/Mobile dimuat ulang. */
+const NAIKKAN_RBAC_REVISION_SQL = `INSERT INTO setting_gex_system (key, value) VALUES ('rbac_revision', '2')
+     ON CONFLICT(key) DO UPDATE SET
+       value = CAST(CAST(setting_gex_system.value AS INTEGER) + 1 AS TEXT);`;
+
 export function validateOperatorDraft(draft: OperatorDraft) {
   const code = draft.kodeOperator.trim().toUpperCase();
   const username = draft.username.trim();
@@ -405,10 +410,21 @@ export async function editOperator(
     args.push(idKaryawan);
   }
   args.push(operatorId);
-  await client.execute({
-    sql: `UPDATE master_operator SET ${updates.join(", ")} WHERE id = ?;`,
-    args,
-  });
+  const tautanBerubah =
+    draft.idKaryawan !== undefined &&
+    idKaryawan !== String(tersimpan.rows[0]?.id_karyawan ?? "");
+  await client.batch(
+    [
+      {
+        sql: `UPDATE master_operator SET ${updates.join(", ")} WHERE id = ?;`,
+        args,
+      },
+      // Tautan personil ikut sesi Desktop/Mobile (`id_karyawan`, Q-53):
+      // revisi baru membuat perangkat memuat ulang sesi tanpa logout.
+      ...(tautanBerubah ? [{ sql: NAIKKAN_RBAC_REVISION_SQL, args: [] }] : []),
+    ],
+    "write",
+  );
 
   await revokeOperatorSessions(
     client,

@@ -1,15 +1,13 @@
 # ANTISLOP.md — hasil antislop
 
-- Waktu: 14 November 2026, 10:40 WIB
-- Commit: fe84fa8 (+ berkas berubah, belum commit)
-- Berkas disunting: 5
+- Waktu: 14 November 2026, 15:56 WIB
+- Commit: 8b38ffb (+ berkas berubah, belum commit)
+- Berkas disunting: 3
 
 ## Disunting
-- `web-desktop/src-tauri/src/desktop/sync.rs` — komentar — ganti em dash pada penanda versi v68 sesuai R-02
-- `web-desktop/src-tauri/src/desktop/hris.rs` — komentar — rapikan pembatas dekoratif berulang menjadi komentar baris tunggal
-- `web-desktop/src/lib/validations/hris.ts` — komentar — rapikan pembatas dekoratif berulang menjadi komentar baris tunggal
-- `web-desktop/src/lib/services/hris.ts` — komentar — rapikan pembatas dekoratif berulang menjadi komentar baris tunggal
-- `web-desktop/src/lib/gateways/hris.ts` — komentar — rapikan pembatas dekoratif berulang menjadi komentar baris tunggal
+- `web-desktop/src-tauri/src/desktop/storage.rs` — komentar — ganti em dash pada penanda versi v69 sesuai R-02
+- `web-desktop/src-tauri/src/desktop/hr_pengajuan.rs` — komentar — rapikan pembatas dekoratif berulang menjadi komentar baris tunggal
+- `web-desktop/src/lib/validations/hr-pengajuan.ts` — komentar — rapikan pembatas dekoratif berulang menjadi komentar baris tunggal
 
 ## Dilewati
 - `CLAUDE.md`, `.agents/`, `.claude/` — konfigurasi panduan agent

@@ -1,0 +1,1694 @@
+{
+  "_": "Vektor kembar desktop/hr_pengajuan.rs (mod tests) dan validations/hr-pengajuan.test.ts.",
+  "jenis": [
+    {
+      "masuk": {
+        "nama": "  Cuti   Tahunan ",
+        "kelompok": "Cuti",
+        "potong_jatah": 1,
+        "dampak_gaji": "Dibayar"
+      },
+      "galat": null,
+      "hasil": {
+        "nama": "Cuti Tahunan",
+        "kelompok": "Cuti",
+        "izin_pemutus": "hr.request.decide",
+        "boleh_urgent": false,
+        "potong_jatah": true,
+        "dampak_gaji": "Dibayar",
+        "maks_hari": null,
+        "satuan_maks": "Hari Kerja",
+        "wajib_dokumen": false,
+        "is_aktif": true
+      }
+    },
+    {
+      "masuk": {
+        "nama": "Sakit",
+        "kelompok": "Sakit",
+        "izin_pemutus": "",
+        "boleh_urgent": true,
+        "dampak_gaji": "Dibayar",
+        "wajib_dokumen": 1,
+        "maks_hari": "",
+        "is_aktif": 0
+      },
+      "galat": null,
+      "hasil": {
+        "nama": "Sakit",
+        "kelompok": "Sakit",
+        "izin_pemutus": "hr.request.decide",
+        "boleh_urgent": true,
+        "potong_jatah": false,
+        "dampak_gaji": "Dibayar",
+        "maks_hari": null,
+        "satuan_maks": "Hari Kerja",
+        "wajib_dokumen": true,
+        "is_aktif": false
+      }
+    },
+    {
+      "masuk": {
+        "nama": "Cuti Melahirkan",
+        "kelompok": "Cuti",
+        "izin_pemutus": "hr.request.decide_major",
+        "dampak_gaji": "Dibayar",
+        "maks_hari": 90,
+        "satuan_maks": "Hari Kalender"
+      },
+      "galat": null,
+      "hasil": {
+        "nama": "Cuti Melahirkan",
+        "kelompok": "Cuti",
+        "izin_pemutus": "hr.request.decide_major",
+        "boleh_urgent": false,
+        "potong_jatah": false,
+        "dampak_gaji": "Dibayar",
+        "maks_hari": 90,
+        "satuan_maks": "Hari Kalender",
+        "wajib_dokumen": false,
+        "is_aktif": true
+      }
+    },
+    {
+      "masuk": {
+        "nama": "Lembur",
+        "kelompok": "Lembur",
+        "dampak_gaji": "Dibayar"
+      },
+      "galat": "Kelompok harus Cuti, Izin, Sakit, atau Dinas Luar.",
+      "hasil": null
+    },
+    {
+      "masuk": {
+        "nama": "Izin",
+        "kelompok": "Izin",
+        "potong_jatah": true,
+        "dampak_gaji": "Dibayar"
+      },
+      "galat": "Hanya kelompok Cuti yang bisa memotong jatah cuti.",
+      "hasil": null
+    },
+    {
+      "masuk": {
+        "nama": "Izin",
+        "kelompok": "Izin",
+        "dampak_gaji": "Gratis"
+      },
+      "galat": "Dampak gaji tidak dikenal.",
+      "hasil": null
+    },
+    {
+      "masuk": {
+        "nama": "Izin",
+        "kelompok": "Izin",
+        "izin_pemutus": "reimburse.decide",
+        "dampak_gaji": "Dibayar"
+      },
+      "galat": "Pemutus pengajuan tidak dikenal.",
+      "hasil": null
+    },
+    {
+      "masuk": {
+        "nama": "Izin",
+        "kelompok": "Izin",
+        "dampak_gaji": "Dibayar",
+        "satuan_maks": "Minggu"
+      },
+      "galat": "Satuan batas hari tidak dikenal.",
+      "hasil": null
+    },
+    {
+      "masuk": {
+        "nama": "Izin",
+        "kelompok": "Izin",
+        "dampak_gaji": "Dibayar",
+        "maks_hari": 0
+      },
+      "galat": "Batas hari harus 1 sampai 366.",
+      "hasil": null
+    },
+    {
+      "masuk": {
+        "nama": "Izin",
+        "kelompok": "Izin",
+        "dampak_gaji": "Dibayar",
+        "maks_hari": 2.5
+      },
+      "galat": "Batas hari harus 1 sampai 366.",
+      "hasil": null
+    }
+  ],
+  "pengajuan": [
+    {
+      "masuk": {
+        "id_karyawan": " P1 ",
+        "id_jenis": "jns-sakit",
+        "tanggal_mulai": "2026-11-16",
+        "tanggal_selesai": "2026-11-16",
+        "alasan": " Demam "
+      },
+      "galat": null,
+      "hasil": {
+        "id_karyawan": "P1",
+        "id_jenis": "jns-sakit",
+        "tanggal_mulai": "2026-11-16",
+        "tanggal_selesai": "2026-11-16",
+        "jam_mulai_ke": null,
+        "jam_sampai_ke": null,
+        "setengah_hari": false,
+        "alasan": "Demam",
+        "urgent": false
+      }
+    },
+    {
+      "masuk": {
+        "id_karyawan": " P1 ",
+        "id_jenis": "jns-sakit",
+        "tanggal_mulai": "2026-11-16",
+        "tanggal_selesai": "2026-11-18",
+        "alasan": " Demam ",
+        "jam_mulai_ke": 3,
+        "jam_sampai_ke": 2,
+        "urgent": true
+      },
+      "galat": null,
+      "hasil": {
+        "id_karyawan": "P1",
+        "id_jenis": "jns-sakit",
+        "tanggal_mulai": "2026-11-16",
+        "tanggal_selesai": "2026-11-18",
+        "jam_mulai_ke": 3,
+        "jam_sampai_ke": 2,
+        "setengah_hari": false,
+        "alasan": "Demam",
+        "urgent": true
+      }
+    },
+    {
+      "masuk": {
+        "id_karyawan": " P1 ",
+        "id_jenis": "jns-sakit",
+        "tanggal_mulai": "2026-11-16",
+        "tanggal_selesai": "2026-11-16",
+        "alasan": " Demam ",
+        "jam_mulai_ke": "",
+        "setengah_hari": 1
+      },
+      "galat": null,
+      "hasil": {
+        "id_karyawan": "P1",
+        "id_jenis": "jns-sakit",
+        "tanggal_mulai": "2026-11-16",
+        "tanggal_selesai": "2026-11-16",
+        "jam_mulai_ke": null,
+        "jam_sampai_ke": null,
+        "setengah_hari": true,
+        "alasan": "Demam",
+        "urgent": false
+      }
+    },
+    {
+      "masuk": {
+        "id_karyawan": "",
+        "id_jenis": "jns-sakit",
+        "tanggal_mulai": "2026-11-16",
+        "tanggal_selesai": "2026-11-16",
+        "alasan": " Demam "
+      },
+      "galat": "Pilih pegawai.",
+      "hasil": null
+    },
+    {
+      "masuk": {
+        "id_karyawan": " P1 ",
+        "id_jenis": "",
+        "tanggal_mulai": "2026-11-16",
+        "tanggal_selesai": "2026-11-16",
+        "alasan": " Demam "
+      },
+      "galat": "Pilih jenis pengajuan.",
+      "hasil": null
+    },
+    {
+      "masuk": {
+        "id_karyawan": " P1 ",
+        "id_jenis": "jns-sakit",
+        "tanggal_mulai": "2026-02-30",
+        "tanggal_selesai": "2026-11-16",
+        "alasan": " Demam "
+      },
+      "galat": "Tanggal pengajuan tidak valid.",
+      "hasil": null
+    },
+    {
+      "masuk": {
+        "id_karyawan": " P1 ",
+        "id_jenis": "jns-sakit",
+        "tanggal_mulai": "2026-11-16",
+        "tanggal_selesai": "2026-11-15",
+        "alasan": " Demam "
+      },
+      "galat": "Tanggal selesai tidak boleh sebelum tanggal mulai.",
+      "hasil": null
+    },
+    {
+      "masuk": {
+        "id_karyawan": " P1 ",
+        "id_jenis": "jns-sakit",
+        "tanggal_mulai": "2026-11-16",
+        "tanggal_selesai": "2027-11-17",
+        "alasan": " Demam "
+      },
+      "galat": "Rentang pengajuan paling panjang 366 hari.",
+      "hasil": null
+    },
+    {
+      "masuk": {
+        "id_karyawan": " P1 ",
+        "id_jenis": "jns-sakit",
+        "tanggal_mulai": "2026-11-16",
+        "tanggal_selesai": "2027-11-16",
+        "alasan": " Demam "
+      },
+      "galat": null,
+      "hasil": {
+        "id_karyawan": "P1",
+        "id_jenis": "jns-sakit",
+        "tanggal_mulai": "2026-11-16",
+        "tanggal_selesai": "2027-11-16",
+        "jam_mulai_ke": null,
+        "jam_sampai_ke": null,
+        "setengah_hari": false,
+        "alasan": "Demam",
+        "urgent": false
+      }
+    },
+    {
+      "masuk": {
+        "id_karyawan": " P1 ",
+        "id_jenis": "jns-sakit",
+        "tanggal_mulai": "2026-11-16",
+        "tanggal_selesai": "2026-11-16",
+        "alasan": " Demam ",
+        "jam_mulai_ke": 21
+      },
+      "galat": "Jam ke-N harus angka 1 sampai 20.",
+      "hasil": null
+    },
+    {
+      "masuk": {
+        "id_karyawan": " P1 ",
+        "id_jenis": "jns-sakit",
+        "tanggal_mulai": "2026-11-16",
+        "tanggal_selesai": "2026-11-16",
+        "alasan": " Demam ",
+        "jam_sampai_ke": "3"
+      },
+      "galat": "Jam ke-N harus angka 1 sampai 20.",
+      "hasil": null
+    },
+    {
+      "masuk": {
+        "id_karyawan": " P1 ",
+        "id_jenis": "jns-sakit",
+        "tanggal_mulai": "2026-11-16",
+        "tanggal_selesai": "2026-11-16",
+        "alasan": " Demam ",
+        "jam_mulai_ke": 4,
+        "jam_sampai_ke": 2
+      },
+      "galat": "Jam selesai tidak boleh sebelum jam mulai.",
+      "hasil": null
+    },
+    {
+      "masuk": {
+        "id_karyawan": " P1 ",
+        "id_jenis": "jns-sakit",
+        "tanggal_mulai": "2026-11-16",
+        "tanggal_selesai": "2026-11-17",
+        "alasan": " Demam ",
+        "setengah_hari": true
+      },
+      "galat": "Setengah hari hanya untuk satu tanggal.",
+      "hasil": null
+    },
+    {
+      "masuk": {
+        "id_karyawan": " P1 ",
+        "id_jenis": "jns-sakit",
+        "tanggal_mulai": "2026-11-16",
+        "tanggal_selesai": "2026-11-16",
+        "alasan": " Demam ",
+        "setengah_hari": true,
+        "jam_mulai_ke": 2
+      },
+      "galat": "Pilih setengah hari atau jam ke-N, tidak keduanya.",
+      "hasil": null
+    },
+    {
+      "masuk": {
+        "id_karyawan": " P1 ",
+        "id_jenis": "jns-sakit",
+        "tanggal_mulai": "2026-11-16",
+        "tanggal_selesai": "2026-11-16",
+        "alasan": "   "
+      },
+      "galat": "Alasan wajib diisi.",
+      "hasil": null
+    },
+    {
+      "masuk": {
+        "id_karyawan": " P1 ",
+        "id_jenis": "jns-sakit",
+        "tanggal_mulai": "2026-11-16",
+        "tanggal_selesai": "2026-11-16",
+        "alasan": "ééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééé"
+      },
+      "galat": "Alasan maksimal 500 karakter.",
+      "hasil": null
+    },
+    {
+      "masuk": {
+        "id_karyawan": " P1 ",
+        "id_jenis": "jns-sakit",
+        "tanggal_mulai": "2026-11-16",
+        "tanggal_selesai": "2026-11-16",
+        "alasan": "éééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééé"
+      },
+      "galat": null,
+      "hasil": {
+        "id_karyawan": "P1",
+        "id_jenis": "jns-sakit",
+        "tanggal_mulai": "2026-11-16",
+        "tanggal_selesai": "2026-11-16",
+        "jam_mulai_ke": null,
+        "jam_sampai_ke": null,
+        "setengah_hari": false,
+        "alasan": "éééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééé",
+        "urgent": false
+      }
+    }
+  ],
+  "periksa_jenis": [
+    {
+      "pengajuan": {
+        "id_karyawan": "P1",
+        "id_jenis": "jns-sakit",
+        "tanggal_mulai": "2026-11-16",
+        "tanggal_selesai": "2026-11-16",
+        "jam_mulai_ke": 3,
+        "jam_sampai_ke": null,
+        "setengah_hari": false,
+        "alasan": "Demam",
+        "urgent": false
+      },
+      "jenis": {
+        "nama": "Sakit",
+        "kelompok": "Sakit",
+        "izin_pemutus": "hr.request.decide",
+        "boleh_urgent": true,
+        "potong_jatah": false,
+        "dampak_gaji": "Dibayar",
+        "maks_hari": null,
+        "satuan_maks": "Hari Kerja",
+        "wajib_dokumen": false,
+        "is_aktif": true
+      },
+      "guru": true,
+      "jp_max": 8,
+      "galat": null
+    },
+    {
+      "pengajuan": {
+        "id_karyawan": "P1",
+        "id_jenis": "jns-sakit",
+        "tanggal_mulai": "2026-11-16",
+        "tanggal_selesai": "2026-11-16",
+        "jam_mulai_ke": 9,
+        "jam_sampai_ke": null,
+        "setengah_hari": false,
+        "alasan": "Demam",
+        "urgent": false
+      },
+      "jenis": {
+        "nama": "Sakit",
+        "kelompok": "Sakit",
+        "izin_pemutus": "hr.request.decide",
+        "boleh_urgent": true,
+        "potong_jatah": false,
+        "dampak_gaji": "Dibayar",
+        "maks_hari": null,
+        "satuan_maks": "Hari Kerja",
+        "wajib_dokumen": false,
+        "is_aktif": true
+      },
+      "guru": true,
+      "jp_max": 8,
+      "galat": "Jam ke-N paling besar 8."
+    },
+    {
+      "pengajuan": {
+        "id_karyawan": "P1",
+        "id_jenis": "jns-sakit",
+        "tanggal_mulai": "2026-11-16",
+        "tanggal_selesai": "2026-11-16",
+        "jam_mulai_ke": null,
+        "jam_sampai_ke": 2,
+        "setengah_hari": false,
+        "alasan": "Demam",
+        "urgent": false
+      },
+      "jenis": {
+        "nama": "Sakit",
+        "kelompok": "Sakit",
+        "izin_pemutus": "hr.request.decide",
+        "boleh_urgent": true,
+        "potong_jatah": false,
+        "dampak_gaji": "Dibayar",
+        "maks_hari": null,
+        "satuan_maks": "Hari Kerja",
+        "wajib_dokumen": false,
+        "is_aktif": true
+      },
+      "guru": false,
+      "jp_max": 8,
+      "galat": "Jam ke-N hanya untuk guru."
+    },
+    {
+      "pengajuan": {
+        "id_karyawan": "P1",
+        "id_jenis": "jns-sakit",
+        "tanggal_mulai": "2026-11-16",
+        "tanggal_selesai": "2026-11-16",
+        "jam_mulai_ke": 2,
+        "jam_sampai_ke": null,
+        "setengah_hari": false,
+        "alasan": "Demam",
+        "urgent": false
+      },
+      "jenis": {
+        "nama": "Cuti Tahunan",
+        "kelompok": "Cuti",
+        "izin_pemutus": "hr.request.decide",
+        "boleh_urgent": false,
+        "potong_jatah": true,
+        "dampak_gaji": "Dibayar",
+        "maks_hari": null,
+        "satuan_maks": "Hari Kerja",
+        "wajib_dokumen": false,
+        "is_aktif": true
+      },
+      "guru": true,
+      "jp_max": 8,
+      "galat": "Cuti selalu hari penuh."
+    },
+    {
+      "pengajuan": {
+        "id_karyawan": "P1",
+        "id_jenis": "jns-sakit",
+        "tanggal_mulai": "2026-11-16",
+        "tanggal_selesai": "2026-11-16",
+        "jam_mulai_ke": null,
+        "jam_sampai_ke": null,
+        "setengah_hari": true,
+        "alasan": "Demam",
+        "urgent": false
+      },
+      "jenis": {
+        "nama": "Sakit",
+        "kelompok": "Sakit",
+        "izin_pemutus": "hr.request.decide",
+        "boleh_urgent": true,
+        "potong_jatah": false,
+        "dampak_gaji": "Dibayar",
+        "maks_hari": null,
+        "satuan_maks": "Hari Kerja",
+        "wajib_dokumen": false,
+        "is_aktif": true
+      },
+      "guru": false,
+      "jp_max": 8,
+      "galat": "Setengah hari hanya untuk kelompok Izin."
+    },
+    {
+      "pengajuan": {
+        "id_karyawan": "P1",
+        "id_jenis": "jns-sakit",
+        "tanggal_mulai": "2026-11-16",
+        "tanggal_selesai": "2026-11-16",
+        "jam_mulai_ke": null,
+        "jam_sampai_ke": null,
+        "setengah_hari": true,
+        "alasan": "Demam",
+        "urgent": false
+      },
+      "jenis": {
+        "nama": "Sakit",
+        "kelompok": "Izin",
+        "izin_pemutus": "hr.request.decide",
+        "boleh_urgent": true,
+        "potong_jatah": false,
+        "dampak_gaji": "Dibayar",
+        "maks_hari": null,
+        "satuan_maks": "Hari Kerja",
+        "wajib_dokumen": false,
+        "is_aktif": true
+      },
+      "guru": true,
+      "jp_max": 8,
+      "galat": "Guru memakai jam ke-N, bukan setengah hari."
+    },
+    {
+      "pengajuan": {
+        "id_karyawan": "P1",
+        "id_jenis": "jns-sakit",
+        "tanggal_mulai": "2026-11-16",
+        "tanggal_selesai": "2026-11-16",
+        "jam_mulai_ke": null,
+        "jam_sampai_ke": null,
+        "setengah_hari": true,
+        "alasan": "Demam",
+        "urgent": false
+      },
+      "jenis": {
+        "nama": "Sakit",
+        "kelompok": "Izin",
+        "izin_pemutus": "hr.request.decide",
+        "boleh_urgent": true,
+        "potong_jatah": false,
+        "dampak_gaji": "Dibayar",
+        "maks_hari": null,
+        "satuan_maks": "Hari Kerja",
+        "wajib_dokumen": false,
+        "is_aktif": true
+      },
+      "guru": false,
+      "jp_max": 8,
+      "galat": null
+    },
+    {
+      "pengajuan": {
+        "id_karyawan": "P1",
+        "id_jenis": "jns-sakit",
+        "tanggal_mulai": "2026-11-16",
+        "tanggal_selesai": "2026-11-16",
+        "jam_mulai_ke": null,
+        "jam_sampai_ke": null,
+        "setengah_hari": false,
+        "alasan": "Demam",
+        "urgent": true
+      },
+      "jenis": {
+        "nama": "Cuti Tahunan",
+        "kelompok": "Cuti",
+        "izin_pemutus": "hr.request.decide",
+        "boleh_urgent": false,
+        "potong_jatah": true,
+        "dampak_gaji": "Dibayar",
+        "maks_hari": null,
+        "satuan_maks": "Hari Kerja",
+        "wajib_dokumen": false,
+        "is_aktif": true
+      },
+      "guru": false,
+      "jp_max": 8,
+      "galat": "Jenis pengajuan ini tidak boleh urgent."
+    },
+    {
+      "pengajuan": {
+        "id_karyawan": "P1",
+        "id_jenis": "jns-sakit",
+        "tanggal_mulai": "2026-11-16",
+        "tanggal_selesai": "2026-11-16",
+        "jam_mulai_ke": null,
+        "jam_sampai_ke": null,
+        "setengah_hari": false,
+        "alasan": "Demam",
+        "urgent": false
+      },
+      "jenis": {
+        "nama": "Sakit",
+        "kelompok": "Sakit",
+        "izin_pemutus": "hr.request.decide",
+        "boleh_urgent": true,
+        "potong_jatah": false,
+        "dampak_gaji": "Dibayar",
+        "maks_hari": null,
+        "satuan_maks": "Hari Kerja",
+        "wajib_dokumen": false,
+        "is_aktif": false
+      },
+      "guru": false,
+      "jp_max": 8,
+      "galat": "Jenis pengajuan ini sudah nonaktif."
+    }
+  ],
+  "maks": [
+    {
+      "jenis": {
+        "nama": "Cuti Menikah",
+        "kelompok": "Cuti",
+        "izin_pemutus": "hr.request.decide",
+        "boleh_urgent": false,
+        "potong_jatah": true,
+        "dampak_gaji": "Dibayar",
+        "maks_hari": 3,
+        "satuan_maks": "Hari Kerja",
+        "wajib_dokumen": false,
+        "is_aktif": true
+      },
+      "hari_kerja": 3,
+      "hari_kalender": 5,
+      "galat": null
+    },
+    {
+      "jenis": {
+        "nama": "Cuti Menikah",
+        "kelompok": "Cuti",
+        "izin_pemutus": "hr.request.decide",
+        "boleh_urgent": false,
+        "potong_jatah": true,
+        "dampak_gaji": "Dibayar",
+        "maks_hari": 3,
+        "satuan_maks": "Hari Kerja",
+        "wajib_dokumen": false,
+        "is_aktif": true
+      },
+      "hari_kerja": 4,
+      "hari_kalender": 4,
+      "galat": "Cuti Menikah paling lama 3 hari kerja."
+    },
+    {
+      "jenis": {
+        "nama": "Cuti Melahirkan",
+        "kelompok": "Cuti",
+        "izin_pemutus": "hr.request.decide",
+        "boleh_urgent": false,
+        "potong_jatah": true,
+        "dampak_gaji": "Dibayar",
+        "maks_hari": 90,
+        "satuan_maks": "Hari Kalender",
+        "wajib_dokumen": false,
+        "is_aktif": true
+      },
+      "hari_kerja": 70,
+      "hari_kalender": 91,
+      "galat": "Cuti Melahirkan paling lama 90 hari kalender."
+    },
+    {
+      "jenis": {
+        "nama": "Cuti Tahunan",
+        "kelompok": "Cuti",
+        "izin_pemutus": "hr.request.decide",
+        "boleh_urgent": false,
+        "potong_jatah": true,
+        "dampak_gaji": "Dibayar",
+        "maks_hari": null,
+        "satuan_maks": "Hari Kerja",
+        "wajib_dokumen": false,
+        "is_aktif": true
+      },
+      "hari_kerja": 300,
+      "hari_kalender": 366,
+      "galat": null
+    }
+  ],
+  "kanonik": [
+    {
+      "isi": {
+        "id_karyawan": "P1",
+        "id_jenis": "jns-sakit",
+        "kelompok": "Sakit",
+        "potong_jatah": false,
+        "dampak_gaji": "Dibayar",
+        "izin_pemutus": "hr.request.decide",
+        "tanggal_mulai": "2026-11-16",
+        "tanggal_selesai": "2026-11-17",
+        "jam_mulai_ke": 3,
+        "jam_sampai_ke": null,
+        "setengah_hari": false,
+        "alasan": "Demam tinggi"
+      },
+      "kanonik": "P1\u001fjns-sakit\u001fSakit\u001f0\u001fDibayar\u001fhr.request.decide\u001f2026-11-16\u001f2026-11-17\u001f3\u001f\u001f0\u001fDemam tinggi",
+      "sidik": "95322722777a5c3b457c240d4cf0703ad85fcd36111654162c80950f8f9d97be"
+    },
+    {
+      "isi": {
+        "id_karyawan": "P1",
+        "id_jenis": "jns-sakit",
+        "kelompok": "Sakit",
+        "potong_jatah": false,
+        "dampak_gaji": "Dibayar",
+        "izin_pemutus": "hr.request.decide",
+        "tanggal_mulai": "2026-11-16",
+        "tanggal_selesai": "2026-11-17",
+        "jam_mulai_ke": 3,
+        "jam_sampai_ke": null,
+        "setengah_hari": false,
+        "alasan": "Demam tinggi "
+      },
+      "kanonik": "P1\u001fjns-sakit\u001fSakit\u001f0\u001fDibayar\u001fhr.request.decide\u001f2026-11-16\u001f2026-11-17\u001f3\u001f\u001f0\u001fDemam tinggi ",
+      "sidik": "46251a4c019e1ae361c3d7d6c18899a2be778a741c869505ba4cef3419ebfa79"
+    },
+    {
+      "isi": {
+        "id_karyawan": "T9",
+        "id_jenis": "jns-izin-dibayar",
+        "kelompok": "Izin",
+        "potong_jatah": false,
+        "dampak_gaji": "Dibayar",
+        "izin_pemutus": "hr.request.decide",
+        "tanggal_mulai": "2026-12-01",
+        "tanggal_selesai": "2026-12-01",
+        "jam_mulai_ke": null,
+        "jam_sampai_ke": null,
+        "setengah_hari": true,
+        "alasan": "Urusan keluarga · ✓"
+      },
+      "kanonik": "T9\u001fjns-izin-dibayar\u001fIzin\u001f0\u001fDibayar\u001fhr.request.decide\u001f2026-12-01\u001f2026-12-01\u001f\u001f\u001f1\u001fUrusan keluarga · ✓",
+      "sidik": "f63d8c1e39035df5483d20c0a5aee08371f1114ec94bf50c9c1974c165884296"
+    }
+  ],
+  "status": [
+    {
+      "sidik": "A",
+      "keputusan": [],
+      "status": "Menunggu",
+      "berlaku": null
+    },
+    {
+      "sidik": "A",
+      "keputusan": [
+        {
+          "id_keputusan": "k2",
+          "jenis": "Tolak",
+          "sidik": "A",
+          "oleh": "kepsek",
+          "waktu_perangkat": "2026-11-10 08:00:00",
+          "diterima_cloud": null
+        },
+        {
+          "id_keputusan": "k1",
+          "jenis": "Setujui",
+          "sidik": "A",
+          "oleh": "kepsek",
+          "waktu_perangkat": "2026-11-10 09:00:00",
+          "diterima_cloud": "2026-11-10 02:00:00"
+        }
+      ],
+      "status": "Disetujui",
+      "berlaku": "k1"
+    },
+    {
+      "sidik": "A",
+      "keputusan": [
+        {
+          "id_keputusan": "k2",
+          "jenis": "Tolak",
+          "sidik": "A",
+          "oleh": "kepsek",
+          "waktu_perangkat": "2026-11-10 08:00:00",
+          "diterima_cloud": null
+        },
+        {
+          "id_keputusan": "k1",
+          "jenis": "Setujui",
+          "sidik": "A",
+          "oleh": "kepsek",
+          "waktu_perangkat": "2026-11-10 08:00:00",
+          "diterima_cloud": null
+        }
+      ],
+      "status": "Disetujui",
+      "berlaku": "k1"
+    },
+    {
+      "sidik": "B",
+      "keputusan": [
+        {
+          "id_keputusan": "k1",
+          "jenis": "Setujui",
+          "sidik": "A",
+          "oleh": "kepsek",
+          "waktu_perangkat": "2026-11-10 08:00:00",
+          "diterima_cloud": "2026-11-10 01:00:00"
+        }
+      ],
+      "status": "Menunggu",
+      "berlaku": null
+    },
+    {
+      "sidik": "A",
+      "keputusan": [
+        {
+          "id_keputusan": "urgent-x",
+          "jenis": "Setujui Urgent",
+          "sidik": "A",
+          "oleh": "kepsek",
+          "waktu_perangkat": "2026-11-10 07:00:00",
+          "diterima_cloud": null
+        },
+        {
+          "id_keputusan": "tahu-x",
+          "jenis": "Diketahui",
+          "sidik": "A",
+          "oleh": "kepsek",
+          "waktu_perangkat": "2026-11-10 09:00:00",
+          "diterima_cloud": null
+        }
+      ],
+      "status": "Disetujui (urgent)",
+      "berlaku": "urgent-x"
+    },
+    {
+      "sidik": "A",
+      "keputusan": [
+        {
+          "id_keputusan": "k1",
+          "jenis": "Setujui",
+          "sidik": "A",
+          "oleh": "kepsek",
+          "waktu_perangkat": "2026-11-10 08:00:00",
+          "diterima_cloud": null
+        },
+        {
+          "id_keputusan": "batal-x",
+          "jenis": "Batal",
+          "sidik": "A",
+          "oleh": "kepsek",
+          "waktu_perangkat": "2026-11-11 08:00:00",
+          "diterima_cloud": null
+        }
+      ],
+      "status": "Dibatalkan",
+      "berlaku": "k1"
+    },
+    {
+      "sidik": "A",
+      "keputusan": [
+        {
+          "id_keputusan": "k1",
+          "jenis": "Tolak",
+          "sidik": "A",
+          "oleh": "kepsek",
+          "waktu_perangkat": "2026-11-10 08:00:00",
+          "diterima_cloud": null
+        }
+      ],
+      "status": "Ditolak",
+      "berlaku": "k1"
+    }
+  ],
+  "tanda": [
+    {
+      "sidik": "A",
+      "diajukan_oleh": "tu",
+      "keputusan": [
+        {
+          "id_keputusan": "urgent-x",
+          "jenis": "Setujui Urgent",
+          "sidik": "A",
+          "oleh": "tu",
+          "waktu_perangkat": "2026-11-10 07:00:00",
+          "diterima_cloud": null
+        }
+      ],
+      "cakupan": null,
+      "hasil": ["perlu_diketahui"]
+    },
+    {
+      "sidik": "A",
+      "diajukan_oleh": "tu",
+      "keputusan": [
+        {
+          "id_keputusan": "urgent-x",
+          "jenis": "Setujui Urgent",
+          "sidik": "A",
+          "oleh": "kepsek",
+          "waktu_perangkat": "2026-11-10 07:00:00",
+          "diterima_cloud": null
+        },
+        {
+          "id_keputusan": "tahu-x",
+          "jenis": "Diketahui",
+          "sidik": "A",
+          "oleh": "kepsek",
+          "waktu_perangkat": "2026-11-10 08:00:00",
+          "diterima_cloud": null
+        }
+      ],
+      "cakupan": true,
+      "hasil": []
+    },
+    {
+      "sidik": "A",
+      "diajukan_oleh": "tu",
+      "keputusan": [
+        {
+          "id_keputusan": "k1",
+          "jenis": "Setujui",
+          "sidik": "A",
+          "oleh": "a",
+          "waktu_perangkat": "2026-11-10 07:00:00",
+          "diterima_cloud": null
+        },
+        {
+          "id_keputusan": "k2",
+          "jenis": "Tolak",
+          "sidik": "A",
+          "oleh": "b",
+          "waktu_perangkat": "2026-11-10 08:00:00",
+          "diterima_cloud": null
+        }
+      ],
+      "cakupan": null,
+      "hasil": ["keputusan_ganda"]
+    },
+    {
+      "sidik": "B",
+      "diajukan_oleh": "tu",
+      "keputusan": [
+        {
+          "id_keputusan": "k1",
+          "jenis": "Setujui",
+          "sidik": "A",
+          "oleh": "kepsek",
+          "waktu_perangkat": "2026-11-10 07:00:00",
+          "diterima_cloud": null
+        }
+      ],
+      "cakupan": null,
+      "hasil": ["keputusan_gugur"]
+    },
+    {
+      "sidik": "A",
+      "diajukan_oleh": " KepSek ",
+      "keputusan": [
+        {
+          "id_keputusan": "k1",
+          "jenis": "Setujui",
+          "sidik": "A",
+          "oleh": "kepsek",
+          "waktu_perangkat": "2026-11-10 07:00:00",
+          "diterima_cloud": null
+        }
+      ],
+      "cakupan": false,
+      "hasil": ["diputus_sendiri", "di_luar_cakupan"]
+    },
+    {
+      "sidik": "A",
+      "diajukan_oleh": "kepsek",
+      "keputusan": [
+        {
+          "id_keputusan": "k1",
+          "jenis": "Setujui",
+          "sidik": "A",
+          "oleh": "kepsek",
+          "waktu_perangkat": "2026-11-10 07:00:00",
+          "diterima_cloud": null
+        },
+        {
+          "id_keputusan": "batal-x",
+          "jenis": "Batal",
+          "sidik": "A",
+          "oleh": "kepsek",
+          "waktu_perangkat": "2026-11-11 07:00:00",
+          "diterima_cloud": null
+        }
+      ],
+      "cakupan": false,
+      "hasil": []
+    },
+    {
+      "sidik": "A",
+      "diajukan_oleh": "tu",
+      "keputusan": [],
+      "cakupan": false,
+      "hasil": []
+    }
+  ],
+  "bentrok": [
+    {
+      "a": {
+        "id_karyawan": "P1",
+        "tanggal_mulai": "2026-11-16",
+        "tanggal_selesai": "2026-11-18",
+        "jam_mulai_ke": null,
+        "jam_sampai_ke": null
+      },
+      "b": {
+        "id_karyawan": "P2",
+        "tanggal_mulai": "2026-11-16",
+        "tanggal_selesai": "2026-11-18",
+        "jam_mulai_ke": null,
+        "jam_sampai_ke": null
+      },
+      "hasil": false
+    },
+    {
+      "a": {
+        "id_karyawan": "P1",
+        "tanggal_mulai": "2026-11-16",
+        "tanggal_selesai": "2026-11-18",
+        "jam_mulai_ke": null,
+        "jam_sampai_ke": null
+      },
+      "b": {
+        "id_karyawan": "P1",
+        "tanggal_mulai": "2026-11-19",
+        "tanggal_selesai": "2026-11-20",
+        "jam_mulai_ke": null,
+        "jam_sampai_ke": null
+      },
+      "hasil": false
+    },
+    {
+      "a": {
+        "id_karyawan": "P1",
+        "tanggal_mulai": "2026-11-16",
+        "tanggal_selesai": "2026-11-18",
+        "jam_mulai_ke": null,
+        "jam_sampai_ke": null
+      },
+      "b": {
+        "id_karyawan": "P1",
+        "tanggal_mulai": "2026-11-18",
+        "tanggal_selesai": "2026-11-20",
+        "jam_mulai_ke": null,
+        "jam_sampai_ke": null
+      },
+      "hasil": true
+    },
+    {
+      "a": {
+        "id_karyawan": "P1",
+        "tanggal_mulai": "2026-11-16",
+        "tanggal_selesai": "2026-11-16",
+        "jam_mulai_ke": null,
+        "jam_sampai_ke": 3
+      },
+      "b": {
+        "id_karyawan": "P1",
+        "tanggal_mulai": "2026-11-16",
+        "tanggal_selesai": "2026-11-16",
+        "jam_mulai_ke": 4,
+        "jam_sampai_ke": null
+      },
+      "hasil": false
+    },
+    {
+      "a": {
+        "id_karyawan": "P1",
+        "tanggal_mulai": "2026-11-16",
+        "tanggal_selesai": "2026-11-16",
+        "jam_mulai_ke": null,
+        "jam_sampai_ke": 4
+      },
+      "b": {
+        "id_karyawan": "P1",
+        "tanggal_mulai": "2026-11-16",
+        "tanggal_selesai": "2026-11-16",
+        "jam_mulai_ke": 4,
+        "jam_sampai_ke": null
+      },
+      "hasil": true
+    },
+    {
+      "a": {
+        "id_karyawan": "P1",
+        "tanggal_mulai": "2026-11-16",
+        "tanggal_selesai": "2026-11-17",
+        "jam_mulai_ke": null,
+        "jam_sampai_ke": 2
+      },
+      "b": {
+        "id_karyawan": "P1",
+        "tanggal_mulai": "2026-11-17",
+        "tanggal_selesai": "2026-11-17",
+        "jam_mulai_ke": 3,
+        "jam_sampai_ke": 6
+      },
+      "hasil": false
+    },
+    {
+      "a": {
+        "id_karyawan": "P1",
+        "tanggal_mulai": "2026-11-16",
+        "tanggal_selesai": "2026-11-17",
+        "jam_mulai_ke": 5,
+        "jam_sampai_ke": null
+      },
+      "b": {
+        "id_karyawan": "P1",
+        "tanggal_mulai": "2026-11-16",
+        "tanggal_selesai": "2026-11-16",
+        "jam_mulai_ke": 1,
+        "jam_sampai_ke": 4
+      },
+      "hasil": false
+    },
+    {
+      "a": {
+        "id_karyawan": "P1",
+        "tanggal_mulai": "2026-11-16",
+        "tanggal_selesai": "2026-11-18",
+        "jam_mulai_ke": 5,
+        "jam_sampai_ke": 2
+      },
+      "b": {
+        "id_karyawan": "P1",
+        "tanggal_mulai": "2026-11-16",
+        "tanggal_selesai": "2026-11-18",
+        "jam_mulai_ke": 1,
+        "jam_sampai_ke": 4
+      },
+      "hasil": true
+    },
+    {
+      "a": {
+        "id_karyawan": "P1",
+        "tanggal_mulai": "2026-11-16",
+        "tanggal_selesai": "2026-11-17",
+        "jam_mulai_ke": 5,
+        "jam_sampai_ke": 2
+      },
+      "b": {
+        "id_karyawan": "P1",
+        "tanggal_mulai": "2026-11-17",
+        "tanggal_selesai": "2026-11-17",
+        "jam_mulai_ke": 3,
+        "jam_sampai_ke": 4
+      },
+      "hasil": false
+    },
+    {
+      "a": {
+        "id_karyawan": "P1",
+        "tanggal_mulai": "2026-11-16",
+        "tanggal_selesai": "2026-11-17",
+        "jam_mulai_ke": 5,
+        "jam_sampai_ke": 2
+      },
+      "b": {
+        "id_karyawan": "P1",
+        "tanggal_mulai": "2026-11-16",
+        "tanggal_selesai": "2026-11-17",
+        "jam_mulai_ke": 1,
+        "jam_sampai_ke": 4
+      },
+      "hasil": true
+    }
+  ],
+  "tanggal_wajib": [
+    {
+      "jadwal": {
+        "hari_masuk": [1, 2, 3, 4, 5],
+        "divisi": "Guru",
+        "kode_shift": 1
+      },
+      "libur": [],
+      "whitelist": [],
+      "mulai": "2026-11-13",
+      "selesai": "2026-11-17",
+      "hasil": ["2026-11-13", "2026-11-16", "2026-11-17"]
+    },
+    {
+      "jadwal": {
+        "hari_masuk": [1, 2, 3, 4, 5, 6],
+        "divisi": "Guru",
+        "kode_shift": 1
+      },
+      "libur": ["2026-11-16"],
+      "whitelist": [],
+      "mulai": "2026-11-14",
+      "selesai": "2026-11-17",
+      "hasil": ["2026-11-14", "2026-11-17"]
+    },
+    {
+      "jadwal": {
+        "hari_masuk": [1, 2, 3, 4, 5],
+        "divisi": "Satpam",
+        "kode_shift": 3
+      },
+      "libur": ["2026-11-16"],
+      "whitelist": [
+        {
+          "id": "w",
+          "scope_type": "DIVISI",
+          "scope_value": "satpam",
+          "tanggal_libur": null,
+          "keterangan": null,
+          "status_aktif": 1
+        }
+      ],
+      "mulai": "2026-11-16",
+      "selesai": "2026-11-16",
+      "hasil": ["2026-11-16"]
+    },
+    {
+      "jadwal": {
+        "hari_masuk": [1, 2, 3, 4, 5],
+        "divisi": "Guru",
+        "kode_shift": 3
+      },
+      "libur": ["2026-11-16", "2026-11-17"],
+      "whitelist": [
+        {
+          "id": "w",
+          "scope_type": "SHIFT",
+          "scope_value": "3",
+          "tanggal_libur": "2026-11-17",
+          "keterangan": null,
+          "status_aktif": 1
+        },
+        {
+          "id": "w",
+          "scope_type": "SHIFT",
+          "scope_value": "3",
+          "tanggal_libur": null,
+          "keterangan": null,
+          "status_aktif": 0
+        }
+      ],
+      "mulai": "2026-11-16",
+      "selesai": "2026-11-17",
+      "hasil": ["2026-11-17"]
+    },
+    {
+      "jadwal": {
+        "hari_masuk": [],
+        "divisi": "",
+        "kode_shift": null
+      },
+      "libur": [],
+      "whitelist": [],
+      "mulai": "2026-11-16",
+      "selesai": "2026-11-16",
+      "hasil": []
+    }
+  ],
+  "cakupan": [
+    {
+      "lingkup_semua": true,
+      "unit_akun": "",
+      "unit_sasaran": "",
+      "hasil": true
+    },
+    {
+      "lingkup_semua": false,
+      "unit_akun": " SMP ",
+      "unit_sasaran": "smp",
+      "hasil": true
+    },
+    {
+      "lingkup_semua": false,
+      "unit_akun": "SMP",
+      "unit_sasaran": "SD",
+      "hasil": false
+    },
+    {
+      "lingkup_semua": false,
+      "unit_akun": "",
+      "unit_sasaran": "",
+      "hasil": false
+    },
+    {
+      "lingkup_semua": false,
+      "unit_akun": "SMP",
+      "unit_sasaran": "",
+      "hasil": false
+    }
+  ],
+  "aksi": [
+    {
+      "aksi": "Setujui",
+      "alasan": "",
+      "keadaan": {
+        "status": "Menunggu",
+        "sudah_diketahui": false,
+        "pengaju_sendiri": false,
+        "superadmin": false,
+        "karyawan_sendiri": false,
+        "boleh_putus": true,
+        "dalam_cakupan": true
+      },
+      "galat": null
+    },
+    {
+      "aksi": "Hapus",
+      "alasan": "",
+      "keadaan": {
+        "status": "Menunggu",
+        "sudah_diketahui": false,
+        "pengaju_sendiri": false,
+        "superadmin": false,
+        "karyawan_sendiri": false,
+        "boleh_putus": true,
+        "dalam_cakupan": true
+      },
+      "galat": "Keputusan tidak dikenal."
+    },
+    {
+      "aksi": "Setujui",
+      "alasan": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+      "keadaan": {
+        "status": "Menunggu",
+        "sudah_diketahui": false,
+        "pengaju_sendiri": false,
+        "superadmin": false,
+        "karyawan_sendiri": false,
+        "boleh_putus": true,
+        "dalam_cakupan": true
+      },
+      "galat": "Alasan maksimal 500 karakter."
+    },
+    {
+      "aksi": "Setujui",
+      "alasan": "",
+      "keadaan": {
+        "status": "Disetujui",
+        "sudah_diketahui": false,
+        "pengaju_sendiri": false,
+        "superadmin": false,
+        "karyawan_sendiri": false,
+        "boleh_putus": true,
+        "dalam_cakupan": true
+      },
+      "galat": "Pengajuan ini tidak lagi menunggu keputusan."
+    },
+    {
+      "aksi": "Setujui",
+      "alasan": "",
+      "keadaan": {
+        "status": "Menunggu",
+        "sudah_diketahui": false,
+        "pengaju_sendiri": false,
+        "superadmin": false,
+        "karyawan_sendiri": false,
+        "boleh_putus": false,
+        "dalam_cakupan": true
+      },
+      "galat": "Kamu tidak punya izin memutus jenis pengajuan ini."
+    },
+    {
+      "aksi": "Setujui",
+      "alasan": "",
+      "keadaan": {
+        "status": "Menunggu",
+        "sudah_diketahui": false,
+        "pengaju_sendiri": false,
+        "superadmin": true,
+        "karyawan_sendiri": true,
+        "boleh_putus": true,
+        "dalam_cakupan": true
+      },
+      "galat": "Pengajuan untuk dirimu sendiri harus diputus orang lain."
+    },
+    {
+      "aksi": "Setujui",
+      "alasan": "",
+      "keadaan": {
+        "status": "Menunggu",
+        "sudah_diketahui": false,
+        "pengaju_sendiri": false,
+        "superadmin": false,
+        "karyawan_sendiri": false,
+        "boleh_putus": true,
+        "dalam_cakupan": false
+      },
+      "galat": "Pegawai ini di luar unit yang kamu pegang."
+    },
+    {
+      "aksi": "Setujui",
+      "alasan": "",
+      "keadaan": {
+        "status": "Menunggu",
+        "sudah_diketahui": false,
+        "pengaju_sendiri": true,
+        "superadmin": false,
+        "karyawan_sendiri": false,
+        "boleh_putus": true,
+        "dalam_cakupan": true
+      },
+      "galat": null
+    },
+    {
+      "aksi": "Tolak",
+      "alasan": "  ",
+      "keadaan": {
+        "status": "Menunggu",
+        "sudah_diketahui": false,
+        "pengaju_sendiri": false,
+        "superadmin": false,
+        "karyawan_sendiri": false,
+        "boleh_putus": true,
+        "dalam_cakupan": true
+      },
+      "galat": "Alasan penolakan wajib diisi."
+    },
+    {
+      "aksi": "Tolak",
+      "alasan": "Tidak ada guru pengganti",
+      "keadaan": {
+        "status": "Menunggu",
+        "sudah_diketahui": false,
+        "pengaju_sendiri": false,
+        "superadmin": false,
+        "karyawan_sendiri": false,
+        "boleh_putus": true,
+        "dalam_cakupan": true
+      },
+      "galat": null
+    },
+    {
+      "aksi": "Diketahui",
+      "alasan": "",
+      "keadaan": {
+        "status": "Disetujui (urgent)",
+        "sudah_diketahui": false,
+        "pengaju_sendiri": false,
+        "superadmin": false,
+        "karyawan_sendiri": false,
+        "boleh_putus": true,
+        "dalam_cakupan": true
+      },
+      "galat": null
+    },
+    {
+      "aksi": "Diketahui",
+      "alasan": "",
+      "keadaan": {
+        "status": "Disetujui (urgent)",
+        "sudah_diketahui": true,
+        "pengaju_sendiri": false,
+        "superadmin": false,
+        "karyawan_sendiri": false,
+        "boleh_putus": true,
+        "dalam_cakupan": true
+      },
+      "galat": "Hanya pengajuan urgent yang belum diketahui yang bisa ditandai."
+    },
+    {
+      "aksi": "Diketahui",
+      "alasan": "",
+      "keadaan": {
+        "status": "Disetujui",
+        "sudah_diketahui": false,
+        "pengaju_sendiri": false,
+        "superadmin": false,
+        "karyawan_sendiri": false,
+        "boleh_putus": true,
+        "dalam_cakupan": true
+      },
+      "galat": "Hanya pengajuan urgent yang belum diketahui yang bisa ditandai."
+    },
+    {
+      "aksi": "Diketahui",
+      "alasan": "",
+      "keadaan": {
+        "status": "Disetujui (urgent)",
+        "sudah_diketahui": false,
+        "pengaju_sendiri": false,
+        "superadmin": false,
+        "karyawan_sendiri": false,
+        "boleh_putus": true,
+        "dalam_cakupan": false
+      },
+      "galat": "Pegawai ini di luar unit yang kamu pegang."
+    },
+    {
+      "aksi": "Batal",
+      "alasan": "",
+      "keadaan": {
+        "status": "Menunggu",
+        "sudah_diketahui": false,
+        "pengaju_sendiri": true,
+        "superadmin": false,
+        "karyawan_sendiri": false,
+        "boleh_putus": true,
+        "dalam_cakupan": true
+      },
+      "galat": "Alasan pembatalan wajib diisi."
+    },
+    {
+      "aksi": "Batal",
+      "alasan": "Salah tanggal",
+      "keadaan": {
+        "status": "Menunggu",
+        "sudah_diketahui": false,
+        "pengaju_sendiri": true,
+        "superadmin": false,
+        "karyawan_sendiri": false,
+        "boleh_putus": false,
+        "dalam_cakupan": false
+      },
+      "galat": null
+    },
+    {
+      "aksi": "Batal",
+      "alasan": "Salah tanggal",
+      "keadaan": {
+        "status": "Menunggu",
+        "sudah_diketahui": false,
+        "pengaju_sendiri": false,
+        "superadmin": true,
+        "karyawan_sendiri": false,
+        "boleh_putus": true,
+        "dalam_cakupan": true
+      },
+      "galat": null
+    },
+    {
+      "aksi": "Batal",
+      "alasan": "Salah tanggal",
+      "keadaan": {
+        "status": "Menunggu",
+        "sudah_diketahui": false,
+        "pengaju_sendiri": false,
+        "superadmin": false,
+        "karyawan_sendiri": false,
+        "boleh_putus": true,
+        "dalam_cakupan": true
+      },
+      "galat": "Hanya pengaju yang bisa membatalkan pengajuan yang masih menunggu."
+    },
+    {
+      "aksi": "Batal",
+      "alasan": "Sudah masuk",
+      "keadaan": {
+        "status": "Disetujui (urgent)",
+        "sudah_diketahui": false,
+        "pengaju_sendiri": false,
+        "superadmin": false,
+        "karyawan_sendiri": false,
+        "boleh_putus": true,
+        "dalam_cakupan": true
+      },
+      "galat": null
+    },
+    {
+      "aksi": "Batal",
+      "alasan": "Sudah masuk",
+      "keadaan": {
+        "status": "Disetujui",
+        "sudah_diketahui": false,
+        "pengaju_sendiri": false,
+        "superadmin": false,
+        "karyawan_sendiri": true,
+        "boleh_putus": true,
+        "dalam_cakupan": true
+      },
+      "galat": "Pengajuan untuk dirimu sendiri harus diputus orang lain."
+    },
+    {
+      "aksi": "Batal",
+      "alasan": "Sudah masuk",
+      "keadaan": {
+        "status": "Disetujui",
+        "sudah_diketahui": false,
+        "pengaju_sendiri": true,
+        "superadmin": false,
+        "karyawan_sendiri": false,
+        "boleh_putus": false,
+        "dalam_cakupan": true
+      },
+      "galat": "Kamu tidak punya izin memutus jenis pengajuan ini."
+    },
+    {
+      "aksi": "Batal",
+      "alasan": "Lagi",
+      "keadaan": {
+        "status": "Ditolak",
+        "sudah_diketahui": false,
+        "pengaju_sendiri": false,
+        "superadmin": false,
+        "karyawan_sendiri": false,
+        "boleh_putus": true,
+        "dalam_cakupan": true
+      },
+      "galat": "Pengajuan yang ditolak atau dibatalkan tidak bisa dibatalkan lagi."
+    }
+  ],
+  "sunting": [
+    {
+      "status": "Menunggu",
+      "pengaju_sendiri": true,
+      "superadmin": false,
+      "galat": null
+    },
+    {
+      "status": "Menunggu",
+      "pengaju_sendiri": false,
+      "superadmin": true,
+      "galat": null
+    },
+    {
+      "status": "Menunggu",
+      "pengaju_sendiri": false,
+      "superadmin": false,
+      "galat": "Hanya pengaju yang bisa menyunting pengajuan ini."
+    },
+    {
+      "status": "Disetujui",
+      "pengaju_sendiri": true,
+      "superadmin": true,
+      "galat": "Pengajuan yang sudah diputus tidak bisa disunting."
+    }
+  ],
+  "urgent": [
+    {
+      "karyawan_sendiri": false,
+      "dalam_cakupan": true,
+      "galat": null
+    },
+    {
+      "karyawan_sendiri": true,
+      "dalam_cakupan": true,
+      "galat": "Pengajuan urgent untuk dirimu sendiri tidak bisa disetujui sendiri."
+    },
+    {
+      "karyawan_sendiri": false,
+      "dalam_cakupan": false,
+      "galat": "Pegawai ini di luar unit yang kamu pegang."
+    }
+  ],
+  "pesan": {
+    "periode_dibayar": [
+      "2026-10-01",
+      "2026-10-31",
+      "Gaji periode 2026-10-01 s.d. 2026-10-31 sudah dibayar; pengajuan di tanggal itu tidak bisa diubah."
+    ],
+    "bertumpuk": [
+      "2026-11-16",
+      "2026-11-17",
+      "Tanggal itu bertumpuk dengan pengajuan lain pegawai ini (2026-11-16 s.d. 2026-11-17)."
+    ],
+    "run_ulang": [
+      "2026-11-01",
+      "2026-11-30",
+      "Proses gaji periode 2026-11-01 s.d. 2026-11-30 sudah dibuat; buat ulang supaya pengajuan ini ikut dihitung."
+    ]
+  }
+}

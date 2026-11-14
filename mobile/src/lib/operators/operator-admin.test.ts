@@ -204,3 +204,42 @@ describe("nomor HP akun operator tidak boleh kembar", () => {
     ).resolves.toEqual({ success: true });
   });
 });
+
+describe("tautan akun ke personil (HRIS Fase 2, Q-53)", () => {
+  test("hanya tautan yang berubah menaikkan rbac_revision", async () => {
+    const role = await client.execute(
+      "SELECT id FROM app_role WHERE is_superadmin = 0 AND status = 'Aktif' LIMIT 1;",
+    );
+    await client.execute(
+      "INSERT OR IGNORE INTO master_data (id_unik, kode_karyawan, nama, divisi, jabatan_status, id_shift, jenis_personil) VALUES ('p9', 'K9', 'Pegawai Sembilan', 'TU', 'Staf', 1, 'Pegawai');",
+    );
+    const draft = (idKaryawan?: string) => ({
+      kodeOperator: "OPT",
+      name: "Operator Tautan",
+      username: "opt",
+      email: "opt@sekolah.id",
+      noHp: "081277778888",
+      password: "Rahasia-2026!",
+      roleId: Number(role.rows[0]?.id),
+      status: "Aktif" as const,
+      idKaryawan,
+    });
+    const revisi = async () =>
+      Number(
+        (
+          await client.execute(
+            "SELECT value FROM setting_gex_system WHERE key = 'rbac_revision';",
+          )
+        ).rows[0]?.value ?? 0,
+      );
+    const { id } = await insertOperator(client, draft());
+    const awal = await revisi();
+    await editOperator(client, id, id, draft("p9"));
+    expect(await revisi()).toBe(awal + 1);
+    await editOperator(client, id, id, draft("p9"));
+    await editOperator(client, id, id, draft());
+    expect(await revisi()).toBe(awal + 1);
+    await editOperator(client, id, id, draft(""));
+    expect(await revisi()).toBe(awal + 2);
+  });
+});

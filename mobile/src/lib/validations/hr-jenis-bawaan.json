@@ -1,0 +1,122 @@
+[
+  {
+    "id_jenis": "jns-cuti-tahunan",
+    "nama": "Cuti Tahunan",
+    "kelompok": "Cuti",
+    "izin_pemutus": "hr.request.decide",
+    "boleh_urgent": false,
+    "potong_jatah": true,
+    "dampak_gaji": "Dibayar",
+    "maks_hari": null,
+    "satuan_maks": "Hari Kerja",
+    "wajib_dokumen": false
+  },
+  {
+    "id_jenis": "jns-cuti-menikah",
+    "nama": "Cuti Menikah",
+    "kelompok": "Cuti",
+    "izin_pemutus": "hr.request.decide",
+    "boleh_urgent": false,
+    "potong_jatah": false,
+    "dampak_gaji": "Dibayar",
+    "maks_hari": 3,
+    "satuan_maks": "Hari Kerja",
+    "wajib_dokumen": false
+  },
+  {
+    "id_jenis": "jns-cuti-duka",
+    "nama": "Duka keluarga inti",
+    "kelompok": "Cuti",
+    "izin_pemutus": "hr.request.decide",
+    "boleh_urgent": true,
+    "potong_jatah": false,
+    "dampak_gaji": "Dibayar",
+    "maks_hari": 2,
+    "satuan_maks": "Hari Kerja",
+    "wajib_dokumen": false
+  },
+  {
+    "id_jenis": "jns-cuti-istri-melahirkan",
+    "nama": "Istri melahirkan / keguguran",
+    "kelompok": "Cuti",
+    "izin_pemutus": "hr.request.decide",
+    "boleh_urgent": true,
+    "potong_jatah": false,
+    "dampak_gaji": "Dibayar",
+    "maks_hari": 2,
+    "satuan_maks": "Hari Kerja",
+    "wajib_dokumen": false
+  },
+  {
+    "id_jenis": "jns-cuti-melahirkan",
+    "nama": "Cuti Melahirkan",
+    "kelompok": "Cuti",
+    "izin_pemutus": "hr.request.decide_major",
+    "boleh_urgent": false,
+    "potong_jatah": false,
+    "dampak_gaji": "Dibayar",
+    "maks_hari": 90,
+    "satuan_maks": "Hari Kalender",
+    "wajib_dokumen": false
+  },
+  {
+    "id_jenis": "jns-cuti-luar-tanggungan",
+    "nama": "Cuti di Luar Tanggungan",
+    "kelompok": "Cuti",
+    "izin_pemutus": "hr.request.decide_major",
+    "boleh_urgent": false,
+    "potong_jatah": false,
+    "dampak_gaji": "Potong Gaji",
+    "maks_hari": null,
+    "satuan_maks": "Hari Kerja",
+    "wajib_dokumen": false
+  },
+  {
+    "id_jenis": "jns-izin-dibayar",
+    "nama": "Izin Dibayar",
+    "kelompok": "Izin",
+    "izin_pemutus": "hr.request.decide",
+    "boleh_urgent": true,
+    "potong_jatah": false,
+    "dampak_gaji": "Dibayar",
+    "maks_hari": null,
+    "satuan_maks": "Hari Kerja",
+    "wajib_dokumen": false
+  },
+  {
+    "id_jenis": "jns-izin-tidak-dibayar",
+    "nama": "Izin Tidak Dibayar",
+    "kelompok": "Izin",
+    "izin_pemutus": "hr.request.decide",
+    "boleh_urgent": true,
+    "potong_jatah": false,
+    "dampak_gaji": "Potong Gaji",
+    "maks_hari": null,
+    "satuan_maks": "Hari Kerja",
+    "wajib_dokumen": false
+  },
+  {
+    "id_jenis": "jns-sakit",
+    "nama": "Sakit",
+    "kelompok": "Sakit",
+    "izin_pemutus": "hr.request.decide",
+    "boleh_urgent": true,
+    "potong_jatah": false,
+    "dampak_gaji": "Dibayar",
+    "maks_hari": null,
+    "satuan_maks": "Hari Kerja",
+    "wajib_dokumen": true
+  },
+  {
+    "id_jenis": "jns-dinas-luar",
+    "nama": "Dinas Luar (lomba, KKG/MGMP, study tour, diklat)",
+    "kelompok": "Dinas Luar",
+    "izin_pemutus": "hr.request.decide",
+    "boleh_urgent": true,
+    "potong_jatah": false,
+    "dampak_gaji": "Dibayar",
+    "maks_hari": null,
+    "satuan_maks": "Hari Kerja",
+    "wajib_dokumen": false
+  }
+]

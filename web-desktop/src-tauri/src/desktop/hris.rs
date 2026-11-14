@@ -948,7 +948,7 @@ fn rows_json(transaction: &Transaction<'_>, sql: &str) -> Result<Vec<Value>, Com
     rows_json_with(transaction, sql, [])
 }
 
-fn rows_json_with(
+pub(crate) fn rows_json_with(
     connection: &rusqlite::Connection,
     sql: &str,
     args: impl rusqlite::Params,
@@ -1020,6 +1020,8 @@ pub fn org(state: &DesktopState) -> Result<Value, CommandError> {
         .collect();
     hasil["pegawai"] = Value::Array(pegawai);
     hasil["jenis_tugas"] = Value::Array(rows_json(&transaction, JENIS_TUGAS_SQL)?);
+    // Jenis pengajuan (HRIS Fase 2) disunting di tab Organisasi.
+    hasil["jenis_pengajuan"] = Value::Array(rows_json(&transaction, super::hr_pengajuan::JENIS_SQL)?);
     hasil["pengaturan"] = pengaturan_kontrak(&transaction)?;
     Ok(hasil)
 }

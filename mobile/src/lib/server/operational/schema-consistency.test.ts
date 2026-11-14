@@ -62,7 +62,8 @@ describe("Schema Consistency & Zero-Drift Guard", () => {
         'inventory_kolom', 'siswa_dapodik', 'siswa_berkas',
         'app_telegram_setting', 'notifikasi_telegram',
         'hr_bagian', 'hr_bagian_nama', 'hr_jabatan', 'hr_tugas_jenis', 'hr_tugas_tambahan', 'hr_kontrak',
-        'hr_profil', 'hr_pendidikan', 'hr_sertifikasi', 'hr_dokumen_jenis', 'hr_dokumen', 'hr_dokumen_berkas'
+        'hr_profil', 'hr_pendidikan', 'hr_sertifikasi', 'hr_dokumen_jenis', 'hr_dokumen', 'hr_dokumen_berkas',
+        'hr_jenis_pengajuan', 'hr_pengajuan', 'hr_pengajuan_keputusan', 'hr_cuti_penyesuaian', 'hr_jp_penanganan', 'hr_pengajuan_berkas'
       );
     `);
     const tableCount = Number(tablesRes.rows[0]?.count ?? 0);

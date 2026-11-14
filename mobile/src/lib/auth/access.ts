@@ -36,7 +36,9 @@ export type AppArea =
   | "keuangan"
   | "kasbon"
   | "tagihan"
-  | "kepegawaian";
+  | "kepegawaian"
+  | "pengajuan"
+  | "jam_kosong";
 
 export interface AccessSubject {
   isSuperadmin: boolean;
@@ -84,6 +86,9 @@ const AREA_PERMISSION: Record<
   // domain. `sync.view` sudah ada di paket bawaan peran operator DAN scanner,
   // jadi memasang penjaganya tidak mencabut akses siapa pun.
   sync: "sync.view",
+  // HRIS Fase 2 (§20.4): halaman baru, tidak ada halaman lama yang dijaga ulang.
+  pengajuan: "hr.request.view",
+  jam_kosong: "hr.substitute.manage",
 };
 
 export function hasPermission(

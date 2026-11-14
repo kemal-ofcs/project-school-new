@@ -21,5 +21,10 @@ export interface OperatorUser {
   requireScanPhoto?: boolean;
   /** Role ini hanya boleh melakukan scan dari alamat IP yang terdaftar. */
   requireScanIpAllowlist?: boolean;
+  /**
+   * Personil yang ditautkan ke akun ini (A-2, HRIS Fase 2 §20.2.10). Kosong =
+   * tak tertaut. Opsional supaya sesi/vault lama tetap terbaca (Q-53).
+   */
+  idKaryawan?: string | null;
   loginAt?: string;
 }

@@ -25,6 +25,12 @@ export const NAVIGATION: readonly NavigationItem[] = [
     icon: "user",
     label: "Kepegawaian",
   },
+  {
+    area: "pengajuan",
+    href: "/pengajuan",
+    icon: "calendar",
+    label: "Cuti & Izin",
+  },
   { area: "idcards", href: "/id-cards", icon: "user", label: "ID Card" },
   { area: "shift", href: "/shift", icon: "clock", label: "Shift" },
   {

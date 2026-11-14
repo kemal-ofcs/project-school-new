@@ -1647,6 +1647,92 @@ pub fn initialize(path: &Path) -> Result<(), String> {
         created_at TEXT NOT NULL DEFAULT (datetime('now'))
       );
       CREATE INDEX IF NOT EXISTS idx_hr_kontrak_karyawan ON hr_kontrak(id_karyawan);
+      -- v69: pengajuan cuti/izin, keputusan, jatah, penanganan JP (HRIS Fase 2,
+      -- `prd-hris.md` §20.3). Tanpa UNIQUE selain PK; kembar `turso.rs` dan
+      -- `db-migrations.ts`.
+      CREATE TABLE IF NOT EXISTS hr_jenis_pengajuan (
+        id_jenis TEXT PRIMARY KEY,
+        nama TEXT NOT NULL,
+        kelompok TEXT NOT NULL CHECK (kelompok IN ('Cuti', 'Izin', 'Sakit', 'Dinas Luar')),
+        izin_pemutus TEXT NOT NULL DEFAULT 'hr.request.decide' CHECK (izin_pemutus IN ('hr.request.decide', 'hr.request.decide_major')),
+        boleh_urgent INTEGER NOT NULL DEFAULT 0 CHECK (boleh_urgent IN (0, 1)),
+        potong_jatah INTEGER NOT NULL DEFAULT 0 CHECK (potong_jatah IN (0, 1)),
+        wajib_dokumen INTEGER NOT NULL DEFAULT 0 CHECK (wajib_dokumen IN (0, 1)),
+        dampak_gaji TEXT NOT NULL CHECK (dampak_gaji IN ('Dibayar', 'Potong Gaji', 'Tidak Berpengaruh')),
+        maks_hari INTEGER CHECK (maks_hari IS NULL OR maks_hari > 0),
+        satuan_maks TEXT NOT NULL DEFAULT 'Hari Kerja' CHECK (satuan_maks IN ('Hari Kerja', 'Hari Kalender')),
+        is_aktif INTEGER NOT NULL DEFAULT 1 CHECK (is_aktif IN (0, 1)),
+        created_at TEXT NOT NULL DEFAULT (datetime('now')),
+        updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+        CHECK (potong_jatah = 0 OR kelompok = 'Cuti')
+      );
+      CREATE TABLE IF NOT EXISTS hr_pengajuan (
+        id_pengajuan TEXT PRIMARY KEY,
+        id_karyawan TEXT NOT NULL,
+        id_jenis TEXT NOT NULL,
+        kelompok TEXT NOT NULL,
+        potong_jatah INTEGER NOT NULL DEFAULT 0 CHECK (potong_jatah IN (0, 1)),
+        dampak_gaji TEXT NOT NULL,
+        izin_pemutus TEXT NOT NULL,
+        tanggal_mulai TEXT NOT NULL,
+        tanggal_selesai TEXT NOT NULL,
+        jam_mulai_ke INTEGER CHECK (jam_mulai_ke IS NULL OR jam_mulai_ke BETWEEN 1 AND 20),
+        jam_sampai_ke INTEGER CHECK (jam_sampai_ke IS NULL OR jam_sampai_ke BETWEEN 1 AND 20),
+        setengah_hari INTEGER NOT NULL DEFAULT 0 CHECK (setengah_hari IN (0, 1)),
+        alasan TEXT NOT NULL,
+        sidik TEXT NOT NULL,
+        diajukan_oleh TEXT NOT NULL,
+        waktu_perangkat TEXT NOT NULL,
+        created_at TEXT NOT NULL DEFAULT (datetime('now')),
+        updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+        CHECK (tanggal_selesai >= tanggal_mulai)
+      );
+      CREATE TABLE IF NOT EXISTS hr_pengajuan_keputusan (
+        id_keputusan TEXT PRIMARY KEY,
+        id_pengajuan TEXT NOT NULL,
+        jenis TEXT NOT NULL CHECK (jenis IN ('Setujui', 'Tolak', 'Setujui Urgent', 'Diketahui', 'Batal')),
+        sidik TEXT NOT NULL,
+        alasan TEXT,
+        oleh TEXT NOT NULL,
+        id_karyawan_oleh TEXT,
+        waktu_perangkat TEXT NOT NULL,
+        diterima_cloud TEXT,
+        created_at TEXT NOT NULL DEFAULT (datetime('now'))
+      );
+      CREATE TABLE IF NOT EXISTS hr_cuti_penyesuaian (
+        id_penyesuaian TEXT PRIMARY KEY,
+        id_karyawan TEXT NOT NULL,
+        periode TEXT NOT NULL,
+        jenis TEXT NOT NULL CHECK (jenis IN ('Saldo Awal', 'Koreksi', 'Pembatalan')),
+        id_ref TEXT,
+        hari INTEGER NOT NULL,
+        alasan TEXT NOT NULL,
+        dicatat_oleh TEXT NOT NULL,
+        created_at TEXT NOT NULL DEFAULT (datetime('now'))
+      );
+      CREATE TABLE IF NOT EXISTS hr_jp_penanganan (
+        id_penanganan TEXT PRIMARY KEY,
+        id_pengajuan TEXT NOT NULL,
+        tanggal TEXT NOT NULL,
+        id_jadwal TEXT NOT NULL,
+        id_rombel TEXT,
+        id_mapel TEXT,
+        jam_ke TEXT,
+        status TEXT NOT NULL CHECK (status IN ('Diganti', 'Tugas Mandiri', 'Digabung')),
+        id_guru_pengganti TEXT,
+        catatan TEXT,
+        dicatat_oleh TEXT NOT NULL,
+        waktu_perangkat TEXT NOT NULL,
+        created_at TEXT NOT NULL DEFAULT (datetime('now')),
+        updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+      );
+      CREATE INDEX IF NOT EXISTS idx_hr_pengajuan_karyawan ON hr_pengajuan(id_karyawan, tanggal_mulai);
+      CREATE INDEX IF NOT EXISTS idx_hr_pengajuan_tanggal ON hr_pengajuan(tanggal_mulai, tanggal_selesai);
+      CREATE INDEX IF NOT EXISTS idx_hr_pengajuan_keputusan_pengajuan ON hr_pengajuan_keputusan(id_pengajuan);
+      CREATE INDEX IF NOT EXISTS idx_hr_cuti_penyesuaian_karyawan ON hr_cuti_penyesuaian(id_karyawan, periode);
+      CREATE INDEX IF NOT EXISTS idx_hr_jp_penanganan_tanggal ON hr_jp_penanganan(tanggal);
+      CREATE INDEX IF NOT EXISTS idx_hr_jp_penanganan_pengajuan ON hr_jp_penanganan(id_pengajuan);
+      CREATE INDEX IF NOT EXISTS idx_hr_jp_penanganan_pengganti ON hr_jp_penanganan(id_guru_pengganti, tanggal);
       CREATE TABLE IF NOT EXISTS akademik_tahun_ajaran (
         id_tahun_ajaran TEXT PRIMARY KEY,
         nama_tahun TEXT NOT NULL,
@@ -1974,6 +2060,8 @@ pub fn initialize(path: &Path) -> Result<(), String> {
         .map_err(|_| "Bagan akun bawaan tidak dapat disiapkan.".to_owned())?;
     super::nilai_akhir::seed_jenis_bawaan(&connection)
         .map_err(|_| "Jenis penilaian bawaan tidak dapat disiapkan.".to_owned())?;
+    super::hr_pengajuan::seed_jenis_lokal(&connection)
+        .map_err(|_| "Jenis pengajuan bawaan tidak dapat disiapkan.".to_owned())?;
     super::nilai_akhir::pulihkan_tarikan_jenis(&connection)
         .map_err(|_| "Kursor tarikan jenis penilaian tidak dapat dipulihkan.".to_owned())?;
 
@@ -2501,6 +2589,12 @@ pub(crate) const CLOUD_MIRRORED_TABLES: &[&str] = &[
     "hr_tugas_jenis",
     "hr_tugas_tambahan",
     "hr_kontrak",
+    // v69 — pengajuan cuti/izin, keputusan, jatah, dan penanganan JP pegawai.
+    "hr_jenis_pengajuan",
+    "hr_pengajuan",
+    "hr_pengajuan_keputusan",
+    "hr_cuti_penyesuaian",
+    "hr_jp_penanganan",
     "payroll_components",
     "salary_configs",
     "overtime_tier_rules",
@@ -2649,6 +2743,12 @@ pub fn reset_cloud_linked_data(
         CommandError::new(
             "LOCAL_RESET_FAILED",
             "Jenis penilaian bawaan tidak dapat disiapkan.",
+        )
+    })?;
+    super::hr_pengajuan::seed_jenis_lokal(&transaction).map_err(|_| {
+        CommandError::new(
+            "LOCAL_RESET_FAILED",
+            "Jenis pengajuan bawaan tidak dapat disiapkan.",
         )
     })?;
 

@@ -49,6 +49,8 @@ const filesToSync = [
   "telegram.rs",
   // HRIS Fase 1 (v68): organisasi pegawai, aturan dan SQL kembar `validations/hris.ts`.
   "hris.rs",
+  // HRIS Fase 2 (v69): pengajuan cuti/izin, kembar `validations/hr-pengajuan.ts`.
+  "hr_pengajuan.rs",
   // HRIS 1c: data pribadi, keuangan, pendidik, dokumen (cloud-only), kembar TS.
   "hris_cloud.rs",
   "commands.rs",

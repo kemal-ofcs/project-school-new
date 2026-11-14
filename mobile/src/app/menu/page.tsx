@@ -21,8 +21,9 @@ function canSeeItem(
   if (item.area === "settings") return true;
   // Halaman Operator Mobile hanya untuk Superadmin (lihat operators/page.tsx).
   if (item.area === "operators") return Boolean(user?.isSuperadmin);
-  // Halaman Kepegawaian hanya di Web/Desktop (Q-35); HRIS Mobile di Fase 8.
-  if (item.area === "kepegawaian") return false;
+  // Kepegawaian dan Cuti & Izin hanya di Web/Desktop (Q-35, Q-50); HRIS
+  // Mobile di Fase 8.
+  if (item.area === "kepegawaian" || item.area === "pengajuan") return false;
   return canAccessArea(user, item.area);
 }
 

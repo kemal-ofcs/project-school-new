@@ -24,6 +24,8 @@ pub mod class_attendance;
 pub mod face_match;
 pub mod grades;
 pub mod hari_kerja;
+// Pengajuan cuti/izin (HRIS Fase 2): SALINAN `desktop/hr_pengajuan.rs`.
+pub mod hr_pengajuan;
 pub mod hris;
 pub mod hris_cloud;
 // Inventaris: SALINAN `desktop/inventory.rs` oleh sync-rust-modules.ts.
