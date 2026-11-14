@@ -137,3 +137,92 @@ describe("hris: organisasi di Web", () => {
     );
   });
 });
+
+// HRIS 1c: data cloud-only. Pasangan Rust: `hris_cloud_profil_dokumen_di_database`.
+describe("hris 1c: profil dan dokumen di Web", () => {
+  test("profil per kelompok izin; siswa ditolak; hapus dokumen membuang berkasnya", async () => {
+    await H.simpanPribadi(client, "uji", {
+      id_karyawan: "p1",
+      nik: "3201.0101-0101 0001",
+      no_kk: "",
+      tempat_lahir: "",
+      tanggal_lahir: "",
+      agama: "Islam",
+      status_nikah: "",
+      nama_ibu_kandung: "",
+      alamat_ktp: "",
+      alamat_domisili: "",
+      darurat_nama: "",
+      darurat_hubungan: "",
+      darurat_hp: "0812 3456 7890",
+    });
+    await expect(
+      H.simpanKeuangan(client, "uji", {
+        id_karyawan: "s1",
+        bank: "",
+        no_rekening: "123-456-789",
+        nama_rekening: "",
+        npwp: "",
+        bpjs_kesehatan: "",
+        bpjs_ketenagakerjaan: "",
+      }),
+    ).rejects.toThrow("Pegawai ini belum ada di database pusat");
+    await H.simpanPendidikan(client, "uji", {
+      id_karyawan: "p1",
+      jenjang: "S1",
+      prodi: "PGSD",
+      perguruan_tinggi: "",
+      tahun_lulus: 2015,
+      linier: 1,
+      catatan: "",
+    });
+
+    const pribadi = await H.getProfil(client, "p1", {
+      pribadi: true,
+      keuangan: false,
+      pendidik: false,
+    });
+    expect(pribadi.pribadi?.nik).toBe("3201010101010001");
+    expect(pribadi.pribadi?.darurat_hp).toBe("+6281234567890");
+    expect("keuangan" in pribadi || "pendidik" in pribadi).toBe(false);
+    const lain = await H.getProfil(client, "p1", {
+      pribadi: false,
+      keuangan: true,
+      pendidik: true,
+    });
+    expect("pribadi" in lain).toBe(false);
+    expect(lain.keuangan?.diubah_pada).toBe("");
+    expect(lain.pendidik?.pendidikan[0]?.jenjang).toBe("S1");
+
+    const { id_dokumen } = await H.simpanDokumen(client, "uji", {
+      id_karyawan: "p1",
+      id_jenis: "dok-ktp",
+      nomor: "",
+      tanggal_terbit: "2020-01-02",
+      tanggal_kedaluwarsa: "",
+      catatan: "",
+    });
+    const png =
+      "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==";
+    const berkas = {
+      id_dokumen,
+      nama_berkas: "ktp.png",
+      mime_type: "image/png",
+      data_base64: png,
+    };
+    for (let i = 0; i < 5; i++) await H.tambahBerkasDokumen(client, berkas);
+    await expect(H.tambahBerkasDokumen(client, berkas)).rejects.toThrow(
+      "sudah berisi 5 berkas",
+    );
+    const daftar = await H.getDokumen(client, "p1");
+    expect(daftar.berkas?.map((b) => b.urutan)).toEqual([1, 2, 3, 4, 5]);
+    expect(daftar.berkas?.[0]?.ukuran_byte).toBe(70);
+    expect(daftar.berkas?.[0]).not.toHaveProperty("data_base64");
+
+    await H.hapusDokumen(client, id_dokumen);
+    expect((await satu("SELECT COUNT(*) AS n FROM hr_dokumen_berkas;")).n).toBe(
+      0,
+    );
+    expect((await H.getDokumen(client, "")).jenis.length).toBeGreaterThan(12);
+  });
+});

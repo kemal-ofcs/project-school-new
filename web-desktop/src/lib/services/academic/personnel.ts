@@ -3,7 +3,11 @@ import "server-only";
 import { db, ensureDbInitialized } from "@/lib/db";
 import { ApiRequestError } from "@/lib/server/http/api-response";
 import { periksaOrganisasi } from "@/lib/services/hris";
-import { BERKONTRAK_SQL, CERMIN_STATUS_SQL } from "@/lib/validations/hris";
+import {
+  BERKONTRAK_SQL,
+  CERMIN_STATUS_SQL,
+  nomorIdentitas,
+} from "@/lib/validations/hris";
 import {
   assertUniqueValue,
   chosenShift,
@@ -64,6 +68,9 @@ export async function saveTeacher(draft: {
   is_edit?: boolean;
 }) {
   await ensureDbInitialized();
+  // NUPTK 16 digit tanpa tanda baca (HRIS §19.2.3), kembar `save_teacher`.
+  const nuptk = nomorIdentitas("nuptk", draft.nuptk ?? "");
+  if (!nuptk.ok) throw new ApiRequestError(nuptk.galat, 400);
   const id = draft.id_guru || `ptk_${crypto.randomUUID().replace(/-/g, "")}`;
   const statusAktif = draft.status_aktif || "Aktif";
   // Cadangannya ID UTUH, bukan irisannya. `id.slice(4, 10)` dulu mengasumsikan
@@ -201,7 +208,7 @@ export async function saveTeacher(draft: {
         args: [
           id,
           draft.nip || null,
-          draft.nuptk || null,
+          nuptk.nilai || null,
           draft.gelar || null,
           draft.spesialisasi_mapel || null,
           draft.status_kepegawaian || "Honorer",

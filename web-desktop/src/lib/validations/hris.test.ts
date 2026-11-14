@@ -220,3 +220,187 @@ describe("hris: kontrak dan tugas (kembar hris.rs)", () => {
     }
   });
 });
+
+// Vektor 1c, kembar `desktop/hris_cloud.rs` (modul `tests`).
+describe("hris 1c: data cloud-only (kembar hris_cloud.rs)", () => {
+  type Kasus = {
+    ubah: object;
+    galat: string | null;
+    hasil: unknown;
+  };
+  const periksaKasus = <T>(
+    daftar: Kasus[],
+    dasar: object,
+    validasi: (
+      isian: T,
+    ) => { ok: true; nilai: T } | { ok: false; galat: string },
+  ) => {
+    for (const k of daftar) {
+      const hasil = validasi({ ...dasar, ...k.ubah } as T);
+      expect(hasil.ok ? null : hasil.galat).toBe(k.galat);
+      if (hasil.ok) expect(hasil.nilai).toEqual(k.hasil as T);
+    }
+  };
+
+  test("nomor pengenal", () => {
+    for (const [jenis, masuk, nilai, galat] of vektor.nomor_identitas) {
+      const hasil = H.nomorIdentitas(jenis as string, masuk as string);
+      expect(hasil.ok ? hasil.nilai : null).toBe(nilai);
+      expect(hasil.ok ? null : hasil.galat).toBe(galat);
+    }
+  });
+
+  test("pribadi, keuangan, pendidikan, sertifikasi, dokumen", () => {
+    periksaKasus(vektor.pribadi, vektor.pribadi_dasar, H.validasiPribadi);
+    periksaKasus(vektor.keuangan, vektor.keuangan_dasar, H.validasiKeuangan);
+    periksaKasus(
+      vektor.pendidikan,
+      vektor.pendidikan_dasar,
+      H.validasiPendidikan,
+    );
+    periksaKasus(
+      vektor.sertifikasi,
+      vektor.sertifikasi_dasar,
+      H.validasiSertifikasi,
+    );
+    periksaKasus(vektor.dokumen, vektor.dokumen_dasar, H.validasiDokumen);
+  });
+
+  test("berkas dokumen", () => {
+    for (const k of vektor.berkas_dokumen) {
+      const hasil = H.uraiBerkasDokumen(
+        k.nama_berkas,
+        k.mime_type,
+        k.data_base64,
+      );
+      expect(hasil.ok ? null : hasil.galat).toBe(k.galat);
+      if (hasil.ok) {
+        const { nama_berkas, mime_type, ukuran_byte } = hasil.nilai;
+        expect({ nama_berkas, mime_type, ukuran_byte }).toEqual(
+          k.hasil as typeof hasil.nilai,
+        );
+      }
+    }
+    const pdf = (byte: number) =>
+      Buffer.from("%PDF-1.7".padEnd(byte, " ")).toString("base64");
+    const pas = H.uraiBerkasDokumen(
+      "a.pdf",
+      "application/pdf",
+      pdf(H.MAKS_BYTE_DOKUMEN),
+    );
+    expect(pas.ok && pas.nilai.ukuran_byte).toBe(H.MAKS_BYTE_DOKUMEN);
+    const lebih = H.uraiBerkasDokumen(
+      "a.pdf",
+      "application/pdf",
+      pdf(H.MAKS_BYTE_DOKUMEN + 1),
+    );
+    expect(lebih.ok ? null : lebih.galat).toBe("Berkas lebih dari 1 MB.");
+  });
+
+  test("kelompok profil dari izin sesi", () => {
+    const subjek = (permissions: string[]) =>
+      ({ isSuperadmin: false, permissions }) as unknown as Parameters<
+        typeof H.kelompokProfil
+      >[0];
+    expect(
+      H.kelompokProfil(subjek(["hr.personal.view", "employees.view"])),
+    ).toEqual({ pribadi: true, keuangan: false, pendidik: false });
+    expect(
+      H.kelompokProfil(subjek(["hr.finance.view", "teachers.view"])),
+    ).toEqual({ pribadi: false, keuangan: true, pendidik: true });
+    expect(H.bolehBacaDokumen(subjek(["hr.org.manage"]), "")).toBe(true);
+    expect(H.bolehBacaDokumen(subjek(["hr.org.manage"]), "p1")).toBe(false);
+    expect(H.bolehBacaDokumen(subjek(["hr.document.view"]), "p1")).toBe(true);
+  });
+
+  test("ringkasan PTK per unit dihitung atas guru", () => {
+    const baris = (
+      unit: string,
+      kelompok: "Guru" | "Tendik",
+      jenjang: string,
+      nrg: string,
+    ) =>
+      ({ unit, kelompok, jenjang, nrg, sertifikat_bidang: "" }) as H.BarisPtk;
+    const r = H.ringkasPtk([
+      baris("SMP", "Guru", "S1", "123456789012"),
+      baris("SMP", "Guru", "D3", ""),
+      baris("SMP", "Guru", "S2", ""),
+      baris("SMP", "Tendik", "SMA/SMK", ""),
+      baris("SD", "Guru", "D4", ""),
+    ]);
+    expect(r.per_unit.map((u) => u.unit)).toEqual(["SD", "SMP"]);
+    expect(r.per_unit[1]).toEqual({
+      unit: "SMP",
+      guru: 3,
+      tendik: 1,
+      guru_s1: 2,
+      guru_sertifikat: 1,
+      persen_s1: 66.7,
+      persen_sertifikat: 33.3,
+    });
+    expect(r.total.guru).toBe(4);
+    expect(r.total.persen_s1).toBe(75);
+  });
+
+  test("SQL disalin harfiah ke hris_cloud.rs (Desktop dan Mobile)", () => {
+    const sql: string[] = [
+      H.PROFIL_PRIBADI_SQL,
+      H.PROFIL_KEUANGAN_SQL,
+      H.SIMPAN_PRIBADI_SQL,
+      H.SIMPAN_KEUANGAN_SQL,
+      H.PENDIDIKAN_SQL,
+      H.SERTIFIKASI_SQL,
+      H.SIMPAN_PENDIDIKAN_SQL,
+      H.HAPUS_PENDIDIKAN_SQL,
+      H.SIMPAN_SERTIFIKASI_SQL,
+      H.HAPUS_SERTIFIKASI_SQL,
+      H.JENIS_DOKUMEN_SQL,
+      H.SIMPAN_JENIS_DOKUMEN_SQL,
+      H.BENTROK_JENIS_DOKUMEN_SQL,
+      H.DOKUMEN_SQL,
+      H.BERKAS_DOKUMEN_SQL,
+      H.AMBIL_BERKAS_SQL,
+      H.SIMPAN_DOKUMEN_SQL,
+      ...H.HAPUS_DOKUMEN_SQL,
+      H.TAMBAH_BERKAS_SQL,
+      H.HAPUS_BERKAS_SQL,
+      H.PTK_SQL,
+      H.PESAN_LURING,
+      H.PESAN_PEGAWAI_BELUM_DI_CLOUD,
+      H.PESAN_DOKUMEN_DITOLAK,
+      H.PESAN_BERKAS_PENUH,
+    ];
+    let diperiksa = 0;
+    for (const dir of ["desktop", "mobile"]) {
+      const lokasi = [
+        join(import.meta.dir, `../../../src-tauri/src/${dir}/hris_cloud.rs`),
+        join(
+          import.meta.dir,
+          `../../../../mobile/src-tauri/src/${dir}/hris_cloud.rs`,
+        ),
+      ].find(existsSync);
+      if (!lokasi) continue;
+      diperiksa++;
+      const rust = readFileSync(lokasi, "utf8").replace(/\s+/g, "");
+      for (const teks of sql) {
+        expect(rust).toContain(JSON.stringify(teks).replace(/\s+/g, ""));
+      }
+      for (const [nama, daftar] of [
+        ["AGAMA", H.AGAMA],
+        ["STATUS_NIKAH", H.STATUS_NIKAH],
+        ["JENJANG", H.JENJANG],
+      ] as const) {
+        expect(rust).toContain(
+          `${nama}:[&str;${daftar.length}]=${JSON.stringify(daftar).replace(/\s+/g, "")};`,
+        );
+      }
+      expect(rust).toContain(`TEKS_MAKS:usize=${H.TEKS_MAKS};`);
+      expect(rust).toContain(`ALAMAT_MAKS:usize=${H.ALAMAT_MAKS};`);
+      expect(rust).toContain("MAKS_BYTE_DOKUMEN:usize=1024*1024;");
+      expect(rust).toContain(
+        `MAKS_BERKAS_DOKUMEN:usize=${H.MAKS_BERKAS_DOKUMEN};`,
+      );
+    }
+    expect(diperiksa).toBeGreaterThan(0);
+  });
+});

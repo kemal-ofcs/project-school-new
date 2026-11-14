@@ -23,6 +23,7 @@ pub mod face_match;
 pub mod grades;
 pub mod hari_kerja;
 pub mod hris;
+pub mod hris_cloud;
 pub mod inventory;
 pub mod cicilan;
 pub mod inventory_pengajuan;

@@ -11,7 +11,7 @@ use super::{
         CommandError, DesktopLoginResult, DesktopRuntimeStatus, DesktopSession, DesktopSyncStatus,
         OperatorUser, SessionMode,
     },
-    hris, operational, portability, rapel,
+    hris, hris_cloud, operational, portability, rapel,
     scanner, secrets, storage, sync, teaching_journal, turso, uks, wa_notification,
 };
 
@@ -3186,6 +3186,187 @@ pub fn desktop_hr_contract_cancel(
 ) -> Result<Value, CommandError> {
     let operator = require_permission(&state, "hr.contract.manage")?;
     hris::batal_kontrak(&state, &operator.username, &id_kontrak, &alasan)
+}
+
+fn klien_cloud(state: &DesktopState) -> Result<super::turso::TursoClient, CommandError> {
+    state.get_turso_client().map_err(hris_cloud::luring)
+}
+
+/// Profil cloud-only seorang pegawai (HRIS 1c): hanya kelompok yang izinnya
+/// dipegang sesi (pribadi, keuangan, pendidik).
+#[tauri::command]
+pub async fn desktop_hr_profile(
+    state: State<'_, DesktopState>,
+    id_karyawan: String,
+) -> Result<Value, CommandError> {
+    let operator = require_any_permission(&state, &["hr.personal.view", "hr.finance.view", "teachers.view"])?;
+    let kelompok = hris_cloud::kelompok_profil(&operator);
+    hris_cloud::profil(&klien_cloud(&state)?, &id_karyawan, kelompok).await.map_err(hris_cloud::luring)
+}
+
+/// Simpan data pribadi (NIK, KK, alamat, kontak darurat), cloud-only.
+#[tauri::command]
+pub async fn desktop_hr_profile_save_personal(
+    state: State<'_, DesktopState>,
+    id_karyawan: String,
+    draft: Value,
+) -> Result<Value, CommandError> {
+    let operator = require_permission(&state, "hr.personal.manage")?;
+    hris_cloud::simpan_pribadi(&klien_cloud(&state)?, &id_karyawan, draft, &operator.username)
+        .await
+        .map_err(hris_cloud::luring)
+}
+
+/// Simpan data keuangan (rekening, NPWP, BPJS), cloud-only, izin sensitif.
+#[tauri::command]
+pub async fn desktop_hr_profile_save_finance(
+    state: State<'_, DesktopState>,
+    id_karyawan: String,
+    draft: Value,
+) -> Result<Value, CommandError> {
+    let operator = require_permission(&state, "hr.finance.manage")?;
+    hris_cloud::simpan_keuangan(&klien_cloud(&state)?, &id_karyawan, draft, &operator.username)
+        .await
+        .map_err(hris_cloud::luring)
+}
+
+/// Riwayat pendidikan baru atau ubah, cloud-only.
+#[tauri::command]
+pub async fn desktop_hr_education_save(
+    state: State<'_, DesktopState>,
+    draft: Value,
+) -> Result<Value, CommandError> {
+    let operator = require_permission(&state, "teachers.manage")?;
+    hris_cloud::simpan_pendidikan(&klien_cloud(&state)?, draft, &operator.username)
+        .await
+        .map_err(hris_cloud::luring)
+}
+
+/// Hapus satu riwayat pendidikan, cloud-only.
+#[tauri::command]
+pub async fn desktop_hr_education_delete(
+    state: State<'_, DesktopState>,
+    id_pendidikan: String,
+) -> Result<Value, CommandError> {
+    require_permission(&state, "teachers.manage")?;
+    hris_cloud::hapus(&klien_cloud(&state)?, hris_cloud::HAPUS_PENDIDIKAN_SQL, &id_pendidikan)
+        .await
+        .map_err(hris_cloud::luring)
+}
+
+/// Sertifikat pendidik baru atau ubah, cloud-only.
+#[tauri::command]
+pub async fn desktop_hr_certification_save(
+    state: State<'_, DesktopState>,
+    draft: Value,
+) -> Result<Value, CommandError> {
+    let operator = require_permission(&state, "teachers.manage")?;
+    hris_cloud::simpan_sertifikasi(&klien_cloud(&state)?, draft, &operator.username)
+        .await
+        .map_err(hris_cloud::luring)
+}
+
+/// Hapus satu sertifikat pendidik, cloud-only.
+#[tauri::command]
+pub async fn desktop_hr_certification_delete(
+    state: State<'_, DesktopState>,
+    id_sertifikasi: String,
+) -> Result<Value, CommandError> {
+    require_permission(&state, "teachers.manage")?;
+    hris_cloud::hapus(&klien_cloud(&state)?, hris_cloud::HAPUS_SERTIFIKASI_SQL, &id_sertifikasi)
+        .await
+        .map_err(hris_cloud::luring)
+}
+
+/// Jenis dokumen; dengan `id_karyawan`, juga dokumen dan daftar berkasnya
+/// tanpa isi. Jenis saja boleh dibaca pemegang `hr.org.manage`.
+#[tauri::command]
+pub async fn desktop_hr_documents(
+    state: State<'_, DesktopState>,
+    id_karyawan: Option<String>,
+) -> Result<Value, CommandError> {
+    let operator = require_any_permission(&state, &["hr.document.view", "hr.org.manage"])?;
+    let id = id_karyawan.unwrap_or_default();
+    if !hris_cloud::boleh_baca_dokumen(&operator, &id) {
+        return Err(CommandError::new("DESKTOP_ACCESS_DENIED", "Akses ditolak untuk tindakan ini."));
+    }
+    hris_cloud::dokumen(&klien_cloud(&state)?, &id).await.map_err(hris_cloud::luring)
+}
+
+/// Satu berkas dokumen beserta isinya, diambil saat dibuka.
+#[tauri::command]
+pub async fn desktop_hr_document_file(
+    state: State<'_, DesktopState>,
+    id_berkas: String,
+) -> Result<Value, CommandError> {
+    require_permission(&state, "hr.document.view")?;
+    hris_cloud::ambil_berkas(&klien_cloud(&state)?, &id_berkas).await.map_err(hris_cloud::luring)
+}
+
+/// Dokumen pegawai baru atau ubah (data tanpa berkas), cloud-only.
+#[tauri::command]
+pub async fn desktop_hr_document_save(
+    state: State<'_, DesktopState>,
+    draft: Value,
+) -> Result<Value, CommandError> {
+    let operator = require_permission(&state, "hr.document.manage")?;
+    hris_cloud::simpan_dokumen(&klien_cloud(&state)?, draft, &operator.username)
+        .await
+        .map_err(hris_cloud::luring)
+}
+
+/// Hapus dokumen bersama semua berkasnya dalam satu transaksi.
+#[tauri::command]
+pub async fn desktop_hr_document_delete(
+    state: State<'_, DesktopState>,
+    id_dokumen: String,
+) -> Result<Value, CommandError> {
+    require_permission(&state, "hr.document.manage")?;
+    hris_cloud::hapus_dokumen(&klien_cloud(&state)?, &id_dokumen).await.map_err(hris_cloud::luring)
+}
+
+/// Tambah satu berkas (maks 1 MB, 5 per dokumen) ke dokumen yang ada.
+#[tauri::command]
+pub async fn desktop_hr_document_file_add(
+    state: State<'_, DesktopState>,
+    id_dokumen: String,
+    nama_berkas: String,
+    mime_type: String,
+    data_base64: String,
+) -> Result<Value, CommandError> {
+    require_permission(&state, "hr.document.manage")?;
+    hris_cloud::tambah_berkas(&klien_cloud(&state)?, &id_dokumen, &nama_berkas, &mime_type, &data_base64)
+        .await
+        .map_err(hris_cloud::luring)
+}
+
+/// Hapus satu berkas dokumen.
+#[tauri::command]
+pub async fn desktop_hr_document_file_delete(
+    state: State<'_, DesktopState>,
+    id_berkas: String,
+) -> Result<Value, CommandError> {
+    require_permission(&state, "hr.document.manage")?;
+    hris_cloud::hapus(&klien_cloud(&state)?, hris_cloud::HAPUS_BERKAS_SQL, &id_berkas)
+        .await
+        .map_err(hris_cloud::luring)
+}
+
+/// Jenis dokumen baru atau ubah nama/aktif (cloud-only, tab Organisasi).
+#[tauri::command]
+pub async fn desktop_hr_document_types_save(
+    state: State<'_, DesktopState>,
+    draft: Value,
+) -> Result<Value, CommandError> {
+    require_permission(&state, "hr.org.manage")?;
+    hris_cloud::simpan_jenis_dokumen(&klien_cloud(&state)?, draft).await.map_err(hris_cloud::luring)
+}
+
+/// Baris Laporan PTK (pegawai aktif, pendidikan, sertifikat, mapel), cloud-only.
+#[tauri::command]
+pub async fn desktop_hr_ptk_report(state: State<'_, DesktopState>) -> Result<Value, CommandError> {
+    require_permission(&state, "teachers.view")?;
+    hris_cloud::laporan_ptk(&klien_cloud(&state)?).await.map_err(hris_cloud::luring)
 }
 
 /// Jenis tagihan, tarif, serta pilihan unit/rombel/tahun ajaran untuk

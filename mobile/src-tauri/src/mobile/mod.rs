@@ -25,6 +25,7 @@ pub mod face_match;
 pub mod grades;
 pub mod hari_kerja;
 pub mod hris;
+pub mod hris_cloud;
 // Inventaris: SALINAN `desktop/inventory.rs` oleh sync-rust-modules.ts.
 pub mod inventory;
 // Pembelian cicilan: SALINAN `desktop/cicilan.rs`.

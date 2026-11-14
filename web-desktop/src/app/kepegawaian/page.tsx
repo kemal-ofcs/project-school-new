@@ -9,8 +9,12 @@ import {
   useState,
 } from "react";
 import { AppShell } from "@/components/AppShell";
+import { masaKerja } from "@/components/kepegawaian/gaya";
+import { JenisDokumenOrganisasi } from "@/components/kepegawaian/JenisDokumenOrganisasi";
 import { OrganisasiTugasKontrak } from "@/components/kepegawaian/OrganisasiTugasKontrak";
+import { RincianPegawai } from "@/components/kepegawaian/RincianPegawai";
 import { TabKontrak } from "@/components/kepegawaian/TabKontrak";
+import { TabLaporanPtk } from "@/components/kepegawaian/TabLaporanPtk";
 import { TabTugas } from "@/components/kepegawaian/TabTugas";
 import { FeedbackBanner } from "@/components/ui/FeedbackBanner";
 import { Modal } from "@/components/ui/Modal";
@@ -31,7 +35,7 @@ import {
   simpanJabatan,
 } from "@/lib/gateways/hris";
 
-type Tab = "daftar" | "struktur" | "kontrak" | "tugas" | "organisasi";
+type Tab = "daftar" | "struktur" | "kontrak" | "tugas" | "organisasi" | "ptk";
 
 const TAB: { kunci: Tab; label: string }[] = [
   { kunci: "daftar", label: "Daftar" },
@@ -39,6 +43,7 @@ const TAB: { kunci: Tab; label: string }[] = [
   { kunci: "kontrak", label: "Kontrak" },
   { kunci: "tugas", label: "Tugas Tambahan" },
   { kunci: "organisasi", label: "Organisasi" },
+  { kunci: "ptk", label: "Laporan PTK" },
 ];
 
 const INPUT =
@@ -50,19 +55,6 @@ const TOMBOL_UTAMA =
 
 function pesanGalat(error: unknown) {
   return error instanceof Error ? error.message : "Permintaan gagal.";
-}
-
-/** Masa kerja dari TMT sampai hari ini WIB; tidak disimpan (§19.2.1). */
-function masaKerja(tmt: string, hariIni: string) {
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(tmt) || tmt > hariIni) return "-";
-  const [ty, tm, td] = tmt.split("-").map(Number);
-  const [hy, hm, hd] = hariIni.split("-").map(Number);
-  let bulan = (hy - ty) * 12 + (hm - tm);
-  if (hd < td) bulan -= 1;
-  const tahun = Math.floor(bulan / 12);
-  const sisa = bulan % 12;
-  if (tahun === 0) return `${sisa} bln`;
-  return sisa === 0 ? `${tahun} th` : `${tahun} th ${sisa} bln`;
 }
 
 export default function KepegawaianPage() {
@@ -113,7 +105,10 @@ export default function KepegawaianPage() {
         aria-label="Bagian halaman Kepegawaian"
         className="flex flex-wrap gap-2 rounded-2xl border border-white/10 bg-slate-900 p-1"
       >
-        {TAB.map(({ kunci, label }) => (
+        {TAB.filter(
+          ({ kunci }) =>
+            kunci !== "ptk" || hasPermission(user, "teachers.view"),
+        ).map(({ kunci, label }) => (
           <button
             key={kunci}
             id={`tab-kepegawaian-${kunci}`}
@@ -157,10 +152,14 @@ export default function KepegawaianPage() {
             onPesan={setPesan}
             onGalat={setGalat}
           />
+        ) : tab === "ptk" ? (
+          <TabLaporanPtk onPesan={setPesan} onGalat={setGalat} />
         ) : (
           <TabOrganisasi
             org={org}
             bolehUbah={bolehUbah}
+            jenisDokumen={bolehUbah || hasPermission(user, "hr.document.view")}
+            onPesan={setPesan}
             onBerhasil={async (teks) => {
               setPesan(teks);
               await muat();
@@ -179,6 +178,7 @@ function TabDaftar({ org }: { org: OrgKepegawaian }) {
   const [bagian, setBagian] = useState("");
   const [jabatan, setJabatan] = useState("");
   const [kelompok, setKelompok] = useState("");
+  const [rincian, setRincian] = useState<PegawaiKepegawaian | null>(null);
   const hariIni = formatTanggalOperasional(Date.now());
   const namaAtasan = new Map(org.pegawai.map((p) => [p.id_unik, p.nama]));
   const daftarUnit = [
@@ -276,6 +276,9 @@ function TabDaftar({ org }: { org: OrgKepegawaian }) {
               <th className="px-3 py-2">Status</th>
               <th className="px-3 py-2">TMT</th>
               <th className="px-3 py-2">Masa kerja</th>
+              <th className="px-3 py-2">
+                <span className="sr-only">Aksi</span>
+              </th>
             </tr>
           </thead>
           <tbody className="divide-y divide-white/5">
@@ -305,11 +308,29 @@ function TabDaftar({ org }: { org: OrgKepegawaian }) {
                 <td className="px-3 py-2">{p.status_kepegawaian || "-"}</td>
                 <td className="px-3 py-2">{p.tmt || "-"}</td>
                 <td className="px-3 py-2">{masaKerja(p.tmt, hariIni)}</td>
+                <td className="px-3 py-2">
+                  <button
+                    type="button"
+                    className={TOMBOL}
+                    aria-label={`Rincian ${p.nama}`}
+                    onClick={() => setRincian(p)}
+                  >
+                    Rincian
+                  </button>
+                </td>
               </tr>
             ))}
           </tbody>
         </table>
       </div>
+      {rincian ? (
+        <RincianPegawai
+          pegawai={rincian}
+          org={org}
+          hariIni={hariIni}
+          onClose={() => setRincian(null)}
+        />
+      ) : null}
     </div>
   );
 }
@@ -396,11 +417,15 @@ type Sunting =
 function TabOrganisasi({
   org,
   bolehUbah,
+  jenisDokumen,
+  onPesan,
   onBerhasil,
   onGalat,
 }: {
   org: OrgKepegawaian;
   bolehUbah: boolean;
+  jenisDokumen: boolean;
+  onPesan: (pesan: string) => void;
   onBerhasil: (pesan: string) => Promise<void>;
   onGalat: (pesan: string) => void;
 }) {
@@ -628,6 +653,10 @@ function TabOrganisasi({
         onBerhasil={onBerhasil}
         onGalat={onGalat}
       />
+
+      {jenisDokumen ? (
+        <JenisDokumenOrganisasi bolehUbah={bolehUbah} onPesan={onPesan} />
+      ) : null}
 
       {sunting?.jenis === "bagian" || sunting?.jenis === "jabatan" ? (
         <ModalNama

@@ -1,31 +1,50 @@
 import "server-only";
 
-import type { Client, Row, Transaction } from "@libsql/client";
+import type { Client, ResultSet, Row, Transaction } from "@libsql/client";
+import type { z } from "zod";
 import { ApiRequestError } from "@/lib/server/http/api-response";
 import {
+  AMBIL_BERKAS_SQL,
   ATURAN_PERCOBAAN,
   ATURAN_PKWT,
   angkaPengaturan,
   BATAL_TUGAS_SQL,
+  type BarisPtk,
   BENTROK_BAGIAN_SQL,
   BENTROK_JABATAN_SQL,
+  BENTROK_JENIS_DOKUMEN_SQL,
   BENTROK_JENIS_TUGAS_SQL,
+  BERKAS_DOKUMEN_SQL,
+  type BerkasDokumenBaris,
+  type berkasDokumenSchema,
   CATAT_NAMA_BAGIAN_SQL,
   CERMIN_STATUS_SQL,
+  type DaftarDokumen,
   type DaftarKontrak,
   type DaftarTugas,
+  DOKUMEN_SQL,
+  type DokumenBaris,
+  type dokumenDraftSchema,
   GABUNG_BAGIAN_SQL,
+  HAPUS_DOKUMEN_SQL,
   HARI_INI_SQL,
   ID_WALI_KELAS,
+  type IsiBerkasDokumen,
   idNamaBagian,
+  JENIS_DOKUMEN_SQL,
   JENIS_TUGAS_SQL,
+  type JenisDokumen,
   type JenisTugas,
   type JenisTugasDraft,
+  type jenisDokumenDraftSchema,
+  type KelompokProfil,
   KONTRAK_SQL,
   type KontrakBaris,
   type KontrakDraft,
   KUNCI_PERCOBAAN_MAKS,
   KUNCI_PKWT_MAKS,
+  type keuanganDraftSchema,
+  type LaporanPtk,
   type MasterDraft,
   normalisasiNama,
   ORG_BAGIAN_NAMA_SQL,
@@ -34,32 +53,59 @@ import {
   ORG_PEGAWAI_SQL,
   type OrgKepegawaian,
   PEGAWAI_SQL,
+  PENDIDIKAN_SQL,
   PENGATURAN_KONTRAK_SQL,
+  PESAN_BERKAS_PENUH,
+  PESAN_DOKUMEN_DITOLAK,
+  PESAN_PEGAWAI_BELUM_DI_CLOUD,
   type PegawaiKepegawaian,
+  type PendidikanBaris,
   type PengaturanKontrak,
   type PengaturanKontrakDraft,
+  PROFIL_KEUANGAN_SQL,
+  PROFIL_PRIBADI_SQL,
+  type ProfilPegawai,
+  PTK_SQL,
+  type pendidikanDraftSchema,
   periksaAtasan,
+  type pribadiDraftSchema,
+  SERTIFIKASI_SQL,
+  type SertifikasiBaris,
   SIMPAN_BAGIAN_SQL,
+  SIMPAN_DOKUMEN_SQL,
   SIMPAN_JABATAN_SQL,
+  SIMPAN_JENIS_DOKUMEN_SQL,
   SIMPAN_JENIS_TUGAS_SQL,
+  SIMPAN_KEUANGAN_SQL,
   SIMPAN_KONTRAK_SQL,
+  SIMPAN_PENDIDIKAN_SQL,
+  SIMPAN_PRIBADI_SQL,
+  SIMPAN_SERTIFIKASI_SQL,
   SIMPAN_TUGAS_SQL,
   STATUS_KINI_SQL,
   STATUS_PEMBATALAN,
+  type sertifikasiDraftSchema,
   statusTugas,
   susunKontrak,
   susunOrg,
   TAHUN_AJARAN_SQL,
+  TAMBAH_BERKAS_SQL,
   TUGAS_BERLAKU_SQL,
   TUGAS_SQL,
   TULIS_ULANG_BAGIAN_SQL,
   TULIS_ULANG_JABATAN_SQL,
   type TugasDraft,
+  uraiBerkasDokumen,
   validasiAlasan,
   validasiAngkaPengaturan,
+  validasiDokumen,
   validasiJenisTugas,
+  validasiKeuangan,
   validasiKontrak,
   validasiNamaMaster,
+  validasiPendidikan,
+  validasiPribadi,
+  validasiSertifikasi,
   validasiTugas,
   WALI_KELAS_SQL,
 } from "@/lib/validations/hris";
@@ -780,4 +826,281 @@ export async function tulisOrganisasi(
     sql: "UPDATE master_data SET id_bagian = NULLIF(?2, ''), id_jabatan = NULLIF(?3, ''), id_atasan = NULLIF(?4, '') WHERE id_unik = ?1;",
     args: [idKaryawan, org.id_bagian, org.id_jabatan, org.id_atasan],
   });
+}
+
+// ── HRIS 1c: data cloud-only (kembar `desktop/hris_cloud.rs`) ──
+//
+// Web menulis langsung ke database cloud; tabel ini tidak pernah tersalin ke
+// perangkat, jadi tidak ada outbox.
+
+function objek(hasil: ResultSet): Record<string, unknown>[] {
+  return hasil.rows.map((row) =>
+    Object.fromEntries(hasil.columns.map((kolom) => [kolom, row[kolom]])),
+  );
+}
+
+function ambilValid<T>(
+  hasil: { ok: true; nilai: T } | { ok: false; galat: string },
+): T {
+  if (!hasil.ok) galat(hasil.galat);
+  return hasil.nilai;
+}
+
+async function tulisPegawai(
+  client: Client,
+  sql: string,
+  args: (string | number | null)[],
+  pesan = PESAN_PEGAWAI_BELUM_DI_CLOUD,
+) {
+  const hasil = await client.execute({ sql, args });
+  if (hasil.rowsAffected === 0) galat(pesan);
+}
+
+export async function getProfil(
+  client: Client,
+  idKaryawan: string,
+  kelompok: KelompokProfil,
+): Promise<ProfilPegawai> {
+  const id = idKaryawan.trim();
+  const baca = async (sql: string) =>
+    objek(await client.execute({ sql, args: [id] }));
+  const profil: ProfilPegawai = { id_karyawan: id };
+  if (kelompok.pribadi) {
+    profil.pribadi = ((await baca(PROFIL_PRIBADI_SQL))[0] ??
+      null) as unknown as ProfilPegawai["pribadi"];
+  }
+  if (kelompok.keuangan) {
+    profil.keuangan = ((await baca(PROFIL_KEUANGAN_SQL))[0] ??
+      null) as unknown as ProfilPegawai["keuangan"];
+  }
+  if (kelompok.pendidik) {
+    profil.pendidik = {
+      pendidikan: (await baca(PENDIDIKAN_SQL)) as unknown as PendidikanBaris[],
+      sertifikasi: (await baca(
+        SERTIFIKASI_SQL,
+      )) as unknown as SertifikasiBaris[],
+    };
+  }
+  return profil;
+}
+
+export async function simpanPribadi(
+  client: Client,
+  operator: string,
+  draft: z.output<typeof pribadiDraftSchema>,
+) {
+  const p = ambilValid(validasiPribadi(draft));
+  await tulisPegawai(client, SIMPAN_PRIBADI_SQL, [
+    draft.id_karyawan,
+    p.nik,
+    p.no_kk,
+    p.tempat_lahir,
+    p.tanggal_lahir,
+    p.agama,
+    p.status_nikah,
+    p.nama_ibu_kandung,
+    p.alamat_ktp,
+    p.alamat_domisili,
+    p.darurat_nama,
+    p.darurat_hubungan,
+    p.darurat_hp,
+    operator,
+  ]);
+  return { sukses: true };
+}
+
+export async function simpanKeuangan(
+  client: Client,
+  operator: string,
+  draft: z.output<typeof keuanganDraftSchema>,
+) {
+  const k = ambilValid(validasiKeuangan(draft));
+  await tulisPegawai(client, SIMPAN_KEUANGAN_SQL, [
+    draft.id_karyawan,
+    k.bank,
+    k.no_rekening,
+    k.nama_rekening,
+    k.npwp,
+    k.bpjs_kesehatan,
+    k.bpjs_ketenagakerjaan,
+    operator,
+  ]);
+  return { sukses: true };
+}
+
+const idAtauBaru = (id: string | undefined, awalan: string) =>
+  id?.trim() || idBaru(awalan);
+
+export async function simpanPendidikan(
+  client: Client,
+  operator: string,
+  draft: z.output<typeof pendidikanDraftSchema>,
+) {
+  const p = ambilValid(validasiPendidikan(draft));
+  const id = idAtauBaru(draft.id, "pdk-");
+  await tulisPegawai(client, SIMPAN_PENDIDIKAN_SQL, [
+    id,
+    draft.id_karyawan,
+    p.jenjang,
+    p.prodi,
+    p.perguruan_tinggi,
+    p.tahun_lulus,
+    p.linier,
+    p.catatan,
+    operator,
+  ]);
+  return { id_pendidikan: id };
+}
+
+export async function simpanSertifikasi(
+  client: Client,
+  operator: string,
+  draft: z.output<typeof sertifikasiDraftSchema>,
+) {
+  const s = ambilValid(validasiSertifikasi(draft));
+  const id = idAtauBaru(draft.id, "srt-");
+  await tulisPegawai(client, SIMPAN_SERTIFIKASI_SQL, [
+    id,
+    draft.id_karyawan,
+    s.nomor_sertifikat,
+    s.nrg,
+    s.tahun,
+    s.bidang_studi,
+    s.catatan,
+    operator,
+  ]);
+  return { id_sertifikasi: id };
+}
+
+/** Hapus satu baris cloud-only berdasarkan id (pendidikan, sertifikat, berkas). */
+export async function hapusBaris(client: Client, sql: string, id: string) {
+  await client.execute({ sql, args: [id.trim()] });
+  return { sukses: true };
+}
+
+export async function getDokumen(
+  client: Client,
+  idKaryawan: string,
+): Promise<DaftarDokumen> {
+  const id = idKaryawan.trim();
+  const jenis = objek(
+    await client.execute(JENIS_DOKUMEN_SQL),
+  ) as unknown as JenisDokumen[];
+  if (id === "") return { jenis };
+  const [dokumen, berkas] = await Promise.all([
+    client.execute({ sql: DOKUMEN_SQL, args: [id] }),
+    client.execute({ sql: BERKAS_DOKUMEN_SQL, args: [id] }),
+  ]);
+  return {
+    jenis,
+    dokumen: objek(dokumen) as unknown as DokumenBaris[],
+    berkas: objek(berkas) as unknown as BerkasDokumenBaris[],
+  };
+}
+
+export async function getBerkasDokumen(
+  client: Client,
+  idBerkas: string,
+): Promise<IsiBerkasDokumen> {
+  const baris = objek(
+    await client.execute({ sql: AMBIL_BERKAS_SQL, args: [idBerkas.trim()] }),
+  )[0];
+  if (!baris) throw new ApiRequestError("Berkas tidak ditemukan.", 404);
+  return baris as unknown as IsiBerkasDokumen;
+}
+
+export async function simpanDokumen(
+  client: Client,
+  operator: string,
+  draft: z.output<typeof dokumenDraftSchema>,
+) {
+  const d = ambilValid(validasiDokumen(draft));
+  const id = idAtauBaru(draft.id, "dok-");
+  await tulisPegawai(
+    client,
+    SIMPAN_DOKUMEN_SQL,
+    [
+      id,
+      draft.id_karyawan,
+      d.id_jenis,
+      d.nomor,
+      d.tanggal_terbit,
+      d.tanggal_kedaluwarsa,
+      d.catatan,
+      operator,
+    ],
+    PESAN_DOKUMEN_DITOLAK,
+  );
+  return { id_dokumen: id };
+}
+
+/** Dokumen dihapus sungguhan bersama berkasnya dalam satu transaksi. */
+export async function hapusDokumen(client: Client, idDokumen: string) {
+  const id = idDokumen.trim();
+  await client.batch(
+    HAPUS_DOKUMEN_SQL.map((sql) => ({ sql, args: [id] })),
+    "write",
+  );
+  return { sukses: true };
+}
+
+export async function tambahBerkasDokumen(
+  client: Client,
+  draft: z.output<typeof berkasDokumenSchema>,
+) {
+  const berkas = ambilValid(
+    uraiBerkasDokumen(draft.nama_berkas, draft.mime_type, draft.data_base64),
+  );
+  const id = idBaru("dkb-");
+  await tulisPegawai(
+    client,
+    TAMBAH_BERKAS_SQL,
+    [
+      id,
+      draft.id_dokumen.trim(),
+      berkas.nama_berkas,
+      berkas.mime_type,
+      berkas.data_base64,
+    ],
+    PESAN_BERKAS_PENUH,
+  );
+  return { id_berkas: id };
+}
+
+export async function simpanJenisDokumen(
+  client: Client,
+  draft: z.output<typeof jenisDokumenDraftSchema>,
+) {
+  const valid = validasiNamaMaster(draft.nama, "jenis dokumen");
+  if (!valid.ok) galat(valid.galat);
+  const aktif = draft.is_aktif === 0 ? 0 : 1;
+  const id = idAtauBaru(draft.id, "dok-");
+  if (
+    aktif === 1 &&
+    (await ada(client, BENTROK_JENIS_DOKUMEN_SQL, [valid.nama, id]))
+  )
+    galat("Jenis dokumen dengan nama itu sudah ada.");
+  await client.execute({
+    sql: SIMPAN_JENIS_DOKUMEN_SQL,
+    args: [id, valid.nama, aktif],
+  });
+  return { id_jenis: id };
+}
+
+export async function getLaporanPtk(client: Client): Promise<LaporanPtk> {
+  const hari = await hariIni(client);
+  const [status, ptk] = await Promise.all([
+    client.execute({ sql: STATUS_KINI_SQL, args: [hari] }),
+    client.execute(PTK_SQL),
+  ]);
+  const kini = new Map(
+    status.rows.map((r) => [teks(r, "id_unik"), teks(r, "status")]),
+  );
+  return {
+    hari_ini: hari,
+    baris: objek(ptk).map((b) => ({
+      ...b,
+      status: kini.get(String(b.id_unik)) ?? "",
+    })) as unknown as BarisPtk[],
+  };
 }

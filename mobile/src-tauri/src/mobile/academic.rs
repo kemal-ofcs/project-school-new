@@ -1701,7 +1701,14 @@ pub fn save_teacher(state: &MobileState, draft: &Value) -> Result<Value, Command
     let kode = text(draft, "kode_karyawan");
     let unit = text(draft, "unit");
     let nip = optional_text(draft, "nip");
-    let nuptk = optional_text(draft, "nuptk");
+    // NUPTK 16 digit tanpa tanda baca (HRIS §19.2.3), ditolak sebelum outbox.
+    let nuptk = match optional_text(draft, "nuptk") {
+        Some(teks) => Some(
+            super::hris_cloud::nomor_identitas("nuptk", &teks)
+                .map_err(|pesan| CommandError::new("VALIDATION_ERROR", pesan))?,
+        ),
+        None => None,
+    };
     let gelar = optional_text(draft, "gelar");
     let spesialisasi = optional_text(draft, "spesialisasi_mapel");
     let status_peg =

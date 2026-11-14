@@ -558,5 +558,490 @@
     ["2026-07-01", "2026-07-31", "", "2026-08-01", "Selesai"],
     ["2026-09-01", "", "", "2026-08-01", "Akan berlaku"],
     ["2026-07-01", "", "2026-07-02 10:00:00", "2026-08-01", "Dibatalkan"]
+  ],
+  "nomor_identitas": [
+    ["nik", "3201.0101-0101 0001", "3201010101010001", null],
+    ["nik", "3201 0101 0101 0001", "3201010101010001", null],
+    ["nik", "   ", "", null],
+    ["nik", "320101010101000", null, "NIK harus 16 digit."],
+    ["nik", "32010101010100O1", null, "NIK hanya boleh berisi angka."],
+    ["nik", "１２３", null, "NIK hanya boleh berisi angka."],
+    ["no_kk", "3201-0101-0101-0001", "3201010101010001", null],
+    ["npwp", "01.234.567.8-901.000", "012345678901000", null],
+    ["npwp", "0123456789012345", "0123456789012345", null],
+    ["npwp", "12345678901234", null, "NPWP harus 15 atau 16 digit."],
+    ["nuptk", "1234 5678 9012 3456", "1234567890123456", null],
+    ["nrg", "123456789012", "123456789012", null],
+    ["nrg", "1234567890123", null, "NRG harus 12 digit."],
+    ["bpjs_kesehatan", "0001234567890", "0001234567890", null],
+    [
+      "bpjs_ketenagakerjaan",
+      "123456789012345678901",
+      null,
+      "Nomor BPJS Ketenagakerjaan harus 5 sampai 20 digit."
+    ],
+    ["no_rekening", "123-456-789", "123456789", null],
+    ["no_rekening", "1234", null, "Nomor rekening harus 5 sampai 20 digit."],
+    ["paspor", "123", null, "Jenis nomor tidak dikenal."]
+  ],
+  "pribadi_dasar": {
+    "nik": "",
+    "no_kk": "",
+    "tempat_lahir": "",
+    "tanggal_lahir": "",
+    "agama": "",
+    "status_nikah": "",
+    "nama_ibu_kandung": "",
+    "alamat_ktp": "",
+    "alamat_domisili": "",
+    "darurat_nama": "",
+    "darurat_hubungan": "",
+    "darurat_hp": ""
+  },
+  "pribadi": [
+    {
+      "ubah": {
+        "nik": "3201.0101-0101 0001",
+        "tempat_lahir": "  Bandung ",
+        "tanggal_lahir": "1990-05-17",
+        "agama": "Islam",
+        "status_nikah": "Kawin",
+        "darurat_hp": "0812-3456-7890"
+      },
+      "galat": null,
+      "hasil": {
+        "nik": "3201010101010001",
+        "no_kk": "",
+        "tempat_lahir": "Bandung",
+        "tanggal_lahir": "1990-05-17",
+        "agama": "Islam",
+        "status_nikah": "Kawin",
+        "nama_ibu_kandung": "",
+        "alamat_ktp": "",
+        "alamat_domisili": "",
+        "darurat_nama": "",
+        "darurat_hubungan": "",
+        "darurat_hp": "+6281234567890"
+      }
+    },
+    {
+      "ubah": {},
+      "galat": null,
+      "hasil": {
+        "nik": "",
+        "no_kk": "",
+        "tempat_lahir": "",
+        "tanggal_lahir": "",
+        "agama": "",
+        "status_nikah": "",
+        "nama_ibu_kandung": "",
+        "alamat_ktp": "",
+        "alamat_domisili": "",
+        "darurat_nama": "",
+        "darurat_hubungan": "",
+        "darurat_hp": ""
+      }
+    },
+    {
+      "ubah": {
+        "agama": "islam"
+      },
+      "galat": "Agama tidak dikenal.",
+      "hasil": null
+    },
+    {
+      "ubah": {
+        "status_nikah": "Menikah"
+      },
+      "galat": "Status pernikahan tidak dikenal.",
+      "hasil": null
+    },
+    {
+      "ubah": {
+        "tanggal_lahir": "1990-02-30"
+      },
+      "galat": "Tanggal lahir tidak valid.",
+      "hasil": null
+    },
+    {
+      "ubah": {
+        "darurat_hp": "12345"
+      },
+      "galat": "Nomor HP darurat tidak valid.",
+      "hasil": null
+    },
+    {
+      "ubah": {
+        "darurat_hp": "0812",
+        "nik": "1"
+      },
+      "galat": "Nomor HP darurat tidak valid.",
+      "hasil": null
+    },
+    {
+      "ubah": {
+        "nik": "123",
+        "no_kk": "abc"
+      },
+      "galat": "NIK harus 16 digit.",
+      "hasil": null
+    },
+    {
+      "ubah": {
+        "alamat_ktp": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+      },
+      "galat": "Alamat KTP maksimal 500 karakter.",
+      "hasil": null
+    },
+    {
+      "ubah": {
+        "nama_ibu_kandung": "ééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééé"
+      },
+      "galat": "Nama ibu kandung maksimal 100 karakter.",
+      "hasil": null
+    }
+  ],
+  "keuangan_dasar": {
+    "bank": "",
+    "no_rekening": "",
+    "nama_rekening": "",
+    "npwp": "",
+    "bpjs_kesehatan": "",
+    "bpjs_ketenagakerjaan": ""
+  },
+  "keuangan": [
+    {
+      "ubah": {
+        "bank": " BSI ",
+        "no_rekening": "7123-4567-89",
+        "nama_rekening": "Siti",
+        "npwp": "01.234.567.8-901.000",
+        "bpjs_kesehatan": "0001234567890",
+        "bpjs_ketenagakerjaan": "12345678901"
+      },
+      "galat": null,
+      "hasil": {
+        "bank": "BSI",
+        "no_rekening": "7123456789",
+        "nama_rekening": "Siti",
+        "npwp": "012345678901000",
+        "bpjs_kesehatan": "0001234567890",
+        "bpjs_ketenagakerjaan": "12345678901"
+      }
+    },
+    {
+      "ubah": {
+        "npwp": "123"
+      },
+      "galat": "NPWP harus 15 atau 16 digit.",
+      "hasil": null
+    },
+    {
+      "ubah": {
+        "no_rekening": "12a45"
+      },
+      "galat": "Nomor rekening hanya boleh berisi angka.",
+      "hasil": null
+    },
+    {
+      "ubah": {
+        "bank": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+      },
+      "galat": "Nama bank maksimal 100 karakter.",
+      "hasil": null
+    }
+  ],
+  "pendidikan_dasar": {
+    "jenjang": "S1",
+    "prodi": "",
+    "perguruan_tinggi": "",
+    "tahun_lulus": null,
+    "linier": 0,
+    "catatan": ""
+  },
+  "pendidikan": [
+    {
+      "ubah": {
+        "prodi": " PGSD ",
+        "perguruan_tinggi": "UPI",
+        "tahun_lulus": 2015,
+        "linier": 1
+      },
+      "galat": null,
+      "hasil": {
+        "jenjang": "S1",
+        "prodi": "PGSD",
+        "perguruan_tinggi": "UPI",
+        "tahun_lulus": 2015,
+        "linier": 1,
+        "catatan": ""
+      }
+    },
+    {
+      "ubah": {
+        "jenjang": " S2 "
+      },
+      "galat": null,
+      "hasil": {
+        "jenjang": "S2",
+        "prodi": "",
+        "perguruan_tinggi": "",
+        "tahun_lulus": null,
+        "linier": 0,
+        "catatan": ""
+      }
+    },
+    {
+      "ubah": {
+        "tahun_lulus": 2100
+      },
+      "galat": null,
+      "hasil": {
+        "jenjang": "S1",
+        "prodi": "",
+        "perguruan_tinggi": "",
+        "tahun_lulus": 2100,
+        "linier": 0,
+        "catatan": ""
+      }
+    },
+    {
+      "ubah": {
+        "jenjang": "S4"
+      },
+      "galat": "Jenjang pendidikan tidak dikenal.",
+      "hasil": null
+    },
+    {
+      "ubah": {
+        "jenjang": "s1"
+      },
+      "galat": "Jenjang pendidikan tidak dikenal.",
+      "hasil": null
+    },
+    {
+      "ubah": {
+        "linier": 2
+      },
+      "galat": "Tanda linier tidak valid.",
+      "hasil": null
+    },
+    {
+      "ubah": {
+        "tahun_lulus": 1949
+      },
+      "galat": "Tahun lulus tidak valid.",
+      "hasil": null
+    }
+  ],
+  "sertifikasi_dasar": {
+    "nomor_sertifikat": "",
+    "nrg": "",
+    "tahun": null,
+    "bidang_studi": "",
+    "catatan": ""
+  },
+  "sertifikasi": [
+    {
+      "ubah": {
+        "nomor_sertifikat": " 1234/SERT ",
+        "nrg": "1234 5678 9012",
+        "tahun": 2018,
+        "bidang_studi": " Matematika "
+      },
+      "galat": null,
+      "hasil": {
+        "nomor_sertifikat": "1234/SERT",
+        "nrg": "123456789012",
+        "tahun": 2018,
+        "bidang_studi": "Matematika",
+        "catatan": ""
+      }
+    },
+    {
+      "ubah": {
+        "bidang_studi": "Matematika"
+      },
+      "galat": "Isi nomor sertifikat atau NRG.",
+      "hasil": null
+    },
+    {
+      "ubah": {
+        "nrg": "123456789012"
+      },
+      "galat": "Bidang studi sertifikat wajib diisi.",
+      "hasil": null
+    },
+    {
+      "ubah": {
+        "nrg": "12345",
+        "bidang_studi": "IPA"
+      },
+      "galat": "NRG harus 12 digit.",
+      "hasil": null
+    },
+    {
+      "ubah": {
+        "nrg": "123456789012",
+        "bidang_studi": "IPA",
+        "tahun": 1900
+      },
+      "galat": "Tahun sertifikat tidak valid.",
+      "hasil": null
+    }
+  ],
+  "dokumen_dasar": {
+    "id_jenis": "dok-ktp",
+    "nomor": "",
+    "tanggal_terbit": "2020-01-02",
+    "tanggal_kedaluwarsa": "",
+    "catatan": ""
+  },
+  "dokumen": [
+    {
+      "ubah": {},
+      "galat": null,
+      "hasil": {
+        "id_jenis": "dok-ktp",
+        "nomor": "",
+        "tanggal_terbit": "2020-01-02",
+        "tanggal_kedaluwarsa": "",
+        "catatan": ""
+      }
+    },
+    {
+      "ubah": {
+        "nomor": " 3201/X ",
+        "tanggal_kedaluwarsa": "2025-01-02",
+        "catatan": " ok "
+      },
+      "galat": null,
+      "hasil": {
+        "id_jenis": "dok-ktp",
+        "nomor": "3201/X",
+        "tanggal_terbit": "2020-01-02",
+        "tanggal_kedaluwarsa": "2025-01-02",
+        "catatan": "ok"
+      }
+    },
+    {
+      "ubah": {
+        "id_jenis": "  "
+      },
+      "galat": "Jenis dokumen wajib dipilih.",
+      "hasil": null
+    },
+    {
+      "ubah": {
+        "tanggal_terbit": ""
+      },
+      "galat": "Tanggal terbit tidak valid.",
+      "hasil": null
+    },
+    {
+      "ubah": {
+        "tanggal_kedaluwarsa": "2019-12-31"
+      },
+      "galat": "Tanggal kedaluwarsa tidak boleh sebelum tanggal terbit.",
+      "hasil": null
+    },
+    {
+      "ubah": {
+        "tanggal_kedaluwarsa": "2021-13-01"
+      },
+      "galat": "Tanggal kedaluwarsa tidak valid.",
+      "hasil": null
+    },
+    {
+      "ubah": {
+        "nomor": "nnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnn"
+      },
+      "galat": "Nomor dokumen maksimal 80 karakter.",
+      "hasil": null
+    }
+  ],
+  "berkas_dokumen": [
+    {
+      "nama_berkas": " ktp.png ",
+      "mime_type": "image/png",
+      "data_base64": "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==",
+      "galat": null,
+      "hasil": {
+        "nama_berkas": "ktp.png",
+        "mime_type": "image/png",
+        "ukuran_byte": 70
+      }
+    },
+    {
+      "nama_berkas": "ijazah.pdf",
+      "mime_type": "application/pdf",
+      "data_base64": "JVBERi0xLjcK",
+      "galat": null,
+      "hasil": {
+        "nama_berkas": "ijazah.pdf",
+        "mime_type": "application/pdf",
+        "ukuran_byte": 9
+      }
+    },
+    {
+      "nama_berkas": "a.jpg",
+      "mime_type": "image/jpeg",
+      "data_base64": "/9j/4AAQ",
+      "galat": null,
+      "hasil": {
+        "nama_berkas": "a.jpg",
+        "mime_type": "image/jpeg",
+        "ukuran_byte": 6
+      }
+    },
+    {
+      "nama_berkas": "a.gif",
+      "mime_type": "image/gif",
+      "data_base64": "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==",
+      "galat": "Berkas harus berupa JPG, PNG, WEBP, atau PDF.",
+      "hasil": null
+    },
+    {
+      "nama_berkas": "a.png",
+      "mime_type": "image/png",
+      "data_base64": "JVBERi0xLjcK",
+      "galat": "Isi berkas tidak sesuai formatnya.",
+      "hasil": null
+    },
+    {
+      "nama_berkas": "a.png",
+      "mime_type": "image/png",
+      "data_base64": "abc",
+      "galat": "Berkas tidak terbaca.",
+      "hasil": null
+    },
+    {
+      "nama_berkas": "a.png",
+      "mime_type": "image/png",
+      "data_base64": "@@@@",
+      "galat": "Berkas tidak terbaca.",
+      "hasil": null
+    },
+    {
+      "nama_berkas": "a.png",
+      "mime_type": "image/png",
+      "data_base64": "",
+      "galat": "Berkas tidak terbaca.",
+      "hasil": null
+    },
+    {
+      "nama_berkas": "  ",
+      "mime_type": "image/png",
+      "data_base64": "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==",
+      "galat": "Nama berkas wajib diisi.",
+      "hasil": null
+    },
+    {
+      "nama_berkas": "nnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnn",
+      "mime_type": "image/png",
+      "data_base64": "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==",
+      "galat": "Nama berkas maksimal 180 karakter.",
+      "hasil": null
+    }
   ]
 }

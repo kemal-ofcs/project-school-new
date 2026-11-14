@@ -943,7 +943,7 @@ fn db_error(_: rusqlite::Error) -> CommandError {
     CommandError::internal()
 }
 
-fn new_id(prefix: &str) -> String {
+pub(crate) fn new_id(prefix: &str) -> String {
     let mut bytes = [0u8; 12];
     rand_core::RngCore::fill_bytes(&mut rand_core::OsRng, &mut bytes);
     format!("{prefix}{}", hex::encode(bytes))

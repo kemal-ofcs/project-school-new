@@ -59,7 +59,7 @@ impl BerkasSah {
     }
 }
 
-fn ukuran_base64(base64: &str) -> Option<usize> {
+pub fn ukuran_base64(base64: &str) -> Option<usize> {
     let tanpa_padding = base64.trim_end_matches('=');
     let sah = base64.len() % 4 == 0
         && base64.len() - tanpa_padding.len() <= 2
@@ -73,7 +73,7 @@ fn ukuran_base64(base64: &str) -> Option<usize> {
     (ukuran > 0).then_some(ukuran)
 }
 
-fn tanda_tangan_cocok(mime: &str, base64: &str) -> bool {
+pub fn tanda_tangan_cocok(mime: &str, base64: &str) -> bool {
     let awal_base64 = &base64[..base64.len().min(16)];
     // `atob` di TS memaafkan sisa bit; Rust disamakan supaya hasilnya kembar.
     let mesin = base64::engine::GeneralPurpose::new(

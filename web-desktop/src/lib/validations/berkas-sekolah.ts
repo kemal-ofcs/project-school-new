@@ -67,7 +67,10 @@ export function ukuranBase64(base64: string): number {
   return (base64.length / 4) * 3 - padding;
 }
 
-function tandaTanganCocok(mime: MimeBerkasSekolah, base64: string): boolean {
+export function tandaTanganCocok(
+  mime: MimeBerkasSekolah,
+  base64: string,
+): boolean {
   let awal: string;
   try {
     awal = atob(base64.slice(0, 16));

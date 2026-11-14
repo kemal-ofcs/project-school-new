@@ -49,6 +49,8 @@ const filesToSync = [
   "telegram.rs",
   // HRIS Fase 1 (v68): organisasi pegawai, aturan dan SQL kembar `validations/hris.ts`.
   "hris.rs",
+  // HRIS 1c: data pribadi, keuangan, pendidik, dokumen (cloud-only), kembar TS.
+  "hris_cloud.rs",
   "commands.rs",
   // Tarif default payroll: satu sumber untuk SQLite lokal dan Turso cloud, di
   // kedua workspace. Perbedaan sekecil apa pun di sini membuat baris seed lokal

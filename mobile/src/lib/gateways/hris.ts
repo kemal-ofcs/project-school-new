@@ -4,31 +4,59 @@ import { requestWebApi } from "@/lib/client/api-client";
 import { isDesktopRuntime } from "@/lib/runtime/app-runtime";
 import { invokeDesktop, kickDesktopSync } from "@/lib/runtime/desktop-commands";
 import type {
+  BerkasDokumenDraft,
+  DaftarDokumen,
   DaftarKontrak,
   DaftarTugas,
+  DokumenDraft,
+  IsiBerkasDokumen,
+  JenisDokumenDraft,
   JenisTugasDraft,
+  KeuanganDraft,
   KontrakDraft,
+  LaporanPtk,
   MasterDraft,
   OrgKepegawaian,
+  PendidikanDraft,
   PengaturanKontrak,
   PengaturanKontrakDraft,
+  PribadiDraft,
+  ProfilPegawai,
+  SertifikasiDraft,
   TugasDraft,
 } from "@/lib/validations/hris";
 
 export type {
   BagianOrg,
+  BarisPtk,
+  BerkasDokumenBaris,
+  BerkasDokumenDraft,
+  DaftarDokumen,
   DaftarKontrak,
   DaftarTugas,
+  DokumenBaris,
+  DokumenDraft,
+  IsiBerkasDokumen,
   JabatanOrg,
+  JenisDokumen,
+  JenisDokumenDraft,
   JenisTugas,
   JenisTugasDraft,
+  KeuanganDraft,
   KontrakBaris,
   KontrakDraft,
+  LaporanPtk,
   MasterDraft,
   OrgKepegawaian,
   PegawaiKepegawaian,
+  PendidikanBaris,
+  PendidikanDraft,
   PengaturanKontrak,
+  PribadiDraft,
+  ProfilPegawai,
   RingkasKontrak,
+  SertifikasiBaris,
+  SertifikasiDraft,
   TugasBaris,
   TugasDraft,
 } from "@/lib/validations/hris";
@@ -193,4 +221,159 @@ export function simpanStatusTidakTetap(
     "/api/payroll/config/pajak-status",
     { daftar },
   );
+}
+
+// HRIS 1c: data cloud-only. Desktop membaca dan menulis langsung ke database
+// cloud lewat command `desktop_hr_*` (tanpa outbox, jadi tanpa kickDesktopSync);
+// tanpa koneksi, command melempar `PESAN_LURING`.
+
+function cloud<T>(
+  command: string,
+  args: Record<string, unknown>,
+  url: string,
+  body: unknown,
+  method: "POST" | "DELETE" = "POST",
+): Promise<T> {
+  if (isDesktopRuntime()) return invokeDesktop<T>(command, args);
+  return requestWebApi<T>(url, method, body);
+}
+
+export function muatProfilPegawai(idKaryawan: string): Promise<ProfilPegawai> {
+  return cloud(
+    "desktop_hr_profile",
+    { idKaryawan },
+    "/api/kepegawaian/profile/query",
+    { id_karyawan: idKaryawan },
+  );
+}
+
+export function simpanDataPribadi(draft: PribadiDraft) {
+  return cloud(
+    "desktop_hr_profile_save_personal",
+    { idKaryawan: draft.id_karyawan, draft },
+    "/api/kepegawaian/profile/personal",
+    draft,
+  );
+}
+
+export function simpanDataKeuangan(draft: KeuanganDraft) {
+  return cloud(
+    "desktop_hr_profile_save_finance",
+    { idKaryawan: draft.id_karyawan, draft },
+    "/api/kepegawaian/profile/finance",
+    draft,
+  );
+}
+
+export function simpanPendidikan(draft: PendidikanDraft) {
+  return cloud<{ id_pendidikan: string }>(
+    "desktop_hr_education_save",
+    { draft },
+    "/api/kepegawaian/education",
+    draft,
+  );
+}
+
+export function hapusPendidikan(id: string) {
+  return cloud(
+    "desktop_hr_education_delete",
+    { idPendidikan: id },
+    "/api/kepegawaian/education",
+    { id },
+    "DELETE",
+  );
+}
+
+export function simpanSertifikasi(draft: SertifikasiDraft) {
+  return cloud<{ id_sertifikasi: string }>(
+    "desktop_hr_certification_save",
+    { draft },
+    "/api/kepegawaian/certification",
+    draft,
+  );
+}
+
+export function hapusSertifikasi(id: string) {
+  return cloud(
+    "desktop_hr_certification_delete",
+    { idSertifikasi: id },
+    "/api/kepegawaian/certification",
+    { id },
+    "DELETE",
+  );
+}
+
+/** Tanpa `idKaryawan`: hanya jenis dokumen (cukup `hr.org.manage`). */
+export function muatDokumen(idKaryawan = ""): Promise<DaftarDokumen> {
+  return cloud(
+    "desktop_hr_documents",
+    { idKaryawan },
+    "/api/kepegawaian/documents/query",
+    { id_karyawan: idKaryawan },
+  );
+}
+
+export function ambilBerkasDokumen(id: string): Promise<IsiBerkasDokumen> {
+  return cloud(
+    "desktop_hr_document_file",
+    { idBerkas: id },
+    "/api/kepegawaian/documents/file/query",
+    { id },
+  );
+}
+
+export function simpanDokumen(draft: DokumenDraft) {
+  return cloud<{ id_dokumen: string }>(
+    "desktop_hr_document_save",
+    { draft },
+    "/api/kepegawaian/documents",
+    draft,
+  );
+}
+
+export function hapusDokumen(id: string) {
+  return cloud(
+    "desktop_hr_document_delete",
+    { idDokumen: id },
+    "/api/kepegawaian/documents",
+    { id },
+    "DELETE",
+  );
+}
+
+export function tambahBerkasDokumen(draft: BerkasDokumenDraft) {
+  return cloud<{ id_berkas: string }>(
+    "desktop_hr_document_file_add",
+    {
+      idDokumen: draft.id_dokumen,
+      namaBerkas: draft.nama_berkas,
+      mimeType: draft.mime_type,
+      dataBase64: draft.data_base64,
+    },
+    "/api/kepegawaian/documents/file",
+    draft,
+  );
+}
+
+export function hapusBerkasDokumen(id: string) {
+  return cloud(
+    "desktop_hr_document_file_delete",
+    { idBerkas: id },
+    "/api/kepegawaian/documents/file",
+    { id },
+    "DELETE",
+  );
+}
+
+export function simpanJenisDokumen(draft: JenisDokumenDraft) {
+  return cloud<{ id_jenis: string }>(
+    "desktop_hr_document_types_save",
+    { draft },
+    "/api/kepegawaian/document-types",
+    draft,
+  );
+}
+
+export function muatLaporanPtk(): Promise<LaporanPtk> {
+  return cloud("desktop_hr_ptk_report", {}, "/api/kepegawaian/ptk/query", {});
 }

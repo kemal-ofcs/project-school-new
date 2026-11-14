@@ -48,14 +48,18 @@ function bacaDataUrl(berkas: Blob): Promise<string> {
 
 const isiBase64 = (dataUrl: string) => dataUrl.slice(dataUrl.indexOf(",") + 1);
 
-export async function siapkanBerkas(file: File): Promise<HasilSiapkanBerkas> {
+/** `maksByte`: batas setelah dipadatkan; bawaan berkas siswa/PMB, 1 MB untuk dokumen pegawai. */
+export async function siapkanBerkas(
+  file: File,
+  maksByte = MAKS_BYTE_BERKAS,
+): Promise<HasilSiapkanBerkas> {
   const namaFile = file.name.trim().slice(0, 180) || "berkas";
 
   if (file.type === "application/pdf") {
-    if (file.size > MAKS_BYTE_BERKAS) {
+    if (file.size > maksByte) {
       return {
         ok: false,
-        pesan: `PDF ini ${kb(file.size)} KB, melebihi batas ${kb(MAKS_BYTE_BERKAS)} KB. Foto halamannya lalu unggah sebagai gambar.`,
+        pesan: `PDF ini ${kb(file.size)} KB, melebihi batas ${kb(maksByte)} KB. Foto halamannya lalu unggah sebagai gambar.`,
       };
     }
     return {
@@ -111,10 +115,10 @@ export async function siapkanBerkas(file: File): Promise<HasilSiapkanBerkas> {
     if (hasil.optimizedSizeBytes <= TARGET_BYTE_FOTO) break;
   }
 
-  if (!hasil || hasil.optimizedSizeBytes > MAKS_BYTE_BERKAS) {
+  if (!hasil || hasil.optimizedSizeBytes > maksByte) {
     return {
       ok: false,
-      pesan: `Foto masih lebih dari ${kb(MAKS_BYTE_BERKAS)} KB setelah dipadatkan. Pilih foto lain.`,
+      pesan: `Foto masih lebih dari ${kb(maksByte)} KB setelah dipadatkan. Pilih foto lain.`,
     };
   }
 

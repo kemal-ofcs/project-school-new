@@ -6,6 +6,14 @@
  */
 
 import { z } from "zod";
+import { type AccessSubject, hasPermission } from "@/lib/auth/access";
+import { normalizeOperatorPhone } from "@/lib/operators/contact";
+import {
+  MIME_BERKAS_SEKOLAH,
+  type MimeBerkasSekolah,
+  tandaTanganCocok,
+  ukuranBase64,
+} from "./berkas-sekolah";
 import { tanggalValid } from "./hari-kerja";
 
 export const NAMA_MAKS = 60;
@@ -904,3 +912,720 @@ export const WALI_KELAS_SQL =
 
 export const TAHUN_AJARAN_SQL =
   "SELECT nama_tahun, MIN(tanggal_mulai) AS tanggal_mulai, MAX(tanggal_selesai) AS tanggal_selesai FROM akademik_tahun_ajaran GROUP BY nama_tahun ORDER BY nama_tahun DESC\n-- batas: tahun ajaran sekolah, satu per tahun\n;";
+
+// ── HRIS 1c: data cloud-only (kembar `desktop/hris_cloud.rs`) ──
+//
+// Pribadi, keuangan, pendidik, dan dokumen hanya ada di database cloud
+// (Q-31): tidak pernah masuk SQLite perangkat, snapshot, atau outbox.
+
+export const AGAMA = [
+  "Islam",
+  "Kristen",
+  "Katolik",
+  "Hindu",
+  "Buddha",
+  "Konghucu",
+  "Lainnya",
+] as const;
+export const STATUS_NIKAH = [
+  "Belum Kawin",
+  "Kawin",
+  "Cerai Hidup",
+  "Cerai Mati",
+] as const;
+export const JENJANG = [
+  "SD",
+  "SMP",
+  "SMA/SMK",
+  "D1",
+  "D2",
+  "D3",
+  "D4",
+  "S1",
+  "S2",
+  "S3",
+] as const;
+export const TEKS_MAKS = 100;
+export const ALAMAT_MAKS = 500;
+export const NAMA_BERKAS_MAKS = 180;
+export const MAKS_BYTE_DOKUMEN = 1024 * 1024;
+export const MAKS_BERKAS_DOKUMEN = 5;
+export const MAKS_BASE64_DOKUMEN = Math.ceil(MAKS_BYTE_DOKUMEN / 3) * 4;
+
+export const PESAN_LURING =
+  "Data ini butuh koneksi ke database. Periksa jaringan, lalu coba lagi.";
+export const PESAN_PEGAWAI_BELUM_DI_CLOUD =
+  "Pegawai ini belum ada di database pusat. Sinkronkan perangkat, lalu coba lagi.";
+export const PESAN_DOKUMEN_DITOLAK =
+  "Pegawai belum ada di database pusat, atau jenis dokumennya tidak dikenal.";
+export const PESAN_BERKAS_PENUH =
+  "Dokumen tidak ditemukan, atau sudah berisi 5 berkas.";
+
+const ATURAN_NOMOR: Record<string, [string, number, number]> = {
+  nik: ["NIK", 16, 16],
+  no_kk: ["Nomor KK", 16, 16],
+  npwp: ["NPWP", 15, 16],
+  nuptk: ["NUPTK", 16, 16],
+  nrg: ["NRG", 12, 12],
+  bpjs_kesehatan: ["Nomor BPJS Kesehatan", 5, 20],
+  bpjs_ketenagakerjaan: ["Nomor BPJS Ketenagakerjaan", 5, 20],
+  no_rekening: ["Nomor rekening", 5, 20],
+};
+
+/**
+ * Nomor pengenal tanpa tanda baca dan spasi (§19.2.3); kosong = tidak diisi.
+ * Cermin `nomor_identitas`.
+ */
+export function nomorIdentitas(jenis: string, teks: string): Hasil<string> {
+  const aturan = ATURAN_NOMOR[jenis];
+  if (!aturan) return { ok: false, galat: "Jenis nomor tidak dikenal." };
+  const [label, min, maks] = aturan;
+  const angka = [...teks].filter((c) => !/^[\s!-/:-@[-`{-~]$/.test(c)).join("");
+  if (angka === "") return { ok: true, nilai: "" };
+  if (!/^\d+$/.test(angka)) {
+    return { ok: false, galat: `${label} hanya boleh berisi angka.` };
+  }
+  if (angka.length >= min && angka.length <= maks) {
+    return { ok: true, nilai: angka };
+  }
+  const galat =
+    min === maks
+      ? `${label} harus ${min} digit.`
+      : maks === min + 1
+        ? `${label} harus ${min} atau ${maks} digit.`
+        : `${label} harus ${min} sampai ${maks} digit.`;
+  return { ok: false, galat };
+}
+
+class GalatIsian extends Error {}
+
+function ambil<T>(hasil: Hasil<T>): T {
+  if (!hasil.ok) throw new GalatIsian(hasil.galat);
+  return hasil.nilai;
+}
+
+/** Urutan pemeriksaan sama dengan Rust: galat pertama yang dilaporkan. */
+function periksa<T>(susun: () => T): Hasil<T> {
+  try {
+    return { ok: true, nilai: susun() };
+  } catch (error) {
+    if (error instanceof GalatIsian) return { ok: false, galat: error.message };
+    throw error;
+  }
+}
+
+function teksPendek(nilai: string, label: string, maks: number): string {
+  const teks = nilai.trim();
+  if (panjang(teks) > maks) {
+    throw new GalatIsian(`${label} maksimal ${maks} karakter.`);
+  }
+  return teks;
+}
+
+function pilihan(nilai: string, daftar: readonly string[], galat: string) {
+  const teks = nilai.trim();
+  if (teks !== "" && !daftar.includes(teks)) throw new GalatIsian(galat);
+  return teks;
+}
+
+function tanggalOpsional(nilai: string, galat: string): string {
+  const teks = nilai.trim();
+  if (teks !== "" && !tanggalValid(teks)) throw new GalatIsian(galat);
+  return teks;
+}
+
+function tahunOpsional(tahun: number | null, galat: string): number | null {
+  if (tahun !== null && (tahun < 1950 || tahun > 2100)) {
+    throw new GalatIsian(galat);
+  }
+  return tahun;
+}
+
+export interface Pribadi {
+  nik: string;
+  no_kk: string;
+  tempat_lahir: string;
+  tanggal_lahir: string;
+  agama: string;
+  status_nikah: string;
+  nama_ibu_kandung: string;
+  alamat_ktp: string;
+  alamat_domisili: string;
+  darurat_nama: string;
+  darurat_hubungan: string;
+  darurat_hp: string;
+}
+
+export function validasiPribadi(p: Pribadi): Hasil<Pribadi> {
+  return periksa(() => {
+    const hp = p.darurat_hp.trim();
+    // Bentuk kanonik `+62…` seperti kontak operator.
+    const darurat_hp = hp === "" ? "" : normalizeOperatorPhone(hp);
+    if (
+      hp !== "" &&
+      (!darurat_hp.startsWith("+") ||
+        darurat_hp.length - 1 < 9 ||
+        darurat_hp.length - 1 > 15)
+    ) {
+      throw new GalatIsian("Nomor HP darurat tidak valid.");
+    }
+    return {
+      nik: ambil(nomorIdentitas("nik", p.nik)),
+      no_kk: ambil(nomorIdentitas("no_kk", p.no_kk)),
+      tempat_lahir: teksPendek(p.tempat_lahir, "Tempat lahir", TEKS_MAKS),
+      tanggal_lahir: tanggalOpsional(
+        p.tanggal_lahir,
+        "Tanggal lahir tidak valid.",
+      ),
+      agama: pilihan(p.agama, AGAMA, "Agama tidak dikenal."),
+      status_nikah: pilihan(
+        p.status_nikah,
+        STATUS_NIKAH,
+        "Status pernikahan tidak dikenal.",
+      ),
+      nama_ibu_kandung: teksPendek(
+        p.nama_ibu_kandung,
+        "Nama ibu kandung",
+        TEKS_MAKS,
+      ),
+      alamat_ktp: teksPendek(p.alamat_ktp, "Alamat KTP", ALAMAT_MAKS),
+      alamat_domisili: teksPendek(
+        p.alamat_domisili,
+        "Alamat domisili",
+        ALAMAT_MAKS,
+      ),
+      darurat_nama: teksPendek(
+        p.darurat_nama,
+        "Nama kontak darurat",
+        TEKS_MAKS,
+      ),
+      darurat_hubungan: teksPendek(
+        p.darurat_hubungan,
+        "Hubungan kontak darurat",
+        TEKS_MAKS,
+      ),
+      darurat_hp,
+    };
+  });
+}
+
+export interface Keuangan {
+  bank: string;
+  no_rekening: string;
+  nama_rekening: string;
+  npwp: string;
+  bpjs_kesehatan: string;
+  bpjs_ketenagakerjaan: string;
+}
+
+export function validasiKeuangan(k: Keuangan): Hasil<Keuangan> {
+  return periksa(() => ({
+    bank: teksPendek(k.bank, "Nama bank", TEKS_MAKS),
+    no_rekening: ambil(nomorIdentitas("no_rekening", k.no_rekening)),
+    nama_rekening: teksPendek(
+      k.nama_rekening,
+      "Nama pemilik rekening",
+      TEKS_MAKS,
+    ),
+    npwp: ambil(nomorIdentitas("npwp", k.npwp)),
+    bpjs_kesehatan: ambil(nomorIdentitas("bpjs_kesehatan", k.bpjs_kesehatan)),
+    bpjs_ketenagakerjaan: ambil(
+      nomorIdentitas("bpjs_ketenagakerjaan", k.bpjs_ketenagakerjaan),
+    ),
+  }));
+}
+
+export interface Pendidikan {
+  jenjang: string;
+  prodi: string;
+  perguruan_tinggi: string;
+  tahun_lulus: number | null;
+  linier: number;
+  catatan: string;
+}
+
+export function validasiPendidikan(p: Pendidikan): Hasil<Pendidikan> {
+  return periksa(() => {
+    const jenjang = p.jenjang.trim();
+    if (!(JENJANG as readonly string[]).includes(jenjang)) {
+      throw new GalatIsian("Jenjang pendidikan tidak dikenal.");
+    }
+    if (p.linier !== 0 && p.linier !== 1) {
+      throw new GalatIsian("Tanda linier tidak valid.");
+    }
+    return {
+      jenjang,
+      prodi: teksPendek(p.prodi, "Program studi", 150),
+      perguruan_tinggi: teksPendek(
+        p.perguruan_tinggi,
+        "Nama sekolah/perguruan tinggi",
+        150,
+      ),
+      tahun_lulus: tahunOpsional(p.tahun_lulus, "Tahun lulus tidak valid."),
+      linier: p.linier,
+      catatan: teksPendek(p.catatan, "Catatan", CATATAN_MAKS),
+    };
+  });
+}
+
+export interface Sertifikasi {
+  nomor_sertifikat: string;
+  nrg: string;
+  tahun: number | null;
+  bidang_studi: string;
+  catatan: string;
+}
+
+export function validasiSertifikasi(s: Sertifikasi): Hasil<Sertifikasi> {
+  return periksa(() => {
+    const hasil = {
+      nomor_sertifikat: teksPendek(
+        s.nomor_sertifikat,
+        "Nomor sertifikat",
+        NOMOR_MAKS,
+      ),
+      nrg: ambil(nomorIdentitas("nrg", s.nrg)),
+      tahun: tahunOpsional(s.tahun, "Tahun sertifikat tidak valid."),
+      bidang_studi: teksPendek(s.bidang_studi, "Bidang studi", 150),
+      catatan: teksPendek(s.catatan, "Catatan", CATATAN_MAKS),
+    };
+    if (hasil.nomor_sertifikat === "" && hasil.nrg === "") {
+      throw new GalatIsian("Isi nomor sertifikat atau NRG.");
+    }
+    if (hasil.bidang_studi === "") {
+      throw new GalatIsian("Bidang studi sertifikat wajib diisi.");
+    }
+    return hasil;
+  });
+}
+
+export interface Dokumen {
+  id_jenis: string;
+  nomor: string;
+  tanggal_terbit: string;
+  tanggal_kedaluwarsa: string;
+  catatan: string;
+}
+
+/** Keputusan 1c B: jenis dan tanggal terbit wajib, nomor opsional. */
+export function validasiDokumen(d: Dokumen): Hasil<Dokumen> {
+  return periksa(() => {
+    const id_jenis = d.id_jenis.trim();
+    if (id_jenis === "") throw new GalatIsian("Jenis dokumen wajib dipilih.");
+    const tanggal_terbit = d.tanggal_terbit.trim();
+    if (!tanggalValid(tanggal_terbit)) {
+      throw new GalatIsian("Tanggal terbit tidak valid.");
+    }
+    const tanggal_kedaluwarsa = tanggalOpsional(
+      d.tanggal_kedaluwarsa,
+      "Tanggal kedaluwarsa tidak valid.",
+    );
+    if (tanggal_kedaluwarsa !== "" && tanggal_kedaluwarsa < tanggal_terbit) {
+      throw new GalatIsian(
+        "Tanggal kedaluwarsa tidak boleh sebelum tanggal terbit.",
+      );
+    }
+    return {
+      id_jenis,
+      nomor: teksPendek(d.nomor, "Nomor dokumen", NOMOR_MAKS),
+      tanggal_terbit,
+      tanggal_kedaluwarsa,
+      catatan: teksPendek(d.catatan, "Catatan", CATATAN_MAKS),
+    };
+  });
+}
+
+export interface BerkasDokumen {
+  nama_berkas: string;
+  mime_type: MimeBerkasSekolah;
+  data_base64: string;
+  ukuran_byte: number;
+}
+
+/** Cermin `urai_berkas_dokumen`: 1 MB, empat MIME, tanda tangan bita (§19.2.5). */
+export function uraiBerkasDokumen(
+  namaBerkas: string,
+  mimeType: string,
+  dataBase64: string,
+): Hasil<BerkasDokumen> {
+  const nama = namaBerkas.trim();
+  if (nama === "") return { ok: false, galat: "Nama berkas wajib diisi." };
+  if (panjang(nama) > NAMA_BERKAS_MAKS) {
+    return {
+      ok: false,
+      galat: `Nama berkas maksimal ${NAMA_BERKAS_MAKS} karakter.`,
+    };
+  }
+  const mime = MIME_BERKAS_SEKOLAH.find((m) => m === mimeType);
+  if (!mime) {
+    return {
+      ok: false,
+      galat: "Berkas harus berupa JPG, PNG, WEBP, atau PDF.",
+    };
+  }
+  const isi = dataBase64.trim();
+  const ukuran = /^[A-Za-z0-9+/]*={0,2}$/.test(isi) ? ukuranBase64(isi) : -1;
+  if (ukuran <= 0) return { ok: false, galat: "Berkas tidak terbaca." };
+  if (ukuran > MAKS_BYTE_DOKUMEN) {
+    return { ok: false, galat: "Berkas lebih dari 1 MB." };
+  }
+  if (!tandaTanganCocok(mime, isi)) {
+    return { ok: false, galat: "Isi berkas tidak sesuai formatnya." };
+  }
+  return {
+    ok: true,
+    nilai: {
+      nama_berkas: nama,
+      mime_type: mime,
+      data_base64: isi,
+      ukuran_byte: ukuran,
+    },
+  };
+}
+
+/** Kelompok profil yang boleh dibaca, dari izin SESI (bukan payload). */
+export interface KelompokProfil {
+  pribadi: boolean;
+  keuangan: boolean;
+  pendidik: boolean;
+}
+
+export function kelompokProfil(subjek: AccessSubject): KelompokProfil {
+  return {
+    pribadi: hasPermission(subjek, "hr.personal.view"),
+    keuangan: hasPermission(subjek, "hr.finance.view"),
+    pendidik: hasPermission(subjek, "teachers.view"),
+  };
+}
+
+/**
+ * Jenis dokumen saja (tanpa pegawai) boleh dibaca pengelola organisasi
+ * (keputusan 1c A); dokumen seorang pegawai tetap butuh `hr.document.view`.
+ */
+export function bolehBacaDokumen(subjek: AccessSubject, idKaryawan: string) {
+  return (
+    hasPermission(subjek, "hr.document.view") ||
+    (idKaryawan.trim() === "" && hasPermission(subjek, "hr.org.manage"))
+  );
+}
+
+// Skema rute 1c
+
+const isianTeks = (maks: number) => z.string().max(maks).optional().default("");
+
+export const pribadiDraftSchema = z
+  .object({
+    id_karyawan: z.string().trim().min(1).max(80),
+    nik: isianTeks(60),
+    no_kk: isianTeks(60),
+    tempat_lahir: isianTeks(300),
+    tanggal_lahir: isianTeks(20),
+    agama: isianTeks(40),
+    status_nikah: isianTeks(40),
+    nama_ibu_kandung: isianTeks(300),
+    alamat_ktp: isianTeks(1000),
+    alamat_domisili: isianTeks(1000),
+    darurat_nama: isianTeks(300),
+    darurat_hubungan: isianTeks(300),
+    darurat_hp: isianTeks(40),
+  })
+  .strict();
+export type PribadiDraft = z.input<typeof pribadiDraftSchema>;
+
+export const keuanganDraftSchema = z
+  .object({
+    id_karyawan: z.string().trim().min(1).max(80),
+    bank: isianTeks(300),
+    no_rekening: isianTeks(60),
+    nama_rekening: isianTeks(300),
+    npwp: isianTeks(60),
+    bpjs_kesehatan: isianTeks(60),
+    bpjs_ketenagakerjaan: isianTeks(60),
+  })
+  .strict();
+export type KeuanganDraft = z.input<typeof keuanganDraftSchema>;
+
+const idOpsional = z.string().trim().max(80).optional();
+const pemilik = z.string().trim().min(1).max(80);
+const tahun = z.number().int().nullable().default(null);
+
+export const pendidikanDraftSchema = z
+  .object({
+    id: idOpsional,
+    id_karyawan: pemilik,
+    jenjang: z.string().max(20),
+    prodi: isianTeks(400),
+    perguruan_tinggi: isianTeks(400),
+    tahun_lulus: tahun,
+    linier: z.number().int().default(0),
+    catatan: isianTeks(1000),
+  })
+  .strict();
+export type PendidikanDraft = z.input<typeof pendidikanDraftSchema>;
+
+export const sertifikasiDraftSchema = z
+  .object({
+    id: idOpsional,
+    id_karyawan: pemilik,
+    nomor_sertifikat: isianTeks(200),
+    nrg: isianTeks(60),
+    tahun,
+    bidang_studi: isianTeks(400),
+    catatan: isianTeks(1000),
+  })
+  .strict();
+export type SertifikasiDraft = z.input<typeof sertifikasiDraftSchema>;
+
+export const dokumenDraftSchema = z
+  .object({
+    id: idOpsional,
+    id_karyawan: pemilik,
+    id_jenis: z.string().max(80),
+    nomor: isianTeks(200),
+    tanggal_terbit: z.string().max(20),
+    tanggal_kedaluwarsa: isianTeks(20),
+    catatan: isianTeks(1000),
+  })
+  .strict();
+export type DokumenDraft = z.input<typeof dokumenDraftSchema>;
+
+export const berkasDokumenSchema = z
+  .object({
+    id_dokumen: pemilik,
+    nama_berkas: z.string().max(400),
+    mime_type: z.string().max(40),
+    data_base64: z
+      .string()
+      .max(MAKS_BASE64_DOKUMEN + 8, "Berkas lebih dari 1 MB."),
+  })
+  .strict();
+export type BerkasDokumenDraft = z.input<typeof berkasDokumenSchema>;
+
+export const jenisDokumenDraftSchema = z
+  .object({
+    id: idOpsional,
+    nama: z.string().max(200),
+    is_aktif: z.union([z.literal(0), z.literal(1)]).default(1),
+  })
+  .strict();
+export type JenisDokumenDraft = z.input<typeof jenisDokumenDraftSchema>;
+
+export const idSchema = z.object({ id: pemilik }).strict();
+
+// Bentuk kembalian command/rute 1c
+
+export interface Jejak {
+  diubah_oleh: string;
+  diubah_pada: string;
+}
+
+export interface PendidikanBaris extends Pendidikan {
+  id_pendidikan: string;
+  dicatat_oleh: string;
+  updated_at: string;
+}
+
+export interface SertifikasiBaris extends Sertifikasi {
+  id_sertifikasi: string;
+  dicatat_oleh: string;
+  updated_at: string;
+}
+
+/** Kunci absen = izinnya tidak dipegang; `null` = belum pernah diisi. */
+export interface ProfilPegawai {
+  id_karyawan: string;
+  pribadi?: (Pribadi & Jejak) | null;
+  keuangan?: (Keuangan & Jejak) | null;
+  pendidik?: {
+    pendidikan: PendidikanBaris[];
+    sertifikasi: SertifikasiBaris[];
+  };
+}
+
+export interface JenisDokumen {
+  id_jenis: string;
+  nama: string;
+  is_aktif: number;
+}
+
+export interface DokumenBaris extends Dokumen {
+  id_dokumen: string;
+  jenis: string;
+  dicatat_oleh: string;
+  updated_at: string;
+}
+
+export interface BerkasDokumenBaris {
+  id_berkas: string;
+  id_dokumen: string;
+  urutan: number;
+  nama_berkas: string;
+  mime_type: string;
+  ukuran_byte: number;
+}
+
+export interface DaftarDokumen {
+  jenis: JenisDokumen[];
+  dokumen?: DokumenBaris[];
+  berkas?: BerkasDokumenBaris[];
+}
+
+export interface IsiBerkasDokumen {
+  id_berkas: string;
+  id_dokumen: string;
+  nama_berkas: string;
+  mime_type: string;
+  data_base64: string;
+}
+
+export interface BarisPtk {
+  id_unik: string;
+  nama: string;
+  nip: string;
+  nuptk: string;
+  unit: string;
+  bagian: string;
+  jabatan: string;
+  tmt: string;
+  kelompok: "Guru" | "Tendik";
+  jenjang: string;
+  prodi: string;
+  perguruan_tinggi: string;
+  linier: number;
+  sertifikat_bidang: string;
+  sertifikat_tahun: number | null;
+  nrg: string;
+  mapel: string;
+  status: string;
+}
+
+export interface LaporanPtk {
+  hari_ini: string;
+  baris: BarisPtk[];
+}
+
+export interface RingkasPtk {
+  unit: string;
+  guru: number;
+  tendik: number;
+  guru_s1: number;
+  guru_sertifikat: number;
+  persen_s1: number;
+  persen_sertifikat: number;
+}
+
+const S1_KE_ATAS = new Set(["D4", "S1", "S2", "S3"]);
+
+/**
+ * Ringkasan Laporan PTK per unit (§19.2.7). Persentase dihitung atas GURU:
+ * kualifikasi S1/D4 dan sertifikat pendidik adalah syarat guru, bukan tendik.
+ */
+export function ringkasPtk(baris: readonly BarisPtk[]): {
+  per_unit: RingkasPtk[];
+  total: RingkasPtk;
+} {
+  const kosong = (unit: string): RingkasPtk => ({
+    unit,
+    guru: 0,
+    tendik: 0,
+    guru_s1: 0,
+    guru_sertifikat: 0,
+    persen_s1: 0,
+    persen_sertifikat: 0,
+  });
+  const peta = new Map<string, RingkasPtk>();
+  const total = kosong("Semua unit");
+  for (const b of baris) {
+    const unit = peta.get(b.unit) ?? kosong(b.unit);
+    peta.set(b.unit, unit);
+    for (const r of [unit, total]) {
+      if (b.kelompok === "Tendik") {
+        r.tendik++;
+        continue;
+      }
+      r.guru++;
+      if (S1_KE_ATAS.has(b.jenjang)) r.guru_s1++;
+      if (b.sertifikat_bidang !== "" || b.nrg !== "") r.guru_sertifikat++;
+    }
+  }
+  const persen = (x: number, n: number) =>
+    n === 0 ? 0 : Math.round((x * 1000) / n) / 10;
+  const selesai = (r: RingkasPtk) => ({
+    ...r,
+    persen_s1: persen(r.guru_s1, r.guru),
+    persen_sertifikat: persen(r.guru_sertifikat, r.guru),
+  });
+  return {
+    per_unit: [...peta.values()]
+      .sort((a, b) => a.unit.localeCompare(b.unit))
+      .map(selesai),
+    total: selesai(total),
+  };
+}
+
+// SQL 1c (harfiah sama dengan hris_cloud.rs)
+
+export const PROFIL_PRIBADI_SQL =
+  "SELECT COALESCE(nik, '') AS nik, COALESCE(no_kk, '') AS no_kk, COALESCE(tempat_lahir, '') AS tempat_lahir, COALESCE(tanggal_lahir, '') AS tanggal_lahir, COALESCE(agama, '') AS agama, COALESCE(status_nikah, '') AS status_nikah, COALESCE(nama_ibu_kandung, '') AS nama_ibu_kandung, COALESCE(alamat_ktp, '') AS alamat_ktp, COALESCE(alamat_domisili, '') AS alamat_domisili, COALESCE(darurat_nama, '') AS darurat_nama, COALESCE(darurat_hubungan, '') AS darurat_hubungan, COALESCE(darurat_hp, '') AS darurat_hp, COALESCE(pribadi_diubah_oleh, '') AS diubah_oleh, COALESCE(pribadi_diubah_pada, '') AS diubah_pada FROM hr_profil WHERE id_karyawan = ?1 LIMIT 1;";
+
+export const PROFIL_KEUANGAN_SQL =
+  "SELECT COALESCE(bank, '') AS bank, COALESCE(no_rekening, '') AS no_rekening, COALESCE(nama_rekening, '') AS nama_rekening, COALESCE(npwp, '') AS npwp, COALESCE(bpjs_kesehatan, '') AS bpjs_kesehatan, COALESCE(bpjs_ketenagakerjaan, '') AS bpjs_ketenagakerjaan, COALESCE(keuangan_diubah_oleh, '') AS diubah_oleh, COALESCE(keuangan_diubah_pada, '') AS diubah_pada FROM hr_profil WHERE id_karyawan = ?1 LIMIT 1;";
+
+export const SIMPAN_PRIBADI_SQL =
+  "INSERT INTO hr_profil (id_karyawan, nik, no_kk, tempat_lahir, tanggal_lahir, agama, status_nikah, nama_ibu_kandung, alamat_ktp, alamat_domisili, darurat_nama, darurat_hubungan, darurat_hp, pribadi_diubah_oleh, pribadi_diubah_pada) SELECT ?1, NULLIF(?2, ''), NULLIF(?3, ''), NULLIF(?4, ''), NULLIF(?5, ''), NULLIF(?6, ''), NULLIF(?7, ''), NULLIF(?8, ''), NULLIF(?9, ''), NULLIF(?10, ''), NULLIF(?11, ''), NULLIF(?12, ''), NULLIF(?13, ''), ?14, datetime('now') FROM master_data m WHERE m.id_unik = ?1 AND LOWER(TRIM(COALESCE(m.jenis_personil, ''))) <> 'siswa' AND NOT EXISTS (SELECT 1 FROM siswa_data sd WHERE sd.id_siswa = m.id_unik) ON CONFLICT(id_karyawan) DO UPDATE SET nik = excluded.nik, no_kk = excluded.no_kk, tempat_lahir = excluded.tempat_lahir, tanggal_lahir = excluded.tanggal_lahir, agama = excluded.agama, status_nikah = excluded.status_nikah, nama_ibu_kandung = excluded.nama_ibu_kandung, alamat_ktp = excluded.alamat_ktp, alamat_domisili = excluded.alamat_domisili, darurat_nama = excluded.darurat_nama, darurat_hubungan = excluded.darurat_hubungan, darurat_hp = excluded.darurat_hp, pribadi_diubah_oleh = excluded.pribadi_diubah_oleh, pribadi_diubah_pada = excluded.pribadi_diubah_pada;";
+
+export const SIMPAN_KEUANGAN_SQL =
+  "INSERT INTO hr_profil (id_karyawan, bank, no_rekening, nama_rekening, npwp, bpjs_kesehatan, bpjs_ketenagakerjaan, keuangan_diubah_oleh, keuangan_diubah_pada) SELECT ?1, NULLIF(?2, ''), NULLIF(?3, ''), NULLIF(?4, ''), NULLIF(?5, ''), NULLIF(?6, ''), NULLIF(?7, ''), ?8, datetime('now') FROM master_data m WHERE m.id_unik = ?1 AND LOWER(TRIM(COALESCE(m.jenis_personil, ''))) <> 'siswa' AND NOT EXISTS (SELECT 1 FROM siswa_data sd WHERE sd.id_siswa = m.id_unik) ON CONFLICT(id_karyawan) DO UPDATE SET bank = excluded.bank, no_rekening = excluded.no_rekening, nama_rekening = excluded.nama_rekening, npwp = excluded.npwp, bpjs_kesehatan = excluded.bpjs_kesehatan, bpjs_ketenagakerjaan = excluded.bpjs_ketenagakerjaan, keuangan_diubah_oleh = excluded.keuangan_diubah_oleh, keuangan_diubah_pada = excluded.keuangan_diubah_pada;";
+
+export const PENDIDIKAN_SQL =
+  "SELECT id_pendidikan, jenjang, COALESCE(prodi, '') AS prodi, COALESCE(perguruan_tinggi, '') AS perguruan_tinggi, tahun_lulus, linier, COALESCE(catatan, '') AS catatan, COALESCE(dicatat_oleh, '') AS dicatat_oleh, updated_at FROM hr_pendidikan WHERE id_karyawan = ?1 ORDER BY COALESCE(tahun_lulus, 0) DESC, id_pendidikan\n-- batas: riwayat pendidikan satu pegawai\n;";
+
+export const SERTIFIKASI_SQL =
+  "SELECT id_sertifikasi, COALESCE(nomor_sertifikat, '') AS nomor_sertifikat, COALESCE(nrg, '') AS nrg, tahun, COALESCE(bidang_studi, '') AS bidang_studi, COALESCE(catatan, '') AS catatan, COALESCE(dicatat_oleh, '') AS dicatat_oleh, updated_at FROM hr_sertifikasi WHERE id_karyawan = ?1 ORDER BY COALESCE(tahun, 0) DESC, id_sertifikasi\n-- batas: sertifikat pendidik satu pegawai\n;";
+
+export const SIMPAN_PENDIDIKAN_SQL =
+  "INSERT INTO hr_pendidikan (id_pendidikan, id_karyawan, jenjang, prodi, perguruan_tinggi, tahun_lulus, linier, catatan, dicatat_oleh, created_at, updated_at) SELECT ?1, ?2, ?3, NULLIF(?4, ''), NULLIF(?5, ''), ?6, ?7, NULLIF(?8, ''), ?9, datetime('now'), datetime('now') FROM master_data m WHERE m.id_unik = ?2 AND LOWER(TRIM(COALESCE(m.jenis_personil, ''))) <> 'siswa' AND NOT EXISTS (SELECT 1 FROM siswa_data sd WHERE sd.id_siswa = m.id_unik) ON CONFLICT(id_pendidikan) DO UPDATE SET jenjang = excluded.jenjang, prodi = excluded.prodi, perguruan_tinggi = excluded.perguruan_tinggi, tahun_lulus = excluded.tahun_lulus, linier = excluded.linier, catatan = excluded.catatan, updated_at = excluded.updated_at WHERE hr_pendidikan.id_karyawan = excluded.id_karyawan;";
+
+export const HAPUS_PENDIDIKAN_SQL =
+  "DELETE FROM hr_pendidikan WHERE id_pendidikan = ?1;";
+
+export const SIMPAN_SERTIFIKASI_SQL =
+  "INSERT INTO hr_sertifikasi (id_sertifikasi, id_karyawan, nomor_sertifikat, nrg, tahun, bidang_studi, catatan, dicatat_oleh, created_at, updated_at) SELECT ?1, ?2, NULLIF(?3, ''), NULLIF(?4, ''), ?5, ?6, NULLIF(?7, ''), ?8, datetime('now'), datetime('now') FROM master_data m WHERE m.id_unik = ?2 AND LOWER(TRIM(COALESCE(m.jenis_personil, ''))) <> 'siswa' AND NOT EXISTS (SELECT 1 FROM siswa_data sd WHERE sd.id_siswa = m.id_unik) ON CONFLICT(id_sertifikasi) DO UPDATE SET nomor_sertifikat = excluded.nomor_sertifikat, nrg = excluded.nrg, tahun = excluded.tahun, bidang_studi = excluded.bidang_studi, catatan = excluded.catatan, updated_at = excluded.updated_at WHERE hr_sertifikasi.id_karyawan = excluded.id_karyawan;";
+
+export const HAPUS_SERTIFIKASI_SQL =
+  "DELETE FROM hr_sertifikasi WHERE id_sertifikasi = ?1;";
+
+export const JENIS_DOKUMEN_SQL =
+  "SELECT id_jenis, nama, is_aktif FROM hr_dokumen_jenis ORDER BY nama, id_jenis\n-- batas: jenis dokumen kepegawaian, tidak tumbuh per hari\n;";
+
+export const SIMPAN_JENIS_DOKUMEN_SQL =
+  "INSERT INTO hr_dokumen_jenis (id_jenis, nama, is_aktif, created_at, updated_at) VALUES (?1, ?2, ?3, datetime('now'), datetime('now')) ON CONFLICT(id_jenis) DO UPDATE SET nama = excluded.nama, is_aktif = excluded.is_aktif, updated_at = excluded.updated_at;";
+
+export const BENTROK_JENIS_DOKUMEN_SQL =
+  "SELECT 1 FROM hr_dokumen_jenis WHERE id_jenis <> ?2 AND is_aktif = 1 AND lower(trim(nama)) = lower(trim(?1)) LIMIT 1;";
+
+export const DOKUMEN_SQL =
+  "SELECT d.id_dokumen, d.id_jenis, COALESCE(j.nama, d.id_jenis) AS jenis, COALESCE(d.nomor, '') AS nomor, COALESCE(d.tanggal_terbit, '') AS tanggal_terbit, COALESCE(d.tanggal_kedaluwarsa, '') AS tanggal_kedaluwarsa, COALESCE(d.catatan, '') AS catatan, COALESCE(d.dicatat_oleh, '') AS dicatat_oleh, d.updated_at FROM hr_dokumen d LEFT JOIN hr_dokumen_jenis j ON j.id_jenis = d.id_jenis WHERE d.id_karyawan = ?1 ORDER BY d.tanggal_terbit DESC, d.id_dokumen\n-- batas: dokumen satu pegawai\n;";
+
+export const BERKAS_DOKUMEN_SQL =
+  "SELECT b.id_berkas, b.id_dokumen, b.urutan, COALESCE(b.nama_berkas, '') AS nama_berkas, b.mime_type, (length(b.data_base64) / 4) * 3 - (CASE WHEN b.data_base64 LIKE '%==' THEN 2 WHEN b.data_base64 LIKE '%=' THEN 1 ELSE 0 END) AS ukuran_byte FROM hr_dokumen_berkas b JOIN hr_dokumen d ON d.id_dokumen = b.id_dokumen WHERE d.id_karyawan = ?1 ORDER BY b.id_dokumen, b.urutan\n-- batas: berkas dokumen satu pegawai, maksimal 5 per dokumen\n;";
+
+export const AMBIL_BERKAS_SQL =
+  "SELECT id_berkas, id_dokumen, COALESCE(nama_berkas, '') AS nama_berkas, mime_type, data_base64 FROM hr_dokumen_berkas WHERE id_berkas = ?1 LIMIT 1;";
+
+export const SIMPAN_DOKUMEN_SQL =
+  "INSERT INTO hr_dokumen (id_dokumen, id_karyawan, id_jenis, nomor, tanggal_terbit, tanggal_kedaluwarsa, catatan, dicatat_oleh, created_at, updated_at) SELECT ?1, ?2, ?3, NULLIF(?4, ''), ?5, NULLIF(?6, ''), NULLIF(?7, ''), ?8, datetime('now'), datetime('now') FROM master_data m WHERE m.id_unik = ?2 AND LOWER(TRIM(COALESCE(m.jenis_personil, ''))) <> 'siswa' AND NOT EXISTS (SELECT 1 FROM siswa_data sd WHERE sd.id_siswa = m.id_unik) AND EXISTS (SELECT 1 FROM hr_dokumen_jenis WHERE id_jenis = ?3) ON CONFLICT(id_dokumen) DO UPDATE SET id_jenis = excluded.id_jenis, nomor = excluded.nomor, tanggal_terbit = excluded.tanggal_terbit, tanggal_kedaluwarsa = excluded.tanggal_kedaluwarsa, catatan = excluded.catatan, updated_at = excluded.updated_at WHERE hr_dokumen.id_karyawan = excluded.id_karyawan;";
+
+export const TAMBAH_BERKAS_SQL =
+  "WITH slot(n) AS (VALUES (1), (2), (3), (4), (5)) INSERT INTO hr_dokumen_berkas (id_berkas, id_dokumen, urutan, nama_berkas, mime_type, data_base64, created_at) SELECT ?1, ?2, MIN(slot.n), ?3, ?4, ?5, datetime('now') FROM slot WHERE slot.n NOT IN (SELECT urutan FROM hr_dokumen_berkas WHERE id_dokumen = ?2) AND EXISTS (SELECT 1 FROM hr_dokumen WHERE id_dokumen = ?2) HAVING MIN(slot.n) IS NOT NULL;";
+
+export const HAPUS_BERKAS_SQL =
+  "DELETE FROM hr_dokumen_berkas WHERE id_berkas = ?1;";
+
+export const PTK_SQL =
+  "SELECT m.id_unik, m.nama, COALESCE(g.nip, '') AS nip, COALESCE(g.nuptk, '') AS nuptk, COALESCE(m.unit, '') AS unit, COALESCE(m.divisi, '') AS bagian, COALESCE(m.jabatan_status, '') AS jabatan, COALESCE(m.tanggal_mulai_aktif, '') AS tmt, CASE WHEN g.id_guru IS NOT NULL OR LOWER(TRIM(COALESCE(m.jenis_personil, ''))) = 'guru' THEN 'Guru' ELSE 'Tendik' END AS kelompok, COALESCE(p.jenjang, '') AS jenjang, COALESCE(p.prodi, '') AS prodi, COALESCE(p.perguruan_tinggi, '') AS perguruan_tinggi, COALESCE(p.linier, 0) AS linier, COALESCE(s.bidang_studi, '') AS sertifikat_bidang, s.tahun AS sertifikat_tahun, COALESCE(s.nrg, '') AS nrg, COALESCE((SELECT group_concat(nama_mapel, ', ') FROM (SELECT DISTINCT mp.nama_mapel FROM jadwal_mengajar j JOIN akademik_mapel mp ON mp.id_mapel = j.id_mapel JOIN akademik_tahun_ajaran ta ON ta.id_tahun_ajaran = j.id_tahun_ajaran WHERE j.id_guru = m.id_unik AND j.is_aktif = 1 AND ta.is_aktif = 1 ORDER BY mp.nama_mapel)), '') AS mapel FROM master_data m LEFT JOIN guru_data g ON g.id_guru = m.id_unik LEFT JOIN hr_pendidikan p ON p.id_pendidikan = (SELECT x.id_pendidikan FROM hr_pendidikan x WHERE x.id_karyawan = m.id_unik ORDER BY CASE x.jenjang WHEN 'S3' THEN 10 WHEN 'S2' THEN 9 WHEN 'S1' THEN 8 WHEN 'D4' THEN 7 WHEN 'D3' THEN 6 WHEN 'D2' THEN 5 WHEN 'D1' THEN 4 WHEN 'SMA/SMK' THEN 3 WHEN 'SMP' THEN 2 ELSE 1 END DESC, COALESCE(x.tahun_lulus, 0) DESC, x.id_pendidikan DESC LIMIT 1) LEFT JOIN hr_sertifikasi s ON s.id_sertifikasi = (SELECT y.id_sertifikasi FROM hr_sertifikasi y WHERE y.id_karyawan = m.id_unik ORDER BY COALESCE(y.tahun, 0) DESC, y.id_sertifikasi DESC LIMIT 1) WHERE LOWER(TRIM(COALESCE(m.jenis_personil, ''))) <> 'siswa' AND NOT EXISTS (SELECT 1 FROM siswa_data sd WHERE sd.id_siswa = m.id_unik) AND COALESCE(m.status_aktif, 'Aktif') = 'Aktif' ORDER BY unit, m.nama, m.id_unik\n-- batas: pegawai aktif sekolah, dibatasi jumlah personil lembaga\n;";
+
+export const HAPUS_DOKUMEN_SQL = [
+  "DELETE FROM hr_dokumen_berkas WHERE id_dokumen = ?1;",
+  "DELETE FROM hr_dokumen WHERE id_dokumen = ?1;",
+] as const;

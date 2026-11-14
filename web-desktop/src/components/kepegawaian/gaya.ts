@@ -13,3 +13,16 @@ export const PERINGATAN =
 export function pesanGalat(error: unknown) {
   return error instanceof Error ? error.message : "Permintaan gagal.";
 }
+
+/** Masa kerja dari TMT sampai hari ini WIB; tidak disimpan (§19.2.1). */
+export function masaKerja(tmt: string, hariIni: string) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(tmt) || tmt > hariIni) return "-";
+  const [ty, tm, td] = tmt.split("-").map(Number);
+  const [hy, hm, hd] = hariIni.split("-").map(Number);
+  let bulan = (hy - ty) * 12 + (hm - tm);
+  if (hd < td) bulan -= 1;
+  const tahun = Math.floor(bulan / 12);
+  const sisa = bulan % 12;
+  if (tahun === 0) return `${sisa} bln`;
+  return sisa === 0 ? `${tahun} th` : `${tahun} th ${sisa} bln`;
+}

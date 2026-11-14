@@ -215,7 +215,7 @@ Ada tabel "di luar snapshot" yang tetap DIDORONG dari lokal, dan ada tabel **clo
 | `siswa_foto`, `absensi_foto`, `notifikasi_wa` | Di luar snapshot, WAJIB push | Ditulis offline, tersinkron ke cloud lewat outbox |
 | `bk_kasus`, `bk_sesi`, `app_wa_config`, `password_reset_request`, `app_mail_config` | Cloud-only | TIDAK punya baris lokal; fiturnya menuntut jaringan di SEMUA build, termasuk Desktop |
 
-`bk_kasus`/`bk_sesi` cloud-only bukan karena ukurannya melainkan karena kerahasiaannya: catatan kedisiplinan seorang anak tidak boleh tersimpan di SQLite terminal pemindai di lobi sekolah — alasan yang sama dengan `password_reset_request`. Karena itu Bimbingan Konseling **menukar akses offline dengan kerahasiaan**, dan itu pertukaran yang disengaja. Konsekuensi praktisnya: jangan membangun halaman Mobile untuk fitur cloud-only — yang lahir hanyalah layar yang gagal justru ketika sinyal hilang. Gateway-nya dijaga `assertTersediaDiMobile()`.
+`bk_kasus`/`bk_sesi` cloud-only bukan karena ukurannya melainkan karena kerahasiaannya: catatan kedisiplinan seorang anak tidak boleh tersimpan di SQLite terminal pemindai di lobi sekolah — alasan yang sama dengan `password_reset_request`. Karena itu Bimbingan Konseling **menukar akses offline dengan kerahasiaan**, dan itu pertukaran yang disengaja. Konsekuensi praktisnya: jangan membangun halaman Mobile untuk fitur cloud-only — yang lahir hanyalah layar yang gagal justru ketika sinyal hilang. Helper lama `assertTersediaDiMobile()` sudah dibuang (lihat `12-build-android-wa-mobile.md`): command cloud-only tetap terdaftar di biner Mobile karena `commands.rs` disalin skrip, dan penjaganya adalah tidak adanya layar Mobile untuk fitur itu (contoh: BK, HRIS 1c).
 
 ---
 
