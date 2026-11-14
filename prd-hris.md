@@ -3383,3 +3383,127 @@ Penyimpangan dari §21 untuk ditinjau:
 - **Belum diuji di browser/perangkat**: tab Beban Mengajar (Web dan Desktop,
   daring dan luring), Unduh Excel, isian batas JP di tab Organisasi (simpan,
   tolak maks < min, sinkron ke perangkat lain).
+
+### 21.12 Sudah dibangun: sub-fase 3b (15 Nov 2026)
+
+Langkah 6–10 §21.7 dibangun di v69 yang sama: tanpa versi skema, tabel, kolom,
+rute sync, atau izin baru. Kelima surat §21.2.2 dicetak dari tab **Surat**
+`/kepegawaian` dan dari tombol di tempat datanya (Web/Desktop); dengan 3a,
+**Fase 3 lengkap**.
+
+- **Pembantu cetak bersama** `components/cetak-a4.ts` (`esc`, `tanggalPanjang`,
+  `kop` dengan baris kedua pilihan, `tandaTangan`, `GAYA_A4`, `cetakDiAkar`,
+  `cetakA4`), di `filesToCopy`. `beritaAcara.ts` (berita acara dan label QR)
+  memakainya; kuitansi A5 tidak disentuh.
+- **Bahan cetak** `desktop_hr_letter_setup(tanggal)` (`hr.duty.manage`, SQLite
+  lokal) ↔ `POST /api/kepegawaian/letters/query` (`suratSetupSchema`
+  `.strict()`): kop (`kop_sekolah` ↔ `kopSekolah`), kunci `hr_surat_*` apa
+  adanya, kepala unit (`KEPALA_UNIT_SQL`), identitas pegawai
+  (`IDENTITAS_PEGAWAI_SQL`), status kini pada tanggal surat (`STATUS_KINI_SQL`),
+  hari ini WIB. Kosong = hari ini; tanggal rusak ditolak.
+- **Pengaturan surat** `desktop_hr_letter_settings_save` (`hr.org.manage`, satu
+  transaksi, `hris::tulis_setting` per kunci) ↔ `POST
+  /api/kepegawaian/letters/settings` (`pengaturanSuratSchema`: objek
+  `.strict()` dengan kedua belas kunci). Aturan kembar
+  `validasi_setting_surat`/`validasi_pengaturan_surat` ↔
+  `validasiSettingSurat`/`validasiPengaturanSurat`, vektor
+  `validations/hr-surat.vektor.json`.
+- **SQL kembar** di `desktop/hr_beban.rs` ↔ `validations/hr-beban.ts` (§21.5),
+  dicek harfiah oleh `hr-beban.test.ts` di Desktop dan salinan Mobile.
+- **Templat** `components/kepegawaian/suratKepegawaian.ts`: `nomorSurat`,
+  `romawi`, `polaSurat`, `uraiDasar`/`dasarSurat` (bawaan
+  `validations/hr-surat-bawaan.json`), `kepalaUnit`, `ketuaYayasan`,
+  `gabungJabatan`, `barisSkPtm`, `unitSkTugas`, dan lima perakit
+  (`suratPembagianTugas`, `suratTugasTambahan`, `suratPengangkatan`,
+  `suratTugasLuar`, `suratKeteranganAktif`) + `cetakSurat`.
+- **Layar**: `DialogCetakSurat.tsx` (satu dialog: tanggal bawaan hari ini WIB,
+  nomor urut buku agenda → nomor dari pola yang boleh diubah, tujuan dan
+  penyelenggara untuk Surat Tugas) dengan pembangun permintaan per sumber;
+  `TabSurat.tsx`; `PengaturanSurat.tsx` di tab Organisasi; tombol **Cetak SK**
+  di baris Tugas Tambahan dan riwayat kontrak GTY/PTY sah, **Cetak Surat
+  Tugas** di rincian pengajuan Dinas Luar berlaku, **Cetak Surat Keterangan
+  Aktif** di rincian pegawai, **Cetak SK Pembagian Tugas** di Beban Mengajar.
+  Semua tombol hanya untuk `hr.duty.manage`; layar tempatnya sudah dijaga izin
+  data sumbernya.
+
+Angka (dihitung ulang dari kode, `audit:contract` sebagai acuan):
+
+| | Sebelum | Sesudah |
+| :-- | :-- | :-- |
+| Command Desktop / Mobile | 409 / 414 | 411 / 416 (`desktop_hr_letter_setup`, `desktop_hr_letter_settings_save`) |
+| Rute Web (`src/app/api/**/route.ts`) | 299 | 301 (`/api/kepegawaian/letters/query`, `/api/kepegawaian/letters/settings`) |
+| Skema, `REQUIRED_TABLE_COUNT`, snapshot, rute kanonik, permission | v69, 122, 81, 145, 120 | tetap |
+
+Gerbang (oleh Claude, per berkas/per nama; `bun run check` belum, sesuai
+keputusan pemilik):
+
+| # | Gerbang | Hasil |
+| :-- | :-- | :-- |
+| 6 | `tsc --noEmit` kedua workspace; `sync-frontend-lib`; HTML berita acara (Serah Terima, Pemusnahan, Stock Opname) dan label QR dari `beritaAcara.ts` HEAD dibandingkan dengan versi baru (DOM tiruan, spasi dinormalkan); render media cetak di Edge | Lulus: keempatnya identik; berita acara tercetak seperti sebelumnya |
+| 7 | Vektor `hr-surat.vektor.json` (19 kunci tunggal, 6 draft) di `hr_beban_vektor_surat` dan `hr-beban.test.ts`; `cargo test hr_beban` (database memori: tugas kepala batal, selesai, dan belum mulai tidak dipakai; yang mulai terakhir menang; unit dibandingkan `LOWER(TRIM)`; cadangan `company_profile.leader_*`; identitas pegawai; simpan pengaturan = 12 event outbox; draft kurang satu kunci ditolak); `services/hr-beban.test.ts` dengan data yang sama di database Web sungguhan (tiga kali); `audit:contract` | Lulus: Rust 4 tes Desktop; TS 18 + 3 tes di Desktop dan salinan Mobile |
+| 8 | `suratKepegawaian.test.ts`: `nomorSurat` (pola bawaan, setiap token, Romawi tiap bulan, pola tanpa `{urut}` ditolak, token kosong tanpa garis miring ganda), penanda tangan (kepala, cadangan profil, kosong; ketua yayasan), teks dasar, `gabungJabatan`, `barisSkPtm` (guru dua unit di dua SK, tugas tanpa unit ke unit utama), `unitSkTugas`, ketujuh varian templat dengan nilai jahat (di-escape) dan data kosong (tanpa `undefined`/`null`/`NaN`) | Lulus: 14 tes |
+| 9 | `tsc` + Biome; `audit:a11y`, `audit:dialog`, `audit:confirm`, `audit:ui-guard`, `audit:route-guard`, `audit:list-bound`, `audit:page-guard`, `audit:sql`, `audit:silent-catch`; kelima surat (tujuh varian) dirakit dari templat sungguhan dan dirender media cetak A4 di Edge (PNG + PDF) | Lulus; tampilan diperiksa, dua perbaikan teks sesudahnya (baris Menetapkan, kata ganda di jabatan) |
+| 10 | `sync-rust-modules`, `sync-frontend-lib`; `audit:contract`, `audit:schema`; `cargo test hr_beban` Mobile | Lulus: Mobile 4 tes, crate Mobile terkompilasi tanpa warning kode |
+
+Keputusan yang diambil di tengah jalan:
+
+- **Identitas semua pegawai di bahan cetak**: `IDENTITAS_PEGAWAI_SQL` (nama,
+  gelar, NIP, NUPTK, jabatan, unit, TMT, guru/tendik) menggantikan "identitas
+  guru" §21.5, supaya kelima surat mengambil identitas dari satu sumber dan
+  Surat Tugas bisa dicetak dari `/pengajuan` tanpa memuat data organisasi.
+  Tanpa data pribadi (Q-70); status kini ikut pada tanggal surat.
+- **Kepala unit disaring di SQL**: satu baris per `LOWER(TRIM(unit))` lewat
+  `NOT EXISTS` tugas kepala berlaku yang lebih baru (seri: `id_tugas`), jadi
+  tidak ada kode penyaring di kedua bahasa. Cadangan profil sekolah dan baris
+  kosong dipilih di TS `kepalaUnit`; jabatan kepala = "Kepala <unit>" (tanpa
+  unit "Kepala Sekolah"), cadangan memakai `leader_title`.
+- **Draft pengaturan wajib membawa kedua belas kunci** (supaya pembangun draft
+  yang lupa satu kunci tidak mengosongkannya diam-diam); kunci asing diperiksa
+  lebih dulu, token pola selain lima ditolak, panjang dihitung per karakter
+  Unicode.
+- **`{kode}` tanpa kunci pengaturan**: tabel §21.3 tidak memuat kunci kode, jadi
+  kode bawaan (`SK-PTM`, `SK-TGS`, `SK-ANGKAT`, `ST`, `SKET`) tetap dan
+  ditampilkan di label isian pola; kode lain ditulis langsung di pola.
+- **Nomor**: pola kosong = bawaan; token kosong (unit kosong, tanggal rusak)
+  tidak meninggalkan garis miring ganda. Nomor SK tugas yang diketik disimpan ke
+  setiap baris yang nomor atau tanggal SK-nya berbeda.
+- **Menimbang/Mengingat**: satu butir per baris; huruf (a, b, …) dan nomor
+  ditambahkan saat cetak.
+- **Ketua yayasan** = jabatan + nama yayasan tanpa kata ganda (`gabungJabatan`:
+  "Ketua Yayasan" + "Yayasan Pendidikan X" → "Ketua Yayasan Pendidikan X");
+  dipakai juga di kalimat pembuka Surat Tugas ("Kepala SMA" + "SMA Contoh").
+- **SK Tugas Tambahan gabungan** (tab Surat: satu jenis × satu tahun ajaran):
+  kepala unit bila semua baris satu unit, selain itu ketua yayasan.
+- **SK Pembagian Tugas per unit**: tugas tanpa unit masuk SK unit utama guru;
+  "Semua unit" mencetak satu SK berisi semuanya. Dari tab Surat hanya semester
+  aktif; semester lain dari tab Beban Mengajar.
+- **Surat Tugas di tab Surat**: daftar Dinas Luar berlaku tahun berjalan.
+- **Surat Keterangan Aktif guru**: mapel semester aktif dari rekap beban, hanya
+  bila sesi memegang `teachers.view`; selain itu surat tanpa baris mapel.
+- **Dialog cetak dibuka sesudah modal rincian ditutup**: `Modal` menutup diri
+  pada Escape lewat listener `window`, jadi dua modal bertumpuk tertutup
+  bersama.
+- **Pengaturan surat tampil bila `hr.duty.manage`** (dibaca lewat bahan
+  cetak) dan bisa disimpan bila `hr.org.manage`. Ketiga role bawaan pemegang
+  `hr.org.manage` juga memegang `hr.duty.manage`.
+- Dialog cetak memakai `data-tanpa-konfirmasi` (dialognya sudah langkah
+  konfirmasi); formulir Pengaturan surat ikut `KonfirmasiSimpan`.
+
+Penyimpangan dari §21 untuk ditinjau:
+
+- **Rombel tanpa unit** tidak masuk SK unit mana pun; ia hanya ada di SK
+  "Semua unit".
+- **SK yayasan memakai kop sekolah** + nama unit pegawai (Q-67), bukan kop
+  yayasan tersendiri.
+- **Tanggal surat bebas** (boleh mundur atau maju); kepala unit mengikuti
+  tanggal itu.
+- **Tidak ada pratinjau penanda tangan** di dialog; unit tanpa kepala dan tanpa
+  pimpinan profil tercetak dengan garis nama kosong.
+- **Keperluan Surat Tugas** = alasan pengajuan apa adanya; tujuan dan
+  penyelenggara boleh kosong, kalimatnya menyesuaikan.
+
+Belum diuji di browser/perangkat: alur layar sungguhan (tab Surat, kelima
+tombol cetak, dialog, simpan nomor SK tugas lalu terlihat di baris, Pengaturan
+surat simpan/tolak/sinkron ke perangkat lain), dialog cetak `window.print()`
+di Web dan WebView2 Desktop, pindah halaman lampiran di kertas, dan logo kop.
+Yang sudah dirender adalah HTML hasil templat dengan media cetak di Edge.

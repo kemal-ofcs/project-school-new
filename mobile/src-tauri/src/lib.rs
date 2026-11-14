@@ -363,6 +363,8 @@ pub fn run() {
             mobile::commands::desktop_hr_document_types_save,
             mobile::commands::desktop_hr_ptk_report,
             mobile::commands::desktop_hr_teaching_load,
+            mobile::commands::desktop_hr_letter_setup,
+            mobile::commands::desktop_hr_letter_settings_save,
             mobile::commands::desktop_hr_requests,
             mobile::commands::desktop_hr_request_save,
             mobile::commands::desktop_hr_request_decide,

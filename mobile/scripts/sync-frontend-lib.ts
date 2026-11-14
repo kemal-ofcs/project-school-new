@@ -61,6 +61,8 @@ const filesToCopy = [
   "components/inventory/PanelPemantauan.tsx",
   "components/inventory/gaya.ts",
   "components/inventory/beritaAcara.ts",
+  // Pembantu cetak A4 (HRIS Fase 3b), dipakai `beritaAcara.ts` di atas.
+  "components/cetak-a4.ts",
   "components/inventory/ekspor.ts",
   // Dialog ekspor Excel berkolom pilihan, misalnya lembar validasi stok.
   "components/inventory/DialogEkspor.tsx",
