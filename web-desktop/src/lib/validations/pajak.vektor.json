@@ -916,6 +916,7 @@
     ["Honorer", null, "tidak_tetap"],
     ["GTT", null, "tidak_tetap"],
     [" ptt ", null, "tidak_tetap"],
+    ["Kontrak", null, "tidak_tetap"],
     ["GTY", null, "tetap"],
     ["PNS/PPPK", null, "tetap"],
     ["", null, "tetap"],
@@ -945,5 +946,11 @@
     ["2026-01-01", "2026-01-15", false],
     ["2026-01-02", "2026-01-31", false],
     ["2026-01-01", "2026-02-28", false]
+  ],
+  "simpan_status": [
+    [["PTT", "honorer", " gtt "], "GTT,PTT,Honorer", null],
+    [[], "", null],
+    [["Kontrak", "Kontrak"], "Kontrak", null],
+    [["GTY", "Tetap"], null, "Status \"Tetap\" tidak dikenal."]
   ]
 }

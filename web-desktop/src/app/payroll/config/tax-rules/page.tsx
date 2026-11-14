@@ -237,7 +237,9 @@ export default function TaxRulesPage() {
           }
         />
 
-        <KartuKonstantaPajak />
+        <KartuKonstantaPajak
+          bolehUbah={hasPermission(user, "payroll.config.manage")}
+        />
 
         {feedback ? (
           <FeedbackBanner

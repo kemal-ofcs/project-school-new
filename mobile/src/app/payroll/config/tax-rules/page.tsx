@@ -287,7 +287,7 @@ export default function MobileTaxRulesPage() {
           onReload={() => void loadRules()}
         />
 
-        <KartuKonstantaPajak />
+        <KartuKonstantaPajak bolehUbah={canManage} />
 
         {feedback ? (
           <FeedbackBanner

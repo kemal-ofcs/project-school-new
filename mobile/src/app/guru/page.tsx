@@ -117,6 +117,8 @@ export default function GuruMobilePage() {
   // Berdiri sendiri, bukan diturunkan dari `form.id_guru` — sejak ID bisa
   // diketik saat menambah, ID terisi tidak lagi berarti "sedang mengubah".
   const [isEditing, setIsEditing] = useState(false);
+  // Guru berkontrak: status mengikuti kontrak (dicatat di Web/Desktop).
+  const [statusTerkunci, setStatusTerkunci] = useState(false);
   const [unitList, setUnitList] = useState<Record<string, unknown>[]>([]);
 
   const isSubmittingRef = useRef(false);
@@ -237,6 +239,7 @@ export default function GuruMobilePage() {
   const handleEdit = useCallback((item: Record<string, unknown>) => {
     setForm(draftGuruDariBaris(item));
     setIsEditing(true);
+    setStatusTerkunci(Boolean(Number(item.berkontrak ?? 0)));
     setFormOpen(true);
   }, []);
 
@@ -531,6 +534,7 @@ export default function GuruMobilePage() {
                   emptyForm(shifts[0] ? Number(shifts[0].id_shift) : undefined),
                 );
                 setIsEditing(false);
+                setStatusTerkunci(false);
                 setFotoBaru(null);
                 setFormOpen(true);
                 triggerHaptic("light");
@@ -906,6 +910,7 @@ export default function GuruMobilePage() {
               <label className="text-[11px] font-semibold text-slate-300">
                 Kepegawaian
                 <select
+                  disabled={statusTerkunci}
                   value={form.status_kepegawaian ?? "Honorer"}
                   onChange={(e) =>
                     setForm((p) => ({
@@ -921,6 +926,11 @@ export default function GuruMobilePage() {
                     </option>
                   ))}
                 </select>
+                {statusTerkunci ? (
+                  <span className="mt-1 block font-normal text-slate-400">
+                    Mengikuti kontrak terakhir.
+                  </span>
+                ) : null}
               </label>
             </div>
             <label className="text-[11px] font-semibold text-slate-300">

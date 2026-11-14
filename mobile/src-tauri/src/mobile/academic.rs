@@ -1631,13 +1631,15 @@ pub fn list_teachers(state: &MobileState) -> Result<Value, CommandError> {
                m.kode_karyawan, m.nama, m.divisi, m.jabatan_status, m.no_hp, m.lp,
                m.status_aktif, m.id_shift, m.token_absensi, m.qr_code, m.status_qr, m.unit,
                m.email, COALESCE(m.id_bagian, ''), COALESCE(m.id_jabatan, ''),
-               COALESCE(m.id_atasan, ''), COALESCE(m.tanggal_mulai_aktif, '')
+               COALESCE(m.id_atasan, ''), COALESCE(m.tanggal_mulai_aktif, ''),
+               {berkontrak} AS berkontrak
         FROM guru_data g
         JOIN master_data m ON m.id_unik = g.id_guru
         ORDER BY m.nama ASC;
     "#;
+    let sql = sql.replace("{berkontrak}", super::hris::BERKONTRAK_SQL);
 
-    let mut stmt = conn.prepare(sql).map_err(|_| CommandError::internal())?;
+    let mut stmt = conn.prepare(&sql).map_err(|_| CommandError::internal())?;
     let rows = stmt
         .query_map([], |row| {
             Ok(json!({
@@ -1666,6 +1668,7 @@ pub fn list_teachers(state: &MobileState) -> Result<Value, CommandError> {
                 "id_jabatan": row.get::<_, String>(22)?,
                 "id_atasan": row.get::<_, String>(23)?,
                 "tanggal_mulai_aktif": row.get::<_, String>(24)?,
+                "berkontrak": row.get::<_, i64>(25)? == 1,
             }))
         })
         .map_err(|_| CommandError::internal())?
@@ -1883,6 +1886,16 @@ pub fn save_teacher(state: &MobileState, draft: &Value) -> Result<Value, Command
         params![id, nip, nuptk, gelar, spesialisasi, status_peg, now, now],
     )
     .map_err(|e| CommandError::new("DB_ERROR", format!("Gagal menyimpan profil guru: {e}")))?;
+    // Guru berkontrak: status dari kontrak menang atas isian form (HRIS §19.2.4).
+    tx.execute(super::hris::CERMIN_STATUS_SQL, params![id])
+        .map_err(|_| CommandError::internal())?;
+    let status_peg: String = tx
+        .query_row(
+            "SELECT COALESCE(status_kepegawaian, '') FROM guru_data WHERE id_guru = ?1;",
+            params![id],
+            |row| row.get(0),
+        )
+        .map_err(|_| CommandError::internal())?;
 
     // 3. Pastikan baris id_card ada supaya guru muncul di modul kartu identitas
     tx.execute(

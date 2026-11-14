@@ -24,6 +24,7 @@ import { hasPermission } from "@/lib/auth/access";
 import { triggerHaptic } from "@/lib/client/haptics";
 import { useAuth } from "@/lib/context/AuthContext";
 import { getDaftarKaryawan } from "@/lib/gateways/employee";
+import { type JenisTugas, muatOrgKepegawaian } from "@/lib/gateways/hris";
 import {
   deletePayrollComponent,
   deleteSalaryConfig,
@@ -211,6 +212,14 @@ export default function MobilePayrollConfigPage() {
       ).sort(),
     [payrollPersonnel],
   );
+
+  // Sasaran `TUGAS:` (Q-29). Tanpa izin lihat pegawai daftarnya kosong.
+  const [jenisTugas, setJenisTugas] = useState<JenisTugas[]>([]);
+  useEffect(() => {
+    muatOrgKepegawaian()
+      .then((org) => setJenisTugas(org.jenis_tugas))
+      .catch(() => setJenisTugas([]));
+  }, []);
 
   const employeeNames = useMemo(() => {
     const map = new Map<string, { nama: string; divisi: string }>();
@@ -651,6 +660,8 @@ export default function MobilePayrollConfigPage() {
                   const recipient = labelAppliesTo(
                     comp.applies_to,
                     (id) => employeeNames.get(id)?.nama || id,
+                    (id) =>
+                      jenisTugas.find((j) => j.id_jenis === id)?.nama ?? id,
                   );
                   return (
                     <li
@@ -1006,7 +1017,7 @@ export default function MobilePayrollConfigPage() {
                   </option>
                   {TEACHER_EMPLOYMENT_STATUSES.map((status) => (
                     <option key={status} value={`STATUS:${status}`}>
-                      Guru berstatus {status}
+                      Berstatus {status}
                     </option>
                   ))}
                   {divisiList.map((divisi) => (
@@ -1015,6 +1026,21 @@ export default function MobilePayrollConfigPage() {
                     </option>
                   ))}
                 </optgroup>
+                {jenisTugas.length > 0 ? (
+                  <optgroup label="Tugas tambahan">
+                    {jenisTugas
+                      .filter(
+                        (j) =>
+                          j.is_aktif === 1 ||
+                          componentDraft?.applies_to === `TUGAS:${j.id_jenis}`,
+                      )
+                      .map((j) => (
+                        <option key={j.id_jenis} value={`TUGAS:${j.id_jenis}`}>
+                          Tugas {j.nama}
+                        </option>
+                      ))}
+                  </optgroup>
+                ) : null}
                 <optgroup label="Perorangan">
                   {payrollPersonnel.map((emp) => (
                     <option

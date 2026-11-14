@@ -13,6 +13,7 @@ import { formatTanggalOperasional } from "@/lib/attendance/time-policy";
 import { hasPermission } from "@/lib/auth/access";
 import { useAuth } from "@/lib/context/AuthContext";
 import { getDaftarKaryawan } from "@/lib/gateways/employee";
+import { type JenisTugas, muatOrgKepegawaian } from "@/lib/gateways/hris";
 import {
   deletePayrollComponent,
   deleteSalaryConfig,
@@ -101,6 +102,17 @@ export default function PayrollConfigPage() {
     const found = payrollPersonnel.find((emp) => String(emp.id_unik) === id);
     return found ? String(found.nama) : id;
   };
+
+  // Sasaran `TUGAS:` (Q-29). Tanpa izin lihat pegawai daftarnya kosong; nilai
+  // yang sudah tersimpan tetap tampil lewat labelnya.
+  const [jenisTugas, setJenisTugas] = useState<JenisTugas[]>([]);
+  useEffect(() => {
+    muatOrgKepegawaian()
+      .then((org) => setJenisTugas(org.jenis_tugas))
+      .catch(() => setJenisTugas([]));
+  }, []);
+  const namaTugas = (id: string) =>
+    jenisTugas.find((j) => j.id_jenis === id)?.nama ?? id;
 
   // Divisi diambil dari data personil yang ada, bukan daftar tetap: nama divisi
   // memang ditulis sekolahnya sendiri.
@@ -670,7 +682,11 @@ export default function PayrollConfigPage() {
                           {comp.calc_type === "PER_HADIR" ? " / hari" : ""}
                         </td>
                         <td className="py-3 px-4 text-xs text-slate-400">
-                          {labelAppliesTo(comp.applies_to, namaPersonil)}
+                          {labelAppliesTo(
+                            comp.applies_to,
+                            namaPersonil,
+                            namaTugas,
+                          )}
                         </td>
                         <td className="py-3 px-4 text-center space-x-2">
                           <button
@@ -955,7 +971,7 @@ export default function PayrollConfigPage() {
                       </option>
                       {TEACHER_EMPLOYMENT_STATUSES.map((status) => (
                         <option key={status} value={`STATUS:${status}`}>
-                          Guru berstatus {status}
+                          Berstatus {status}
                         </option>
                       ))}
                       {divisiList.map((divisi) => (
@@ -964,6 +980,24 @@ export default function PayrollConfigPage() {
                         </option>
                       ))}
                     </optgroup>
+                    {jenisTugas.length > 0 ? (
+                      <optgroup label="Tugas tambahan">
+                        {jenisTugas
+                          .filter(
+                            (j) =>
+                              j.is_aktif === 1 ||
+                              draftComp.applies_to === `TUGAS:${j.id_jenis}`,
+                          )
+                          .map((j) => (
+                            <option
+                              key={j.id_jenis}
+                              value={`TUGAS:${j.id_jenis}`}
+                            >
+                              Tugas {j.nama}
+                            </option>
+                          ))}
+                      </optgroup>
+                    ) : null}
                     <optgroup label="Perorangan">
                       {payrollPersonnel.map((emp) => (
                         <option
@@ -980,9 +1014,10 @@ export default function PayrollConfigPage() {
                 <p className="mt-1 text-xs text-slate-500">
                   Kelompok dinilai saat payroll dihitung, jadi guru yang baru
                   masuk ikut terhitung tanpa komponennya disunting lagi. Pilih
-                  perorangan untuk tunjangan yang memang milik satu orang —
-                  tunjangan wali kelas, atau gaji pokok tetap seorang guru.
-                  Siswa tidak pernah menerima komponen payroll.
+                  perorangan untuk tunjangan yang memang milik satu orang,
+                  misalnya gaji pokok tetap seorang guru. Tunjangan jabatan
+                  seperti wali kelas memakai kelompok Tugas tambahan. Siswa
+                  tidak pernah menerima komponen payroll.
                 </p>
               </div>
 

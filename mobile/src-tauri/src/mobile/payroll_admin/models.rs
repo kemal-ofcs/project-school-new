@@ -217,6 +217,9 @@ pub struct PayrollRecapRow {
     /// antara dua query berarti angka yang disetujui bukan angka yang dibayar.
     pub jenis_personil: String,
     pub status_kepegawaian: String,
+    /// Jenis tugas tambahan yang berlaku pada periode (`hris::TUGAS_BERLAKU_SQL`).
+    #[serde(default)]
+    pub tugas: Vec<String>,
     pub rate_per_hour: i64,
     pub ptkp_status: String,
     pub total_hadir: i64,
@@ -290,6 +293,8 @@ pub struct ComponentSubject {
     pub status_kepegawaian: String,
     /// `master_data.divisi`.
     pub divisi: String,
+    /// Id jenis tugas tambahan yang berlaku pada periode run (`TUGAS:`).
+    pub tugas: Vec<String>,
     /// JP mengajar terparaf pada periode ini; dasar komponen `PER_JP`.
     pub total_teaching_jp: i64,
     /// Hari hadir pada periode ini; dasar komponen `PER_HADIR`.

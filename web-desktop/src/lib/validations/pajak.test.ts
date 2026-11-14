@@ -40,6 +40,11 @@ describe("pajak (cermin pajak.rs)", () => {
         P.statusPph(statusKepegawaian as string, daftar),
       ]).toEqual([statusKepegawaian, setting, status]);
     }
+    for (const [daftar, nilai, galat] of vektor.simpan_status) {
+      const hasil = P.validasiStatusTidakTetap(daftar as string[]);
+      expect(hasil.ok ? hasil.nilai : null).toBe(nilai as string | null);
+      expect(hasil.ok ? null : hasil.galat).toBe(galat as string | null);
+    }
     for (const [status, kategori, nilai] of vektor.ptkp) {
       expect<(string | number)[]>([
         P.kategoriTer(status as string),

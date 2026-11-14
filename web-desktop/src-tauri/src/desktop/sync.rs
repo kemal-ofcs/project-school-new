@@ -1603,7 +1603,7 @@ const SNAPSHOT_TABLES: &[SnapshotTable] = &[
         entity_column: "id_pembayaran",
         delete_missing: false,
     },
-    // v68 — organisasi, tugas tambahan, dan kontrak (HRIS Fase 1). Baris
+    // v68: organisasi, tugas tambahan, dan kontrak (HRIS Fase 1). Baris
     // tidak pernah dihapus: master dinonaktifkan, tugas dibatalkan, kontrak
     // append-only (pembatalan = baris `Pembatalan`).
     SnapshotTable {
@@ -1814,7 +1814,11 @@ pub(crate) const CANONICAL_SYNC_ROUTES: &[(&str, &str)] = &[
     ("billing-type", "save"),
     ("face-template", "delete"),
     ("face-template", "save"),
-    // v68 — organisasi pegawai (HRIS Fase 1a).
+    // v68: organisasi pegawai (HRIS Fase 1a), kontrak dan tugas (1b).
+    ("hr-contract", "create"),
+    ("hr-duty", "cancel"),
+    ("hr-duty", "save"),
+    ("hr-duty-type", "save"),
     ("hr-position", "save"),
     ("hr-section", "merge"),
     ("hr-section", "save"),

@@ -1627,3 +1627,72 @@ Penyimpangan dan catatan, untuk ditinjau:
   ke Mobile; `menu/page.tsx` memfilternya, Q-35).
 - `desktop_hr_settings_save`, jenis tugas, dan jenis dokumen (§19.5
   kelompok Organisasi) dikerjakan di 1b/1c bersama pemakainya.
+
+### 19.12 Sudah dibangun: sub-fase 1b (14 Nov 2026)
+
+Langkah 7–10 §19.7 dibangun di skema v68 yang sama (tanpa versi baru):
+aturan kembar kontrak dan tugas di `desktop/hris.rs` ↔ `validations/hris.ts`
++ `services/hris.ts` (vektor `hris.vektor.json`, 16 konstanta SQL baru dicek
+harfiah), rute sync `hr-contract/create`, `hr-duty-type/save`,
+`hr-duty/save|cancel`, cermin status kontrak di `save_teacher`/`saveTeacher`
+dan handler cloud `teacher/*`, `STATUS_KINI_SQL` + `TUGAS_BERLAKU_SQL` di
+rekap gaji Rust dan `computePayrollRecap`, sasaran `TUGAS:`, kunci
+`pajak_status_tidak_tetap` bisa disimpan (`PILIHAN_STATUS_TIDAK_TETAP`), tab
+Kontrak dan Tugas Tambahan, jenis tugas dan angka kontrak di tab Organisasi,
+kunci status di form guru (Web dan Mobile), kelompok "Tugas tambahan" di form
+komponen (Web dan Mobile), dan centang status di kartu konstanta pajak.
+Command baru 10 (`desktop_hr_settings_save`, `desktop_hr_duty_types_save`,
+`desktop_hr_duties`, `desktop_hr_duty_save`, `desktop_hr_duty_cancel`,
+`desktop_hr_contracts`, `desktop_hr_contract_create`,
+`desktop_hr_contract_cancel`, `desktop_get_pajak_status_tidak_tetap`,
+`desktop_save_pajak_status_tidak_tetap`): Desktop 369 → 379, Mobile 375 →
+385. Rute Web baru 10 (`/api/kepegawaian/contracts|contracts/query|
+contracts/cancel|duties|duties/query|duties/cancel|duty-type|settings`,
+`/api/payroll/config/pajak-status` + `/query`).
+
+Keputusan 1b (semua sesuai rekomendasi, 14 Nov 2026):
+
+- **A.** Membatalkan kontrak sah terakhir tidak mengubah `guru_data`; isian
+  status di form guru terbuka lagi (`CERMIN_STATUS_SQL` hanya berjalan bila
+  masih ada kontrak sah).
+- **B.** Kontrak pertama yang berawal di masa depan langsung dicerminkan;
+  untuk periode sebelum mulainya gaji jatuh ke `guru_data` (sudah status
+  baru). Form kontrak memperingatkan dan menyarankan mencatat kontrak yang
+  sedang berjalan lebih dulu.
+- **C.** Kontrak yang lewat tanggal selesai tanpa kontrak baru tetap menjadi
+  status gaji; layar menandainya "Berakhir".
+- **D.** Pilihan centang = K-1 + `Kontrak`; nilai lain ditolak saat simpan.
+- **E.** Angka kontrak: percobaan 1–12 bulan, PKWT 12–120 bulan, kosong =
+  bawaan 3/60.
+- **F.** Simpan komponen `TUGAS:<id>` menolak id jenis yang tidak ada
+  (perangkat dan Web); cloud tidak menolak.
+- **G.** `Kontrak` masuk bawaan tidak tetap (`pajak-bawaan.json`, Q-27).
+- **H.** Tes cloud memakai statement handler di SQLite memori (pola tes 1a).
+
+Gerbang (oleh Claude, per berkas/per nama; `bun run check` belum):
+
+| # | Gerbang | Hasil |
+| :-- | :-- | :-- |
+| 7–8 | `cargo test hris` Desktop (11) dan Mobile (11, crate Mobile terkompilasi dengan 10 command baru;  termasuk baru `hris_vektor_kontrak`, `hris_vektor_tugas`, `hris_kontrak_status_kini_dan_cermin`, `hris_tugas_berlaku_dan_batal`); `bun test validations/hris.test.ts` (9), `services/hris.test.ts` (4) | Lulus. Cermin tidak bergantung urutan tiba; perangkat lama yang menyimpan guru berkontrak tidak mengubah status; pembatalan ganda satu baris; tendik PTT berstatus PTT; wali kelas dari rombel per semester; baris wali kelas tidak memberi tugas sendiri; batal ganda mempertahankan alasan pertama |
+| 9 | `cargo test payroll::` Desktop (28); `bun test` `pajak.test.ts` (7), `payroll-calculator.test.ts` (17), `payroll-pajak.test.ts` (4, timeout 30 s seperti `run-tests.ts`) | Lulus. Vektor sasaran `TUGAS:` kembar; vektor `simpan_status` dan `Kontrak` bawaan tidak tetap |
+| 10 | `tsc --noEmit` dan Biome kedua workspace; `audit:contract`, `audit:sql`, `audit:schema`, `audit:a11y`, `audit:page-guard`, `audit:ui-guard`, `audit:list-bound`, `audit:confirm`, `audit:dialog`, `audit:route-guard`, `audit:silent-catch` | Lulus |
+
+Penyimpangan dan catatan, untuk ditinjau:
+
+- **Alasan pembatalan kontrak disimpan di `catatan` baris `Pembatalan`**:
+  `hr_kontrak` tidak punya kolom alasan, dan skema tidak dinaikkan.
+- **Status tugas punya nilai keempat "Akan berlaku"** (mulai sesudah hari
+  ini), selain Berlaku/Selesai/Dibatalkan.
+- **Tugas non-wali kelas membuang `id_rombel`**; rombel hanya bermakna untuk
+  wali kelas.
+- **`DIVISI:` di form komponen tetap dari teks divisi personil**, belum dari
+  `hr_bagian` (sama dengan saringan halaman Karyawan di 1a; nama bagian =
+  teks divisi sesudah migrasi).
+- **Label `STATUS:` menjadi "Berstatus X"** (bukan "Guru berstatus X"),
+  karena status kini berlaku untuk tendik juga (Q-25).
+- **Daftar jenis tugas di form komponen dibaca lewat `desktop_hr_org`**:
+  pengguna payroll tanpa `employees.view`/`teachers.view` tidak melihat
+  kelompok "Tugas tambahan"; komponen `TUGAS:` yang sudah ada tetap tampil
+  lewat labelnya (id jenis).
+- Mobile tetap tanpa tab Kepegawaian (Q-35); kontrak dan tugas dicatat di
+  Web/Desktop.

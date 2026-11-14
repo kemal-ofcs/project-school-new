@@ -3112,6 +3112,82 @@ pub fn desktop_hr_position_save(
     hris::simpan_jabatan(&state, draft)
 }
 
+/// Angka kontrak (masa percobaan, batas GTT/PTT berturut-turut); kosong = bawaan.
+#[tauri::command]
+pub fn desktop_hr_settings_save(
+    state: State<'_, DesktopState>,
+    draft: Value,
+) -> Result<Value, CommandError> {
+    require_permission(&state, "hr.org.manage")?;
+    hris::simpan_pengaturan(&state, draft)
+}
+
+/// Jenis tugas tambahan baru atau ubah nama/ekuivalen JP/aktif.
+#[tauri::command]
+pub fn desktop_hr_duty_types_save(
+    state: State<'_, DesktopState>,
+    draft: Value,
+) -> Result<Value, CommandError> {
+    require_permission(&state, "hr.org.manage")?;
+    hris::simpan_jenis_tugas(&state, draft)
+}
+
+/// Tugas tambahan, wali kelas dari rombel, dan rentang tahun ajaran.
+#[tauri::command]
+pub fn desktop_hr_duties(state: State<'_, DesktopState>) -> Result<Value, CommandError> {
+    require_any_permission(&state, &["employees.view", "teachers.view"])?;
+    hris::duties(&state)
+}
+
+/// Tugas tambahan baru atau ubah; wali kelas wajib rombel yang walinya orang itu.
+#[tauri::command]
+pub fn desktop_hr_duty_save(
+    state: State<'_, DesktopState>,
+    draft: Value,
+) -> Result<Value, CommandError> {
+    let operator = require_permission(&state, "hr.duty.manage")?;
+    hris::simpan_tugas(&state, &operator.username, draft)
+}
+
+/// Batalkan tugas tambahan yang salah input (wajib alasan).
+#[tauri::command]
+pub fn desktop_hr_duty_cancel(
+    state: State<'_, DesktopState>,
+    id_tugas: String,
+    alasan: String,
+) -> Result<Value, CommandError> {
+    let operator = require_permission(&state, "hr.duty.manage")?;
+    hris::batal_tugas(&state, &operator.username, &id_tugas, &alasan)
+}
+
+/// Semua kontrak, status kini, dan tanda per pegawai.
+#[tauri::command]
+pub fn desktop_hr_contracts(state: State<'_, DesktopState>) -> Result<Value, CommandError> {
+    require_any_permission(&state, &["employees.view", "teachers.view"])?;
+    hris::contracts(&state)
+}
+
+/// Kontrak baru (append-only); status guru dicerminkan dari kontrak.
+#[tauri::command]
+pub fn desktop_hr_contract_create(
+    state: State<'_, DesktopState>,
+    draft: Value,
+) -> Result<Value, CommandError> {
+    let operator = require_permission(&state, "hr.contract.manage")?;
+    hris::simpan_kontrak(&state, &operator.username, draft)
+}
+
+/// Batalkan kontrak dengan baris `Pembatalan` (wajib alasan).
+#[tauri::command]
+pub fn desktop_hr_contract_cancel(
+    state: State<'_, DesktopState>,
+    id_kontrak: String,
+    alasan: String,
+) -> Result<Value, CommandError> {
+    let operator = require_permission(&state, "hr.contract.manage")?;
+    hris::batal_kontrak(&state, &operator.username, &id_kontrak, &alasan)
+}
+
 /// Jenis tagihan, tarif, serta pilihan unit/rombel/tahun ajaran untuk
 /// menerbitkan, dengan izin tagihan (bukan `academic.view`).
 #[tauri::command]

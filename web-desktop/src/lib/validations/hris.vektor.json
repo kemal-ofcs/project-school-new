@@ -166,5 +166,397 @@
         "atasan_siklus": ["p3", "p4"]
       }
     }
+  ],
+  "kontrak_dasar": {
+    "status": "GTY",
+    "nomor": "",
+    "tanggal_mulai": "2026-07-01",
+    "tanggal_selesai": "",
+    "percobaan_selesai": "",
+    "catatan": ""
+  },
+  "kontrak": [
+    {
+      "ubah": {
+        "status": " GTY ",
+        "nomor": " SK/01 ",
+        "percobaan_selesai": "2026-09-30",
+        "catatan": " ok "
+      },
+      "guru": true,
+      "galat": null,
+      "hasil": {
+        "status": "GTY",
+        "nomor": "SK/01",
+        "tanggal_mulai": "2026-07-01",
+        "tanggal_selesai": "",
+        "percobaan_selesai": "2026-09-30",
+        "catatan": "ok"
+      }
+    },
+    {
+      "ubah": { "status": "Kontrak" },
+      "guru": true,
+      "galat": "Status kontrak tidak dikenal."
+    },
+    {
+      "ubah": { "tanggal_mulai": "2026-02-30" },
+      "guru": true,
+      "galat": "Tanggal mulai kontrak tidak valid."
+    },
+    {
+      "ubah": { "tanggal_selesai": "31-12-2026" },
+      "guru": true,
+      "galat": "Tanggal selesai kontrak tidak valid."
+    },
+    {
+      "ubah": { "status": "GTT", "tanggal_selesai": "2027-06-30" },
+      "guru": false,
+      "galat": "Status GTY dan GTT hanya untuk guru."
+    },
+    {
+      "ubah": { "status": "PTT", "tanggal_selesai": "2027-06-30" },
+      "guru": true,
+      "galat": "Status PTY dan PTT hanya untuk tenaga kependidikan."
+    },
+    {
+      "ubah": { "status": "GTT" },
+      "guru": true,
+      "galat": "Kontrak GTT dan PTT wajib punya tanggal selesai."
+    },
+    {
+      "ubah": { "status": "PTT", "tanggal_selesai": "2026-06-30" },
+      "guru": false,
+      "galat": "Tanggal selesai tidak boleh sebelum tanggal mulai."
+    },
+    {
+      "ubah": { "status": "Honorer", "percobaan_selesai": "2026-09-30" },
+      "guru": false,
+      "galat": "Masa percobaan hanya untuk GTY dan PTY."
+    },
+    {
+      "ubah": { "status": "PTY", "percobaan_selesai": "2026-06-01" },
+      "guru": false,
+      "galat": "Akhir masa percobaan tidak boleh sebelum tanggal mulai."
+    },
+    {
+      "ubah": {
+        "status": "PTY",
+        "tanggal_selesai": "2026-08-01",
+        "percobaan_selesai": "2026-09-01"
+      },
+      "guru": false,
+      "galat": "Akhir masa percobaan melewati tanggal selesai kontrak."
+    },
+    {
+      "ubah": {
+        "status": "PNS",
+        "nomor": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+      },
+      "guru": false,
+      "galat": "Nomor SK/kontrak maksimal 80 karakter."
+    },
+    {
+      "ubah": { "status": "Honorer", "tanggal_selesai": "2026-12-31" },
+      "guru": false,
+      "galat": null,
+      "hasil": {
+        "status": "Honorer",
+        "nomor": "",
+        "tanggal_mulai": "2026-07-01",
+        "tanggal_selesai": "2026-12-31",
+        "percobaan_selesai": "",
+        "catatan": ""
+      }
+    }
+  ],
+  "alasan": [
+    [" salah input ", "salah input", null],
+    ["   ", null, "Alasan pembatalan wajib diisi."]
+  ],
+  "tambah_bulan": [
+    ["2026-01-31", 1, "2026-02-28"],
+    ["2024-01-31", 1, "2024-02-29"],
+    ["2026-11-15", 3, "2027-02-15"],
+    ["2026-05-10", 0, "2026-05-10"],
+    ["2026-03-31", 60, "2031-03-31"],
+    ["2026-02-30", 1, null]
+  ],
+  "status_kerja": [
+    {
+      "kontrak": [],
+      "tanggal": "2026-08-01",
+      "hasil": {
+        "keadaan": "Tanpa kontrak",
+        "status": "",
+        "id_kontrak": "",
+        "sampai": "",
+        "percobaan_sampai": ""
+      }
+    },
+    {
+      "kontrak": [
+        ["k2", "p1", "GTY", "", "2026-07-01", "", "2026-09-30"],
+        ["k1", "p1", "GTT", "", "2025-07-01", "2026-06-30", ""]
+      ],
+      "tanggal": "2026-08-01",
+      "hasil": {
+        "keadaan": "Berlaku",
+        "status": "GTY",
+        "id_kontrak": "k2",
+        "sampai": "",
+        "percobaan_sampai": "2026-09-30"
+      }
+    },
+    {
+      "kontrak": [
+        ["k2", "p1", "GTY", "", "2026-07-01", "", "2026-09-30"],
+        ["k1", "p1", "GTT", "", "2025-07-01", "2026-06-30", ""]
+      ],
+      "tanggal": "2026-10-01",
+      "hasil": {
+        "keadaan": "Berlaku",
+        "status": "GTY",
+        "id_kontrak": "k2",
+        "sampai": "",
+        "percobaan_sampai": ""
+      }
+    },
+    {
+      "kontrak": [["k1", "p1", "GTT", "", "2025-07-01", "2026-06-30", ""]],
+      "tanggal": "2026-07-15",
+      "hasil": {
+        "keadaan": "Berakhir",
+        "status": "GTT",
+        "id_kontrak": "k1",
+        "sampai": "2026-06-30",
+        "percobaan_sampai": ""
+      }
+    },
+    {
+      "kontrak": [
+        ["k1", "p1", "GTT", "", "2025-07-01", "2026-06-30", ""],
+        ["batal-k2", "p1", "Pembatalan", "k2", "2026-07-01", "", ""],
+        ["k2", "p1", "GTY", "", "2026-07-01", "", ""]
+      ],
+      "tanggal": "2026-08-01",
+      "hasil": {
+        "keadaan": "Berakhir",
+        "status": "GTT",
+        "id_kontrak": "k1",
+        "sampai": "2026-06-30",
+        "percobaan_sampai": ""
+      }
+    },
+    {
+      "kontrak": [["k3", "p1", "PTY", "", "2027-01-01", "", ""]],
+      "tanggal": "2026-08-01",
+      "hasil": {
+        "keadaan": "Akan berlaku",
+        "status": "PTY",
+        "id_kontrak": "k3",
+        "sampai": "",
+        "percobaan_sampai": ""
+      }
+    },
+    {
+      "kontrak": [
+        ["kb", "p1", "PNS", "", "2026-01-01", "", ""],
+        ["ka", "p1", "Honorer", "", "2026-01-01", "", ""]
+      ],
+      "tanggal": "2026-01-01",
+      "hasil": {
+        "keadaan": "Berlaku",
+        "status": "PNS",
+        "id_kontrak": "kb",
+        "sampai": "",
+        "percobaan_sampai": ""
+      }
+    }
+  ],
+  "tanda": [
+    {
+      "kontrak": [["k1", "p1", "GTY", "", "2026-01-31", "", "2026-05-01"]],
+      "aturan": { "percobaan_maks_bulan": 3, "pkwt_maks_bulan": 60 },
+      "hasil": ["percobaan_lewat"]
+    },
+    {
+      "kontrak": [["k1", "p1", "GTY", "", "2026-01-31", "", "2026-04-30"]],
+      "aturan": { "percobaan_maks_bulan": 3, "pkwt_maks_bulan": 60 },
+      "hasil": []
+    },
+    {
+      "kontrak": [
+        ["k1", "p1", "PTY", "", "2018-01-01", "2019-12-31", ""],
+        ["k2", "p1", "PTT", "", "2020-01-01", "2022-12-31", ""],
+        ["k3", "p1", "PTT", "", "2023-01-01", "2025-01-02", ""]
+      ],
+      "aturan": { "percobaan_maks_bulan": 3, "pkwt_maks_bulan": 60 },
+      "hasil": ["pkwt_lewat"]
+    },
+    {
+      "kontrak": [
+        ["k1", "p1", "GTT", "", "2015-01-01", "2019-12-31", ""],
+        ["k2", "p1", "Honorer", "", "2020-01-01", "2020-12-31", ""],
+        ["k3", "p1", "GTT", "", "2021-01-01", "2021-12-31", ""]
+      ],
+      "aturan": { "percobaan_maks_bulan": 3, "pkwt_maks_bulan": 60 },
+      "hasil": []
+    },
+    {
+      "kontrak": [
+        ["k1", "p1", "PTT", "", "2015-01-01", "2025-12-31", ""],
+        ["batal-k1", "p1", "Pembatalan", "k1", "2015-01-01", "", ""]
+      ],
+      "aturan": { "percobaan_maks_bulan": 3, "pkwt_maks_bulan": 60 },
+      "hasil": []
+    },
+    {
+      "kontrak": [["k1", "p1", "PTT", "", "2026-01-01", "2027-01-02", ""]],
+      "aturan": { "percobaan_maks_bulan": 3, "pkwt_maks_bulan": 12 },
+      "hasil": ["pkwt_lewat"]
+    }
+  ],
+  "susun_kontrak": [
+    {
+      "kontrak": [
+        ["k9", "p2", "PTT", "", "2026-01-01", "2026-12-31", ""],
+        ["k1", "p1", "GTY", "", "2026-01-01", "", ""],
+        ["batal-k9", "p2", "Pembatalan", "k9", "2026-01-01", "", ""]
+      ],
+      "hari_ini": "2026-03-01",
+      "aturan": { "percobaan_maks_bulan": 3, "pkwt_maks_bulan": 60 },
+      "hasil": {
+        "ringkas": [
+          {
+            "id_karyawan": "p1",
+            "keadaan": "Berlaku",
+            "status": "GTY",
+            "id_kontrak": "k1",
+            "sampai": "",
+            "percobaan_sampai": "",
+            "tanda": []
+          },
+          {
+            "id_karyawan": "p2",
+            "keadaan": "Tanpa kontrak",
+            "status": "",
+            "id_kontrak": "",
+            "sampai": "",
+            "percobaan_sampai": "",
+            "tanda": []
+          }
+        ],
+        "dibatalkan": ["k9"]
+      }
+    }
+  ],
+  "angka": [
+    [null, "percobaan", 3],
+    ["", "percobaan", 3],
+    ["6", "percobaan", 6],
+    ["13", "percobaan", 3],
+    ["abc", "pkwt", 60],
+    ["120", "pkwt", 120],
+    ["011", "pkwt", 60]
+  ],
+  "validasi_angka": [
+    ["", "percobaan", "Masa percobaan", "", null],
+    [" 006 ", "percobaan", "Masa percobaan", "6", null],
+    [
+      "0",
+      "percobaan",
+      "Masa percobaan",
+      null,
+      "Masa percobaan harus 1 sampai 12 bulan, atau kosong untuk bawaan 3."
+    ],
+    [
+      "2,5",
+      "pkwt",
+      "Batas GTT/PTT",
+      null,
+      "Batas GTT/PTT harus 12 sampai 120 bulan, atau kosong untuk bawaan 60."
+    ]
+  ],
+  "tugas_dasar": {
+    "id_karyawan": "p1",
+    "id_jenis": "tgs-piket",
+    "unit": "  SMP   Negeri ",
+    "tahun_ajaran": "2026/2027",
+    "id_rombel": "r1",
+    "nomor_sk": " SK-9 ",
+    "tanggal_sk": "2026-07-01",
+    "ekuivalen_jp": null,
+    "tanggal_mulai": "2026-07-13",
+    "tanggal_selesai": ""
+  },
+  "tugas": [
+    {
+      "ubah": {},
+      "galat": null,
+      "hasil": {
+        "id_karyawan": "p1",
+        "id_jenis": "tgs-piket",
+        "unit": "SMP Negeri",
+        "tahun_ajaran": "2026/2027",
+        "id_rombel": "",
+        "nomor_sk": "SK-9",
+        "tanggal_sk": "2026-07-01",
+        "ekuivalen_jp": null,
+        "tanggal_mulai": "2026-07-13",
+        "tanggal_selesai": ""
+      }
+    },
+    {
+      "ubah": { "id_jenis": "tgs-wali-kelas", "ekuivalen_jp": 3 },
+      "galat": null,
+      "hasil": {
+        "id_karyawan": "p1",
+        "id_jenis": "tgs-wali-kelas",
+        "unit": "SMP Negeri",
+        "tahun_ajaran": "2026/2027",
+        "id_rombel": "r1",
+        "nomor_sk": "SK-9",
+        "tanggal_sk": "2026-07-01",
+        "ekuivalen_jp": 3,
+        "tanggal_mulai": "2026-07-13",
+        "tanggal_selesai": ""
+      }
+    },
+    {
+      "ubah": { "id_jenis": "tgs-wali-kelas", "id_rombel": " " },
+      "galat": "Tugas wali kelas wajib memilih rombel."
+    },
+    {
+      "ubah": { "ekuivalen_jp": 41 },
+      "galat": "Ekuivalen JP harus 0 sampai 40."
+    },
+    {
+      "ubah": { "tanggal_selesai": "2026-07-01" },
+      "galat": "Tanggal selesai tidak boleh sebelum tanggal mulai."
+    },
+    { "ubah": { "id_karyawan": "" }, "galat": "Pilih pegawai." },
+    { "ubah": { "id_jenis": " " }, "galat": "Pilih jenis tugas." },
+    { "ubah": { "tahun_ajaran": "" }, "galat": "Tahun ajaran wajib dipilih." },
+    {
+      "ubah": { "tanggal_mulai": "2026-7-13" },
+      "galat": "Tanggal mulai tugas tidak valid."
+    },
+    {
+      "ubah": { "tanggal_sk": "2026-13-01" },
+      "galat": "Tanggal SK tidak valid."
+    }
+  ],
+  "jenis_tugas": [
+    [" Koordinator   BK ", 4, "Koordinator BK", null],
+    ["K", 2, null, "Nama jenis tugas minimal 2 karakter."],
+    ["Koordinator", 41, null, "Ekuivalen JP harus 0 sampai 40."]
+  ],
+  "status_tugas": [
+    ["2026-07-01", "", "", "2026-08-01", "Berlaku"],
+    ["2026-07-01", "2026-08-01", "", "2026-08-01", "Berlaku"],
+    ["2026-07-01", "2026-07-31", "", "2026-08-01", "Selesai"],
+    ["2026-09-01", "", "", "2026-08-01", "Akan berlaku"],
+    ["2026-07-01", "", "2026-07-02 10:00:00", "2026-08-01", "Dibatalkan"]
   ]
 }

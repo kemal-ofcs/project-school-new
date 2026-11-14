@@ -1,6 +1,7 @@
 import "server-only";
 
 import type { Client } from "@libsql/client";
+import { statusKini, tugasBerlaku } from "@/lib/services/hris";
 import { pinjamanAktif } from "@/lib/services/loan";
 import {
   adaKomponenTetap,
@@ -52,6 +53,8 @@ export interface PayrollRecapRow {
    */
   jenis_personil: string;
   status_kepegawaian: string;
+  /** Jenis tugas tambahan yang berlaku pada periode (`TUGAS_BERLAKU_SQL`). */
+  tugas: string[];
   rate_per_hour: number;
   ptkp_status: string;
   total_hadir: number;
@@ -333,6 +336,8 @@ export async function computePayrollRecap(
     rapelAktif,
     tidakTetapRow,
     pembandingPerOrang,
+    statusPeriode,
+    tugasPeriode,
   ] = await Promise.all([
     loadOvertimeTiers(client, "HARI_KERJA"),
     // Jenjang lembur hari libur dikonfigurasi terpisah oleh user di menu
@@ -441,6 +446,11 @@ export async function computePayrollRecap(
       args: [KUNCI_STATUS_TIDAK_TETAP],
     }),
     loadPembanding(client, periodStart),
+    // HRIS Fase 1b: status dari kontrak pada akhir periode (guru dan tendik,
+    // Q-25) dan tugas tambahan yang berlaku (`TUGAS:`, Q-29). Cerminan
+    // `hris::status_kini`/`tugas_berlaku` di `payroll/commands.rs`.
+    statusKini(client, periodEnd),
+    tugasBerlaku(client, periodStart, periodEnd),
   ]);
   const tidakTetap = daftarStatusTidakTetap(
     tidakTetapRow.rows[0] ? String(tidakTetapRow.rows[0].value ?? "") : null,
@@ -522,8 +532,10 @@ export async function computePayrollRecap(
     const subject: ComponentSubject = {
       id_karyawan: idKaryawan,
       jenis_personil: String(row.jenis_personil ?? ""),
-      status_kepegawaian: String(row.status_kepegawaian ?? ""),
+      status_kepegawaian:
+        statusPeriode.get(idKaryawan) ?? String(row.status_kepegawaian ?? ""),
       divisi: String(row.divisi ?? ""),
+      tugas: tugasPeriode.get(idKaryawan) ?? [],
       total_teaching_jp: teaching.total_jp,
       total_hadir: Number(row.total_hadir || 0),
     };
@@ -613,6 +625,7 @@ export async function computePayrollRecap(
       divisi: subject.divisi,
       jenis_personil: subject.jenis_personil,
       status_kepegawaian: subject.status_kepegawaian,
+      tugas: [...subject.tugas],
       rate_per_hour: ratePerHour,
       ptkp_status: ptkpStatus,
       total_hadir: Number(row.total_hadir || 0),

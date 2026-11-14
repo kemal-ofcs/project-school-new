@@ -84,6 +84,8 @@ export default function GuruPage() {
   // Berdiri sendiri, bukan diturunkan dari `formData.id_guru` — sejak ID bisa
   // diketik saat menambah, ID terisi tidak lagi berarti "sedang mengedit".
   const [isEditing, setIsEditing] = useState(false);
+  // Guru berkontrak: status mengikuti kontrak (Kepegawaian → Kontrak).
+  const [statusTerkunci, setStatusTerkunci] = useState(false);
   const [unitList, setUnitList] = useState<Record<string, unknown>[]>([]);
   const [formData, setFormData] = useState<GuruInput>({
     id_guru: "",
@@ -226,12 +228,14 @@ export default function GuruPage() {
       tanggal_mulai_aktif: "",
     });
     setIsEditing(false);
+    setStatusTerkunci(false);
     setFotoBaru(null);
     setShowModal(true);
   };
 
   const handleOpenEdit = (item: Record<string, unknown>) => {
     setIsEditing(true);
+    setStatusTerkunci(Boolean(Number(item.berkontrak ?? 0)));
     setFormData(draftGuruDariBaris(item));
     setShowModal(true);
   };
@@ -1144,6 +1148,10 @@ export default function GuruPage() {
                   </label>
                   <select
                     id="guru-status-peg"
+                    disabled={statusTerkunci}
+                    aria-describedby={
+                      statusTerkunci ? "guru-status-terkunci" : undefined
+                    }
                     value={formData.status_kepegawaian || "Honorer"}
                     onChange={(e) =>
                       setFormData({
@@ -1181,6 +1189,15 @@ export default function GuruPage() {
                       Kontrak
                     </option>
                   </select>
+                  {statusTerkunci ? (
+                    <p
+                      id="guru-status-terkunci"
+                      className="mt-1 text-xs text-slate-400"
+                    >
+                      Mengikuti kontrak terakhir. Ubah lewat Kepegawaian →
+                      Kontrak.
+                    </p>
+                  ) : null}
                 </div>
               </div>
 

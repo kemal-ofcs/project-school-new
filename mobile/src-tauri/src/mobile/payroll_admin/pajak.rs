@@ -154,6 +154,32 @@ pub fn daftar_status_tidak_tetap(nilai: Option<&str>) -> Vec<String> {
     }
 }
 
+/// Pilihan centang kunci `pajak_status_tidak_tetap` (Q-26 (a)): status kontrak
+/// K-1 ditambah nilai lama `Kontrak`. Cermin `PILIHAN_STATUS_TIDAK_TETAP` di
+/// `validations/pajak.ts`.
+pub const PILIHAN_STATUS_TIDAK_TETAP: [&str; 8] =
+    ["GTY", "PTY", "GTT", "PTT", "Honorer", "PNS", "PPPK", "Kontrak"];
+
+/// Isi kunci dari centang layar, urut seperti pilihan. Daftar kosong = `""`;
+/// nilai di luar pilihan ditolak. Cermin `validasiStatusTidakTetap`.
+pub fn validasi_status_tidak_tetap(daftar: &[String]) -> Result<String, String> {
+    let mut dipilih = Vec::new();
+    for isi in daftar {
+        let isi = isi.trim();
+        let cocok = PILIHAN_STATUS_TIDAK_TETAP
+            .iter()
+            .find(|p| p.to_lowercase() == isi.to_lowercase())
+            .ok_or_else(|| format!("Status \"{isi}\" tidak dikenal."))?;
+        dipilih.push(*cocok);
+    }
+    Ok(PILIHAN_STATUS_TIDAK_TETAP
+        .iter()
+        .filter(|p| dipilih.contains(p))
+        .copied()
+        .collect::<Vec<_>>()
+        .join(","))
+}
+
 /// Q-2 (b): status kepegawaian yang tercantum di daftar = tidak tetap,
 /// sisanya (termasuk tendik tanpa `guru_data`) tetap. Huruf besar-kecil
 /// diabaikan.
@@ -701,6 +727,12 @@ mod tests {
         for k in v["status"].as_array().expect("status") {
             let daftar = daftar_status_tidak_tetap(k[1].as_str());
             assert_eq!(status_pph(k[0].as_str().expect("status kepegawaian"), &daftar), k[2], "{k}");
+        }
+        for k in v["simpan_status"].as_array().expect("simpan status") {
+            let daftar: Vec<String> = serde_json::from_value(k[0].clone()).expect("daftar");
+            let hasil = validasi_status_tidak_tetap(&daftar);
+            assert_eq!(hasil.as_ref().ok().map(String::as_str), k[1].as_str(), "{k}");
+            assert_eq!(hasil.err().as_deref(), k[2].as_str(), "{k}");
         }
         for k in v["ptkp"].as_array().expect("ptkp") {
             let status = k[0].as_str().expect("ptkp");

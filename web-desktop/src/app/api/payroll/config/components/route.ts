@@ -89,6 +89,20 @@ export async function PUT(request: NextRequest) {
         appliesTo.startsWith(`${prefix}:`) &&
         appliesTo.slice(prefix.length + 1).trim() !== "",
     );
+    // Kecuali `TUGAS:`: sasarannya id jenis (Q-29), dan id yang salah ketik
+    // sama butanya dengan id personil yang salah ketik.
+    if (appliesTo.toUpperCase().startsWith("TUGAS:")) {
+      const jenis = await client.execute({
+        sql: "SELECT 1 FROM hr_tugas_jenis WHERE id_jenis = ?1;",
+        args: [appliesTo.slice("TUGAS:".length).trim()],
+      });
+      if (jenis.rows.length === 0) {
+        throw new ApiRequestError(
+          "Jenis tugas tambahan untuk komponen ini tidak ditemukan.",
+          400,
+        );
+      }
+    }
     if (appliesTo !== APPLIES_TO_ALL && !bentukKelompok) {
       const personil = await client.execute({
         sql: "SELECT COALESCE(jenis_personil, '') AS jenis_personil FROM master_data WHERE id_unik = ? LIMIT 1;",

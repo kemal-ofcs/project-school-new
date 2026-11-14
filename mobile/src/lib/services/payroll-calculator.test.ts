@@ -315,6 +315,10 @@ const VEKTOR_SASARAN: Array<[string, boolean]> = [
   ["DIVISI:Kurikulum", true],
   ["DIVISI:kurikulum", true],
   ["DIVISI:Tata Usaha", false],
+  // Tugas tambahan, per id jenis (wali kelas dari rombel).
+  ["TUGAS:tgs-wali-kelas", true],
+  ["tugas:TGS-WALI-KELAS", true],
+  ["TUGAS:tgs-piket", false],
   // Awalan yang TIDAK dikenal diperlakukan sebagai id, bukan "semua".
   ["KELOMPOK:Guru", false],
   ["PERSONIL:", false],
@@ -330,6 +334,7 @@ describe("sasaran komponen payroll", () => {
       jenis_personil: "GURU",
       status_kepegawaian: "Honorer",
       divisi: "Kurikulum",
+      tugas: ["tgs-wali-kelas"],
       total_teaching_jp: 0,
       total_hadir: 0,
     };
@@ -350,6 +355,7 @@ describe("sasaran komponen payroll", () => {
       jenis_personil: "Pegawai",
       status_kepegawaian: "",
       divisi: "Tata Usaha",
+      tugas: [],
       total_teaching_jp: 0,
       total_hadir: 0,
     };
@@ -383,6 +389,7 @@ describe("jenis perhitungan komponen", () => {
       jenis_personil: "GURU",
       status_kepegawaian: "Honorer",
       divisi: "Kurikulum",
+      tugas: [],
       total_teaching_jp: 20,
       total_hadir: 24,
     };
@@ -432,6 +439,7 @@ describe("jenis perhitungan komponen", () => {
         jenis_personil: "",
         status_kepegawaian: "",
         divisi: "",
+        tugas: [],
         total_teaching_jp: -5,
         total_hadir: -3,
       },
@@ -540,6 +548,7 @@ describe("dasar BPJS hanya gaji pokok dan tunjangan tetap (VS3)", () => {
         jenis_personil: "",
         status_kepegawaian: "",
         divisi: "",
+        tugas: [],
         total_teaching_jp: 0,
         total_hadir: 20,
       },

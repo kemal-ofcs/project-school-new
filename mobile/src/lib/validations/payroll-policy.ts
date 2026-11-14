@@ -1,5 +1,6 @@
 import { normalizePersonnelRole } from "@/lib/contracts/scanner";
 import { isValidDate } from "@/lib/validations/accounting";
+import { PILIHAN_STATUS_TIDAK_TETAP } from "@/lib/validations/pajak";
 
 /**
  * Kebijakan payroll yang dibaca DUA sisi: layar (Web/Desktop/Mobile) dan mesin
@@ -98,6 +99,8 @@ export const APPLIES_TO_GROUP_PREFIXES = [
   "PERSONIL",
   "STATUS",
   "DIVISI",
+  // HRIS Fase 1b (Q-29): id jenis tugas tambahan, dari `TUGAS_BERLAKU_SQL`.
+  "TUGAS",
 ] as const;
 
 export type AppliesToGroupPrefix = (typeof APPLIES_TO_GROUP_PREFIXES)[number];
@@ -110,12 +113,7 @@ export type AppliesToGroupPrefix = (typeof APPLIES_TO_GROUP_PREFIXES)[number];
  * pilihan — penilaiannya tetap membandingkan apa yang benar-benar tersimpan,
  * termasuk status lama yang tidak ada di daftar ini.
  */
-export const TEACHER_EMPLOYMENT_STATUSES = [
-  "PNS",
-  "GTY",
-  "GTT",
-  "Honorer",
-] as const;
+export const TEACHER_EMPLOYMENT_STATUSES = PILIHAN_STATUS_TIDAK_TETAP;
 
 /** Satu orang, dilihat dari sudut pandang penyaringan komponen payroll. */
 export interface ComponentSubject {
@@ -126,6 +124,8 @@ export interface ComponentSubject {
   status_kepegawaian: string;
   /** `master_data.divisi`. */
   divisi: string;
+  /** Id jenis tugas tambahan yang berlaku pada periode run (`TUGAS:`). */
+  tugas: readonly string[];
   /** JP mengajar terparaf pada periode ini; dasar komponen `PER_JP`. */
   total_teaching_jp: number;
   /** Hari hadir pada periode ini; dasar komponen `PER_HADIR`. */
@@ -200,6 +200,8 @@ export function appliesToSubject(
           return samaTeks(subject.status_kepegawaian, isi);
         case "DIVISI":
           return samaTeks(subject.divisi, isi);
+        case "TUGAS":
+          return subject.tugas.some((t) => samaTeks(t, isi));
         default:
           break;
       }
@@ -218,6 +220,7 @@ export function appliesToSubject(
 export function labelAppliesTo(
   appliesTo: string,
   namaPersonil?: (id: string) => string,
+  namaTugas?: (idJenis: string) => string,
 ): string {
   const value = normalizeAppliesTo(appliesTo);
   if (value === APPLIES_TO_ALL) return "Semua Personil Digaji";
@@ -227,8 +230,9 @@ export function labelAppliesTo(
     const prefix = value.slice(0, pisah).toUpperCase();
     const isi = value.slice(pisah + 1);
     if (prefix === "PERSONIL") return `Semua ${isi}`;
-    if (prefix === "STATUS") return `Guru berstatus ${isi}`;
+    if (prefix === "STATUS") return `Berstatus ${isi}`;
     if (prefix === "DIVISI") return `Divisi ${isi}`;
+    if (prefix === "TUGAS") return `Tugas ${namaTugas ? namaTugas(isi) : isi}`;
   }
   return namaPersonil ? namaPersonil(value) : value;
 }

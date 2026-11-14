@@ -17,5 +17,5 @@
     "basis_dasar_pasal_17": 5000
   },
   "pembulatan_pkp": 1000,
-  "status_tidak_tetap": ["Honorer", "GTT", "PTT"]
+  "status_tidak_tetap": ["Honorer", "GTT", "PTT", "Kontrak"]
 }

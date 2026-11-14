@@ -9,6 +9,9 @@ import {
   useState,
 } from "react";
 import { AppShell } from "@/components/AppShell";
+import { OrganisasiTugasKontrak } from "@/components/kepegawaian/OrganisasiTugasKontrak";
+import { TabKontrak } from "@/components/kepegawaian/TabKontrak";
+import { TabTugas } from "@/components/kepegawaian/TabTugas";
 import { FeedbackBanner } from "@/components/ui/FeedbackBanner";
 import { Modal } from "@/components/ui/Modal";
 import { PageHeader } from "@/components/ui/PageHeader";
@@ -28,11 +31,13 @@ import {
   simpanJabatan,
 } from "@/lib/gateways/hris";
 
-type Tab = "daftar" | "struktur" | "organisasi";
+type Tab = "daftar" | "struktur" | "kontrak" | "tugas" | "organisasi";
 
 const TAB: { kunci: Tab; label: string }[] = [
   { kunci: "daftar", label: "Daftar" },
   { kunci: "struktur", label: "Struktur" },
+  { kunci: "kontrak", label: "Kontrak" },
+  { kunci: "tugas", label: "Tugas Tambahan" },
   { kunci: "organisasi", label: "Organisasi" },
 ];
 
@@ -138,6 +143,20 @@ export default function KepegawaianPage() {
           <TabDaftar org={org} />
         ) : tab === "struktur" ? (
           <TabStruktur org={org} />
+        ) : tab === "kontrak" ? (
+          <TabKontrak
+            org={org}
+            bolehUbah={hasPermission(user, "hr.contract.manage")}
+            onPesan={setPesan}
+            onGalat={setGalat}
+          />
+        ) : tab === "tugas" ? (
+          <TabTugas
+            org={org}
+            bolehUbah={hasPermission(user, "hr.duty.manage")}
+            onPesan={setPesan}
+            onGalat={setGalat}
+          />
         ) : (
           <TabOrganisasi
             org={org}
@@ -602,6 +621,13 @@ function TabOrganisasi({
           ) : null}
         </ul>
       </section>
+
+      <OrganisasiTugasKontrak
+        org={org}
+        bolehUbah={bolehUbah}
+        onBerhasil={onBerhasil}
+        onGalat={onGalat}
+      />
 
       {sunting?.jenis === "bagian" || sunting?.jenis === "jabatan" ? (
         <ModalNama

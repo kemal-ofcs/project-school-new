@@ -147,6 +147,44 @@ export function daftarStatusTidakTetap(nilai: string | null): string[] {
 }
 
 /**
+ * Pilihan centang kunci `pajak_status_tidak_tetap` (Q-26 (a), keputusan D):
+ * status kontrak K-1 ditambah nilai lama `Kontrak` dari form guru Mobile.
+ * Cermin `PILIHAN_STATUS_TIDAK_TETAP` di `pajak.rs`.
+ */
+export const PILIHAN_STATUS_TIDAK_TETAP = [
+  "GTY",
+  "PTY",
+  "GTT",
+  "PTT",
+  "Honorer",
+  "PNS",
+  "PPPK",
+  "Kontrak",
+] as const;
+
+/**
+ * Isi kunci dari centang layar, urut seperti pilihan. Daftar kosong = `""`
+ * (tidak ada yang tidak tetap); nilai di luar pilihan ditolak.
+ */
+export function validasiStatusTidakTetap(
+  daftar: readonly string[],
+): { ok: true; nilai: string } | { ok: false; galat: string } {
+  const dipilih = new Set<string>();
+  for (const isi of daftar) {
+    const cocok = PILIHAN_STATUS_TIDAK_TETAP.find(
+      (p) => p.toLowerCase() === isi.trim().toLowerCase(),
+    );
+    if (!cocok)
+      return { ok: false, galat: `Status "${isi.trim()}" tidak dikenal.` };
+    dipilih.add(cocok);
+  }
+  return {
+    ok: true,
+    nilai: PILIHAN_STATUS_TIDAK_TETAP.filter((p) => dipilih.has(p)).join(","),
+  };
+}
+
+/**
  * Q-2 (b): status kepegawaian yang tercantum di daftar = tidak tetap,
  * sisanya (termasuk tendik tanpa `guru_data`) tetap. Huruf besar-kecil
  * diabaikan.

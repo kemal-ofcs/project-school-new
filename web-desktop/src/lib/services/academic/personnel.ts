@@ -3,6 +3,7 @@ import "server-only";
 import { db, ensureDbInitialized } from "@/lib/db";
 import { ApiRequestError } from "@/lib/server/http/api-response";
 import { periksaOrganisasi } from "@/lib/services/hris";
+import { BERKONTRAK_SQL, CERMIN_STATUS_SQL } from "@/lib/validations/hris";
 import {
   assertUniqueValue,
   chosenShift,
@@ -28,7 +29,8 @@ export async function getTeachers() {
            g.created_at, g.updated_at,
            m.kode_karyawan, m.nama, m.divisi, m.jabatan_status, m.no_hp, m.lp,
            m.status_aktif, m.id_shift, m.token_absensi, m.qr_code, m.status_qr, m.unit,
-           m.email, m.id_bagian, m.id_jabatan, m.id_atasan, m.tanggal_mulai_aktif
+           m.email, m.id_bagian, m.id_jabatan, m.id_atasan, m.tanggal_mulai_aktif,
+           ${BERKONTRAK_SQL} AS berkontrak
     FROM guru_data g
     JOIN master_data m ON m.id_unik = g.id_guru
     ORDER BY m.nama ASC;
@@ -205,6 +207,8 @@ export async function saveTeacher(draft: {
           draft.status_kepegawaian || "Honorer",
         ],
       },
+      // Guru berkontrak: status dari kontrak menang atas isian form (HRIS §19.2.4).
+      { sql: CERMIN_STATUS_SQL, args: [id] },
       {
         sql: `
       INSERT INTO id_card (id_unik, nama, divisi, idcard_status, tanggal_generate)

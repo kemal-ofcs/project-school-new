@@ -308,7 +308,7 @@ impl PayrollCalculator {
     /// Apakah komponen dengan `applies_to` ini berlaku untuk orang tersebut?
     ///
     /// "ALL" berlaku untuk semua; sebuah id berlaku untuk satu orang; dan
-    /// ketiga awalan kelompok (`PERSONIL:`, `STATUS:`, `DIVISI:`) dijawab dari
+    /// awalan kelompok (`PERSONIL:`, `STATUS:`, `DIVISI:`, `TUGAS:`) dijawab dari
     /// kolom yang sudah dibawa rekap. Nilai yang TIDAK dikenal diperlakukan
     /// sebagai id — bukan sebagai "berlaku untuk semua". Salah arah di sini
     /// berarti tunjangan menyebar ke seluruh sekolah karena satu salah ketik,
@@ -333,6 +333,7 @@ impl PayrollCalculator {
                     "PERSONIL" => return sama(normalize_personnel_role(&subject.jenis_personil)),
                     "STATUS" => return sama(&subject.status_kepegawaian),
                     "DIVISI" => return sama(&subject.divisi),
+                    "TUGAS" => return subject.tugas.iter().any(|t| sama(t)),
                     _ => {}
                 }
             }
@@ -557,6 +558,10 @@ mod tests {
         ("DIVISI:Kurikulum", true),
         ("DIVISI:kurikulum", true),
         ("DIVISI:Tata Usaha", false),
+        // Tugas tambahan, per id jenis (wali kelas dari rombel).
+        ("TUGAS:tgs-wali-kelas", true),
+        ("tugas:TGS-WALI-KELAS", true),
+        ("TUGAS:tgs-piket", false),
         // Awalan yang TIDAK dikenal diperlakukan sebagai id, bukan "semua".
         ("KELOMPOK:Guru", false),
         ("PERSONIL:", false),
@@ -569,6 +574,7 @@ mod tests {
             jenis_personil: "GURU".to_string(),
             status_kepegawaian: "Honorer".to_string(),
             divisi: "Kurikulum".to_string(),
+            tugas: vec!["tgs-wali-kelas".to_string()],
             ..Default::default()
         };
 
@@ -604,6 +610,7 @@ mod tests {
             divisi: "Kurikulum".to_string(),
             total_teaching_jp: 20,
             total_hadir: 24,
+            ..Default::default()
         };
 
         for (calc_type, nilai, harapan) in VEKTOR_CALC {

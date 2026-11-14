@@ -16,6 +16,7 @@ use rusqlite::{params, OptionalExtension, Transaction};
 use serde::Deserialize;
 use serde_json::{json, Value};
 
+use super::hari_kerja::tanggal_valid;
 use super::{config::DesktopState, models::CommandError, storage, sync};
 
 pub const NAMA_MAKS: usize = 60;
@@ -93,7 +94,7 @@ pub const ORG_BAGIAN_SQL: &str = "SELECT id_bagian, nama, is_aktif FROM hr_bagia
 pub const ORG_BAGIAN_NAMA_SQL: &str = "SELECT id_bagian, nama FROM hr_bagian_nama ORDER BY created_at, id_nama\n-- batas: nama yang pernah dipakai bagian sekolah\n;";
 pub const ORG_JABATAN_SQL: &str = "SELECT id_jabatan, nama, is_aktif FROM hr_jabatan ORDER BY nama, id_jabatan\n-- batas: daftar jabatan sekolah, tidak tumbuh per hari\n;";
 
-// ─── Aturan murni ───────────────────────────────────────────────────────────
+// Aturan murni
 
 /// Spasi beruntun menjadi satu, spasi tepi dibuang.
 pub fn normalisasi_nama(nama: &str) -> String {
@@ -276,7 +277,451 @@ pub fn susun_org(
     })
 }
 
-// ─── Handler cloud (statement murni, tanpa membaca) ─────────────────────────
+// Fase 1b: kontrak dan status kepegawaian (§19.2.4)
+
+/// K-1, Q-24. Cermin `STATUS_KONTRAK` di `validations/hris.ts` dan CHECK
+/// `hr_kontrak.status`.
+pub const STATUS_KONTRAK: [&str; 7] = ["GTY", "PTY", "GTT", "PTT", "Honorer", "PNS", "PPPK"];
+pub const STATUS_PEMBATALAN: &str = "Pembatalan";
+pub const NOMOR_MAKS: usize = 80;
+pub const CATATAN_MAKS: usize = 500;
+
+/// Angka hukum kontrak sebagai pengaturan sekolah (Q-28); kosong = bawaan.
+pub const KUNCI_PERCOBAAN_MAKS: &str = "hr_percobaan_maks_bulan";
+pub const KUNCI_PKWT_MAKS: &str = "hr_pkwt_maks_bulan";
+
+#[derive(Debug, Clone, Copy)]
+pub struct Aturan {
+    pub bawaan: i64,
+    pub min: i64,
+    pub maks: i64,
+}
+
+pub const ATURAN_PERCOBAAN: Aturan = Aturan { bawaan: 3, min: 1, maks: 12 };
+pub const ATURAN_PKWT: Aturan = Aturan { bawaan: 60, min: 12, maks: 120 };
+
+/// Status kepegawaian per pegawai pada ?1 (Q-25): kontrak tidak dibatalkan
+/// terakhir yang sudah mulai, lalu `guru_data`, lalu kosong.
+pub const STATUS_KINI_SQL: &str = "SELECT m.id_unik, COALESCE((SELECT k.status FROM hr_kontrak k WHERE k.id_karyawan = m.id_unik AND k.status <> 'Pembatalan' AND k.tanggal_mulai <= ?1 AND NOT EXISTS (SELECT 1 FROM hr_kontrak b WHERE b.status = 'Pembatalan' AND b.id_ref = k.id_kontrak) ORDER BY k.tanggal_mulai DESC, k.id_kontrak DESC LIMIT 1), g.status_kepegawaian, '') AS status FROM master_data m LEFT JOIN guru_data g ON g.id_guru = m.id_unik WHERE LOWER(TRIM(COALESCE(m.jenis_personil, ''))) <> 'siswa' AND NOT EXISTS (SELECT 1 FROM siswa_data sd WHERE sd.id_siswa = m.id_unik)\n-- batas: pegawai sekolah (guru dan tendik), dibatasi jumlah personil lembaga\n;";
+/// Cermin status kontrak terakhir ke `guru_data` (tanggal 9999-12-31). Tanpa
+/// kontrak sah tersisa, `guru_data` tidak diubah. ?1 = id pegawai.
+pub const CERMIN_STATUS_SQL: &str = "UPDATE guru_data SET status_kepegawaian = (SELECT k.status FROM hr_kontrak k WHERE k.id_karyawan = ?1 AND k.status <> 'Pembatalan' AND NOT EXISTS (SELECT 1 FROM hr_kontrak b WHERE b.status = 'Pembatalan' AND b.id_ref = k.id_kontrak) ORDER BY k.tanggal_mulai DESC, k.id_kontrak DESC LIMIT 1) WHERE id_guru = ?1 AND EXISTS (SELECT 1 FROM hr_kontrak k WHERE k.id_karyawan = ?1 AND k.status <> 'Pembatalan' AND NOT EXISTS (SELECT 1 FROM hr_kontrak b WHERE b.status = 'Pembatalan' AND b.id_ref = k.id_kontrak)) AND status_kepegawaian IS NOT (SELECT k.status FROM hr_kontrak k WHERE k.id_karyawan = ?1 AND k.status <> 'Pembatalan' AND NOT EXISTS (SELECT 1 FROM hr_kontrak b WHERE b.status = 'Pembatalan' AND b.id_ref = k.id_kontrak) ORDER BY k.tanggal_mulai DESC, k.id_kontrak DESC LIMIT 1);";
+/// Guru (alias `g`) yang punya kontrak sah: isian status di form terkunci.
+pub const BERKONTRAK_SQL: &str = "EXISTS (SELECT 1 FROM hr_kontrak k WHERE k.id_karyawan = g.id_guru AND k.status <> 'Pembatalan' AND NOT EXISTS (SELECT 1 FROM hr_kontrak b WHERE b.status = 'Pembatalan' AND b.id_ref = k.id_kontrak))";
+/// ?1 id, ?2 pegawai, ?3 status, ?4 id_ref, ?5 nomor, ?6 mulai, ?7 selesai,
+/// ?8 percobaan, ?9 catatan, ?10 pencatat.
+pub const SIMPAN_KONTRAK_SQL: &str = "INSERT OR IGNORE INTO hr_kontrak (id_kontrak, id_karyawan, status, id_ref, nomor, tanggal_mulai, tanggal_selesai, percobaan_selesai, catatan, dicatat_oleh, created_at) VALUES (?1, ?2, ?3, NULLIF(?4, ''), NULLIF(?5, ''), ?6, NULLIF(?7, ''), NULLIF(?8, ''), NULLIF(?9, ''), NULLIF(?10, ''), datetime('now'));";
+pub const KONTRAK_SQL: &str = "SELECT id_kontrak, id_karyawan, status, COALESCE(id_ref, '') AS id_ref, COALESCE(nomor, '') AS nomor, tanggal_mulai, COALESCE(tanggal_selesai, '') AS tanggal_selesai, COALESCE(percobaan_selesai, '') AS percobaan_selesai, COALESCE(catatan, '') AS catatan, COALESCE(dicatat_oleh, '') AS dicatat_oleh, created_at FROM hr_kontrak ORDER BY id_karyawan, tanggal_mulai, id_kontrak\n-- batas: kontrak pegawai sekolah, beberapa baris per orang sepanjang masa kerja\n;";
+pub const PENGATURAN_KONTRAK_SQL: &str = "SELECT key, value FROM setting_gex_system WHERE key IN ('hr_percobaan_maks_bulan', 'hr_pkwt_maks_bulan')\n-- batas: dua kunci pengaturan\n;";
+pub const HARI_INI_SQL: &str = "SELECT date('now', '+7 hours') AS hari_ini;";
+
+// Fase 1b: tugas tambahan (§19.2.2)
+
+/// Satu-satunya id jenis yang dikenal kode: wali kelas dibaca dari rombel.
+pub const ID_WALI_KELAS: &str = "tgs-wali-kelas";
+pub const EKUIVALEN_MAKS: i64 = 40;
+
+/// ?1 id, ?2 nama, ?3 ekuivalen JP, ?4 aktif.
+pub const SIMPAN_JENIS_TUGAS_SQL: &str = "INSERT INTO hr_tugas_jenis (id_jenis, nama, ekuivalen_jp, is_aktif, created_at, updated_at) VALUES (?1, ?2, ?3, ?4, datetime('now'), datetime('now')) ON CONFLICT(id_jenis) DO UPDATE SET nama = excluded.nama, ekuivalen_jp = excluded.ekuivalen_jp, is_aktif = excluded.is_aktif, updated_at = excluded.updated_at;";
+pub const BENTROK_JENIS_TUGAS_SQL: &str = "SELECT 1 FROM hr_tugas_jenis WHERE id_jenis <> ?2 AND is_aktif = 1 AND lower(trim(nama)) = lower(trim(?1)) LIMIT 1;";
+pub const JENIS_TUGAS_SQL: &str = "SELECT id_jenis, nama, ekuivalen_jp, is_aktif FROM hr_tugas_jenis ORDER BY nama, id_jenis\n-- batas: jenis tugas tambahan sekolah, tidak tumbuh per hari\n;";
+/// Upsert penuh; baris yang sudah dibatalkan tidak berubah lagi. Urutan
+/// parameter di `SIMPAN_TUGAS_SQL` (TS).
+pub const SIMPAN_TUGAS_SQL: &str = "INSERT INTO hr_tugas_tambahan (id_tugas, id_karyawan, id_jenis, unit, tahun_ajaran, id_rombel, nomor_sk, tanggal_sk, ekuivalen_jp, tanggal_mulai, tanggal_selesai, dicatat_oleh, created_at, updated_at) VALUES (?1, ?2, ?3, NULLIF(?4, ''), ?5, NULLIF(?6, ''), NULLIF(?7, ''), NULLIF(?8, ''), ?9, ?10, NULLIF(?11, ''), NULLIF(?12, ''), datetime('now'), datetime('now')) ON CONFLICT(id_tugas) DO UPDATE SET id_karyawan = excluded.id_karyawan, id_jenis = excluded.id_jenis, unit = excluded.unit, tahun_ajaran = excluded.tahun_ajaran, id_rombel = excluded.id_rombel, nomor_sk = excluded.nomor_sk, tanggal_sk = excluded.tanggal_sk, ekuivalen_jp = excluded.ekuivalen_jp, tanggal_mulai = excluded.tanggal_mulai, tanggal_selesai = excluded.tanggal_selesai, updated_at = excluded.updated_at WHERE hr_tugas_tambahan.dibatalkan_pada IS NULL;";
+/// ?1 id, ?2 pembatal, ?3 alasan; hanya bila belum dibatalkan.
+pub const BATAL_TUGAS_SQL: &str = "UPDATE hr_tugas_tambahan SET dibatalkan_pada = datetime('now'), dibatalkan_oleh = ?2, alasan_batal = ?3, updated_at = datetime('now') WHERE id_tugas = ?1 AND dibatalkan_pada IS NULL;";
+/// Jenis tugas yang dipegang tiap pegawai pada [?1, ?2] (Q-29); wali kelas
+/// dari rombel aktif yang semesternya beririsan.
+pub const TUGAS_BERLAKU_SQL: &str = "SELECT t.id_karyawan, t.id_jenis FROM hr_tugas_tambahan t WHERE t.dibatalkan_pada IS NULL AND t.id_jenis <> 'tgs-wali-kelas' AND t.tanggal_mulai <= ?2 AND (COALESCE(t.tanggal_selesai, '') = '' OR t.tanggal_selesai >= ?1) UNION SELECT r.id_wali_kelas, 'tgs-wali-kelas' FROM akademik_rombel r JOIN akademik_tahun_ajaran ta ON ta.id_tahun_ajaran = r.id_tahun_ajaran WHERE r.is_aktif = 1 AND COALESCE(r.id_wali_kelas, '') <> '' AND ta.tanggal_mulai <= ?2 AND ta.tanggal_selesai >= ?1 ORDER BY 1, 2\n-- batas: tugas tambahan pegawai sekolah pada satu periode gaji\n;";
+pub const TUGAS_SQL: &str = "SELECT id_tugas, id_karyawan, id_jenis, COALESCE(unit, '') AS unit, tahun_ajaran, COALESCE(id_rombel, '') AS id_rombel, COALESCE(nomor_sk, '') AS nomor_sk, COALESCE(tanggal_sk, '') AS tanggal_sk, ekuivalen_jp, tanggal_mulai, COALESCE(tanggal_selesai, '') AS tanggal_selesai, COALESCE(dicatat_oleh, '') AS dicatat_oleh, COALESCE(dibatalkan_pada, '') AS dibatalkan_pada, COALESCE(dibatalkan_oleh, '') AS dibatalkan_oleh, COALESCE(alasan_batal, '') AS alasan_batal FROM hr_tugas_tambahan ORDER BY tahun_ajaran DESC, tanggal_mulai, id_tugas\n-- batas: tugas tambahan sekolah, beberapa per pegawai per tahun ajaran\n;";
+pub const WALI_KELAS_SQL: &str = "SELECT r.id_rombel, r.nama_rombel, r.id_wali_kelas, ta.nama_tahun, ta.semester, ta.tanggal_mulai, ta.tanggal_selesai FROM akademik_rombel r JOIN akademik_tahun_ajaran ta ON ta.id_tahun_ajaran = r.id_tahun_ajaran WHERE r.is_aktif = 1 AND COALESCE(r.id_wali_kelas, '') <> '' ORDER BY ta.nama_tahun DESC, ta.semester, r.nama_rombel, r.id_rombel\n-- batas: rombel aktif sekolah, satu wali per rombel\n;";
+pub const TAHUN_AJARAN_SQL: &str = "SELECT nama_tahun, MIN(tanggal_mulai) AS tanggal_mulai, MAX(tanggal_selesai) AS tanggal_selesai FROM akademik_tahun_ajaran GROUP BY nama_tahun ORDER BY nama_tahun DESC\n-- batas: tahun ajaran sekolah, satu per tahun\n;";
+
+fn panjang(teks: &str) -> usize {
+    teks.chars().count()
+}
+
+/// Isian kontrak (form, payload outbox); kosong = tidak diisi.
+#[derive(Debug, Clone, Default, Deserialize, serde::Serialize, PartialEq)]
+pub struct KontrakIsian {
+    #[serde(default)]
+    pub status: String,
+    #[serde(default)]
+    pub nomor: String,
+    #[serde(default)]
+    pub tanggal_mulai: String,
+    #[serde(default)]
+    pub tanggal_selesai: String,
+    #[serde(default)]
+    pub percobaan_selesai: String,
+    #[serde(default)]
+    pub catatan: String,
+}
+
+/// Kelengkapan kontrak, bukan angka hukum. Cermin `validasiKontrak`.
+pub fn validasi_kontrak(isian: &KontrakIsian, guru: bool) -> Result<KontrakIsian, String> {
+    let k = KontrakIsian {
+        status: isian.status.trim().to_owned(),
+        nomor: isian.nomor.trim().to_owned(),
+        tanggal_mulai: isian.tanggal_mulai.trim().to_owned(),
+        tanggal_selesai: isian.tanggal_selesai.trim().to_owned(),
+        percobaan_selesai: isian.percobaan_selesai.trim().to_owned(),
+        catatan: isian.catatan.trim().to_owned(),
+    };
+    let salah = |galat: &str| Err(galat.to_owned());
+    let status = k.status.as_str();
+    if !STATUS_KONTRAK.contains(&status) {
+        return salah("Status kontrak tidak dikenal.");
+    }
+    if !tanggal_valid(&k.tanggal_mulai) {
+        return salah("Tanggal mulai kontrak tidak valid.");
+    }
+    if !k.tanggal_selesai.is_empty() && !tanggal_valid(&k.tanggal_selesai) {
+        return salah("Tanggal selesai kontrak tidak valid.");
+    }
+    if !k.percobaan_selesai.is_empty() && !tanggal_valid(&k.percobaan_selesai) {
+        return salah("Tanggal akhir masa percobaan tidak valid.");
+    }
+    if matches!(status, "GTY" | "GTT") && !guru {
+        return salah("Status GTY dan GTT hanya untuk guru.");
+    }
+    if matches!(status, "PTY" | "PTT") && guru {
+        return salah("Status PTY dan PTT hanya untuk tenaga kependidikan.");
+    }
+    if matches!(status, "GTT" | "PTT") && k.tanggal_selesai.is_empty() {
+        return salah("Kontrak GTT dan PTT wajib punya tanggal selesai.");
+    }
+    if !k.tanggal_selesai.is_empty() && k.tanggal_selesai < k.tanggal_mulai {
+        return salah("Tanggal selesai tidak boleh sebelum tanggal mulai.");
+    }
+    if !k.percobaan_selesai.is_empty() {
+        if !matches!(status, "GTY" | "PTY") {
+            return salah("Masa percobaan hanya untuk GTY dan PTY.");
+        }
+        if k.percobaan_selesai < k.tanggal_mulai {
+            return salah("Akhir masa percobaan tidak boleh sebelum tanggal mulai.");
+        }
+        if !k.tanggal_selesai.is_empty() && k.percobaan_selesai > k.tanggal_selesai {
+            return salah("Akhir masa percobaan melewati tanggal selesai kontrak.");
+        }
+    }
+    if panjang(&k.nomor) > NOMOR_MAKS {
+        return Err(format!("Nomor SK/kontrak maksimal {NOMOR_MAKS} karakter."));
+    }
+    if panjang(&k.catatan) > CATATAN_MAKS {
+        return Err(format!("Catatan maksimal {CATATAN_MAKS} karakter."));
+    }
+    Ok(k)
+}
+
+/// Alasan pembatalan kontrak atau tugas.
+pub fn validasi_alasan(alasan: &str) -> Result<String, String> {
+    let teks = alasan.trim();
+    if teks.is_empty() {
+        return Err("Alasan pembatalan wajib diisi.".to_owned());
+    }
+    if panjang(teks) > CATATAN_MAKS {
+        return Err(format!("Alasan maksimal {CATATAN_MAKS} karakter."));
+    }
+    Ok(teks.to_owned())
+}
+
+fn hari_dalam_bulan(tahun: i64, bulan: i64) -> i64 {
+    match bulan {
+        2 if (tahun % 4 == 0 && tahun % 100 != 0) || tahun % 400 == 0 => 29,
+        2 => 28,
+        4 | 6 | 9 | 11 => 30,
+        _ => 31,
+    }
+}
+
+/// Tanggal + n bulan; tanggal di luar bulan tujuan menjadi akhir bulan.
+pub fn tambah_bulan(tanggal: &str, bulan: i64) -> Option<String> {
+    if !tanggal_valid(tanggal) {
+        return None;
+    }
+    let mut bagian = tanggal.split('-').map(|b| b.parse::<i64>().ok());
+    let (y, m, d) = (bagian.next()??, bagian.next()??, bagian.next()??);
+    let total = y * 12 + (m - 1) + bulan;
+    let (ty, tm) = (total.div_euclid(12), total.rem_euclid(12) + 1);
+    let td = d.min(hari_dalam_bulan(ty, tm));
+    Some(format!("{ty:04}-{tm:02}-{td:02}"))
+}
+
+/// Baris `hr_kontrak` (`KONTRAK_SQL`); kolom kosong = `""`.
+#[derive(Debug, Clone, Default, Deserialize, serde::Serialize)]
+pub struct KontrakBaris {
+    pub id_kontrak: String,
+    pub id_karyawan: String,
+    pub status: String,
+    #[serde(default)]
+    pub id_ref: String,
+    #[serde(default)]
+    pub nomor: String,
+    pub tanggal_mulai: String,
+    #[serde(default)]
+    pub tanggal_selesai: String,
+    #[serde(default)]
+    pub percobaan_selesai: String,
+    #[serde(default)]
+    pub catatan: String,
+    #[serde(default)]
+    pub dicatat_oleh: String,
+    #[serde(default)]
+    pub created_at: String,
+}
+
+/// Kontrak tidak dibatalkan, urut (tanggal mulai, id) seperti `STATUS_KINI_SQL`.
+pub fn kontrak_sah(kontrak: &[KontrakBaris]) -> Vec<&KontrakBaris> {
+    let batal: BTreeSet<&str> = kontrak
+        .iter()
+        .filter(|k| k.status == STATUS_PEMBATALAN)
+        .map(|k| k.id_ref.as_str())
+        .collect();
+    let mut sah: Vec<&KontrakBaris> = kontrak
+        .iter()
+        .filter(|k| k.status != STATUS_PEMBATALAN && !batal.contains(k.id_kontrak.as_str()))
+        .collect();
+    sah.sort_by(|a, b| {
+        a.tanggal_mulai
+            .cmp(&b.tanggal_mulai)
+            .then_with(|| a.id_kontrak.cmp(&b.id_kontrak))
+    });
+    sah
+}
+
+/// Keadaan kontrak satu orang pada `tanggal`; cermin `statusKerja`.
+pub fn status_kerja(kontrak: &[KontrakBaris], tanggal: &str) -> Value {
+    let sah = kontrak_sah(kontrak);
+    let bentuk = |keadaan: &str, k: Option<&KontrakBaris>, percobaan: &str| {
+        json!({
+            "keadaan": keadaan,
+            "status": k.map(|k| k.status.as_str()).unwrap_or(""),
+            "id_kontrak": k.map(|k| k.id_kontrak.as_str()).unwrap_or(""),
+            "sampai": k.map(|k| k.tanggal_selesai.as_str()).unwrap_or(""),
+            "percobaan_sampai": percobaan,
+        })
+    };
+    let Some(k) = sah.iter().rev().find(|k| k.tanggal_mulai.as_str() <= tanggal) else {
+        return match sah.first() {
+            Some(nanti) => bentuk("Akan berlaku", Some(nanti), &nanti.percobaan_selesai),
+            None => bentuk("Tanpa kontrak", None, ""),
+        };
+    };
+    let keadaan = if !k.tanggal_selesai.is_empty() && k.tanggal_selesai.as_str() < tanggal {
+        "Berakhir"
+    } else {
+        "Berlaku"
+    };
+    let percobaan = if !k.percobaan_selesai.is_empty() && k.percobaan_selesai.as_str() >= tanggal {
+        k.percobaan_selesai.as_str()
+    } else {
+        ""
+    };
+    bentuk(keadaan, Some(k), percobaan)
+}
+
+#[derive(Debug, Clone, Copy, Deserialize)]
+pub struct AturanKontrak {
+    pub percobaan_maks_bulan: i64,
+    pub pkwt_maks_bulan: i64,
+}
+
+/// Tanda, bukan penolakan (Q-28); cermin `tandaKontrak`.
+pub fn tanda_kontrak(kontrak: &[KontrakBaris], aturan: AturanKontrak) -> Vec<&'static str> {
+    let sah = kontrak_sah(kontrak);
+    let mut tanda = Vec::new();
+    let percobaan_lewat = sah.iter().any(|k| {
+        !k.percobaan_selesai.is_empty()
+            && tambah_bulan(&k.tanggal_mulai, aturan.percobaan_maks_bulan)
+                .is_some_and(|batas| k.percobaan_selesai > batas)
+    });
+    if percobaan_lewat {
+        tanda.push("percobaan_lewat");
+    }
+    let mut awal = sah.len();
+    while awal > 0 && matches!(sah[awal - 1].status.as_str(), "GTT" | "PTT") {
+        awal -= 1;
+    }
+    let rangkaian = &sah[awal..];
+    if let Some(pertama) = rangkaian.first() {
+        let akhir = rangkaian
+            .iter()
+            .map(|k| k.tanggal_selesai.as_str())
+            .max()
+            .unwrap_or("");
+        if tambah_bulan(&pertama.tanggal_mulai, aturan.pkwt_maks_bulan)
+            .is_some_and(|batas| akhir > batas.as_str())
+        {
+            tanda.push("pkwt_lewat");
+        }
+    }
+    tanda
+}
+
+/// Ringkasan tab Kontrak per pegawai (urut id); cermin `susunKontrak`.
+pub fn susun_kontrak(kontrak: &[KontrakBaris], hari_ini: &str, aturan: AturanKontrak) -> Value {
+    let mut per: BTreeMap<&str, Vec<KontrakBaris>> = BTreeMap::new();
+    for k in kontrak {
+        per.entry(k.id_karyawan.as_str()).or_default().push(k.clone());
+    }
+    let ringkas: Vec<Value> = per
+        .iter()
+        .map(|(id, daftar)| {
+            let mut baris = status_kerja(daftar, hari_ini);
+            baris["id_karyawan"] = json!(id);
+            baris["tanda"] = json!(tanda_kontrak(daftar, aturan));
+            baris
+        })
+        .collect();
+    let dibatalkan: BTreeSet<&str> = kontrak
+        .iter()
+        .filter(|k| k.status == STATUS_PEMBATALAN && !k.id_ref.is_empty())
+        .map(|k| k.id_ref.as_str())
+        .collect();
+    json!({ "ringkas": ringkas, "dibatalkan": dibatalkan })
+}
+
+fn angka_pendek(teks: &str) -> Option<i64> {
+    if (1..=4).contains(&teks.len()) && teks.bytes().all(|b| b.is_ascii_digit()) {
+        teks.parse().ok()
+    } else {
+        None
+    }
+}
+
+/// Nilai kunci angka kontrak; kosong, rusak, atau di luar rentang = bawaan.
+pub fn angka_pengaturan(nilai: Option<&str>, aturan: Aturan) -> i64 {
+    angka_pendek(nilai.unwrap_or("").trim())
+        .filter(|n| (aturan.min..=aturan.maks).contains(n))
+        .unwrap_or(aturan.bawaan)
+}
+
+/// Isian pengaturan dari layar; `""` = kembali ke bawaan.
+pub fn validasi_angka_pengaturan(teks: &str, aturan: Aturan, label: &str) -> Result<String, String> {
+    let isi = teks.trim();
+    if isi.is_empty() {
+        return Ok(String::new());
+    }
+    match angka_pendek(isi).filter(|n| (aturan.min..=aturan.maks).contains(n)) {
+        Some(n) => Ok(n.to_string()),
+        None => Err(format!(
+            "{label} harus {} sampai {} bulan, atau kosong untuk bawaan {}.",
+            aturan.min, aturan.maks, aturan.bawaan
+        )),
+    }
+}
+
+/// Isian tugas tambahan; kosong = tidak diisi.
+#[derive(Debug, Clone, Default, Deserialize, serde::Serialize, PartialEq)]
+pub struct TugasIsian {
+    #[serde(default)]
+    pub id_karyawan: String,
+    #[serde(default)]
+    pub id_jenis: String,
+    #[serde(default)]
+    pub unit: String,
+    #[serde(default)]
+    pub tahun_ajaran: String,
+    #[serde(default)]
+    pub id_rombel: String,
+    #[serde(default)]
+    pub nomor_sk: String,
+    #[serde(default)]
+    pub tanggal_sk: String,
+    #[serde(default)]
+    pub ekuivalen_jp: Option<i64>,
+    #[serde(default)]
+    pub tanggal_mulai: String,
+    #[serde(default)]
+    pub tanggal_selesai: String,
+}
+
+fn ekuivalen_sah(n: i64) -> bool {
+    (0..=EKUIVALEN_MAKS).contains(&n)
+}
+
+/// Kelengkapan tugas tambahan; cermin `validasiTugas`.
+pub fn validasi_tugas(isian: &TugasIsian) -> Result<TugasIsian, String> {
+    let mut t = TugasIsian {
+        id_karyawan: isian.id_karyawan.trim().to_owned(),
+        id_jenis: isian.id_jenis.trim().to_owned(),
+        unit: normalisasi_nama(&isian.unit),
+        tahun_ajaran: isian.tahun_ajaran.trim().to_owned(),
+        id_rombel: isian.id_rombel.trim().to_owned(),
+        nomor_sk: isian.nomor_sk.trim().to_owned(),
+        tanggal_sk: isian.tanggal_sk.trim().to_owned(),
+        ekuivalen_jp: isian.ekuivalen_jp,
+        tanggal_mulai: isian.tanggal_mulai.trim().to_owned(),
+        tanggal_selesai: isian.tanggal_selesai.trim().to_owned(),
+    };
+    let salah = |galat: &str| Err(galat.to_owned());
+    if t.id_karyawan.is_empty() {
+        return salah("Pilih pegawai.");
+    }
+    if t.id_jenis.is_empty() {
+        return salah("Pilih jenis tugas.");
+    }
+    if t.tahun_ajaran.is_empty() {
+        return salah("Tahun ajaran wajib dipilih.");
+    }
+    if panjang(&t.tahun_ajaran) > 20 {
+        return salah("Tahun ajaran tidak valid.");
+    }
+    if !tanggal_valid(&t.tanggal_mulai) {
+        return salah("Tanggal mulai tugas tidak valid.");
+    }
+    if !t.tanggal_selesai.is_empty() && !tanggal_valid(&t.tanggal_selesai) {
+        return salah("Tanggal selesai tugas tidak valid.");
+    }
+    if !t.tanggal_selesai.is_empty() && t.tanggal_selesai < t.tanggal_mulai {
+        return salah("Tanggal selesai tidak boleh sebelum tanggal mulai.");
+    }
+    if !t.tanggal_sk.is_empty() && !tanggal_valid(&t.tanggal_sk) {
+        return salah("Tanggal SK tidak valid.");
+    }
+    if t.ekuivalen_jp.is_some_and(|n| !ekuivalen_sah(n)) {
+        return Err(format!("Ekuivalen JP harus 0 sampai {EKUIVALEN_MAKS}."));
+    }
+    if panjang(&t.nomor_sk) > NOMOR_MAKS {
+        return Err(format!("Nomor SK maksimal {NOMOR_MAKS} karakter."));
+    }
+    if panjang(&t.unit) > NOMOR_MAKS {
+        return Err(format!("Unit maksimal {NOMOR_MAKS} karakter."));
+    }
+    if t.id_jenis == ID_WALI_KELAS {
+        if t.id_rombel.is_empty() {
+            return salah("Tugas wali kelas wajib memilih rombel.");
+        }
+    } else {
+        t.id_rombel.clear();
+    }
+    Ok(t)
+}
+
+/// Jenis tugas dari layar Organisasi; mengembalikan nama ternormalkan.
+pub fn validasi_jenis_tugas(nama: &str, ekuivalen_jp: i64) -> Result<String, String> {
+    let nama = validasi_nama_master(nama, "jenis tugas")?;
+    if !ekuivalen_sah(ekuivalen_jp) {
+        return Err(format!("Ekuivalen JP harus 0 sampai {EKUIVALEN_MAKS}."));
+    }
+    Ok(nama)
+}
+
+/// Status tugas diturunkan, tidak disimpan; cermin `statusTugas`.
+pub fn status_tugas(tanggal_mulai: &str, tanggal_selesai: &str, dibatalkan_pada: &str, hari_ini: &str) -> &'static str {
+    if !dibatalkan_pada.is_empty() {
+        "Dibatalkan"
+    } else if !tanggal_selesai.is_empty() && tanggal_selesai < hari_ini {
+        "Selesai"
+    } else if tanggal_mulai > hari_ini {
+        "Akan berlaku"
+    } else {
+        "Berlaku"
+    }
+}
+
+// Handler cloud (statement murni, tanpa membaca)
 
 fn teks(row: &Value, kunci: &str) -> String {
     row.get(kunci)
@@ -353,6 +798,88 @@ pub fn cloud_jabatan_statements(payload: &Value, entity_key: &str) -> Vec<(Strin
     ]
 }
 
+/// `hr-contract/create` (kontrak dan pembatalan): insert append-only lalu
+/// cermin status guru. Status di luar CHECK atau kolom wajib kosong = tidak
+/// ada statement (event tetap diterima, outbox tidak macet).
+pub fn cloud_kontrak_statements(payload: &Value, entity_key: &str) -> Vec<(String, Vec<Value>)> {
+    let id = Some(teks(payload, "id_kontrak"))
+        .filter(|id| !id.is_empty())
+        .unwrap_or_else(|| entity_key.trim().to_owned());
+    let id_karyawan = teks(payload, "id_karyawan");
+    let status = teks(payload, "status");
+    let mulai = teks(payload, "tanggal_mulai");
+    let status_sah = STATUS_KONTRAK.contains(&status.as_str()) || status == STATUS_PEMBATALAN;
+    if id.is_empty() || id_karyawan.is_empty() || mulai.is_empty() || !status_sah {
+        return Vec::new();
+    }
+    let kolom = ["id_ref", "nomor", "tanggal_mulai", "tanggal_selesai", "percobaan_selesai", "catatan", "dicatat_oleh"];
+    let mut args = vec![json!(id), json!(id_karyawan), json!(status)];
+    args.extend(kolom.iter().map(|k| json!(teks(payload, k))));
+    vec![
+        (SIMPAN_KONTRAK_SQL.to_owned(), args),
+        (CERMIN_STATUS_SQL.to_owned(), vec![json!(id_karyawan)]),
+    ]
+}
+
+/// `teacher/create|update`: sesudah upsert `guru_data`, status dari kontrak
+/// menang atas isian form atau perangkat lama (temuan 5).
+pub fn cloud_cermin_guru(id_guru: &str) -> (String, Vec<Value>) {
+    (CERMIN_STATUS_SQL.to_owned(), vec![json!(id_guru)])
+}
+
+/// `hr-duty-type/save`.
+pub fn cloud_jenis_tugas_statements(payload: &Value, entity_key: &str) -> Vec<(String, Vec<Value>)> {
+    let id = Some(teks(payload, "id_jenis"))
+        .filter(|id| !id.is_empty())
+        .unwrap_or_else(|| entity_key.trim().to_owned());
+    let nama = normalisasi_nama(&teks(payload, "nama"));
+    let ekuivalen = payload.get("ekuivalen_jp").and_then(Value::as_i64).unwrap_or(0);
+    if id.is_empty() || nama.is_empty() || !ekuivalen_sah(ekuivalen) {
+        return Vec::new();
+    }
+    vec![(
+        SIMPAN_JENIS_TUGAS_SQL.to_owned(),
+        vec![json!(id), json!(nama), json!(ekuivalen), json!(aktif(payload))],
+    )]
+}
+
+/// `hr-duty/save`: upsert penuh dari payload form.
+pub fn cloud_tugas_statements(payload: &Value, entity_key: &str) -> Vec<(String, Vec<Value>)> {
+    let mut p = payload.clone();
+    if teks(&p, "id_tugas").is_empty() {
+        p["id_tugas"] = json!(entity_key.trim());
+    }
+    let wajib = ["id_tugas", "id_karyawan", "id_jenis", "tahun_ajaran", "tanggal_mulai"];
+    let ekuivalen = p.get("ekuivalen_jp").filter(|v| !v.is_null());
+    let ekuivalen_ok = ekuivalen.map_or(true, |v| v.as_i64().is_some_and(ekuivalen_sah));
+    if wajib.iter().any(|k| teks(&p, k).is_empty()) || !ekuivalen_ok {
+        return Vec::new();
+    }
+    let args = simpan_tugas_args(&p)
+        .into_iter()
+        .map(|v| match v {
+            rusqlite::types::Value::Text(s) => json!(s),
+            rusqlite::types::Value::Integer(n) => json!(n),
+            _ => Value::Null,
+        })
+        .collect();
+    vec![(SIMPAN_TUGAS_SQL.to_owned(), args)]
+}
+
+/// `hr-duty/cancel`: hanya mengisi kolom batal yang masih kosong.
+pub fn cloud_batal_tugas_statements(payload: &Value, entity_key: &str) -> Vec<(String, Vec<Value>)> {
+    let id = Some(teks(payload, "id_tugas"))
+        .filter(|id| !id.is_empty())
+        .unwrap_or_else(|| entity_key.trim().to_owned());
+    if id.is_empty() {
+        return Vec::new();
+    }
+    vec![(
+        BATAL_TUGAS_SQL.to_owned(),
+        vec![json!(id), json!(teks(payload, "dibatalkan_oleh")), json!(teks(payload, "alasan_batal"))],
+    )]
+}
+
 /// Penjaga "pegawai" untuk statement per orang; ?1 = id_unik.
 const PEGAWAI_ID_SQL: &str = "LOWER(TRIM(COALESCE(jenis_personil, ''))) <> 'siswa' AND NOT EXISTS (SELECT 1 FROM siswa_data sd WHERE sd.id_siswa = ?1)";
 
@@ -401,7 +928,7 @@ pub fn cloud_organisasi_pegawai(id_unik: &str, row: &Value) -> Vec<(String, Vec<
     hasil
 }
 
-// ─── Penulisan lokal (Desktop/Mobile) ───────────────────────────────────────
+// Penulisan lokal (Desktop/Mobile)
 
 fn invalid(message: impl Into<String>) -> CommandError {
     CommandError::new("VALIDATION_ERROR", message)
@@ -418,10 +945,18 @@ fn new_id(prefix: &str) -> String {
 }
 
 fn rows_json(transaction: &Transaction<'_>, sql: &str) -> Result<Vec<Value>, CommandError> {
-    let mut statement = transaction.prepare(sql).map_err(db_error)?;
+    rows_json_with(transaction, sql, [])
+}
+
+fn rows_json_with(
+    connection: &rusqlite::Connection,
+    sql: &str,
+    args: impl rusqlite::Params,
+) -> Result<Vec<Value>, CommandError> {
+    let mut statement = connection.prepare(sql).map_err(db_error)?;
     let names: Vec<String> = statement.column_names().iter().map(|n| (*n).to_owned()).collect();
     let rows = statement
-        .query_map([], |row| {
+        .query_map(args, |row| {
             let mut obj = serde_json::Map::new();
             for (i, name) in names.iter().enumerate() {
                 let value = match row.get_ref(i)? {
@@ -473,8 +1008,441 @@ pub fn org(state: &DesktopState) -> Result<Value, CommandError> {
         &nama_lama,
         &master_org(&jabatan, "id_jabatan"),
     );
+    let kini = status_kini(&transaction, &hari_ini(&transaction)?)?;
+    let pegawai: Vec<Value> = pegawai
+        .into_iter()
+        .map(|mut p| {
+            if let Some(status) = kini.get(&teks(&p, "id_unik")) {
+                p["status_kepegawaian"] = json!(status);
+            }
+            p
+        })
+        .collect();
     hasil["pegawai"] = Value::Array(pegawai);
+    hasil["jenis_tugas"] = Value::Array(rows_json(&transaction, JENIS_TUGAS_SQL)?);
+    hasil["pengaturan"] = pengaturan_kontrak(&transaction)?;
     Ok(hasil)
+}
+
+/// `hari ini` WIB menurut jam SQLite (`HARI_INI_SQL`).
+pub fn hari_ini(connection: &rusqlite::Connection) -> Result<String, CommandError> {
+    connection
+        .query_row(HARI_INI_SQL, [], |row| row.get(0))
+        .map_err(db_error)
+}
+
+/// `STATUS_KINI_SQL` pada `tanggal`: id pegawai → status kepegawaian.
+pub fn status_kini(
+    connection: &rusqlite::Connection,
+    tanggal: &str,
+) -> Result<HashMap<String, String>, CommandError> {
+    Ok(rows_json_with(connection, STATUS_KINI_SQL, params![tanggal])?
+        .iter()
+        .map(|r| (teks(r, "id_unik"), r.get("status").and_then(Value::as_str).unwrap_or("").to_owned()))
+        .collect())
+}
+
+/// `TUGAS_BERLAKU_SQL` pada [awal, akhir]: id pegawai → id jenis tugas.
+pub fn tugas_berlaku(
+    connection: &rusqlite::Connection,
+    awal: &str,
+    akhir: &str,
+) -> Result<HashMap<String, Vec<String>>, CommandError> {
+    let mut hasil: HashMap<String, Vec<String>> = HashMap::new();
+    for r in rows_json_with(connection, TUGAS_BERLAKU_SQL, params![awal, akhir])? {
+        let id = r.get("id_karyawan").and_then(Value::as_str).unwrap_or("").to_owned();
+        hasil.entry(id).or_default().push(teks(&r, "id_jenis"));
+    }
+    Ok(hasil)
+}
+
+fn pengaturan_kontrak(connection: &rusqlite::Connection) -> Result<Value, CommandError> {
+    let nilai: HashMap<String, String> = rows_json_with(connection, PENGATURAN_KONTRAK_SQL, [])?
+        .iter()
+        .map(|r| (teks(r, "key"), r.get("value").and_then(Value::as_str).unwrap_or("").to_owned()))
+        .collect();
+    let percobaan = nilai.get(KUNCI_PERCOBAAN_MAKS).cloned().unwrap_or_default();
+    let pkwt = nilai.get(KUNCI_PKWT_MAKS).cloned().unwrap_or_default();
+    Ok(json!({
+        "percobaan_maks_bulan": percobaan,
+        "pkwt_maks_bulan": pkwt,
+        "berlaku": {
+            "percobaan_maks_bulan": angka_pengaturan(Some(&percobaan), ATURAN_PERCOBAAN),
+            "pkwt_maks_bulan": angka_pengaturan(Some(&pkwt), ATURAN_PKWT),
+        },
+    }))
+}
+
+/// Satu kunci `setting_gex_system` + event outbox `setting` (pola JP): antrean
+/// lama kunci yang sama dibuang dulu supaya nilai lama tidak menyusul.
+pub fn tulis_setting(
+    transaction: &Transaction<'_>,
+    client_id: &str,
+    key: &str,
+    value: &str,
+) -> Result<(), CommandError> {
+    transaction
+        .execute(
+            "INSERT INTO setting_gex_system (key, value) VALUES (?1, ?2) ON CONFLICT(key) DO UPDATE SET value = excluded.value;",
+            params![key, value],
+        )
+        .map_err(db_error)?;
+    transaction
+        .execute(
+            "DELETE FROM desktop_sync_conflict WHERE domain = 'setting' AND entity_key = ?1;",
+            params![key],
+        )
+        .map_err(db_error)?;
+    transaction
+        .execute(
+            "DELETE FROM desktop_sync_outbox WHERE domain = 'setting' AND entity_key = ?1 AND status IN ('pending', 'failed', 'conflict');",
+            params![key],
+        )
+        .map_err(db_error)?;
+    sync::enqueue(
+        transaction,
+        client_id,
+        "setting",
+        "update",
+        key,
+        &json!({ "key": key, "value": value }),
+        None,
+    )?;
+    Ok(())
+}
+
+/// Pegawai (bukan siswa) yang ada; `Some(true)` bila punya `guru_data`.
+fn pegawai_guru(transaction: &Transaction<'_>, id: &str) -> Result<Option<bool>, CommandError> {
+    transaction
+        .query_row(
+            &format!("SELECT EXISTS (SELECT 1 FROM guru_data WHERE id_guru = m.id_unik) FROM master_data m WHERE m.id_unik = ?1 AND {PEGAWAI_SQL};"),
+            params![id],
+            |row| row.get::<_, i64>(0),
+        )
+        .optional()
+        .map(|r| r.map(|g| g == 1))
+        .map_err(db_error)
+}
+
+fn kontrak_baris(rows: Vec<Value>) -> Vec<KontrakBaris> {
+    rows.into_iter()
+        .filter_map(|r| serde_json::from_value(r).ok())
+        .collect()
+}
+
+/// `desktop_hr_contracts`: semua kontrak + ringkasan per pegawai.
+pub fn contracts(state: &DesktopState) -> Result<Value, CommandError> {
+    let mut connection = storage::database(&state.data_dir)?;
+    let transaction = connection.transaction().map_err(db_error)?;
+    let rows = rows_json(&transaction, KONTRAK_SQL)?;
+    let hari = hari_ini(&transaction)?;
+    let pengaturan = pengaturan_kontrak(&transaction)?;
+    let aturan: AturanKontrak =
+        serde_json::from_value(pengaturan["berlaku"].clone()).map_err(|_| CommandError::internal())?;
+    let mut hasil = susun_kontrak(&kontrak_baris(rows.clone()), &hari, aturan);
+    hasil["kontrak"] = Value::Array(rows);
+    hasil["hari_ini"] = json!(hari);
+    hasil["pengaturan"] = pengaturan;
+    Ok(hasil)
+}
+
+fn kontrak_payload(id: &str, id_karyawan: &str, id_ref: &str, k: &KontrakIsian, oleh: &str) -> Value {
+    json!({
+        "id_kontrak": id,
+        "id_karyawan": id_karyawan,
+        "status": k.status,
+        "id_ref": id_ref,
+        "nomor": k.nomor,
+        "tanggal_mulai": k.tanggal_mulai,
+        "tanggal_selesai": k.tanggal_selesai,
+        "percobaan_selesai": k.percobaan_selesai,
+        "catatan": k.catatan,
+        "dicatat_oleh": oleh,
+    })
+}
+
+fn tulis_kontrak(transaction: &Transaction<'_>, p: &Value) -> Result<(), CommandError> {
+    transaction
+        .execute(
+            SIMPAN_KONTRAK_SQL,
+            params![
+                teks(p, "id_kontrak"),
+                teks(p, "id_karyawan"),
+                teks(p, "status"),
+                teks(p, "id_ref"),
+                teks(p, "nomor"),
+                teks(p, "tanggal_mulai"),
+                teks(p, "tanggal_selesai"),
+                teks(p, "percobaan_selesai"),
+                teks(p, "catatan"),
+                teks(p, "dicatat_oleh"),
+            ],
+        )
+        .map_err(db_error)?;
+    transaction
+        .execute(CERMIN_STATUS_SQL, params![teks(p, "id_karyawan")])
+        .map_err(db_error)?;
+    Ok(())
+}
+
+/// `desktop_hr_contract_create`.
+pub fn simpan_kontrak(state: &DesktopState, oleh: &str, draft: Value) -> Result<Value, CommandError> {
+    let id_karyawan = teks(&draft, "id_karyawan");
+    let isian: KontrakIsian =
+        serde_json::from_value(draft).map_err(|_| invalid("Data kontrak tidak valid."))?;
+    let client_id = sync::ensure_client_id(state)?;
+    let mut connection = storage::database(&state.data_dir)?;
+    let transaction = connection.transaction().map_err(db_error)?;
+    let guru = pegawai_guru(&transaction, &id_karyawan)?
+        .ok_or_else(|| invalid("Kontrak hanya untuk pegawai (guru dan tendik)."))?;
+    let k = validasi_kontrak(&isian, guru).map_err(invalid)?;
+    let id = new_id("kon-");
+    let payload = kontrak_payload(&id, &id_karyawan, "", &k, oleh);
+    tulis_kontrak(&transaction, &payload)?;
+    sync::enqueue(&transaction, &client_id, "hr-contract", "create", &id, &payload, None)?;
+    transaction.commit().map_err(db_error)?;
+    Ok(payload)
+}
+
+/// `desktop_hr_contract_cancel`: baris `Pembatalan` berid `batal-<id>`.
+pub fn batal_kontrak(state: &DesktopState, oleh: &str, id_kontrak: &str, alasan: &str) -> Result<Value, CommandError> {
+    let alasan = validasi_alasan(alasan).map_err(invalid)?;
+    let client_id = sync::ensure_client_id(state)?;
+    let mut connection = storage::database(&state.data_dir)?;
+    let transaction = connection.transaction().map_err(db_error)?;
+    let (id_karyawan, mulai): (String, String) = transaction
+        .query_row(
+            "SELECT id_karyawan, tanggal_mulai FROM hr_kontrak WHERE id_kontrak = ?1 AND status <> 'Pembatalan';",
+            params![id_kontrak.trim()],
+            |row| Ok((row.get(0)?, row.get(1)?)),
+        )
+        .optional()
+        .map_err(db_error)?
+        .ok_or_else(|| invalid("Kontrak tidak ditemukan."))?;
+    if ada(&transaction, "SELECT 1 FROM hr_kontrak WHERE status = 'Pembatalan' AND id_ref = ?1;", params![id_kontrak.trim()])? {
+        return Err(invalid("Kontrak ini sudah dibatalkan."));
+    }
+    let id = format!("batal-{}", id_kontrak.trim());
+    let isian = KontrakIsian {
+        status: STATUS_PEMBATALAN.to_owned(),
+        tanggal_mulai: mulai,
+        catatan: alasan,
+        ..Default::default()
+    };
+    let payload = kontrak_payload(&id, &id_karyawan, id_kontrak.trim(), &isian, oleh);
+    tulis_kontrak(&transaction, &payload)?;
+    sync::enqueue(&transaction, &client_id, "hr-contract", "create", &id, &payload, None)?;
+    transaction.commit().map_err(db_error)?;
+    Ok(payload)
+}
+
+/// `desktop_hr_settings_save`: angka kontrak (Q-28); `""` = bawaan.
+pub fn simpan_pengaturan(state: &DesktopState, draft: Value) -> Result<Value, CommandError> {
+    let percobaan = validasi_angka_pengaturan(&teks(&draft, "percobaan_maks_bulan"), ATURAN_PERCOBAAN, "Masa percobaan")
+        .map_err(invalid)?;
+    let pkwt = validasi_angka_pengaturan(&teks(&draft, "pkwt_maks_bulan"), ATURAN_PKWT, "Batas GTT/PTT")
+        .map_err(invalid)?;
+    let client_id = sync::ensure_client_id(state)?;
+    let mut connection = storage::database(&state.data_dir)?;
+    let transaction = connection.transaction().map_err(db_error)?;
+    tulis_setting(&transaction, &client_id, KUNCI_PERCOBAAN_MAKS, &percobaan)?;
+    tulis_setting(&transaction, &client_id, KUNCI_PKWT_MAKS, &pkwt)?;
+    let hasil = pengaturan_kontrak(&transaction)?;
+    transaction.commit().map_err(db_error)?;
+    Ok(hasil)
+}
+
+#[derive(Debug, Deserialize)]
+pub struct JenisTugasDraft {
+    #[serde(default)]
+    pub id: Option<String>,
+    pub nama: String,
+    pub ekuivalen_jp: i64,
+    #[serde(default = "satu")]
+    pub is_aktif: i64,
+}
+
+/// `desktop_hr_duty_types_save`: jenis baru atau ubah nama/ekuivalen/aktif.
+pub fn simpan_jenis_tugas(state: &DesktopState, draft: Value) -> Result<Value, CommandError> {
+    let draft: JenisTugasDraft =
+        serde_json::from_value(draft).map_err(|_| invalid("Data jenis tugas tidak valid."))?;
+    let nama = validasi_jenis_tugas(&draft.nama, draft.ekuivalen_jp).map_err(invalid)?;
+    if !matches!(draft.is_aktif, 0 | 1) {
+        return Err(invalid("Status aktif jenis tugas tidak valid."));
+    }
+    let client_id = sync::ensure_client_id(state)?;
+    let mut connection = storage::database(&state.data_dir)?;
+    let transaction = connection.transaction().map_err(db_error)?;
+    let id = match draft.id.as_deref().map(str::trim).filter(|id| !id.is_empty()) {
+        Some(id) => {
+            if !ada(&transaction, "SELECT 1 FROM hr_tugas_jenis WHERE id_jenis = ?1;", params![id])? {
+                return Err(invalid("Jenis tugas tidak ditemukan."));
+            }
+            id.to_owned()
+        }
+        None => new_id("tgs-"),
+    };
+    if ada(&transaction, BENTROK_JENIS_TUGAS_SQL, params![nama, id])? {
+        return Err(invalid(format!("Nama \"{nama}\" sudah dipakai jenis tugas lain.")));
+    }
+    transaction
+        .execute(SIMPAN_JENIS_TUGAS_SQL, params![id, nama, draft.ekuivalen_jp, draft.is_aktif])
+        .map_err(db_error)?;
+    let payload = json!({ "id_jenis": id, "nama": nama, "ekuivalen_jp": draft.ekuivalen_jp, "is_aktif": draft.is_aktif });
+    sync::enqueue(&transaction, &client_id, "hr-duty-type", "save", &id, &payload, None)?;
+    transaction.commit().map_err(db_error)?;
+    Ok(payload)
+}
+
+/// `desktop_hr_duties`: tugas (status diturunkan), wali kelas dari rombel,
+/// dan rentang tahun ajaran untuk tanggal bawaan form.
+pub fn duties(state: &DesktopState) -> Result<Value, CommandError> {
+    let mut connection = storage::database(&state.data_dir)?;
+    let transaction = connection.transaction().map_err(db_error)?;
+    let hari = hari_ini(&transaction)?;
+    let tugas: Vec<Value> = rows_json(&transaction, TUGAS_SQL)?
+        .into_iter()
+        .map(|mut t| {
+            t["status"] = json!(status_tugas(
+                &teks(&t, "tanggal_mulai"),
+                &teks(&t, "tanggal_selesai"),
+                &teks(&t, "dibatalkan_pada"),
+                &hari,
+            ));
+            t
+        })
+        .collect();
+    Ok(json!({
+        "jenis": rows_json(&transaction, JENIS_TUGAS_SQL)?,
+        "tugas": tugas,
+        "wali_kelas": rows_json(&transaction, WALI_KELAS_SQL)?,
+        "tahun_ajaran": rows_json(&transaction, TAHUN_AJARAN_SQL)?,
+        "hari_ini": hari,
+    }))
+}
+
+fn tugas_payload(id: &str, t: &TugasIsian, oleh: &str) -> Value {
+    json!({
+        "id_tugas": id,
+        "id_karyawan": t.id_karyawan,
+        "id_jenis": t.id_jenis,
+        "unit": t.unit,
+        "tahun_ajaran": t.tahun_ajaran,
+        "id_rombel": t.id_rombel,
+        "nomor_sk": t.nomor_sk,
+        "tanggal_sk": t.tanggal_sk,
+        "ekuivalen_jp": t.ekuivalen_jp,
+        "tanggal_mulai": t.tanggal_mulai,
+        "tanggal_selesai": t.tanggal_selesai,
+        "dicatat_oleh": oleh,
+    })
+}
+
+fn simpan_tugas_args(p: &Value) -> Vec<rusqlite::types::Value> {
+    use rusqlite::types::Value as Sql;
+    let s = |k: &str| Sql::Text(teks(p, k));
+    vec![
+        s("id_tugas"),
+        s("id_karyawan"),
+        s("id_jenis"),
+        s("unit"),
+        s("tahun_ajaran"),
+        s("id_rombel"),
+        s("nomor_sk"),
+        s("tanggal_sk"),
+        p.get("ekuivalen_jp").and_then(Value::as_i64).map_or(Sql::Null, Sql::Integer),
+        s("tanggal_mulai"),
+        s("tanggal_selesai"),
+        s("dicatat_oleh"),
+    ]
+}
+
+/// `desktop_hr_duty_save`: tugas baru atau ubah (upsert penuh).
+pub fn simpan_tugas(state: &DesktopState, oleh: &str, draft: Value) -> Result<Value, CommandError> {
+    let id_lama = teks(&draft, "id");
+    let isian: TugasIsian =
+        serde_json::from_value(draft).map_err(|_| invalid("Data tugas tidak valid."))?;
+    let t = validasi_tugas(&isian).map_err(invalid)?;
+    let client_id = sync::ensure_client_id(state)?;
+    let mut connection = storage::database(&state.data_dir)?;
+    let transaction = connection.transaction().map_err(db_error)?;
+    let jenis_lama = if id_lama.is_empty() {
+        None
+    } else {
+        let (jenis, batal): (String, Option<String>) = transaction
+            .query_row(
+                "SELECT id_jenis, dibatalkan_pada FROM hr_tugas_tambahan WHERE id_tugas = ?1;",
+                params![id_lama],
+                |row| Ok((row.get(0)?, row.get(1)?)),
+            )
+            .optional()
+            .map_err(db_error)?
+            .ok_or_else(|| invalid("Tugas tidak ditemukan."))?;
+        if batal.is_some() {
+            return Err(invalid("Tugas yang sudah dibatalkan tidak bisa diubah."));
+        }
+        Some(jenis)
+    };
+    if pegawai_guru(&transaction, &t.id_karyawan)?.is_none() {
+        return Err(invalid("Tugas tambahan hanya untuk pegawai (guru dan tendik)."));
+    }
+    let (nama_jenis, jenis_aktif): (String, i64) = transaction
+        .query_row(
+            "SELECT nama, is_aktif FROM hr_tugas_jenis WHERE id_jenis = ?1;",
+            params![t.id_jenis],
+            |row| Ok((row.get(0)?, row.get(1)?)),
+        )
+        .optional()
+        .map_err(db_error)?
+        .ok_or_else(|| invalid("Jenis tugas tidak ditemukan."))?;
+    if jenis_aktif != 1 && jenis_lama.as_deref() != Some(t.id_jenis.as_str()) {
+        return Err(invalid(format!("Jenis tugas \"{nama_jenis}\" sudah nonaktif.")));
+    }
+    if t.id_jenis == ID_WALI_KELAS
+        && !ada(
+            &transaction,
+            "SELECT 1 FROM akademik_rombel WHERE id_rombel = ?1 AND id_wali_kelas = ?2;",
+            params![t.id_rombel, t.id_karyawan],
+        )?
+    {
+        return Err(invalid("Rombel ini tidak berwali pegawai tersebut."));
+    }
+    let id = if id_lama.is_empty() { new_id("tgt-") } else { id_lama };
+    let payload = tugas_payload(&id, &t, oleh);
+    transaction
+        .execute(SIMPAN_TUGAS_SQL, rusqlite::params_from_iter(simpan_tugas_args(&payload)))
+        .map_err(db_error)?;
+    sync::enqueue(&transaction, &client_id, "hr-duty", "save", &id, &payload, None)?;
+    transaction.commit().map_err(db_error)?;
+    Ok(payload)
+}
+
+/// `desktop_hr_duty_cancel`.
+pub fn batal_tugas(state: &DesktopState, oleh: &str, id_tugas: &str, alasan: &str) -> Result<Value, CommandError> {
+    let alasan = validasi_alasan(alasan).map_err(invalid)?;
+    let id = id_tugas.trim();
+    let client_id = sync::ensure_client_id(state)?;
+    let mut connection = storage::database(&state.data_dir)?;
+    let transaction = connection.transaction().map_err(db_error)?;
+    let batal: Option<String> = transaction
+        .query_row(
+            "SELECT dibatalkan_pada FROM hr_tugas_tambahan WHERE id_tugas = ?1;",
+            params![id],
+            |row| row.get(0),
+        )
+        .optional()
+        .map_err(db_error)?
+        .ok_or_else(|| invalid("Tugas tidak ditemukan."))?;
+    if batal.is_some() {
+        return Err(invalid("Tugas ini sudah dibatalkan."));
+    }
+    transaction
+        .execute(BATAL_TUGAS_SQL, params![id, oleh, alasan])
+        .map_err(db_error)?;
+    let payload = json!({ "id_tugas": id, "dibatalkan_oleh": oleh, "alasan_batal": alasan });
+    sync::enqueue(&transaction, &client_id, "hr-duty", "cancel", id, &payload, None)?;
+    transaction.commit().map_err(db_error)?;
+    Ok(payload)
 }
 
 #[derive(Debug, Deserialize)]
@@ -951,5 +1919,212 @@ mod tests {
             .query_row("SELECT id_bagian FROM master_data WHERE id_unik = 's1';", [], |r| r.get(0))
             .unwrap();
         assert_eq!(siswa, None);
+    }
+
+    // Fase 1b: vektor kembar `hris.test.ts` "kontrak dan tugas"
+
+    fn gabung(dasar: &Value, ubah: &Value) -> Value {
+        let mut hasil = dasar.clone();
+        for (k, v) in ubah.as_object().expect("ubah") {
+            hasil[k] = v.clone();
+        }
+        hasil
+    }
+
+    /// Baris ringkas vektor: [id, pegawai, status, id_ref, mulai, selesai, percobaan].
+    fn kontrak_vektor(nilai: &Value) -> Vec<KontrakBaris> {
+        nilai
+            .as_array()
+            .expect("kontrak")
+            .iter()
+            .map(|b| {
+                let s = |i: usize| b[i].as_str().unwrap_or("").to_owned();
+                KontrakBaris {
+                    id_kontrak: s(0),
+                    id_karyawan: s(1),
+                    status: s(2),
+                    id_ref: s(3),
+                    tanggal_mulai: s(4),
+                    tanggal_selesai: s(5),
+                    percobaan_selesai: s(6),
+                    ..Default::default()
+                }
+            })
+            .collect()
+    }
+
+    fn aturan_dari(nama: &str) -> Aturan {
+        if nama == "percobaan" {
+            ATURAN_PERCOBAAN
+        } else {
+            ATURAN_PKWT
+        }
+    }
+
+    #[test]
+    fn hris_vektor_kontrak() {
+        let v = vektor();
+        for k in v["kontrak"].as_array().expect("kontrak") {
+            let isian: KontrakIsian = serde_json::from_value(gabung(&v["kontrak_dasar"], &k["ubah"])).unwrap();
+            let hasil = validasi_kontrak(&isian, k["guru"].as_bool().unwrap());
+            assert_eq!(hasil.as_ref().err().map(String::as_str), k["galat"].as_str(), "{k}");
+            if let Ok(nilai) = hasil {
+                assert_eq!(serde_json::to_value(nilai).unwrap(), k["hasil"], "{k}");
+            }
+        }
+        for k in v["alasan"].as_array().expect("alasan") {
+            let hasil = validasi_alasan(k[0].as_str().unwrap());
+            assert_eq!(hasil.as_ref().ok().map(String::as_str), k[1].as_str(), "{k}");
+            assert_eq!(hasil.err().as_deref(), k[2].as_str(), "{k}");
+        }
+        for k in v["tambah_bulan"].as_array().expect("tambah bulan") {
+            assert_eq!(tambah_bulan(k[0].as_str().unwrap(), k[1].as_i64().unwrap()).as_deref(), k[2].as_str(), "{k}");
+        }
+        for k in v["status_kerja"].as_array().expect("status kerja") {
+            assert_eq!(status_kerja(&kontrak_vektor(&k["kontrak"]), k["tanggal"].as_str().unwrap()), k["hasil"], "{k}");
+        }
+        for k in v["tanda"].as_array().expect("tanda") {
+            let aturan: AturanKontrak = serde_json::from_value(k["aturan"].clone()).unwrap();
+            assert_eq!(json!(tanda_kontrak(&kontrak_vektor(&k["kontrak"]), aturan)), k["hasil"], "{k}");
+        }
+        for k in v["susun_kontrak"].as_array().expect("susun kontrak") {
+            let aturan: AturanKontrak = serde_json::from_value(k["aturan"].clone()).unwrap();
+            assert_eq!(
+                susun_kontrak(&kontrak_vektor(&k["kontrak"]), k["hari_ini"].as_str().unwrap(), aturan),
+                k["hasil"]
+            );
+        }
+        for k in v["angka"].as_array().expect("angka") {
+            assert_eq!(angka_pengaturan(k[0].as_str(), aturan_dari(k[1].as_str().unwrap())), k[2].as_i64().unwrap(), "{k}");
+        }
+        for k in v["validasi_angka"].as_array().expect("validasi angka") {
+            let hasil = validasi_angka_pengaturan(
+                k[0].as_str().unwrap(),
+                aturan_dari(k[1].as_str().unwrap()),
+                k[2].as_str().unwrap(),
+            );
+            assert_eq!(hasil.as_ref().ok().map(String::as_str), k[3].as_str(), "{k}");
+            assert_eq!(hasil.err().as_deref(), k[4].as_str(), "{k}");
+        }
+    }
+
+    #[test]
+    fn hris_vektor_tugas() {
+        let v = vektor();
+        for k in v["tugas"].as_array().expect("tugas") {
+            let isian: TugasIsian = serde_json::from_value(gabung(&v["tugas_dasar"], &k["ubah"])).unwrap();
+            let hasil = validasi_tugas(&isian);
+            assert_eq!(hasil.as_ref().err().map(String::as_str), k["galat"].as_str(), "{k}");
+            if let Ok(nilai) = hasil {
+                assert_eq!(serde_json::to_value(nilai).unwrap(), k["hasil"], "{k}");
+            }
+        }
+        for k in v["jenis_tugas"].as_array().expect("jenis tugas") {
+            let hasil = validasi_jenis_tugas(k[0].as_str().unwrap(), k[1].as_i64().unwrap());
+            assert_eq!(hasil.as_ref().ok().map(String::as_str), k[2].as_str(), "{k}");
+            assert_eq!(hasil.err().as_deref(), k[3].as_str(), "{k}");
+        }
+        for k in v["status_tugas"].as_array().expect("status tugas") {
+            let s = |i: usize| k[i].as_str().unwrap();
+            assert_eq!(status_tugas(s(0), s(1), s(2), s(3)), s(4), "{k}");
+        }
+    }
+
+    fn hub_kontrak() -> rusqlite::Connection {
+        let connection = rusqlite::Connection::open_in_memory().expect("memori");
+        connection
+            .execute_batch(
+                "CREATE TABLE master_data (id_unik TEXT PRIMARY KEY, jenis_personil TEXT);
+                 CREATE TABLE siswa_data (id_siswa TEXT PRIMARY KEY);
+                 CREATE TABLE guru_data (id_guru TEXT PRIMARY KEY, status_kepegawaian TEXT);
+                 CREATE TABLE hr_kontrak (id_kontrak TEXT PRIMARY KEY, id_karyawan TEXT NOT NULL, status TEXT NOT NULL, id_ref TEXT, nomor TEXT, tanggal_mulai TEXT NOT NULL, tanggal_selesai TEXT, percobaan_selesai TEXT, catatan TEXT, dicatat_oleh TEXT, created_at TEXT NOT NULL DEFAULT (datetime('now')));
+                 CREATE TABLE hr_tugas_tambahan (id_tugas TEXT PRIMARY KEY, id_karyawan TEXT NOT NULL, id_jenis TEXT NOT NULL, unit TEXT, tahun_ajaran TEXT NOT NULL, id_rombel TEXT, nomor_sk TEXT, tanggal_sk TEXT, ekuivalen_jp INTEGER, tanggal_mulai TEXT NOT NULL, tanggal_selesai TEXT, dicatat_oleh TEXT, dibatalkan_pada TEXT, dibatalkan_oleh TEXT, alasan_batal TEXT, created_at TEXT NOT NULL DEFAULT (datetime('now')), updated_at TEXT NOT NULL DEFAULT (datetime('now')));
+                 CREATE TABLE akademik_tahun_ajaran (id_tahun_ajaran TEXT PRIMARY KEY, nama_tahun TEXT NOT NULL, semester TEXT NOT NULL, tanggal_mulai TEXT NOT NULL, tanggal_selesai TEXT NOT NULL);
+                 CREATE TABLE akademik_rombel (id_rombel TEXT PRIMARY KEY, id_tahun_ajaran TEXT NOT NULL, nama_rombel TEXT NOT NULL, id_wali_kelas TEXT, is_aktif INTEGER NOT NULL DEFAULT 1);
+                 INSERT INTO master_data VALUES ('g1', 'GURU'), ('t1', 'Pegawai'), ('s1', 'SISWA');
+                 INSERT INTO guru_data VALUES ('g1', 'Honorer');
+                 INSERT INTO akademik_tahun_ajaran VALUES ('ta1', '2026/2027', 'Ganjil', '2026-07-13', '2026-12-19'), ('ta0', '2025/2026', 'Genap', '2026-01-05', '2026-06-20');
+                 INSERT INTO akademik_rombel VALUES ('r1', 'ta1', 'VII A', 'g1', 1), ('r0', 'ta0', 'VI A', 't1', 1);",
+            )
+            .expect("hub kontrak");
+        connection
+    }
+
+    fn status_guru(connection: &rusqlite::Connection) -> String {
+        connection
+            .query_row("SELECT status_kepegawaian FROM guru_data WHERE id_guru = 'g1';", [], |r| r.get(0))
+            .unwrap()
+    }
+
+    fn kontrak_event(id: &str, pegawai: &str, status: &str, id_ref: &str, mulai: &str) -> Value {
+        json!({ "id_kontrak": id, "id_karyawan": pegawai, "status": status, "id_ref": id_ref, "tanggal_mulai": mulai, "tanggal_selesai": "", "dicatat_oleh": "tu" })
+    }
+
+    /// Keputusan A dan B §19.12: cermin mengikuti kontrak sah terakhir, tidak
+    /// bergantung urutan tiba; pembatalan semua kontrak tidak mengubah guru_data.
+    #[test]
+    fn hris_kontrak_status_kini_dan_cermin() {
+        let c = hub_kontrak();
+        // Perangkat lama menyimpan guru berstatus form: cermin tanpa kontrak = tidak berubah.
+        jalankan(&c, &[cloud_cermin_guru("g1")]);
+        assert_eq!(status_guru(&c), "Honorer");
+        jalankan(&c, &cloud_kontrak_statements(&kontrak_event("k2", "g1", "GTY", "", "2027-01-01"), ""));
+        jalankan(&c, &cloud_kontrak_statements(&kontrak_event("k1", "g1", "GTT", "", "2026-01-01"), ""));
+        assert_eq!(status_guru(&c), "GTY", "cermin = kontrak terakhir, apa pun urutan tiba");
+        // Simpan guru dari perangkat lama menimpa status, cermin mengembalikannya.
+        c.execute("UPDATE guru_data SET status_kepegawaian = 'Honorer' WHERE id_guru = 'g1';", []).unwrap();
+        jalankan(&c, &[cloud_cermin_guru("g1")]);
+        assert_eq!(status_guru(&c), "GTY");
+        // Gaji memakai tanggal periode: sebelum k2 mulai masih GTT.
+        let kini = |tanggal: &str| status_kini(&c, tanggal).unwrap();
+        assert_eq!(kini("2026-08-31").get("g1").map(String::as_str), Some("GTT"));
+        assert_eq!(kini("2027-01-31").get("g1").map(String::as_str), Some("GTY"));
+        assert_eq!(kini("2025-12-31").get("g1").map(String::as_str), Some("GTY"), "sebelum kontrak pertama: guru_data (keputusan B)");
+        assert!(!kini("2026-08-31").contains_key("s1"), "siswa tidak ikut");
+        assert_eq!(kini("2026-08-31").get("t1").map(String::as_str), Some(""));
+        // Pembatalan k2: cermin kembali ke k1; event ganda tidak menggandakan baris.
+        let batal = kontrak_event("batal-k2", "g1", "Pembatalan", "k2", "2027-01-01");
+        jalankan(&c, &cloud_kontrak_statements(&batal, ""));
+        jalankan(&c, &cloud_kontrak_statements(&batal, ""));
+        assert_eq!(status_guru(&c), "GTT");
+        let jumlah: i64 = c.query_row("SELECT COUNT(*) FROM hr_kontrak;", [], |r| r.get(0)).unwrap();
+        assert_eq!(jumlah, 3);
+        // Semua kontrak dibatalkan: guru_data tetap (keputusan A).
+        jalankan(&c, &cloud_kontrak_statements(&kontrak_event("batal-k1", "g1", "Pembatalan", "k1", "2026-01-01"), ""));
+        assert_eq!(status_guru(&c), "GTT");
+        // Status di luar CHECK tidak menghasilkan statement.
+        assert!(cloud_kontrak_statements(&kontrak_event("k9", "g1", "Kontrak", "", "2026-01-01"), "").is_empty());
+        // Tendik ber-PTT: status kini dari kontrak, guru_data tidak ada.
+        jalankan(&c, &cloud_kontrak_statements(&kontrak_event("k3", "t1", "PTT", "", "2026-01-01"), ""));
+        assert_eq!(kini("2026-08-31").get("t1").map(String::as_str), Some("PTT"));
+    }
+
+    #[test]
+    fn hris_tugas_berlaku_dan_batal() {
+        let c = hub_kontrak();
+        let tugas = |id: &str, jenis: &str, mulai: &str, selesai: &str| {
+            json!({ "id_tugas": id, "id_karyawan": "t1", "id_jenis": jenis, "unit": "", "tahun_ajaran": "2026/2027", "id_rombel": "", "nomor_sk": "", "tanggal_sk": "", "ekuivalen_jp": null, "tanggal_mulai": mulai, "tanggal_selesai": selesai, "dicatat_oleh": "tu" })
+        };
+        jalankan(&c, &cloud_tugas_statements(&tugas("t-a", "tgs-piket", "2026-07-13", ""), ""));
+        jalankan(&c, &cloud_tugas_statements(&tugas("t-b", "tgs-kalab", "2026-07-13", "2026-07-31"), ""));
+        // Baris wali kelas hanya pembawa SK, tidak memberi tugas sendiri.
+        jalankan(&c, &cloud_tugas_statements(&tugas("t-c", "tgs-wali-kelas", "2026-07-13", ""), ""));
+        let agustus = tugas_berlaku(&c, "2026-08-01", "2026-08-31").unwrap();
+        assert_eq!(agustus.get("t1"), Some(&vec!["tgs-piket".to_owned()]));
+        assert_eq!(agustus.get("g1"), Some(&vec!["tgs-wali-kelas".to_owned()]), "wali kelas dari rombel");
+        let juli = tugas_berlaku(&c, "2026-07-01", "2026-07-31").unwrap();
+        assert_eq!(juli.get("t1"), Some(&vec!["tgs-kalab".to_owned(), "tgs-piket".to_owned()]));
+        let juni = tugas_berlaku(&c, "2026-06-01", "2026-06-30").unwrap();
+        assert_eq!(juni.get("t1"), Some(&vec!["tgs-wali-kelas".to_owned()]), "semester Genap r0 beririsan Juni");
+        // Batal dua kali: alasan pertama yang bertahan.
+        jalankan(&c, &cloud_batal_tugas_statements(&json!({"id_tugas": "t-a", "dibatalkan_oleh": "tu", "alasan_batal": "salah input"}), ""));
+        jalankan(&c, &cloud_batal_tugas_statements(&json!({"id_tugas": "t-a", "dibatalkan_oleh": "x", "alasan_batal": "kedua"}), ""));
+        let alasan: String = c.query_row("SELECT alasan_batal FROM hr_tugas_tambahan WHERE id_tugas = 't-a';", [], |r| r.get(0)).unwrap();
+        assert_eq!(alasan, "salah input");
+        // Tugas batal tidak berubah oleh save yang telat.
+        jalankan(&c, &cloud_tugas_statements(&tugas("t-a", "tgs-piket", "2026-07-13", "2026-12-31"), ""));
+        let selesai: Option<String> = c.query_row("SELECT tanggal_selesai FROM hr_tugas_tambahan WHERE id_tugas = 't-a';", [], |r| r.get(0)).unwrap();
+        assert_eq!(selesai, None);
+        assert!(!tugas_berlaku(&c, "2026-08-01", "2026-08-31").unwrap().contains_key("t1"));
     }
 }

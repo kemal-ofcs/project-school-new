@@ -18,6 +18,7 @@ use super::models::{
     PayrollItem, PayrollRecapRow, PayrollRun, PayrollStatus, SalaryConfig, TaughtSession, TaxRule,
 };
 use crate::mobile::config::MobileState;
+use crate::mobile::hris;
 use crate::mobile::loan;
 use crate::mobile::models::CommandError;
 use crate::mobile::rapel;
@@ -210,7 +211,7 @@ fn normalize_applies_to(raw: &str) -> String {
 
 /// Awalan kelompok yang dikenali `applies_to`. Cerminan
 /// `APPLIES_TO_GROUP_PREFIXES` di `src/lib/validations/payroll-policy.ts`.
-const APPLIES_TO_GROUP_PREFIXES: &[&str] = &["PERSONIL", "STATUS", "DIVISI"];
+const APPLIES_TO_GROUP_PREFIXES: &[&str] = &["PERSONIL", "STATUS", "DIVISI", "TUGAS"];
 
 /// Jenis perhitungan komponen. WAJIB sama dengan CHECK constraint di ketiga
 /// jalur provisioning, enum Zod `sync-schema.ts`, dan `PAYROLL_CALC_TYPES` di
@@ -1055,6 +1056,28 @@ pub async fn desktop_save_payroll_component(
                 && !isi.trim().is_empty()
         })
         .unwrap_or(false);
+    // Kecuali `TUGAS:`: sasarannya id jenis (Q-29), dan id yang salah ketik
+    // sama butanya dengan id personil yang salah ketik (keputusan F).
+    if let Some(id_jenis) = applies_to
+        .split_once(':')
+        .filter(|(prefix, _)| prefix.eq_ignore_ascii_case("TUGAS"))
+        .map(|(_, isi)| isi.trim())
+    {
+        let ada: Option<i64> = tx
+            .query_row(
+                "SELECT 1 FROM hr_tugas_jenis WHERE id_jenis = ?1;",
+                params![id_jenis],
+                |row| row.get(0),
+            )
+            .optional()
+            .map_err(|_| CommandError::internal())?;
+        if ada.is_none() {
+            return Err(CommandError::new(
+                "VALIDATION_ERROR",
+                "Jenis tugas tambahan untuk komponen ini tidak ditemukan.",
+            ));
+        }
+    }
     if applies_to != APPLIES_TO_ALL && !bentuk_kelompok {
         let jenis: Option<String> = tx
             .query_row(
@@ -1592,6 +1615,10 @@ pub async fn desktop_get_payroll_recap(
     let tidak_tetap = load_status_tidak_tetap(&conn)?;
     let pembanding_per_orang = load_pembanding(&conn, &period_start)?;
     let masa_run = pajak::masa(&period_start);
+    // HRIS Fase 1b: status kepegawaian dari kontrak pada akhir periode (guru
+    // dan tendik, Q-25) dan tugas tambahan yang berlaku (`TUGAS:`, Q-29).
+    let status_periode = hris::status_kini(&conn, &period_end)?;
+    let tugas_periode = hris::tugas_berlaku(&conn, &period_start, &period_end)?;
 
     let rekap_sql = format!(
         r#"
@@ -1600,9 +1627,7 @@ pub async fn desktop_get_payroll_recap(
                 md.nama,
                 md.divisi,
                 COALESCE(md.jenis_personil, '') AS jenis_personil,
-                -- Status kepegawaian hanya ada pada guru, dan hanya dipakai
-                -- komponen bertujuan kelompok (`STATUS:Honorer`). Kosong untuk
-                -- yang bukan guru, sehingga kelompok itu tidak pernah cocok.
+                -- Ditimpa `hris::status_kini` (kontrak, lalu kolom ini) di bawah.
                 COALESCE(g.status_kepegawaian, '') AS status_kepegawaian,
                 COALESCE(sc.rate_per_hour, 0) AS rate_per_hour,
                 COALESCE(sc.rate_per_jp, 0) AS rate_per_jp,
@@ -1709,7 +1734,10 @@ pub async fn desktop_get_payroll_recap(
     let mut result = Vec::new();
 
     for item in rows {
-        if let Ok(agg) = item {
+        if let Ok(mut agg) = item {
+            if let Some(status) = status_periode.get(&agg.id_unik) {
+                agg.status_kepegawaian = status.clone();
+            }
             // Sakelar lembur guru: kebijakan sekolah, dibaca sekali per rekap.
             // Untuk selain guru nilainya tidak pernah berlaku.
             let overtime_allowed = teacher_overtime || !is_teacher_personnel(&agg.jenis_personil);
@@ -1764,6 +1792,7 @@ pub async fn desktop_get_payroll_recap(
                 jenis_personil: agg.jenis_personil.clone(),
                 status_kepegawaian: agg.status_kepegawaian.clone(),
                 divisi: agg.divisi.clone(),
+                tugas: tugas_periode.get(&agg.id_unik).cloned().unwrap_or_default(),
                 total_teaching_jp: teaching.total_jp,
                 total_hadir: agg.total_hadir,
             };
@@ -1825,6 +1854,7 @@ pub async fn desktop_get_payroll_recap(
                 divisi: agg.divisi,
                 jenis_personil: agg.jenis_personil,
                 status_kepegawaian: agg.status_kepegawaian,
+                tugas: subject.tugas,
                 rate_per_hour: agg.rate_per_hour,
                 ptkp_status: agg.ptkp_status,
                 total_hadir: agg.total_hadir,
@@ -1996,6 +2026,7 @@ pub async fn desktop_create_payroll_run(
             jenis_personil: row.jenis_personil.clone(),
             status_kepegawaian: row.status_kepegawaian.clone(),
             divisi: row.divisi.clone(),
+            tugas: row.tugas.clone(),
             // Dibaca dari baris REKAP, bukan dihitung ulang: pembekuan harus
             // memakai angka yang sama dengan yang dilihat dan disetujui admin.
             total_teaching_jp: row.total_teaching_jp,
@@ -2690,6 +2721,50 @@ fn load_overtime_tiers(
 }
 
 /// Daftar status kepegawaian tidak tetap (Q-2 (b)) dari `setting_gex_system`.
+/// Status kepegawaian yang dihitung pegawai tidak tetap untuk PPh 21, beserta
+/// pilihannya (kartu konstanta pajak).
+#[tauri::command]
+pub fn desktop_get_pajak_status_tidak_tetap(
+    state: State<'_, MobileState>,
+) -> Result<Value, CommandError> {
+    require_permission(&state, "payroll.view")?;
+    let conn = storage::database(&state.data_dir)?;
+    let tersimpan: Option<String> = conn
+        .query_row(
+            "SELECT value FROM setting_gex_system WHERE key = ?1 LIMIT 1;",
+            params![pajak::KUNCI_STATUS_TIDAK_TETAP],
+            |row| row.get(0),
+        )
+        .optional()
+        .map_err(|_| CommandError::internal())?;
+    Ok(json!({
+        "tersimpan": tersimpan.is_some(),
+        "daftar": pajak::daftar_status_tidak_tetap(tersimpan.as_deref()),
+        "pilihan": pajak::PILIHAN_STATUS_TIDAK_TETAP,
+    }))
+}
+
+/// Simpan centang status tidak tetap (Q-26 (a)); berlaku untuk run berikutnya.
+#[tauri::command]
+pub fn desktop_save_pajak_status_tidak_tetap(
+    state: State<'_, MobileState>,
+    daftar: Vec<String>,
+) -> Result<Value, CommandError> {
+    require_permission(&state, "payroll.config.manage")?;
+    let nilai = pajak::validasi_status_tidak_tetap(&daftar)
+        .map_err(|pesan| CommandError::new("VALIDATION_ERROR", pesan))?;
+    let client_id = sync::ensure_client_id(&state)?;
+    let mut conn = storage::database(&state.data_dir)?;
+    let tx = conn.transaction().map_err(|_| CommandError::internal())?;
+    hris::tulis_setting(&tx, &client_id, pajak::KUNCI_STATUS_TIDAK_TETAP, &nilai)?;
+    tx.commit().map_err(|_| CommandError::internal())?;
+    Ok(json!({
+        "tersimpan": true,
+        "daftar": pajak::daftar_status_tidak_tetap(Some(&nilai)),
+        "pilihan": pajak::PILIHAN_STATUS_TIDAK_TETAP,
+    }))
+}
+
 fn load_status_tidak_tetap(conn: &Connection) -> Result<Vec<String>, CommandError> {
     let nilai: Option<String> = conn
         .query_row(

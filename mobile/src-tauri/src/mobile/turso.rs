@@ -10481,6 +10481,10 @@ fn canonical_sync_route(domain: &str, operation: &str) -> Option<(&'static str, 
         ("hr-section", "save") => ("hr-section", "save"),
         ("hr-section", "merge") => ("hr-section", "merge"),
         ("hr-position", "save") => ("hr-position", "save"),
+        ("hr-contract", "create") => ("hr-contract", "create"),
+        ("hr-duty-type", "save") => ("hr-duty-type", "save"),
+        ("hr-duty", "save") => ("hr-duty", "save"),
+        ("hr-duty", "cancel") => ("hr-duty", "cancel"),
         ("academic_year" | "academic-year", "create") => ("academic-year", "create"),
         ("academic_year" | "academic-year", "update") => ("academic-year", "update"),
         ("academic_year" | "academic-year", "delete") => ("academic-year", "delete"),
@@ -12944,6 +12948,27 @@ async fn apply_event_to_turso(
                 turso.query_one(sql, args).await?;
             }
         }
+        // Kontrak, jenis tugas, dan tugas tambahan (HRIS Fase 1b).
+        ("hr-contract", "create") => {
+            for (sql, args) in hris::cloud_kontrak_statements(payload, entity_key) {
+                turso.query_one(sql, args).await?;
+            }
+        }
+        ("hr-duty-type", "save") => {
+            for (sql, args) in hris::cloud_jenis_tugas_statements(payload, entity_key) {
+                turso.query_one(sql, args).await?;
+            }
+        }
+        ("hr-duty", "save") => {
+            for (sql, args) in hris::cloud_tugas_statements(payload, entity_key) {
+                turso.query_one(sql, args).await?;
+            }
+        }
+        ("hr-duty", "cancel") => {
+            for (sql, args) in hris::cloud_batal_tugas_statements(payload, entity_key) {
+                turso.query_one(sql, args).await?;
+            }
+        }
         ("academic-year", "create" | "update") => {
             let row = payload
                 .get("academic_year")
@@ -13570,6 +13595,11 @@ async fn apply_event_to_turso(
                         json!(spesialisasi), json!(status_peg), json!(created_at), json!(updated_at)
                     ],
                 ).await?;
+
+                // Status dari kontrak menang atas isian form atau perangkat
+                // lama (HRIS temuan 5); tanpa kontrak, isian tetap berlaku.
+                let (sql, args) = hris::cloud_cermin_guru(id);
+                turso.query_one(sql, args).await?;
 
                 // `master_data` TIDAK ditulis dari sini. Barisnya diurus rute
                 // kanonik `employee/update` + `employee/token` yang dikirim
