@@ -1555,6 +1555,14 @@ export default function SettingsPage() {
                   {alfaModalResult.jumlahShiftTidakValid}
                 </div>
               </div>
+              <div className="rounded-xl border border-white/10 bg-slate-950/60 p-3">
+                <div className="text-[11px] text-slate-400">
+                  Cuti &amp; Izin Berlaku
+                </div>
+                <div className="text-xl font-black text-emerald-400">
+                  {alfaModalResult.jumlahPengajuan}
+                </div>
+              </div>
             </div>
 
             <div className="flex justify-end pt-2">

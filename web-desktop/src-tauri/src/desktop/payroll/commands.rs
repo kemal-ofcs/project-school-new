@@ -13,6 +13,7 @@ use super::models::{
     PayrollItem, PayrollRecapRow, PayrollRun, PayrollStatus, SalaryConfig, TaughtSession, TaxRule,
 };
 use crate::desktop::config::DesktopState;
+use crate::desktop::hr_pengajuan;
 use crate::desktop::hris;
 use crate::desktop::loan;
 use crate::desktop::models::CommandError;
@@ -1614,6 +1615,9 @@ pub async fn desktop_get_payroll_recap(
     // dan tendik, Q-25) dan tugas tambahan yang berlaku (`TUGAS:`, Q-29).
     let status_periode = hris::status_kini(&conn, &period_end)?;
     let tugas_periode = hris::tugas_berlaku(&conn, &period_start, &period_end)?;
+    // HRIS Fase 2 (§20.2.7): cuti/izin Dibayar yang berlaku menambah menit
+    // reguler; dipakai pratinjau DAN pembekuan lewat baris yang sama.
+    let cuti_periode = hr_pengajuan::cuti_dibayar(&conn, &period_start, &period_end)?;
 
     let rekap_sql = format!(
         r#"
@@ -1736,9 +1740,12 @@ pub async fn desktop_get_payroll_recap(
             // Sakelar lembur guru: kebijakan sekolah, dibaca sekali per rekap.
             // Untuk selain guru nilainya tidak pernah berlaku.
             let overtime_allowed = teacher_overtime || !is_teacher_personnel(&agg.jenis_personil);
+            let cuti = cuti_periode.get(&agg.id_unik).cloned().unwrap_or_default();
+            // Menit cuti adalah jam hari biasa: tanggal wajib tidak pernah
+            // tanggal libur, jadi masuk sebelum kebijakan lembur.
             let (jam_kerja_menit, lembur_menit, libur_menit) =
                 PayrollCalculator::apply_overtime_policy(
-                    agg.jam_kerja_menit,
+                    agg.jam_kerja_menit + cuti.menit,
                     agg.lembur_menit,
                     agg.libur_menit,
                     agg.libur_jam_kerja_menit,
@@ -1819,7 +1826,8 @@ pub async fn desktop_get_payroll_recap(
                     status: status_pajak,
                     ptkp_awal_tahun: &agg.ptkp_awal_tahun,
                     keluar_pada: agg.keluar_pada.as_deref(),
-                    hari: agg.total_hadir,
+                    // Q-41: hari cuti dibayar ikut `hari` TER harian.
+                    hari: agg.total_hadir + cuti.hari,
                     pembanding: &pembanding,
                 },
                 &bpjs_rules,
@@ -1886,6 +1894,9 @@ pub async fn desktop_get_payroll_recap(
                 ptkp_awal_tahun: agg.ptkp_awal_tahun,
                 keluar_pada: agg.keluar_pada,
                 pajak: serde_json::to_value(&pajak_masa.pph).unwrap_or(Value::Null),
+                cuti_dibayar_hari: cuti.hari,
+                cuti_dibayar_menit: cuti.menit,
+                jam_normal_nol: cuti.jam_normal_nol,
             });
         }
     }
@@ -2062,7 +2073,7 @@ pub async fn desktop_create_payroll_run(
                 status: status_pajak,
                 ptkp_awal_tahun: &row.ptkp_awal_tahun,
                 keluar_pada: row.keluar_pada.as_deref(),
-                hari: row.total_hadir,
+                hari: row.total_hadir + row.cuti_dibayar_hari,
                 pembanding: &pembanding,
             },
             &bpjs_rules,
@@ -2105,6 +2116,7 @@ pub async fn desktop_create_payroll_run(
             "pajak": pajak_masa.pph,
             "kasbon": loan::rincian_kasbon_json(&rincian_kasbon),
             "rapel": rapel::rincian_rapel_json(rapel_ini),
+            "cuti_dibayar": { "hari": row.cuti_dibayar_hari, "menit": row.cuti_dibayar_menit },
             "calculated_at": now.clone()
         });
 

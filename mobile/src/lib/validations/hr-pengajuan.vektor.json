@@ -1690,5 +1690,881 @@
       "2026-11-30",
       "Proses gaji periode 2026-11-01 s.d. 2026-11-30 sudah dibuat; buat ulang supaya pengajuan ini ikut dihitung."
     ]
-  }
+  },
+  "penuh_pada": [
+    {
+      "p": {
+        "id_karyawan": "A",
+        "tanggal_mulai": "2026-11-02",
+        "tanggal_selesai": "2026-11-04",
+        "kelompok": "Izin",
+        "dampak_gaji": "Dibayar",
+        "jam_mulai_ke": null,
+        "jam_sampai_ke": null,
+        "setengah_hari": false
+      },
+      "t": "2026-11-02",
+      "hasil": true
+    },
+    {
+      "p": {
+        "id_karyawan": "A",
+        "tanggal_mulai": "2026-11-02",
+        "tanggal_selesai": "2026-11-04",
+        "kelompok": "Izin",
+        "dampak_gaji": "Dibayar",
+        "jam_mulai_ke": 3,
+        "jam_sampai_ke": null,
+        "setengah_hari": false
+      },
+      "t": "2026-11-02",
+      "hasil": false
+    },
+    {
+      "p": {
+        "id_karyawan": "A",
+        "tanggal_mulai": "2026-11-02",
+        "tanggal_selesai": "2026-11-04",
+        "kelompok": "Izin",
+        "dampak_gaji": "Dibayar",
+        "jam_mulai_ke": 3,
+        "jam_sampai_ke": null,
+        "setengah_hari": false
+      },
+      "t": "2026-11-03",
+      "hasil": true
+    },
+    {
+      "p": {
+        "id_karyawan": "A",
+        "tanggal_mulai": "2026-11-02",
+        "tanggal_selesai": "2026-11-04",
+        "kelompok": "Izin",
+        "dampak_gaji": "Dibayar",
+        "jam_mulai_ke": 3,
+        "jam_sampai_ke": null,
+        "setengah_hari": false
+      },
+      "t": "2026-11-04",
+      "hasil": true
+    },
+    {
+      "p": {
+        "id_karyawan": "A",
+        "tanggal_mulai": "2026-11-02",
+        "tanggal_selesai": "2026-11-04",
+        "kelompok": "Izin",
+        "dampak_gaji": "Dibayar",
+        "jam_mulai_ke": 1,
+        "jam_sampai_ke": null,
+        "setengah_hari": false
+      },
+      "t": "2026-11-02",
+      "hasil": true
+    },
+    {
+      "p": {
+        "id_karyawan": "A",
+        "tanggal_mulai": "2026-11-02",
+        "tanggal_selesai": "2026-11-04",
+        "kelompok": "Izin",
+        "dampak_gaji": "Dibayar",
+        "jam_mulai_ke": null,
+        "jam_sampai_ke": 4,
+        "setengah_hari": false
+      },
+      "t": "2026-11-04",
+      "hasil": false
+    },
+    {
+      "p": {
+        "id_karyawan": "A",
+        "tanggal_mulai": "2026-11-02",
+        "tanggal_selesai": "2026-11-04",
+        "kelompok": "Izin",
+        "dampak_gaji": "Dibayar",
+        "jam_mulai_ke": null,
+        "jam_sampai_ke": 4,
+        "setengah_hari": false
+      },
+      "t": "2026-11-03",
+      "hasil": true
+    },
+    {
+      "p": {
+        "id_karyawan": "A",
+        "tanggal_mulai": "2026-11-05",
+        "tanggal_selesai": "2026-11-05",
+        "kelompok": "Izin",
+        "dampak_gaji": "Dibayar",
+        "jam_mulai_ke": null,
+        "jam_sampai_ke": null,
+        "setengah_hari": true
+      },
+      "t": "2026-11-05",
+      "hasil": false
+    }
+  ],
+  "menit_cuti_dibayar": [
+    {
+      "masuk": [true, false, 0, 480],
+      "hasil": [1, 480]
+    },
+    {
+      "masuk": [true, true, 300, 480],
+      "hasil": [0, 0]
+    },
+    {
+      "masuk": [false, false, 0, 480],
+      "hasil": [1, 480]
+    },
+    {
+      "masuk": [false, true, 180, 480],
+      "hasil": [0, 300]
+    },
+    {
+      "masuk": [false, true, 600, 480],
+      "hasil": [0, 0]
+    },
+    {
+      "masuk": [true, false, 0, 0],
+      "hasil": [1, 0]
+    },
+    {
+      "masuk": [false, false, 120, 480],
+      "hasil": [1, 360]
+    },
+    {
+      "masuk": [true, false, 0, -5],
+      "hasil": [1, 0]
+    }
+  ],
+  "cuti_dibayar": [
+    {
+      "tanggal": [
+        ["2026-11-02", true],
+        ["2026-11-03", false],
+        ["2026-11-03", true],
+        ["2026-11-04", false]
+      ],
+      "absen": {
+        "2026-11-03": [true, 200],
+        "2026-11-04": [true, 240]
+      },
+      "normal": 480,
+      "hasil": {
+        "hari": 1,
+        "menit": 720,
+        "jam_normal_nol": false
+      }
+    },
+    {
+      "tanggal": [["2026-11-02", true]],
+      "absen": {},
+      "normal": 0,
+      "hasil": {
+        "hari": 1,
+        "menit": 0,
+        "jam_normal_nol": true
+      }
+    },
+    {
+      "tanggal": [],
+      "absen": {},
+      "normal": 480,
+      "hasil": {
+        "hari": 0,
+        "menit": 0,
+        "jam_normal_nol": false
+      }
+    }
+  ],
+  "hadir_saat_cuti": [
+    {
+      "p": {
+        "id_karyawan": "A",
+        "tanggal_mulai": "2026-11-02",
+        "tanggal_selesai": "2026-11-04",
+        "kelompok": "Cuti",
+        "dampak_gaji": "Dibayar",
+        "jam_mulai_ke": null,
+        "jam_sampai_ke": null,
+        "setengah_hari": false
+      },
+      "hadir": ["A|2026-11-03"],
+      "hasil": true
+    },
+    {
+      "p": {
+        "id_karyawan": "A",
+        "tanggal_mulai": "2026-11-02",
+        "tanggal_selesai": "2026-11-04",
+        "kelompok": "Cuti",
+        "dampak_gaji": "Dibayar",
+        "jam_mulai_ke": null,
+        "jam_sampai_ke": null,
+        "setengah_hari": false
+      },
+      "hadir": ["B|2026-11-03"],
+      "hasil": false
+    },
+    {
+      "p": {
+        "id_karyawan": "A",
+        "tanggal_mulai": "2026-11-02",
+        "tanggal_selesai": "2026-11-04",
+        "kelompok": "Izin",
+        "dampak_gaji": "Dibayar",
+        "jam_mulai_ke": null,
+        "jam_sampai_ke": null,
+        "setengah_hari": false
+      },
+      "hadir": ["A|2026-11-03"],
+      "hasil": false
+    },
+    {
+      "p": {
+        "id_karyawan": "A",
+        "tanggal_mulai": "2026-11-02",
+        "tanggal_selesai": "2026-11-04",
+        "kelompok": "Cuti",
+        "dampak_gaji": "Dibayar",
+        "jam_mulai_ke": null,
+        "jam_sampai_ke": 4,
+        "setengah_hari": false
+      },
+      "hadir": ["A|2026-11-04"],
+      "hasil": false
+    }
+  ],
+  "aturan_cuti": [
+    {
+      "peta": {},
+      "kelompok": "guru",
+      "hasil": {
+        "periode": "tahunan",
+        "hak": 12,
+        "bulan_awal": 7,
+        "syarat_bulan": 12,
+        "sisa": "hangus",
+        "bawa_maks": 6,
+        "bawa_bulan": 3
+      }
+    },
+    {
+      "peta": {},
+      "kelompok": "tendik",
+      "hasil": {
+        "periode": "tahunan",
+        "hak": 12,
+        "bulan_awal": 1,
+        "syarat_bulan": 12,
+        "sisa": "hangus",
+        "bawa_maks": 6,
+        "bawa_bulan": 3
+      }
+    },
+    {
+      "peta": {
+        "hr_cuti_hak:guru": "0",
+        "hr_cuti_periode:guru": "ulang_tahun_kerja",
+        "hr_cuti_bulan_awal:guru": "13",
+        "hr_cuti_sisa:guru": "dibawa",
+        "hr_cuti_bawa_maks:tendik": "9"
+      },
+      "kelompok": "guru",
+      "hasil": {
+        "periode": "ulang_tahun_kerja",
+        "hak": 0,
+        "bulan_awal": 7,
+        "syarat_bulan": 12,
+        "sisa": "dibawa",
+        "bawa_maks": 6,
+        "bawa_bulan": 3
+      }
+    },
+    {
+      "peta": {
+        "hr_cuti_hak:guru": "0",
+        "hr_cuti_periode:guru": "ulang_tahun_kerja",
+        "hr_cuti_bulan_awal:guru": "13",
+        "hr_cuti_sisa:guru": "dibawa",
+        "hr_cuti_bawa_maks:tendik": "9"
+      },
+      "kelompok": "tendik",
+      "hasil": {
+        "periode": "tahunan",
+        "hak": 12,
+        "bulan_awal": 1,
+        "syarat_bulan": 12,
+        "sisa": "hangus",
+        "bawa_maks": 9,
+        "bawa_bulan": 3
+      }
+    },
+    {
+      "peta": {
+        "hr_cuti_hak:guru": " 15 ",
+        "hr_cuti_sisa:guru": "diuangkan"
+      },
+      "kelompok": "guru",
+      "hasil": {
+        "periode": "tahunan",
+        "hak": 15,
+        "bulan_awal": 7,
+        "syarat_bulan": 12,
+        "sisa": "hangus",
+        "bawa_maks": 6,
+        "bawa_bulan": 3
+      }
+    }
+  ],
+  "validasi_aturan_cuti": [
+    {
+      "masuk": {
+        "guru": {
+          "periode": "tahunan",
+          "hak": 12,
+          "bulan_awal": 7,
+          "syarat_bulan": 12,
+          "sisa": "dibawa",
+          "bawa_maks": 6,
+          "bawa_bulan": 3
+        },
+        "tendik": {
+          "periode": "ulang_tahun_kerja",
+          "hak": 10,
+          "bulan_awal": 1,
+          "syarat_bulan": 0,
+          "sisa": "hangus",
+          "bawa_maks": 0,
+          "bawa_bulan": 12
+        }
+      },
+      "galat": null,
+      "hasil": [
+        ["hr_cuti_periode:guru", "tahunan"],
+        ["hr_cuti_hak:guru", "12"],
+        ["hr_cuti_bulan_awal:guru", "7"],
+        ["hr_cuti_syarat_bulan:guru", "12"],
+        ["hr_cuti_sisa:guru", "dibawa"],
+        ["hr_cuti_bawa_maks:guru", "6"],
+        ["hr_cuti_bawa_bulan:guru", "3"],
+        ["hr_cuti_periode:tendik", "ulang_tahun_kerja"],
+        ["hr_cuti_hak:tendik", "10"],
+        ["hr_cuti_bulan_awal:tendik", "1"],
+        ["hr_cuti_syarat_bulan:tendik", "0"],
+        ["hr_cuti_sisa:tendik", "hangus"],
+        ["hr_cuti_bawa_maks:tendik", "0"],
+        ["hr_cuti_bawa_bulan:tendik", "12"]
+      ]
+    },
+    {
+      "masuk": {},
+      "galat": "Aturan cuti guru tidak lengkap.",
+      "hasil": null
+    },
+    {
+      "masuk": {
+        "guru": {
+          "periode": "tahunan",
+          "hak": 12,
+          "bulan_awal": 7,
+          "syarat_bulan": 12,
+          "sisa": "dibawa",
+          "bawa_maks": 6,
+          "bawa_bulan": 3
+        }
+      },
+      "galat": "Aturan cuti tendik tidak lengkap.",
+      "hasil": null
+    },
+    {
+      "masuk": {
+        "guru": {
+          "periode": "kalender",
+          "hak": 12,
+          "bulan_awal": 7,
+          "syarat_bulan": 12,
+          "sisa": "dibawa",
+          "bawa_maks": 6,
+          "bawa_bulan": 3
+        },
+        "tendik": {
+          "periode": "ulang_tahun_kerja",
+          "hak": 10,
+          "bulan_awal": 1,
+          "syarat_bulan": 0,
+          "sisa": "hangus",
+          "bawa_maks": 0,
+          "bawa_bulan": 12
+        }
+      },
+      "galat": "Periode cuti guru harus tahunan atau ulang tahun kerja.",
+      "hasil": null
+    },
+    {
+      "masuk": {
+        "guru": {
+          "periode": "tahunan",
+          "hak": 12,
+          "bulan_awal": 7,
+          "syarat_bulan": 12,
+          "sisa": "diuangkan",
+          "bawa_maks": 6,
+          "bawa_bulan": 3
+        },
+        "tendik": {
+          "periode": "ulang_tahun_kerja",
+          "hak": 10,
+          "bulan_awal": 1,
+          "syarat_bulan": 0,
+          "sisa": "hangus",
+          "bawa_maks": 0,
+          "bawa_bulan": 12
+        }
+      },
+      "galat": "Sisa cuti guru harus hangus atau dibawa.",
+      "hasil": null
+    },
+    {
+      "masuk": {
+        "guru": {
+          "periode": "tahunan",
+          "hak": 61,
+          "bulan_awal": 7,
+          "syarat_bulan": 12,
+          "sisa": "dibawa",
+          "bawa_maks": 6,
+          "bawa_bulan": 3
+        },
+        "tendik": {
+          "periode": "ulang_tahun_kerja",
+          "hak": 10,
+          "bulan_awal": 1,
+          "syarat_bulan": 0,
+          "sisa": "hangus",
+          "bawa_maks": 0,
+          "bawa_bulan": 12
+        }
+      },
+      "galat": "Hak cuti guru harus 0 sampai 60.",
+      "hasil": null
+    },
+    {
+      "masuk": {
+        "guru": {
+          "periode": "tahunan",
+          "hak": "12",
+          "bulan_awal": 7,
+          "syarat_bulan": 12,
+          "sisa": "dibawa",
+          "bawa_maks": 6,
+          "bawa_bulan": 3
+        },
+        "tendik": {
+          "periode": "ulang_tahun_kerja",
+          "hak": 10,
+          "bulan_awal": 1,
+          "syarat_bulan": 0,
+          "sisa": "hangus",
+          "bawa_maks": 0,
+          "bawa_bulan": 12
+        }
+      },
+      "galat": "Hak cuti guru harus 0 sampai 60.",
+      "hasil": null
+    },
+    {
+      "masuk": {
+        "guru": {
+          "periode": "tahunan",
+          "hak": 12.5,
+          "bulan_awal": 7,
+          "syarat_bulan": 12,
+          "sisa": "dibawa",
+          "bawa_maks": 6,
+          "bawa_bulan": 3
+        },
+        "tendik": {
+          "periode": "ulang_tahun_kerja",
+          "hak": 10,
+          "bulan_awal": 1,
+          "syarat_bulan": 0,
+          "sisa": "hangus",
+          "bawa_maks": 0,
+          "bawa_bulan": 12
+        }
+      },
+      "galat": "Hak cuti guru harus 0 sampai 60.",
+      "hasil": null
+    },
+    {
+      "masuk": {
+        "guru": {
+          "periode": "tahunan",
+          "hak": 12,
+          "bulan_awal": 7,
+          "syarat_bulan": 12,
+          "sisa": "dibawa",
+          "bawa_maks": 6,
+          "bawa_bulan": 3
+        },
+        "tendik": {
+          "periode": "ulang_tahun_kerja",
+          "hak": 10,
+          "bulan_awal": 0,
+          "syarat_bulan": 0,
+          "sisa": "hangus",
+          "bawa_maks": 0,
+          "bawa_bulan": 12
+        }
+      },
+      "galat": "Bulan awal periode tendik harus 1 sampai 12.",
+      "hasil": null
+    }
+  ],
+  "jatah_cuti": [
+    {
+      "_": "tahunan bulan 7, berhak sebelum Juli",
+      "tmt": "2024-03-15",
+      "aturan": {
+        "periode": "tahunan",
+        "hak": 12,
+        "bulan_awal": 7,
+        "syarat_bulan": 12,
+        "sisa": "hangus",
+        "bawa_maks": 6,
+        "bawa_bulan": 3
+      },
+      "terpakai": [],
+      "penyesuaian": [],
+      "hari_ini": "2026-11-14",
+      "hasil": [
+        {
+          "mulai": "2025-03-15",
+          "selesai": "2025-06-30",
+          "sebelum_berhak": false,
+          "hak": 12,
+          "bawaan": 0,
+          "bawaan_hangus": 0,
+          "bawaan_sampai": null,
+          "penyesuaian": 0,
+          "terpakai": 0,
+          "sisa": 12
+        },
+        {
+          "mulai": "2025-07-01",
+          "selesai": "2026-06-30",
+          "sebelum_berhak": false,
+          "hak": 12,
+          "bawaan": 0,
+          "bawaan_hangus": 0,
+          "bawaan_sampai": null,
+          "penyesuaian": 0,
+          "terpakai": 0,
+          "sisa": 12
+        },
+        {
+          "mulai": "2026-07-01",
+          "selesai": "2027-06-30",
+          "sebelum_berhak": false,
+          "hak": 12,
+          "bawaan": 0,
+          "bawaan_hangus": 0,
+          "bawaan_sampai": null,
+          "penyesuaian": 0,
+          "terpakai": 0,
+          "sisa": 12
+        }
+      ]
+    },
+    {
+      "_": "dibawa: 6 dari sisa 11, dipakai 2 dalam 3 bulan, 4 hangus",
+      "tmt": "2024-07-01",
+      "aturan": {
+        "periode": "tahunan",
+        "hak": 12,
+        "bulan_awal": 7,
+        "syarat_bulan": 12,
+        "sisa": "dibawa",
+        "bawa_maks": 6,
+        "bawa_bulan": 3
+      },
+      "terpakai": [
+        "2025-08-04",
+        "2025-08-05",
+        "2025-09-01",
+        "2026-07-06",
+        "2026-07-07",
+        "2026-12-01"
+      ],
+      "penyesuaian": [["2025-07-01", 2]],
+      "hari_ini": "2026-11-14",
+      "hasil": [
+        {
+          "mulai": "2025-07-01",
+          "selesai": "2026-06-30",
+          "sebelum_berhak": false,
+          "hak": 12,
+          "bawaan": 0,
+          "bawaan_hangus": 0,
+          "bawaan_sampai": null,
+          "penyesuaian": 2,
+          "terpakai": 3,
+          "sisa": 11
+        },
+        {
+          "mulai": "2026-07-01",
+          "selesai": "2027-06-30",
+          "sebelum_berhak": false,
+          "hak": 12,
+          "bawaan": 6,
+          "bawaan_hangus": 4,
+          "bawaan_sampai": "2026-09-30",
+          "penyesuaian": 0,
+          "terpakai": 3,
+          "sisa": 11
+        }
+      ]
+    },
+    {
+      "_": "ulang tahun kerja, akhir bulan dijepit, pemakaian sebelum berhak, sisa minus",
+      "tmt": "2025-01-31",
+      "aturan": {
+        "periode": "ulang_tahun_kerja",
+        "hak": 12,
+        "bulan_awal": 1,
+        "syarat_bulan": 12,
+        "sisa": "hangus",
+        "bawa_maks": 6,
+        "bawa_bulan": 3
+      },
+      "terpakai": ["2025-06-02"],
+      "penyesuaian": [["2026-01-31", -14]],
+      "hari_ini": "2026-11-14",
+      "hasil": [
+        {
+          "mulai": "2025-01-31",
+          "selesai": "2026-01-30",
+          "sebelum_berhak": true,
+          "hak": 0,
+          "bawaan": 0,
+          "bawaan_hangus": 0,
+          "bawaan_sampai": null,
+          "penyesuaian": 0,
+          "terpakai": 1,
+          "sisa": -1
+        },
+        {
+          "mulai": "2026-01-31",
+          "selesai": "2027-01-30",
+          "sebelum_berhak": false,
+          "hak": 12,
+          "bawaan": 0,
+          "bawaan_hangus": 0,
+          "bawaan_sampai": null,
+          "penyesuaian": -14,
+          "terpakai": 0,
+          "sisa": -2
+        }
+      ]
+    },
+    {
+      "_": "tanpa TMT",
+      "tmt": null,
+      "aturan": {
+        "periode": "tahunan",
+        "hak": 12,
+        "bulan_awal": 7,
+        "syarat_bulan": 12,
+        "sisa": "hangus",
+        "bawa_maks": 6,
+        "bawa_bulan": 3
+      },
+      "terpakai": ["2026-03-02"],
+      "penyesuaian": [],
+      "hari_ini": "2026-11-14",
+      "hasil": []
+    },
+    {
+      "_": "tendik kalender, syarat 0",
+      "tmt": "2026-02-10",
+      "aturan": {
+        "periode": "tahunan",
+        "hak": 12,
+        "bulan_awal": 1,
+        "syarat_bulan": 0,
+        "sisa": "hangus",
+        "bawa_maks": 6,
+        "bawa_bulan": 3
+      },
+      "terpakai": ["2026-03-02"],
+      "penyesuaian": [],
+      "hari_ini": "2026-11-14",
+      "hasil": [
+        {
+          "mulai": "2026-02-10",
+          "selesai": "2026-12-31",
+          "sebelum_berhak": false,
+          "hak": 12,
+          "bawaan": 0,
+          "bawaan_hangus": 0,
+          "bawaan_sampai": null,
+          "penyesuaian": 0,
+          "terpakai": 1,
+          "sisa": 11
+        }
+      ]
+    }
+  ],
+  "penyesuaian": [
+    {
+      "masuk": {
+        "id_karyawan": "A",
+        "periode": "2026-07-01",
+        "jenis": "Koreksi",
+        "hari": -2,
+        "alasan": " salah hitung "
+      },
+      "galat": null,
+      "hasil": {
+        "batal": "",
+        "id_karyawan": "A",
+        "periode": "2026-07-01",
+        "jenis": "Koreksi",
+        "hari": -2,
+        "alasan": "salah hitung"
+      }
+    },
+    {
+      "masuk": {
+        "id_karyawan": "A",
+        "periode": "2026-07-01",
+        "jenis": "Saldo Awal",
+        "hari": 366,
+        "alasan": " salah hitung "
+      },
+      "galat": null,
+      "hasil": {
+        "batal": "",
+        "id_karyawan": "A",
+        "periode": "2026-07-01",
+        "jenis": "Saldo Awal",
+        "hari": 366,
+        "alasan": "salah hitung"
+      }
+    },
+    {
+      "masuk": {
+        "batal": "cpy-1",
+        "alasan": "dobel"
+      },
+      "galat": null,
+      "hasil": {
+        "batal": "cpy-1",
+        "id_karyawan": "",
+        "periode": "",
+        "jenis": "Pembatalan",
+        "hari": 0,
+        "alasan": "dobel"
+      }
+    },
+    {
+      "masuk": {
+        "batal": "cpy-1",
+        "alasan": ""
+      },
+      "galat": "Alasan wajib diisi.",
+      "hasil": null
+    },
+    {
+      "masuk": {
+        "id_karyawan": "",
+        "periode": "2026-07-01",
+        "jenis": "Koreksi",
+        "hari": -2,
+        "alasan": " salah hitung "
+      },
+      "galat": "Pilih pegawai.",
+      "hasil": null
+    },
+    {
+      "masuk": {
+        "id_karyawan": "A",
+        "periode": "2026-13-01",
+        "jenis": "Koreksi",
+        "hari": -2,
+        "alasan": " salah hitung "
+      },
+      "galat": "Periode jatah tidak valid.",
+      "hasil": null
+    },
+    {
+      "masuk": {
+        "id_karyawan": "A",
+        "periode": "2026-07-01",
+        "jenis": "Pembatalan",
+        "hari": -2,
+        "alasan": " salah hitung "
+      },
+      "galat": "Jenis penyesuaian harus Saldo Awal atau Koreksi.",
+      "hasil": null
+    },
+    {
+      "masuk": {
+        "id_karyawan": "A",
+        "periode": "2026-07-01",
+        "jenis": "Koreksi",
+        "hari": 0,
+        "alasan": " salah hitung "
+      },
+      "galat": "Jumlah hari harus -366 sampai 366 dan bukan 0.",
+      "hasil": null
+    },
+    {
+      "masuk": {
+        "id_karyawan": "A",
+        "periode": "2026-07-01",
+        "jenis": "Koreksi",
+        "hari": 367,
+        "alasan": " salah hitung "
+      },
+      "galat": "Jumlah hari harus -366 sampai 366 dan bukan 0.",
+      "hasil": null
+    },
+    {
+      "masuk": {
+        "id_karyawan": "A",
+        "periode": "2026-07-01",
+        "jenis": "Koreksi",
+        "hari": "2",
+        "alasan": " salah hitung "
+      },
+      "galat": "Jumlah hari harus -366 sampai 366 dan bukan 0.",
+      "hasil": null
+    },
+    {
+      "masuk": {
+        "id_karyawan": "A",
+        "periode": "2026-07-01",
+        "jenis": "Koreksi",
+        "hari": 1.5,
+        "alasan": " salah hitung "
+      },
+      "galat": "Jumlah hari harus -366 sampai 366 dan bukan 0.",
+      "hasil": null
+    },
+    {
+      "masuk": {
+        "id_karyawan": "A",
+        "periode": "2026-07-01",
+        "jenis": "Koreksi",
+        "hari": -2,
+        "alasan": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      },
+      "galat": "Alasan maksimal 500 karakter.",
+      "hasil": null
+    }
+  ]
 }

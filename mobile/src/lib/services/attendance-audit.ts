@@ -11,6 +11,7 @@ import {
   selisihHariKalender,
 } from "@/lib/attendance/time-policy";
 import { db, ensureDbInitialized } from "@/lib/db";
+import { pengajuanPada } from "@/lib/services/hr-pengajuan";
 import { parseHariKerja, wajibMasuk } from "@/lib/validations/hari-kerja";
 import {
   hariSekolahUntuk,
@@ -53,6 +54,8 @@ export interface RingkasanAuditAbsensi {
   fleksibel: number;
   tanpaData: number;
   shiftTidakValid: number;
+  /** Ditutup pengajuan cuti/izin berlaku (HRIS v69, kategori "Pengajuan"). */
+  pengajuan: number;
   karyawanBermasalah: number;
   skorKualitas: number;
 }
@@ -229,6 +232,9 @@ export async function auditKualitasAbsensi(
     scanMasalah.set(id, entry);
   }
 
+  // Pengajuan berlaku pada tanggal target: id → hari penuh (§20.2.6).
+  const pengajuanHari = await pengajuanPada(targetDb, tanggalTarget);
+
   // Predikat siswa dan unitnya sama dengan Generate Alfa.
   const empRes = await targetDb.execute(
     `SELECT m.id_unik, m.nama, m.divisi, m.id_shift,
@@ -259,6 +265,7 @@ export async function auditKualitasAbsensi(
     fleksibel: 0,
     tanpaData: 0,
     shiftTidakValid: 0,
+    pengajuan: 0,
     karyawanBermasalah: 0,
     skorKualitas: 100,
   };
@@ -351,8 +358,14 @@ export async function auditKualitasAbsensi(
       // Jam shift tidak terurai — jendela waktunya tidak bisa dinilai.
     }
 
-    const record = absensi.get(idUnik);
+    const tercatat = absensi.get(idUnik);
     let bermasalah = false;
+    // Pengajuan berlaku: hari penuh menutup "Tanpa Data"/"Belum Scan Masuk"
+    // dan Alfa lama; hari sebagian hanya "Belum Scan Pulang".
+    const ajuan = pengajuanHari.get(idUnik);
+    const alfaTertutup =
+      ajuan !== undefined && tercatat?.statusKehadiran === "Alfa";
+    const record = alfaTertutup ? undefined : tercatat;
 
     const catat = (
       kategori: string,
@@ -375,7 +388,29 @@ export async function auditKualitasAbsensi(
       });
     };
 
-    if (!record) {
+    if (ajuan !== undefined) {
+      ringkasan.pengajuan++;
+      temuan.push({
+        idKaryawan: idUnik,
+        nama,
+        divisi,
+        namaShift: shift.namaShift,
+        jamShift,
+        kategori: "Pengajuan",
+        keparahan: "info",
+        detail: ajuan
+          ? "Ditutup pengajuan cuti/izin yang berlaku (hari penuh)."
+          : "Ditutup pengajuan cuti/izin yang berlaku (sebagian hari).",
+        jamMasuk: tercatat?.jamMasuk ?? "",
+        jamPulang: tercatat?.jamPulang ?? "",
+        statusKehadiran: tercatat?.statusKehadiran ?? "",
+        sumber: tercatat?.sumber ?? "",
+      });
+    }
+
+    if (!record && (alfaTertutup || ajuan === true)) {
+      // Hari penuh atau Alfa lama yang ditutup pengajuan: tidak dinilai.
+    } else if (!record) {
       if (masaDepan) {
         ringkasan.menungguJamAbsen++;
       } else if (tutupMasuk !== null && menitBerjalan < tutupMasuk) {
@@ -422,7 +457,8 @@ export async function auditKualitasAbsensi(
       if (
         record.jamMasuk !== "" &&
         record.jamPulang === "" &&
-        record.statusKehadiran !== "Alfa"
+        record.statusKehadiran !== "Alfa" &&
+        ajuan !== false
       ) {
         if (tutupPulang !== null && menitBerjalan > tutupPulang) {
           ringkasan.belumScanPulang++;

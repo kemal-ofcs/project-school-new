@@ -128,6 +128,70 @@ describe("hr-pengajuan: aturan kembar", () => {
     expect(P.pesanRunUlang(g, h)).toBe(i);
   });
 
+  test("hari penuh, cuti dibayar, hadir saat cuti", () => {
+    for (const k of vektor.penuh_pada) {
+      expect(P.penuhPada(k.p as P.Berlaku, k.t)).toBe(k.hasil);
+    }
+    for (const k of vektor.menit_cuti_dibayar) {
+      const [penuh, hadir, jam, normal] = k.masuk as [
+        boolean,
+        boolean,
+        number,
+        number,
+      ];
+      expect(P.menitCutiDibayar(penuh, hadir, jam, normal)).toEqual(
+        k.hasil as [number, number],
+      );
+    }
+    for (const k of vektor.cuti_dibayar) {
+      const absen = new Map(
+        Object.entries(k.absen as Record<string, [boolean, number]>),
+      );
+      expect(
+        P.hitungCutiDibayar(k.tanggal as [string, boolean][], absen, k.normal),
+      ).toEqual(k.hasil);
+    }
+    for (const k of vektor.hadir_saat_cuti) {
+      expect(P.hadirSaatCuti(k.p as P.Berlaku, new Set(k.hadir))).toBe(k.hasil);
+    }
+  });
+
+  test("aturan, jatah, dan penyesuaian cuti", () => {
+    for (const k of vektor.aturan_cuti) {
+      expect(
+        P.aturanCuti(
+          new Map(Object.entries(k.peta as Record<string, string>)),
+          k.kelompok,
+        ),
+      ).toEqual(k.hasil);
+    }
+    for (const k of vektor.validasi_aturan_cuti) {
+      const hasil = P.validasiAturanCuti(k.masuk as Record<string, unknown>);
+      expect(galat(hasil)).toBe(k.galat);
+      expect(hasil.ok ? hasil.nilai : null).toEqual(
+        k.hasil as [string, string][] | null,
+      );
+    }
+    for (const k of vektor.jatah_cuti) {
+      expect(
+        P.jatahCuti(
+          k.tmt,
+          k.aturan,
+          k.terpakai,
+          k.penyesuaian as [string, number][],
+          k.hari_ini,
+        ),
+      ).toEqual(k.hasil as P.PeriodeCuti[]);
+    }
+    for (const k of vektor.penyesuaian) {
+      const hasil = P.validasiPenyesuaian(k.masuk as Record<string, unknown>);
+      expect(galat(hasil)).toBe(k.galat);
+      expect(hasil.ok ? hasil.nilai : null).toEqual(
+        k.hasil as P.PenyesuaianSah | null,
+      );
+    }
+  });
+
   test("jenis bawaan sah menurut validasi", () => {
     expect(P.JENIS_BAWAAN).toHaveLength(10);
     for (const j of P.JENIS_BAWAAN) {
@@ -159,6 +223,17 @@ describe("hr-pengajuan: aturan kembar", () => {
       P.PENGAJUAN_SATU_SQL,
       P.KEPUTUSAN_SATU_SQL,
       P.WAKTU_SQL,
+      P.LAPORAN_PENGAJUAN_SQL,
+      P.HARI_ABSEN_SQL,
+      P.JADWAL_PEGAWAI_SQL,
+      P.JATAH_PEGAWAI_SQL,
+      P.JATAH_TERPAKAI_SQL,
+      P.HADIR_ORANG_SQL,
+      P.PENYESUAIAN_ORANG_SQL,
+      P.PENYESUAIAN_SATU_SQL,
+      P.RIWAYAT_PENGAJUAN_SQL,
+      P.ATURAN_CUTI_SQL,
+      P.CLOUD_PENYESUAIAN_SQL,
     ];
     let diperiksa = 0;
     for (const dir of ["desktop", "mobile"]) {
@@ -182,6 +257,10 @@ describe("hr-pengajuan: aturan kembar", () => {
         ["IZIN_PEMUTUS", P.IZIN_PEMUTUS],
         ["KEPUTUSAN_FINAL", P.KEPUTUSAN_FINAL],
         ["AKSI_KEPUTUSAN", P.AKSI_KEPUTUSAN],
+        ["KELOMPOK_CUTI", P.KELOMPOK_CUTI],
+        ["PERIODE_CUTI", P.PERIODE_CUTI],
+        ["SISA_CUTI", P.SISA_CUTI],
+        ["JENIS_PENYESUAIAN", P.JENIS_PENYESUAIAN],
       ] as const) {
         expect(rust).toContain(
           `${nama}:[&str;${daftar.length}]=${JSON.stringify(daftar).replace(/\s+/g, "")};`,
@@ -192,10 +271,28 @@ describe("hr-pengajuan: aturan kembar", () => {
         ["MAKS_RENTANG_HARI", P.MAKS_RENTANG_HARI, "i64"],
         ["MAKS_HARI_JENIS", P.MAKS_HARI_JENIS, "i64"],
         ["MAKS_JAM_KE", P.MAKS_JAM_KE, "i64"],
+        ["MAKS_HARI_PENYESUAIAN", P.MAKS_HARI_PENYESUAIAN, "i64"],
       ] as const) {
         expect(rust).toContain(`${nama}:${tipe}=${nilai};`);
       }
     }
     expect(diperiksa).toBeGreaterThan(0);
+    // Batas aturan cuti: isian, label, min, maks, bawaan guru dan tendik.
+    for (const dir of ["desktop", "mobile"]) {
+      const lokasi = [
+        join(import.meta.dir, `../../../src-tauri/src/${dir}/hr_pengajuan.rs`),
+        join(
+          import.meta.dir,
+          `../../../../mobile/src-tauri/src/${dir}/hr_pengajuan.rs`,
+        ),
+      ].find(existsSync);
+      if (!lokasi) continue;
+      const rust = readFileSync(lokasi, "utf8").replace(/\s+/g, "");
+      for (const [isian, label, min, maks, guru, tendik] of P.BATAS_CUTI) {
+        expect(rust).toContain(
+          `(${JSON.stringify(isian)},${JSON.stringify(label).replace(/\s+/g, "")},${min},${maks},${guru},${tendik})`,
+        );
+      }
+    }
   });
 });

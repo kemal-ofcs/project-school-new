@@ -3418,6 +3418,53 @@ pub fn desktop_hr_request_types_save(
     hr_pengajuan::simpan_jenis(&state, draft)
 }
 
+/// Aturan cuti guru dan tendik (tab Organisasi), lewat outbox `setting`.
+#[tauri::command]
+pub fn desktop_hr_leave_settings_save(
+    state: State<'_, DesktopState>,
+    draft: Value,
+) -> Result<Value, CommandError> {
+    require_permission(&state, "hr.org.manage")?;
+    hr_pengajuan::simpan_aturan_cuti(&state, draft)
+}
+
+/// Aturan cuti (juga untuk `hr.org.manage` di tab Organisasi); dengan
+/// `id_karyawan` juga jatah per periode, penyesuaian, riwayat, dan jumlah
+/// tanggal wajib rentang `mulai`..`selesai`, khusus `hr.request.view`.
+#[tauri::command]
+pub fn desktop_hr_leave_balance(
+    state: State<'_, DesktopState>,
+    id_karyawan: Option<String>,
+    mulai: Option<String>,
+    selesai: Option<String>,
+) -> Result<Value, CommandError> {
+    let operator = require_any_permission(&state, &["hr.request.view", "hr.org.manage"])?;
+    let lihat_pegawai =
+        operator.is_superadmin || operator.permissions.iter().any(|p| p == "hr.request.view");
+    if !lihat_pegawai && id_karyawan.as_deref().is_some_and(|id| !id.trim().is_empty()) {
+        return Err(CommandError::new(
+            "DESKTOP_ACCESS_DENIED",
+            "Kamu tidak punya izin melihat jatah cuti pegawai.",
+        ));
+    }
+    hr_pengajuan::saldo_cuti(
+        &state,
+        id_karyawan.as_deref(),
+        mulai.as_deref(),
+        selesai.as_deref(),
+    )
+}
+
+/// Penyesuaian jatah cuti append-only, atau pembatalannya (`batal-<id>`).
+#[tauri::command]
+pub fn desktop_hr_leave_adjust(
+    state: State<'_, DesktopState>,
+    draft: Value,
+) -> Result<Value, CommandError> {
+    let operator = require_permission(&state, "hr.leave.adjust")?;
+    hr_pengajuan::sesuaikan_cuti(&state, &operator, draft)
+}
+
 /// Jenis tagihan, tarif, serta pilihan unit/rombel/tahun ajaran untuk
 /// menerbitkan, dengan izin tagihan (bukan `academic.view`).
 #[tauri::command]

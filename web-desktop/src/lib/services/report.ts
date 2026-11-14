@@ -2,6 +2,7 @@ import "server-only";
 
 import { formatTanggalOperasional } from "@/lib/attendance/time-policy";
 import { db, ensureDbInitialized } from "@/lib/db";
+import { LAPORAN_PENGAJUAN_SQL } from "@/lib/validations/hr-pengajuan";
 import {
   type DataLaporanKehadiran,
   validateRentangLaporan,
@@ -432,6 +433,8 @@ export async function getLaporanKehadiran(
     hari: await daftar(LAPORAN_KEHADIRAN_SQL.hari),
     libur: await daftar(LAPORAN_KEHADIRAN_SQL.libur),
     whitelist: await daftar(LAPORAN_KEHADIRAN_SQL.whitelist),
+    // Pengajuan berlaku (HRIS v69); kembar `laporan_kehadiran` Rust.
+    pengajuan: await daftar(LAPORAN_PENGAJUAN_SQL),
   };
 }
 

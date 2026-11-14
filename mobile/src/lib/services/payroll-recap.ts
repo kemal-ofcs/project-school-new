@@ -1,6 +1,7 @@
 import "server-only";
 
 import type { Client } from "@libsql/client";
+import { cutiDibayar } from "@/lib/services/hr-pengajuan";
 import { statusKini, tugasBerlaku } from "@/lib/services/hris";
 import { pinjamanAktif } from "@/lib/services/loan";
 import {
@@ -101,6 +102,15 @@ export interface PayrollRecapRow {
   keluar_pada: string | null;
   /** Isi `breakdown_snapshot.pajak` yang akan dibekukan. */
   pajak: HasilPph;
+  /**
+   * Cuti/izin Dibayar (HRIS v69, §20.2.7): hari tanpa scan Hadir dan menit
+   * yang sudah ikut jam reguler. Hari menambah `hari` TER harian pegawai
+   * tidak tetap, tidak `total_hadir` (Q-41).
+   */
+  cuti_dibayar_hari: number;
+  cuti_dibayar_menit: number;
+  /** Ada cuti dibayar tetapi jam normal shift-nya 0. */
+  jam_normal_nol: boolean;
   // Extra fields (not part of the Rust PayrollRecapRow response shape, but
   // needed by run creation to build payroll_items without recomputing).
   breakdown_snapshot: string;
@@ -338,6 +348,7 @@ export async function computePayrollRecap(
     pembandingPerOrang,
     statusPeriode,
     tugasPeriode,
+    cutiPeriode,
   ] = await Promise.all([
     loadOvertimeTiers(client, "HARI_KERJA"),
     // Jenjang lembur hari libur dikonfigurasi terpisah oleh user di menu
@@ -451,6 +462,9 @@ export async function computePayrollRecap(
     // `hris::status_kini`/`tugas_berlaku` di `payroll/commands.rs`.
     statusKini(client, periodEnd),
     tugasBerlaku(client, periodStart, periodEnd),
+    // HRIS Fase 2 (§20.2.7): cuti/izin Dibayar menambah menit reguler.
+    // Cerminan `hr_pengajuan::cuti_dibayar`.
+    cutiDibayar(client, periodStart, periodEnd),
   ]);
   const tidakTetap = daftarStatusTidakTetap(
     tidakTetapRow.rows[0] ? String(tidakTetapRow.rows[0].value ?? "") : null,
@@ -472,12 +486,19 @@ export async function computePayrollRecap(
     // selain guru.
     const overtimeAllowed =
       teacherOvertime || !isTeacherPersonnel(row.jenis_personil);
+    const cuti = cutiPeriode.get(idKaryawan) ?? {
+      hari: 0,
+      menit: 0,
+      jam_normal_nol: false,
+    };
+    // Menit cuti adalah jam hari biasa (tanggal wajib tidak pernah libur),
+    // jadi masuk sebelum kebijakan lembur.
     const {
       regular: jamKerjaMenit,
       overtime: lemburMenit,
       holiday: liburMenit,
     } = applyOvertimePolicy(
-      Number(row.total_jam_kerja_menit || 0),
+      Number(row.total_jam_kerja_menit || 0) + cuti.menit,
       Number(row.total_lembur_menit || 0),
       Number(row.total_libur_menit || 0),
       Number(row.total_libur_jam_kerja_menit || 0),
@@ -566,7 +587,8 @@ export async function computePayrollRecap(
         status: statusPajak,
         ptkp_awal_tahun: ptkpAwalTahun,
         keluar_pada: keluarPada,
-        hari: subject.total_hadir,
+        // Q-41: hari cuti dibayar ikut `hari` TER harian.
+        hari: subject.total_hadir + cuti.hari,
         pembanding: ringkasPembanding(
           pembandingPerOrang.get(idKaryawan) ?? [],
           masaRun,
@@ -616,6 +638,7 @@ export async function computePayrollRecap(
       pajak: pajakMasa.pph,
       kasbon: kasbon.rincian,
       rapel: rincianRapelJson(rapel),
+      cuti_dibayar: { hari: cuti.hari, menit: cuti.menit },
       calculated_at: new Date().toISOString(),
     });
 
@@ -651,6 +674,9 @@ export async function computePayrollRecap(
       ptkp_awal_tahun: ptkpAwalTahun,
       keluar_pada: keluarPada,
       pajak: pajakMasa.pph,
+      cuti_dibayar_hari: cuti.hari,
+      cuti_dibayar_menit: cuti.menit,
+      jam_normal_nol: cuti.jam_normal_nol,
       breakdown_snapshot: breakdownSnapshot,
       bpjs_company_total: bpjsCompany,
     };

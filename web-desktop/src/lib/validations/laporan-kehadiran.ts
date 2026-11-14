@@ -60,6 +60,24 @@ export interface DataLaporanKehadiran {
   hari: HariLaporan[];
   libur: { tanggal: string; nama: string }[];
   whitelist: HolidayWhitelistEntry[];
+  /** Pengajuan cuti/izin/sakit/dinas luar yang berlaku (HRIS v69). */
+  pengajuan: PengajuanLaporan[];
+}
+
+export interface PengajuanLaporan {
+  id: string;
+  mulai: string;
+  selesai: string;
+  kelompok: string;
+}
+
+/** Kode laporan untuk kelompok pengajuan; `null` = tidak tampil. */
+export function kodeKelompok(kelompok: string): string | null {
+  if (kelompok === "Dinas Luar") return "DL";
+  if (kelompok === "Cuti") return "C";
+  if (kelompok === "Izin") return "I";
+  if (kelompok === "Sakit") return "S";
+  return null;
 }
 
 export const KODE_LAPORAN = [
@@ -67,6 +85,8 @@ export const KODE_LAPORAN = [
   ["T", "Hadir, terlambat"],
   ["S", "Sakit"],
   ["I", "Izin"],
+  ["C", "Cuti (pengajuan Cuti & Izin)"],
+  ["DL", "Dinas luar (pengajuan Cuti & Izin), dihitung hadir"],
   ["D", "Dispensasi"],
   ["A", "Alfa (tidak hadir tanpa keterangan)"],
   ["L", "Hari libur dari halaman Hari Libur"],
@@ -83,12 +103,15 @@ export interface BarisLaporan {
   menitTerlambat: number;
   sakit: number;
   izin: number;
+  cuti: number;
+  /** Dinas luar: hari wajib dan ikut persen hadir (bekerja di luar sekolah). */
+  dinas: number;
   dispensasi: number;
   alfa: number;
   tanpaData: number;
   libur: number;
   wajibMasuk: number;
-  /** Hadir ÷ hari wajib masuk, satu desimal; `null` bila tidak ada hari wajib. */
+  /** (Hadir + dinas luar) ÷ hari wajib masuk, satu desimal; `null` bila tidak ada hari wajib. */
   persen: number | null;
 }
 
@@ -157,6 +180,18 @@ export function susunLaporanKehadiran(
   const catatan = new Map(
     data.hari.map((hari) => [`${hari.id}|${hari.tanggal}`, hari]),
   );
+  // Pengajuan pertama per orang per tanggal (urutan SQL).
+  const kodeAjuan = new Map<string, string>();
+  for (const p of data.pengajuan ?? []) {
+    const kode = kodeKelompok(p.kelompok);
+    if (!kode) continue;
+    for (const t of tanggal) {
+      const kunci = `${p.id}|${t}`;
+      if (t >= p.mulai && t <= p.selesai && !kodeAjuan.has(kunci)) {
+        kodeAjuan.set(kunci, kode);
+      }
+    }
+  }
 
   const baris = data.personil
     .filter((personil) => !jenis || personil.jenis === jenis)
@@ -166,6 +201,21 @@ export function susunLaporanKehadiran(
           ? hariSekolahUntuk(hariSekolah, personil.id_unit_siswa)
           : parseHariKerja(personil.hari_kerja);
       const kodeShift = Number(personil.kode_shift);
+      const dijadwalkanPada = (t: string) => {
+        const tanggalLibur = libur.has(t);
+        return wajibMasuk({
+          tanggal: t,
+          hariMasuk,
+          libur: tanggalLibur,
+          masukSaatLibur:
+            tanggalLibur &&
+            evaluateHolidayScan(data.whitelist, {
+              tanggal: t,
+              divisi: personil.divisi,
+              kodeShift: Number.isFinite(kodeShift) ? kodeShift : null,
+            }).allowed,
+        });
+      };
       const hasil: BarisLaporan = {
         personil,
         sel: [],
@@ -174,6 +224,8 @@ export function susunLaporanKehadiran(
         menitTerlambat: 0,
         sakit: 0,
         izin: 0,
+        cuti: 0,
+        dinas: 0,
         dispensasi: 0,
         alfa: 0,
         tanpaData: 0,
@@ -189,6 +241,21 @@ export function susunLaporanKehadiran(
         }
         const hari = catatan.get(`${personil.id}|${t}`);
         const kode = kodeTercatat(hari);
+        // Urutan §20.2.6: H/T > pengajuan > S/I/D Koreksi Admin > A > L/M/-.
+        // Pengajuan hanya di tanggal wajib atau yang punya catatan.
+        const ajuan =
+          kode === "H" || kode === "T"
+            ? null
+            : (kodeAjuan.get(`${personil.id}|${t}`) ?? null);
+        if (ajuan && (kode || dijadwalkanPada(t))) {
+          hasil.sel.push(ajuan);
+          hasil.wajibMasuk++;
+          if (ajuan === "S") hasil.sakit++;
+          if (ajuan === "I") hasil.izin++;
+          if (ajuan === "C") hasil.cuti++;
+          if (ajuan === "DL") hasil.dinas++;
+          continue;
+        }
         if (kode) {
           hasil.sel.push(kode);
           hasil.wajibMasuk++;
@@ -205,19 +272,7 @@ export function susunLaporanKehadiran(
         }
 
         const tanggalLibur = libur.has(t);
-        const dijadwalkan = wajibMasuk({
-          tanggal: t,
-          hariMasuk,
-          libur: tanggalLibur,
-          masukSaatLibur:
-            tanggalLibur &&
-            evaluateHolidayScan(data.whitelist, {
-              tanggal: t,
-              divisi: personil.divisi,
-              kodeShift: Number.isFinite(kodeShift) ? kodeShift : null,
-            }).allowed,
-        });
-        if (dijadwalkan) {
+        if (dijadwalkanPada(t)) {
           hasil.sel.push("-");
           hasil.wajibMasuk++;
           hasil.tanpaData++;
@@ -230,7 +285,9 @@ export function susunLaporanKehadiran(
       }
 
       if (hasil.wajibMasuk > 0) {
-        hasil.persen = Math.round((hasil.hadir / hasil.wajibMasuk) * 1000) / 10;
+        hasil.persen =
+          Math.round(((hasil.hadir + hasil.dinas) / hasil.wajibMasuk) * 1000) /
+          10;
       }
       return hasil;
     });

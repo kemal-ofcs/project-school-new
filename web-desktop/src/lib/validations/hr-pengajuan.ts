@@ -16,7 +16,7 @@ import {
   type HolidayWhitelistEntry,
 } from "./holiday-whitelist";
 import jenisBawaan from "./hr-jenis-bawaan.json";
-import { validasiNamaMaster } from "./hris";
+import { tambahBulan, validasiNamaMaster } from "./hris";
 
 export const KELOMPOK = ["Cuti", "Izin", "Sakit", "Dinas Luar"] as const;
 export const DAMPAK_GAJI = [
@@ -527,6 +527,7 @@ export const LABEL_TANDA: Record<string, string> = {
   diputus_sendiri: "Diajukan dan diputus orang yang sama",
   bertumpuk: "Bertumpuk dengan pengajuan lain",
   di_luar_cakupan: "Pemutus kini di luar unit pegawai",
+  hadir_saat_cuti: "Ada scan Hadir di hari cuti (jatah tidak terpotong)",
 };
 
 // Bertumpuk, hari wajib, cakupan
@@ -732,6 +733,435 @@ export const pesanBertumpuk = (mulai: string, selesai: string) =>
   `Tanggal itu bertumpuk dengan pengajuan lain pegawai ini (${mulai} s.d. ${selesai}).`;
 export const pesanRunUlang = (mulai: string, selesai: string) =>
   `Proses gaji periode ${mulai} s.d. ${selesai} sudah dibuat; buat ulang supaya pengajuan ini ikut dihitung.`;
+
+// Sub-fase 2b: absensi, gaji, dan jatah cuti (§20.2.4, §20.2.6, §20.2.7)
+
+export const LAPORAN_PENGAJUAN_SQL = `SELECT json_object('id', p.id_karyawan, 'mulai', p.tanggal_mulai, 'selesai', p.tanggal_selesai, 'kelompok', p.kelompok) FROM hr_pengajuan p WHERE p.tanggal_mulai <= ?2 AND p.tanggal_selesai >= ?1 AND ${PENGAJUAN_BERLAKU_SQL} ORDER BY p.id_karyawan, p.tanggal_mulai, p.id_pengajuan;`;
+export const HARI_ABSEN_SQL =
+  "SELECT id_karyawan, tanggal, MAX(CASE WHEN status_kehadiran IN ('Hadir', 'PRESENT') THEN 1 ELSE 0 END) AS hadir, COALESCE(SUM(jam_kerja), 0) AS jam_kerja FROM absensi_harian WHERE tanggal >= ?1 AND tanggal <= ?2 GROUP BY id_karyawan, tanggal;";
+export const JADWAL_PEGAWAI_SQL =
+  "SELECT m.id_unik, COALESCE(m.divisi, '') AS divisi, s.hari_kerja, s.kode_shift, COALESCE(s.jam_kerja_normal_menit, 0) AS jam_normal FROM master_data m LEFT JOIN tbl_shift s ON s.id_shift = m.id_shift WHERE m.id_unik IN (SELECT value FROM json_each(?1));";
+export const JATAH_PEGAWAI_SQL =
+  "SELECT m.id_unik, m.nama, COALESCE(m.unit, '') AS unit, COALESCE(m.tanggal_mulai_aktif, '') AS tmt, CASE WHEN EXISTS (SELECT 1 FROM guru_data g WHERE g.id_guru = m.id_unik) THEN 1 ELSE 0 END AS guru, COALESCE(m.divisi, '') AS divisi, s.hari_kerja, s.kode_shift FROM master_data m LEFT JOIN tbl_shift s ON s.id_shift = m.id_shift WHERE m.id_unik = ?1 AND LOWER(TRIM(COALESCE(m.jenis_personil, ''))) <> 'siswa' AND NOT EXISTS (SELECT 1 FROM siswa_data sd WHERE sd.id_siswa = m.id_unik);";
+export const JATAH_TERPAKAI_SQL = `SELECT p.tanggal_mulai, p.tanggal_selesai FROM hr_pengajuan p WHERE p.id_karyawan = ?1 AND p.potong_jatah = 1 AND ${PENGAJUAN_BERLAKU_SQL} ORDER BY p.tanggal_mulai, p.id_pengajuan;`;
+export const HADIR_ORANG_SQL =
+  "SELECT tanggal FROM absensi_harian WHERE id_karyawan = ?1 AND tanggal >= ?2 AND tanggal <= ?3 AND status_kehadiran IN ('Hadir', 'PRESENT') GROUP BY tanggal;";
+export const PENYESUAIAN_ORANG_SQL =
+  "SELECT u.id_penyesuaian, u.periode, u.jenis, COALESCE(u.id_ref, '') AS id_ref, u.hari, u.alasan, u.dicatat_oleh, u.created_at, CASE WHEN EXISTS (SELECT 1 FROM hr_cuti_penyesuaian b WHERE b.jenis = 'Pembatalan' AND b.id_ref = u.id_penyesuaian) THEN 1 ELSE 0 END AS dibatalkan FROM hr_cuti_penyesuaian u WHERE u.id_karyawan = ?1 ORDER BY u.periode, u.created_at, u.id_penyesuaian;";
+export const PENYESUAIAN_SATU_SQL =
+  "SELECT u.id_penyesuaian, u.id_karyawan, u.periode, u.jenis, CASE WHEN EXISTS (SELECT 1 FROM hr_cuti_penyesuaian b WHERE b.jenis = 'Pembatalan' AND b.id_ref = u.id_penyesuaian) THEN 1 ELSE 0 END AS dibatalkan FROM hr_cuti_penyesuaian u WHERE u.id_penyesuaian = ?1;";
+export const RIWAYAT_PENGAJUAN_SQL =
+  "SELECT p.id_pengajuan, p.id_karyawan, COALESCE(m.nama, p.id_karyawan) AS nama, COALESCE(m.unit, '') AS unit, CASE WHEN EXISTS (SELECT 1 FROM guru_data g WHERE g.id_guru = p.id_karyawan) THEN 1 ELSE 0 END AS guru, p.id_jenis, COALESCE(j.nama, p.id_jenis) AS nama_jenis, p.kelompok, p.potong_jatah, p.dampak_gaji, p.izin_pemutus, p.tanggal_mulai, p.tanggal_selesai, p.jam_mulai_ke, p.jam_sampai_ke, p.setengah_hari, p.alasan, p.sidik, p.diajukan_oleh, p.waktu_perangkat FROM hr_pengajuan p LEFT JOIN master_data m ON m.id_unik = p.id_karyawan LEFT JOIN hr_jenis_pengajuan j ON j.id_jenis = p.id_jenis WHERE p.id_karyawan = ?1 ORDER BY p.tanggal_mulai DESC, p.id_pengajuan LIMIT 200;";
+export const ATURAN_CUTI_SQL =
+  "SELECT key, value FROM setting_gex_system WHERE key LIKE 'hr_cuti_%';";
+export const CLOUD_PENYESUAIAN_SQL =
+  "INSERT INTO hr_cuti_penyesuaian (id_penyesuaian, id_karyawan, periode, jenis, id_ref, hari, alasan, dicatat_oleh, created_at) VALUES (?1, ?2, ?3, ?4, NULLIF(?5, ''), ?6, ?7, ?8, datetime('now')) ON CONFLICT(id_penyesuaian) DO NOTHING;";
+
+/** Pengajuan berlaku hasil `PENGAJUAN_RENTANG_SQL`. Cermin `Berlaku`. */
+export interface Berlaku {
+  id_karyawan: string;
+  tanggal_mulai: string;
+  tanggal_selesai: string;
+  kelompok: string;
+  dampak_gaji: string;
+  jam_mulai_ke: number | null;
+  jam_sampai_ke: number | null;
+  setengah_hari: boolean;
+}
+
+/** Cermin `penuh_pada`: pengajuan menutup `t` sehari penuh (Q-46). */
+export function penuhPada(p: Berlaku, t: string): boolean {
+  const awalSebagian =
+    t === p.tanggal_mulai && p.jam_mulai_ke !== null && p.jam_mulai_ke > 1;
+  const akhirSebagian = t === p.tanggal_selesai && p.jam_sampai_ke !== null;
+  return !(p.setengah_hari || awalSebagian || akhirSebagian);
+}
+
+/** Cermin `menit_cuti_dibayar` (tabel §20.2.7): `[hari, menit]`. */
+export function menitCutiDibayar(
+  penuh: boolean,
+  hadir: boolean,
+  jamKerja: number,
+  normal: number,
+): [number, number] {
+  if (penuh && hadir) return [0, 0];
+  return [
+    hadir ? 0 : 1,
+    Math.max(0, Math.max(0, normal) - Math.max(0, jamKerja)),
+  ];
+}
+
+export interface CutiDibayar {
+  hari: number;
+  menit: number;
+  jam_normal_nol: boolean;
+}
+
+/** Cermin `hitung_cuti_dibayar`: satu tanggal sekali, penuh menang. */
+export function hitungCutiDibayar(
+  tanggal: readonly (readonly [string, boolean])[],
+  absen: ReadonlyMap<string, readonly [boolean, number]>,
+  normal: number,
+): CutiDibayar {
+  const per = new Map<string, boolean>();
+  for (const [t, penuh] of tanggal) per.set(t, (per.get(t) ?? false) || penuh);
+  const hasil: CutiDibayar = {
+    hari: 0,
+    menit: 0,
+    jam_normal_nol: per.size > 0 && normal <= 0,
+  };
+  for (const [t, penuh] of per) {
+    const [hadir, jam] = absen.get(t) ?? [false, 0];
+    const [h, m] = menitCutiDibayar(penuh, hadir, jam, normal);
+    hasil.hari += h;
+    hasil.menit += m;
+  }
+  return hasil;
+}
+
+/** Cermin `hadir_saat_cuti`; `hadir` berisi `id|tanggal`. */
+export function hadirSaatCuti(p: Berlaku, hadir: ReadonlySet<string>): boolean {
+  return (
+    p.kelompok === "Cuti" &&
+    tanggalRentang(p.tanggal_mulai, p.tanggal_selesai).some(
+      (t) => penuhPada(p, t) && hadir.has(`${p.id_karyawan}|${t}`),
+    )
+  );
+}
+
+/** Baris SQL berkolom pengajuan (daftar, riwayat, `PENGAJUAN_RENTANG_SQL`). */
+export function berlakuDari(r: Record<string, unknown>): Berlaku {
+  const opsional = (v: unknown) =>
+    v === null || v === undefined || v === "" ? null : Number(v);
+  return {
+    id_karyawan: String(r.id_karyawan ?? ""),
+    tanggal_mulai: String(r.tanggal_mulai ?? ""),
+    tanggal_selesai: String(r.tanggal_selesai ?? ""),
+    kelompok: String(r.kelompok ?? ""),
+    dampak_gaji: String(r.dampak_gaji ?? ""),
+    jam_mulai_ke: opsional(r.jam_mulai_ke),
+    jam_sampai_ke: opsional(r.jam_sampai_ke),
+    setengah_hari: Number(r.setengah_hari ?? 0) === 1,
+  };
+}
+
+// Aturan dan jatah cuti per kelompok (§20.2.4)
+
+export const KELOMPOK_CUTI = ["guru", "tendik"] as const;
+export type KelompokCuti = (typeof KELOMPOK_CUTI)[number];
+export const PERIODE_CUTI = ["tahunan", "ulang_tahun_kerja"] as const;
+export const SISA_CUTI = ["hangus", "dibawa"] as const;
+export const JENIS_PENYESUAIAN = ["Saldo Awal", "Koreksi"] as const;
+export const MAKS_HARI_PENYESUAIAN = 366;
+
+/** Cermin `BATAS_CUTI`: isian, label, min, maks, bawaan guru, bawaan tendik. */
+export const BATAS_CUTI = [
+  ["hak", "Hak cuti", 0, 60, 12, 12],
+  ["bulan_awal", "Bulan awal periode", 1, 12, 7, 1],
+  ["syarat_bulan", "Masa kerja minimum", 0, 24, 12, 12],
+  ["bawa_maks", "Sisa maksimal dibawa", 0, 60, 6, 6],
+  ["bawa_bulan", "Batas pakai sisa dibawa", 1, 12, 3, 3],
+] as const;
+
+export interface AturanCuti {
+  periode: string;
+  hak: number;
+  bulan_awal: number;
+  syarat_bulan: number;
+  sisa: string;
+  bawa_maks: number;
+  bawa_bulan: number;
+}
+
+export const kunciCuti = (isian: string, kelompok: string) =>
+  `hr_cuti_${isian}:${kelompok}`;
+
+/** Cermin `aturan_cuti`. Kosong atau di luar batas = bawaan kelompok. */
+export function aturanCuti(
+  peta: ReadonlyMap<string, string>,
+  kelompok: string,
+): AturanCuti {
+  const guru = kelompok === "guru";
+  const nilai = (isian: string) => peta.get(kunciCuti(isian, kelompok))?.trim();
+  const angka = (i: number) => {
+    const [isian, , min, maks, bawaanGuru, bawaanTendik] = BATAS_CUTI[i];
+    const teksNilai = nilai(isian);
+    const n =
+      teksNilai !== undefined && /^[+-]?\d+$/.test(teksNilai)
+        ? Number(teksNilai)
+        : Number.NaN;
+    return n >= min && n <= maks ? n : guru ? bawaanGuru : bawaanTendik;
+  };
+  const pilih = (isian: string, daftar: readonly string[]) => {
+    const v = nilai(isian);
+    return v !== undefined && daftar.includes(v) ? v : daftar[0];
+  };
+  return {
+    periode: pilih("periode", PERIODE_CUTI),
+    hak: angka(0),
+    bulan_awal: angka(1),
+    syarat_bulan: angka(2),
+    sisa: pilih("sisa", SISA_CUTI),
+    bawa_maks: angka(3),
+    bawa_bulan: angka(4),
+  };
+}
+
+/** Cermin `validasi_aturan_cuti`: pasangan kunci-nilai, urutan tetap. */
+export function validasiAturanCuti(draft: Draft): Hasil<[string, string][]> {
+  const hasil: [string, string][] = [];
+  for (const k of KELOMPOK_CUTI) {
+    const a = draft[k];
+    if (typeof a !== "object" || a === null || Array.isArray(a)) {
+      return gagal(`Aturan cuti ${k} tidak lengkap.`);
+    }
+    const isian = a as Draft;
+    const periode = teks(isian, "periode");
+    if (!termasuk(PERIODE_CUTI, periode)) {
+      return gagal(`Periode cuti ${k} harus tahunan atau ulang tahun kerja.`);
+    }
+    const sisa = teks(isian, "sisa");
+    if (!termasuk(SISA_CUTI, sisa)) {
+      return gagal(`Sisa cuti ${k} harus hangus atau dibawa.`);
+    }
+    hasil.push([kunciCuti("periode", k), periode]);
+    for (const [nama, label, min, maks] of BATAS_CUTI) {
+      const n = isian[nama];
+      if (
+        typeof n !== "number" ||
+        !Number.isInteger(n) ||
+        n < min ||
+        n > maks
+      ) {
+        return gagal(`${label} ${k} harus ${min} sampai ${maks}.`);
+      }
+      hasil.push([kunciCuti(nama, k), String(n)]);
+      if (nama === "syarat_bulan") hasil.push([kunciCuti("sisa", k), sisa]);
+    }
+  }
+  return ok(hasil);
+}
+
+export interface PeriodeCuti {
+  mulai: string;
+  selesai: string;
+  sebelum_berhak: boolean;
+  hak: number;
+  bawaan: number;
+  bawaan_hangus: number;
+  bawaan_sampai: string | null;
+  penyesuaian: number;
+  terpakai: number;
+  sisa: number;
+}
+
+/** Cermin `jatah_cuti`. */
+export function jatahCuti(
+  tmt: string | null,
+  a: AturanCuti,
+  terpakai: readonly string[],
+  penyesuaian: readonly (readonly [string, number])[],
+  hariIni: string,
+): PeriodeCuti[] {
+  if (tmt === null || !tanggalValid(tmt)) return [];
+  const berhak = tambahBulan(tmt, a.syarat_bulan);
+  if (berhak === null) return [];
+  let akhir = hariIni;
+  for (const t of [...terpakai, ...penyesuaian.map(([p]) => p)]) {
+    if (t > akhir) akhir = t;
+  }
+
+  const batas: [string, string, number, boolean][] = [];
+  if (tmt < berhak || terpakai.some((t) => t < berhak)) {
+    const awalan = terpakai.filter((t) => t < tmt).sort()[0] ?? tmt;
+    const selesai = tambahHari(berhak, -1);
+    if (awalan <= selesai) batas.push([awalan, selesai, 0, true]);
+  }
+  if (a.periode === "tahunan") {
+    const tahun = Number(berhak.slice(0, 4));
+    const bulan = Number(berhak.slice(5, 7));
+    const awal = (y: number) =>
+      `${String(y).padStart(4, "0")}-${String(a.bulan_awal).padStart(2, "0")}-01`;
+    let y = (bulan >= a.bulan_awal ? tahun : tahun - 1) + 1;
+    batas.push([berhak, tambahHari(awal(y), -1), a.hak, false]);
+    while (awal(y) <= akhir && batas.length < 200) {
+      batas.push([awal(y), tambahHari(awal(y + 1), -1), a.hak, false]);
+      y += 1;
+    }
+  } else {
+    for (let k = 0; batas.length < 200; k++) {
+      const mulai = tambahBulan(berhak, 12 * k);
+      const berikut = tambahBulan(berhak, 12 * (k + 1));
+      if (mulai === null || berikut === null || mulai > akhir) break;
+      batas.push([mulai, tambahHari(berikut, -1), a.hak, false]);
+    }
+  }
+
+  const hasil: PeriodeCuti[] = [];
+  for (const [mulai, selesai, hak, sebelumBerhak] of batas) {
+    const pakai = terpakai.filter((t) => t >= mulai && t <= selesai).length;
+    const adj = penyesuaian
+      .filter(([p]) => p === mulai)
+      .reduce((n, [, h]) => n + h, 0);
+    const sebelumnya = hasil.at(-1);
+    const bawaan =
+      sebelumnya && !sebelumnya.sebelum_berhak && a.sisa === "dibawa"
+        ? Math.min(Math.max(sebelumnya.sisa, 0), a.bawa_maks)
+        : 0;
+    let hangus = 0;
+    let sampai: string | null = null;
+    if (bawaan > 0) {
+      const batasBawa = tambahBulan(mulai, a.bawa_bulan);
+      if (batasBawa !== null) {
+        const awal = terpakai.filter((t) => t >= mulai && t < batasBawa).length;
+        if (hariIni >= batasBawa) hangus = bawaan - Math.min(bawaan, awal);
+        sampai = tambahHari(batasBawa, -1);
+      }
+    }
+    hasil.push({
+      mulai,
+      selesai,
+      sebelum_berhak: sebelumBerhak,
+      hak,
+      bawaan,
+      bawaan_hangus: hangus,
+      bawaan_sampai: sampai,
+      penyesuaian: adj,
+      terpakai: pakai,
+      sisa: hak + adj + bawaan - hangus - pakai,
+    });
+  }
+  return hasil.filter(
+    (p) => !p.sebelum_berhak || p.terpakai !== 0 || p.penyesuaian !== 0,
+  );
+}
+
+export interface PenyesuaianSah {
+  batal: string;
+  id_karyawan: string;
+  periode: string;
+  jenis: string;
+  hari: number;
+  alasan: string;
+}
+
+/** Cermin `validasi_penyesuaian`. */
+export function validasiPenyesuaian(draft: Draft): Hasil<PenyesuaianSah> {
+  const alasan = teks(draft, "alasan");
+  const cekAlasan = (): string | null => {
+    if (alasan === "") return "Alasan wajib diisi.";
+    if (panjang(alasan) > MAKS_ALASAN) {
+      return `Alasan maksimal ${MAKS_ALASAN} karakter.`;
+    }
+    return null;
+  };
+  const batal = teks(draft, "batal");
+  if (batal !== "") {
+    const salah = cekAlasan();
+    if (salah) return gagal(salah);
+    return ok({
+      batal,
+      id_karyawan: "",
+      periode: "",
+      jenis: "Pembatalan",
+      hari: 0,
+      alasan,
+    });
+  }
+  const idKaryawan = teks(draft, "id_karyawan");
+  if (idKaryawan === "") return gagal("Pilih pegawai.");
+  const periode = teks(draft, "periode");
+  if (!tanggalValid(periode)) return gagal("Periode jatah tidak valid.");
+  const jenis = teks(draft, "jenis");
+  if (!termasuk(JENIS_PENYESUAIAN, jenis)) {
+    return gagal("Jenis penyesuaian harus Saldo Awal atau Koreksi.");
+  }
+  const hari = draft.hari;
+  if (
+    typeof hari !== "number" ||
+    !Number.isInteger(hari) ||
+    hari === 0 ||
+    Math.abs(hari) > MAKS_HARI_PENYESUAIAN
+  ) {
+    return gagal(
+      `Jumlah hari harus -${MAKS_HARI_PENYESUAIAN} sampai ${MAKS_HARI_PENYESUAIAN} dan bukan 0.`,
+    );
+  }
+  const salah = cekAlasan();
+  if (salah) return gagal(salah);
+  return ok({
+    batal: "",
+    id_karyawan: idKaryawan,
+    periode,
+    jenis,
+    hari,
+    alasan,
+  });
+}
+
+export const LABEL_TANDA_CUTI: Record<string, string> = {
+  tanpa_tmt: "TMT kosong: belum punya jatah cuti",
+  jatah_minus: "Sisa jatah periode ini minus",
+};
+
+export const aturanCutiDraftSchema = z
+  .object({
+    guru: z.record(z.string(), z.unknown()),
+    tendik: z.record(z.string(), z.unknown()),
+  })
+  .strict();
+export type AturanCutiDraft = { guru: AturanCuti; tendik: AturanCuti };
+
+export const penyesuaianDraftSchema = z
+  .object({
+    batal: z.string().max(80).optional(),
+    id_karyawan: z.string().max(80).optional(),
+    periode: z.string().max(10).optional(),
+    jenis: z.string().max(20).optional(),
+    hari: z.number().optional(),
+    alasan: z.string().max(2000),
+  })
+  .strict();
+export type PenyesuaianDraft = z.infer<typeof penyesuaianDraftSchema>;
+
+export const saldoQuerySchema = z
+  .object({
+    id_karyawan: z.string().max(80).nullable().optional(),
+    mulai: z.string().max(10).nullable().optional(),
+    selesai: z.string().max(10).nullable().optional(),
+  })
+  .strict();
+
+export interface BarisPenyesuaian {
+  id_penyesuaian: string;
+  periode: string;
+  jenis: string;
+  id_ref: string;
+  hari: number;
+  alasan: string;
+  dicatat_oleh: string;
+  created_at: string;
+  dibatalkan: number;
+}
+
+/** Bentuk jawaban `desktop_hr_leave_balance` / `POST /api/pengajuan/leave/query`. */
+export interface SaldoCuti {
+  aturan: { guru: AturanCuti; tendik: AturanCuti };
+  hari_ini: string;
+  pegawai: {
+    id_karyawan: string;
+    nama: string;
+    unit: string;
+    kelompok: KelompokCuti;
+    tmt: string;
+    tanda: string[];
+    berjalan: PeriodeCuti | null;
+    penyesuaian: BarisPenyesuaian[];
+    periode: PeriodeCuti[];
+    riwayat: PengajuanTersusun[];
+    hari_wajib?: number;
+  } | null;
+}
 
 // Daftar (dipakai service Web; Rust susun_daftar)
 

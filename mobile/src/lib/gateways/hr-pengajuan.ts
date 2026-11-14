@@ -4,21 +4,31 @@ import { requestWebApi } from "@/lib/client/api-client";
 import { isDesktopRuntime } from "@/lib/runtime/app-runtime";
 import { invokeDesktop, kickDesktopSync } from "@/lib/runtime/desktop-commands";
 import type {
+  AturanCuti,
+  AturanCutiDraft,
   DaftarPengajuan,
   HasilSimpanPengajuan,
   JenisDraft,
   PengajuanDraft,
+  PenyesuaianDraft,
+  SaldoCuti,
 } from "@/lib/validations/hr-pengajuan";
 
 export type {
+  AturanCuti,
+  AturanCutiDraft,
   BarisJenis,
   BarisKeputusan,
+  BarisPenyesuaian,
   DaftarPengajuan,
   HasilSimpanPengajuan,
   JenisDraft,
   PegawaiPengajuan,
   PengajuanDraft,
   PengajuanTersusun,
+  PenyesuaianDraft,
+  PeriodeCuti,
+  SaldoCuti,
 } from "@/lib/validations/hr-pengajuan";
 
 // Command `desktop_hr_request*` terdaftar di biner Desktop DAN Mobile
@@ -76,6 +86,44 @@ export function simpanJenisPengajuan(draft: JenisDraft) {
     "desktop_hr_request_types_save",
     { draft },
     "/api/pengajuan/types",
+    draft,
+  );
+}
+
+/** Aturan cuti; dengan pegawai juga jatah, penyesuaian, dan riwayatnya. */
+export async function muatSaldoCuti(
+  idKaryawan: string | null,
+  mulai: string | null = null,
+  selesai: string | null = null,
+): Promise<SaldoCuti> {
+  if (isDesktopRuntime()) {
+    return invokeDesktop("desktop_hr_leave_balance", {
+      idKaryawan,
+      mulai,
+      selesai,
+    });
+  }
+  return requestWebApi("/api/pengajuan/leave/query", "POST", {
+    id_karyawan: idKaryawan,
+    mulai,
+    selesai,
+  });
+}
+
+export function simpanAturanCuti(draft: AturanCutiDraft) {
+  return mutasi<{ guru: AturanCuti; tendik: AturanCuti }>(
+    "desktop_hr_leave_settings_save",
+    { draft },
+    "/api/pengajuan/leave/settings",
+    draft,
+  );
+}
+
+export function sesuaikanJatahCuti(draft: PenyesuaianDraft) {
+  return mutasi(
+    "desktop_hr_leave_adjust",
+    { draft },
+    "/api/pengajuan/leave/adjust",
     draft,
   );
 }

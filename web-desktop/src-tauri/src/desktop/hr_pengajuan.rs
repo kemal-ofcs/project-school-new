@@ -43,12 +43,11 @@ const PESAN_CAKUPAN: &str = "Pegawai ini di luar unit yang kamu pegang.";
 // SQL kembar (teks identik dengan TS)
 
 /// Predikat "pengajuan berlaku" (Disetujui / Disetujui (urgent)) atas alias
-/// `p`. Dipakai SEMUA pembaca; tidak ada kueri status lain. Pembacanya (Alfa,
-/// audit, laporan, gaji) lahir di sub-fase 2b.
+/// `p`. Dipakai SEMUA pembaca (Alfa, audit, laporan, gaji, jatah); tidak ada
+/// kueri status lain. Disalin harfiah ke setiap kueri turunannya.
 #[cfg_attr(not(test), allow(dead_code))]
 pub const PENGAJUAN_BERLAKU_SQL: &str = "NOT EXISTS (SELECT 1 FROM hr_pengajuan_keputusan b WHERE b.id_pengajuan = p.id_pengajuan AND b.jenis = 'Batal') AND (SELECT k.jenis FROM hr_pengajuan_keputusan k WHERE k.id_pengajuan = p.id_pengajuan AND k.sidik = p.sidik AND k.jenis IN ('Setujui', 'Tolak', 'Setujui Urgent') ORDER BY k.diterima_cloud IS NULL, k.diterima_cloud, k.waktu_perangkat, k.id_keputusan LIMIT 1) IN ('Setujui', 'Setujui Urgent')";
 /// Pengajuan berlaku yang bertumpuk dengan `?1`..`?2`.
-#[cfg_attr(not(test), allow(dead_code))]
 pub const PENGAJUAN_RENTANG_SQL: &str = "SELECT p.id_pengajuan, p.id_karyawan, p.tanggal_mulai, p.tanggal_selesai, p.kelompok, p.dampak_gaji, p.potong_jatah, p.jam_mulai_ke, p.jam_sampai_ke, p.setengah_hari FROM hr_pengajuan p WHERE p.tanggal_mulai <= ?2 AND p.tanggal_selesai >= ?1 AND NOT EXISTS (SELECT 1 FROM hr_pengajuan_keputusan b WHERE b.id_pengajuan = p.id_pengajuan AND b.jenis = 'Batal') AND (SELECT k.jenis FROM hr_pengajuan_keputusan k WHERE k.id_pengajuan = p.id_pengajuan AND k.sidik = p.sidik AND k.jenis IN ('Setujui', 'Tolak', 'Setujui Urgent') ORDER BY k.diterima_cloud IS NULL, k.diterima_cloud, k.waktu_perangkat, k.id_keputusan LIMIT 1) IN ('Setujui', 'Setujui Urgent') ORDER BY p.id_karyawan, p.tanggal_mulai, p.id_pengajuan;";
 /// Proses gaji `PAID` yang periodenya menyentuh `?1`..`?2` (Q-52).
 pub const PERIODE_DIBAYAR_SQL: &str = "SELECT period_start, period_end FROM payroll_runs WHERE status = 'PAID' AND period_start <= ?2 AND period_end >= ?1 ORDER BY period_start LIMIT 1;";
@@ -744,6 +743,408 @@ pub fn pesan_run_ulang(mulai: &str, selesai: &str) -> String {
     format!("Proses gaji periode {mulai} s.d. {selesai} sudah dibuat; buat ulang supaya pengajuan ini ikut dihitung.")
 }
 
+// Sub-fase 2b: absensi, gaji, dan jatah cuti (§20.2.4, §20.2.6, §20.2.7)
+
+/// Pengajuan berlaku untuk laporan kehadiran (kunci data `pengajuan`).
+pub const LAPORAN_PENGAJUAN_SQL: &str = "SELECT json_object('id', p.id_karyawan, 'mulai', p.tanggal_mulai, 'selesai', p.tanggal_selesai, 'kelompok', p.kelompok) FROM hr_pengajuan p WHERE p.tanggal_mulai <= ?2 AND p.tanggal_selesai >= ?1 AND NOT EXISTS (SELECT 1 FROM hr_pengajuan_keputusan b WHERE b.id_pengajuan = p.id_pengajuan AND b.jenis = 'Batal') AND (SELECT k.jenis FROM hr_pengajuan_keputusan k WHERE k.id_pengajuan = p.id_pengajuan AND k.sidik = p.sidik AND k.jenis IN ('Setujui', 'Tolak', 'Setujui Urgent') ORDER BY k.diterima_cloud IS NULL, k.diterima_cloud, k.waktu_perangkat, k.id_keputusan LIMIT 1) IN ('Setujui', 'Setujui Urgent') ORDER BY p.id_karyawan, p.tanggal_mulai, p.id_pengajuan;";
+/// Per orang per tanggal `?1`..`?2`: ada scan Hadir (definisi `total_hadir`
+/// rekap gaji) dan jam kerja tercatat.
+pub const HARI_ABSEN_SQL: &str = "SELECT id_karyawan, tanggal, MAX(CASE WHEN status_kehadiran IN ('Hadir', 'PRESENT') THEN 1 ELSE 0 END) AS hadir, COALESCE(SUM(jam_kerja), 0) AS jam_kerja FROM absensi_harian WHERE tanggal >= ?1 AND tanggal <= ?2 GROUP BY id_karyawan, tanggal;";
+/// Jadwal kini pegawai di larik JSON `?1` (shift `master_data.id_shift`).
+pub const JADWAL_PEGAWAI_SQL: &str = "SELECT m.id_unik, COALESCE(m.divisi, '') AS divisi, s.hari_kerja, s.kode_shift, COALESCE(s.jam_kerja_normal_menit, 0) AS jam_normal FROM master_data m LEFT JOIN tbl_shift s ON s.id_shift = m.id_shift WHERE m.id_unik IN (SELECT value FROM json_each(?1));";
+/// Satu pegawai untuk jatah cuti: TMT, kelompok guru/tendik, dan jadwal.
+pub const JATAH_PEGAWAI_SQL: &str = "SELECT m.id_unik, m.nama, COALESCE(m.unit, '') AS unit, COALESCE(m.tanggal_mulai_aktif, '') AS tmt, CASE WHEN EXISTS (SELECT 1 FROM guru_data g WHERE g.id_guru = m.id_unik) THEN 1 ELSE 0 END AS guru, COALESCE(m.divisi, '') AS divisi, s.hari_kerja, s.kode_shift FROM master_data m LEFT JOIN tbl_shift s ON s.id_shift = m.id_shift WHERE m.id_unik = ?1 AND LOWER(TRIM(COALESCE(m.jenis_personil, ''))) <> 'siswa' AND NOT EXISTS (SELECT 1 FROM siswa_data sd WHERE sd.id_siswa = m.id_unik);";
+/// Rentang pengajuan Cuti ber-`potong_jatah` yang berlaku milik `?1`.
+pub const JATAH_TERPAKAI_SQL: &str = "SELECT p.tanggal_mulai, p.tanggal_selesai FROM hr_pengajuan p WHERE p.id_karyawan = ?1 AND p.potong_jatah = 1 AND NOT EXISTS (SELECT 1 FROM hr_pengajuan_keputusan b WHERE b.id_pengajuan = p.id_pengajuan AND b.jenis = 'Batal') AND (SELECT k.jenis FROM hr_pengajuan_keputusan k WHERE k.id_pengajuan = p.id_pengajuan AND k.sidik = p.sidik AND k.jenis IN ('Setujui', 'Tolak', 'Setujui Urgent') ORDER BY k.diterima_cloud IS NULL, k.diterima_cloud, k.waktu_perangkat, k.id_keputusan LIMIT 1) IN ('Setujui', 'Setujui Urgent') ORDER BY p.tanggal_mulai, p.id_pengajuan;";
+/// Tanggal scan Hadir milik `?1` dalam `?2`..`?3`.
+pub const HADIR_ORANG_SQL: &str = "SELECT tanggal FROM absensi_harian WHERE id_karyawan = ?1 AND tanggal >= ?2 AND tanggal <= ?3 AND status_kehadiran IN ('Hadir', 'PRESENT') GROUP BY tanggal;";
+/// Penyesuaian jatah satu pegawai, beserta penanda sudah dibatalkan.
+pub const PENYESUAIAN_ORANG_SQL: &str = "SELECT u.id_penyesuaian, u.periode, u.jenis, COALESCE(u.id_ref, '') AS id_ref, u.hari, u.alasan, u.dicatat_oleh, u.created_at, CASE WHEN EXISTS (SELECT 1 FROM hr_cuti_penyesuaian b WHERE b.jenis = 'Pembatalan' AND b.id_ref = u.id_penyesuaian) THEN 1 ELSE 0 END AS dibatalkan FROM hr_cuti_penyesuaian u WHERE u.id_karyawan = ?1 ORDER BY u.periode, u.created_at, u.id_penyesuaian;";
+pub const PENYESUAIAN_SATU_SQL: &str = "SELECT u.id_penyesuaian, u.id_karyawan, u.periode, u.jenis, CASE WHEN EXISTS (SELECT 1 FROM hr_cuti_penyesuaian b WHERE b.jenis = 'Pembatalan' AND b.id_ref = u.id_penyesuaian) THEN 1 ELSE 0 END AS dibatalkan FROM hr_cuti_penyesuaian u WHERE u.id_penyesuaian = ?1;";
+/// Riwayat pengajuan satu pegawai (kolom sama dengan `DAFTAR_PENGAJUAN_SQL`).
+pub const RIWAYAT_PENGAJUAN_SQL: &str = "SELECT p.id_pengajuan, p.id_karyawan, COALESCE(m.nama, p.id_karyawan) AS nama, COALESCE(m.unit, '') AS unit, CASE WHEN EXISTS (SELECT 1 FROM guru_data g WHERE g.id_guru = p.id_karyawan) THEN 1 ELSE 0 END AS guru, p.id_jenis, COALESCE(j.nama, p.id_jenis) AS nama_jenis, p.kelompok, p.potong_jatah, p.dampak_gaji, p.izin_pemutus, p.tanggal_mulai, p.tanggal_selesai, p.jam_mulai_ke, p.jam_sampai_ke, p.setengah_hari, p.alasan, p.sidik, p.diajukan_oleh, p.waktu_perangkat FROM hr_pengajuan p LEFT JOIN master_data m ON m.id_unik = p.id_karyawan LEFT JOIN hr_jenis_pengajuan j ON j.id_jenis = p.id_jenis WHERE p.id_karyawan = ?1 ORDER BY p.tanggal_mulai DESC, p.id_pengajuan LIMIT 200;";
+pub const ATURAN_CUTI_SQL: &str =
+    "SELECT key, value FROM setting_gex_system WHERE key LIKE 'hr_cuti_%';";
+
+/// Pengajuan berlaku hasil `PENGAJUAN_RENTANG_SQL`.
+#[derive(Debug, Clone, Deserialize)]
+pub struct Berlaku {
+    pub id_karyawan: String,
+    pub tanggal_mulai: String,
+    pub tanggal_selesai: String,
+    pub kelompok: String,
+    pub dampak_gaji: String,
+    #[serde(default)]
+    pub jam_mulai_ke: Option<i64>,
+    #[serde(default)]
+    pub jam_sampai_ke: Option<i64>,
+    pub setengah_hari: bool,
+}
+
+/// Cermin `penuhPada`: pengajuan menutup `t` sehari penuh. Hari sebagian
+/// (Q-46) = setengah hari, hari pertama yang mulai sesudah jam ke-1, atau
+/// hari terakhir yang berhenti di jam tertentu.
+pub fn penuh_pada(p: &Berlaku, t: &str) -> bool {
+    let awal_sebagian = t == p.tanggal_mulai && p.jam_mulai_ke.is_some_and(|n| n > 1);
+    let akhir_sebagian = t == p.tanggal_selesai && p.jam_sampai_ke.is_some();
+    !(p.setengah_hari || awal_sebagian || akhir_sebagian)
+}
+
+/// Cermin `menitCutiDibayar` (tabel §20.2.7, Q-46): `(hari, menit)` satu
+/// tanggal wajib. Hari penuh dengan scan Hadir = Hadir menang; selain itu
+/// menit dibayar = max(tercatat, jam normal) dikurangi yang tercatat, dan
+/// hari dihitung bila tidak ada scan Hadir (TER harian, Q-41).
+pub fn menit_cuti_dibayar(penuh: bool, hadir: bool, jam_kerja: i64, normal: i64) -> (i64, i64) {
+    if penuh && hadir {
+        return (0, 0);
+    }
+    (i64::from(!hadir), (normal.max(0) - jam_kerja.max(0)).max(0))
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Serialize)]
+pub struct CutiDibayar {
+    pub hari: i64,
+    pub menit: i64,
+    /// Ada tanggal cuti dibayar tetapi jam normal shift-nya 0.
+    pub jam_normal_nol: bool,
+}
+
+/// Cermin `hitungCutiDibayar`: `tanggal` = (tanggal wajib, penuh) dari
+/// pengajuan Dibayar satu orang; satu tanggal dihitung sekali, penuh menang.
+/// `absen` = tanggal → (ada scan Hadir, jam kerja tercatat).
+pub fn hitung_cuti_dibayar(
+    tanggal: &[(String, bool)],
+    absen: &HashMap<String, (bool, i64)>,
+    normal: i64,
+) -> CutiDibayar {
+    let mut per: std::collections::BTreeMap<&str, bool> = std::collections::BTreeMap::new();
+    for (t, penuh) in tanggal {
+        per.entry(t.as_str())
+            .and_modify(|p| *p = *p || *penuh)
+            .or_insert(*penuh);
+    }
+    let mut hasil = CutiDibayar {
+        jam_normal_nol: !per.is_empty() && normal <= 0,
+        ..CutiDibayar::default()
+    };
+    for (t, penuh) in per {
+        let (hadir, jam) = absen.get(t).copied().unwrap_or((false, 0));
+        let (h, m) = menit_cuti_dibayar(penuh, hadir, jam, normal);
+        hasil.hari += h;
+        hasil.menit += m;
+    }
+    hasil
+}
+
+/// Cermin `hadirSaatCuti`: pengajuan Cuti yang berlaku punya tanggal hari
+/// penuh dengan scan Hadir (`hadir` berisi `id|tanggal`). Hadir menang dan
+/// jatah tidak terpotong; tanda ini hanya untuk ditinjau.
+pub fn hadir_saat_cuti(p: &Berlaku, hadir: &HashSet<String>) -> bool {
+    p.kelompok == "Cuti"
+        && tanggal_rentang(&p.tanggal_mulai, &p.tanggal_selesai)
+            .iter()
+            .any(|t| penuh_pada(p, t) && hadir.contains(&format!("{}|{t}", p.id_karyawan)))
+}
+
+// Aturan dan jatah cuti per kelompok (§20.2.4)
+
+pub const KELOMPOK_CUTI: [&str; 2] = ["guru", "tendik"];
+pub const PERIODE_CUTI: [&str; 2] = ["tahunan", "ulang_tahun_kerja"];
+pub const SISA_CUTI: [&str; 2] = ["hangus", "dibawa"];
+pub const JENIS_PENYESUAIAN: [&str; 2] = ["Saldo Awal", "Koreksi"];
+pub const MAKS_HARI_PENYESUAIAN: i64 = 366;
+
+/// Isian angka aturan cuti: (isian, label, min, maks, bawaan guru, bawaan
+/// tendik). Kunci setting = `hr_cuti_<isian>:<kelompok>`.
+pub const BATAS_CUTI: [(&str, &str, i64, i64, i64, i64); 5] = [
+    ("hak", "Hak cuti", 0, 60, 12, 12),
+    ("bulan_awal", "Bulan awal periode", 1, 12, 7, 1),
+    ("syarat_bulan", "Masa kerja minimum", 0, 24, 12, 12),
+    ("bawa_maks", "Sisa maksimal dibawa", 0, 60, 6, 6),
+    ("bawa_bulan", "Batas pakai sisa dibawa", 1, 12, 3, 3),
+];
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct AturanCuti {
+    pub periode: String,
+    pub hak: i64,
+    pub bulan_awal: i64,
+    pub syarat_bulan: i64,
+    pub sisa: String,
+    pub bawa_maks: i64,
+    pub bawa_bulan: i64,
+}
+
+pub fn kunci_cuti(isian: &str, kelompok: &str) -> String {
+    format!("hr_cuti_{isian}:{kelompok}")
+}
+
+/// Cermin `aturanCuti`. Kosong atau di luar batas = bawaan kelompok.
+pub fn aturan_cuti(peta: &HashMap<String, String>, kelompok: &str) -> AturanCuti {
+    let guru = kelompok == "guru";
+    let nilai = |isian: &str| peta.get(&kunci_cuti(isian, kelompok)).map(|v| v.trim());
+    let angka = |i: usize| {
+        let (isian, _, min, maks, bawaan_guru, bawaan_tendik) = BATAS_CUTI[i];
+        nilai(isian)
+            .and_then(|v| v.parse::<i64>().ok())
+            .filter(|n| (min..=maks).contains(n))
+            .unwrap_or(if guru { bawaan_guru } else { bawaan_tendik })
+    };
+    let pilih = |isian: &str, daftar: &[&str]| {
+        nilai(isian)
+            .filter(|v| daftar.contains(v))
+            .unwrap_or(daftar[0])
+            .to_owned()
+    };
+    AturanCuti {
+        periode: pilih("periode", &PERIODE_CUTI),
+        hak: angka(0),
+        bulan_awal: angka(1),
+        syarat_bulan: angka(2),
+        sisa: pilih("sisa", &SISA_CUTI),
+        bawa_maks: angka(3),
+        bawa_bulan: angka(4),
+    }
+}
+
+/// Cermin `validasiAturanCuti`: `{ guru: {…}, tendik: {…} }` → pasangan
+/// kunci-nilai siap disimpan, urutan tetap.
+pub fn validasi_aturan_cuti(draft: &Value) -> Result<Vec<(String, String)>, String> {
+    let mut hasil = Vec::new();
+    for k in KELOMPOK_CUTI {
+        let a = draft
+            .get(k)
+            .filter(|a| a.is_object())
+            .ok_or_else(|| format!("Aturan cuti {k} tidak lengkap."))?;
+        let periode = teks(a, "periode");
+        if !PERIODE_CUTI.contains(&periode.as_str()) {
+            return Err(format!(
+                "Periode cuti {k} harus tahunan atau ulang tahun kerja."
+            ));
+        }
+        let sisa = teks(a, "sisa");
+        if !SISA_CUTI.contains(&sisa.as_str()) {
+            return Err(format!("Sisa cuti {k} harus hangus atau dibawa."));
+        }
+        hasil.push((kunci_cuti("periode", k), periode));
+        for (isian, label, min, maks, _, _) in BATAS_CUTI {
+            match a.get(isian).and_then(Value::as_i64) {
+                Some(n) if (min..=maks).contains(&n) => {
+                    hasil.push((kunci_cuti(isian, k), n.to_string()))
+                }
+                _ => return Err(format!("{label} {k} harus {min} sampai {maks}.")),
+            }
+            if isian == "syarat_bulan" {
+                hasil.push((kunci_cuti("sisa", k), sisa.clone()));
+            }
+        }
+    }
+    Ok(hasil)
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct PeriodeCuti {
+    /// Kunci periode (`hr_cuti_penyesuaian.periode`).
+    pub mulai: String,
+    /// Inklusif.
+    pub selesai: String,
+    /// Periode sebelum tanggal berhak: hak 0, tidak membawa sisa.
+    pub sebelum_berhak: bool,
+    pub hak: i64,
+    pub bawaan: i64,
+    pub bawaan_hangus: i64,
+    pub bawaan_sampai: Option<String>,
+    pub penyesuaian: i64,
+    pub terpakai: i64,
+    pub sisa: i64,
+}
+
+fn kurang_sehari(tanggal: &str) -> Option<String> {
+    add_days(tanggal, -1).ok()
+}
+
+/// Cermin `jatahCuti` (pola perusahaan §17.7, periode tahunan berbulan awal).
+/// `terpakai` = tanggal wajib dari Cuti ber-`potong_jatah` yang berlaku,
+/// sudah dikurangi tanggal Hadir; `penyesuaian` = (periode, hari) yang tidak
+/// dibatalkan. TMT kosong = tanpa periode (tanda `tanpa_tmt`).
+pub fn jatah_cuti(
+    tmt: Option<&str>,
+    a: &AturanCuti,
+    terpakai: &[String],
+    penyesuaian: &[(String, i64)],
+    hari_ini: &str,
+) -> Vec<PeriodeCuti> {
+    let Some(masuk) = tmt.filter(|t| tanggal_valid(t)) else {
+        return Vec::new();
+    };
+    let Some(berhak) = hris::tambah_bulan(masuk, a.syarat_bulan) else {
+        return Vec::new();
+    };
+    let mut akhir = hari_ini.to_owned();
+    for t in terpakai.iter().chain(penyesuaian.iter().map(|(p, _)| p)) {
+        if *t > akhir {
+            akhir = t.clone();
+        }
+    }
+
+    // (mulai, selesai, hak, sebelum_berhak)
+    let mut batas: Vec<(String, String, i64, bool)> = Vec::new();
+    if masuk < berhak.as_str() || terpakai.iter().any(|t| *t < berhak) {
+        let mulai = terpakai
+            .iter()
+            .filter(|t| t.as_str() < masuk)
+            .min()
+            .cloned()
+            .unwrap_or_else(|| masuk.to_owned());
+        if let Some(selesai) = kurang_sehari(&berhak) {
+            if mulai <= selesai {
+                batas.push((mulai, selesai, 0, true));
+            }
+        }
+    }
+    if a.periode == "tahunan" {
+        let tahun: i64 = berhak.get(0..4).and_then(|y| y.parse().ok()).unwrap_or(0);
+        let bulan: i64 = berhak.get(5..7).and_then(|m| m.parse().ok()).unwrap_or(1);
+        let awal = |y: i64| format!("{y:04}-{:02}-01", a.bulan_awal);
+        let mut y = if bulan >= a.bulan_awal {
+            tahun
+        } else {
+            tahun - 1
+        } + 1;
+        let selesai = kurang_sehari(&awal(y)).unwrap_or_else(|| awal(y));
+        batas.push((berhak.clone(), selesai, a.hak, false));
+        while awal(y) <= akhir && batas.len() < 200 {
+            let selesai = kurang_sehari(&awal(y + 1)).unwrap_or_else(|| awal(y + 1));
+            batas.push((awal(y), selesai, a.hak, false));
+            y += 1;
+        }
+    } else {
+        let mut k = 0;
+        while batas.len() < 200 {
+            let (Some(mulai), Some(berikut)) = (
+                hris::tambah_bulan(&berhak, 12 * k),
+                hris::tambah_bulan(&berhak, 12 * (k + 1)),
+            ) else {
+                break;
+            };
+            if mulai > akhir {
+                break;
+            }
+            let selesai = kurang_sehari(&berikut).unwrap_or(berikut);
+            batas.push((mulai, selesai, a.hak, false));
+            k += 1;
+        }
+    }
+
+    let mut hasil: Vec<PeriodeCuti> = Vec::with_capacity(batas.len());
+    for (mulai, selesai, hak, sebelum_berhak) in batas {
+        let dalam = |t: &str| t >= mulai.as_str() && t <= selesai.as_str();
+        let pakai = terpakai.iter().filter(|t| dalam(t)).count() as i64;
+        let adj: i64 = penyesuaian
+            .iter()
+            .filter(|(p, _)| *p == mulai)
+            .map(|(_, h)| h)
+            .sum();
+        let bawaan = match hasil.last().filter(|p| !p.sebelum_berhak) {
+            Some(p) if a.sisa == "dibawa" => p.sisa.max(0).min(a.bawa_maks),
+            _ => 0,
+        };
+        let (mut hangus, mut sampai) = (0, None);
+        if bawaan > 0 {
+            if let Some(batas_bawa) = hris::tambah_bulan(&mulai, a.bawa_bulan) {
+                let awal = terpakai
+                    .iter()
+                    .filter(|t| t.as_str() >= mulai.as_str() && t.as_str() < batas_bawa.as_str())
+                    .count() as i64;
+                if hari_ini >= batas_bawa.as_str() {
+                    hangus = bawaan - bawaan.min(awal);
+                }
+                sampai = kurang_sehari(&batas_bawa);
+            }
+        }
+        hasil.push(PeriodeCuti {
+            sisa: hak + adj + bawaan - hangus - pakai,
+            mulai,
+            selesai,
+            sebelum_berhak,
+            hak,
+            bawaan,
+            bawaan_hangus: hangus,
+            bawaan_sampai: sampai,
+            penyesuaian: adj,
+            terpakai: pakai,
+        });
+    }
+    // Periode sebelum berhak hanya tampil bila ada isinya.
+    hasil.retain(|p| !p.sebelum_berhak || p.terpakai != 0 || p.penyesuaian != 0);
+    hasil
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct PenyesuaianSah {
+    /// Id penyesuaian yang dibatalkan; kosong = penyesuaian baru.
+    pub batal: String,
+    pub id_karyawan: String,
+    pub periode: String,
+    pub jenis: String,
+    pub hari: i64,
+    pub alasan: String,
+}
+
+/// Cermin `validasiPenyesuaian`.
+pub fn validasi_penyesuaian(draft: &Value) -> Result<PenyesuaianSah, String> {
+    let alasan = teks(draft, "alasan");
+    let cek_alasan = || -> Result<(), String> {
+        if alasan.is_empty() {
+            return Err("Alasan wajib diisi.".into());
+        }
+        if panjang(&alasan) > MAKS_ALASAN {
+            return Err(format!("Alasan maksimal {MAKS_ALASAN} karakter."));
+        }
+        Ok(())
+    };
+    let batal = teks(draft, "batal");
+    if !batal.is_empty() {
+        cek_alasan()?;
+        return Ok(PenyesuaianSah {
+            batal,
+            id_karyawan: String::new(),
+            periode: String::new(),
+            jenis: "Pembatalan".into(),
+            hari: 0,
+            alasan,
+        });
+    }
+    let id_karyawan = teks(draft, "id_karyawan");
+    if id_karyawan.is_empty() {
+        return Err("Pilih pegawai.".into());
+    }
+    let periode = teks(draft, "periode");
+    if !tanggal_valid(&periode) {
+        return Err("Periode jatah tidak valid.".into());
+    }
+    let jenis = teks(draft, "jenis");
+    if !JENIS_PENYESUAIAN.contains(&jenis.as_str()) {
+        return Err("Jenis penyesuaian harus Saldo Awal atau Koreksi.".into());
+    }
+    let hari = draft
+        .get("hari")
+        .and_then(Value::as_i64)
+        .filter(|n| *n != 0 && n.abs() <= MAKS_HARI_PENYESUAIAN)
+        .ok_or_else(|| {
+            format!("Jumlah hari harus -{MAKS_HARI_PENYESUAIAN} sampai {MAKS_HARI_PENYESUAIAN} dan bukan 0.")
+        })?;
+    cek_alasan()?;
+    Ok(PenyesuaianSah {
+        batal: String::new(),
+        id_karyawan,
+        periode,
+        jenis,
+        hari,
+        alasan,
+    })
+}
+
 // Handler cloud (tidak pernah menolak)
 
 fn id_dari(payload: &Value, kunci: &str, entity_key: &str) -> String {
@@ -1037,6 +1438,7 @@ pub fn requests(
         params![json!(ids).to_string()],
     )?;
     susun_daftar(&mut pengajuan, &keputusan);
+    tandai_hadir_saat_cuti(&connection, &mut pengajuan)?;
     Ok(json!({
         "pengajuan": pengajuan,
         "jenis": rows_json_with(&connection, JENIS_SQL, [])?,
@@ -1515,6 +1917,420 @@ pub fn simpan_jenis(state: &DesktopState, draft: Value) -> Result<Value, Command
     Ok(payload)
 }
 
+// Pembaca 2b (Alfa, audit, gaji, jatah)
+
+fn angka_kolom(r: &Value, kunci: &str) -> i64 {
+    r.get(kunci).and_then(Value::as_i64).unwrap_or(0)
+}
+
+fn opsional_kolom(r: &Value, kunci: &str) -> Option<i64> {
+    r.get(kunci).and_then(Value::as_i64)
+}
+
+fn berlaku_dari(r: &Value) -> Berlaku {
+    Berlaku {
+        id_karyawan: teks(r, "id_karyawan"),
+        tanggal_mulai: teks(r, "tanggal_mulai"),
+        tanggal_selesai: teks(r, "tanggal_selesai"),
+        kelompok: teks(r, "kelompok"),
+        dampak_gaji: teks(r, "dampak_gaji"),
+        jam_mulai_ke: opsional_kolom(r, "jam_mulai_ke"),
+        jam_sampai_ke: opsional_kolom(r, "jam_sampai_ke"),
+        setengah_hari: angka_kolom(r, "setengah_hari") == 1,
+    }
+}
+
+/// Pengajuan berlaku yang bertumpuk dengan `mulai`..`selesai`.
+pub fn muat_berlaku(
+    connection: &rusqlite::Connection,
+    mulai: &str,
+    selesai: &str,
+) -> Result<Vec<Berlaku>, CommandError> {
+    Ok(
+        rows_json_with(connection, PENGAJUAN_RENTANG_SQL, params![mulai, selesai])?
+            .iter()
+            .map(berlaku_dari)
+            .collect(),
+    )
+}
+
+/// Pegawai yang ditutup pengajuan berlaku pada `tanggal`, dengan penanda hari
+/// penuh (Generate Alfa melewati keduanya; audit membedakannya, §20.2.6).
+pub fn pengajuan_pada(
+    connection: &rusqlite::Connection,
+    tanggal: &str,
+) -> Result<HashMap<String, bool>, CommandError> {
+    let mut hasil: HashMap<String, bool> = HashMap::new();
+    for p in muat_berlaku(connection, tanggal, tanggal)? {
+        let penuh = penuh_pada(&p, tanggal);
+        *hasil.entry(p.id_karyawan).or_insert(false) |= penuh;
+    }
+    Ok(hasil)
+}
+
+fn muat_kalender(
+    connection: &rusqlite::Connection,
+    mulai: &str,
+    selesai: &str,
+) -> Result<(HashSet<String>, Vec<HolidayWhitelistEntry>), CommandError> {
+    let libur = rows_json_with(connection, LIBUR_SQL, params![mulai, selesai])?
+        .iter()
+        .map(|r| teks(r, "tanggal"))
+        .collect();
+    let whitelist = rows_json_with(connection, WHITELIST_SQL, [])?
+        .iter()
+        .map(|r| HolidayWhitelistEntry {
+            id: teks(r, "id"),
+            scope_type: teks(r, "scope_type"),
+            scope_value: teks(r, "scope_value"),
+            tanggal_libur: Some(teks(r, "tanggal_libur")).filter(|t| !t.is_empty()),
+            status_aktif: angka_kolom(r, "status_aktif"),
+        })
+        .collect();
+    Ok((libur, whitelist))
+}
+
+fn jadwal_dari(r: &Value) -> Jadwal {
+    Jadwal {
+        divisi: teks(r, "divisi"),
+        hari_masuk: parse_hari_kerja(r.get("hari_kerja").and_then(Value::as_str)),
+        kode_shift: opsional_kolom(r, "kode_shift"),
+    }
+}
+
+/// Kait rekap gaji (§20.2.7): `CutiDibayar` per pegawai untuk periode, dari
+/// pengajuan berlaku ber-`dampak_gaji = 'Dibayar'` atas tanggal wajibnya.
+pub fn cuti_dibayar(
+    connection: &rusqlite::Connection,
+    mulai: &str,
+    akhir: &str,
+) -> Result<HashMap<String, CutiDibayar>, CommandError> {
+    let berlaku: Vec<Berlaku> = muat_berlaku(connection, mulai, akhir)?
+        .into_iter()
+        .filter(|p| p.dampak_gaji == "Dibayar")
+        .collect();
+    if berlaku.is_empty() {
+        return Ok(HashMap::new());
+    }
+    let ids: Vec<&str> = berlaku.iter().map(|p| p.id_karyawan.as_str()).collect();
+    let jadwal: HashMap<String, (Jadwal, i64)> = rows_json_with(
+        connection,
+        JADWAL_PEGAWAI_SQL,
+        params![json!(ids).to_string()],
+    )?
+    .iter()
+    .map(|r| {
+        (
+            teks(r, "id_unik"),
+            (jadwal_dari(r), angka_kolom(r, "jam_normal")),
+        )
+    })
+    .collect();
+    let (libur, whitelist) = muat_kalender(connection, mulai, akhir)?;
+    let mut absen: HashMap<String, HashMap<String, (bool, i64)>> = HashMap::new();
+    for r in rows_json_with(connection, HARI_ABSEN_SQL, params![mulai, akhir])? {
+        absen.entry(teks(&r, "id_karyawan")).or_default().insert(
+            teks(&r, "tanggal"),
+            (angka_kolom(&r, "hadir") == 1, angka_kolom(&r, "jam_kerja")),
+        );
+    }
+    let mut tanggal: HashMap<&str, Vec<(String, bool)>> = HashMap::new();
+    for p in &berlaku {
+        let Some((j, _)) = jadwal.get(&p.id_karyawan) else {
+            continue;
+        };
+        let dari = p.tanggal_mulai.as_str().max(mulai);
+        let sampai = p.tanggal_selesai.as_str().min(akhir);
+        for t in tanggal_wajib(j, &libur, &whitelist, dari, sampai) {
+            let penuh = penuh_pada(p, &t);
+            tanggal
+                .entry(p.id_karyawan.as_str())
+                .or_default()
+                .push((t, penuh));
+        }
+    }
+    let kosong = HashMap::new();
+    Ok(tanggal
+        .into_iter()
+        .map(|(id, daftar)| {
+            let normal = jadwal.get(id).map_or(0, |(_, n)| *n);
+            let hasil = hitung_cuti_dibayar(&daftar, absen.get(id).unwrap_or(&kosong), normal);
+            (id.to_owned(), hasil)
+        })
+        .collect())
+}
+
+/// Tanda `hadir_saat_cuti` di daftar (dipanggil `requests`). Cermin
+/// `tandaiHadirSaatCuti`.
+fn tandai_hadir_saat_cuti(
+    connection: &rusqlite::Connection,
+    pengajuan: &mut [Value],
+) -> Result<(), CommandError> {
+    let cuti: Vec<usize> = (0..pengajuan.len())
+        .filter(|i| {
+            teks(&pengajuan[*i], "kelompok") == "Cuti"
+                && status_berlaku(&teks(&pengajuan[*i], "status"))
+        })
+        .collect();
+    let (Some(mulai), Some(selesai)) = (
+        cuti.iter()
+            .map(|i| teks(&pengajuan[*i], "tanggal_mulai"))
+            .min(),
+        cuti.iter()
+            .map(|i| teks(&pengajuan[*i], "tanggal_selesai"))
+            .max(),
+    ) else {
+        return Ok(());
+    };
+    let hadir: HashSet<String> =
+        rows_json_with(connection, HARI_ABSEN_SQL, params![mulai, selesai])?
+            .iter()
+            .filter(|r| angka_kolom(r, "hadir") == 1)
+            .map(|r| format!("{}|{}", teks(r, "id_karyawan"), teks(r, "tanggal")))
+            .collect();
+    for i in cuti {
+        if hadir_saat_cuti(&berlaku_dari(&pengajuan[i]), &hadir) {
+            if let Some(tanda) = pengajuan[i]["tanda"].as_array_mut() {
+                tanda.push(json!("hadir_saat_cuti"));
+            }
+        }
+    }
+    Ok(())
+}
+
+fn peta_aturan(connection: &rusqlite::Connection) -> Result<HashMap<String, String>, CommandError> {
+    Ok(rows_json_with(connection, ATURAN_CUTI_SQL, [])?
+        .iter()
+        .map(|r| (teks(r, "key"), teks(r, "value")))
+        .collect())
+}
+
+fn aturan_json(peta: &HashMap<String, String>) -> Value {
+    json!({ "guru": aturan_cuti(peta, "guru"), "tendik": aturan_cuti(peta, "tendik") })
+}
+
+/// Tanggal terpakai jatah satu pegawai: tanggal wajib Cuti `potong_jatah`
+/// yang berlaku, dikurangi tanggal Hadir (Hadir menang).
+fn tanggal_terpakai(
+    connection: &rusqlite::Connection,
+    id: &str,
+    jadwal: &Jadwal,
+) -> Result<Vec<String>, CommandError> {
+    let rentang: Vec<(String, String)> =
+        rows_json_with(connection, JATAH_TERPAKAI_SQL, params![id])?
+            .iter()
+            .map(|r| (teks(r, "tanggal_mulai"), teks(r, "tanggal_selesai")))
+            .collect();
+    let (Some(mulai), Some(selesai)) = (
+        rentang.iter().map(|r| r.0.clone()).min(),
+        rentang.iter().map(|r| r.1.clone()).max(),
+    ) else {
+        return Ok(Vec::new());
+    };
+    let (libur, whitelist) = muat_kalender(connection, &mulai, &selesai)?;
+    let hadir: HashSet<String> =
+        rows_json_with(connection, HADIR_ORANG_SQL, params![id, mulai, selesai])?
+            .iter()
+            .map(|r| teks(r, "tanggal"))
+            .collect();
+    let mut tanggal: Vec<String> = rentang
+        .iter()
+        .flat_map(|(a, b)| tanggal_wajib(jadwal, &libur, &whitelist, a, b))
+        .filter(|t| !hadir.contains(t))
+        .collect();
+    tanggal.sort();
+    tanggal.dedup();
+    Ok(tanggal)
+}
+
+/// Jatah satu pegawai: periode, penyesuaian, riwayat, tanda. Dipakai
+/// `saldo_cuti` dan pemeriksa periode penyesuaian.
+fn jatah_pegawai(
+    connection: &rusqlite::Connection,
+    peta: &HashMap<String, String>,
+    id: &str,
+    hari_ini: &str,
+) -> Result<Option<(Value, Jadwal, Vec<PeriodeCuti>)>, CommandError> {
+    let Some(p) = rows_json_with(connection, JATAH_PEGAWAI_SQL, params![id])?
+        .into_iter()
+        .next()
+    else {
+        return Ok(None);
+    };
+    let kelompok = if angka_kolom(&p, "guru") == 1 {
+        "guru"
+    } else {
+        "tendik"
+    };
+    let jadwal = jadwal_dari(&p);
+    let penyesuaian = rows_json_with(connection, PENYESUAIAN_ORANG_SQL, params![id])?;
+    let aktif: Vec<(String, i64)> = penyesuaian
+        .iter()
+        .filter(|r| teks(r, "jenis") != "Pembatalan" && angka_kolom(r, "dibatalkan") == 0)
+        .map(|r| (teks(r, "periode"), angka_kolom(r, "hari")))
+        .collect();
+    let tmt = teks(&p, "tmt");
+    let terpakai = tanggal_terpakai(connection, id, &jadwal)?;
+    let periode = jatah_cuti(
+        Some(tmt.as_str()).filter(|t| !t.is_empty()),
+        &aturan_cuti(peta, kelompok),
+        &terpakai,
+        &aktif,
+        hari_ini,
+    );
+    let berjalan = periode
+        .iter()
+        .find(|x| x.mulai.as_str() <= hari_ini && hari_ini <= x.selesai.as_str());
+    let mut tanda = Vec::new();
+    if tmt.is_empty() {
+        tanda.push("tanpa_tmt");
+    }
+    if berjalan.is_some_and(|x| x.sisa < 0) {
+        tanda.push("jatah_minus");
+    }
+    let info = json!({
+        "id_karyawan": id,
+        "nama": teks(&p, "nama"),
+        "unit": teks(&p, "unit"),
+        "kelompok": kelompok,
+        "tmt": tmt,
+        "tanda": tanda,
+        "berjalan": berjalan,
+        "penyesuaian": penyesuaian,
+    });
+    Ok(Some((info, jadwal, periode)))
+}
+
+/// `desktop_hr_leave_balance`: aturan kedua kelompok; dengan `id_karyawan`
+/// juga jatah per periode, penyesuaian, riwayat pengajuan, dan (bila rentang
+/// dibawa) jumlah tanggal wajibnya untuk form Ajukan.
+pub fn saldo_cuti(
+    state: &DesktopState,
+    id_karyawan: Option<&str>,
+    mulai: Option<&str>,
+    selesai: Option<&str>,
+) -> Result<Value, CommandError> {
+    let connection = storage::database(&state.data_dir)?;
+    let (_, hari_ini) = waktu(&connection)?;
+    let peta = peta_aturan(&connection)?;
+    let mut hasil = json!({ "aturan": aturan_json(&peta), "hari_ini": hari_ini, "pegawai": null });
+    let Some(id) = id_karyawan.map(str::trim).filter(|id| !id.is_empty()) else {
+        return Ok(hasil);
+    };
+    let (mut info, jadwal, periode) = jatah_pegawai(&connection, &peta, id, &hari_ini)?
+        .ok_or_else(|| invalid("Jatah cuti hanya untuk pegawai (guru dan tendik)."))?;
+    let mut riwayat = rows_json_with(&connection, RIWAYAT_PENGAJUAN_SQL, params![id])?;
+    let ids: Vec<String> = riwayat.iter().map(|p| teks(p, "id_pengajuan")).collect();
+    let keputusan = rows_json_with(
+        &connection,
+        DAFTAR_KEPUTUSAN_SQL,
+        params![json!(ids).to_string()],
+    )?;
+    susun_daftar(&mut riwayat, &keputusan);
+    tandai_hadir_saat_cuti(&connection, &mut riwayat)?;
+    info["periode"] = json!(periode);
+    info["riwayat"] = Value::Array(riwayat);
+    if let (Some(a), Some(b)) = (mulai, selesai) {
+        if !tanggal_valid(a)
+            || !tanggal_valid(b)
+            || b < a
+            || days_between(a, b).unwrap_or(i64::MAX) >= MAKS_RENTANG_HARI
+        {
+            return Err(invalid("Rentang tanggal tidak valid."));
+        }
+        let (libur, whitelist) = muat_kalender(&connection, a, b)?;
+        info["hari_wajib"] = json!(tanggal_wajib(&jadwal, &libur, &whitelist, a, b).len());
+    }
+    hasil["pegawai"] = info;
+    Ok(hasil)
+}
+
+/// `desktop_hr_leave_settings_save`: aturan cuti guru dan tendik lewat outbox
+/// `setting`.
+pub fn simpan_aturan_cuti(state: &DesktopState, draft: Value) -> Result<Value, CommandError> {
+    let pasangan = validasi_aturan_cuti(&draft).map_err(invalid)?;
+    let client_id = sync::ensure_client_id(state)?;
+    let mut connection = storage::database(&state.data_dir)?;
+    let transaction = connection.transaction().map_err(db_error)?;
+    for (kunci, nilai) in &pasangan {
+        hris::tulis_setting(&transaction, &client_id, kunci, nilai)?;
+    }
+    let hasil = aturan_json(&peta_aturan(&transaction)?);
+    transaction.commit().map_err(db_error)?;
+    Ok(hasil)
+}
+
+/// `desktop_hr_leave_adjust`: penyesuaian jatah append-only, atau pembatalan
+/// berid `batal-<id>`.
+pub fn sesuaikan_cuti(
+    state: &DesktopState,
+    operator: &OperatorUser,
+    draft: Value,
+) -> Result<Value, CommandError> {
+    let s = validasi_penyesuaian(&draft).map_err(invalid)?;
+    let client_id = sync::ensure_client_id(state)?;
+    let mut connection = storage::database(&state.data_dir)?;
+    let transaction = connection.transaction().map_err(db_error)?;
+    let payload = if s.batal.is_empty() {
+        let (_, hari_ini) = waktu(&transaction)?;
+        let peta = peta_aturan(&transaction)?;
+        let (_, _, periode) = jatah_pegawai(&transaction, &peta, &s.id_karyawan, &hari_ini)?
+            .ok_or_else(|| invalid("Jatah cuti hanya untuk pegawai (guru dan tendik)."))?;
+        if !periode.iter().any(|p| p.mulai == s.periode) {
+            return Err(invalid("Periode itu bukan periode jatah pegawai ini."));
+        }
+        json!({
+            "id_penyesuaian": hris::new_id("cpy-"),
+            "id_karyawan": s.id_karyawan,
+            "periode": s.periode,
+            "jenis": s.jenis,
+            "id_ref": "",
+            "hari": s.hari,
+            "alasan": s.alasan,
+            "dicatat_oleh": operator.username,
+        })
+    } else {
+        let target = rows_json_with(&transaction, PENYESUAIAN_SATU_SQL, params![s.batal])?
+            .into_iter()
+            .next()
+            .filter(|r| teks(r, "jenis") != "Pembatalan")
+            .ok_or_else(|| invalid("Penyesuaian tidak ditemukan."))?;
+        if angka_kolom(&target, "dibatalkan") == 1 {
+            return Err(invalid("Penyesuaian ini sudah dibatalkan."));
+        }
+        json!({
+            "id_penyesuaian": format!("batal-{}", s.batal),
+            "id_karyawan": teks(&target, "id_karyawan"),
+            "periode": teks(&target, "periode"),
+            "jenis": "Pembatalan",
+            "id_ref": s.batal,
+            "hari": 0,
+            "alasan": s.alasan,
+            "dicatat_oleh": operator.username,
+        })
+    };
+    let id = teks(&payload, "id_penyesuaian");
+    for (sql, args) in cloud_penyesuaian_statements(&payload, &id) {
+        transaction
+            .execute(
+                &sql,
+                rusqlite::params_from_iter(args.iter().map(json_ke_sql)),
+            )
+            .map_err(db_error)?;
+    }
+    sync::enqueue(
+        &transaction,
+        &client_id,
+        "hr-leave-adjustment",
+        "create",
+        &id,
+        &payload,
+        None,
+    )?;
+    transaction.commit().map_err(db_error)?;
+    Ok(payload)
+}
+
 #[cfg(test)]
 mod tests {
     // Vektor yang sama diuji `validations/hr-pengajuan.test.ts`.
@@ -1719,6 +2535,126 @@ mod tests {
         let urutan = "ORDER BY k.diterima_cloud IS NULL, k.diterima_cloud, k.waktu_perangkat, k.id_keputusan LIMIT 1";
         assert!(PENGAJUAN_AKTIF_ORANG_SQL.contains(urutan));
         assert!(PENGAJUAN_BERLAKU_SQL.contains(urutan));
+    }
+
+    #[test]
+    fn hr_pengajuan_vektor_cuti_dibayar() {
+        let v = vektor();
+        let berlaku =
+            |p: &Value| -> Berlaku { serde_json::from_value(p.clone()).expect("berlaku") };
+        for k in v["penuh_pada"].as_array().expect("penuh_pada") {
+            let hasil = penuh_pada(&berlaku(&k["p"]), k["t"].as_str().expect("t"));
+            assert_eq!(json!(hasil), k["hasil"], "{k}");
+        }
+        for k in v["menit_cuti_dibayar"].as_array().expect("menit") {
+            let m = &k["masuk"];
+            let hasil = menit_cuti_dibayar(
+                m[0] == true,
+                m[1] == true,
+                m[2].as_i64().expect("jam"),
+                m[3].as_i64().expect("normal"),
+            );
+            assert_eq!(json!([hasil.0, hasil.1]), k["hasil"], "{k}");
+        }
+        for k in v["cuti_dibayar"].as_array().expect("cuti_dibayar") {
+            let tanggal: Vec<(String, bool)> =
+                serde_json::from_value(k["tanggal"].clone()).expect("tanggal");
+            let absen: HashMap<String, (bool, i64)> =
+                serde_json::from_value(k["absen"].clone()).expect("absen");
+            let hasil = hitung_cuti_dibayar(&tanggal, &absen, k["normal"].as_i64().expect("n"));
+            assert_eq!(json!(hasil), k["hasil"], "{k}");
+        }
+        for k in v["hadir_saat_cuti"].as_array().expect("hadir_saat_cuti") {
+            let hadir: HashSet<String> = serde_json::from_value(k["hadir"].clone()).expect("hadir");
+            assert_eq!(
+                json!(hadir_saat_cuti(&berlaku(&k["p"]), &hadir)),
+                k["hasil"],
+                "{k}"
+            );
+        }
+    }
+
+    #[test]
+    fn hr_pengajuan_vektor_jatah_cuti() {
+        let v = vektor();
+        for k in v["aturan_cuti"].as_array().expect("aturan_cuti") {
+            let peta: HashMap<String, String> =
+                serde_json::from_value(k["peta"].clone()).expect("peta");
+            let hasil = aturan_cuti(&peta, k["kelompok"].as_str().expect("kelompok"));
+            assert_eq!(json!(hasil), k["hasil"], "{k}");
+        }
+        for k in v["validasi_aturan_cuti"].as_array().expect("validasi") {
+            let hasil = validasi_aturan_cuti(&k["masuk"]);
+            assert_eq!(galat(hasil.clone()), k["galat"], "{k}");
+            assert_eq!(
+                hasil.map(|h| json!(h)).unwrap_or(Value::Null),
+                k["hasil"],
+                "{k}"
+            );
+        }
+        for k in v["jatah_cuti"].as_array().expect("jatah_cuti") {
+            let aturan: AturanCuti = serde_json::from_value(k["aturan"].clone()).expect("aturan");
+            let terpakai: Vec<String> =
+                serde_json::from_value(k["terpakai"].clone()).expect("terpakai");
+            let penyesuaian: Vec<(String, i64)> =
+                serde_json::from_value(k["penyesuaian"].clone()).expect("penyesuaian");
+            let hasil = jatah_cuti(
+                k["tmt"].as_str(),
+                &aturan,
+                &terpakai,
+                &penyesuaian,
+                k["hari_ini"].as_str().expect("hari_ini"),
+            );
+            assert_eq!(json!(hasil), k["hasil"], "{}", k["_"]);
+        }
+        for k in v["penyesuaian"].as_array().expect("penyesuaian") {
+            let hasil = validasi_penyesuaian(&k["masuk"]);
+            assert_eq!(galat(hasil.clone()), k["galat"], "{k}");
+            assert_eq!(
+                hasil.map(|h| json!(h)).unwrap_or(Value::Null),
+                k["hasil"],
+                "{k}"
+            );
+        }
+    }
+
+    /// Kait gaji dan Alfa membaca database sungguhan: pengajuan Dibayar yang
+    /// disetujui menjadi menit cuti, Ditolak dan Potong Gaji tidak.
+    #[test]
+    fn hr_pengajuan_cuti_dibayar_dari_database() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        storage::initialize(dir.path()).expect("schema");
+        let c = storage::database(dir.path()).expect("db");
+        c.execute_batch(
+            "INSERT INTO tbl_shift (id_shift, kode_shift, nama_shift, jam_masuk, jam_pulang, jam_kerja_normal_menit, hari_kerja) VALUES (91, 91, 'Uji', '07:00', '15:00', 420, '1,2,3,4,5');
+             INSERT INTO master_data (id_unik, nama, divisi, id_shift, status_aktif, jenis_personil) VALUES ('P1', 'Pegawai Satu', 'TU', 91, 'Aktif', 'Pegawai'), ('P2', 'Pegawai Dua', 'TU', 91, 'Aktif', 'Pegawai');
+             INSERT INTO hr_pengajuan (id_pengajuan, id_karyawan, id_jenis, kelompok, potong_jatah, dampak_gaji, izin_pemutus, tanggal_mulai, tanggal_selesai, setengah_hari, alasan, sidik, diajukan_oleh, waktu_perangkat) VALUES
+               ('x1', 'P1', 'jns-cuti-tahunan', 'Cuti', 1, 'Dibayar', 'hr.request.decide', '2026-11-06', '2026-11-09', 0, 'a', 's1', 'u', '2026-11-01 08:00:00'),
+               ('x2', 'P2', 'jns-izin-tidak-dibayar', 'Izin', 0, 'Potong Gaji', 'hr.request.decide', '2026-11-06', '2026-11-06', 0, 'a', 's2', 'u', '2026-11-01 08:00:00'),
+               ('x3', 'P2', 'jns-izin-dibayar', 'Izin', 0, 'Dibayar', 'hr.request.decide', '2026-11-10', '2026-11-10', 0, 'a', 's3', 'u', '2026-11-01 08:00:00');
+             INSERT INTO hr_pengajuan_keputusan (id_keputusan, id_pengajuan, jenis, sidik, oleh, waktu_perangkat) VALUES
+               ('k1', 'x1', 'Setujui', 's1', 'kepsek', '2026-11-02 08:00:00'),
+               ('k2', 'x2', 'Setujui', 's2', 'kepsek', '2026-11-02 08:00:00'),
+               ('k3', 'x3', 'Tolak', 's3', 'kepsek', '2026-11-02 08:00:00');
+             INSERT INTO absensi_harian (tanggal, id_karyawan, nama, kelas_divisi, status_kehadiran, status_absen, sumber, update_terakhir, jam_kerja, id_shift, bulan, tahun, id_sesi, mode_tugas) VALUES
+               ('2026-11-09', 'P1', 'Pegawai Satu', 'TU', 'Hadir', 'Hadir', 'Scanner', '2026-11-09 15:00:00', 400, 91, 'November', 2026, 's-p1', 'NORMAL');",
+        )
+        .expect("fixture");
+        // 6 Nov Jumat, 7-8 libur mingguan, 9 Nov Senin Hadir: satu hari dibayar.
+        let hasil = cuti_dibayar(&c, "2026-11-01", "2026-11-30").expect("cuti");
+        assert_eq!(hasil.len(), 1, "{hasil:?}");
+        assert_eq!(
+            hasil["P1"],
+            CutiDibayar {
+                hari: 1,
+                menit: 420,
+                jam_normal_nol: false
+            }
+        );
+        let tanggal = pengajuan_pada(&c, "2026-11-06").expect("pada");
+        assert_eq!(tanggal.get("P1"), Some(&true));
+        assert_eq!(tanggal.get("P2"), Some(&true));
+        assert!(pengajuan_pada(&c, "2026-11-10").expect("pada").is_empty());
     }
 
     #[test]

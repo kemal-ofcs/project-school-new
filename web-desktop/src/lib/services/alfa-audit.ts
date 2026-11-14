@@ -16,6 +16,7 @@ import {
   isValidOperatorPhone,
   normalizeOperatorPhone,
 } from "@/lib/operators/contact";
+import { pengajuanPada } from "@/lib/services/hr-pengajuan";
 import { generateWaNotificationId } from "@/lib/services/wa-notification";
 import { parseHariKerja, wajibMasuk } from "@/lib/validations/hari-kerja";
 import {
@@ -51,6 +52,8 @@ export interface RingkasanAlfa {
   jumlahLibur: number;
   /** Karyawan yang dilewati karena shift-nya hilang / jam shift tidak terurai. */
   jumlahShiftTidakValid: number;
+  /** Dilewati karena pengajuan cuti/izin berlaku di tanggal itu (HRIS v69). */
+  jumlahPengajuan: number;
   status: string;
   pesan: string;
 }
@@ -99,6 +102,7 @@ export async function generateAlfaHarian(
       jumlahNonaktif: 0,
       jumlahLibur: 0,
       jumlahShiftTidakValid: 0,
+      jumlahPengajuan: 0,
       status: "NONAKTIF",
       pesan: "Generate Alfa dimatikan melalui Pengaturan",
     };
@@ -191,6 +195,10 @@ export async function generateAlfaHarian(
   // ringkasan hanya menampilkan nol tanpa alasan.
   let jumlahLibur = 0;
   let jumlahShiftTidakValid = 0;
+  // Pegawai dengan pengajuan berlaku (hari penuh atau sebagian) dilewati;
+  // pengajuan tidak pernah menulis `absensi_harian` (§20.2.6).
+  let jumlahPengajuan = 0;
+  const pengaju = new Map<string, Map<string, boolean>>();
 
   for (const row of empRes.rows) {
     const emp = row as Record<string, unknown>;
@@ -348,6 +356,14 @@ export async function generateAlfaHarian(
       continue;
     }
 
+    if (!pengaju.has(tanggalStr)) {
+      pengaju.set(tanggalStr, await pengajuanPada(targetDb, tanggalStr));
+    }
+    if (pengaju.get(tanggalStr)?.has(idUnik)) {
+      jumlahPengajuan++;
+      continue;
+    }
+
     const [tY, tM] = tanggalStr.split("-").map(Number);
     const bulanStr = monthNames[tM - 1] || "Januari";
     const tahunNum = tY;
@@ -495,7 +511,7 @@ export async function generateAlfaHarian(
       : "IDLE";
   const pesan = todayHoliday
     ? `Hari ini Hari Libur (${String(todayHoliday.nama_libur || "")}). Generate Alfa dilewati untuk hari ini.`
-    : `Generate Alfa Selesai. Dibuat: ${jumlahAlfaDibuat}, Sudah Ada: ${jumlahSudahAda}, Belum Waktunya: ${jumlahBelumWaktunya}, Fleksibel: ${jumlahFleksibel}, Libur: ${jumlahLibur}, Shift Tidak Valid: ${jumlahShiftTidakValid}`;
+    : `Generate Alfa Selesai. Dibuat: ${jumlahAlfaDibuat}, Sudah Ada: ${jumlahSudahAda}, Belum Waktunya: ${jumlahBelumWaktunya}, Fleksibel: ${jumlahFleksibel}, Libur: ${jumlahLibur}, Shift Tidak Valid: ${jumlahShiftTidakValid}, Pengajuan: ${jumlahPengajuan}`;
 
   return {
     jumlahAlfaDibuat,
@@ -505,6 +521,7 @@ export async function generateAlfaHarian(
     jumlahNonaktif,
     jumlahLibur,
     jumlahShiftTidakValid,
+    jumlahPengajuan,
     status: statusSummary,
     pesan,
   };

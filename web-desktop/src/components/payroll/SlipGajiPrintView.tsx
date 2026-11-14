@@ -41,6 +41,8 @@ interface BreakdownSnapshot {
   overtime_salary?: number;
   components?: ComponentItem[];
   bpjs?: BpjsItem[];
+  /** HRIS v69: menitnya sudah ikut gaji pokok. Slip lama tanpa kunci ini. */
+  cuti_dibayar?: { hari: number; menit: number };
   tax?: {
     method?: string;
     category?: string;
@@ -158,6 +160,17 @@ export function SlipGajiPrintView({
                   {IDR.format(item.basic_salary)}
                 </td>
               </tr>
+              {(breakdown.cuti_dibayar?.hari ?? 0) > 0 ||
+              (breakdown.cuti_dibayar?.menit ?? 0) > 0 ? (
+                <tr>
+                  <td className="py-1 pl-3 text-slate-500">
+                    {`Cuti dibayar (${breakdown.cuti_dibayar?.hari ?? 0} hari, ${Number(((breakdown.cuti_dibayar?.menit ?? 0) / 60).toFixed(2))}j)`}
+                  </td>
+                  <td className="py-1 text-right text-slate-500">
+                    termasuk gaji pokok
+                  </td>
+                </tr>
+              ) : null}
               {item.overtime_salary > 0 && (
                 <tr>
                   <td className="py-1 text-slate-600">

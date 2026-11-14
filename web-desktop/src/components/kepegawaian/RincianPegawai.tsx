@@ -22,6 +22,7 @@ import {
   simpanDataPribadi,
 } from "@/lib/gateways/hris";
 import { AGAMA, STATUS_NIKAH } from "@/lib/validations/hris";
+import { CutiPegawai } from "./CutiPegawai";
 import { DokumenPegawai } from "./DokumenPegawai";
 import {
   INPUT,
@@ -39,6 +40,7 @@ type TabRincian =
   | "keuangan"
   | "pendidik"
   | "kontrak"
+  | "cuti"
   | "dokumen";
 
 interface Isian {
@@ -118,6 +120,9 @@ export function RincianPegawai({
       ? [{ kunci: "pendidik" as const, label: "Pendidik" }]
       : []),
     { kunci: "kontrak", label: "Kontrak" },
+    ...(boleh("hr.request.view")
+      ? [{ kunci: "cuti" as const, label: "Cuti" }]
+      : []),
     ...(boleh("hr.document.view")
       ? [{ kunci: "dokumen" as const, label: "Dokumen" }]
       : []),
@@ -239,6 +244,11 @@ export function RincianPegawai({
             <Kerja pegawai={pegawai} org={org} hariIni={hariIni} />
           ) : tab === "kontrak" ? (
             <Kontrak idKaryawan={id} />
+          ) : tab === "cuti" ? (
+            <CutiPegawai
+              idKaryawan={id}
+              bolehSesuaikan={boleh("hr.leave.adjust")}
+            />
           ) : tab === "dokumen" ? (
             <DokumenPegawai
               idKaryawan={id}

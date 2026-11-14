@@ -694,6 +694,13 @@ export default function OperationalPage() {
                 </option>
                 <option value="Terlambat">Terlambat (Disesuaikan)</option>
               </select>
+              {["Sakit", "Izin", "Dispen"].includes(
+                correction.jenis_koreksi,
+              ) ? (
+                <p className="mt-1 text-xs text-amber-200">
+                  Untuk catatan baru, pakai Pengajuan di menu Cuti &amp; Izin.
+                </p>
+              ) : null}
             </div>
 
             {/* Jam Koreksi */}

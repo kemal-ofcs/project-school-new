@@ -103,6 +103,10 @@ export interface PayrollRecapRow {
   est_net_salary: number;
   /** Rincian PPh 21 per masa yang akan dibekukan (v67). */
   pajak: HasilPph;
+  /** Cuti/izin Dibayar (HRIS v69): hari dan menit yang sudah ikut jam reguler. */
+  cuti_dibayar_hari: number;
+  cuti_dibayar_menit: number;
+  jam_normal_nol: boolean;
 }
 
 export interface PayrollRunRow {

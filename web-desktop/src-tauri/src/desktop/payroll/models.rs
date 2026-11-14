@@ -271,6 +271,16 @@ pub struct PayrollRecapRow {
     pub keluar_pada: Option<String>,
     /// Isi `breakdown_snapshot.pajak` yang akan dibekukan (`pajak::HasilPph`).
     pub pajak: serde_json::Value,
+    /// Cuti/izin Dibayar (HRIS v69, §20.2.7): hari tanpa scan Hadir dan menit
+    /// yang sudah ikut `total_regular_minutes`. Hari menambah `hari` TER
+    /// harian pegawai tidak tetap, tidak `total_hadir` (Q-41).
+    #[serde(default)]
+    pub cuti_dibayar_hari: i64,
+    #[serde(default)]
+    pub cuti_dibayar_menit: i64,
+    /// Ada cuti dibayar tetapi jam normal shift-nya 0.
+    #[serde(default)]
+    pub jam_normal_nol: bool,
 }
 
 /// Satu orang, dilihat dari sudut pandang penyaringan komponen payroll.

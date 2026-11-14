@@ -105,6 +105,7 @@ const DATA: DataLaporanKehadiran = {
       status_aktif: 1,
     },
   ],
+  pengajuan: [],
 };
 
 describe("susunLaporanKehadiran", () => {
@@ -151,6 +152,56 @@ describe("susunLaporanKehadiran", () => {
       libur: 2,
       wajibMasuk: 4,
       persen: 0,
+    });
+  });
+
+  test("pengajuan: H/T menang, lalu pengajuan, lalu koreksi dan Alfa; DL ikut persen", () => {
+    const { baris } = susunLaporanKehadiran({
+      ...DATA,
+      pengajuan: [
+        {
+          id: "G1",
+          mulai: "2026-10-05",
+          selesai: "2026-10-05",
+          kelompok: "Dinas Luar",
+        },
+        {
+          id: "G1",
+          mulai: "2026-10-09",
+          selesai: "2026-10-09",
+          kelompok: "Izin",
+        },
+        {
+          id: "P1",
+          mulai: "2026-10-05",
+          selesai: "2026-10-05",
+          kelompok: "Sakit",
+        },
+        {
+          id: "P1",
+          mulai: "2026-10-08",
+          selesai: "2026-10-10",
+          kelompok: "Cuti",
+        },
+      ],
+    });
+    const [g1, p1] = baris;
+    expect(g1.sel.join("")).toBe("DLI-DH-");
+    expect(p1.sel.join("")).toBe("HTLCCM");
+    expect(p1).toMatchObject({
+      hadir: 2,
+      sakit: 0,
+      cuti: 2,
+      tanpaData: 0,
+      wajibMasuk: 4,
+      persen: 50,
+    });
+    expect(g1).toMatchObject({
+      hadir: 1,
+      dinas: 1,
+      alfa: 0,
+      wajibMasuk: 6,
+      persen: 33.3,
     });
   });
 

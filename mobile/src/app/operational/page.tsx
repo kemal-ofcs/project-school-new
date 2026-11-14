@@ -822,6 +822,12 @@ export default function OperationalPage() {
                     </option>
                   ))}
                 </select>
+                {["Sakit", "Izin", "Dispen"].includes(korJenis) ? (
+                  <p className="mt-1 text-[11px] text-amber-200">
+                    Untuk catatan baru, pakai Pengajuan di menu Cuti &amp; Izin
+                    (Web/Desktop).
+                  </p>
+                ) : null}
               </div>
 
               {/* Jam Koreksi (Kondisional) */}

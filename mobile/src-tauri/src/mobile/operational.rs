@@ -2510,6 +2510,7 @@ pub fn generate_alfa_harian(
             "jumlahNonaktif": 0,
             "jumlahLibur": 0,
             "jumlahShiftTidakValid": 0,
+            "jumlahPengajuan": 0,
             "status": "NONAKTIF",
             "pesan": "Generate Alfa dimatikan melalui Pengaturan"
         }));
@@ -2539,6 +2540,7 @@ pub fn generate_alfa_harian(
                 "jumlahNonaktif": 0,
                 "jumlahLibur": 0,
                 "jumlahShiftTidakValid": 0,
+                "jumlahPengajuan": 0,
                 "status": "ERROR",
                 "pesan": "Waktu sistem tidak dapat diproses"
             }));
@@ -2602,6 +2604,10 @@ pub fn generate_alfa_harian(
     // ringkasan hanya menampilkan nol tanpa alasan.
     let mut libur = 0;
     let mut shift_tidak_valid = 0;
+    // Pegawai dengan pengajuan berlaku (hari penuh atau sebagian) dilewati;
+    // pengajuan tidak pernah menulis `absensi_harian` (§20.2.6).
+    let mut pengajuan = 0;
+    let mut pengaju: HashMap<String, HashMap<String, bool>> = HashMap::new();
 
     let now_minute = parse_time_to_minutes(&now_moment.time);
 
@@ -2805,6 +2811,18 @@ pub fn generate_alfa_harian(
             continue;
         }
 
+        if !pengaju.contains_key(&work_date) {
+            let hari = super::hr_pengajuan::pengajuan_pada(&transaction, &work_date)?;
+            pengaju.insert(work_date.clone(), hari);
+        }
+        if pengaju
+            .get(&work_date)
+            .is_some_and(|hari| hari.contains_key(&id_unik))
+        {
+            pengajuan += 1;
+            continue;
+        }
+
         let month_idx = match work_date.get(5..7).and_then(|m| m.parse::<usize>().ok()) {
             Some(m) if m >= 1 && m <= 12 => m - 1,
             _ => 0,
@@ -2904,12 +2922,12 @@ pub fn generate_alfa_harian(
             if alfa_dibuat > 0 {
                 (
                     "SELESAI",
-                    format!("Generate Alfa Selesai. Dibuat: {alfa_dibuat}, Sudah Ada: {sudah_ada}, Belum Waktunya: {belum_waktunya}, Fleksibel (dinilai): {fleksibel}, Libur: {libur}, Shift Tidak Valid: {shift_tidak_valid}"),
+                    format!("Generate Alfa Selesai. Dibuat: {alfa_dibuat}, Sudah Ada: {sudah_ada}, Belum Waktunya: {belum_waktunya}, Fleksibel (dinilai): {fleksibel}, Libur: {libur}, Shift Tidak Valid: {shift_tidak_valid}, Pengajuan: {pengajuan}"),
                 )
             } else {
                 (
                     "IDLE",
-                    format!("Generate Alfa Selesai. Dibuat: {alfa_dibuat}, Sudah Ada: {sudah_ada}, Belum Waktunya: {belum_waktunya}, Fleksibel (dinilai): {fleksibel}, Libur: {libur}, Shift Tidak Valid: {shift_tidak_valid}"),
+                    format!("Generate Alfa Selesai. Dibuat: {alfa_dibuat}, Sudah Ada: {sudah_ada}, Belum Waktunya: {belum_waktunya}, Fleksibel (dinilai): {fleksibel}, Libur: {libur}, Shift Tidak Valid: {shift_tidak_valid}, Pengajuan: {pengajuan}"),
                 )
             }
         }
@@ -3033,6 +3051,7 @@ pub fn generate_alfa_harian(
         "jumlahNonaktif": nonaktif_count,
         "jumlahLibur": libur,
         "jumlahShiftTidakValid": shift_tidak_valid,
+        "jumlahPengajuan": pengajuan,
         "status": status,
         "pesan": pesan
     }))
@@ -3242,6 +3261,9 @@ pub fn get_attendance_audit(
     }
     drop(scan_statement);
 
+    // Pengajuan berlaku pada tanggal target: id → hari penuh (§20.2.6).
+    let pengajuan_hari = super::hr_pengajuan::pengajuan_pada(&connection, &tanggal_target)?;
+
     // Hari kerja mingguan per shift dan Hari Sekolah siswa. Cermin
     // `auditKualitasAbsensi`.
     let mut hari_kerja_statement = connection
@@ -3317,6 +3339,7 @@ pub fn get_attendance_audit(
     let mut fleksibel = 0i64;
     let mut tanpa_data = 0i64;
     let mut shift_tidak_valid = 0i64;
+    let mut pengajuan = 0i64;
     let mut karyawan_bermasalah = 0i64;
     let mut temuan: Vec<TemuanAudit> = Vec::new();
 
@@ -3422,7 +3445,28 @@ pub fn get_attendance_audit(
             });
         };
 
-        match absensi.get(&id_unik) {
+        // Pengajuan berlaku: hari penuh menutup "Tanpa Data"/"Belum Scan Masuk"
+        // dan Alfa lama; hari sebagian hanya "Belum Scan Pulang".
+        let ajuan = pengajuan_hari.get(&id_unik).copied();
+        if let Some(penuh) = ajuan {
+            pengajuan += 1;
+            catat(
+                "Pengajuan",
+                "info",
+                if penuh {
+                    "Ditutup pengajuan cuti/izin yang berlaku (hari penuh).".to_owned()
+                } else {
+                    "Ditutup pengajuan cuti/izin yang berlaku (sebagian hari).".to_owned()
+                },
+                absensi.get(&id_unik),
+                &mut temuan,
+            );
+        }
+        let record = absensi.get(&id_unik);
+        let alfa_tertutup = ajuan.is_some()
+            && record.is_some_and(|r| r.2.as_str() == "Alfa");
+        match record.filter(|_| !alfa_tertutup) {
+            None if alfa_tertutup || ajuan == Some(true) => {}
             None => {
                 if masa_depan {
                     menunggu_jam_absen += 1;
@@ -3483,7 +3527,11 @@ pub fn get_attendance_audit(
                     _ => izin_sakit += 1,
                 }
 
-                if !masuk.is_empty() && pulang.is_empty() && kehadiran.as_str() != "Alfa" {
+                if !masuk.is_empty()
+                    && pulang.is_empty()
+                    && kehadiran.as_str() != "Alfa"
+                    && ajuan != Some(false)
+                {
                     if tutup_pulang.is_some_and(|tutup| menit_berjalan > tutup) {
                         belum_scan_pulang += 1;
                         bermasalah = true;
@@ -3646,6 +3694,7 @@ pub fn get_attendance_audit(
             "fleksibel": fleksibel,
             "tanpaData": tanpa_data,
             "shiftTidakValid": shift_tidak_valid,
+            "pengajuan": pengajuan,
             "karyawanBermasalah": karyawan_bermasalah,
             "skorKualitas": skor,
         },

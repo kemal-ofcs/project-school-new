@@ -302,6 +302,9 @@ export default function AuditAbsensiPage() {
               <StatusBadge tone="neutral">
                 Shift Fleksibel {ringkasan.fleksibel}
               </StatusBadge>
+              <StatusBadge tone="info">
+                Cuti &amp; Izin {ringkasan.pengajuan}
+              </StatusBadge>
               {ringkasan.menungguJamAbsen > 0 ? (
                 <StatusBadge tone="neutral">
                   Menunggu Jam Absen {ringkasan.menungguJamAbsen}

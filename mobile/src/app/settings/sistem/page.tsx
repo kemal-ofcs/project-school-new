@@ -464,6 +464,14 @@ export default function SistemInfrastrukturPage() {
                     {alfaSummary.jumlahShiftTidakValid}
                   </span>
                 </div>
+                <div className="flex justify-between gap-2">
+                  <span className="text-slate-500">
+                    Cuti &amp; izin berlaku:
+                  </span>
+                  <span className="font-bold text-slate-200">
+                    {alfaSummary.jumlahPengajuan}
+                  </span>
+                </div>
                 <p className="col-span-2 pt-1 text-[11px] leading-4 text-slate-400">
                   {alfaSummary.pesan}
                 </p>

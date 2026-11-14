@@ -2480,6 +2480,18 @@ fn laporan_kehadiran(
             .map_err(|_| CommandError::internal())?;
         hasil[kunci] = Value::Array(baris);
     }
+    // Pengajuan cuti/izin/sakit/dinas luar yang berlaku (HRIS v69); kodenya
+    // disusun `susunLaporanKehadiran`. SQL kembar `report.ts`.
+    let mut statement = connection
+        .prepare(super::hr_pengajuan::LAPORAN_PENGAJUAN_SQL)
+        .map_err(|_| CommandError::internal())?;
+    let pengajuan = statement
+        .query_map(params![mulai, selesai], |row| row.get::<_, String>(0))
+        .map_err(|_| CommandError::internal())?
+        .map(|teks| teks.map(|teks| serde_json::from_str(&teks).unwrap_or(Value::Null)))
+        .collect::<Result<Vec<Value>, _>>()
+        .map_err(|_| CommandError::internal())?;
+    hasil["pengajuan"] = Value::Array(pengajuan);
     Ok(hasil)
 }
 
@@ -3538,6 +3550,7 @@ INSERT INTO hari_libur_whitelist (id, scope_type, scope_value, tanggal_libur, ke
             .map(|w| w["id"].clone())
             .collect();
         assert_eq!(whitelist, vec![json!("w-semua")]);
+        assert_eq!(hasil["pengajuan"], json!([]));
     }
 
     /// Ekspresi Senin pekan berjalan yang dipakai `tren_mingguan` dan

@@ -17,9 +17,11 @@ import type { OperatorUser } from "@/lib/auth/operator-user";
 import {
   type DaftarPengajuan,
   muatPengajuan,
+  muatSaldoCuti,
   type PengajuanDraft,
   type PengajuanTersusun,
   putuskanPengajuan,
+  type SaldoCuti,
   simpanPengajuan,
 } from "@/lib/gateways/hr-pengajuan";
 import {
@@ -361,6 +363,18 @@ function FormPengajuan({
     d.tanggal_mulai === d.tanggal_selesai;
   const bolehUrgent =
     jenis?.boleh_urgent === 1 && hasPermission(user, "hr.request.urgent");
+  const ringkasan = useRingkasanJatah(
+    d.id_karyawan,
+    d.tanggal_mulai,
+    d.tanggal_selesai,
+  );
+  const periodeMulai = ringkasan?.periode.find(
+    (p) => p.mulai <= d.tanggal_mulai && d.tanggal_mulai <= p.selesai,
+  );
+  const sisaSesudah =
+    periodeMulai && jenis?.potong_jatah === 1
+      ? periodeMulai.sisa - (ringkasan?.hari_wajib ?? 0)
+      : null;
 
   const kirim = async (event: FormEvent) => {
     event.preventDefault();
@@ -563,6 +577,31 @@ function FormPengajuan({
             </span>
           </label>
         ) : null}
+        {ringkasan && ringkasan.hari_wajib !== undefined ? (
+          <div className="rounded-xl border border-white/10 bg-slate-950 px-3 py-2 text-sm text-slate-200">
+            <p>
+              Hari kerja dalam rentang ini: {ringkasan.hari_wajib} hari
+              {jenis?.potong_jatah === 1 ? " (memotong jatah cuti)" : ""}.
+            </p>
+            {jenis?.potong_jatah === 1 ? (
+              periodeMulai && sisaSesudah !== null ? (
+                <p className={sisaSesudah < 0 ? "text-amber-200" : ""}>
+                  Sisa jatah periode {periodeMulai.mulai} s.d.{" "}
+                  {periodeMulai.selesai}: {periodeMulai.sisa} hari, sesudah
+                  pengajuan ini {sisaSesudah} hari
+                  {sisaSesudah < 0
+                    ? ". Melebihi jatah; pemutus tetap bisa menyetujui."
+                    : "."}
+                </p>
+              ) : (
+                <p className="text-amber-200">
+                  Tanggal ini di luar periode jatah pegawai (TMT kosong atau
+                  belum berhak cuti).
+                </p>
+              )
+            ) : null}
+          </div>
+        ) : null}
         {jenis?.wajib_dokumen === 1 ? (
           <p className={PERINGATAN}>
             Jenis ini perlu dokumen pendukung (misalnya surat dokter). Pengajuan
@@ -580,6 +619,36 @@ function FormPengajuan({
       </form>
     </Modal>
   );
+}
+
+/**
+ * Jatah dan hari wajib pegawai untuk rentang form (§20.2.4: "hari terpakai dan
+ * sisa sebelum disimpan"). Rentang belum lengkap atau gagal dimuat = tanpa
+ * ringkasan; backend tetap menilai ulang saat simpan.
+ */
+function useRingkasanJatah(id: string, mulai: string, selesai: string) {
+  const [hasil, setHasil] = useState<SaldoCuti["pegawai"]>(null);
+  useEffect(() => {
+    if (!id || !mulai || !selesai || selesai < mulai) {
+      setHasil(null);
+      return;
+    }
+    let batal = false;
+    const tunda = setTimeout(() => {
+      muatSaldoCuti(id, mulai, selesai)
+        .then((s) => {
+          if (!batal) setHasil(s.pegawai);
+        })
+        .catch(() => {
+          if (!batal) setHasil(null);
+        });
+    }, 300);
+    return () => {
+      batal = true;
+      clearTimeout(tunda);
+    };
+  }, [id, mulai, selesai]);
+  return hasil;
 }
 
 const TOMBOL_AKSI: [string, string][] = [

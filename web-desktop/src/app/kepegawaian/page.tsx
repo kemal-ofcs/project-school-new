@@ -9,6 +9,7 @@ import {
   useState,
 } from "react";
 import { AppShell } from "@/components/AppShell";
+import { AturanCutiOrganisasi } from "@/components/kepegawaian/AturanCutiOrganisasi";
 import { masaKerja } from "@/components/kepegawaian/gaya";
 import { JenisDokumenOrganisasi } from "@/components/kepegawaian/JenisDokumenOrganisasi";
 import { JenisPengajuanOrganisasi } from "@/components/kepegawaian/JenisPengajuanOrganisasi";
@@ -160,6 +161,7 @@ export default function KepegawaianPage() {
             org={org}
             bolehUbah={bolehUbah}
             jenisDokumen={bolehUbah || hasPermission(user, "hr.document.view")}
+            aturanCuti={bolehUbah || hasPermission(user, "hr.request.view")}
             onPesan={setPesan}
             onBerhasil={async (teks) => {
               setPesan(teks);
@@ -419,6 +421,7 @@ function TabOrganisasi({
   org,
   bolehUbah,
   jenisDokumen,
+  aturanCuti,
   onPesan,
   onBerhasil,
   onGalat,
@@ -426,6 +429,7 @@ function TabOrganisasi({
   org: OrgKepegawaian;
   bolehUbah: boolean;
   jenisDokumen: boolean;
+  aturanCuti: boolean;
   onPesan: (pesan: string) => void;
   onBerhasil: (pesan: string) => Promise<void>;
   onGalat: (pesan: string) => void;
@@ -661,6 +665,14 @@ function TabOrganisasi({
         onBerhasil={onBerhasil}
         onGalat={onGalat}
       />
+
+      {aturanCuti ? (
+        <AturanCutiOrganisasi
+          bolehUbah={bolehUbah}
+          onBerhasil={onBerhasil}
+          onGalat={onGalat}
+        />
+      ) : null}
 
       {jenisDokumen ? (
         <JenisDokumenOrganisasi bolehUbah={bolehUbah} onPesan={onPesan} />

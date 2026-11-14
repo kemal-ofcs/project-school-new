@@ -382,6 +382,23 @@ export function PayrollRecapTable({
                   {IDR.format(selectedRow.est_basic_salary)}
                 </span>
               </div>
+              {selectedRow.cuti_dibayar_hari > 0 ||
+              selectedRow.cuti_dibayar_menit > 0 ? (
+                <div className="flex justify-between py-1 border-b border-white/5">
+                  <span className="pl-3 text-slate-400">
+                    Cuti dibayar ({selectedRow.cuti_dibayar_hari} hari,{" "}
+                    {Number((selectedRow.cuti_dibayar_menit / 60).toFixed(2))}
+                    j)
+                  </span>
+                  <span className="text-slate-400">termasuk gaji pokok</span>
+                </div>
+              ) : null}
+              {selectedRow.jam_normal_nol ? (
+                <p className="py-1 text-amber-200">
+                  Ada cuti dibayar, tetapi jam kerja normal shift pegawai ini 0
+                  menit, jadi cutinya tidak menambah gaji.
+                </p>
+              ) : null}
               <div className="flex justify-between py-1 border-b border-white/5">
                 <span className="text-slate-300">
                   Upah Lembur (Indeks Hari Kerja{" "}
