@@ -261,6 +261,7 @@ const DESKTOP_COMMANDS: &[&str] = &[
     "desktop_hr_offboarding_save",
     "desktop_hr_offboarding_apply",
     "desktop_hr_offboarding_cancel",
+    "desktop_hr_exit_reasons_save",
     "desktop_hr_requests",
     "desktop_hr_request_save",
     "desktop_hr_request_decide",

@@ -279,6 +279,7 @@ pub fn run() {
             desktop::commands::desktop_hr_offboarding_save,
             desktop::commands::desktop_hr_offboarding_apply,
             desktop::commands::desktop_hr_offboarding_cancel,
+            desktop::commands::desktop_hr_exit_reasons_save,
             desktop::commands::desktop_hr_requests,
             desktop::commands::desktop_hr_request_save,
             desktop::commands::desktop_hr_request_decide,

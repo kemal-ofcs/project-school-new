@@ -373,6 +373,7 @@ pub fn run() {
             mobile::commands::desktop_hr_offboarding_save,
             mobile::commands::desktop_hr_offboarding_apply,
             mobile::commands::desktop_hr_offboarding_cancel,
+            mobile::commands::desktop_hr_exit_reasons_save,
             mobile::commands::desktop_hr_requests,
             mobile::commands::desktop_hr_request_save,
             mobile::commands::desktop_hr_request_decide,

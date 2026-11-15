@@ -11,20 +11,21 @@ import {
 } from "@/lib/server/http/api-response";
 import { assertSameOriginMutation } from "@/lib/server/http/request-security";
 import { simpanKeluar } from "@/lib/services/hr-keluar";
-import { keluarDraftSchema } from "@/lib/validations/hr-keluar";
+import { keluarSimpanSchema } from "@/lib/validations/hr-keluar";
 
 export const runtime = "nodejs";
 
 /**
  * Catat atau ubah proses keluar yang belum berlaku; cermin
- * `desktop_hr_offboarding_save`. Cakupan unit dan "bukan diri sendiri" dari sesi.
+ * `desktop_hr_offboarding_save`, termasuk nomor surat keluar dari dialog cetak.
+ * Cakupan unit dan "bukan diri sendiri" dari sesi.
  */
 export async function POST(request: NextRequest) {
   try {
     assertSameOriginMutation(request);
     const actor = await requireWebPermission(request, "hr.offboard.manage");
     await ensureServerDatabaseInitialized();
-    const parsed = keluarDraftSchema.safeParse(await readJsonBody(request));
+    const parsed = keluarSimpanSchema.safeParse(await readJsonBody(request));
     if (!parsed.success) {
       return noStoreJson(
         { sukses: false, pesan: "Data proses keluar tidak valid." },

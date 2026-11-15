@@ -7,6 +7,7 @@ import {
   type KontrakBaris,
   muatBebanMengajar,
   muatSetupSurat,
+  simpanNomorKeluar,
   simpanSuratPeringatan,
   simpanTugas,
   type TugasBaris,
@@ -18,7 +19,11 @@ import {
   type SetupSurat,
   susunBebanMengajar,
 } from "@/lib/validations/hr-beban";
-import type { SpBaris } from "@/lib/validations/hr-keluar";
+import type {
+  KeluarBaris,
+  SpBaris,
+  SuratKeluar,
+} from "@/lib/validations/hr-keluar";
 import type { PengajuanTersusun } from "@/lib/validations/hr-pengajuan";
 import { INPUT, LABEL, pesanGalat, TOMBOL, TOMBOL_UTAMA } from "./gaya";
 import {
@@ -31,6 +36,8 @@ import {
   polaSurat,
   suratKeteranganAktif,
   suratPembagianTugas,
+  suratPemberhentian,
+  suratPengalamanKerja,
   suratPengangkatan,
   suratPeringatan,
   suratTugasLuar,
@@ -218,7 +225,9 @@ export function DialogCetakSurat({
               ? "Nomor ini tidak disimpan aplikasi; catat di buku agenda."
               : jenis === "sp"
                 ? "Nomor ini disimpan ke SP-nya."
-                : "Nomor dan tanggal ini disimpan ke tugas tambahannya."}
+                : jenis === "berhenti" || jenis === "pengalaman"
+                  ? "Nomor ini disimpan ke proses keluarnya."
+                  : "Nomor dan tanggal ini disimpan ke tugas tambahannya."}
           </p>
         </div>
         {jenis === "tugas_luar" ? (
@@ -274,7 +283,7 @@ export function DialogCetakSurat({
   );
 }
 
-// ── Pembangun permintaan per sumber data ────────────────────────────────────
+// Pembangun permintaan per sumber data
 
 export function permintaanPembagianTugas(
   data: DataBeban,
@@ -405,6 +414,49 @@ export function permintaanSp(
               : undefined;
           }
         : undefined,
+  };
+}
+
+/**
+ * SK Pemberhentian (GTY/PTY) atau Surat Keterangan Pengalaman Kerja untuk
+ * proses keluar yang Berlaku (Fase 4c). Nomor disimpan ke `hr_keluar` bila
+ * sesi memegang `hr.offboard.manage`; tanggal surat tidak disimpan.
+ */
+export function permintaanSuratKeluar(
+  k: KeluarBaris,
+  jenis: SuratKeluar,
+  bolehSimpanNomor: boolean,
+): PermintaanSurat {
+  const nomorAwal = jenis === "berhenti" ? k.nomor_sk : k.nomor_keterangan;
+  const isian = {
+    id_karyawan: k.id_karyawan,
+    status_kepegawaian: k.status_kepegawaian,
+    masa_kerja_mulai: k.masa_kerja_mulai,
+    tanggal_terakhir: k.tanggal_terakhir,
+    alasan_nama: k.alasan_nama,
+  };
+  return {
+    jenis,
+    keterangan: `${k.nama} · ${k.status_kepegawaian || "tanpa status"}`,
+    unit: (s) => identitas(s, k.id_karyawan).unit || k.unit,
+    nomorAwal,
+    rakit: (d) =>
+      jenis === "berhenti"
+        ? suratPemberhentian(d, isian)
+        : suratPengalamanKerja(d, isian),
+    simpanNomor: bolehSimpanNomor
+      ? async (nomor) => {
+          if (nomor === nomorAwal) return undefined;
+          const hasil = await simpanNomorKeluar({
+            id_keluar: k.id_keluar,
+            jenis_surat: jenis,
+            nomor,
+          });
+          return hasil.nomor_kembar
+            ? "Surat sudah dicetak. Nomor ini juga dipakai surat keluar lain; periksa buku agenda."
+            : undefined;
+        }
+      : undefined,
   };
 }
 

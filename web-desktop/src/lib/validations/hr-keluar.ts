@@ -8,7 +8,7 @@
  * `master_data.id_keluar`.
  */
 import { z } from "zod";
-import { tanggalValid } from "./hari-kerja";
+import { parseHariKerja, tanggalValid } from "./hari-kerja";
 import alasanBawaan from "./hr-keluar-alasan-bawaan.json";
 import { tambahHari } from "./hr-pengajuan";
 import {
@@ -50,7 +50,7 @@ export function seedAlasanArgs(a: AlasanBawaan) {
   ];
 }
 
-// ── Surat peringatan: aturan murni (§22.2.1) ──
+// Surat peringatan: aturan murni (§22.2.1)
 
 /** WAJIB sama dengan CHECK `hr_sp.tingkat`. */
 export const TINGKAT_SP = ["SP1", "SP2", "SP3"] as const;
@@ -276,7 +276,7 @@ export function masaSpBerlaku(nilai: string | null | undefined): number {
   return angkaPengaturan(nilai ?? "", ATURAN_SP_MASA);
 }
 
-// ── SQL, dieja harfiah sama di `desktop/hr_keluar.rs` ──
+// SQL, dieja harfiah sama di `desktop/hr_keluar.rs`
 
 export const SP_PEGAWAI_SQL =
   "SELECT id_sp, id_karyawan, tingkat, usulan_tingkat, COALESCE(alasan_tingkat, '') AS alasan_tingkat, tanggal, masa_bulan, berlaku_sampai, COALESCE(nomor, '') AS nomor, pelanggaran, COALESCE(harapan, '') AS harapan, penanda_nama, penanda_jabatan, COALESCE(penanda_nip, '') AS penanda_nip, COALESCE(unit, '') AS unit, dicatat_oleh, created_at, COALESCE(diubah_oleh, '') AS diubah_oleh, COALESCE(diubah_pada, '') AS diubah_pada, COALESCE(dicabut_oleh, '') AS dicabut_oleh, COALESCE(dicabut_pada, '') AS dicabut_pada, COALESCE(alasan_cabut, '') AS alasan_cabut FROM hr_sp WHERE id_karyawan = ?1 ORDER BY tanggal DESC, created_at DESC, id_sp DESC\n-- batas: surat peringatan satu pegawai\n;";
@@ -295,7 +295,7 @@ export const UBAH_SP_SQL =
 export const CABUT_SP_SQL =
   "UPDATE hr_sp SET dicabut_oleh = ?2, dicabut_pada = datetime('now'), alasan_cabut = ?3 WHERE id_sp = ?1 AND dicabut_pada IS NULL;";
 
-// ── Pegawai keluar: aturan murni (§22.2.2), cermin `desktop/hr_keluar.rs` ──
+// Pegawai keluar: aturan murni (§22.2.2), cermin `desktop/hr_keluar.rs`
 
 export const MAKS_TEKS_KELUAR = 1000;
 
@@ -327,12 +327,37 @@ export interface KeluarSah {
   keterangan: string | null;
   kartu_ditarik: boolean;
   catatan_checklist: string | null;
+  /** `null` = pakai usulan (`UPAH_RATA_SQL`). */
+  upah_pokok: number | null;
+  alasan_upah: string | null;
+  tunjangan_tetap: number;
+  /** Hanya baris yang nominalnya diisi; sisanya mengikuti usulan. */
+  rincian: IsianRincian[];
+}
+
+/** Cermin `rupiah`: bilangan bulat 0..maks; tidak dikirim/`null` = `null`. */
+function rupiah(
+  draft: Draft,
+  kunci: string,
+  label: string,
+  maks: number,
+): Hasil<number | null> {
+  const nilai = draft[kunci];
+  if (nilai === undefined || nilai === null) return ok(null);
+  if (
+    typeof nilai !== "number" ||
+    !Number.isInteger(nilai) ||
+    nilai < 0 ||
+    nilai > maks
+  )
+    return gagal(`${label} tidak valid.`);
+  return ok(nilai);
 }
 
 /**
  * Cermin `validasi_keluar`. Hanya bentuk isian; status pegawai, tanggal masuk,
- * alasan aktif, dan wewenang diperiksa pemanggil. Hari terakhir boleh di masa
- * depan.
+ * alasan aktif, wewenang, dan usulan diperiksa pemanggil. Hari terakhir boleh
+ * di masa depan.
  */
 export function validasiKeluar(draft: Draft): Hasil<KeluarSah> {
   const id_karyawan = isian(draft, "id_karyawan");
@@ -365,6 +390,61 @@ export function validasiKeluar(draft: Draft): Hasil<KeluarSah> {
     MAKS_TEKS_KELUAR,
   );
   if (!catatan.ok) return catatan;
+  const upah = rupiah(draft, "upah_pokok", "Upah pokok", MAKS_UPAH);
+  if (!upah.ok) return upah;
+  const tunjangan = rupiah(
+    draft,
+    "tunjangan_tetap",
+    "Tunjangan tetap",
+    MAKS_UPAH,
+  );
+  if (!tunjangan.ok) return tunjangan;
+  const tunjanganTetap = tunjangan.nilai ?? 0;
+  if ((upah.nilai ?? 0) + tunjanganTetap > MAKS_UPAH)
+    return gagal("Upah pokok + tunjangan tetap terlalu besar.");
+  const alasanUpah = teksOpsional(
+    draft,
+    "alasan_upah",
+    "Alasan upah",
+    MAKS_TEKS_KELUAR,
+  );
+  if (!alasanUpah.ok) return alasanUpah;
+  const rincian: IsianRincian[] = [];
+  const daftar = draft.rincian;
+  if (daftar !== undefined && daftar !== null) {
+    if (!Array.isArray(daftar)) return gagal("Rincian tidak valid.");
+    for (const baris of daftar as Draft[]) {
+      const komponen = isian(baris ?? {}, "komponen");
+      if (
+        !komponen ||
+        !(KOMPONEN_RINCIAN as readonly string[]).includes(komponen)
+      )
+        return gagal("Komponen rincian tidak dikenal.");
+      if (rincian.some((r) => r.komponen === komponen))
+        return gagal(`Komponen ${komponen} tercantum dua kali.`);
+      const nominal = rupiah(
+        baris,
+        "nominal",
+        `Nominal ${komponen}`,
+        MAKS_NOMINAL_RINCIAN,
+      );
+      if (!nominal.ok) return nominal;
+      if (nominal.nilai === null)
+        return gagal(`Nominal ${komponen} tidak valid.`);
+      const alasanUbah = teksOpsional(
+        baris,
+        "alasan_ubah",
+        "Alasan perubahan",
+        MAKS_TEKS_KELUAR,
+      );
+      if (!alasanUbah.ok) return alasanUbah;
+      rincian.push({
+        komponen: komponen as KomponenRincian,
+        nominal: nominal.nilai,
+        alasan_ubah: alasanUbah.nilai,
+      });
+    }
+  }
   return ok({
     id_keluar: isian(draft, "id_keluar"),
     id_karyawan,
@@ -375,7 +455,337 @@ export function validasiKeluar(draft: Draft): Hasil<KeluarSah> {
     keterangan: keterangan.nilai,
     kartu_ditarik: draft.kartu_ditarik === true,
     catatan_checklist: catatan.nilai,
+    upah_pokok: upah.nilai,
+    alasan_upah: alasanUpah.nilai,
+    tunjangan_tetap: tunjanganTetap,
+    rincian,
   });
+}
+
+// Pesangon: aturan murni (§22.2.3), cermin `desktop/hr_keluar.rs`
+
+/** WAJIB sama dengan CHECK `hr_keluar_rincian.komponen`; urutannya urutan tampil. */
+export const KOMPONEN_RINCIAN = [
+  "UP",
+  "UPMK",
+  "UPH Cuti",
+  "UPH Lainnya",
+  "Kompensasi PKWT",
+  "Uang Pisah",
+  "Lainnya",
+] as const;
+export type KomponenRincian = (typeof KOMPONEN_RINCIAN)[number];
+export const MAKS_UPAH = 1_000_000_000;
+export const MAKS_NOMINAL_RINCIAN = 100_000_000_000;
+export const MAKS_PENGALI = 1000;
+export const MAKS_NAMA_ALASAN = 100;
+
+/** Cermin `bulan_penuh`: n terbesar dengan `tambahBulan(mulai, n)` ≤ `akhir`. */
+export function bulanPenuh(mulai: string, akhir: string): number {
+  if (!tanggalValid(mulai) || !tanggalValid(akhir)) return 0;
+  const bulanKe = (t: string) =>
+    Number(t.slice(0, 4)) * 12 + Number(t.slice(5, 7));
+  let n = bulanKe(akhir) - bulanKe(mulai);
+  while (n > 0) {
+    const t = tambahBulan(mulai, n);
+    if (t !== null && t <= akhir) break;
+    n--;
+  }
+  return Math.max(n, 0);
+}
+
+/**
+ * Cermin `masa_kerja_bulan`: bulan penuh dari `mulai` sampai hari sesudah
+ * `tanggalTerakhir` (eksklusif).
+ */
+export function masaKerjaBulan(mulai: string, tanggalTerakhir: string): number {
+  if (!tanggalValid(tanggalTerakhir)) return 0;
+  return bulanPenuh(mulai, tambahHari(tanggalTerakhir, 1));
+}
+
+/** Kelipatan UP menurut tahun masa kerja (PP 35/2021 Pasal 40 ayat 2). */
+export const kelipatanUp = (tahun: number) =>
+  Math.min(Math.max(tahun + 1, 1), 9);
+
+/** Kelipatan UPMK menurut tahun masa kerja (PP 35/2021 Pasal 40 ayat 3). */
+export function kelipatanUpmk(tahun: number): number {
+  if (tahun < 3) return 0;
+  if (tahun >= 24) return 10;
+  return Math.floor(tahun / 3) + 1;
+}
+
+/**
+ * Cermin `rata_upah` (Q-82): total slip dibagi jumlah bulan berbeda,
+ * dibulatkan setengah ke atas. Tanpa slip = 0 (wajib diisi tangan).
+ */
+export function rataUpah(total: number, bulan: number): number {
+  if (bulan <= 0 || total <= 0) return 0;
+  return Math.min(Math.floor((2 * total + bulan) / (2 * bulan)), MAKS_UPAH);
+}
+
+/** Cermin `pembagi_uph` (Q-83): 25 bila shift ≥ 6 hari kerja (kosong = 7), 21 bila kurang. */
+export const pembagiUph = (hariKerja: string | null | undefined) =>
+  parseHariKerja(hariKerja).length >= 6 ? 25 : 21;
+
+export type KelompokStatus = "tetap" | "kontrak" | "negeri" | "lainnya";
+
+/**
+ * Cermin `kelompok_status` (Q-81): `tetap` GTY/PTY, `kontrak` GTT/PTT,
+ * `negeri` PNS/PPPK, `lainnya` Honorer, tanpa status, dan teks lain.
+ */
+export function kelompokStatus(status: string): KelompokStatus {
+  switch (status.trim().toUpperCase()) {
+    case "GTY":
+    case "PTY":
+      return "tetap";
+    case "GTT":
+    case "PTT":
+      return "kontrak";
+    case "PNS":
+    case "PPPK":
+      return "negeri";
+    default:
+      return "lainnya";
+  }
+}
+
+export interface MasukanPesangon {
+  /** Status kini pada hari terakhir (`STATUS_KINI_SQL`). */
+  status: string;
+  /** Upah pokok + tunjangan tetap. */
+  upah: number;
+  /** `tanggal_daftar`; kosong = UP dan UPMK 0. */
+  masa_kerja_mulai: string | null;
+  tanggal_terakhir: string;
+  pengali_up: number;
+  pengali_upmk: number;
+  uph: boolean;
+  kompensasi_pkwt: boolean;
+  uang_pisah: boolean;
+  /** Sisa cuti periode yang memuat hari terakhir. */
+  sisa_cuti: number;
+  sebelum_berhak: boolean;
+  /** 25 atau 21 (`pembagiUph`). */
+  pembagi: number;
+  /** Mulai kontrak berlaku pada hari terakhir yang punya tanggal selesai. */
+  kontrak_mulai: string | null;
+}
+
+export interface Usulan {
+  komponen: KomponenRincian;
+  dasar: string | null;
+  usulan: number;
+}
+
+/**
+ * Cermin `usulan_pesangon` (§22.2.3, Q-81). Bilangan bulat, dibulatkan ke
+ * rupiah terdekat (setengah ke atas); urutan = `KOMPONEN_RINCIAN`.
+ */
+export function usulanPesangon(m: MasukanPesangon): Usulan[] {
+  const kelompok = kelompokStatus(m.status);
+  if (kelompok === "negeri") return [];
+  const upah = Math.min(Math.max(m.upah, 0), MAKS_UPAH);
+  const yayasan = kelompok === "tetap" || kelompok === "kontrak";
+  const hasil: Usulan[] = [];
+  const baris = (komponen: KomponenRincian, dasar: string | null, n: number) =>
+    hasil.push({ komponen, dasar, usulan: n });
+  if (kelompok === "tetap") {
+    const mulai = m.masa_kerja_mulai;
+    if (mulai && tanggalValid(mulai)) {
+      const tahun = Math.floor(masaKerjaBulan(mulai, m.tanggal_terakhir) / 12);
+      for (const [komponen, kelipatan, pengali] of [
+        ["UP", kelipatanUp(tahun), m.pengali_up],
+        ["UPMK", kelipatanUpmk(tahun), m.pengali_upmk],
+      ] as const) {
+        baris(
+          komponen,
+          `Masa kerja ${tahun} tahun: ${kelipatan} × upah × ${pengali}%`,
+          Math.floor((upah * kelipatan * pengali + 50) / 100),
+        );
+      }
+    } else {
+      baris("UP", "Tanggal masuk kosong", 0);
+      baris("UPMK", "Tanggal masuk kosong", 0);
+    }
+  }
+  if (yayasan && m.uph) {
+    if (m.sisa_cuti > 0 && !m.sebelum_berhak) {
+      const pembagi = Math.max(m.pembagi, 1);
+      baris(
+        "UPH Cuti",
+        `Sisa cuti ${m.sisa_cuti} hari × upah ÷ ${pembagi}`,
+        Math.floor((2 * m.sisa_cuti * upah + pembagi) / (2 * pembagi)),
+      );
+    }
+    baris("UPH Lainnya", null, 0);
+  }
+  if (kelompok === "kontrak" && m.kompensasi_pkwt) {
+    const mulai = m.kontrak_mulai;
+    if (mulai && tanggalValid(mulai)) {
+      const bulan = Math.max(masaKerjaBulan(mulai, m.tanggal_terakhir), 1);
+      baris(
+        "Kompensasi PKWT",
+        `Kontrak ${bulan} bulan: upah × ${bulan} ÷ 12`,
+        Math.floor((upah * bulan + 6) / 12),
+      );
+    }
+  }
+  if (kelompok === "tetap" && m.uang_pisah) baris("Uang Pisah", null, 0);
+  baris("Lainnya", null, 0);
+  return hasil;
+}
+
+export interface IsianRincian {
+  komponen: KomponenRincian;
+  nominal: number;
+  alasan_ubah: string | null;
+}
+
+export interface RincianSah extends Usulan {
+  nominal: number;
+  alasan_ubah: string | null;
+  urutan: number;
+}
+
+/**
+ * Cermin `susun_rincian`: setiap baris usulan mendapat nominalnya (bawaan =
+ * usulan); nominal lain dari usulan wajib beralasan, alasan hanya disimpan
+ * bila nominal berbeda.
+ */
+export function susunRincian(
+  usulan: readonly Usulan[],
+  isianRincian: readonly IsianRincian[],
+): Hasil<RincianSah[]> {
+  const asing = isianRincian.find(
+    (i) => !usulan.some((u) => u.komponen === i.komponen),
+  );
+  if (asing)
+    return gagal(`Komponen ${asing.komponen} tidak berlaku untuk proses ini.`);
+  const hasil: RincianSah[] = [];
+  for (const [i, u] of usulan.entries()) {
+    const isi = isianRincian.find((r) => r.komponen === u.komponen);
+    const nominal = isi ? isi.nominal : u.usulan;
+    const alasan_ubah =
+      nominal !== u.usulan ? (isi?.alasan_ubah ?? null) : null;
+    if (nominal !== u.usulan && !alasan_ubah)
+      return gagal(
+        `Nominal ${u.komponen} berbeda dari usulan; alasannya wajib diisi.`,
+      );
+    hasil.push({ ...u, nominal, alasan_ubah, urutan: i + 1 });
+  }
+  return ok(hasil);
+}
+
+/** Cermin `periksa_upah`: upah pokok lain dari usulan wajib beralasan. */
+export function periksaUpah(
+  upahPokok: number,
+  usulan: number,
+  alasan: string | null,
+): Hasil<null> {
+  if (upahPokok !== usulan && !alasan)
+    return gagal("Upah pokok berbeda dari usulan; alasannya wajib diisi.");
+  return ok(null);
+}
+
+export interface RingkasanPesangon {
+  total: number;
+  sisa_kasbon: number;
+  /** Boleh negatif: sisa kasbon lebih besar dari pesangon. */
+  perkiraan_diterima: number;
+}
+
+/** Cermin `ringkasan_pesangon`: tidak disimpan kecuali di potret Berlakukan. */
+export function ringkasanPesangon(
+  nominal: readonly number[],
+  sisaKasbon: number,
+): RingkasanPesangon {
+  const total = nominal.reduce((n, x) => n + x, 0);
+  return {
+    total,
+    sisa_kasbon: sisaKasbon,
+    perkiraan_diterima: total - sisaKasbon,
+  };
+}
+
+export interface AlasanSah {
+  id_alasan: string | null;
+  nama: string;
+  pengali_up: number;
+  pengali_upmk: number;
+  uph: boolean;
+  kompensasi_pkwt: boolean;
+  uang_pisah: boolean;
+  is_aktif: boolean;
+  dasar_hukum: string | null;
+}
+
+/** Cermin `validasi_alasan`. Sakelar yang tidak dikirim = bawaan. */
+export function validasiAlasan(draft: Draft): Hasil<AlasanSah> {
+  const nama = teksWajib(draft, "nama", "Nama alasan", MAKS_NAMA_ALASAN);
+  if (!nama.ok) return nama;
+  const pengali = (kunci: string, label: string): Hasil<number> => {
+    const n = draft[kunci];
+    return typeof n === "number" &&
+      Number.isInteger(n) &&
+      n >= 0 &&
+      n <= MAKS_PENGALI
+      ? ok(n)
+      : gagal(`${label} harus bilangan bulat 0–${MAKS_PENGALI} (persen).`);
+  };
+  const up = pengali("pengali_up", "Pengali UP");
+  if (!up.ok) return up;
+  const upmk = pengali("pengali_upmk", "Pengali UPMK");
+  if (!upmk.ok) return upmk;
+  const sakelar = (kunci: string, bawaan: boolean) =>
+    typeof draft[kunci] === "boolean" ? (draft[kunci] as boolean) : bawaan;
+  const dasar = teksOpsional(
+    draft,
+    "dasar_hukum",
+    "Dasar hukum",
+    MAKS_TEKS_KELUAR,
+  );
+  if (!dasar.ok) return dasar;
+  return ok({
+    id_alasan: isian(draft, "id_alasan"),
+    nama: nama.nilai,
+    pengali_up: up.nilai,
+    pengali_upmk: upmk.nilai,
+    uph: sakelar("uph", true),
+    kompensasi_pkwt: sakelar("kompensasi_pkwt", false),
+    uang_pisah: sakelar("uang_pisah", false),
+    is_aktif: sakelar("is_aktif", true),
+    dasar_hukum: dasar.nilai,
+  });
+}
+
+/** Jenis surat keluar (kunci `hr_surat_pola:<jenis>`, §22.2.5). */
+export const SURAT_KELUAR = ["berhenti", "pengalaman"] as const;
+export type SuratKeluar = (typeof SURAT_KELUAR)[number];
+export const PESAN_SURAT_BELUM_BERLAKU =
+  "Surat keluar hanya untuk proses yang sudah berlaku.";
+export const PESAN_SK_BUKAN_TETAP = "SK Pemberhentian hanya untuk GTY dan PTY.";
+export const PESAN_KETERANGAN_NEGERI =
+  "Surat keterangan pengalaman kerja tidak untuk PNS dan PPPK.";
+
+/**
+ * Cermin `periksa_surat_keluar` (Q-86): SK Pemberhentian untuk GTY/PTY,
+ * keterangan pengalaman kerja untuk semua kecuali PNS/PPPK; keduanya hanya
+ * untuk proses Berlaku.
+ */
+export function periksaSuratKeluar(
+  jenis: string,
+  statusKeluarIni: string,
+  statusKepegawaian: string,
+): Hasil<null> {
+  if (!(SURAT_KELUAR as readonly string[]).includes(jenis))
+    return gagal("Jenis surat tidak dikenal.");
+  if (statusKeluarIni !== "Berlaku") return gagal(PESAN_SURAT_BELUM_BERLAKU);
+  const kelompok = kelompokStatus(statusKepegawaian);
+  if (jenis === "berhenti" && kelompok !== "tetap")
+    return gagal(PESAN_SK_BUKAN_TETAP);
+  if (jenis === "pengalaman" && kelompok === "negeri")
+    return gagal(PESAN_KETERANGAN_NEGERI);
+  return ok(null);
 }
 
 /** Cermin `status_aktif_keluar`: potongan SQL melawan zombie (Q-80). */
@@ -385,7 +795,7 @@ export const statusAktifKeluar = (baru: string) =>
 export const tanggalSelesaiKeluar = (baru: string) =>
   TANGGAL_SELESAI_KELUAR_SQL.replace("{baru}", baru);
 
-// ── SQL keluar, dieja harfiah sama di `desktop/hr_keluar.rs` ──
+// SQL keluar, dieja harfiah sama di `desktop/hr_keluar.rs`
 // Checklist: `?1` = id pegawai, `?2` = hari terakhir bekerja.
 
 export const PESAN_SUDAH_KELUAR =
@@ -439,19 +849,19 @@ export const AKUN_TERTAUT_SQL =
 export const SUPERADMIN_AKTIF_SQL =
   "SELECT COUNT(*) AS jumlah FROM master_operator m JOIN app_role r ON r.id = m.role_id WHERE r.is_superadmin = 1 AND COALESCE(m.status, 'Aktif') = 'Aktif';";
 export const PEGAWAI_KELUAR_SQL =
-  "SELECT m.id_unik, m.nama, COALESCE(m.status_aktif, 'Aktif') AS status_aktif, COALESCE(m.tanggal_daftar, '') AS tanggal_daftar, COALESCE(m.unit, '') AS unit, COALESCE(m.id_keluar, '') AS id_keluar FROM master_data m WHERE m.id_unik = ?1 AND LOWER(TRIM(COALESCE(m.jenis_personil, ''))) <> 'siswa' AND NOT EXISTS (SELECT 1 FROM siswa_data sd WHERE sd.id_siswa = m.id_unik) LIMIT 1;";
+  "SELECT m.id_unik, m.nama, COALESCE(m.status_aktif, 'Aktif') AS status_aktif, COALESCE(m.tanggal_daftar, '') AS tanggal_daftar, COALESCE(m.unit, '') AS unit, COALESCE(m.id_keluar, '') AS id_keluar, COALESCE(m.jenis_personil, '') AS jenis_personil, COALESCE(m.divisi, '') AS divisi, COALESCE(s.hari_kerja, '') AS hari_kerja FROM master_data m LEFT JOIN tbl_shift s ON s.id_shift = m.id_shift WHERE m.id_unik = ?1 AND LOWER(TRIM(COALESCE(m.jenis_personil, ''))) <> 'siswa' AND NOT EXISTS (SELECT 1 FROM siswa_data sd WHERE sd.id_siswa = m.id_unik) LIMIT 1;";
 export const ALASAN_KELUAR_SQL =
   "SELECT id_alasan, nama, pengali_up, pengali_upmk, uph, kompensasi_pkwt, uang_pisah, is_aktif, COALESCE(dasar_hukum, '') AS dasar_hukum FROM hr_keluar_alasan ORDER BY is_aktif DESC, nama, id_alasan LIMIT 100;";
 export const ALASAN_SATU_SQL =
-  "SELECT id_alasan, nama, is_aktif FROM hr_keluar_alasan WHERE id_alasan = ?1 LIMIT 1;";
+  "SELECT id_alasan, nama, pengali_up, pengali_upmk, uph, kompensasi_pkwt, uang_pisah, is_aktif FROM hr_keluar_alasan WHERE id_alasan = ?1 LIMIT 1;";
 export const DAFTAR_KELUAR_SQL =
-  "SELECT k.id_keluar, k.id_karyawan, COALESCE(m.nama, k.id_karyawan) AS nama, COALESCE(m.unit, '') AS unit, k.id_alasan, COALESCE(k.alasan_nama, '') AS alasan_nama, COALESCE(k.id_sp, '') AS id_sp, COALESCE(k.status_kepegawaian, '') AS status_kepegawaian, COALESCE(k.tanggal_pemberitahuan, '') AS tanggal_pemberitahuan, k.tanggal_terakhir, COALESCE(k.keterangan, '') AS keterangan, COALESCE(k.masa_kerja_mulai, '') AS masa_kerja_mulai, k.kartu_ditarik, COALESCE(k.catatan_checklist, '') AS catatan_checklist, k.dicatat_oleh, k.created_at, COALESCE(k.diubah_oleh, '') AS diubah_oleh, COALESCE(k.diubah_pada, '') AS diubah_pada, COALESCE(k.berlaku_oleh, '') AS berlaku_oleh, COALESCE(k.berlaku_pada, '') AS berlaku_pada, COALESCE(k.dibatalkan_oleh, '') AS dibatalkan_oleh, COALESCE(k.dibatalkan_pada, '') AS dibatalkan_pada, COALESCE(k.alasan_batal, '') AS alasan_batal FROM hr_keluar k LEFT JOIN master_data m ON m.id_unik = k.id_karyawan ORDER BY k.tanggal_terakhir DESC, k.created_at DESC, k.id_keluar LIMIT 500;";
+  "SELECT k.id_keluar, k.id_karyawan, COALESCE(m.nama, k.id_karyawan) AS nama, COALESCE(m.unit, '') AS unit, k.id_alasan, COALESCE(k.alasan_nama, '') AS alasan_nama, COALESCE(k.id_sp, '') AS id_sp, COALESCE(k.status_kepegawaian, '') AS status_kepegawaian, COALESCE(k.tanggal_pemberitahuan, '') AS tanggal_pemberitahuan, k.tanggal_terakhir, COALESCE(k.keterangan, '') AS keterangan, COALESCE(k.masa_kerja_mulai, '') AS masa_kerja_mulai, k.kartu_ditarik, COALESCE(k.catatan_checklist, '') AS catatan_checklist, k.dicatat_oleh, k.created_at, COALESCE(k.diubah_oleh, '') AS diubah_oleh, COALESCE(k.diubah_pada, '') AS diubah_pada, COALESCE(k.berlaku_oleh, '') AS berlaku_oleh, COALESCE(k.berlaku_pada, '') AS berlaku_pada, COALESCE(k.dibatalkan_oleh, '') AS dibatalkan_oleh, COALESCE(k.dibatalkan_pada, '') AS dibatalkan_pada, COALESCE(k.alasan_batal, '') AS alasan_batal, k.upah_pokok, k.usulan_upah_pokok, k.tunjangan_tetap, COALESCE(k.alasan_upah, '') AS alasan_upah, COALESCE(k.nomor_sk, '') AS nomor_sk, COALESCE(k.nomor_keterangan, '') AS nomor_keterangan FROM hr_keluar k LEFT JOIN master_data m ON m.id_unik = k.id_karyawan ORDER BY k.tanggal_terakhir DESC, k.created_at DESC, k.id_keluar LIMIT 500;";
 export const KELUAR_SATU_SQL =
-  "SELECT k.id_keluar, k.id_karyawan, COALESCE(m.nama, k.id_karyawan) AS nama, COALESCE(m.unit, '') AS unit, k.id_alasan, COALESCE(k.alasan_nama, '') AS alasan_nama, COALESCE(k.id_sp, '') AS id_sp, COALESCE(k.status_kepegawaian, '') AS status_kepegawaian, COALESCE(k.tanggal_pemberitahuan, '') AS tanggal_pemberitahuan, k.tanggal_terakhir, COALESCE(k.keterangan, '') AS keterangan, COALESCE(k.masa_kerja_mulai, '') AS masa_kerja_mulai, k.kartu_ditarik, COALESCE(k.catatan_checklist, '') AS catatan_checklist, k.dicatat_oleh, k.created_at, COALESCE(k.diubah_oleh, '') AS diubah_oleh, COALESCE(k.diubah_pada, '') AS diubah_pada, COALESCE(k.berlaku_oleh, '') AS berlaku_oleh, COALESCE(k.berlaku_pada, '') AS berlaku_pada, COALESCE(k.dibatalkan_oleh, '') AS dibatalkan_oleh, COALESCE(k.dibatalkan_pada, '') AS dibatalkan_pada, COALESCE(k.alasan_batal, '') AS alasan_batal FROM hr_keluar k LEFT JOIN master_data m ON m.id_unik = k.id_karyawan WHERE k.id_keluar = ?1 LIMIT 1;";
+  "SELECT k.id_keluar, k.id_karyawan, COALESCE(m.nama, k.id_karyawan) AS nama, COALESCE(m.unit, '') AS unit, k.id_alasan, COALESCE(k.alasan_nama, '') AS alasan_nama, COALESCE(k.id_sp, '') AS id_sp, COALESCE(k.status_kepegawaian, '') AS status_kepegawaian, COALESCE(k.tanggal_pemberitahuan, '') AS tanggal_pemberitahuan, k.tanggal_terakhir, COALESCE(k.keterangan, '') AS keterangan, COALESCE(k.masa_kerja_mulai, '') AS masa_kerja_mulai, k.kartu_ditarik, COALESCE(k.catatan_checklist, '') AS catatan_checklist, k.dicatat_oleh, k.created_at, COALESCE(k.diubah_oleh, '') AS diubah_oleh, COALESCE(k.diubah_pada, '') AS diubah_pada, COALESCE(k.berlaku_oleh, '') AS berlaku_oleh, COALESCE(k.berlaku_pada, '') AS berlaku_pada, COALESCE(k.dibatalkan_oleh, '') AS dibatalkan_oleh, COALESCE(k.dibatalkan_pada, '') AS dibatalkan_pada, COALESCE(k.alasan_batal, '') AS alasan_batal, k.upah_pokok, k.usulan_upah_pokok, k.tunjangan_tetap, COALESCE(k.alasan_upah, '') AS alasan_upah, COALESCE(k.nomor_sk, '') AS nomor_sk, COALESCE(k.nomor_keterangan, '') AS nomor_keterangan FROM hr_keluar k LEFT JOIN master_data m ON m.id_unik = k.id_karyawan WHERE k.id_keluar = ?1 LIMIT 1;";
 export const SIMPAN_KELUAR_SQL =
-  "INSERT INTO hr_keluar (id_keluar, id_karyawan, id_alasan, alasan_nama, id_sp, status_kepegawaian, tanggal_pemberitahuan, tanggal_terakhir, keterangan, masa_kerja_mulai, kartu_ditarik, catatan_checklist, dicatat_oleh, created_at) SELECT ?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, datetime('now') WHERE NOT EXISTS (SELECT 1 FROM hr_keluar x WHERE x.id_karyawan = ?2 AND x.dibatalkan_pada IS NULL);";
+  "INSERT INTO hr_keluar (id_keluar, id_karyawan, id_alasan, alasan_nama, id_sp, status_kepegawaian, tanggal_pemberitahuan, tanggal_terakhir, keterangan, masa_kerja_mulai, kartu_ditarik, catatan_checklist, dicatat_oleh, created_at, upah_pokok, usulan_upah_pokok, tunjangan_tetap, alasan_upah) SELECT ?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, datetime('now'), ?14, ?15, ?16, ?17 WHERE NOT EXISTS (SELECT 1 FROM hr_keluar x WHERE x.id_karyawan = ?2 AND x.dibatalkan_pada IS NULL);";
 export const UBAH_KELUAR_SQL =
-  "UPDATE hr_keluar SET id_alasan = ?3, alasan_nama = ?4, id_sp = ?5, status_kepegawaian = ?6, tanggal_pemberitahuan = ?7, tanggal_terakhir = ?8, keterangan = ?9, masa_kerja_mulai = ?10, kartu_ditarik = ?11, catatan_checklist = ?12, diubah_oleh = ?13, diubah_pada = datetime('now') WHERE id_keluar = ?1 AND id_karyawan = ?2 AND berlaku_pada IS NULL AND dibatalkan_pada IS NULL;";
+  "UPDATE hr_keluar SET id_alasan = ?3, alasan_nama = ?4, id_sp = ?5, status_kepegawaian = ?6, tanggal_pemberitahuan = ?7, tanggal_terakhir = ?8, keterangan = ?9, masa_kerja_mulai = ?10, kartu_ditarik = ?11, catatan_checklist = ?12, upah_pokok = ?14, usulan_upah_pokok = ?15, tunjangan_tetap = ?16, alasan_upah = ?17, diubah_oleh = ?13, diubah_pada = datetime('now') WHERE id_keluar = ?1 AND id_karyawan = ?2 AND berlaku_pada IS NULL AND dibatalkan_pada IS NULL;";
 export const BERLAKUKAN_SQL = [
   "UPDATE hr_keluar SET berlaku_oleh = ?2, berlaku_pada = datetime('now'), checklist_saat_berlaku = ?3 WHERE id_keluar = ?1 AND id_karyawan = ?4 AND berlaku_pada IS NULL AND dibatalkan_pada IS NULL AND tanggal_terakhir <= date('now', '+7 hours') AND NOT EXISTS (SELECT 1 FROM jadwal_mengajar j JOIN akademik_tahun_ajaran t ON t.id_tahun_ajaran = j.id_tahun_ajaran WHERE j.id_guru = ?4 AND j.is_aktif = 1 AND t.tanggal_selesai > hr_keluar.tanggal_terakhir) AND NOT EXISTS (SELECT 1 FROM akademik_rombel r JOIN akademik_tahun_ajaran t ON t.id_tahun_ajaran = r.id_tahun_ajaran WHERE r.id_wali_kelas = ?4 AND r.is_aktif = 1 AND t.tanggal_selesai > hr_keluar.tanggal_terakhir);",
   "UPDATE master_data SET status_aktif = 'Nonaktif', tanggal_selesai_aktif = (SELECT k.tanggal_terakhir FROM hr_keluar k WHERE k.id_keluar = ?1), id_keluar = ?1 WHERE id_unik = ?4 AND EXISTS (SELECT 1 FROM hr_keluar k WHERE k.id_keluar = ?1 AND k.id_karyawan = ?4 AND k.berlaku_pada IS NOT NULL AND k.dibatalkan_pada IS NULL);",
@@ -463,7 +873,33 @@ export const BATALKAN_SQL = [
   "UPDATE hr_keluar SET dibatalkan_oleh = ?2, dibatalkan_pada = datetime('now'), alasan_batal = ?3 WHERE id_keluar = ?1 AND dibatalkan_pada IS NULL;",
 ] as const;
 
-// ── Bentuk rute dan command ──
+// SQL pesangon dan surat keluar (4c), dieja harfiah sama di Rust
+
+export const UPAH_RATA_SQL =
+  "SELECT COALESCE(SUM(i.basic_salary + i.teaching_salary), 0) AS total, COUNT(DISTINCT substr(r.period_end, 1, 7)) AS bulan FROM payroll_items i JOIN payroll_runs r ON r.id = i.payroll_run_id WHERE i.id_karyawan = ?1 AND r.status = 'PAID' AND r.period_end <= ?2 AND r.period_end > date(?2, '-12 months')\n-- batas: satu baris agregat atas slip satu pegawai dalam 12 bulan\n;";
+export const KONTRAK_KELUAR_SQL =
+  "SELECT k.tanggal_mulai, COALESCE(k.tanggal_selesai, '') AS tanggal_selesai FROM hr_kontrak k WHERE k.id_karyawan = ?2 AND k.status <> 'Pembatalan' AND k.tanggal_mulai <= ?1 AND NOT EXISTS (SELECT 1 FROM hr_kontrak b WHERE b.status = 'Pembatalan' AND b.id_ref = k.id_kontrak) ORDER BY k.tanggal_mulai DESC, k.id_kontrak DESC LIMIT 1;";
+export const TUNJANGAN_ACUAN_SQL =
+  "SELECT id, name, CAST(ROUND(default_value) AS INTEGER) AS nilai, applies_to FROM payroll_components WHERE category = 'ALLOWANCE' AND calc_type = 'FIXED' AND is_active = 1 ORDER BY name, id LIMIT 100;";
+export const RINCIAN_KELUAR_SQL =
+  "SELECT komponen, COALESCE(dasar, '') AS dasar, usulan, nominal, COALESCE(alasan_ubah, '') AS alasan_ubah, urutan FROM hr_keluar_rincian WHERE id_keluar = ?1 ORDER BY urutan, komponen LIMIT 20;";
+export const HAPUS_RINCIAN_SQL =
+  "DELETE FROM hr_keluar_rincian WHERE id_keluar = ?1 AND EXISTS (SELECT 1 FROM hr_keluar k WHERE k.id_keluar = ?1 AND k.berlaku_pada IS NULL AND k.dibatalkan_pada IS NULL);";
+export const SIMPAN_RINCIAN_SQL =
+  "INSERT INTO hr_keluar_rincian (id_rincian, id_keluar, komponen, dasar, usulan, nominal, alasan_ubah, urutan) SELECT ?1 || ':' || ?2, ?1, ?2, ?3, ?4, ?5, ?6, ?7 WHERE EXISTS (SELECT 1 FROM hr_keluar k WHERE k.id_keluar = ?1 AND k.berlaku_pada IS NULL AND k.dibatalkan_pada IS NULL);";
+export const SIMPAN_ALASAN_SQL =
+  "INSERT INTO hr_keluar_alasan (id_alasan, nama, pengali_up, pengali_upmk, uph, kompensasi_pkwt, uang_pisah, is_aktif, dasar_hukum, created_at, updated_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, datetime('now'), datetime('now'));";
+export const UBAH_ALASAN_SQL =
+  "UPDATE hr_keluar_alasan SET nama = ?2, pengali_up = ?3, pengali_upmk = ?4, uph = ?5, kompensasi_pkwt = ?6, uang_pisah = ?7, is_aktif = ?8, dasar_hukum = ?9, updated_at = datetime('now') WHERE id_alasan = ?1;";
+/** Urutan `SURAT_KELUAR`. */
+export const NOMOR_KELUAR_SQL = [
+  "UPDATE hr_keluar SET nomor_sk = ?2 WHERE id_keluar = ?1 AND berlaku_pada IS NOT NULL AND dibatalkan_pada IS NULL;",
+  "UPDATE hr_keluar SET nomor_keterangan = ?2 WHERE id_keluar = ?1 AND berlaku_pada IS NOT NULL AND dibatalkan_pada IS NULL;",
+] as const;
+export const NOMOR_KELUAR_KEMBAR_SQL =
+  "SELECT COUNT(*) AS jumlah FROM hr_keluar WHERE id_keluar <> ?2 AND (nomor_sk = ?1 OR nomor_keterangan = ?1);";
+
+// Bentuk rute dan command
 
 const teksBebas = (maks: number) => z.string().max(maks).default("");
 
@@ -535,7 +971,7 @@ export interface HasilSimpanSp {
   nomor_kembar: boolean;
 }
 
-// ── Bentuk rute dan command: pegawai keluar (4b) ──
+// Bentuk rute dan command: pegawai keluar (4b)
 
 /** Body `offboarding/save`, cermin `draft` `desktop_hr_offboarding_save`. */
 export const keluarDraftSchema = z
@@ -549,9 +985,58 @@ export const keluarDraftSchema = z
     keterangan: teksBebas(MAKS_TEKS_KELUAR + 100),
     kartu_ditarik: z.boolean().default(false),
     catatan_checklist: teksBebas(MAKS_TEKS_KELUAR + 100),
+    // Isinya diperiksa `validasiKeluar` (pesan yang sama dengan Rust).
+    upah_pokok: z.number().nullable().default(null),
+    alasan_upah: teksBebas(MAKS_TEKS_KELUAR + 100),
+    tunjangan_tetap: z.number().default(0),
+    rincian: z
+      .array(
+        z
+          .object({
+            komponen: z.enum(KOMPONEN_RINCIAN),
+            nominal: z.number(),
+            alasan_ubah: teksBebas(MAKS_TEKS_KELUAR + 100),
+          })
+          .strict(),
+      )
+      .max(KOMPONEN_RINCIAN.length)
+      .default([]),
   })
   .strict();
 export type KeluarDraft = z.input<typeof keluarDraftSchema>;
+
+/**
+ * Nomor surat keluar dari dialog cetak, lewat rute/command simpan yang sama
+ * (`desktop_hr_offboarding_save` membedakannya dari kunci `jenis_surat`).
+ */
+export const keluarNomorSchema = z
+  .object({
+    id_keluar: z.string().min(1).max(40),
+    jenis_surat: z.enum(SURAT_KELUAR),
+    nomor: teksBebas(NOMOR_MAKS + 20),
+  })
+  .strict();
+export type KeluarNomor = z.input<typeof keluarNomorSchema>;
+export const keluarSimpanSchema = z.union([
+  keluarNomorSchema,
+  keluarDraftSchema,
+]);
+
+/** Body `offboarding/reasons`, cermin `draft` `desktop_hr_exit_reasons_save`. */
+export const alasanDraftSchema = z
+  .object({
+    id_alasan: teksBebas(40),
+    nama: z.string().max(MAKS_NAMA_ALASAN + 20),
+    pengali_up: z.number(),
+    pengali_upmk: z.number(),
+    uph: z.boolean(),
+    kompensasi_pkwt: z.boolean(),
+    uang_pisah: z.boolean(),
+    is_aktif: z.boolean(),
+    dasar_hukum: teksBebas(MAKS_TEKS_KELUAR + 100),
+  })
+  .strict();
+export type AlasanDraft = z.input<typeof alasanDraftSchema>;
 
 /** Rincian (`id_keluar`) atau pratinjau (`id_karyawan` + `tanggal_terakhir`). */
 export const keluarRincianSchema = z
@@ -597,6 +1082,12 @@ export interface KeluarBaris {
   dibatalkan_oleh: string;
   dibatalkan_pada: string;
   alasan_batal: string;
+  upah_pokok: number;
+  usulan_upah_pokok: number;
+  tunjangan_tetap: number;
+  alasan_upah: string;
+  nomor_sk: string;
+  nomor_keterangan: string;
   status: StatusKeluar;
 }
 
@@ -670,9 +1161,75 @@ export interface RincianKeluar {
     tanggal_daftar: string;
     unit: string;
     id_keluar: string;
+    jenis_personil: string;
+    divisi: string;
+    hari_kerja: string;
   };
   status_kepegawaian: string;
+  /** Rincian tersimpan (kosong untuk pratinjau). */
+  rincian: RincianTersimpan[];
+  ringkasan: RingkasanPesangon;
+  pesangon: BahanPesangon;
   checklist: ChecklistKeluar;
   alasan: AlasanKeluar[];
   hari_ini: string;
+}
+
+export interface RincianTersimpan {
+  komponen: KomponenRincian;
+  dasar: string;
+  usulan: number;
+  nominal: number;
+  alasan_ubah: string;
+  urutan: number;
+}
+
+/** Cermin `bahan_pesangon`: masukan usulan dari cloud. */
+export interface BahanPesangon {
+  status: string;
+  usulan_upah_pokok: number;
+  /** Jumlah bulan slip PAID yang dirata-rata; 0 = upah wajib diisi. */
+  bulan_slip: number;
+  pembagi: number;
+  /** `""` = tanpa kontrak bertanggal selesai. */
+  kontrak_mulai: string;
+  /** Komponen ALLOWANCE nominal tetap aktif; disaring `appliesToSubject`. */
+  tunjangan: { id: string; name: string; nilai: number; applies_to: string }[];
+  /** Id jenis tugas tambahan yang berlaku pada hari terakhir. */
+  tugas: string[];
+}
+
+/** Cermin `masukan_pesangon`: bahan cloud + alasan + sisa cuti + upah. */
+export function masukanPesangon(
+  bahan: BahanPesangon,
+  pegawai: { tanggal_daftar: string },
+  alasan: Pick<
+    AlasanKeluar,
+    "pengali_up" | "pengali_upmk" | "uph" | "kompensasi_pkwt" | "uang_pisah"
+  >,
+  sisaCuti: ChecklistKeluar["sisa_cuti"],
+  tanggal: string,
+  upah: number,
+): MasukanPesangon {
+  return {
+    status: bahan.status,
+    upah,
+    masa_kerja_mulai: pegawai.tanggal_daftar || null,
+    tanggal_terakhir: tanggal,
+    pengali_up: alasan.pengali_up,
+    pengali_upmk: alasan.pengali_upmk,
+    uph: alasan.uph,
+    kompensasi_pkwt: alasan.kompensasi_pkwt,
+    uang_pisah: alasan.uang_pisah,
+    sisa_cuti: sisaCuti?.sisa ?? 0,
+    sebelum_berhak: sisaCuti?.sebelum_berhak === true,
+    pembagi: bahan.pembagi,
+    kontrak_mulai: bahan.kontrak_mulai || null,
+  };
+}
+
+export interface HasilNomorKeluar {
+  sukses: true;
+  id_keluar: string;
+  nomor_kembar: boolean;
 }

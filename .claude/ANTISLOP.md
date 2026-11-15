@@ -1,11 +1,15 @@
 # ANTISLOP.md — hasil antislop
 
-- Waktu: 15 November 2026, 00:18 WIB
-- Commit: fc14532 (+ berkas berubah, belum commit)
-- Berkas disunting: 1
+- Waktu: 15 November 2026, 08:56 WIB
+- Commit: 10233aa (+ berkas berubah, belum commit)
+- Berkas disunting: 5
 
 ## Disunting
-- `web-desktop/src/components/kepegawaian/TabBebanMengajar.tsx` — teks UI — rapikan format rentang batas beban mengajar menjadi tanda hubung standar
+- `web-desktop/src-tauri/src/desktop/hr_keluar.rs` — komentar — rapikan pembatas dekoratif berulang menjadi komentar baris tunggal
+- `web-desktop/src/lib/validations/hr-keluar.ts` — komentar — rapikan pembatas dekoratif berulang menjadi komentar baris tunggal
+- `web-desktop/src/lib/services/hr-keluar.ts` — komentar — rapikan pembatas dekoratif berulang menjadi komentar baris tunggal
+- `web-desktop/src/components/kepegawaian/DialogCetakSurat.tsx` — komentar — rapikan pembatas dekoratif berulang menjadi komentar baris tunggal
+- `web-desktop/src/components/kepegawaian/suratKepegawaian.ts` — komentar — rapikan pembatas dekoratif berulang menjadi komentar baris tunggal
 
 ## Dilewati
 - `CLAUDE.md`, `.agents/`, `.claude/` — konfigurasi panduan agent

@@ -1,3 +1,4 @@
+import { tanggalValid } from "@/lib/validations/hari-kerja";
 import type {
   IdentitasPegawai,
   JenisSk,
@@ -6,6 +7,7 @@ import type {
   SemesterBeban,
   SetupSurat,
 } from "@/lib/validations/hr-beban";
+import { tambahHari } from "@/lib/validations/hr-pengajuan";
 import bawaan from "@/lib/validations/hr-surat-bawaan.json";
 import { cetakA4, esc, kop, ROOT_ID, tanggalPanjang } from "../cetak-a4";
 import { masaKerja } from "./gaya";
@@ -27,6 +29,8 @@ export const KODE_SURAT: Record<JenisSurat, string> = {
   tugas_luar: "ST",
   aktif: "SKET",
   sp: "SP",
+  berhenti: "SK-BERHENTI",
+  pengalaman: "SKET-KERJA",
 };
 
 export const NAMA_SURAT: Record<JenisSurat, string> = {
@@ -36,6 +40,8 @@ export const NAMA_SURAT: Record<JenisSurat, string> = {
   tugas_luar: "Surat Tugas",
   aktif: "Surat Keterangan Aktif",
   sp: "Surat Peringatan",
+  berhenti: "SK Pemberhentian",
+  pengalaman: "Surat Keterangan Pengalaman Kerja",
 };
 
 const NAMA_STATUS: Record<string, string> = {
@@ -201,7 +207,7 @@ export function identitas(setup: SetupSurat, id: string): IdentitasPegawai {
 const statusKini = (setup: SetupSurat, id: string) =>
   setup.status.find((s) => s.id_unik === id)?.status ?? "";
 
-// ── Kerangka dokumen ────────────────────────────────────────────────────────
+// Kerangka dokumen
 
 export interface DasarCetak {
   setup: SetupSurat;
@@ -251,16 +257,22 @@ function blokTandaTangan(d: DasarCetak, penanda: Penanda, sk: boolean): string {
     </div>`;
 }
 
+/**
+ * `berhenti` (SK Pemberhentian, Fase 4c) memakai teks bawaan tetap: Pengaturan
+ * surat hanya menyimpan Menimbang/Mengingat ketiga SK Fase 3b.
+ */
 function keputusan(
   d: DasarCetak,
-  jenis: JenisSk,
+  jenis: JenisSk | "berhenti",
   unit: string,
   penanda: Penanda,
   tentang: string[],
   diktum: string[],
   lampiran = "",
 ): string {
-  const dasar = uraiDasar(dasarSurat(d.setup, jenis));
+  const dasar = uraiDasar(
+    jenis === "berhenti" ? bawaan.berhenti : dasarSurat(d.setup, jenis),
+  );
   const daftar = (butir: string[], tipe: "a" | "1") =>
     butir.length
       ? `<ol type="${tipe}">${butir.map((b) => `<li>${esc(b)}</li>`).join("")}</ol>`
@@ -308,7 +320,7 @@ function kepalaLampiran(d: DasarCetak, penanda: Penanda): string {
 const namaNip = (nama: string, nip: string) =>
   `${esc(nama)}${nip ? `<br><span class="kecil">NIP ${esc(nip)}</span>` : ""}`;
 
-// ── 1. SK Pembagian Tugas Mengajar (per unit rombel, Q-66) ──────────────────
+// 1. SK Pembagian Tugas Mengajar (per unit rombel, Q-66)
 
 export interface BarisSkPtm {
   id_unik: string;
@@ -424,7 +436,7 @@ export function suratPembagianTugas(
   );
 }
 
-// ── 2. SK Tugas Tambahan (satu baris, atau satu jenis satu tahun ajaran) ────
+// 2. SK Tugas Tambahan (satu baris, atau satu jenis satu tahun ajaran)
 
 export interface TugasSk {
   id_karyawan: string;
@@ -504,7 +516,7 @@ export function suratTugasTambahan(
   );
 }
 
-// ── 3. SK Pengangkatan GTY/PTY (ketua yayasan) ──────────────────────────────
+// 3. SK Pengangkatan GTY/PTY (ketua yayasan)
 
 export function suratPengangkatan(
   d: DasarCetak,
@@ -531,7 +543,7 @@ export function suratPengangkatan(
   );
 }
 
-// ── Surat (bukan SK) ────────────────────────────────────────────────────────
+// Surat (bukan SK)
 
 function surat(
   d: DasarCetak,
@@ -553,7 +565,7 @@ function rentang(mulai: string, selesai: string): string {
   return `${tanggalPanjang(mulai, false) || "-"} sampai dengan ${tanggalPanjang(selesai, false)}`;
 }
 
-// ── 4. Surat Tugas (Dinas Luar berlaku, Q-69) ───────────────────────────────
+// 4. Surat Tugas (Dinas Luar berlaku, Q-69)
 
 export interface IsianTugasLuar {
   id_karyawan: string;
@@ -598,7 +610,7 @@ export function suratTugasLuar(d: DasarCetak, p: IsianTugasLuar): string {
   );
 }
 
-// ── 5. Surat Keterangan Aktif (tanpa data pribadi, Q-70) ────────────────────
+// 5. Surat Keterangan Aktif (tanpa data pribadi, Q-70)
 
 export function suratKeteranganAktif(
   d: DasarCetak,
@@ -644,7 +656,7 @@ export function suratKeteranganAktif(
   );
 }
 
-// ── 6. Surat Peringatan (HRIS Fase 4a, §22.2.5) ─────────────────────────────
+// 6. Surat Peringatan (HRIS Fase 4a, §22.2.5)
 
 export interface IsianSp {
   id_karyawan: string;
@@ -706,6 +718,90 @@ export function suratPeringatan(d: DasarCetak, p: IsianSp): string {
       <div class="nama-ttd">${esc(namaGelar(o.nama, o.gelar)) || "...................................."}</div>
       <div>Tanggal: ....................</div>
     </div>`;
+}
+
+// 7. SK Pemberhentian dan Surat Keterangan Pengalaman Kerja (Fase 4c)
+
+/** Bahan dari baris `hr_keluar` yang sudah Berlaku; rincian pesangon tidak dicetak. */
+export interface IsianKeluar {
+  id_karyawan: string;
+  /** Status kini yang disalin saat proses dicatat. */
+  status_kepegawaian: string;
+  masa_kerja_mulai: string;
+  tanggal_terakhir: string;
+  alasan_nama: string;
+}
+
+const tabelPegawai = (o: IdentitasPegawai, jabatan = "Jabatan") =>
+  tabelData([
+    ["Nama", namaGelar(o.nama, o.gelar)],
+    ["NIP", o.nip],
+    ...(o.guru === 1 ? ([["NUPTK", o.nuptk]] as [string, string][]) : []),
+    [jabatan, o.jabatan],
+    ["Unit kerja", o.unit],
+  ]);
+
+/** SK Pemberhentian GTY/PTY, ditandatangani ketua yayasan (Q-86). */
+export function suratPemberhentian(d: DasarCetak, p: IsianKeluar): string {
+  const o = identitas(d.setup, p.id_karyawan);
+  const status = NAMA_STATUS[p.status_kepegawaian] ?? p.status_kepegawaian;
+  return keputusan(
+    d,
+    "berhenti",
+    o.unit,
+    ketuaYayasan(d.setup),
+    [`Pemberhentian ${status}`],
+    [
+      `Memberhentikan:${tabelPegawai(o)}dari kedudukannya sebagai ${esc(status)}${status !== p.status_kepegawaian ? ` (${esc(p.status_kepegawaian)})` : ""} dengan hari terakhir bekerja tanggal ${esc(tanggalPanjang(p.tanggal_terakhir, false) || "-")}${p.alasan_nama.trim() ? `, dengan alasan ${esc(p.alasan_nama.trim().toLowerCase())}` : ""}.`,
+      "Hak yang bersangkutan sehubungan dengan pemberhentian ini diselesaikan sesuai peraturan kepegawaian yayasan dan peraturan perundang-undangan yang berlaku.",
+    ],
+  );
+}
+
+/**
+ * Surat Keterangan Pengalaman Kerja, semua status kecuali PNS/PPPK,
+ * ditandatangani kepala unit pegawai pada tanggal surat (Q-86). Tanpa alasan
+ * keluar dan tanpa data pribadi.
+ */
+export function suratPengalamanKerja(d: DasarCetak, p: IsianKeluar): string {
+  const o = identitas(d.setup, p.id_karyawan);
+  const guru = o.guru === 1;
+  const penanda = kepalaUnit(d.setup, o.unit);
+  const sekolah = d.setup.kop.nama?.trim() || "sekolah";
+  // Hari terakhir ikut dihitung: masa kerja sampai hari sesudahnya.
+  const masa = masaKerja(
+    p.masa_kerja_mulai,
+    tanggalValid(p.tanggal_terakhir) ? tambahHari(p.tanggal_terakhir, 1) : "",
+  )
+    .replace("th", "tahun")
+    .replace("bln", "bulan");
+  return surat(
+    d,
+    o.unit,
+    "SURAT KETERANGAN PENGALAMAN KERJA",
+    `
+    <p>Yang bertanda tangan di bawah ini:</p>
+    ${tabelData([
+      ["Nama", penanda.nama],
+      ["NIP", penanda.nip],
+      ["Jabatan", penanda.jabatan],
+    ])}
+    <p>menerangkan bahwa:</p>
+    ${tabelData([
+      ["Nama", namaGelar(o.nama, o.gelar)],
+      ["NIP", o.nip],
+      ...(guru ? ([["NUPTK", o.nuptk]] as [string, string][]) : []),
+      ["Jabatan terakhir", o.jabatan],
+      ["Unit kerja", o.unit],
+      ["Status kepegawaian", p.status_kepegawaian],
+      ["Mulai bekerja", tanggalPanjang(p.masa_kerja_mulai, false)],
+      ["Hari terakhir bekerja", tanggalPanjang(p.tanggal_terakhir, false)],
+      ["Masa kerja", masa === "-" ? "" : masa],
+    ])}
+    <p>adalah benar pernah bekerja sebagai ${guru ? "guru" : "pegawai"} di ${esc(o.unit && !kunci(sekolah).includes(kunci(o.unit)) ? `${o.unit.trim()} ${sekolah}` : sekolah)} pada masa tersebut di atas.</p>
+    <p>Demikian surat keterangan ini dibuat untuk dipergunakan sebagaimana mestinya.</p>`,
+    penanda,
+  );
 }
 
 /** Cetak salah satu surat di atas lewat dialog cetak (`cetak-a4.ts`). */

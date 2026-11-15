@@ -5,10 +5,14 @@ import { isDesktopRuntime } from "@/lib/runtime/app-runtime";
 import { invokeDesktop, kickDesktopSync } from "@/lib/runtime/desktop-commands";
 import type { DataBeban, SetupSurat } from "@/lib/validations/hr-beban";
 import type {
+  AlasanDraft,
+  AlasanKeluar,
   DaftarKeluar,
   DaftarSp,
+  HasilNomorKeluar,
   HasilSimpanSp,
   KeluarDraft,
+  KeluarNomor,
   RincianKeluar,
   SpDraft,
 } from "@/lib/validations/hr-keluar";
@@ -405,7 +409,7 @@ export async function muatSetupSurat(tanggal: string): Promise<SetupSurat> {
   return requestWebApi("/api/kepegawaian/letters/query", "POST", { tanggal });
 }
 
-/** Ketiga belas kunci pengaturan surat sekaligus (`kunciPengaturanSurat`). */
+/** Kelima belas kunci pengaturan surat sekaligus (`kunciPengaturanSurat`). */
 export function simpanPengaturanSurat(
   draft: Record<string, string>,
 ): Promise<Record<string, string>> {
@@ -485,6 +489,30 @@ export function simpanKeluar(
     "desktop_hr_offboarding_save",
     { draft },
     "/api/kepegawaian/offboarding/save",
+    draft,
+  );
+}
+
+/** Nomor SK Pemberhentian / surat keterangan pengalaman kerja (proses Berlaku). */
+export function simpanNomorKeluar(
+  draft: KeluarNomor,
+): Promise<HasilNomorKeluar> {
+  return cloud(
+    "desktop_hr_offboarding_save",
+    { draft },
+    "/api/kepegawaian/offboarding/save",
+    draft,
+  );
+}
+
+/** Ubah (`id_alasan`) atau tambah alasan keluar dan pengalinya. */
+export function simpanAlasanKeluar(
+  draft: AlasanDraft,
+): Promise<{ sukses: true; id_alasan: string; alasan: AlasanKeluar[] }> {
+  return cloud(
+    "desktop_hr_exit_reasons_save",
+    { draft },
+    "/api/kepegawaian/offboarding/reasons",
     draft,
   );
 }

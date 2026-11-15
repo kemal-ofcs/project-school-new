@@ -716,7 +716,11 @@
         "tanggal_terakhir": "2026-03-31",
         "keterangan": null,
         "kartu_ditarik": false,
-        "catatan_checklist": null
+        "catatan_checklist": null,
+        "upah_pokok": null,
+        "alasan_upah": null,
+        "tunjangan_tetap": 0,
+        "rincian": []
       },
       "galat": null
     },
@@ -742,7 +746,11 @@
         "tanggal_terakhir": "2026-03-31",
         "keterangan": "Pindah kota",
         "kartu_ditarik": true,
-        "catatan_checklist": "Laptop sudah kembali"
+        "catatan_checklist": "Laptop sudah kembali",
+        "upah_pokok": null,
+        "alasan_upah": null,
+        "tunjangan_tetap": 0,
+        "rincian": []
       },
       "galat": null
     },
@@ -762,7 +770,11 @@
         "tanggal_terakhir": "2099-12-31",
         "keterangan": null,
         "kartu_ditarik": false,
-        "catatan_checklist": null
+        "catatan_checklist": null,
+        "upah_pokok": null,
+        "alasan_upah": null,
+        "tunjangan_tetap": 0,
+        "rincian": []
       },
       "galat": null
     },
@@ -783,7 +795,11 @@
         "tanggal_terakhir": "2026-03-31",
         "keterangan": null,
         "kartu_ditarik": false,
-        "catatan_checklist": null
+        "catatan_checklist": null,
+        "upah_pokok": null,
+        "alasan_upah": null,
+        "tunjangan_tetap": 0,
+        "rincian": []
       },
       "galat": null
     },
@@ -804,7 +820,11 @@
         "tanggal_terakhir": "2026-03-31",
         "keterangan": null,
         "kartu_ditarik": false,
-        "catatan_checklist": null
+        "catatan_checklist": null,
+        "upah_pokok": null,
+        "alasan_upah": null,
+        "tunjangan_tetap": 0,
+        "rincian": []
       },
       "galat": null
     },
@@ -890,6 +910,1419 @@
       },
       "hasil": null,
       "galat": "Catatan checklist maksimal 1000 karakter."
+    },
+    {
+      "nama": "upah dan rincian",
+      "draft": {
+        "id_karyawan": " P1 ",
+        "id_alasan": "klr-resign",
+        "tanggal_terakhir": "2026-03-31",
+        "upah_pokok": 3500000,
+        "alasan_upah": " Termasuk honor wali ",
+        "tunjangan_tetap": 500000,
+        "rincian": [
+          {
+            "komponen": "UP",
+            "nominal": 1,
+            "alasan_ubah": " PKB "
+          },
+          {
+            "komponen": "Lainnya",
+            "nominal": 0
+          }
+        ]
+      },
+      "hasil": {
+        "id_keluar": null,
+        "id_karyawan": "P1",
+        "id_alasan": "klr-resign",
+        "id_sp": null,
+        "tanggal_pemberitahuan": null,
+        "tanggal_terakhir": "2026-03-31",
+        "keterangan": null,
+        "kartu_ditarik": false,
+        "catatan_checklist": null,
+        "upah_pokok": 3500000,
+        "alasan_upah": "Termasuk honor wali",
+        "tunjangan_tetap": 500000,
+        "rincian": [
+          {
+            "komponen": "UP",
+            "nominal": 1,
+            "alasan_ubah": "PKB"
+          },
+          {
+            "komponen": "Lainnya",
+            "nominal": 0,
+            "alasan_ubah": null
+          }
+        ]
+      },
+      "galat": null
+    },
+    {
+      "nama": "upah null = usulan",
+      "draft": {
+        "id_karyawan": " P1 ",
+        "id_alasan": "klr-resign",
+        "tanggal_terakhir": "2026-03-31",
+        "upah_pokok": null,
+        "rincian": null
+      },
+      "hasil": {
+        "id_keluar": null,
+        "id_karyawan": "P1",
+        "id_alasan": "klr-resign",
+        "id_sp": null,
+        "tanggal_pemberitahuan": null,
+        "tanggal_terakhir": "2026-03-31",
+        "keterangan": null,
+        "kartu_ditarik": false,
+        "catatan_checklist": null,
+        "upah_pokok": null,
+        "alasan_upah": null,
+        "tunjangan_tetap": 0,
+        "rincian": []
+      },
+      "galat": null
+    },
+    {
+      "nama": "upah negatif",
+      "draft": {
+        "id_karyawan": " P1 ",
+        "id_alasan": "klr-resign",
+        "tanggal_terakhir": "2026-03-31",
+        "upah_pokok": -1
+      },
+      "hasil": null,
+      "galat": "Upah pokok tidak valid."
+    },
+    {
+      "nama": "upah pecahan",
+      "draft": {
+        "id_karyawan": " P1 ",
+        "id_alasan": "klr-resign",
+        "tanggal_terakhir": "2026-03-31",
+        "upah_pokok": 1.5
+      },
+      "hasil": null,
+      "galat": "Upah pokok tidak valid."
+    },
+    {
+      "nama": "upah teks",
+      "draft": {
+        "id_karyawan": " P1 ",
+        "id_alasan": "klr-resign",
+        "tanggal_terakhir": "2026-03-31",
+        "upah_pokok": "1000"
+      },
+      "hasil": null,
+      "galat": "Upah pokok tidak valid."
+    },
+    {
+      "nama": "tunjangan di atas batas",
+      "draft": {
+        "id_karyawan": " P1 ",
+        "id_alasan": "klr-resign",
+        "tanggal_terakhir": "2026-03-31",
+        "tunjangan_tetap": 1000000001
+      },
+      "hasil": null,
+      "galat": "Tunjangan tetap tidak valid."
+    },
+    {
+      "nama": "jumlah upah di atas batas",
+      "draft": {
+        "id_karyawan": " P1 ",
+        "id_alasan": "klr-resign",
+        "tanggal_terakhir": "2026-03-31",
+        "upah_pokok": 600000000,
+        "tunjangan_tetap": 500000000
+      },
+      "hasil": null,
+      "galat": "Upah pokok + tunjangan tetap terlalu besar."
+    },
+    {
+      "nama": "rincian bukan daftar",
+      "draft": {
+        "id_karyawan": " P1 ",
+        "id_alasan": "klr-resign",
+        "tanggal_terakhir": "2026-03-31",
+        "rincian": "UP"
+      },
+      "hasil": null,
+      "galat": "Rincian tidak valid."
+    },
+    {
+      "nama": "komponen perusahaan tidak dikenal",
+      "draft": {
+        "id_karyawan": " P1 ",
+        "id_alasan": "klr-resign",
+        "tanggal_terakhir": "2026-03-31",
+        "rincian": [
+          {
+            "komponen": "UPH Ongkos Pulang",
+            "nominal": 1
+          }
+        ]
+      },
+      "hasil": null,
+      "galat": "Komponen rincian tidak dikenal."
+    },
+    {
+      "nama": "komponen kembar",
+      "draft": {
+        "id_karyawan": " P1 ",
+        "id_alasan": "klr-resign",
+        "tanggal_terakhir": "2026-03-31",
+        "rincian": [
+          {
+            "komponen": "UP",
+            "nominal": 1
+          },
+          {
+            "komponen": "UP",
+            "nominal": 2
+          }
+        ]
+      },
+      "hasil": null,
+      "galat": "Komponen UP tercantum dua kali."
+    },
+    {
+      "nama": "nominal negatif",
+      "draft": {
+        "id_karyawan": " P1 ",
+        "id_alasan": "klr-resign",
+        "tanggal_terakhir": "2026-03-31",
+        "rincian": [
+          {
+            "komponen": "UP",
+            "nominal": -5
+          }
+        ]
+      },
+      "hasil": null,
+      "galat": "Nominal UP tidak valid."
+    },
+    {
+      "nama": "nominal teks",
+      "draft": {
+        "id_karyawan": " P1 ",
+        "id_alasan": "klr-resign",
+        "tanggal_terakhir": "2026-03-31",
+        "rincian": [
+          {
+            "komponen": "UP",
+            "nominal": "5"
+          }
+        ]
+      },
+      "hasil": null,
+      "galat": "Nominal UP tidak valid."
+    }
+  ],
+  "bulan_penuh": [
+    {
+      "mulai": "2020-03-15",
+      "akhir": "2026-03-15",
+      "hasil": 72
+    },
+    {
+      "mulai": "2020-03-15",
+      "akhir": "2026-03-14",
+      "hasil": 71
+    },
+    {
+      "mulai": "2026-01-31",
+      "akhir": "2026-02-28",
+      "hasil": 1
+    },
+    {
+      "mulai": "2026-01-31",
+      "akhir": "2026-02-27",
+      "hasil": 0
+    },
+    {
+      "mulai": "2024-02-29",
+      "akhir": "2025-02-28",
+      "hasil": 12
+    },
+    {
+      "mulai": "2026-06-10",
+      "akhir": "2026-05-01",
+      "hasil": 0
+    },
+    {
+      "mulai": "",
+      "akhir": "2026-05-01",
+      "hasil": 0
+    }
+  ],
+  "masa_kerja": [
+    {
+      "mulai": "2020-03-15",
+      "terakhir": "2026-03-14",
+      "hasil": 72
+    },
+    {
+      "mulai": "2020-03-15",
+      "terakhir": "2026-03-13",
+      "hasil": 71
+    },
+    {
+      "mulai": "2026-01-01",
+      "terakhir": "2026-07-31",
+      "hasil": 7
+    },
+    {
+      "mulai": "2026-01-01",
+      "terakhir": "",
+      "hasil": 0
+    },
+    {
+      "mulai": "2026-01-01",
+      "terakhir": "2026-02-30",
+      "hasil": 0
+    }
+  ],
+  "kelipatan": [
+    {
+      "tahun": 0,
+      "up": 1,
+      "upmk": 0
+    },
+    {
+      "tahun": 2,
+      "up": 3,
+      "upmk": 0
+    },
+    {
+      "tahun": 3,
+      "up": 4,
+      "upmk": 2
+    },
+    {
+      "tahun": 5,
+      "up": 6,
+      "upmk": 2
+    },
+    {
+      "tahun": 6,
+      "up": 7,
+      "upmk": 3
+    },
+    {
+      "tahun": 8,
+      "up": 9,
+      "upmk": 3
+    },
+    {
+      "tahun": 9,
+      "up": 9,
+      "upmk": 4
+    },
+    {
+      "tahun": 23,
+      "up": 9,
+      "upmk": 8
+    },
+    {
+      "tahun": 24,
+      "up": 9,
+      "upmk": 10
+    },
+    {
+      "tahun": 30,
+      "up": 9,
+      "upmk": 10
+    }
+  ],
+  "rata_upah": [
+    {
+      "total": 0,
+      "bulan": 0,
+      "hasil": 0
+    },
+    {
+      "total": 12000000,
+      "bulan": 3,
+      "hasil": 4000000
+    },
+    {
+      "total": 10,
+      "bulan": 3,
+      "hasil": 3
+    },
+    {
+      "total": 11,
+      "bulan": 2,
+      "hasil": 6
+    },
+    {
+      "total": 5,
+      "bulan": 0,
+      "hasil": 0
+    },
+    {
+      "total": 24000000000,
+      "bulan": 1,
+      "hasil": 1000000000
+    }
+  ],
+  "pembagi": [
+    {
+      "hari_kerja": null,
+      "hasil": 25
+    },
+    {
+      "hari_kerja": "",
+      "hasil": 25
+    },
+    {
+      "hari_kerja": "1,2,3,4,5,6",
+      "hasil": 25
+    },
+    {
+      "hari_kerja": "1,2,3,4,5",
+      "hasil": 21
+    },
+    {
+      "hari_kerja": "1",
+      "hasil": 21
+    },
+    {
+      "hari_kerja": "rusak",
+      "hasil": 25
+    }
+  ],
+  "kelompok": [
+    {
+      "status": "GTY",
+      "hasil": "tetap"
+    },
+    {
+      "status": " pty ",
+      "hasil": "tetap"
+    },
+    {
+      "status": "gtt",
+      "hasil": "kontrak"
+    },
+    {
+      "status": "PTT",
+      "hasil": "kontrak"
+    },
+    {
+      "status": "PNS",
+      "hasil": "negeri"
+    },
+    {
+      "status": "pppk",
+      "hasil": "negeri"
+    },
+    {
+      "status": "Honorer",
+      "hasil": "lainnya"
+    },
+    {
+      "status": "",
+      "hasil": "lainnya"
+    },
+    {
+      "status": "Kontrak",
+      "hasil": "lainnya"
+    }
+  ],
+  "pesangon": [
+    {
+      "nama": "vektor perusahaan: 6 tahun, PHK pelanggaran 50/100, sisa cuti 4",
+      "masukan": {
+        "status": "GTY",
+        "upah": 5000000,
+        "masa_kerja_mulai": "2020-03-15",
+        "tanggal_terakhir": "2026-03-14",
+        "pengali_up": 50,
+        "pengali_upmk": 100,
+        "uph": true,
+        "kompensasi_pkwt": false,
+        "uang_pisah": false,
+        "sisa_cuti": 4,
+        "sebelum_berhak": false,
+        "pembagi": 25,
+        "kontrak_mulai": null
+      },
+      "hasil": [
+        {
+          "komponen": "UP",
+          "dasar": "Masa kerja 6 tahun: 7 × upah × 50%",
+          "usulan": 17500000
+        },
+        {
+          "komponen": "UPMK",
+          "dasar": "Masa kerja 6 tahun: 3 × upah × 100%",
+          "usulan": 15000000
+        },
+        {
+          "komponen": "UPH Cuti",
+          "dasar": "Sisa cuti 4 hari × upah ÷ 25",
+          "usulan": 800000
+        },
+        {
+          "komponen": "UPH Lainnya",
+          "dasar": null,
+          "usulan": 0
+        },
+        {
+          "komponen": "Lainnya",
+          "dasar": null,
+          "usulan": 0
+        }
+      ]
+    },
+    {
+      "nama": "vektor perusahaan: sehari kurang = 5 tahun",
+      "masukan": {
+        "status": "GTY",
+        "upah": 5000000,
+        "masa_kerja_mulai": "2020-03-15",
+        "tanggal_terakhir": "2026-03-13",
+        "pengali_up": 50,
+        "pengali_upmk": 100,
+        "uph": false,
+        "kompensasi_pkwt": false,
+        "uang_pisah": false,
+        "sisa_cuti": 0,
+        "sebelum_berhak": false,
+        "pembagi": 25,
+        "kontrak_mulai": null
+      },
+      "hasil": [
+        {
+          "komponen": "UP",
+          "dasar": "Masa kerja 5 tahun: 6 × upah × 50%",
+          "usulan": 15000000
+        },
+        {
+          "komponen": "UPMK",
+          "dasar": "Masa kerja 5 tahun: 2 × upah × 100%",
+          "usulan": 10000000
+        },
+        {
+          "komponen": "Lainnya",
+          "dasar": null,
+          "usulan": 0
+        }
+      ]
+    },
+    {
+      "nama": "GTY 6 tahun efisiensi, shift 5 hari (÷ 21)",
+      "masukan": {
+        "status": "GTY",
+        "upah": 4000000,
+        "masa_kerja_mulai": "2020-07-01",
+        "tanggal_terakhir": "2026-06-30",
+        "pengali_up": 100,
+        "pengali_upmk": 100,
+        "uph": true,
+        "kompensasi_pkwt": false,
+        "uang_pisah": false,
+        "sisa_cuti": 3,
+        "sebelum_berhak": false,
+        "pembagi": 21,
+        "kontrak_mulai": null
+      },
+      "hasil": [
+        {
+          "komponen": "UP",
+          "dasar": "Masa kerja 6 tahun: 7 × upah × 100%",
+          "usulan": 28000000
+        },
+        {
+          "komponen": "UPMK",
+          "dasar": "Masa kerja 6 tahun: 3 × upah × 100%",
+          "usulan": 12000000
+        },
+        {
+          "komponen": "UPH Cuti",
+          "dasar": "Sisa cuti 3 hari × upah ÷ 21",
+          "usulan": 571429
+        },
+        {
+          "komponen": "UPH Lainnya",
+          "dasar": null,
+          "usulan": 0
+        },
+        {
+          "komponen": "Lainnya",
+          "dasar": null,
+          "usulan": 0
+        }
+      ]
+    },
+    {
+      "nama": "GTY mengundurkan diri: uang pisah, cuti sebelum berhak tidak diusulkan",
+      "masukan": {
+        "status": "gty ",
+        "upah": 4000000,
+        "masa_kerja_mulai": "2025-01-01",
+        "tanggal_terakhir": "2026-06-30",
+        "pengali_up": 0,
+        "pengali_upmk": 0,
+        "uph": true,
+        "kompensasi_pkwt": false,
+        "uang_pisah": true,
+        "sisa_cuti": 5,
+        "sebelum_berhak": true,
+        "pembagi": 25,
+        "kontrak_mulai": null
+      },
+      "hasil": [
+        {
+          "komponen": "UP",
+          "dasar": "Masa kerja 1 tahun: 2 × upah × 0%",
+          "usulan": 0
+        },
+        {
+          "komponen": "UPMK",
+          "dasar": "Masa kerja 1 tahun: 0 × upah × 0%",
+          "usulan": 0
+        },
+        {
+          "komponen": "UPH Lainnya",
+          "dasar": null,
+          "usulan": 0
+        },
+        {
+          "komponen": "Uang Pisah",
+          "dasar": null,
+          "usulan": 0
+        },
+        {
+          "komponen": "Lainnya",
+          "dasar": null,
+          "usulan": 0
+        }
+      ]
+    },
+    {
+      "nama": "PTY pensiun 175%, pembulatan setengah ke atas",
+      "masukan": {
+        "status": "PTY",
+        "upah": 1234567,
+        "masa_kerja_mulai": "2025-01-01",
+        "tanggal_terakhir": "2026-06-30",
+        "pengali_up": 175,
+        "pengali_upmk": 100,
+        "uph": false,
+        "kompensasi_pkwt": false,
+        "uang_pisah": false,
+        "sisa_cuti": 0,
+        "sebelum_berhak": false,
+        "pembagi": 25,
+        "kontrak_mulai": null
+      },
+      "hasil": [
+        {
+          "komponen": "UP",
+          "dasar": "Masa kerja 1 tahun: 2 × upah × 175%",
+          "usulan": 4320985
+        },
+        {
+          "komponen": "UPMK",
+          "dasar": "Masa kerja 1 tahun: 0 × upah × 100%",
+          "usulan": 0
+        },
+        {
+          "komponen": "Lainnya",
+          "dasar": null,
+          "usulan": 0
+        }
+      ]
+    },
+    {
+      "nama": "GTY 26 tahun: kelipatan maksimal",
+      "masukan": {
+        "status": "GTY",
+        "upah": 1000000,
+        "masa_kerja_mulai": "2000-01-01",
+        "tanggal_terakhir": "2025-12-31",
+        "pengali_up": 100,
+        "pengali_upmk": 100,
+        "uph": false,
+        "kompensasi_pkwt": false,
+        "uang_pisah": false,
+        "sisa_cuti": 0,
+        "sebelum_berhak": false,
+        "pembagi": 25,
+        "kontrak_mulai": null
+      },
+      "hasil": [
+        {
+          "komponen": "UP",
+          "dasar": "Masa kerja 26 tahun: 9 × upah × 100%",
+          "usulan": 9000000
+        },
+        {
+          "komponen": "UPMK",
+          "dasar": "Masa kerja 26 tahun: 10 × upah × 100%",
+          "usulan": 10000000
+        },
+        {
+          "komponen": "Lainnya",
+          "dasar": null,
+          "usulan": 0
+        }
+      ]
+    },
+    {
+      "nama": "GTY tanggal masuk kosong",
+      "masukan": {
+        "status": "GTY",
+        "upah": 5000000,
+        "masa_kerja_mulai": null,
+        "tanggal_terakhir": "2026-06-30",
+        "pengali_up": 100,
+        "pengali_upmk": 100,
+        "uph": false,
+        "kompensasi_pkwt": false,
+        "uang_pisah": false,
+        "sisa_cuti": 0,
+        "sebelum_berhak": false,
+        "pembagi": 25,
+        "kontrak_mulai": null
+      },
+      "hasil": [
+        {
+          "komponen": "UP",
+          "dasar": "Tanggal masuk kosong",
+          "usulan": 0
+        },
+        {
+          "komponen": "UPMK",
+          "dasar": "Tanggal masuk kosong",
+          "usulan": 0
+        },
+        {
+          "komponen": "Lainnya",
+          "dasar": null,
+          "usulan": 0
+        }
+      ]
+    },
+    {
+      "nama": "GTY tanpa slip: upah 0",
+      "masukan": {
+        "status": "GTY",
+        "upah": 0,
+        "masa_kerja_mulai": "2020-01-01",
+        "tanggal_terakhir": "2026-06-30",
+        "pengali_up": 100,
+        "pengali_upmk": 100,
+        "uph": true,
+        "kompensasi_pkwt": false,
+        "uang_pisah": false,
+        "sisa_cuti": 2,
+        "sebelum_berhak": false,
+        "pembagi": 25,
+        "kontrak_mulai": null
+      },
+      "hasil": [
+        {
+          "komponen": "UP",
+          "dasar": "Masa kerja 6 tahun: 7 × upah × 100%",
+          "usulan": 0
+        },
+        {
+          "komponen": "UPMK",
+          "dasar": "Masa kerja 6 tahun: 3 × upah × 100%",
+          "usulan": 0
+        },
+        {
+          "komponen": "UPH Cuti",
+          "dasar": "Sisa cuti 2 hari × upah ÷ 25",
+          "usulan": 0
+        },
+        {
+          "komponen": "UPH Lainnya",
+          "dasar": null,
+          "usulan": 0
+        },
+        {
+          "komponen": "Lainnya",
+          "dasar": null,
+          "usulan": 0
+        }
+      ]
+    },
+    {
+      "nama": "GTT habis kontrak: kompensasi 7 bulan, uang pisah diabaikan",
+      "masukan": {
+        "status": "GTT",
+        "upah": 3333333,
+        "masa_kerja_mulai": "2025-07-01",
+        "tanggal_terakhir": "2026-07-31",
+        "pengali_up": 100,
+        "pengali_upmk": 0,
+        "uph": true,
+        "kompensasi_pkwt": true,
+        "uang_pisah": true,
+        "sisa_cuti": 0,
+        "sebelum_berhak": false,
+        "pembagi": 25,
+        "kontrak_mulai": "2026-01-01"
+      },
+      "hasil": [
+        {
+          "komponen": "UPH Lainnya",
+          "dasar": null,
+          "usulan": 0
+        },
+        {
+          "komponen": "Kompensasi PKWT",
+          "dasar": "Kontrak 7 bulan: upah × 7 ÷ 12",
+          "usulan": 1944444
+        },
+        {
+          "komponen": "Lainnya",
+          "dasar": null,
+          "usulan": 0
+        }
+      ]
+    },
+    {
+      "nama": "PTT kontrak kurang dari sebulan = 1 bulan",
+      "masukan": {
+        "status": "PTT",
+        "upah": 2400000,
+        "masa_kerja_mulai": null,
+        "tanggal_terakhir": "2026-06-30",
+        "pengali_up": 0,
+        "pengali_upmk": 0,
+        "uph": false,
+        "kompensasi_pkwt": true,
+        "uang_pisah": false,
+        "sisa_cuti": 0,
+        "sebelum_berhak": false,
+        "pembagi": 25,
+        "kontrak_mulai": "2026-06-20"
+      },
+      "hasil": [
+        {
+          "komponen": "Kompensasi PKWT",
+          "dasar": "Kontrak 1 bulan: upah × 1 ÷ 12",
+          "usulan": 200000
+        },
+        {
+          "komponen": "Lainnya",
+          "dasar": null,
+          "usulan": 0
+        }
+      ]
+    },
+    {
+      "nama": "GTT tanpa kontrak bertanggal selesai",
+      "masukan": {
+        "status": "GTT",
+        "upah": 3000000,
+        "masa_kerja_mulai": null,
+        "tanggal_terakhir": "2026-06-30",
+        "pengali_up": 0,
+        "pengali_upmk": 0,
+        "uph": false,
+        "kompensasi_pkwt": true,
+        "uang_pisah": false,
+        "sisa_cuti": 0,
+        "sebelum_berhak": false,
+        "pembagi": 25,
+        "kontrak_mulai": null
+      },
+      "hasil": [
+        {
+          "komponen": "Lainnya",
+          "dasar": null,
+          "usulan": 0
+        }
+      ]
+    },
+    {
+      "nama": "GTT sisa cuti tanpa sakelar UPH",
+      "masukan": {
+        "status": "GTT",
+        "upah": 3000000,
+        "masa_kerja_mulai": null,
+        "tanggal_terakhir": "2026-06-30",
+        "pengali_up": 0,
+        "pengali_upmk": 0,
+        "uph": false,
+        "kompensasi_pkwt": false,
+        "uang_pisah": false,
+        "sisa_cuti": 4,
+        "sebelum_berhak": false,
+        "pembagi": 25,
+        "kontrak_mulai": null
+      },
+      "hasil": [
+        {
+          "komponen": "Lainnya",
+          "dasar": null,
+          "usulan": 0
+        }
+      ]
+    },
+    {
+      "nama": "Honorer: hanya baris yang diisi tangan",
+      "masukan": {
+        "status": "Honorer",
+        "upah": 1500000,
+        "masa_kerja_mulai": "2015-01-01",
+        "tanggal_terakhir": "2026-06-30",
+        "pengali_up": 100,
+        "pengali_upmk": 100,
+        "uph": true,
+        "kompensasi_pkwt": false,
+        "uang_pisah": true,
+        "sisa_cuti": 6,
+        "sebelum_berhak": false,
+        "pembagi": 25,
+        "kontrak_mulai": null
+      },
+      "hasil": [
+        {
+          "komponen": "Lainnya",
+          "dasar": null,
+          "usulan": 0
+        }
+      ]
+    },
+    {
+      "nama": "tanpa status",
+      "masukan": {
+        "status": "",
+        "upah": 1500000,
+        "masa_kerja_mulai": null,
+        "tanggal_terakhir": "2026-06-30",
+        "pengali_up": 0,
+        "pengali_upmk": 0,
+        "uph": true,
+        "kompensasi_pkwt": false,
+        "uang_pisah": false,
+        "sisa_cuti": 6,
+        "sebelum_berhak": false,
+        "pembagi": 25,
+        "kontrak_mulai": null
+      },
+      "hasil": [
+        {
+          "komponen": "Lainnya",
+          "dasar": null,
+          "usulan": 0
+        }
+      ]
+    },
+    {
+      "nama": "PNS tanpa baris",
+      "masukan": {
+        "status": "PNS",
+        "upah": 5000000,
+        "masa_kerja_mulai": "2010-01-01",
+        "tanggal_terakhir": "2026-06-30",
+        "pengali_up": 100,
+        "pengali_upmk": 0,
+        "uph": true,
+        "kompensasi_pkwt": false,
+        "uang_pisah": false,
+        "sisa_cuti": 3,
+        "sebelum_berhak": false,
+        "pembagi": 25,
+        "kontrak_mulai": null
+      },
+      "hasil": []
+    },
+    {
+      "nama": "PPPK tanpa baris",
+      "masukan": {
+        "status": "pppk",
+        "upah": 5000000,
+        "masa_kerja_mulai": null,
+        "tanggal_terakhir": "2026-06-30",
+        "pengali_up": 0,
+        "pengali_upmk": 0,
+        "uph": false,
+        "kompensasi_pkwt": false,
+        "uang_pisah": false,
+        "sisa_cuti": 0,
+        "sebelum_berhak": false,
+        "pembagi": 25,
+        "kontrak_mulai": null
+      },
+      "hasil": []
+    }
+  ],
+  "susun": [
+    {
+      "nama": "tanpa isian = usulan",
+      "usulan": [
+        {
+          "komponen": "UP",
+          "dasar": "Masa kerja 6 tahun: 7 × upah × 50%",
+          "usulan": 17500000
+        },
+        {
+          "komponen": "UPMK",
+          "dasar": "Masa kerja 6 tahun: 3 × upah × 100%",
+          "usulan": 15000000
+        },
+        {
+          "komponen": "UPH Cuti",
+          "dasar": "Sisa cuti 4 hari × upah ÷ 25",
+          "usulan": 800000
+        },
+        {
+          "komponen": "UPH Lainnya",
+          "dasar": null,
+          "usulan": 0
+        },
+        {
+          "komponen": "Lainnya",
+          "dasar": null,
+          "usulan": 0
+        }
+      ],
+      "isian": [],
+      "hasil": [
+        {
+          "komponen": "UP",
+          "dasar": "Masa kerja 6 tahun: 7 × upah × 50%",
+          "usulan": 17500000,
+          "nominal": 17500000,
+          "alasan_ubah": null,
+          "urutan": 1
+        },
+        {
+          "komponen": "UPMK",
+          "dasar": "Masa kerja 6 tahun: 3 × upah × 100%",
+          "usulan": 15000000,
+          "nominal": 15000000,
+          "alasan_ubah": null,
+          "urutan": 2
+        },
+        {
+          "komponen": "UPH Cuti",
+          "dasar": "Sisa cuti 4 hari × upah ÷ 25",
+          "usulan": 800000,
+          "nominal": 800000,
+          "alasan_ubah": null,
+          "urutan": 3
+        },
+        {
+          "komponen": "UPH Lainnya",
+          "dasar": null,
+          "usulan": 0,
+          "nominal": 0,
+          "alasan_ubah": null,
+          "urutan": 4
+        },
+        {
+          "komponen": "Lainnya",
+          "dasar": null,
+          "usulan": 0,
+          "nominal": 0,
+          "alasan_ubah": null,
+          "urutan": 5
+        }
+      ],
+      "galat": null
+    },
+    {
+      "nama": "beda tanpa alasan",
+      "usulan": [
+        {
+          "komponen": "UP",
+          "dasar": "Masa kerja 6 tahun: 7 × upah × 50%",
+          "usulan": 17500000
+        },
+        {
+          "komponen": "UPMK",
+          "dasar": "Masa kerja 6 tahun: 3 × upah × 100%",
+          "usulan": 15000000
+        },
+        {
+          "komponen": "UPH Cuti",
+          "dasar": "Sisa cuti 4 hari × upah ÷ 25",
+          "usulan": 800000
+        },
+        {
+          "komponen": "UPH Lainnya",
+          "dasar": null,
+          "usulan": 0
+        },
+        {
+          "komponen": "Lainnya",
+          "dasar": null,
+          "usulan": 0
+        }
+      ],
+      "isian": [
+        {
+          "komponen": "UP",
+          "nominal": 20000000,
+          "alasan_ubah": null
+        }
+      ],
+      "hasil": null,
+      "galat": "Nominal UP berbeda dari usulan; alasannya wajib diisi."
+    },
+    {
+      "nama": "beda dengan alasan; sama dengan usulan alasannya dibuang",
+      "usulan": [
+        {
+          "komponen": "UP",
+          "dasar": "Masa kerja 6 tahun: 7 × upah × 50%",
+          "usulan": 17500000
+        },
+        {
+          "komponen": "UPMK",
+          "dasar": "Masa kerja 6 tahun: 3 × upah × 100%",
+          "usulan": 15000000
+        },
+        {
+          "komponen": "UPH Cuti",
+          "dasar": "Sisa cuti 4 hari × upah ÷ 25",
+          "usulan": 800000
+        },
+        {
+          "komponen": "UPH Lainnya",
+          "dasar": null,
+          "usulan": 0
+        },
+        {
+          "komponen": "Lainnya",
+          "dasar": null,
+          "usulan": 0
+        }
+      ],
+      "isian": [
+        {
+          "komponen": "UP",
+          "nominal": 20000000,
+          "alasan_ubah": "PKB"
+        },
+        {
+          "komponen": "UPMK",
+          "nominal": 15000000,
+          "alasan_ubah": "x"
+        },
+        {
+          "komponen": "Lainnya",
+          "nominal": 250000,
+          "alasan_ubah": "Bonus pengabdian"
+        }
+      ],
+      "hasil": [
+        {
+          "komponen": "UP",
+          "dasar": "Masa kerja 6 tahun: 7 × upah × 50%",
+          "usulan": 17500000,
+          "nominal": 20000000,
+          "alasan_ubah": "PKB",
+          "urutan": 1
+        },
+        {
+          "komponen": "UPMK",
+          "dasar": "Masa kerja 6 tahun: 3 × upah × 100%",
+          "usulan": 15000000,
+          "nominal": 15000000,
+          "alasan_ubah": null,
+          "urutan": 2
+        },
+        {
+          "komponen": "UPH Cuti",
+          "dasar": "Sisa cuti 4 hari × upah ÷ 25",
+          "usulan": 800000,
+          "nominal": 800000,
+          "alasan_ubah": null,
+          "urutan": 3
+        },
+        {
+          "komponen": "UPH Lainnya",
+          "dasar": null,
+          "usulan": 0,
+          "nominal": 0,
+          "alasan_ubah": null,
+          "urutan": 4
+        },
+        {
+          "komponen": "Lainnya",
+          "dasar": null,
+          "usulan": 0,
+          "nominal": 250000,
+          "alasan_ubah": "Bonus pengabdian",
+          "urutan": 5
+        }
+      ],
+      "galat": null
+    },
+    {
+      "nama": "komponen di luar usulan",
+      "usulan": [
+        {
+          "komponen": "UP",
+          "dasar": "Masa kerja 6 tahun: 7 × upah × 50%",
+          "usulan": 17500000
+        },
+        {
+          "komponen": "UPMK",
+          "dasar": "Masa kerja 6 tahun: 3 × upah × 100%",
+          "usulan": 15000000
+        },
+        {
+          "komponen": "UPH Cuti",
+          "dasar": "Sisa cuti 4 hari × upah ÷ 25",
+          "usulan": 800000
+        },
+        {
+          "komponen": "UPH Lainnya",
+          "dasar": null,
+          "usulan": 0
+        },
+        {
+          "komponen": "Lainnya",
+          "dasar": null,
+          "usulan": 0
+        }
+      ],
+      "isian": [
+        {
+          "komponen": "Uang Pisah",
+          "nominal": 1,
+          "alasan_ubah": "x"
+        }
+      ],
+      "hasil": null,
+      "galat": "Komponen Uang Pisah tidak berlaku untuk proses ini."
+    },
+    {
+      "nama": "PNS: tanpa usulan, tanpa rincian",
+      "usulan": [],
+      "isian": [],
+      "hasil": [],
+      "galat": null
+    }
+  ],
+  "upah": [
+    {
+      "upah_pokok": 1,
+      "usulan": 2,
+      "alasan": null,
+      "galat": "Upah pokok berbeda dari usulan; alasannya wajib diisi."
+    },
+    {
+      "upah_pokok": 2,
+      "usulan": 2,
+      "alasan": null,
+      "galat": null
+    },
+    {
+      "upah_pokok": 1,
+      "usulan": 2,
+      "alasan": "Slip belum lengkap",
+      "galat": null
+    }
+  ],
+  "alasan": [
+    {
+      "nama": "minimal: sakelar bawaan",
+      "draft": {
+        "nama": " Mutasi ",
+        "pengali_up": 100,
+        "pengali_upmk": 0
+      },
+      "hasil": {
+        "id_alasan": null,
+        "nama": "Mutasi",
+        "pengali_up": 100,
+        "pengali_upmk": 0,
+        "uph": true,
+        "kompensasi_pkwt": false,
+        "uang_pisah": false,
+        "is_aktif": true,
+        "dasar_hukum": null
+      },
+      "galat": null
+    },
+    {
+      "nama": "lengkap",
+      "draft": {
+        "id_alasan": "klr-efisiensi",
+        "nama": "PHK Efisiensi",
+        "pengali_up": 50,
+        "pengali_upmk": 100,
+        "uph": false,
+        "kompensasi_pkwt": true,
+        "uang_pisah": true,
+        "is_aktif": false,
+        "dasar_hukum": " Pasal 43 "
+      },
+      "hasil": {
+        "id_alasan": "klr-efisiensi",
+        "nama": "PHK Efisiensi",
+        "pengali_up": 50,
+        "pengali_upmk": 100,
+        "uph": false,
+        "kompensasi_pkwt": true,
+        "uang_pisah": true,
+        "is_aktif": false,
+        "dasar_hukum": "Pasal 43"
+      },
+      "galat": null
+    },
+    {
+      "nama": "nama kosong",
+      "draft": {
+        "nama": " ",
+        "pengali_up": 0,
+        "pengali_upmk": 0
+      },
+      "hasil": null,
+      "galat": "Nama alasan wajib diisi."
+    },
+    {
+      "nama": "nama terlalu panjang",
+      "draft": {
+        "nama": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+        "pengali_up": 0,
+        "pengali_upmk": 0
+      },
+      "hasil": null,
+      "galat": "Nama alasan maksimal 100 karakter."
+    },
+    {
+      "nama": "pengali UP di atas 1000",
+      "draft": {
+        "nama": "X",
+        "pengali_up": 1001,
+        "pengali_upmk": 0
+      },
+      "hasil": null,
+      "galat": "Pengali UP harus bilangan bulat 0–1000 (persen)."
+    },
+    {
+      "nama": "pengali UP pecahan",
+      "draft": {
+        "nama": "X",
+        "pengali_up": 1.5,
+        "pengali_upmk": 0
+      },
+      "hasil": null,
+      "galat": "Pengali UP harus bilangan bulat 0–1000 (persen)."
+    },
+    {
+      "nama": "pengali UP tidak dikirim",
+      "draft": {
+        "nama": "X",
+        "pengali_upmk": 0
+      },
+      "hasil": null,
+      "galat": "Pengali UP harus bilangan bulat 0–1000 (persen)."
+    },
+    {
+      "nama": "pengali UPMK negatif",
+      "draft": {
+        "nama": "X",
+        "pengali_up": 0,
+        "pengali_upmk": -1
+      },
+      "hasil": null,
+      "galat": "Pengali UPMK harus bilangan bulat 0–1000 (persen)."
+    }
+  ],
+  "surat_keluar": [
+    {
+      "jenis": "berhenti",
+      "status_keluar": "Berlaku",
+      "status_kepegawaian": "GTY",
+      "galat": null
+    },
+    {
+      "jenis": "berhenti",
+      "status_keluar": "Berlaku",
+      "status_kepegawaian": " pty",
+      "galat": null
+    },
+    {
+      "jenis": "berhenti",
+      "status_keluar": "Berlaku",
+      "status_kepegawaian": "GTT",
+      "galat": "SK Pemberhentian hanya untuk GTY dan PTY."
+    },
+    {
+      "jenis": "berhenti",
+      "status_keluar": "Berlaku",
+      "status_kepegawaian": "Honorer",
+      "galat": "SK Pemberhentian hanya untuk GTY dan PTY."
+    },
+    {
+      "jenis": "pengalaman",
+      "status_keluar": "Berlaku",
+      "status_kepegawaian": "Honorer",
+      "galat": null
+    },
+    {
+      "jenis": "pengalaman",
+      "status_keluar": "Berlaku",
+      "status_kepegawaian": "",
+      "galat": null
+    },
+    {
+      "jenis": "pengalaman",
+      "status_keluar": "Berlaku",
+      "status_kepegawaian": "GTT",
+      "galat": null
+    },
+    {
+      "jenis": "pengalaman",
+      "status_keluar": "Berlaku",
+      "status_kepegawaian": "PPPK",
+      "galat": "Surat keterangan pengalaman kerja tidak untuk PNS dan PPPK."
+    },
+    {
+      "jenis": "pengalaman",
+      "status_keluar": "Jatuh tempo",
+      "status_kepegawaian": "GTY",
+      "galat": "Surat keluar hanya untuk proses yang sudah berlaku."
+    },
+    {
+      "jenis": "berhenti",
+      "status_keluar": "Dibatalkan",
+      "status_kepegawaian": "GTY",
+      "galat": "Surat keluar hanya untuk proses yang sudah berlaku."
+    },
+    {
+      "jenis": "sp",
+      "status_keluar": "Berlaku",
+      "status_kepegawaian": "GTY",
+      "galat": "Jenis surat tidak dikenal."
+    }
+  ],
+  "ringkasan": [
+    {
+      "nominal": [17500000, 15000000, 800000],
+      "sisa_kasbon": 2000000,
+      "hasil": {
+        "total": 33300000,
+        "sisa_kasbon": 2000000,
+        "perkiraan_diterima": 31300000
+      }
+    },
+    {
+      "nominal": [],
+      "sisa_kasbon": 500000,
+      "hasil": {
+        "total": 0,
+        "sisa_kasbon": 500000,
+        "perkiraan_diterima": -500000
+      }
     }
   ]
 }

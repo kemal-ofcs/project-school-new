@@ -357,7 +357,10 @@ export const IDENTITAS_PEGAWAI_SQL =
 export const PENGATURAN_SURAT_SQL =
   "SELECT key, value FROM setting_gex_system WHERE substr(key, 1, 9) = 'hr_surat_'\n-- batas: kunci pengaturan surat (pola, dasar, kota, yayasan)\n;";
 
-/** `sp` (HRIS Fase 4a, §22.2.5): Surat Peringatan. */
+/**
+ * `sp` (HRIS Fase 4a, §22.2.5): Surat Peringatan; `berhenti` dan `pengalaman`
+ * (Fase 4c): SK Pemberhentian dan Surat Keterangan Pengalaman Kerja.
+ */
 export const JENIS_SURAT = [
   "ptm",
   "tugas",
@@ -365,6 +368,8 @@ export const JENIS_SURAT = [
   "tugas_luar",
   "aktif",
   "sp",
+  "berhenti",
+  "pengalaman",
 ] as const;
 export type JenisSurat = (typeof JENIS_SURAT)[number];
 export const JENIS_SK = ["ptm", "tugas", "angkat"] as const;
@@ -375,7 +380,7 @@ export const KUNCI_YAYASAN_NAMA = "hr_surat_yayasan_nama";
 export const KUNCI_YAYASAN_KETUA = "hr_surat_yayasan_ketua";
 export const KUNCI_YAYASAN_JABATAN = "hr_surat_yayasan_jabatan";
 
-/** Tiga belas kunci dalam urutan tetap; cermin `kunci_pengaturan_surat`. */
+/** Lima belas kunci dalam urutan tetap; cermin `kunci_pengaturan_surat`. */
 export function kunciPengaturanSurat(): string[] {
   return [
     ...JENIS_SURAT.map((j) => `hr_surat_pola:${j}`),
@@ -441,7 +446,7 @@ export function validasiSettingSurat(
 }
 
 /**
- * Draft layar: SEMUA tiga belas kunci wajib ada, kunci asing ditolak lebih
+ * Draft layar: SEMUA lima belas kunci wajib ada, kunci asing ditolak lebih
  * dulu (urut nama kunci). Cermin `validasi_pengaturan_surat`.
  */
 export function validasiPengaturanSurat(
@@ -467,7 +472,7 @@ export const suratSetupSchema = z
   .object({ tanggal: z.string().trim().max(10) })
   .strict();
 
-/** Body rute `letters/settings`: ketiga belas kunci; isinya diperiksa `validasiPengaturanSurat`. */
+/** Body rute `letters/settings`: kelima belas kunci; isinya diperiksa `validasiPengaturanSurat`. */
 export const pengaturanSuratSchema = z
   .object(
     Object.fromEntries(

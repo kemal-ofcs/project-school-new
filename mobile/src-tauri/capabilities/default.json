@@ -325,6 +325,7 @@
     "allow-desktop-hr-offboarding-save",
     "allow-desktop-hr-offboarding-apply",
     "allow-desktop-hr-offboarding-cancel",
+    "allow-desktop-hr-exit-reasons-save",
     "allow-desktop-hr-requests",
     "allow-desktop-hr-request-save",
     "allow-desktop-hr-request-decide",

@@ -18,6 +18,7 @@ import {
   PESAN_KELUAR_BERLAKU,
   PESAN_KELUAR_DIBATALKAN,
   PESAN_KELUAR_TERBUKA,
+  PESAN_SK_BUKAN_TETAP,
   PESAN_SP_DICABUT,
   type SpDraft,
   statusAktifKeluar,
@@ -25,6 +26,21 @@ import {
 } from "@/lib/validations/hr-keluar";
 
 mock.module("server-only", () => ({}));
+
+// Sisa cuti = callback `sisa_tiga` di tes Rust 4c; `null` (tanpa periode)
+// untuk tes 4b.
+let sisaCuti: { sisa: number } | null = null;
+const pengajuanAsli = await import("@/lib/services/hr-pengajuan");
+mock.module("@/lib/services/hr-pengajuan", () => ({
+  ...pengajuanAsli,
+  sisaCutiPada: async () =>
+    sisaCuti && {
+      mulai: "2026-01-01",
+      selesai: "2026-12-31",
+      sisa: sisaCuti.sisa,
+      sebelum_berhak: false,
+    },
+}));
 
 const S = await import("./hr-keluar");
 
@@ -316,5 +332,194 @@ describe("hr-keluar: pegawai keluar di database Web", () => {
     expect(daftar.keluar[0]?.status).toBe("Dibatalkan");
     expect(daftar.alasan).toHaveLength(9);
     await S.simpanKeluar(client, kepeg, draftKeluar());
+  });
+});
+
+// Pasangan Rust: `hr_keluar_pesangon_cloud`, data dan angka yang sama (P1/P2
+// di sana = Q1/Q2 di sini; P1/P2 sudah dipakai tes SP berkas ini).
+describe("hr-keluar: pesangon dan surat keluar di database Web", () => {
+  const yayasan = operator("yayasan", null, [
+    "hr.offboard.manage",
+    "hr.offboard.decide",
+    "hr.scope.all",
+  ]);
+  const rincianDb = async (id: string) =>
+    (
+      await client.execute({
+        sql: "SELECT komponen, usulan, nominal, alasan_ubah FROM hr_keluar_rincian WHERE id_keluar = ? ORDER BY urutan;",
+        args: [id],
+      })
+    ).rows.map((r) => [String(r.komponen), Number(r.nominal), r.alasan_ubah]);
+  const alasan = {
+    pengali_up: 0,
+    pengali_upmk: 0,
+    uph: true,
+    kompensasi_pkwt: false,
+    uang_pisah: false,
+    is_aktif: true,
+  };
+
+  test("usulan upah, rincian satu batch, alasan, beku sejak berlaku, nomor", async () => {
+    sisaCuti = { sisa: 3 };
+    await client.batch(
+      [
+        "INSERT INTO tbl_shift (id_shift, kode_shift, nama_shift, jam_masuk, jam_pulang, jam_kerja_normal_menit, hari_kerja) VALUES (77, 77, 'Lima hari', '07:00', '15:00', 420, '1,2,3,4,5');",
+        "INSERT INTO master_data (id_unik, kode_karyawan, nama, divisi, id_shift, jenis_personil, unit, tanggal_daftar, status_aktif) VALUES ('Q1', 'KQ1', 'Ani', 'Guru', 77, 'GURU', 'SMP', '2020-07-01', 'Aktif'), ('Q2', 'KQ2', 'Budi', 'Guru', 77, 'GURU', 'SMP', '2025-07-01', 'Aktif');",
+        "INSERT INTO hr_kontrak (id_kontrak, id_karyawan, status, tanggal_mulai, tanggal_selesai) VALUES ('k1', 'Q1', 'GTY', '2020-07-01', NULL), ('k2', 'Q2', 'GTT', '2026-01-01', '2026-12-31');",
+        "INSERT INTO payroll_runs (id, idempotency_key, period_start, period_end, status, created_by) VALUES ('r-apr', 'r-apr', '2026-04-01', '2026-04-30', 'PAID', 'x'), ('r-mei', 'r-mei', '2026-05-01', '2026-05-31', 'PAID', 'x'), ('r-mei2', 'r-mei2', '2026-05-01', '2026-05-31', 'PAID', 'x'), ('r-jun', 'r-jun', '2026-06-01', '2026-06-30', 'DRAFT', 'x'), ('r-lama', 'r-lama', '2025-05-01', '2025-05-31', 'PAID', 'x');",
+        "INSERT INTO payroll_items (id, payroll_run_id, id_karyawan, nama_karyawan, divisi, total_regular_hours, total_overtime_hours, total_overtime_index, rate_per_hour, basic_salary, teaching_salary, overtime_salary, gross_salary, net_salary, breakdown_snapshot) VALUES ('i1', 'r-apr', 'Q1', 'Ani', 'Guru', 0, 0, 0, 0, 3000000, 1000000, 500000, 0, 0, '{}'), ('i2', 'r-mei', 'Q1', 'Ani', 'Guru', 0, 0, 0, 0, 3000000, 500000, 0, 0, 0, '{}'), ('i3', 'r-mei2', 'Q1', 'Ani', 'Guru', 0, 0, 0, 0, 0, 500000, 0, 0, 0, '{}'), ('i4', 'r-jun', 'Q1', 'Ani', 'Guru', 0, 0, 0, 0, 9000000, 0, 0, 0, 0, '{}'), ('i5', 'r-lama', 'Q1', 'Ani', 'Guru', 0, 0, 0, 0, 9000000, 0, 0, 0, 0, '{}');",
+      ],
+      "write",
+    );
+    const draft: KeluarDraft = {
+      id_karyawan: "Q1",
+      id_alasan: "klr-efisiensi",
+      tanggal_terakhir: "2026-06-30",
+    };
+    const { id_keluar: id1 } = await S.simpanKeluar(client, yayasan, draft);
+    const header = (
+      await client.execute({
+        sql: "SELECT upah_pokok, usulan_upah_pokok, tunjangan_tetap FROM hr_keluar WHERE id_keluar = ?;",
+        args: [id1],
+      })
+    ).rows[0];
+    expect([
+      Number(header?.upah_pokok),
+      Number(header?.usulan_upah_pokok),
+      Number(header?.tunjangan_tetap),
+    ]).toEqual([4_000_000, 4_000_000, 0]);
+    expect((await rincianDb(id1)).map(([k, n]) => [k, n])).toEqual([
+      ["UP", 28_000_000],
+      ["UPMK", 12_000_000],
+      ["UPH Cuti", 571_429],
+      ["UPH Lainnya", 0],
+      ["Lainnya", 0],
+    ]);
+
+    const ubah: KeluarDraft = {
+      ...draft,
+      id_keluar: id1,
+      rincian: [{ komponen: "Lainnya", nominal: 250_000 }],
+    };
+    expect(await galat(S.simpanKeluar(client, yayasan, ubah))).toBe(
+      "Nominal Lainnya berbeda dari usulan; alasannya wajib diisi.",
+    );
+    ubah.rincian = [
+      {
+        komponen: "Lainnya",
+        nominal: 250_000,
+        alasan_ubah: "Penghargaan masa bakti",
+      },
+    ];
+    ubah.upah_pokok = 4_500_000;
+    expect(await galat(S.simpanKeluar(client, yayasan, ubah))).toBe(
+      "Upah pokok berbeda dari usulan; alasannya wajib diisi.",
+    );
+    ubah.alasan_upah = "Honor JP Juni";
+    ubah.tunjangan_tetap = 500_000;
+    await S.simpanKeluar(client, yayasan, ubah);
+    const r = await rincianDb(id1);
+    expect(r).toHaveLength(5);
+    expect(r[0]?.[1]).toBe(35_000_000);
+    expect(r[4]).toEqual(["Lainnya", 250_000, "Penghargaan masa bakti"]);
+
+    // Pengali disunting: rincian tersimpan tidak tersentuh.
+    await S.simpanAlasan(client, {
+      ...alasan,
+      id_alasan: "klr-efisiensi",
+      nama: "PHK Efisiensi",
+      pengali_up: 50,
+      pengali_upmk: 100,
+    });
+    expect((await rincianDb(id1))[0]?.[1]).toBe(35_000_000);
+    expect(
+      await galat(
+        S.simpanAlasan(client, {
+          ...alasan,
+          id_alasan: "klr-hilang",
+          nama: "X",
+        }),
+      ),
+    ).toBe("Alasan keluar tidak ditemukan.");
+    const baru = await S.simpanAlasan(client, {
+      ...alasan,
+      nama: "Mutasi Yayasan",
+    });
+    expect(baru.alasan).toHaveLength(10);
+
+    const rincian = await S.rincianKeluar(client, { id_keluar: id1 });
+    expect(rincian.pesangon.usulan_upah_pokok).toBe(4_000_000);
+    expect(rincian.pesangon.bulan_slip).toBe(2);
+    expect(rincian.pesangon.pembagi).toBe(21);
+    expect(rincian.status_kepegawaian).toBe("GTY");
+    expect(rincian.rincian).toHaveLength(5);
+    expect(rincian.ringkasan.total).toBe(
+      35_000_000 + 15_000_000 + 714_286 + 250_000,
+    );
+
+    // GTT habis kontrak: kompensasi PKWT; tanpa slip upah wajib beralasan.
+    const gtt: KeluarDraft = {
+      id_karyawan: "Q2",
+      id_alasan: "klr-habis-kontrak",
+      tanggal_terakhir: "2026-06-30",
+      upah_pokok: 3_000_000,
+    };
+    expect(await galat(S.simpanKeluar(client, yayasan, gtt))).toBe(
+      "Upah pokok berbeda dari usulan; alasannya wajib diisi.",
+    );
+    const { id_keluar: id2 } = await S.simpanKeluar(client, yayasan, {
+      ...gtt,
+      alasan_upah: "Belum ada slip PAID",
+    });
+    expect((await rincianDb(id2)).map(([k, n]) => [k, n])).toEqual([
+      ["UPH Cuti", 428_571],
+      ["UPH Lainnya", 0],
+      ["Kompensasi PKWT", 1_500_000],
+      ["Lainnya", 0],
+    ]);
+
+    // Berlakukan: rincian beku dan ikut potret.
+    await S.berlakukanKeluar(client, yayasan, id1);
+    await S.berlakukanKeluar(client, yayasan, id2);
+    const potret = JSON.parse(
+      String(
+        (
+          await client.execute({
+            sql: "SELECT checklist_saat_berlaku FROM hr_keluar WHERE id_keluar = ?;",
+            args: [id1],
+          })
+        ).rows[0]?.checklist_saat_berlaku,
+      ),
+    );
+    expect(potret.rincian).toHaveLength(5);
+    expect(potret.ringkasan.perkiraan_diterima).toBe(potret.ringkasan.total);
+    expect(
+      await galat(S.simpanKeluar(client, yayasan, { ...ubah, rincian: [] })),
+    ).toBe(PESAN_KELUAR_BERLAKU);
+    expect((await rincianDb(id1))[4]?.[1]).toBe(250_000);
+
+    // Nomor surat keluar: disimpan; kembar ditandai; SK hanya GTY/PTY.
+    const sk = await S.simpanKeluar(client, yayasan, {
+      id_keluar: id1,
+      jenis_surat: "berhenti",
+      nomor: "001/SK",
+    });
+    expect(sk.nomor_kembar).toBe(false);
+    expect(
+      await galat(
+        S.simpanKeluar(client, yayasan, {
+          id_keluar: id2,
+          jenis_surat: "berhenti",
+          nomor: "002/SK",
+        }),
+      ),
+    ).toBe(PESAN_SK_BUKAN_TETAP);
+    const ket = await S.simpanKeluar(client, yayasan, {
+      id_keluar: id2,
+      jenis_surat: "pengalaman",
+      nomor: "001/SK",
+    });
+    expect(ket.nomor_kembar).toBe(true);
+    sisaCuti = null;
   });
 });

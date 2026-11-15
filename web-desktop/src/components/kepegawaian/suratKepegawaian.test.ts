@@ -11,6 +11,8 @@ import {
   romawi,
   suratKeteranganAktif,
   suratPembagianTugas,
+  suratPemberhentian,
+  suratPengalamanKerja,
   suratPengangkatan,
   suratPeringatan,
   suratTugasLuar,
@@ -344,6 +346,15 @@ describe("templat: nilai di-escape, data kosong tanpa 'undefined'", () => {
       id_karyawan: "G1",
       mapel: d === kosong ? [] : [JAHAT],
     }),
+    ...[suratPemberhentian, suratPengalamanKerja].map((rakit) =>
+      rakit(d, {
+        id_karyawan: "G1",
+        status_kepegawaian: d === kosong ? "GTY" : JAHAT,
+        masa_kerja_mulai: d === kosong ? "" : "2020-07-01",
+        tanggal_terakhir: d === kosong ? "" : "2026-06-30",
+        alasan_nama: d === kosong ? "" : JAHAT,
+      }),
+    ),
     ...["SP1", "SP3"].map((tingkat) =>
       suratPeringatan(d, {
         id_karyawan: "G1",
@@ -389,6 +400,37 @@ ${JAHAT}`,
     const [, dicabut] = bentuk(jahat).slice(-2);
     expect(dicabut).toContain("<strong>DICABUT</strong>");
     expect(dicabut).toContain("&lt;script&gt;&quot;&amp;'<br>&lt;script&gt;");
+  });
+
+  test("surat keluar: penanda tangan, masa kerja, tanpa pesangon", () => {
+    const isian = {
+      id_karyawan: "G1",
+      status_kepegawaian: "GTY",
+      masa_kerja_mulai: "2020-07-01",
+      tanggal_terakhir: "2026-06-30",
+      alasan_nama: "Mengundurkan Diri",
+    };
+    const d = {
+      setup: setup({
+        pengaturan: { hr_surat_yayasan_ketua: "Ketua Uji" },
+      }),
+      nomor: "001/SK-BERHENTI/2026",
+      tanggal: "2026-07-01",
+    };
+    const sk = suratPemberhentian(d, isian);
+    expect(sk).toContain("PEMBERHENTIAN GURU TETAP YAYASAN");
+    expect(sk).toContain("30 Juni 2026");
+    expect(sk).toContain("mengundurkan diri");
+    expect(sk).toContain("Ketua Uji");
+    // Menimbang/Mengingat SK Pemberhentian selalu teks bawaan.
+    expect(sk).toContain("Pemutusan Hubungan Kerja");
+    const ket = suratPengalamanKerja(d, isian);
+    expect(ket).toContain("SURAT KETERANGAN PENGALAMAN KERJA");
+    expect(ket).toContain("6 tahun");
+    expect(ket).not.toContain("Mengundurkan Diri");
+    for (const html of [sk, ket]) {
+      expect(html).not.toMatch(/UPMK|pesangon|Rp/);
+    }
   });
 
   test("teks bawaan tercetak saat pengaturan kosong", () => {

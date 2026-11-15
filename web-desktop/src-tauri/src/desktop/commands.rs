@@ -3409,13 +3409,13 @@ pub fn desktop_hr_teaching_load(
 
 /// Bahan cetak SK dan surat pada `tanggal` (kosong = hari ini WIB): kop,
 /// pengaturan surat, kepala per unit, identitas guru; dari SQLite lokal.
-/// Juga untuk pembaca SP (`hr.warning.view`): penanda tangan bawaan dan cetak SP.
+/// Juga untuk pembaca SP (`hr.warning.view`) dan surat keluar (`hr.offboard.view`).
 #[tauri::command]
 pub fn desktop_hr_letter_setup(
     state: State<'_, DesktopState>,
     tanggal: Option<String>,
 ) -> Result<Value, CommandError> {
-    require_any_permission(&state, &["hr.duty.manage", "hr.warning.view"])?;
+    require_any_permission(&state, &["hr.duty.manage", "hr.warning.view", "hr.offboard.view"])?;
     hr_beban::letter_setup(&state, tanggal.as_deref().unwrap_or(""))
 }
 
@@ -3521,7 +3521,20 @@ pub async fn desktop_hr_offboarding_save(
     draft: Value,
 ) -> Result<Value, CommandError> {
     let operator = require_permission(&state, "hr.offboard.manage")?;
-    hr_keluar::simpan_keluar(&klien_cloud(&state)?, &operator, &draft)
+    hr_keluar::simpan_keluar(&klien_cloud(&state)?, &operator, &draft, sisa_cuti_lokal(&state))
+        .await
+        .map_err(hris_cloud::luring)
+}
+
+/// Ubah atau tambah alasan keluar beserta pengalinya (HRIS Fase 4c); proses
+/// yang sudah berlaku tidak tersentuh.
+#[tauri::command]
+pub async fn desktop_hr_exit_reasons_save(
+    state: State<'_, DesktopState>,
+    draft: Value,
+) -> Result<Value, CommandError> {
+    require_permission(&state, "hr.offboard.decide")?;
+    hr_keluar::simpan_alasan(&klien_cloud(&state)?, &draft)
         .await
         .map_err(hris_cloud::luring)
 }

@@ -8,6 +8,7 @@ import {
   PENGAJUAN_AKTIF_ORANG_SQL,
   UNIT_PERSONIL_SQL,
 } from "./hr-pengajuan";
+import { STATUS_KINI_SQL } from "./hris";
 
 // Vektor yang sama dengan `mod tests` di `desktop/hr_keluar.rs`.
 
@@ -63,6 +64,20 @@ describe("hr-keluar: SQL kembar", () => {
       K.UBAH_KELUAR_SQL,
       ...K.BERLAKUKAN_SQL,
       ...K.BATALKAN_SQL,
+      // Fase 4c
+      K.UPAH_RATA_SQL,
+      K.KONTRAK_KELUAR_SQL,
+      K.TUNJANGAN_ACUAN_SQL,
+      K.RINCIAN_KELUAR_SQL,
+      K.HAPUS_RINCIAN_SQL,
+      K.SIMPAN_RINCIAN_SQL,
+      K.SIMPAN_ALASAN_SQL,
+      K.UBAH_ALASAN_SQL,
+      ...K.NOMOR_KELUAR_SQL,
+      K.NOMOR_KELUAR_KEMBAR_SQL,
+      K.PESAN_SURAT_BELUM_BERLAKU,
+      K.PESAN_SK_BUKAN_TETAP,
+      K.PESAN_KETERANGAN_NEGERI,
     ];
     let diperiksa = 0;
     for (const dir of ["desktop", "mobile"]) {
@@ -152,6 +167,14 @@ describe("hr-keluar: SQL kembar", () => {
     expect(baca("../services/payroll-recap.ts")).toContain(
       "KELUAR_DI_PERIODE_SQL})",
     );
+    // Kontrak berlaku = subkueri `STATUS_KINI_SQL` (kontrak terakhir yang tidak dibatalkan).
+    expect(tanpaSpasi(STATUS_KINI_SQL)).toContain(
+      potong(K.KONTRAK_KELUAR_SQL, "k.status <> 'Pembatalan'", "LIMIT 1"),
+    );
+    // Komponen rincian = CHECK `hr_keluar_rincian.komponen` di kedua jalur provisioning.
+    const check = `komponenIN(${K.KOMPONEN_RINCIAN.map((k) => `'${k}'`).join(",")})`;
+    expect(rust("turso.rs")).toContain(tanpaSpasi(check));
+    expect(baca("../db-migrations.ts")).toContain(tanpaSpasi(check));
   });
 
   test("sembilan alasan bawaan, pengali 0–1000", () => {
@@ -212,6 +235,79 @@ describe("hr-keluar: vektor SP", () => {
     expect(K.statusAktifKeluar("?")).toBe(
       "CASE WHEN COALESCE(master_data.id_keluar, '') <> '' THEN 'Nonaktif' ELSE ? END",
     );
+  });
+
+  test("pesangon (4c): masa kerja, upah, pembagi, usulan, rincian, alasan, surat", () => {
+    for (const k of vektor.bulan_penuh) {
+      expect({ k, hasil: K.bulanPenuh(k.mulai, k.akhir) }).toEqual({
+        k,
+        hasil: k.hasil,
+      });
+    }
+    for (const k of vektor.masa_kerja) {
+      expect({ k, hasil: K.masaKerjaBulan(k.mulai, k.terakhir) }).toEqual({
+        k,
+        hasil: k.hasil,
+      });
+    }
+    for (const k of vektor.kelipatan) {
+      expect([K.kelipatanUp(k.tahun), K.kelipatanUpmk(k.tahun)]).toEqual([
+        k.up,
+        k.upmk,
+      ]);
+    }
+    for (const k of vektor.rata_upah) {
+      expect(K.rataUpah(k.total, k.bulan)).toBe(k.hasil);
+    }
+    for (const k of vektor.pembagi) {
+      expect(K.pembagiUph(k.hari_kerja)).toBe(k.hasil);
+    }
+    for (const k of vektor.kelompok) {
+      expect(K.kelompokStatus(k.status)).toBe(k.hasil as K.KelompokStatus);
+    }
+    for (const k of vektor.pesangon) {
+      expect({
+        nama: k.nama,
+        hasil: K.usulanPesangon(k.masukan as K.MasukanPesangon),
+      }).toEqual({ nama: k.nama, hasil: k.hasil as K.Usulan[] });
+    }
+    for (const k of vektor.susun) {
+      const hasil = K.susunRincian(
+        k.usulan as K.Usulan[],
+        k.isian as K.IsianRincian[],
+      );
+      expect({
+        nama: k.nama,
+        hasil: hasil.ok ? hasil.nilai : null,
+        galat: hasil.ok ? null : hasil.galat,
+      }).toEqual({ nama: k.nama, hasil: k.hasil as never, galat: k.galat });
+    }
+    for (const k of vektor.upah) {
+      const hasil = K.periksaUpah(k.upah_pokok, k.usulan, k.alasan);
+      expect(hasil.ok ? null : hasil.galat).toBe(k.galat);
+    }
+    for (const k of vektor.alasan) {
+      const hasil = K.validasiAlasan(k.draft);
+      expect({
+        nama: k.nama,
+        hasil: hasil.ok ? hasil.nilai : null,
+        galat: hasil.ok ? null : hasil.galat,
+      }).toEqual({ nama: k.nama, hasil: k.hasil as never, galat: k.galat });
+    }
+    for (const k of vektor.surat_keluar) {
+      const hasil = K.periksaSuratKeluar(
+        k.jenis,
+        k.status_keluar,
+        k.status_kepegawaian,
+      );
+      expect({ k, galat: hasil.ok ? null : hasil.galat }).toEqual({
+        k,
+        galat: k.galat,
+      });
+    }
+    for (const k of vektor.ringkasan) {
+      expect(K.ringkasanPesangon(k.nominal, k.sisa_kasbon)).toEqual(k.hasil);
+    }
   });
 
   test("validasi, tingkat, dan wewenang", () => {

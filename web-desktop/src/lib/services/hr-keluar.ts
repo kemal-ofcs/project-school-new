@@ -12,15 +12,19 @@ import {
   ALASAN_KELUAR_SQL,
   ALASAN_SATU_SQL,
   ALFA_SESUDAH_SQL,
+  type AlasanDraft,
   type AlasanKeluar,
   akhirMasaSp,
   BATALKAN_SQL,
+  type BahanPesangon,
   BERLAKUKAN_SQL,
   CABUT_SP_SQL,
   type ChecklistKeluar,
   DAFTAR_KELUAR_SQL,
   type DaftarKeluar,
   type DaftarSp,
+  HAPUS_RINCIAN_SQL,
+  type HasilNomorKeluar,
   type HasilSimpanSp,
   JADWAL_AKTIF_KELUAR_SQL,
   JP_PENGGANTI_SESUDAH_SQL,
@@ -28,10 +32,15 @@ import {
   KELUAR_SATU_SQL,
   type KeluarBaris,
   type KeluarDraft,
+  type KeluarNomor,
+  KONTRAK_KELUAR_SQL,
   MAKS_TEKS_KELUAR,
   MAKS_TEKS_SP,
   MASA_SP_SQL,
   masaSpBerlaku,
+  masukanPesangon,
+  NOMOR_KELUAR_KEMBAR_SQL,
+  NOMOR_KELUAR_SQL,
   NOMOR_KEMBAR_SQL,
   PEGAWAI_KELUAR_SQL,
   PEGAWAI_SP_SQL,
@@ -46,12 +55,21 @@ import {
   PESAN_SP_DICABUT,
   PESAN_SUPERADMIN_TERAKHIR,
   PINJAMAN_PERSONIL_SQL,
+  pembagiUph,
+  periksaSuratKeluar,
   periksaTingkat,
+  periksaUpah,
   periksaWewenangSp,
   RAPEL_KELUAR_SQL,
+  RINCIAN_KELUAR_SQL,
   type RincianKeluar,
+  type RincianTersimpan,
   RUN_MASA_TERAKHIR_SQL,
+  rataUpah,
+  ringkasanPesangon,
+  SIMPAN_ALASAN_SQL,
   SIMPAN_KELUAR_SQL,
+  SIMPAN_RINCIAN_SQL,
   SIMPAN_SP_SQL,
   SP_PEGAWAI_SQL,
   SP_SATU_SQL,
@@ -59,13 +77,20 @@ import {
   type SpDraft,
   type SpRingkas,
   SUPERADMIN_AKTIF_SQL,
+  SURAT_KELUAR,
   statusKeluar,
   statusSp,
+  susunRincian,
   type TingkatSp,
   TUGAS_KELUAR_SQL,
+  TUNJANGAN_ACUAN_SQL,
+  UBAH_ALASAN_SQL,
   UBAH_KELUAR_SQL,
   UBAH_SP_SQL,
+  UPAH_RATA_SQL,
+  usulanPesangon,
   usulanTingkat,
+  validasiAlasan,
   validasiKeluar,
   validasiSp,
   WALI_KELUAR_SQL,
@@ -76,8 +101,10 @@ import {
 } from "@/lib/validations/hr-pengajuan";
 import {
   HARI_INI_SQL,
+  NOMOR_MAKS,
   PESAN_PEGAWAI_BELUM_DI_CLOUD,
   STATUS_KINI_SQL,
+  TUGAS_BERLAKU_SQL,
 } from "@/lib/validations/hris";
 
 // Cermin I/O cloud `desktop/hr_keluar.rs`. Tabelnya cloud-only, jadi Web dan
@@ -313,7 +340,7 @@ export async function cabutSp(
   return { sukses: true as const };
 }
 
-// ── Pegawai keluar (HRIS Fase 4b), cermin I/O cloud `desktop/hr_keluar.rs` ──
+// Pegawai keluar (HRIS Fase 4b), cermin I/O cloud `desktop/hr_keluar.rs`
 
 /** Baris hasil query menjadi objek berkunci kolom (tanpa indeks angka). */
 const objek = (r: Row | undefined): Record<string, string> =>
@@ -335,6 +362,9 @@ function denganStatusKeluar(r: Row, hari: string): KeluarBaris {
   return {
     ...(objek(r) as unknown as KeluarBaris),
     kartu_ditarik: angka(r, "kartu_ditarik") === 1,
+    upah_pokok: angka(r, "upah_pokok"),
+    usulan_upah_pokok: angka(r, "usulan_upah_pokok"),
+    tunjangan_tetap: angka(r, "tunjangan_tetap"),
     status: statusKeluar(
       teks(r, "tanggal_terakhir"),
       teks(r, "berlaku_pada") !== "",
@@ -477,22 +507,76 @@ export async function rincianKeluar(
   }
   const pegawai = await satu(client, PEGAWAI_KELUAR_SQL, [id]);
   if (!pegawai) galat(PESAN_PEGAWAI_BELUM_DI_CLOUD);
+  const bahan = await bahanPesangon(client, pegawai, tanggal);
+  const checklist = await checklistKeluar(client, id, tanggal);
+  const rincian = keluar
+    ? await rincianTersimpan(client, keluar.id_keluar)
+    : [];
   return {
     keluar,
     pegawai: objek(pegawai) as unknown as RincianKeluar["pegawai"],
-    status_kepegawaian: await statusKini(client, id, tanggal),
-    checklist: await checklistKeluar(client, id, tanggal),
+    status_kepegawaian: bahan.status,
+    rincian,
+    ringkasan: ringkasanPesangon(
+      rincian.map((r) => r.nominal),
+      checklist.sisa_kasbon,
+    ),
+    pesangon: bahan,
+    checklist,
     alasan: await alasanKeluar(client),
     hari_ini: hari,
   };
+}
+
+/** Cermin `bahan_pesangon` (§22.2.3). */
+async function bahanPesangon(
+  client: Client,
+  pegawai: Row,
+  tanggal: string,
+): Promise<BahanPesangon> {
+  const id = teks(pegawai, "id_unik");
+  const upah = await satu(client, UPAH_RATA_SQL, [id, tanggal]);
+  const kontrak = await satu(client, KONTRAK_KELUAR_SQL, [tanggal, id]);
+  return {
+    status: await statusKini(client, id, tanggal),
+    usulan_upah_pokok: rataUpah(angka(upah, "total"), angka(upah, "bulan")),
+    bulan_slip: angka(upah, "bulan"),
+    pembagi: pembagiUph(teks(pegawai, "hari_kerja")),
+    kontrak_mulai:
+      kontrak && teks(kontrak, "tanggal_selesai") !== ""
+        ? teks(kontrak, "tanggal_mulai")
+        : "",
+    tunjangan: (await semua(client, TUNJANGAN_ACUAN_SQL)).map((r) => ({
+      id: teks(r, "id"),
+      name: teks(r, "name"),
+      nilai: angka(r, "nilai"),
+      applies_to: teks(r, "applies_to"),
+    })),
+    tugas: (await semua(client, TUGAS_BERLAKU_SQL, [tanggal, tanggal]))
+      .filter((r) => teks(r, "id_karyawan") === id)
+      .map((r) => teks(r, "id_jenis")),
+  };
+}
+
+async function rincianTersimpan(
+  client: Client,
+  idKeluar: string,
+): Promise<RincianTersimpan[]> {
+  return (await semua(client, RINCIAN_KELUAR_SQL, [idKeluar])).map((r) => ({
+    ...(objek(r) as unknown as RincianTersimpan),
+    usulan: angka(r, "usulan"),
+    nominal: angka(r, "nominal"),
+    urutan: angka(r, "urutan"),
+  }));
 }
 
 /** Cermin `simpan_keluar`. `master_data` tidak berubah sebelum Berlakukan. */
 export async function simpanKeluar(
   client: Client,
   operator: OperatorUser,
-  draft: KeluarDraft,
-) {
+  draft: KeluarDraft | KeluarNomor,
+): Promise<{ sukses: true; id_keluar: string; nomor_kembar?: boolean }> {
+  if ("jenis_surat" in draft) return simpanNomorKeluar(client, operator, draft);
   const cek = validasiKeluar(draft);
   if (!cek.ok) galat(cek.galat);
   const sah = cek.nilai;
@@ -515,27 +599,154 @@ export async function simpanKeluar(
   if (!alasan) galat("Alasan keluar tidak ditemukan.");
   if (angka(alasan, "is_aktif") !== 1) galat("Alasan keluar sudah nonaktif.");
   const id = sah.id_keluar ?? idBaru("klr-");
-  const hasil = await client.execute({
-    sql: sah.id_keluar ? UBAH_KELUAR_SQL : SIMPAN_KELUAR_SQL,
-    args: [
-      id,
-      sah.id_karyawan,
-      sah.id_alasan,
-      teks(alasan, "nama"),
-      sah.id_sp,
-      await statusKini(client, sah.id_karyawan, sah.tanggal_terakhir),
-      sah.tanggal_pemberitahuan,
+  const bahan = await bahanPesangon(client, pegawai, sah.tanggal_terakhir);
+  const usulanUpah = bahan.usulan_upah_pokok;
+  const upahPokok = sah.upah_pokok ?? usulanUpah;
+  const alasanUpah = upahPokok !== usulanUpah ? sah.alasan_upah : null;
+  const cekUpah = periksaUpah(upahPokok, usulanUpah, alasanUpah);
+  if (!cekUpah.ok) galat(cekUpah.galat);
+  const usulan = usulanPesangon(
+    masukanPesangon(
+      bahan,
+      { tanggal_daftar: masuk },
+      {
+        pengali_up: angka(alasan, "pengali_up"),
+        pengali_upmk: angka(alasan, "pengali_upmk"),
+        uph: angka(alasan, "uph") === 1,
+        kompensasi_pkwt: angka(alasan, "kompensasi_pkwt") === 1,
+        uang_pisah: angka(alasan, "uang_pisah") === 1,
+      },
+      await sisaCutiPada(client, sah.id_karyawan, sah.tanggal_terakhir),
       sah.tanggal_terakhir,
-      sah.keterangan,
-      masuk || null,
-      sah.kartu_ditarik ? 1 : 0,
-      sah.catatan_checklist,
-      operator.username,
+      upahPokok + sah.tunjangan_tetap,
+    ),
+  );
+  const rincian = susunRincian(usulan, sah.rincian);
+  if (!rincian.ok) galat(rincian.galat);
+  // Header + rincian dalam satu batch; rincian dijaga keadaan "belum
+  // berlaku" proses yang sama (cermin `simpan_keluar`).
+  await client.batch(
+    [
+      {
+        sql: sah.id_keluar ? UBAH_KELUAR_SQL : SIMPAN_KELUAR_SQL,
+        args: [
+          id,
+          sah.id_karyawan,
+          sah.id_alasan,
+          teks(alasan, "nama"),
+          sah.id_sp,
+          bahan.status,
+          sah.tanggal_pemberitahuan,
+          sah.tanggal_terakhir,
+          sah.keterangan,
+          masuk || null,
+          sah.kartu_ditarik ? 1 : 0,
+          sah.catatan_checklist,
+          operator.username,
+          upahPokok,
+          usulanUpah,
+          sah.tunjangan_tetap,
+          alasanUpah,
+        ],
+      },
+      { sql: HAPUS_RINCIAN_SQL, args: [id] },
+      ...rincian.nilai.map((r) => ({
+        sql: SIMPAN_RINCIAN_SQL,
+        args: [
+          id,
+          r.komponen,
+          r.dasar,
+          r.usulan,
+          r.nominal,
+          r.alasan_ubah,
+          r.urutan,
+        ],
+      })),
     ],
-  });
-  if (hasil.rowsAffected === 0)
-    galat(sah.id_keluar ? PESAN_KELUAR_BERLAKU : PESAN_KELUAR_TERBUKA);
+    "write",
+  );
+  const sesudah = await satu(client, KELUAR_SATU_SQL, [id]);
+  if (!sesudah) galat(PESAN_KELUAR_TERBUKA);
+  if (teks(sesudah, "dibatalkan_pada") !== "") galat(PESAN_KELUAR_DIBATALKAN);
+  if (teks(sesudah, "berlaku_pada") !== "") galat(PESAN_KELUAR_BERLAKU);
   return { sukses: true as const, id_keluar: id };
+}
+
+/** Cermin `simpan_nomor_keluar`: nomor kembar hanya ditandai (Q-74). */
+async function simpanNomorKeluar(
+  client: Client,
+  operator: OperatorUser,
+  draft: KeluarNomor,
+): Promise<HasilNomorKeluar> {
+  const id = draft.id_keluar.trim();
+  if (!id) galat("Proses keluar tidak ditemukan.");
+  const nomor = (draft.nomor ?? "").trim() || null;
+  if (nomor && [...nomor].length > NOMOR_MAKS)
+    galat(`Nomor surat maksimal ${NOMOR_MAKS} karakter.`);
+  const header = denganStatusKeluar(
+    await headerKeluar(client, id),
+    await hariIni(client),
+  );
+  await wewenangKeluar(client, operator, header.id_karyawan);
+  const cek = periksaSuratKeluar(
+    draft.jenis_surat,
+    header.status,
+    header.status_kepegawaian,
+  );
+  if (!cek.ok) galat(cek.galat);
+  await client.batch(
+    [
+      {
+        sql: NOMOR_KELUAR_SQL[draft.jenis_surat === SURAT_KELUAR[0] ? 0 : 1],
+        args: [id, nomor],
+      },
+    ],
+    "write",
+  );
+  const kembar = nomor
+    ? angka(
+        await satu(client, NOMOR_KELUAR_KEMBAR_SQL, [nomor, id]),
+        "jumlah",
+      ) > 0
+    : false;
+  return { sukses: true, id_keluar: id, nomor_kembar: kembar };
+}
+
+/**
+ * Cermin `simpan_alasan`: ubah (`id_alasan`) atau tambah alasan keluar.
+ * Proses yang sudah berlaku tidak tersentuh karena rinciannya beku.
+ */
+export async function simpanAlasan(client: Client, draft: AlasanDraft) {
+  const cek = validasiAlasan(draft);
+  if (!cek.ok) galat(cek.galat);
+  const sah = cek.nilai;
+  if (sah.id_alasan && !(await satu(client, ALASAN_SATU_SQL, [sah.id_alasan])))
+    galat("Alasan keluar tidak ditemukan.");
+  const id = sah.id_alasan ?? idBaru("klr-");
+  await client.batch(
+    [
+      {
+        sql: sah.id_alasan ? UBAH_ALASAN_SQL : SIMPAN_ALASAN_SQL,
+        args: [
+          id,
+          sah.nama,
+          sah.pengali_up,
+          sah.pengali_upmk,
+          sah.uph ? 1 : 0,
+          sah.kompensasi_pkwt ? 1 : 0,
+          sah.uang_pisah ? 1 : 0,
+          sah.is_aktif ? 1 : 0,
+          sah.dasar_hukum,
+        ],
+      },
+    ],
+    "write",
+  );
+  return {
+    sukses: true as const,
+    id_alasan: id,
+    alasan: await alasanKeluar(client),
+  };
 }
 
 function periksaBlokir(c: ChecklistKeluar) {
@@ -574,7 +785,21 @@ export async function berlakukanKeluar(
     const total = angka(await satu(client, SUPERADMIN_AKTIF_SQL), "jumlah");
     if (total <= superTertaut) galat(PESAN_SUPERADMIN_TERAKHIR);
   }
-  const args = [id, operator.username, JSON.stringify(potret), idKaryawan];
+  // Rincian dan ringkasan ikut potret (cermin `berlakukan_keluar`).
+  const rincian = await rincianTersimpan(client, id);
+  const args = [
+    id,
+    operator.username,
+    JSON.stringify({
+      ...potret,
+      ringkasan: ringkasanPesangon(
+        rincian.map((r) => r.nominal),
+        potret.sisa_kasbon,
+      ),
+      rincian,
+    }),
+    idKaryawan,
+  ];
   await client.batch(
     BERLAKUKAN_SQL.map((sql) => ({ sql, args })),
     "write",

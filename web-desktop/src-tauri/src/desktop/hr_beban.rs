@@ -43,8 +43,9 @@ pub const IDENTITAS_PEGAWAI_SQL: &str = "SELECT m.id_unik, m.nama, COALESCE(g.ge
 pub const PENGATURAN_SURAT_SQL: &str = "SELECT key, value FROM setting_gex_system WHERE substr(key, 1, 9) = 'hr_surat_'\n-- batas: kunci pengaturan surat (pola, dasar, kota, yayasan)\n;";
 
 /// Jenis surat (`hr_surat_pola:<jenis>`); SK saja yang punya Menimbang/Mengingat.
-/// `sp` (HRIS Fase 4a, §22.2.5): Surat Peringatan.
-pub const JENIS_SURAT: [&str; 6] = ["ptm", "tugas", "angkat", "tugas_luar", "aktif", "sp"];
+/// `sp` (HRIS Fase 4a, §22.2.5): Surat Peringatan; `berhenti` dan `pengalaman`
+/// (Fase 4c): SK Pemberhentian dan Surat Keterangan Pengalaman Kerja.
+pub const JENIS_SURAT: [&str; 8] = ["ptm", "tugas", "angkat", "tugas_luar", "aktif", "sp", "berhenti", "pengalaman"];
 pub const JENIS_SK: [&str; 3] = ["ptm", "tugas", "angkat"];
 pub const TOKEN_POLA: [&str; 5] = ["urut", "kode", "unit", "romawi", "tahun"];
 pub const KUNCI_SURAT_KOTA: &str = "hr_surat_kota";
@@ -52,7 +53,7 @@ pub const KUNCI_YAYASAN_NAMA: &str = "hr_surat_yayasan_nama";
 pub const KUNCI_YAYASAN_KETUA: &str = "hr_surat_yayasan_ketua";
 pub const KUNCI_YAYASAN_JABATAN: &str = "hr_surat_yayasan_jabatan";
 
-/// Tiga belas kunci pengaturan surat dalam urutan tetap; cermin `kunciPengaturanSurat`.
+/// Lima belas kunci pengaturan surat dalam urutan tetap; cermin `kunciPengaturanSurat`.
 pub fn kunci_pengaturan_surat() -> Vec<String> {
     let mut kunci: Vec<String> = JENIS_SURAT.iter().map(|j| format!("hr_surat_pola:{j}")).collect();
     kunci.extend(JENIS_SK.iter().map(|j| format!("hr_surat_dasar:{j}")));
@@ -127,7 +128,7 @@ pub fn validasi_setting_surat(kunci: &str, nilai: &str) -> Result<String, String
     }
 }
 
-/// Draft layar: SEMUA tiga belas kunci wajib ada (draft yang lupa satu kunci
+/// Draft layar: SEMUA lima belas kunci wajib ada (draft yang lupa satu kunci
 /// tidak boleh mengosongkannya diam-diam). Cermin `validasiPengaturanSurat`.
 pub fn validasi_pengaturan_surat(draft: &Value) -> Result<Vec<(String, String)>, String> {
     let peta = draft.as_object().ok_or_else(|| "Pengaturan surat tidak valid.".to_owned())?;
@@ -471,7 +472,7 @@ mod tests {
                 |r| r.get(0),
             )
             .unwrap();
-        assert_eq!(antre, 13, "satu event outbox per kunci");
+        assert_eq!(antre, 15, "satu event outbox per kunci");
         draft.remove(KUNCI_YAYASAN_KETUA);
         assert!(letter_settings_save(&st, Value::Object(draft)).is_err());
     }

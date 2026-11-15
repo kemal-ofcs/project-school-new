@@ -16,20 +16,39 @@ import {
   muatDaftarKeluar,
   muatRincianKeluar,
   type OrgKepegawaian,
+  simpanAlasanKeluar,
   simpanKeluar,
 } from "@/lib/gateways/hris";
 import { syncNow } from "@/lib/gateways/sync-status";
 import { formatRupiah } from "@/lib/validations/accounting";
+import { tanggalValid } from "@/lib/validations/hari-kerja";
 import {
+  type AlasanDraft,
   type AlasanKeluar,
   type ChecklistKeluar,
   type DaftarKeluar,
+  type IsianRincian,
   type KeluarBaris,
   type KeluarDraft,
+  kelompokStatus,
+  MAKS_NAMA_ALASAN,
+  MAKS_PENGALI,
   MAKS_TEKS_KELUAR,
+  MAKS_UPAH,
+  masukanPesangon,
   type RincianKeluar,
+  type RincianTersimpan,
+  ringkasanPesangon,
   type StatusKeluar,
+  type Usulan,
+  usulanPesangon,
 } from "@/lib/validations/hr-keluar";
+import { appliesToSubject } from "@/lib/validations/payroll-policy";
+import {
+  DialogCetakSurat,
+  type PermintaanSurat,
+  permintaanSuratKeluar,
+} from "./DialogCetakSurat";
 import {
   INPUT,
   LABEL,
@@ -80,7 +99,8 @@ const terbuka = (s: StatusKeluar) => s === "Dijadwalkan" || s === "Jatuh tempo";
  * Tab Keluar di /kepegawaian (HRIS Fase 4b, §22.5 layar 2): daftar per status,
  * catat dan ubah proses, rincian dengan checklist (blokir merah, tanda kuning),
  * Berlakukan, dan Batalkan. Data cloud-only; izin di sini hanya menyembunyikan
- * tombol, backend menilai ulang dari sesi. Angka pesangon menyusul di 4c.
+ * tombol, backend menilai ulang dari sesi. Pesangon, alasan dan pengali, dan
+ * cetak surat keluar dari 4c.
  */
 export function TabKeluar({
   org,
@@ -101,8 +121,11 @@ export function TabKeluar({
   const [form, setForm] = useState<{
     baris: KeluarBaris | null;
     awal: AwalKeluar | null;
+    rincian: RincianTersimpan[];
   } | null>(null);
   const [rincian, setRincian] = useState<string | null>(null);
+  const [cetak, setCetak] = useState<PermintaanSurat | null>(null);
+  const [aturAlasan, setAturAlasan] = useState(false);
 
   const muat = useCallback(async () => {
     try {
@@ -119,7 +142,7 @@ export function TabKeluar({
 
   useEffect(() => {
     if (!awal) return;
-    setForm({ baris: null, awal });
+    setForm({ baris: null, awal, rincian: [] });
     onAwalTerpakai();
   }, [awal, onAwalTerpakai]);
 
@@ -180,15 +203,26 @@ export function TabKeluar({
             ))}
           </select>
         </div>
-        {boleh("hr.offboard.manage") ? (
-          <button
-            type="button"
-            className={TOMBOL_UTAMA}
-            onClick={() => setForm({ baris: null, awal: null })}
-          >
-            Catat proses keluar
-          </button>
-        ) : null}
+        <div className="flex flex-wrap gap-2">
+          {boleh("hr.offboard.decide") ? (
+            <button
+              type="button"
+              className={TOMBOL}
+              onClick={() => setAturAlasan(true)}
+            >
+              Alasan dan pengali
+            </button>
+          ) : null}
+          {boleh("hr.offboard.manage") ? (
+            <button
+              type="button"
+              className={TOMBOL_UTAMA}
+              onClick={() => setForm({ baris: null, awal: null, rincian: [] })}
+            >
+              Catat proses keluar
+            </button>
+          ) : null}
+        </div>
       </div>
       <ul className="space-y-2">
         {daftar.map((k) => (
@@ -234,6 +268,7 @@ export function TabKeluar({
           hariIni={data.hari_ini}
           baris={form.baris}
           awal={form.awal}
+          rincianAwal={form.rincian}
           onClose={() => setForm(null)}
           onSelesai={selesai}
         />
@@ -243,11 +278,30 @@ export function TabKeluar({
           idKeluar={rincian}
           boleh={boleh}
           onClose={() => setRincian(null)}
-          onUbah={(baris) => {
+          onUbah={(baris, isi) => {
             setRincian(null);
-            setForm({ baris, awal: null });
+            setForm({ baris, awal: null, rincian: isi });
+          }}
+          onCetak={(permintaan) => {
+            // Dialog cetak dibuka sesudah modal rincian ditutup: Escape di
+            // `Modal` menutup setiap modal yang terbuka.
+            setRincian(null);
+            setCetak(permintaan);
           }}
           onSelesai={selesai}
+        />
+      ) : null}
+      {cetak ? (
+        <DialogCetakSurat permintaan={cetak} onClose={() => setCetak(null)} />
+      ) : null}
+      {aturAlasan ? (
+        <AlasanKeluarModal
+          alasan={data.alasan}
+          onClose={() => setAturAlasan(false)}
+          onTersimpan={(daftarBaru) => {
+            setData((lama) => (lama ? { ...lama, alasan: daftarBaru } : lama));
+            onPesan("Alasan keluar disimpan.");
+          }}
         />
       ) : null}
     </div>
@@ -260,6 +314,7 @@ function FormKeluar({
   hariIni,
   baris,
   awal,
+  rincianAwal,
   onClose,
   onSelesai,
 }: {
@@ -268,6 +323,8 @@ function FormKeluar({
   hariIni: string;
   baris: KeluarBaris | null;
   awal: AwalKeluar | null;
+  /** Rincian tersimpan saat mengubah: nominal yang beda dari usulan dipertahankan. */
+  rincianAwal: RincianTersimpan[];
   onClose: () => void;
   onSelesai: (pesan: string) => Promise<void>;
 }) {
@@ -282,7 +339,24 @@ function FormKeluar({
     keterangan: baris?.keterangan ?? "",
     kartu_ditarik: baris?.kartu_ditarik ?? false,
     catatan_checklist: baris?.catatan_checklist ?? "",
+    // `null` = ikut usulan; upah yang dulu diubah tetap diubah.
+    upah_pokok:
+      baris && baris.upah_pokok !== baris.usulan_upah_pokok
+        ? baris.upah_pokok
+        : null,
+    alasan_upah: baris?.alasan_upah ?? "",
+    tunjangan_tetap: baris?.tunjangan_tetap ?? 0,
   }));
+  // Hanya nominal yang beda dari usulan; sisanya mengikuti usulan terbaru.
+  const [isian, setIsian] = useState<IsianRincian[]>(() =>
+    rincianAwal
+      .filter((r) => r.nominal !== r.usulan)
+      .map((r) => ({
+        komponen: r.komponen,
+        nominal: r.nominal,
+        alasan_ubah: r.alasan_ubah,
+      })),
+  );
   const [pratinjau, setPratinjau] = useState<RincianKeluar | null>(null);
   const [galat, setGalat] = useState<string | null>(null);
   const [menyimpan, setMenyimpan] = useState(false);
@@ -297,19 +371,42 @@ function FormKeluar({
     (a) => a.is_aktif || a.id_alasan === draft.id_alasan,
   );
 
-  const periksa = async () => {
-    setGalat(null);
-    try {
-      setPratinjau(
-        await muatRincianKeluar({
-          idKaryawan: draft.id_karyawan,
-          tanggalTerakhir: draft.tanggal_terakhir,
-        }),
-      );
-    } catch (error) {
-      setGalat(pesanGalat(error));
-    }
-  };
+  // Checklist dan bahan usulan dimuat ulang setiap pegawai atau hari terakhir
+  // berubah; usulan dihitung di layar dengan aturan yang sama dengan backend.
+  const idKaryawan = draft.id_karyawan;
+  const tanggalTerakhir = draft.tanggal_terakhir ?? "";
+  useEffect(() => {
+    setPratinjau(null);
+    if (!idKaryawan || !tanggalValid(tanggalTerakhir)) return;
+    let berlaku = true;
+    muatRincianKeluar({ idKaryawan, tanggalTerakhir })
+      .then((hasil) => {
+        if (berlaku) setPratinjau(hasil);
+      })
+      .catch((error: unknown) => {
+        if (berlaku) setGalat(pesanGalat(error));
+      });
+    return () => {
+      berlaku = false;
+    };
+  }, [idKaryawan, tanggalTerakhir]);
+
+  const alasanIni = alasan.find((a) => a.id_alasan === draft.id_alasan);
+  const usulanUpah = pratinjau?.pesangon.usulan_upah_pokok ?? 0;
+  const upahPokok = draft.upah_pokok ?? usulanUpah;
+  const usulan: Usulan[] =
+    pratinjau && alasanIni
+      ? usulanPesangon(
+          masukanPesangon(
+            pratinjau.pesangon,
+            pratinjau.pegawai,
+            alasanIni,
+            pratinjau.checklist.sisa_cuti,
+            tanggalTerakhir,
+            upahPokok + (draft.tunjangan_tetap ?? 0),
+          ),
+        )
+      : [];
 
   const kirim = async (event: FormEvent) => {
     event.preventDefault();
@@ -318,7 +415,18 @@ function FormKeluar({
     setMenyimpan(true);
     setGalat(null);
     try {
-      await simpanKeluar(draft);
+      // Komponen yang tidak lagi diusulkan (alasan atau status berubah) dibuang.
+      await simpanKeluar({
+        ...draft,
+        alasan_upah: upahPokok !== usulanUpah ? draft.alasan_upah : "",
+        rincian: isian
+          .filter((i) =>
+            usulan.some(
+              (u) => u.komponen === i.komponen && u.usulan !== i.nominal,
+            ),
+          )
+          .map((i) => ({ ...i, alasan_ubah: i.alasan_ubah ?? "" })),
+      });
       await onSelesai(
         baris ? "Proses keluar diperbarui." : "Proses keluar dicatat.",
       );
@@ -446,22 +554,26 @@ function FormKeluar({
             className={`${INPUT} py-2`}
           />
         </div>
-        <div className="space-y-2">
-          <button
-            type="button"
-            className={TOMBOL}
-            disabled={!draft.id_karyawan || !draft.tanggal_terakhir}
-            onClick={() => void periksa()}
-          >
-            Periksa checklist
-          </button>
-          {pratinjau ? (
-            <DaftarChecklist
-              checklist={pratinjau.checklist}
-              tanggalTerakhir={draft.tanggal_terakhir}
-            />
-          ) : null}
-        </div>
+        {pratinjau && alasanIni ? (
+          <BagianPesangon
+            pratinjau={pratinjau}
+            draft={draft}
+            usulan={usulan}
+            isian={isian}
+            onDraft={(kunci, nilai) =>
+              setDraft((d) => ({ ...d, [kunci]: nilai }))
+            }
+            onIsian={setIsian}
+          />
+        ) : idKaryawan && draft.id_alasan && !pratinjau ? (
+          <p className="text-sm text-slate-400">Menghitung usulan pesangon…</p>
+        ) : null}
+        {pratinjau ? (
+          <DaftarChecklist
+            checklist={pratinjau.checklist}
+            tanggalTerakhir={tanggalTerakhir}
+          />
+        ) : null}
         {galat ? (
           <p className="text-sm text-rose-300" role="alert">
             {galat}
@@ -485,12 +597,14 @@ function RincianKeluarModal({
   boleh,
   onClose,
   onUbah,
+  onCetak,
   onSelesai,
 }: {
   idKeluar: string;
   boleh: (izin: Izin) => boolean;
   onClose: () => void;
-  onUbah: (baris: KeluarBaris) => void;
+  onUbah: (baris: KeluarBaris, rincian: RincianTersimpan[]) => void;
+  onCetak: (permintaan: PermintaanSurat) => void;
   onSelesai: (pesan: string) => Promise<void>;
 }) {
   const [data, setData] = useState<RincianKeluar | null>(null);
@@ -588,6 +702,45 @@ function RincianKeluarModal({
             <p className="text-sm text-slate-300">
               Catatan checklist: {k.catatan_checklist}
             </p>
+          ) : null}
+          <RincianPesangon k={k} data={data} />
+          {k.status === "Berlaku" ? (
+            <div className="flex flex-wrap gap-2">
+              {kelompokStatus(k.status_kepegawaian) === "tetap" ? (
+                <button
+                  type="button"
+                  className={TOMBOL}
+                  onClick={() =>
+                    onCetak(
+                      permintaanSuratKeluar(
+                        k,
+                        "berhenti",
+                        boleh("hr.offboard.manage"),
+                      ),
+                    )
+                  }
+                >
+                  Cetak SK Pemberhentian
+                </button>
+              ) : null}
+              {kelompokStatus(k.status_kepegawaian) !== "negeri" ? (
+                <button
+                  type="button"
+                  className={TOMBOL}
+                  onClick={() =>
+                    onCetak(
+                      permintaanSuratKeluar(
+                        k,
+                        "pengalaman",
+                        boleh("hr.offboard.manage"),
+                      ),
+                    )
+                  }
+                >
+                  Cetak surat keterangan kerja
+                </button>
+              ) : null}
+            </div>
           ) : null}
           {k.status !== "Dibatalkan" ? (
             <DaftarChecklist
@@ -695,7 +848,7 @@ function RincianKeluarModal({
                 <button
                   type="button"
                   className={TOMBOL}
-                  onClick={() => onUbah(k)}
+                  onClick={() => onUbah(k, data.rincian)}
                 >
                   Ubah
                 </button>
@@ -872,5 +1025,554 @@ function DaftarChecklist({
         </p>
       ) : null}
     </div>
+  );
+}
+
+/** Isian rupiah: bilangan bulat ≥ 0; kosong atau rusak = 0. */
+function rupiahMasukan(teks: string): number {
+  const n = Math.trunc(Number(teks));
+  return Number.isFinite(n) && n > 0 ? n : 0;
+}
+
+/**
+ * Upah, tunjangan tetap, dan rincian pesangon di form keluar (§22.2.3). Usulan
+ * dihitung `usulanPesangon` dari bahan cloud; backend menghitung ulang saat
+ * simpan dengan aturan yang sama.
+ */
+function BagianPesangon({
+  pratinjau,
+  draft,
+  usulan,
+  isian,
+  onDraft,
+  onIsian,
+}: {
+  pratinjau: RincianKeluar;
+  draft: KeluarDraft;
+  usulan: Usulan[];
+  isian: IsianRincian[];
+  onDraft: (
+    kunci: "upah_pokok" | "alasan_upah" | "tunjangan_tetap",
+    nilai: string | number | null,
+  ) => void;
+  onIsian: (ubah: (lama: IsianRincian[]) => IsianRincian[]) => void;
+}) {
+  const b = pratinjau.pesangon;
+  const usulanUpah = b.usulan_upah_pokok;
+  const upahPokok = draft.upah_pokok ?? usulanUpah;
+  const acuan = b.tunjangan.filter((t) =>
+    appliesToSubject(t.applies_to, {
+      id_karyawan: pratinjau.pegawai.id_unik,
+      jenis_personil: pratinjau.pegawai.jenis_personil,
+      status_kepegawaian: b.status,
+      divisi: pratinjau.pegawai.divisi,
+      tugas: b.tugas,
+      total_teaching_jp: 0,
+      total_hadir: 0,
+    }),
+  );
+  const isiDari = (u: Usulan) => isian.find((i) => i.komponen === u.komponen);
+  const nominalDari = (u: Usulan) => isiDari(u)?.nominal ?? u.usulan;
+  const ubahNominal = (u: Usulan, teks: string) => {
+    const nominal = rupiahMasukan(teks);
+    onIsian((lama) => {
+      const lain = lama.filter((i) => i.komponen !== u.komponen);
+      if (nominal === u.usulan) return lain;
+      const sebelum = lama.find((i) => i.komponen === u.komponen);
+      return [
+        ...lain,
+        {
+          komponen: u.komponen,
+          nominal,
+          alasan_ubah: sebelum?.alasan_ubah ?? null,
+        },
+      ];
+    });
+  };
+  const ubahAlasan = (u: Usulan, teks: string) =>
+    onIsian((lama) =>
+      lama.map((i) =>
+        i.komponen === u.komponen ? { ...i, alasan_ubah: teks } : i,
+      ),
+    );
+  const ringkasan = ringkasanPesangon(
+    usulan.map(nominalDari),
+    pratinjau.checklist.sisa_kasbon,
+  );
+
+  return (
+    <fieldset className="space-y-3 rounded-xl border border-white/10 p-3">
+      <legend className="px-1 text-sm font-semibold text-white">
+        Pesangon
+      </legend>
+      <p className="text-xs text-slate-400">
+        Status kepegawaian pada hari terakhir: {b.status || "tanpa status"}.
+        Angka di bawah adalah usulan aturan; nominal yang diubah wajib diberi
+        alasan. Rincian beku sejak proses diberlakukan dan tidak ikut dicetak.
+      </p>
+      <div className="grid gap-3 sm:grid-cols-2">
+        <div>
+          <label htmlFor="keluar-upah" className={LABEL}>
+            Upah pokok sebulan (Rp)
+          </label>
+          <input
+            id="keluar-upah"
+            type="number"
+            inputMode="numeric"
+            min={0}
+            max={MAKS_UPAH}
+            step={1}
+            required
+            value={upahPokok}
+            onChange={(e) => {
+              const n = rupiahMasukan(e.target.value);
+              onDraft("upah_pokok", n === usulanUpah ? null : n);
+            }}
+            className={INPUT}
+            aria-describedby="keluar-upah-catatan"
+          />
+          <p id="keluar-upah-catatan" className="mt-1 text-xs text-slate-400">
+            {b.bulan_slip > 0
+              ? `Usulan ${formatRupiah(usulanUpah)}: rata-rata gaji pokok jam + honor JP dari slip yang sudah dibayar, ${b.bulan_slip} bulan dalam 12 bulan terakhir.`
+              : "Belum ada slip yang dibayar dalam 12 bulan terakhir, jadi upahnya diisi tangan dengan alasan."}
+          </p>
+        </div>
+        <div>
+          <label htmlFor="keluar-tunjangan" className={LABEL}>
+            Tunjangan tetap sebulan (Rp)
+          </label>
+          <input
+            id="keluar-tunjangan"
+            type="number"
+            inputMode="numeric"
+            min={0}
+            max={MAKS_UPAH}
+            step={1}
+            value={draft.tunjangan_tetap ?? 0}
+            onChange={(e) =>
+              onDraft("tunjangan_tetap", rupiahMasukan(e.target.value))
+            }
+            className={INPUT}
+            aria-describedby="keluar-tunjangan-acuan"
+          />
+          <p
+            id="keluar-tunjangan-acuan"
+            className="mt-1 text-xs text-slate-400"
+          >
+            {acuan.length > 0
+              ? `Acuan dari komponen gaji: ${acuan.map((t) => `${t.name} ${formatRupiah(t.nilai)}`).join(", ")}. Tidak dijumlahkan otomatis.`
+              : "Tidak ada tunjangan nominal tetap di komponen gaji yang berlaku untuk pegawai ini."}
+          </p>
+        </div>
+      </div>
+      {upahPokok !== usulanUpah ? (
+        <div>
+          <label htmlFor="keluar-alasan-upah" className={LABEL}>
+            Alasan upah berbeda dari usulan
+          </label>
+          <input
+            id="keluar-alasan-upah"
+            required
+            maxLength={MAKS_TEKS_KELUAR}
+            value={draft.alasan_upah ?? ""}
+            onChange={(e) => onDraft("alasan_upah", e.target.value)}
+            className={INPUT}
+          />
+        </div>
+      ) : null}
+      {usulan.length === 0 ? (
+        <p className="text-sm text-slate-300">
+          PNS dan PPPK tidak mendapat rincian pesangon dari yayasan; haknya
+          dibayar instansinya.
+        </p>
+      ) : (
+        <ul className="space-y-2">
+          {usulan.map((u) => {
+            const nominal = nominalDari(u);
+            const id = `keluar-nominal-${KOMPONEN_ID[u.komponen]}`;
+            return (
+              <li
+                key={u.komponen}
+                className="grid gap-2 rounded-xl border border-white/10 bg-slate-950 p-2 sm:grid-cols-[1fr_12rem]"
+              >
+                <div className="min-w-0 text-sm">
+                  <label htmlFor={id} className="font-semibold text-white">
+                    {u.komponen}
+                  </label>
+                  <p className="text-xs text-slate-400">
+                    {u.dasar ?? "Diisi bila ada"} · usulan{" "}
+                    {formatRupiah(u.usulan)}
+                  </p>
+                </div>
+                <input
+                  id={id}
+                  type="number"
+                  inputMode="numeric"
+                  min={0}
+                  step={1}
+                  value={nominal}
+                  onChange={(e) => ubahNominal(u, e.target.value)}
+                  className={INPUT}
+                />
+                {nominal !== u.usulan ? (
+                  <div className="sm:col-span-2">
+                    <label htmlFor={`${id}-alasan`} className={LABEL}>
+                      Alasan nominal {u.komponen} berbeda dari usulan
+                    </label>
+                    <input
+                      id={`${id}-alasan`}
+                      required
+                      maxLength={MAKS_TEKS_KELUAR}
+                      value={isiDari(u)?.alasan_ubah ?? ""}
+                      onChange={(e) => ubahAlasan(u, e.target.value)}
+                      className={INPUT}
+                    />
+                  </div>
+                ) : null}
+              </li>
+            );
+          })}
+        </ul>
+      )}
+      <Ringkasan
+        total={ringkasan.total}
+        sisaKasbon={ringkasan.sisa_kasbon}
+        diterima={ringkasan.perkiraan_diterima}
+      />
+    </fieldset>
+  );
+}
+
+/** Id elemen per komponen (nama komponen memuat spasi). */
+const KOMPONEN_ID: Record<IsianRincian["komponen"], string> = {
+  UP: "up",
+  UPMK: "upmk",
+  "UPH Cuti": "uph-cuti",
+  "UPH Lainnya": "uph-lain",
+  "Kompensasi PKWT": "kompensasi",
+  "Uang Pisah": "uang-pisah",
+  Lainnya: "lainnya",
+};
+
+function Ringkasan({
+  total,
+  sisaKasbon,
+  diterima,
+}: {
+  total: number;
+  sisaKasbon: number;
+  diterima: number;
+}) {
+  return (
+    <dl className="grid gap-2 text-sm sm:grid-cols-3">
+      <Isian label="Total rincian" nilai={formatRupiah(total)} />
+      <Isian label="Dikurangi sisa kasbon" nilai={formatRupiah(sisaKasbon)} />
+      <Isian
+        label={diterima < 0 ? "Kasbon belum tertutup" : "Perkiraan diterima"}
+        nilai={formatRupiah(Math.abs(diterima))}
+      />
+    </dl>
+  );
+}
+
+/** Rincian pesangon tersimpan di modal rincian (beku sejak berlaku). */
+function RincianPesangon({ k, data }: { k: KeluarBaris; data: RincianKeluar }) {
+  if (data.rincian.length === 0) {
+    return (
+      <p className="text-sm text-slate-400">
+        {kelompokStatus(k.status_kepegawaian) === "negeri"
+          ? "PNS dan PPPK: tanpa rincian pesangon dari yayasan."
+          : terbuka(k.status)
+            ? "Rincian pesangon belum dihitung. Buka Ubah lalu simpan untuk mengisi upah dan rinciannya."
+            : "Proses ini tidak punya rincian pesangon."}
+      </p>
+    );
+  }
+  return (
+    <div className="space-y-2">
+      <h3 className="text-sm font-semibold text-white">Pesangon</h3>
+      <dl className="grid gap-2 text-sm sm:grid-cols-2">
+        <Isian label="Upah pokok" nilai={formatRupiah(k.upah_pokok)} />
+        <Isian
+          label="Tunjangan tetap"
+          nilai={formatRupiah(k.tunjangan_tetap)}
+        />
+        {k.upah_pokok !== k.usulan_upah_pokok ? (
+          <Isian
+            label={`Usulan upah ${formatRupiah(k.usulan_upah_pokok)}, diubah karena`}
+            nilai={k.alasan_upah}
+          />
+        ) : null}
+      </dl>
+      <ul className="space-y-1 text-sm">
+        {data.rincian.map((r) => (
+          <li
+            key={r.komponen}
+            className="flex flex-wrap justify-between gap-2 border-b border-white/5 pb-1"
+          >
+            <span className="min-w-0 text-slate-200">
+              {r.komponen}
+              {r.dasar ? (
+                <span className="block text-xs text-slate-400">{r.dasar}</span>
+              ) : null}
+              {r.nominal !== r.usulan ? (
+                <span className="block text-xs text-amber-200">
+                  Usulan {formatRupiah(r.usulan)}; {r.alasan_ubah}
+                </span>
+              ) : null}
+            </span>
+            <span className="font-semibold text-white">
+              {formatRupiah(r.nominal)}
+            </span>
+          </li>
+        ))}
+      </ul>
+      <Ringkasan
+        total={data.ringkasan.total}
+        sisaKasbon={data.ringkasan.sisa_kasbon}
+        diterima={data.ringkasan.perkiraan_diterima}
+      />
+    </div>
+  );
+}
+
+const ALASAN_BARU: AlasanDraft = {
+  id_alasan: "",
+  nama: "",
+  pengali_up: 0,
+  pengali_upmk: 0,
+  uph: true,
+  kompensasi_pkwt: false,
+  uang_pisah: false,
+  is_aktif: true,
+  dasar_hukum: "",
+};
+
+/**
+ * Alasan keluar dan pengalinya (`hr.offboard.decide`, Q-84). Proses yang
+ * sudah berlaku tidak tersentuh; yang belum berlaku memakai angka baru saat
+ * disimpan berikutnya.
+ */
+function AlasanKeluarModal({
+  alasan,
+  onClose,
+  onTersimpan,
+}: {
+  alasan: AlasanKeluar[];
+  onClose: () => void;
+  onTersimpan: (alasan: AlasanKeluar[]) => void;
+}) {
+  const [daftar, setDaftar] = useState(alasan);
+  const [isi, setIsi] = useState<AlasanDraft | null>(null);
+  const [galat, setGalat] = useState<string | null>(null);
+  const [menyimpan, setMenyimpan] = useState(false);
+  const isSubmittingRef = useRef(false);
+  const ubah = (kunci: keyof AlasanDraft, nilai: string | number | boolean) =>
+    setIsi((lama) => (lama ? { ...lama, [kunci]: nilai } : lama));
+
+  const simpan = async (event: FormEvent) => {
+    event.preventDefault();
+    if (!isi || isSubmittingRef.current) return;
+    isSubmittingRef.current = true;
+    setMenyimpan(true);
+    setGalat(null);
+    try {
+      const hasil = await simpanAlasanKeluar(isi);
+      setDaftar(hasil.alasan);
+      onTersimpan(hasil.alasan);
+      setIsi(null);
+    } catch (error) {
+      setGalat(pesanGalat(error));
+    } finally {
+      isSubmittingRef.current = false;
+      setMenyimpan(false);
+    }
+  };
+
+  return (
+    <Modal
+      title="Alasan keluar dan pengali"
+      onClose={onClose}
+      hideFooter
+      maxWidth="max-w-2xl"
+    >
+      <div className="space-y-4">
+        <p className={PERINGATAN}>
+          Pengali dalam persen dari kelipatan UP dan UPMK. Angka bawaan wajib
+          dicek ulang yayasan atau konsultan. Proses yang sudah berlaku tidak
+          berubah; proses yang belum berlaku memakai angka baru saat disimpan
+          lagi.
+        </p>
+        {isi ? (
+          <form className="space-y-3" onSubmit={simpan}>
+            <div>
+              <label htmlFor="alasan-nama" className={LABEL}>
+                Nama alasan
+              </label>
+              <input
+                id="alasan-nama"
+                required
+                maxLength={MAKS_NAMA_ALASAN}
+                value={isi.nama}
+                onChange={(e) => ubah("nama", e.target.value)}
+                className={INPUT}
+              />
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div>
+                <label htmlFor="alasan-up" className={LABEL}>
+                  Pengali UP (%)
+                </label>
+                <input
+                  id="alasan-up"
+                  type="number"
+                  inputMode="numeric"
+                  min={0}
+                  max={MAKS_PENGALI}
+                  step={1}
+                  required
+                  value={isi.pengali_up}
+                  onChange={(e) =>
+                    ubah("pengali_up", rupiahMasukan(e.target.value))
+                  }
+                  className={INPUT}
+                />
+              </div>
+              <div>
+                <label htmlFor="alasan-upmk" className={LABEL}>
+                  Pengali UPMK (%)
+                </label>
+                <input
+                  id="alasan-upmk"
+                  type="number"
+                  inputMode="numeric"
+                  min={0}
+                  max={MAKS_PENGALI}
+                  step={1}
+                  required
+                  value={isi.pengali_upmk}
+                  onChange={(e) =>
+                    ubah("pengali_upmk", rupiahMasukan(e.target.value))
+                  }
+                  className={INPUT}
+                />
+              </div>
+            </div>
+            {(
+              [
+                ["uph", "Uang penggantian hak (sisa cuti dan lainnya)"],
+                ["kompensasi_pkwt", "Kompensasi kontrak untuk GTT dan PTT"],
+                ["uang_pisah", "Uang pisah untuk GTY dan PTY"],
+                [
+                  "is_aktif",
+                  "Aktif (bisa dipilih saat mencatat proses keluar)",
+                ],
+              ] as const
+            ).map(([kunci, label]) => (
+              <label
+                key={kunci}
+                className="flex items-center gap-2 text-sm text-slate-200"
+              >
+                <input
+                  type="checkbox"
+                  checked={isi[kunci]}
+                  onChange={(e) => ubah(kunci, e.target.checked)}
+                />
+                {label}
+              </label>
+            ))}
+            <div>
+              <label htmlFor="alasan-dasar" className={LABEL}>
+                Dasar hukum (opsional)
+              </label>
+              <textarea
+                id="alasan-dasar"
+                maxLength={MAKS_TEKS_KELUAR}
+                rows={2}
+                value={isi.dasar_hukum ?? ""}
+                onChange={(e) => ubah("dasar_hukum", e.target.value)}
+                className={`${INPUT} py-2`}
+              />
+            </div>
+            {galat ? (
+              <p className="text-sm text-rose-300" role="alert">
+                {galat}
+              </p>
+            ) : null}
+            <div className="flex justify-end gap-2">
+              <button
+                type="button"
+                className={TOMBOL}
+                onClick={() => setIsi(null)}
+              >
+                Kembali
+              </button>
+              <button
+                type="submit"
+                className={TOMBOL_UTAMA}
+                disabled={menyimpan}
+              >
+                Simpan alasan
+              </button>
+            </div>
+          </form>
+        ) : (
+          <>
+            <ul className="space-y-2">
+              {daftar.map((a) => (
+                <li
+                  key={a.id_alasan}
+                  className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-white/10 bg-slate-950 px-3 py-2 text-sm"
+                >
+                  <div className="min-w-0">
+                    <span className="font-semibold text-white">{a.nama}</span>
+                    {a.is_aktif ? null : (
+                      <span className="text-slate-400"> · nonaktif</span>
+                    )}
+                    <span className="block text-xs text-slate-400">
+                      UP {a.pengali_up}% · UPMK {a.pengali_upmk}%
+                      {a.uph ? " · UPH" : ""}
+                      {a.kompensasi_pkwt ? " · kompensasi kontrak" : ""}
+                      {a.uang_pisah ? " · uang pisah" : ""}
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    className={TOMBOL}
+                    onClick={() =>
+                      setIsi({
+                        id_alasan: a.id_alasan,
+                        nama: a.nama,
+                        pengali_up: a.pengali_up,
+                        pengali_upmk: a.pengali_upmk,
+                        uph: a.uph,
+                        kompensasi_pkwt: a.kompensasi_pkwt,
+                        uang_pisah: a.uang_pisah,
+                        is_aktif: a.is_aktif,
+                        dasar_hukum: a.dasar_hukum,
+                      })
+                    }
+                  >
+                    Ubah
+                  </button>
+                </li>
+              ))}
+            </ul>
+            <div className="flex justify-end gap-2">
+              <button type="button" className={TOMBOL} onClick={onClose}>
+                Tutup
+              </button>
+              <button
+                type="button"
+                className={TOMBOL_UTAMA}
+                onClick={() => setIsi({ ...ALASAN_BARU })}
+              >
+                Tambah alasan
+              </button>
+            </div>
+          </>
+        )}
+      </div>
+    </Modal>
   );
 }
