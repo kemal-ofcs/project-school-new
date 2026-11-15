@@ -239,6 +239,7 @@ export const NAVIGATION_GROUPS: readonly NavigationGroupSpec[] = [
     hrefs: [
       "/karyawan",
       "/kepegawaian",
+      "/pengajuan",
       "/guru",
       "/siswa",
       "/id-cards",
