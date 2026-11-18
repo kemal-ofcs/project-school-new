@@ -22,6 +22,7 @@ import {
   pukulJamKe,
   susunJamKe,
 } from "@/lib/validations/class-attendance";
+import { JadwalGrid } from "./JadwalGrid";
 
 /**
  * Jadwal mengajar mingguan per rombel.
@@ -93,6 +94,7 @@ export function JadwalPanel({
   const [filterUnit, setFilterUnit] = useState("");
   const [draft, setDraft] = useState<JadwalDraft | null>(null);
   const [periods, setPeriods] = useState<LessonPeriodRow[]>([]);
+  const [tampilan, setTampilan] = useState<"grid" | "daftar">("grid");
 
   const unitRombel = (idRombel: string) =>
     String(
@@ -265,6 +267,29 @@ export function JadwalPanel({
 
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-wrap items-center gap-3">
+          <fieldset className="flex rounded-xl border border-white/10 bg-slate-900 p-0.5">
+            <legend className="sr-only">Tampilan jadwal</legend>
+            {(
+              [
+                ["grid", "Grid per rombel"],
+                ["daftar", "Daftar"],
+              ] as const
+            ).map(([nilai, label]) => (
+              <button
+                key={nilai}
+                type="button"
+                aria-pressed={tampilan === nilai}
+                onClick={() => setTampilan(nilai)}
+                className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition ${
+                  tampilan === nilai
+                    ? "bg-sky-700 text-white"
+                    : "text-slate-400 hover:text-slate-200"
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </fieldset>
           {unitList.length > 0 ? (
             <>
               <label
@@ -291,28 +316,35 @@ export function JadwalPanel({
               </PilihCari>
             </>
           ) : null}
-          <label
-            htmlFor="filter-rombel-jadwal"
-            className="text-xs font-semibold text-slate-400"
-          >
-            Filter Rombel:
-          </label>
-          <PilihCari
-            id="filter-rombel-jadwal"
-            value={filterRombel}
-            onChange={(event) => setFilterRombel(event.target.value)}
-            className="rounded-xl border border-white/10 bg-slate-900 px-3 py-2 text-sm text-slate-100 shadow-inner focus:border-sky-500 focus:outline-none"
-          >
-            <option value="">Semua rombel</option>
-            {rombelTampil.map((rom) => (
-              <option key={String(rom.id_rombel)} value={String(rom.id_rombel)}>
-                Kelas {String(rom.tingkat)} - {String(rom.nama_rombel)}
-              </option>
-            ))}
-          </PilihCari>
+          {tampilan === "daftar" ? (
+            <>
+              <label
+                htmlFor="filter-rombel-jadwal"
+                className="text-xs font-semibold text-slate-400"
+              >
+                Filter Rombel:
+              </label>
+              <PilihCari
+                id="filter-rombel-jadwal"
+                value={filterRombel}
+                onChange={(event) => setFilterRombel(event.target.value)}
+                className="rounded-xl border border-white/10 bg-slate-900 px-3 py-2 text-sm text-slate-100 shadow-inner focus:border-sky-500 focus:outline-none"
+              >
+                <option value="">Semua rombel</option>
+                {rombelTampil.map((rom) => (
+                  <option
+                    key={String(rom.id_rombel)}
+                    value={String(rom.id_rombel)}
+                  >
+                    Kelas {String(rom.tingkat)} - {String(rom.nama_rombel)}
+                  </option>
+                ))}
+              </PilihCari>
+            </>
+          ) : null}
         </div>
 
-        {canManage ? (
+        {canManage && tampilan === "daftar" ? (
           <button
             type="button"
             onClick={bukaTambah}
@@ -324,119 +356,135 @@ export function JadwalPanel({
         ) : null}
       </div>
 
-      <div className="overflow-x-auto rounded-xl border border-white/10">
-        <table className="w-full text-left text-sm text-slate-300">
-          <thead className="bg-slate-800/80 text-xs font-semibold uppercase text-slate-400">
-            <tr>
-              <th className="px-3 py-2">Hari</th>
-              <th className="px-3 py-2">Jam Ke</th>
-              <th className="px-3 py-2">Rombel</th>
-              <th className="px-3 py-2">Mata Pelajaran</th>
-              <th className="px-3 py-2">Pengajar</th>
-              <th className="px-3 py-2 text-center">Status</th>
-              {canManage ? (
-                <th className="px-3 py-2 text-center">Aksi</th>
-              ) : null}
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-white/5">
-            {loading ? (
+      {tampilan === "grid" ? (
+        <JadwalGrid
+          tahunAjaranList={tahunAjaranList}
+          rombelList={rombelList}
+          rombelPilihan={rombelTampil}
+          idRombelAwal={filterRombel}
+          guruList={guruList}
+          mapelUntuk={mapelUntuk}
+          belUntuk={belUntuk}
+          canManage={canManage}
+          onFeedback={onFeedback}
+          onTersimpan={() => void muat()}
+        />
+      ) : (
+        <div className="overflow-x-auto rounded-xl border border-white/10">
+          <table className="w-full text-left text-sm text-slate-300">
+            <thead className="bg-slate-800/80 text-xs font-semibold uppercase text-slate-400">
               <tr>
-                <td
-                  colSpan={canManage ? 7 : 6}
-                  className="px-3 py-6 text-center text-slate-500"
-                >
-                  Memuat jadwal mengajar...
-                </td>
+                <th className="px-3 py-2">Hari</th>
+                <th className="px-3 py-2">Jam Ke</th>
+                <th className="px-3 py-2">Rombel</th>
+                <th className="px-3 py-2">Mata Pelajaran</th>
+                <th className="px-3 py-2">Pengajar</th>
+                <th className="px-3 py-2 text-center">Status</th>
+                {canManage ? (
+                  <th className="px-3 py-2 text-center">Aksi</th>
+                ) : null}
               </tr>
-            ) : rowsTampil.length === 0 ? (
-              <tr>
-                <td
-                  colSpan={canManage ? 7 : 6}
-                  className="px-3 py-6 text-center text-slate-500"
-                >
-                  Belum ada jadwal. Presensi kelas tetap berjalan tanpa ini.
-                </td>
-              </tr>
-            ) : (
-              rowsTampil.map((row) => (
-                <tr key={row.id_jadwal} className="hover:bg-white/[0.02]">
-                  <td className="px-3 py-2 font-semibold text-slate-200">
-                    {HARI.find((h) => h.nilai === row.hari)?.label ?? row.hari}
+            </thead>
+            <tbody className="divide-y divide-white/5">
+              {loading ? (
+                <tr>
+                  <td
+                    colSpan={canManage ? 7 : 6}
+                    className="px-3 py-6 text-center text-slate-500"
+                  >
+                    Memuat jadwal mengajar...
                   </td>
-                  <td className="px-3 py-2 font-mono text-slate-300">
-                    {row.jam_ke}
-                    {pukulJamKe(
-                      belUntuk(row.id_rombel, row.hari),
-                      row.jam_ke,
-                    ) ? (
-                      <span className="block text-[11px] text-slate-400">
-                        {pukulJamKe(
-                          belUntuk(row.id_rombel, row.hari),
-                          row.jam_ke,
-                        )}
-                      </span>
-                    ) : null}
-                  </td>
-                  <td className="px-3 py-2 text-xs text-slate-400">
-                    {row.nama_rombel || row.id_rombel}
-                  </td>
-                  <td className="px-3 py-2 text-slate-200">
-                    {row.nama_mapel || row.id_mapel}
-                  </td>
-                  <td className="px-3 py-2 text-xs text-slate-400">
-                    {row.nama_guru || row.id_guru}
-                  </td>
-                  <td className="px-3 py-2 text-center">
-                    <span
-                      className={`rounded px-2 py-0.5 text-[11px] font-semibold ${
-                        row.is_aktif === 1
-                          ? "bg-emerald-500/10 text-emerald-400"
-                          : "bg-slate-700/40 text-slate-400"
-                      }`}
-                    >
-                      {row.is_aktif === 1 ? "Aktif" : "Nonaktif"}
-                    </span>
-                  </td>
-                  {canManage ? (
-                    <td className="space-x-2 px-3 py-2 text-center">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          const [awal, akhir] = row.jam_ke.includes("-")
-                            ? row.jam_ke.split("-").map(Number)
-                            : [Number(row.jam_ke), Number(row.jam_ke)];
-                          setDraft({
-                            id_jadwal: row.id_jadwal,
-                            id_tahun_ajaran: row.id_tahun_ajaran,
-                            id_rombel: row.id_rombel,
-                            id_mapel: row.id_mapel,
-                            id_guru: row.id_guru,
-                            hari: row.hari,
-                            jamDari: awal ?? 1,
-                            jamSampai: akhir ?? 1,
-                            is_aktif: row.is_aktif,
-                          });
-                        }}
-                        className="rounded border border-white/10 bg-slate-800 px-2 py-1 text-xs text-sky-400"
-                      >
-                        Edit
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => void hapus(row)}
-                        className="rounded border border-white/10 bg-slate-800 px-2 py-1 text-xs text-rose-400"
-                      >
-                        Hapus
-                      </button>
-                    </td>
-                  ) : null}
                 </tr>
-              ))
-            )}
-          </tbody>
-        </table>
-      </div>
+              ) : rowsTampil.length === 0 ? (
+                <tr>
+                  <td
+                    colSpan={canManage ? 7 : 6}
+                    className="px-3 py-6 text-center text-slate-500"
+                  >
+                    Belum ada jadwal. Presensi kelas tetap berjalan tanpa ini.
+                  </td>
+                </tr>
+              ) : (
+                rowsTampil.map((row) => (
+                  <tr key={row.id_jadwal} className="hover:bg-white/[0.02]">
+                    <td className="px-3 py-2 font-semibold text-slate-200">
+                      {HARI.find((h) => h.nilai === row.hari)?.label ??
+                        row.hari}
+                    </td>
+                    <td className="px-3 py-2 font-mono text-slate-300">
+                      {row.jam_ke}
+                      {pukulJamKe(
+                        belUntuk(row.id_rombel, row.hari),
+                        row.jam_ke,
+                      ) ? (
+                        <span className="block text-[11px] text-slate-400">
+                          {pukulJamKe(
+                            belUntuk(row.id_rombel, row.hari),
+                            row.jam_ke,
+                          )}
+                        </span>
+                      ) : null}
+                    </td>
+                    <td className="px-3 py-2 text-xs text-slate-400">
+                      {row.nama_rombel || row.id_rombel}
+                    </td>
+                    <td className="px-3 py-2 text-slate-200">
+                      {row.nama_mapel || row.id_mapel}
+                    </td>
+                    <td className="px-3 py-2 text-xs text-slate-400">
+                      {row.nama_guru || row.id_guru}
+                    </td>
+                    <td className="px-3 py-2 text-center">
+                      <span
+                        className={`rounded px-2 py-0.5 text-[11px] font-semibold ${
+                          row.is_aktif === 1
+                            ? "bg-emerald-500/10 text-emerald-400"
+                            : "bg-slate-700/40 text-slate-400"
+                        }`}
+                      >
+                        {row.is_aktif === 1 ? "Aktif" : "Nonaktif"}
+                      </span>
+                    </td>
+                    {canManage ? (
+                      <td className="space-x-2 px-3 py-2 text-center">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const [awal, akhir] = row.jam_ke.includes("-")
+                              ? row.jam_ke.split("-").map(Number)
+                              : [Number(row.jam_ke), Number(row.jam_ke)];
+                            setDraft({
+                              id_jadwal: row.id_jadwal,
+                              id_tahun_ajaran: row.id_tahun_ajaran,
+                              id_rombel: row.id_rombel,
+                              id_mapel: row.id_mapel,
+                              id_guru: row.id_guru,
+                              hari: row.hari,
+                              jamDari: awal ?? 1,
+                              jamSampai: akhir ?? 1,
+                              is_aktif: row.is_aktif,
+                            });
+                          }}
+                          className="rounded border border-white/10 bg-slate-800 px-2 py-1 text-xs text-sky-400"
+                        >
+                          Edit
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => void hapus(row)}
+                          className="rounded border border-white/10 bg-slate-800 px-2 py-1 text-xs text-rose-400"
+                        >
+                          Hapus
+                        </button>
+                      </td>
+                    ) : null}
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      )}
 
       {draft ? (
         <Modal
