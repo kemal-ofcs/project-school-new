@@ -52,13 +52,20 @@ export function isValidOperatorPhone(value: string) {
 
 /**
  * Melempar pesan berbahasa Indonesia yang siap ditampilkan bila kontak tidak
- * memenuhi syarat. Email dan nomor HP wajib untuk setiap akun operator.
+ * memenuhi syarat. Nomor HP selalu wajib. Email wajib kecuali `emailWajib`
+ * false, yaitu akun yang ditautkan ke personil (keputusan 2026-11-18: data
+ * guru/pegawai sering tanpa email, akun seperti itu dipulihkan Admin). Email
+ * yang diisi tetap harus berformat benar. Cerminan
+ * `validate_operator_contact_akun` di `turso.rs`.
  */
-export function assertOperatorContact(email: string, phone: string) {
+export function assertOperatorContact(
+  email: string,
+  phone: string,
+  emailWajib = true,
+) {
   if (!email.trim()) {
-    throw new Error("Email operator wajib diisi.");
-  }
-  if (!isValidOperatorEmail(email)) {
+    if (emailWajib) throw new Error("Email operator wajib diisi.");
+  } else if (!isValidOperatorEmail(email)) {
     throw new Error("Format email operator tidak valid.");
   }
   if (!phone.trim()) {

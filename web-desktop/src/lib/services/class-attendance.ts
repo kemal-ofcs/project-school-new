@@ -662,7 +662,7 @@ export async function saveClassAttendance(draft: SaveClassAttendanceDraft) {
 
 /**
  * Presensi kelas gabungan: satu sesi per rombel, ditulis SEKALIGUS dalam satu
- * `db.batch` — satu rombel yang ditolak membatalkan semuanya, sehingga tidak
+ * `db.batch`: satu rombel yang ditolak membatalkan semuanya, sehingga tidak
  * ada kelas gabungan yang tersimpan setengah. Pesan penolakan diberi nama
  * rombelnya. Cerminan `save_class_attendance_gabungan` di `class_attendance.rs`.
  */

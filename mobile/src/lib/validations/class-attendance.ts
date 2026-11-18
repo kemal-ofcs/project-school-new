@@ -699,7 +699,7 @@ export interface KepalaPresensiGabungan {
  * rekonsiliasi tetap membaca per rombel), jadi yang dijaga di sini hanyalah
  * bahwa semuanya memang satu jam mengajar: guru, mapel, tanggal, jam, dan tahun
  * ajaran sama, rombelnya berbeda. Honor JP tidak berlipat karena gaji sudah
- * menghitung gabungan per (tanggal, jam) — lihat `summarizeTeaching`.
+ * menghitung gabungan per (tanggal, jam), lihat `summarizeTeaching`.
  *
  * Hanya untuk sesi baru: sesi yang sudah tersimpan disunting satu per satu.
  * Cerminan `periksa_presensi_gabungan` di `class_attendance.rs`, diuji dengan

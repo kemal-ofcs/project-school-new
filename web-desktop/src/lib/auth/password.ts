@@ -105,3 +105,18 @@ export async function verifyPassword(password: string, storedValue: string) {
     return { valid: false, needsUpgrade: false };
   }
 }
+
+/**
+ * Pemeriksaan "Ganti Password" milik pengguna sendiri: aturan kekuatan yang
+ * sama dengan pembuatan akun, ditambah tidak boleh sama dengan password lama.
+ * `null` = sah. Cerminan `periksa_password_baru` di `commands.rs`; vektornya
+ * `validations/password-baru.vektor.json`.
+ */
+export function periksaPasswordBaru(lama: string, baru: string) {
+  const lemah = validatePasswordStrength(baru);
+  if (lemah) return lemah;
+  if (baru === lama) {
+    return "Password baru tidak boleh sama dengan password lama.";
+  }
+  return null;
+}

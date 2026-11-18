@@ -184,6 +184,7 @@ const DESKTOP_COMMANDS: &[&str] = &[
     "desktop_get_roster_for_attendance",
     "desktop_save_class_attendance",
     "desktop_save_class_attendance_gabungan",
+    "desktop_change_own_password",
     "desktop_get_lesson_periods",
     "desktop_save_lesson_period",
     "desktop_delete_lesson_period",

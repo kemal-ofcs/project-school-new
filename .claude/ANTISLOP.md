@@ -1,15 +1,12 @@
 # ANTISLOP.md — hasil antislop
 
-- Waktu: 15 November 2026, 08:56 WIB
-- Commit: 10233aa (+ berkas berubah, belum commit)
-- Berkas disunting: 5
+- Waktu: 18 November 2026, 10:10 WIB
+- Commit: 2655e20 (+ berkas berubah, belum commit)
+- Berkas disunting: 2
 
 ## Disunting
-- `web-desktop/src-tauri/src/desktop/hr_keluar.rs` — komentar — rapikan pembatas dekoratif berulang menjadi komentar baris tunggal
-- `web-desktop/src/lib/validations/hr-keluar.ts` — komentar — rapikan pembatas dekoratif berulang menjadi komentar baris tunggal
-- `web-desktop/src/lib/services/hr-keluar.ts` — komentar — rapikan pembatas dekoratif berulang menjadi komentar baris tunggal
-- `web-desktop/src/components/kepegawaian/DialogCetakSurat.tsx` — komentar — rapikan pembatas dekoratif berulang menjadi komentar baris tunggal
-- `web-desktop/src/components/kepegawaian/suratKepegawaian.ts` — komentar — rapikan pembatas dekoratif berulang menjadi komentar baris tunggal
+- `web-desktop/src/lib/services/class-attendance.ts` — komentar — ganti em dash pada penjelasan batch menjadi titik dua sesuai R-02
+- `web-desktop/src/lib/validations/class-attendance.ts` — komentar — ganti em dash pada referensi perangkuman menjadi koma sesuai R-02
 
 ## Dilewati
 - `CLAUDE.md`, `.agents/`, `.claude/` — konfigurasi panduan agent

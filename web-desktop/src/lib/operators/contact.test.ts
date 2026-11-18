@@ -120,3 +120,21 @@ describe("penyamaran kontak", () => {
     expect(maskPhone("bukan nomor")).toBe("");
   });
 });
+
+// Kasus yang sama dengan `validate_operator_contact_akun` di turso.rs.
+describe("assertOperatorContact untuk akun tertaut personil", () => {
+  test("email boleh kosong bila tidak wajib, HP tetap wajib", () => {
+    expect(() =>
+      assertOperatorContact("", "081234567890", false),
+    ).not.toThrow();
+    expect(() => assertOperatorContact("", "081234567890", true)).toThrow(
+      "Email operator wajib diisi.",
+    );
+    expect(() => assertOperatorContact("", "", false)).toThrow(
+      "Nomor HP operator wajib diisi.",
+    );
+    expect(() =>
+      assertOperatorContact("bukan-email", "081234567890", false),
+    ).toThrow("Format email operator tidak valid.");
+  });
+});

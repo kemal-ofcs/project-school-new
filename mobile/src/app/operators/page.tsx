@@ -869,11 +869,14 @@ function OperatorFormModal({
             className={INPUT_CLASS}
           />
         </FormField>
-        <FormField label="Email" htmlFor="operator-email">
+        <FormField
+          label={draft.idKaryawan ? "Email (opsional)" : "Email"}
+          htmlFor="operator-email"
+        >
           <input
             id="operator-email"
             type="email"
-            required
+            required={!draft.idKaryawan}
             autoComplete="email"
             autoCapitalize="none"
             placeholder="operator@sppg.id"

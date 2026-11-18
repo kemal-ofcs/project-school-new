@@ -7704,7 +7704,12 @@ impl TursoClient {
                 "Data operator tidak lengkap.",
             ));
         }
-        validate_operator_contact(&email, &no_hp)?;
+        let id_karyawan = draft
+            .get("id_karyawan")
+            .and_then(Value::as_str)
+            .unwrap_or("")
+            .trim();
+        validate_operator_contact_akun(&email, &no_hp, !id_karyawan.is_empty())?;
 
         let role_row = self
             .query_one(
@@ -7739,11 +7744,6 @@ impl TursoClient {
             }
         }
         self.assert_operator_phone_unique(&no_hp, 0).await?;
-        let id_karyawan = draft
-            .get("id_karyawan")
-            .and_then(Value::as_str)
-            .unwrap_or("")
-            .trim();
         self.assert_personil_akun(id_karyawan, status, 0).await?;
 
         let password_hash = hash_password_pbkdf2(password);
@@ -7890,7 +7890,7 @@ impl TursoClient {
         if next_email.is_some() || next_phone.is_some() {
             let stored = self
                 .query_one(
-                    "SELECT COALESCE(email, '') AS email, COALESCE(no_hp, '') AS no_hp FROM master_operator WHERE id = ? LIMIT 1;",
+                    "SELECT COALESCE(email, '') AS email, COALESCE(no_hp, '') AS no_hp, COALESCE(id_karyawan, '') AS id_karyawan FROM master_operator WHERE id = ? LIMIT 1;",
                     vec![json!(id)],
                 )
                 .await?
@@ -7912,7 +7912,12 @@ impl TursoClient {
                     .unwrap_or("")
                     .to_string()
             });
-            validate_operator_contact(&email, &phone)?;
+            let tertaut = draft
+                .get("id_karyawan")
+                .and_then(Value::as_str)
+                .or_else(|| stored.get("id_karyawan").and_then(Value::as_str))
+                .is_some_and(|k| !k.trim().is_empty());
+            validate_operator_contact_akun(&email, &phone, tertaut)?;
             if next_phone.is_some() {
                 self.assert_operator_phone_unique(&phone, id).await?;
             }
@@ -16857,6 +16862,29 @@ pub fn validate_operator_contact(email: &str, phone: &str) -> Result<(), Command
     Ok(())
 }
 
+/// Kontak akun operator biasa. Email boleh KOSONG bila akun ditautkan ke
+/// personil (guru/pegawai), keputusan 2026-11-18: data personil sering tanpa
+/// email, dan akun seperti itu dipulihkan Admin, bukan lewat link email. Email
+/// yang diisi tetap wajib berformat benar; HP selalu wajib. Bootstrap
+/// Superadmin tetap memakai `validate_operator_contact`. Cerminan
+/// `assertOperatorContact(email, hp, emailWajib)` di `operators/contact.ts`.
+pub fn validate_operator_contact_akun(
+    email: &str,
+    phone: &str,
+    tertaut_personil: bool,
+) -> Result<(), CommandError> {
+    if tertaut_personil && email.trim().is_empty() {
+        if !is_valid_operator_phone(phone) {
+            return Err(CommandError::new(
+                "VALIDATION_ERROR",
+                "Nomor HP operator wajib diisi. Gunakan format 08xxxxxxxxxx atau +62xxxxxxxxxx.",
+            ));
+        }
+        return Ok(());
+    }
+    validate_operator_contact(email, phone)
+}
+
 /// Menyamarkan email untuk layar "Lupa Password" yang terbuka tanpa login.
 pub fn mask_operator_email(value: &str) -> String {
     let email = normalize_operator_email(value);
@@ -17560,6 +17588,12 @@ mod tests {
         assert!(validate_operator_contact("", "081234567890").is_err());
         assert!(validate_operator_contact("operator@sppg.id", "").is_err());
         assert!(validate_operator_contact("bukan-email", "081234567890").is_err());
+        // Akun tertaut personil boleh tanpa email, tidak tanpa HP; email yang
+        // diisi tetap harus sah. Kasus yang sama di `contact.test.ts`.
+        assert!(validate_operator_contact_akun("", "081234567890", true).is_ok());
+        assert!(validate_operator_contact_akun("", "081234567890", false).is_err());
+        assert!(validate_operator_contact_akun("", "", true).is_err());
+        assert!(validate_operator_contact_akun("bukan-email", "081234567890", true).is_err());
     }
 
     /// Layar "Lupa Password" terbuka tanpa login, jadi kontak lengkap tidak

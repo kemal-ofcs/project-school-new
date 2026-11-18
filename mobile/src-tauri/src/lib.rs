@@ -296,6 +296,7 @@ pub fn run() {
             mobile::commands::desktop_get_roster_for_attendance,
             mobile::commands::desktop_save_class_attendance,
             mobile::commands::desktop_save_class_attendance_gabungan,
+            mobile::commands::desktop_change_own_password,
             mobile::commands::desktop_get_lesson_periods,
             mobile::commands::desktop_save_lesson_period,
             mobile::commands::desktop_delete_lesson_period,

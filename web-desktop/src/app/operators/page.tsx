@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import type { FormEvent, ReactNode } from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { AppShell } from "@/components/AppShell";
+import { BuatAkunMassal } from "@/components/operators/BuatAkunMassal";
 import { FeedbackBanner } from "@/components/ui/FeedbackBanner";
 import { Icon } from "@/components/ui/Icon";
 import { Modal } from "@/components/ui/Modal";
@@ -103,6 +104,7 @@ export default function MasterOperatorPage() {
     message: string;
   } | null>(null);
   const [operatorModal, setOperatorModal] = useState(false);
+  const [akunMassal, setAkunMassal] = useState(false);
   const [editingOperator, setEditingOperator] = useState<OperatorRecord | null>(
     null,
   );
@@ -379,15 +381,37 @@ export default function MasterOperatorPage() {
             </button>
           ))}
         </div>
-        <button
-          type="button"
-          onClick={activeTab === "operators" ? openNewOperator : openNewRole}
-          disabled={loading}
-          className="min-h-11 rounded-xl bg-amber-300 px-4 text-xs font-black text-slate-950 transition hover:bg-amber-200 disabled:opacity-50"
-        >
-          {activeTab === "operators" ? "Tambah operator" : "Buat role baru"}
-        </button>
+        <div className="flex flex-wrap gap-2">
+          {activeTab === "operators" ? (
+            <button
+              type="button"
+              onClick={() => setAkunMassal(true)}
+              disabled={loading}
+              className="min-h-11 rounded-xl border border-amber-300/40 px-4 text-xs font-black text-amber-200 transition hover:bg-amber-300/10 disabled:opacity-50"
+            >
+              Buat akun massal
+            </button>
+          ) : null}
+          <button
+            type="button"
+            onClick={activeTab === "operators" ? openNewOperator : openNewRole}
+            disabled={loading}
+            className="min-h-11 rounded-xl bg-amber-300 px-4 text-xs font-black text-slate-950 transition hover:bg-amber-200 disabled:opacity-50"
+          >
+            {activeTab === "operators" ? "Tambah operator" : "Buat role baru"}
+          </button>
+        </div>
       </div>
+
+      {akunMassal ? (
+        <BuatAkunMassal
+          actorId={user.id}
+          operators={operators}
+          roles={roles}
+          onClose={() => setAkunMassal(false)}
+          onSelesai={() => void loadData(true)}
+        />
+      ) : null}
 
       {loading ? (
         <div className="app-panel grid min-h-72 place-items-center rounded-3xl text-sm text-slate-400">
@@ -562,11 +586,14 @@ function OperatorFormModal({
           />
         </FormField>
         <div className="grid gap-4 sm:grid-cols-2">
-          <FormField label="Email" htmlFor="operator-email">
+          <FormField
+            label={draft.idKaryawan ? "Email (opsional)" : "Email"}
+            htmlFor="operator-email"
+          >
             <input
               id="operator-email"
               type="email"
-              required
+              required={!draft.idKaryawan}
               autoComplete="email"
               placeholder="operator@sppg.id"
               value={draft.email}

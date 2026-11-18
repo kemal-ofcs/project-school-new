@@ -32,10 +32,11 @@ export function validateOperatorDraft(draft: OperatorDraft) {
   if (!/^[a-zA-Z0-9._-]{3,40}$/.test(username)) {
     throw new Error("Username harus 3-40 karakter tanpa spasi.");
   }
-  // Email dan nomor HP wajib pada setiap penyimpanan, termasuk saat menyunting
-  // akun lama yang lahir sebelum kolom ini ada. Email adalah satu-satunya jalur
-  // pengiriman link "Lupa Password", jadi akun tanpa email tidak bisa dipulihkan.
-  assertOperatorContact(draft.email, draft.noHp);
+  // Nomor HP wajib pada setiap penyimpanan, termasuk akun lama. Email juga
+  // wajib, kecuali akun yang ditautkan ke personil (keputusan 2026-11-18):
+  // tanpa email, link "Lupa Password" tidak bisa dikirim dan pemulihannya
+  // lewat Admin.
+  assertOperatorContact(draft.email, draft.noHp, !draft.idKaryawan?.trim());
   if (!Number.isSafeInteger(draft.roleId) || draft.roleId < 1) {
     throw new Error("Role operator wajib dipilih.");
   }

@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
+import { GantiPasswordForm } from "@/components/GantiPasswordForm";
 import { LicenseCard } from "@/components/license/LicenseCard";
 import { MobileAppShell } from "@/components/MobileAppShell";
 import { PasswordRecoveryCard } from "@/components/PasswordRecoveryCard";
@@ -32,6 +33,10 @@ export default function AkunKeamananPage() {
         {/* Tidak dijaga izin apa pun: setiap operator berhak mengamankan
             akunnya sendiri, termasuk role paling terbatas. */}
         <ThemeSettingsCard />
+        <section className="rounded-2xl border border-white/10 bg-slate-900/60 p-4">
+          <h2 className="mb-3 text-sm font-bold text-white">Ganti Password</h2>
+          <GantiPasswordForm />
+        </section>
         <TwoFactorCard />
         <PasswordRecoveryCard />
         <LicenseCard />

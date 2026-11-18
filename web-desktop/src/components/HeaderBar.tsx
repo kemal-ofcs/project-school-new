@@ -1,6 +1,9 @@
 "use client";
 
+import { useState } from "react";
+import { GantiPasswordForm } from "@/components/GantiPasswordForm";
 import { Icon } from "@/components/ui/Icon";
+import { Modal } from "@/components/ui/Modal";
 import { ThemeToggle } from "@/components/ui/ThemeToggle";
 import { useAuth } from "@/lib/context/AuthContext";
 import {
@@ -21,6 +24,9 @@ const MENU_BUTTON_CLASS =
 export function HeaderBar() {
   const { user, logout } = useAuth();
   const { desktopOpen, drawerOpen } = useSidebarState();
+  // Ganti password ada di sini, bukan di Pengaturan: halaman itu dijaga izin
+  // `settings`, sedangkan setiap akun (guru, staf) perlu bisa memakainya.
+  const [gantiPassword, setGantiPassword] = useState(false);
 
   if (!user) return null;
 
@@ -77,6 +83,16 @@ export function HeaderBar() {
 
           <button
             type="button"
+            onClick={() => setGantiPassword(true)}
+            aria-label="Ganti password"
+            title="Ganti password"
+            className={`grid size-10 ${MENU_BUTTON_CLASS}`}
+          >
+            <Icon name="lock" className="size-4" />
+          </button>
+
+          <button
+            type="button"
             onClick={logout}
             aria-label="Keluar dari aplikasi"
             title="Keluar"
@@ -86,6 +102,15 @@ export function HeaderBar() {
           </button>
         </div>
       </div>
+      {gantiPassword ? (
+        <Modal
+          title="Ganti Password"
+          titleId="modal-ganti-password"
+          onClose={() => setGantiPassword(false)}
+        >
+          <GantiPasswordForm />
+        </Modal>
+      ) : null}
     </header>
   );
 }

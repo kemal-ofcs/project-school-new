@@ -41,6 +41,7 @@ const filesToCopy = [
   "components/BelSekolahRunner.tsx",
   "components/BelPerangkatPanel.tsx",
   "components/LivenessCapture.tsx",
+  "components/GantiPasswordForm.tsx",
   // Konfirmasi sebelum menyimpan formulir, dipasang di kedua shell.
   "components/KonfirmasiSimpan.tsx",
   // Dropdown berpencarian untuk daftar panjang.

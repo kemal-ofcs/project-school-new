@@ -996,6 +996,64 @@ pub async fn desktop_issue_recovery_codes(
     Ok(json!({ "codes": codes }))
 }
 
+/// Ganti password akun yang sedang login. Password lama wajib cocok; aturan
+/// kekuatan sama dengan pembuatan akun. Semua sesi Web akun itu dicabut, dan
+/// cache login luring perangkat ini diperbarui supaya password lama tidak lagi
+/// membuka aplikasi saat offline. Cerminan `/api/auth/change-password`.
+#[tauri::command]
+pub async fn desktop_change_own_password(
+    state: State<'_, DesktopState>,
+    current_password: String,
+    new_password: String,
+) -> Result<Value, CommandError> {
+    let actor = require_session(&state)?;
+    let current_password = Zeroizing::new(current_password);
+    let new_password = Zeroizing::new(new_password);
+    if let Some(pesan) = periksa_password_baru(&current_password, &new_password) {
+        return Err(CommandError::new("VALIDATION_ERROR", pesan));
+    }
+    let turso = state.get_turso_client()?;
+    assert_password_saat_ini(&turso, actor.id, &current_password).await?;
+    turso
+        .query_one(
+            "UPDATE master_operator SET password_hash = ?, updated_at = datetime('now') WHERE id = ?;",
+            vec![
+                json!(super::turso::hash_password_pbkdf2(&new_password)),
+                json!(actor.id),
+            ],
+        )
+        .await?;
+    turso
+        .query_one(
+            "UPDATE app_session SET revoked_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now'), revoked_reason = 'password-diganti' WHERE operator_id = ? AND revoked_at IS NULL;",
+            vec![json!(actor.id)],
+        )
+        .await?;
+    // Gagal memperbarui cache luring tidak membatalkan penggantian: password
+    // di cloud sudah berubah, dan login online berikutnya memperbaruinya.
+    let _ = secrets::provision(&state, actor.clone(), &new_password);
+    storage::audit(&state.data_dir, Some(actor.id), "password-changed-self", None);
+    Ok(json!({ "sukses": true }))
+}
+
+/// Cerminan `periksaPasswordBaru` (dan `validatePasswordStrength`) di
+/// `auth/password.ts`; vektor `validations/password-baru.vektor.json`.
+pub fn periksa_password_baru(lama: &str, baru: &str) -> Option<&'static str> {
+    if baru.chars().count() < 12 {
+        return Some("Password minimal 12 karakter.");
+    }
+    if !baru.chars().any(|c| c.is_ascii_lowercase()) || !baru.chars().any(|c| c.is_ascii_uppercase()) {
+        return Some("Password harus memiliki huruf kecil dan huruf besar.");
+    }
+    if !baru.chars().any(|c| c.is_ascii_digit()) {
+        return Some("Password harus memiliki angka.");
+    }
+    if baru == lama {
+        return Some("Password baru tidak boleh sama dengan password lama.");
+    }
+    None
+}
+
 /// Bukti bahwa pemegang sesi memang pemilik akunnya, sebelum mendaftarkan
 /// autentikator atau mencetak kode pemulihan. Sesi saja tidak cukup: siapa pun
 /// di depan komputer yang ditinggal dalam keadaan login akan mendapat kunci
@@ -6002,3 +6060,28 @@ pub fn desktop_open_external_url(
     Ok(())
 }
 
+
+#[cfg(test)]
+mod tests_password_baru {
+    use super::periksa_password_baru;
+    use serde_json::Value;
+
+    // Vektor kembar `password-baru.test.ts`.
+    const VEKTOR: &str = include_str!("../../../src/lib/validations/password-baru.vektor.json");
+
+    #[test]
+    fn password_baru_vektor() {
+        let vektor: Value = serde_json::from_str(VEKTOR).expect("vektor terbaca");
+        for kasus in vektor["kasus"].as_array().expect("kasus") {
+            assert_eq!(
+                periksa_password_baru(
+                    kasus["lama"].as_str().unwrap_or(""),
+                    kasus["baru"].as_str().unwrap_or("")
+                ),
+                kasus["hasil"].as_str(),
+                "{}",
+                kasus["baru"]
+            );
+        }
+    }
+}
