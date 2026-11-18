@@ -567,6 +567,27 @@ export const PERMISSION_CATALOG = [
     name: "Berlakukan Pegawai Keluar",
     group: "Kepegawaian",
   },
+  // HRIS Fase 5 (`prd-hris.md` §23.4).
+  {
+    key: "hr.performance.view",
+    name: "Lihat Penilaian Kinerja",
+    group: "Kepegawaian",
+  },
+  {
+    key: "hr.performance.assess",
+    name: "Nilai Kinerja Pegawai",
+    group: "Kepegawaian",
+  },
+  {
+    key: "hr.performance.finalize",
+    name: "Finalkan Penilaian Kinerja",
+    group: "Kepegawaian",
+  },
+  {
+    key: "hr.performance.config",
+    name: "Atur Template Kinerja",
+    group: "Kepegawaian",
+  },
 ] as const;
 
 export type PermissionKey = (typeof PERMISSION_CATALOG)[number]["key"];
@@ -683,6 +704,10 @@ export const SENSITIVE_MUTATION_PERMISSIONS = new Set<PermissionKey>([
   "hr.warning.sp3",
   "hr.warning.cancel",
   "hr.offboard.decide",
+  // HRIS Fase 5 (§23.4): Final membekukan nilai; template, ambang, dan
+  // predikat menentukan nilai setiap penilaian yang belum Final (Q-104).
+  "hr.performance.finalize",
+  "hr.performance.config",
 ]);
 
 /**
@@ -703,6 +728,9 @@ export const CONFIDENTIAL_PERMISSIONS = new Set<PermissionKey>([
   "hr.warning.manage",
   "hr.offboard.view",
   "hr.offboard.manage",
+  // Nilai dan catatan penilai kinerja (§23.4).
+  "hr.performance.view",
+  "hr.performance.assess",
 ]);
 
 export const SYSTEM_ROLE_KEYS = [
@@ -774,6 +802,10 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<
     "hr.offboard.view",
     "hr.offboard.manage",
     "hr.offboard.decide",
+    "hr.performance.view",
+    "hr.performance.assess",
+    "hr.performance.finalize",
+    "hr.performance.config",
   ],
   "kepala-sekolah": [
     "home.view",
@@ -787,6 +819,8 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<
     "hr.substitute.manage",
     "hr.warning.view",
     "hr.warning.manage",
+    "hr.performance.view",
+    "hr.performance.assess",
   ],
   kepegawaian: [
     "home.view",
@@ -810,6 +844,8 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<
     "hr.warning.view",
     "hr.offboard.view",
     "hr.offboard.manage",
+    "hr.performance.view",
+    "hr.performance.config",
   ],
   "kepala-tu": [
     "home.view",
@@ -818,6 +854,7 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<
     "hr.request.submit",
     "hr.request.urgent",
     "hr.request.decide",
+    "hr.performance.assess",
   ],
   "guru-piket": ["home.view", "sync.view", "hr.substitute.manage"],
 };

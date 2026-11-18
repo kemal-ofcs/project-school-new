@@ -28,6 +28,7 @@ pub mod hari_kerja;
 pub mod hr_beban;
 // SP dan pegawai keluar (HRIS Fase 4): SALINAN `desktop/hr_keluar.rs`.
 pub mod hr_keluar;
+pub mod hr_kinerja;
 // Pengajuan cuti/izin (HRIS Fase 2): SALINAN `desktop/hr_pengajuan.rs`.
 pub mod hr_pengajuan;
 pub mod hris;

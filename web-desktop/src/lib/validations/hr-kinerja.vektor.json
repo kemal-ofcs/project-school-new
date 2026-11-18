@@ -1,0 +1,2010 @@
+{
+  "template": [
+    {
+      "nama": "sah: nama dipangkas, kosong jadi null, urutan dari posisi",
+      "draft": {
+        "nama": "  Kinerja Guru  ",
+        "kelompok": "Guru",
+        "is_bawaan": false,
+        "is_aktif": true,
+        "keterangan": "  ",
+        "aspek": [
+          {
+            "nama": "Kehadiran",
+            "tipe": "Otomatis Kehadiran",
+            "bobot": 30,
+            "is_aktif": true
+          },
+          {
+            "nama": "Supervisi",
+            "tipe": "Manual",
+            "bobot": 70,
+            "is_aktif": true,
+            "id_aspek": "x:1",
+            "panduan": "  Observasi  "
+          },
+          {
+            "nama": "Lama",
+            "tipe": "Manual",
+            "bobot": 5,
+            "is_aktif": false
+          }
+        ]
+      },
+      "hasil": {
+        "id_template": null,
+        "nama": "Kinerja Guru",
+        "kelompok": "Guru",
+        "keterangan": null,
+        "is_bawaan": false,
+        "is_aktif": true,
+        "aspek": [
+          {
+            "id_aspek": null,
+            "nama": "Kehadiran",
+            "tipe": "Otomatis Kehadiran",
+            "bobot": 30,
+            "panduan": null,
+            "urutan": 0,
+            "is_aktif": true
+          },
+          {
+            "id_aspek": "x:1",
+            "nama": "Supervisi",
+            "tipe": "Manual",
+            "bobot": 70,
+            "panduan": "Observasi",
+            "urutan": 1,
+            "is_aktif": true
+          },
+          {
+            "id_aspek": null,
+            "nama": "Lama",
+            "tipe": "Manual",
+            "bobot": 5,
+            "panduan": null,
+            "urutan": 2,
+            "is_aktif": false
+          }
+        ]
+      }
+    },
+    {
+      "nama": "sah: tendik dengan kehadiran, id dan keterangan dibawa, nama 100 emoji",
+      "draft": {
+        "nama": "😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀",
+        "kelompok": "Tendik",
+        "is_bawaan": true,
+        "is_aktif": true,
+        "id_template": " ktp-1 ",
+        "keterangan": " Satpam ",
+        "aspek": [
+          {
+            "nama": "Kehadiran",
+            "tipe": "Otomatis Kehadiran",
+            "bobot": 40,
+            "is_aktif": true
+          },
+          {
+            "nama": "Kewaspadaan",
+            "tipe": "Manual",
+            "bobot": 60,
+            "is_aktif": true
+          }
+        ]
+      },
+      "hasil": {
+        "id_template": "ktp-1",
+        "nama": "😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀",
+        "kelompok": "Tendik",
+        "keterangan": "Satpam",
+        "is_bawaan": true,
+        "is_aktif": true,
+        "aspek": [
+          {
+            "id_aspek": null,
+            "nama": "Kehadiran",
+            "tipe": "Otomatis Kehadiran",
+            "bobot": 40,
+            "panduan": null,
+            "urutan": 0,
+            "is_aktif": true
+          },
+          {
+            "id_aspek": null,
+            "nama": "Kewaspadaan",
+            "tipe": "Manual",
+            "bobot": 60,
+            "panduan": null,
+            "urutan": 1,
+            "is_aktif": true
+          }
+        ]
+      }
+    },
+    {
+      "nama": "nama kosong",
+      "draft": {
+        "nama": "   ",
+        "kelompok": "Guru",
+        "is_bawaan": false,
+        "is_aktif": true,
+        "aspek": [
+          {
+            "nama": "A",
+            "tipe": "Manual",
+            "bobot": 100,
+            "is_aktif": true
+          }
+        ]
+      },
+      "galat": "Nama template wajib diisi."
+    },
+    {
+      "nama": "nama 101 karakter",
+      "draft": {
+        "nama": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "kelompok": "Guru",
+        "is_bawaan": false,
+        "is_aktif": true,
+        "aspek": [
+          {
+            "nama": "A",
+            "tipe": "Manual",
+            "bobot": 100,
+            "is_aktif": true
+          }
+        ]
+      },
+      "galat": "Nama template maksimal 100 karakter."
+    },
+    {
+      "nama": "kelompok asing",
+      "draft": {
+        "nama": "Kinerja",
+        "kelompok": "Staf",
+        "is_bawaan": false,
+        "is_aktif": true,
+        "aspek": [
+          {
+            "nama": "A",
+            "tipe": "Manual",
+            "bobot": 100,
+            "is_aktif": true
+          }
+        ]
+      },
+      "galat": "Kelompok template harus Guru atau Tendik."
+    },
+    {
+      "nama": "keterangan 1001",
+      "draft": {
+        "nama": "Kinerja",
+        "kelompok": "Guru",
+        "is_bawaan": false,
+        "is_aktif": true,
+        "keterangan": "kkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkk",
+        "aspek": [
+          {
+            "nama": "A",
+            "tipe": "Manual",
+            "bobot": 100,
+            "is_aktif": true
+          }
+        ]
+      },
+      "galat": "Keterangan maksimal 1000 karakter."
+    },
+    {
+      "nama": "bawaan nonaktif",
+      "draft": {
+        "nama": "Kinerja",
+        "kelompok": "Guru",
+        "is_bawaan": true,
+        "is_aktif": false,
+        "aspek": [
+          {
+            "nama": "A",
+            "tipe": "Manual",
+            "bobot": 100,
+            "is_aktif": true
+          }
+        ]
+      },
+      "galat": "Template bawaan tidak bisa dinonaktifkan."
+    },
+    {
+      "nama": "101 aspek",
+      "draft": {
+        "nama": "Kinerja",
+        "kelompok": "Guru",
+        "is_bawaan": false,
+        "is_aktif": true,
+        "aspek": [
+          {
+            "nama": "A0",
+            "tipe": "Manual",
+            "bobot": 1,
+            "is_aktif": true
+          },
+          {
+            "nama": "A1",
+            "tipe": "Manual",
+            "bobot": 1,
+            "is_aktif": true
+          },
+          {
+            "nama": "A2",
+            "tipe": "Manual",
+            "bobot": 1,
+            "is_aktif": true
+          },
+          {
+            "nama": "A3",
+            "tipe": "Manual",
+            "bobot": 1,
+            "is_aktif": true
+          },
+          {
+            "nama": "A4",
+            "tipe": "Manual",
+            "bobot": 1,
+            "is_aktif": true
+          },
+          {
+            "nama": "A5",
+            "tipe": "Manual",
+            "bobot": 1,
+            "is_aktif": true
+          },
+          {
+            "nama": "A6",
+            "tipe": "Manual",
+            "bobot": 1,
+            "is_aktif": true
+          },
+          {
+            "nama": "A7",
+            "tipe": "Manual",
+            "bobot": 1,
+            "is_aktif": true
+          },
+          {
+            "nama": "A8",
+            "tipe": "Manual",
+            "bobot": 1,
+            "is_aktif": true
+          },
+          {
+            "nama": "A9",
+            "tipe": "Manual",
+            "bobot": 1,
+            "is_aktif": true
+          },
+          {
+            "nama": "A10",
+            "tipe": "Manual",
+            "bobot": 1,
+            "is_aktif": true
+          },
+          {
+            "nama": "A11",
+            "tipe": "Manual",
+            "bobot": 1,
+            "is_aktif": true
+          },
+          {
+            "nama": "A12",
+            "tipe": "Manual",
+            "bobot": 1,
+            "is_aktif": true
+          },
+          {
+            "nama": "A13",
+            "tipe": "Manual",
+            "bobot": 1,
+            "is_aktif": true
+          },
+          {
+            "nama": "A14",
+            "tipe": "Manual",
+            "bobot": 1,
+            "is_aktif": true
+          },
+          {
+            "nama": "A15",
+            "tipe": "Manual",
+            "bobot": 1,
+            "is_aktif": true
+          },
+          {
+            "nama": "A16",
+            "tipe": "Manual",
+            "bobot": 1,
+            "is_aktif": true
+          },
+          {
+            "nama": "A17",
+            "tipe": "Manual",
+            "bobot": 1,
+            "is_aktif": true
+          },
+          {
+            "nama": "A18",
+            "tipe": "Manual",
+            "bobot": 1,
+            "is_aktif": true
+          },
+          {
+            "nama": "A19",
+            "tipe": "Manual",
+            "bobot": 1,
+            "is_aktif": true
+          },
+          {
+            "nama": "A20",
+            "tipe": "Manual",
+            "bobot": 1,
+            "is_aktif": true
+          },
+          {
+            "nama": "A21",
+            "tipe": "Manual",
+            "bobot": 1,
+            "is_aktif": true
+          },
+          {
+            "nama": "A22",
+            "tipe": "Manual",
+            "bobot": 1,
+            "is_aktif": true
+          },
+          {
+            "nama": "A23",
+            "tipe": "Manual",
+            "bobot": 1,
+            "is_aktif": true
+          },
+          {
+            "nama": "A24",
+            "tipe": "Manual",
+            "bobot": 1,
+            "is_aktif": true
+          },
+          {
+            "nama": "A25",
+            "tipe": "Manual",
+            "bobot": 1,
+            "is_aktif": true
+          },
+          {
+            "nama": "A26",
+            "tipe": "Manual",
+            "bobot": 1,
+            "is_aktif": true
+          },
+          {
+            "nama": "A27",
+            "tipe": "Manual",
+            "bobot": 1,
+            "is_aktif": true
+          },
+          {
+            "nama": "A28",
+            "tipe": "Manual",
+            "bobot": 1,
+            "is_aktif": true
+          },
+          {
+            "nama": "A29",
+            "tipe": "Manual",
+            "bobot": 1,
+            "is_aktif": true
+          },
+          {
+            "nama": "A30",
+            "tipe": "Manual",
+            "bobot": 1,
+            "is_aktif": true
+          },
+          {
+            "nama": "A31",
+            "tipe": "Manual",
+            "bobot": 1,
+            "is_aktif": true
+          },
+          {
+            "nama": "A32",
+            "tipe": "Manual",
+            "bobot": 1,
+            "is_aktif": true
+          },
+          {
+            "nama": "A33",
+            "tipe": "Manual",
+            "bobot": 1,
+            "is_aktif": true
+          },
+          {
+            "nama": "A34",
+            "tipe": "Manual",
+            "bobot": 1,
+            "is_aktif": true
+          },
+          {
+            "nama": "A35",
+            "tipe": "Manual",
+            "bobot": 1,
+            "is_aktif": true
+          },
+          {
+            "nama": "A36",
+            "tipe": "Manual",
+            "bobot": 1,
+            "is_aktif": true
+          },
+          {
+            "nama": "A37",
+            "tipe": "Manual",
+            "bobot": 1,
+            "is_aktif": true
+          },
+          {
+            "nama": "A38",
+            "tipe": "Manual",
+            "bobot": 1,
+            "is_aktif": true
+          },
+          {
+            "nama": "A39",
+            "tipe": "Manual",
+            "bobot": 1,
+            "is_aktif": true
+          },
+          {
+            "nama": "A40",
+            "tipe": "Manual",
+            "bobot": 1,
+            "is_aktif": true
+          },
+          {
+            "nama": "A41",
+            "tipe": "Manual",
+            "bobot": 1,
+            "is_aktif": true
+          },
+          {
+            "nama": "A42",
+            "tipe": "Manual",
+            "bobot": 1,
+            "is_aktif": true
+          },
+          {
+            "nama": "A43",
+            "tipe": "Manual",
+            "bobot": 1,
+            "is_aktif": true
+          },
+          {
+            "nama": "A44",
+            "tipe": "Manual",
+            "bobot": 1,
+            "is_aktif": true
+          },
+          {
+            "nama": "A45",
+            "tipe": "Manual",
+            "bobot": 1,
+            "is_aktif": true
+          },
+          {
+            "nama": "A46",
+            "tipe": "Manual",
+            "bobot": 1,
+            "is_aktif": true
+          },
+          {
+            "nama": "A47",
+            "tipe": "Manual",
+            "bobot": 1,
+            "is_aktif": true
+          },
+          {
+            "nama": "A48",
+            "tipe": "Manual",
+            "bobot": 1,
+            "is_aktif": true
+          },
+          {
+            "nama": "A49",
+            "tipe": "Manual",
+            "bobot": 1,
+            "is_aktif": true
+          },
+          {
+            "nama": "A50",
+            "tipe": "Manual",
+            "bobot": 1,
+            "is_aktif": true
+          },
+          {
+            "nama": "A51",
+            "tipe": "Manual",
+            "bobot": 1,
+            "is_aktif": true
+          },
+          {
+            "nama": "A52",
+            "tipe": "Manual",
+            "bobot": 1,
+            "is_aktif": true
+          },
+          {
+            "nama": "A53",
+            "tipe": "Manual",
+            "bobot": 1,
+            "is_aktif": true
+          },
+          {
+            "nama": "A54",
+            "tipe": "Manual",
+            "bobot": 1,
+            "is_aktif": true
+          },
+          {
+            "nama": "A55",
+            "tipe": "Manual",
+            "bobot": 1,
+            "is_aktif": true
+          },
+          {
+            "nama": "A56",
+            "tipe": "Manual",
+            "bobot": 1,
+            "is_aktif": true
+          },
+          {
+            "nama": "A57",
+            "tipe": "Manual",
+            "bobot": 1,
+            "is_aktif": true
+          },
+          {
+            "nama": "A58",
+            "tipe": "Manual",
+            "bobot": 1,
+            "is_aktif": true
+          },
+          {
+            "nama": "A59",
+            "tipe": "Manual",
+            "bobot": 1,
+            "is_aktif": true
+          },
+          {
+            "nama": "A60",
+            "tipe": "Manual",
+            "bobot": 1,
+            "is_aktif": true
+          },
+          {
+            "nama": "A61",
+            "tipe": "Manual",
+            "bobot": 1,
+            "is_aktif": true
+          },
+          {
+            "nama": "A62",
+            "tipe": "Manual",
+            "bobot": 1,
+            "is_aktif": true
+          },
+          {
+            "nama": "A63",
+            "tipe": "Manual",
+            "bobot": 1,
+            "is_aktif": true
+          },
+          {
+            "nama": "A64",
+            "tipe": "Manual",
+            "bobot": 1,
+            "is_aktif": true
+          },
+          {
+            "nama": "A65",
+            "tipe": "Manual",
+            "bobot": 1,
+            "is_aktif": true
+          },
+          {
+            "nama": "A66",
+            "tipe": "Manual",
+            "bobot": 1,
+            "is_aktif": true
+          },
+          {
+            "nama": "A67",
+            "tipe": "Manual",
+            "bobot": 1,
+            "is_aktif": true
+          },
+          {
+            "nama": "A68",
+            "tipe": "Manual",
+            "bobot": 1,
+            "is_aktif": true
+          },
+          {
+            "nama": "A69",
+            "tipe": "Manual",
+            "bobot": 1,
+            "is_aktif": true
+          },
+          {
+            "nama": "A70",
+            "tipe": "Manual",
+            "bobot": 1,
+            "is_aktif": true
+          },
+          {
+            "nama": "A71",
+            "tipe": "Manual",
+            "bobot": 1,
+            "is_aktif": true
+          },
+          {
+            "nama": "A72",
+            "tipe": "Manual",
+            "bobot": 1,
+            "is_aktif": true
+          },
+          {
+            "nama": "A73",
+            "tipe": "Manual",
+            "bobot": 1,
+            "is_aktif": true
+          },
+          {
+            "nama": "A74",
+            "tipe": "Manual",
+            "bobot": 1,
+            "is_aktif": true
+          },
+          {
+            "nama": "A75",
+            "tipe": "Manual",
+            "bobot": 1,
+            "is_aktif": true
+          },
+          {
+            "nama": "A76",
+            "tipe": "Manual",
+            "bobot": 1,
+            "is_aktif": true
+          },
+          {
+            "nama": "A77",
+            "tipe": "Manual",
+            "bobot": 1,
+            "is_aktif": true
+          },
+          {
+            "nama": "A78",
+            "tipe": "Manual",
+            "bobot": 1,
+            "is_aktif": true
+          },
+          {
+            "nama": "A79",
+            "tipe": "Manual",
+            "bobot": 1,
+            "is_aktif": true
+          },
+          {
+            "nama": "A80",
+            "tipe": "Manual",
+            "bobot": 1,
+            "is_aktif": true
+          },
+          {
+            "nama": "A81",
+            "tipe": "Manual",
+            "bobot": 1,
+            "is_aktif": true
+          },
+          {
+            "nama": "A82",
+            "tipe": "Manual",
+            "bobot": 1,
+            "is_aktif": true
+          },
+          {
+            "nama": "A83",
+            "tipe": "Manual",
+            "bobot": 1,
+            "is_aktif": true
+          },
+          {
+            "nama": "A84",
+            "tipe": "Manual",
+            "bobot": 1,
+            "is_aktif": true
+          },
+          {
+            "nama": "A85",
+            "tipe": "Manual",
+            "bobot": 1,
+            "is_aktif": true
+          },
+          {
+            "nama": "A86",
+            "tipe": "Manual",
+            "bobot": 1,
+            "is_aktif": true
+          },
+          {
+            "nama": "A87",
+            "tipe": "Manual",
+            "bobot": 1,
+            "is_aktif": true
+          },
+          {
+            "nama": "A88",
+            "tipe": "Manual",
+            "bobot": 1,
+            "is_aktif": true
+          },
+          {
+            "nama": "A89",
+            "tipe": "Manual",
+            "bobot": 1,
+            "is_aktif": true
+          },
+          {
+            "nama": "A90",
+            "tipe": "Manual",
+            "bobot": 1,
+            "is_aktif": true
+          },
+          {
+            "nama": "A91",
+            "tipe": "Manual",
+            "bobot": 1,
+            "is_aktif": true
+          },
+          {
+            "nama": "A92",
+            "tipe": "Manual",
+            "bobot": 1,
+            "is_aktif": true
+          },
+          {
+            "nama": "A93",
+            "tipe": "Manual",
+            "bobot": 1,
+            "is_aktif": true
+          },
+          {
+            "nama": "A94",
+            "tipe": "Manual",
+            "bobot": 1,
+            "is_aktif": true
+          },
+          {
+            "nama": "A95",
+            "tipe": "Manual",
+            "bobot": 1,
+            "is_aktif": true
+          },
+          {
+            "nama": "A96",
+            "tipe": "Manual",
+            "bobot": 1,
+            "is_aktif": true
+          },
+          {
+            "nama": "A97",
+            "tipe": "Manual",
+            "bobot": 1,
+            "is_aktif": true
+          },
+          {
+            "nama": "A98",
+            "tipe": "Manual",
+            "bobot": 1,
+            "is_aktif": true
+          },
+          {
+            "nama": "A99",
+            "tipe": "Manual",
+            "bobot": 1,
+            "is_aktif": true
+          },
+          {
+            "nama": "A100",
+            "tipe": "Manual",
+            "bobot": 1,
+            "is_aktif": true
+          }
+        ]
+      },
+      "galat": "Aspek paling banyak 100."
+    },
+    {
+      "nama": "nama aspek kosong",
+      "draft": {
+        "nama": "Kinerja",
+        "kelompok": "Guru",
+        "is_bawaan": false,
+        "is_aktif": true,
+        "aspek": [
+          {
+            "nama": " ",
+            "tipe": "Manual",
+            "bobot": 100,
+            "is_aktif": true
+          }
+        ]
+      },
+      "galat": "Nama aspek wajib diisi."
+    },
+    {
+      "nama": "nama aspek 101",
+      "draft": {
+        "nama": "Kinerja",
+        "kelompok": "Guru",
+        "is_bawaan": false,
+        "is_aktif": true,
+        "aspek": [
+          {
+            "nama": "nnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnn",
+            "tipe": "Manual",
+            "bobot": 100,
+            "is_aktif": true
+          }
+        ]
+      },
+      "galat": "Nama aspek maksimal 100 karakter."
+    },
+    {
+      "nama": "tipe asing",
+      "draft": {
+        "nama": "Kinerja",
+        "kelompok": "Guru",
+        "is_bawaan": false,
+        "is_aktif": true,
+        "aspek": [
+          {
+            "nama": "A",
+            "tipe": "Otomatis Gaji",
+            "bobot": 100,
+            "is_aktif": true
+          }
+        ]
+      },
+      "galat": "Tipe aspek \"Otomatis Gaji\" tidak dikenal."
+    },
+    {
+      "nama": "presensi kelas di template tendik",
+      "draft": {
+        "nama": "Kinerja",
+        "kelompok": "Tendik",
+        "is_bawaan": false,
+        "is_aktif": true,
+        "aspek": [
+          {
+            "nama": "Presensi",
+            "tipe": "Otomatis Presensi Kelas",
+            "bobot": 100,
+            "is_aktif": true
+          }
+        ]
+      },
+      "galat": "Aspek Otomatis Presensi Kelas hanya untuk template Guru."
+    },
+    {
+      "nama": "jurnal di template tendik, walau nonaktif",
+      "draft": {
+        "nama": "Kinerja",
+        "kelompok": "Tendik",
+        "is_bawaan": false,
+        "is_aktif": true,
+        "aspek": [
+          {
+            "nama": "A",
+            "tipe": "Manual",
+            "bobot": 100,
+            "is_aktif": true
+          },
+          {
+            "nama": "Jurnal",
+            "tipe": "Otomatis Jurnal",
+            "bobot": 1,
+            "is_aktif": false
+          }
+        ]
+      },
+      "galat": "Aspek Otomatis Jurnal hanya untuk template Guru."
+    },
+    {
+      "nama": "bobot 0",
+      "draft": {
+        "nama": "Kinerja",
+        "kelompok": "Guru",
+        "is_bawaan": false,
+        "is_aktif": true,
+        "aspek": [
+          {
+            "nama": "A",
+            "tipe": "Manual",
+            "bobot": 0,
+            "is_aktif": true
+          }
+        ]
+      },
+      "galat": "Bobot aspek \"A\" harus bilangan bulat 1 sampai 100."
+    },
+    {
+      "nama": "bobot pecahan",
+      "draft": {
+        "nama": "Kinerja",
+        "kelompok": "Guru",
+        "is_bawaan": false,
+        "is_aktif": true,
+        "aspek": [
+          {
+            "nama": "A",
+            "tipe": "Manual",
+            "bobot": 10.5,
+            "is_aktif": true
+          }
+        ]
+      },
+      "galat": "Bobot aspek \"A\" harus bilangan bulat 1 sampai 100."
+    },
+    {
+      "nama": "bobot 101",
+      "draft": {
+        "nama": "Kinerja",
+        "kelompok": "Guru",
+        "is_bawaan": false,
+        "is_aktif": true,
+        "aspek": [
+          {
+            "nama": "A",
+            "tipe": "Manual",
+            "bobot": 101,
+            "is_aktif": true
+          }
+        ]
+      },
+      "galat": "Bobot aspek \"A\" harus bilangan bulat 1 sampai 100."
+    },
+    {
+      "nama": "panduan 1001",
+      "draft": {
+        "nama": "Kinerja",
+        "kelompok": "Guru",
+        "is_bawaan": false,
+        "is_aktif": true,
+        "aspek": [
+          {
+            "nama": "A",
+            "tipe": "Manual",
+            "bobot": 100,
+            "is_aktif": true,
+            "panduan": "ppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppp"
+          }
+        ]
+      },
+      "galat": "Panduan aspek \"A\" maksimal 1000 karakter."
+    },
+    {
+      "nama": "nama aspek kembar beda huruf",
+      "draft": {
+        "nama": "Kinerja",
+        "kelompok": "Guru",
+        "is_bawaan": false,
+        "is_aktif": true,
+        "aspek": [
+          {
+            "nama": "Kehadiran",
+            "tipe": "Manual",
+            "bobot": 50,
+            "is_aktif": true
+          },
+          {
+            "nama": " kehadiran ",
+            "tipe": "Manual",
+            "bobot": 50,
+            "is_aktif": true
+          }
+        ]
+      },
+      "galat": "Nama aspek \"kehadiran\" dipakai dua kali."
+    },
+    {
+      "nama": "semua aspek nonaktif",
+      "draft": {
+        "nama": "Kinerja",
+        "kelompok": "Guru",
+        "is_bawaan": false,
+        "is_aktif": true,
+        "aspek": [
+          {
+            "nama": "A",
+            "tipe": "Manual",
+            "bobot": 100,
+            "is_aktif": false
+          }
+        ]
+      },
+      "galat": "Template butuh paling sedikit satu aspek aktif."
+    },
+    {
+      "nama": "21 aspek aktif",
+      "draft": {
+        "nama": "Kinerja",
+        "kelompok": "Guru",
+        "is_bawaan": false,
+        "is_aktif": true,
+        "aspek": [
+          {
+            "nama": "A0",
+            "tipe": "Manual",
+            "bobot": 1,
+            "is_aktif": true
+          },
+          {
+            "nama": "A1",
+            "tipe": "Manual",
+            "bobot": 1,
+            "is_aktif": true
+          },
+          {
+            "nama": "A2",
+            "tipe": "Manual",
+            "bobot": 1,
+            "is_aktif": true
+          },
+          {
+            "nama": "A3",
+            "tipe": "Manual",
+            "bobot": 1,
+            "is_aktif": true
+          },
+          {
+            "nama": "A4",
+            "tipe": "Manual",
+            "bobot": 1,
+            "is_aktif": true
+          },
+          {
+            "nama": "A5",
+            "tipe": "Manual",
+            "bobot": 1,
+            "is_aktif": true
+          },
+          {
+            "nama": "A6",
+            "tipe": "Manual",
+            "bobot": 1,
+            "is_aktif": true
+          },
+          {
+            "nama": "A7",
+            "tipe": "Manual",
+            "bobot": 1,
+            "is_aktif": true
+          },
+          {
+            "nama": "A8",
+            "tipe": "Manual",
+            "bobot": 1,
+            "is_aktif": true
+          },
+          {
+            "nama": "A9",
+            "tipe": "Manual",
+            "bobot": 1,
+            "is_aktif": true
+          },
+          {
+            "nama": "A10",
+            "tipe": "Manual",
+            "bobot": 1,
+            "is_aktif": true
+          },
+          {
+            "nama": "A11",
+            "tipe": "Manual",
+            "bobot": 1,
+            "is_aktif": true
+          },
+          {
+            "nama": "A12",
+            "tipe": "Manual",
+            "bobot": 1,
+            "is_aktif": true
+          },
+          {
+            "nama": "A13",
+            "tipe": "Manual",
+            "bobot": 1,
+            "is_aktif": true
+          },
+          {
+            "nama": "A14",
+            "tipe": "Manual",
+            "bobot": 1,
+            "is_aktif": true
+          },
+          {
+            "nama": "A15",
+            "tipe": "Manual",
+            "bobot": 1,
+            "is_aktif": true
+          },
+          {
+            "nama": "A16",
+            "tipe": "Manual",
+            "bobot": 1,
+            "is_aktif": true
+          },
+          {
+            "nama": "A17",
+            "tipe": "Manual",
+            "bobot": 1,
+            "is_aktif": true
+          },
+          {
+            "nama": "A18",
+            "tipe": "Manual",
+            "bobot": 1,
+            "is_aktif": true
+          },
+          {
+            "nama": "A19",
+            "tipe": "Manual",
+            "bobot": 1,
+            "is_aktif": true
+          },
+          {
+            "nama": "A20",
+            "tipe": "Manual",
+            "bobot": 1,
+            "is_aktif": true
+          }
+        ]
+      },
+      "galat": "Aspek aktif paling banyak 20."
+    },
+    {
+      "nama": "dua kehadiran aktif",
+      "draft": {
+        "nama": "Kinerja",
+        "kelompok": "Guru",
+        "is_bawaan": false,
+        "is_aktif": true,
+        "aspek": [
+          {
+            "nama": "Hadir 1",
+            "tipe": "Otomatis Kehadiran",
+            "bobot": 50,
+            "is_aktif": true
+          },
+          {
+            "nama": "Hadir 2",
+            "tipe": "Otomatis Kehadiran",
+            "bobot": 50,
+            "is_aktif": true
+          }
+        ]
+      },
+      "galat": "Aspek Otomatis Kehadiran hanya boleh satu per template."
+    },
+    {
+      "nama": "dua kehadiran, satu nonaktif: sah",
+      "draft": {
+        "nama": "Kinerja",
+        "kelompok": "Guru",
+        "is_bawaan": false,
+        "is_aktif": true,
+        "aspek": [
+          {
+            "nama": "Hadir 1",
+            "tipe": "Otomatis Kehadiran",
+            "bobot": 100,
+            "is_aktif": true
+          },
+          {
+            "nama": "Hadir 2",
+            "tipe": "Otomatis Kehadiran",
+            "bobot": 50,
+            "is_aktif": false
+          }
+        ]
+      },
+      "hasil": {
+        "id_template": null,
+        "nama": "Kinerja",
+        "kelompok": "Guru",
+        "keterangan": null,
+        "is_bawaan": false,
+        "is_aktif": true,
+        "aspek": [
+          {
+            "id_aspek": null,
+            "nama": "Hadir 1",
+            "tipe": "Otomatis Kehadiran",
+            "bobot": 100,
+            "panduan": null,
+            "urutan": 0,
+            "is_aktif": true
+          },
+          {
+            "id_aspek": null,
+            "nama": "Hadir 2",
+            "tipe": "Otomatis Kehadiran",
+            "bobot": 50,
+            "panduan": null,
+            "urutan": 1,
+            "is_aktif": false
+          }
+        ]
+      }
+    },
+    {
+      "nama": "total 90, aspek nonaktif tidak dihitung",
+      "draft": {
+        "nama": "Kinerja",
+        "kelompok": "Guru",
+        "is_bawaan": false,
+        "is_aktif": true,
+        "aspek": [
+          {
+            "nama": "A",
+            "tipe": "Manual",
+            "bobot": 60,
+            "is_aktif": true
+          },
+          {
+            "nama": "B",
+            "tipe": "Manual",
+            "bobot": 30,
+            "is_aktif": true
+          },
+          {
+            "nama": "C",
+            "tipe": "Manual",
+            "bobot": 10,
+            "is_aktif": false
+          }
+        ]
+      },
+      "galat": "Total bobot aspek aktif harus 100, sekarang 90."
+    }
+  ],
+  "template_lama": [
+    {
+      "nama": "sah, aspek baru tanpa id",
+      "draft": {
+        "nama": "Kinerja",
+        "kelompok": "Guru",
+        "is_bawaan": false,
+        "is_aktif": true,
+        "id_template": "ktp-a",
+        "aspek": [
+          {
+            "nama": "A",
+            "tipe": "Manual",
+            "bobot": 60,
+            "is_aktif": true,
+            "id_aspek": "ktp-a:1"
+          },
+          {
+            "nama": "B",
+            "tipe": "Otomatis Kehadiran",
+            "bobot": 40,
+            "is_aktif": true,
+            "id_aspek": "ktp-a:2"
+          },
+          {
+            "nama": "C",
+            "tipe": "Manual",
+            "bobot": 1,
+            "is_aktif": false
+          }
+        ]
+      },
+      "kelompok_lama": "Guru",
+      "aspek_lama": [
+        {
+          "id_aspek": "ktp-a:1",
+          "tipe": "Manual"
+        },
+        {
+          "id_aspek": "ktp-a:2",
+          "tipe": "Otomatis Kehadiran"
+        }
+      ],
+      "hasil": null
+    },
+    {
+      "nama": "kelompok berubah",
+      "draft": {
+        "nama": "Kinerja",
+        "kelompok": "Guru",
+        "is_bawaan": false,
+        "is_aktif": true,
+        "id_template": "ktp-a",
+        "aspek": [
+          {
+            "nama": "A",
+            "tipe": "Manual",
+            "bobot": 60,
+            "is_aktif": true,
+            "id_aspek": "ktp-a:1"
+          },
+          {
+            "nama": "B",
+            "tipe": "Otomatis Kehadiran",
+            "bobot": 40,
+            "is_aktif": true,
+            "id_aspek": "ktp-a:2"
+          },
+          {
+            "nama": "C",
+            "tipe": "Manual",
+            "bobot": 1,
+            "is_aktif": false
+          }
+        ]
+      },
+      "kelompok_lama": "Tendik",
+      "aspek_lama": [
+        {
+          "id_aspek": "ktp-a:1",
+          "tipe": "Manual"
+        },
+        {
+          "id_aspek": "ktp-a:2",
+          "tipe": "Otomatis Kehadiran"
+        }
+      ],
+      "galat": "Kelompok template tidak bisa diubah."
+    },
+    {
+      "nama": "tipe berubah",
+      "draft": {
+        "nama": "Kinerja",
+        "kelompok": "Guru",
+        "is_bawaan": false,
+        "is_aktif": true,
+        "id_template": "ktp-a",
+        "aspek": [
+          {
+            "nama": "A",
+            "tipe": "Manual",
+            "bobot": 60,
+            "is_aktif": true,
+            "id_aspek": "ktp-a:1"
+          },
+          {
+            "nama": "B",
+            "tipe": "Otomatis Kehadiran",
+            "bobot": 40,
+            "is_aktif": true,
+            "id_aspek": "ktp-a:2"
+          },
+          {
+            "nama": "C",
+            "tipe": "Manual",
+            "bobot": 1,
+            "is_aktif": false
+          }
+        ]
+      },
+      "kelompok_lama": "Guru",
+      "aspek_lama": [
+        {
+          "id_aspek": "ktp-a:1",
+          "tipe": "Manual"
+        },
+        {
+          "id_aspek": "ktp-a:2",
+          "tipe": "Manual"
+        }
+      ],
+      "galat": "Tipe aspek \"B\" tidak bisa diubah."
+    },
+    {
+      "nama": "aspek lama hilang",
+      "draft": {
+        "nama": "Kinerja",
+        "kelompok": "Guru",
+        "is_bawaan": false,
+        "is_aktif": true,
+        "id_template": "ktp-a",
+        "aspek": [
+          {
+            "nama": "A",
+            "tipe": "Manual",
+            "bobot": 60,
+            "is_aktif": true,
+            "id_aspek": "ktp-a:1"
+          },
+          {
+            "nama": "B",
+            "tipe": "Otomatis Kehadiran",
+            "bobot": 40,
+            "is_aktif": true,
+            "id_aspek": "ktp-a:2"
+          },
+          {
+            "nama": "C",
+            "tipe": "Manual",
+            "bobot": 1,
+            "is_aktif": false
+          }
+        ]
+      },
+      "kelompok_lama": "Guru",
+      "aspek_lama": [
+        {
+          "id_aspek": "ktp-a:1",
+          "tipe": "Manual"
+        },
+        {
+          "id_aspek": "ktp-a:2",
+          "tipe": "Otomatis Kehadiran"
+        },
+        {
+          "id_aspek": "ktp-a:3",
+          "tipe": "Manual"
+        }
+      ],
+      "galat": "Aspek tidak bisa dihapus; nonaktifkan saja."
+    },
+    {
+      "nama": "id aspek bukan milik template",
+      "draft": {
+        "nama": "Kinerja",
+        "kelompok": "Guru",
+        "is_bawaan": false,
+        "is_aktif": true,
+        "id_template": "ktp-a",
+        "aspek": [
+          {
+            "nama": "A",
+            "tipe": "Manual",
+            "bobot": 60,
+            "is_aktif": true,
+            "id_aspek": "ktp-a:1"
+          },
+          {
+            "nama": "B",
+            "tipe": "Otomatis Kehadiran",
+            "bobot": 40,
+            "is_aktif": true,
+            "id_aspek": "ktp-a:2"
+          },
+          {
+            "nama": "C",
+            "tipe": "Manual",
+            "bobot": 1,
+            "is_aktif": false
+          }
+        ]
+      },
+      "kelompok_lama": "Guru",
+      "aspek_lama": [
+        {
+          "id_aspek": "ktp-a:1",
+          "tipe": "Manual"
+        }
+      ],
+      "galat": "Aspek tidak dikenal untuk template ini."
+    },
+    {
+      "nama": "template baru membawa id aspek",
+      "draft": {
+        "nama": "Kinerja",
+        "kelompok": "Guru",
+        "is_bawaan": false,
+        "is_aktif": true,
+        "id_template": "ktp-a",
+        "aspek": [
+          {
+            "nama": "A",
+            "tipe": "Manual",
+            "bobot": 60,
+            "is_aktif": true,
+            "id_aspek": "ktp-a:1"
+          },
+          {
+            "nama": "B",
+            "tipe": "Otomatis Kehadiran",
+            "bobot": 40,
+            "is_aktif": true,
+            "id_aspek": "ktp-a:2"
+          },
+          {
+            "nama": "C",
+            "tipe": "Manual",
+            "bobot": 1,
+            "is_aktif": false
+          }
+        ]
+      },
+      "kelompok_lama": null,
+      "aspek_lama": [],
+      "galat": "Aspek tidak dikenal untuk template ini."
+    }
+  ],
+  "ambang": [
+    {
+      "nama": "bawaan",
+      "masukan": "950,900,800,700",
+      "hasil": "950,900,800,700"
+    },
+    {
+      "nama": "spasi",
+      "masukan": " 950 , 900,800 ,700 ",
+      "hasil": "950,900,800,700"
+    },
+    {
+      "nama": "nol di depan",
+      "masukan": "0950,900,800,700",
+      "hasil": "950,900,800,700"
+    },
+    {
+      "nama": "tepi 1000 dan 1",
+      "masukan": "1000,3,2,1",
+      "hasil": "1000,3,2,1"
+    },
+    {
+      "nama": "tiga angka",
+      "masukan": "950,900,800",
+      "galat": "Ambang harus empat bilangan bulat 1 sampai 1000 yang turun, misalnya 950,900,800,700."
+    },
+    {
+      "nama": "tidak turun",
+      "masukan": "950,950,800,700",
+      "galat": "Ambang harus empat bilangan bulat 1 sampai 1000 yang turun, misalnya 950,900,800,700."
+    },
+    {
+      "nama": "naik",
+      "masukan": "700,800,900,950",
+      "galat": "Ambang harus empat bilangan bulat 1 sampai 1000 yang turun, misalnya 950,900,800,700."
+    },
+    {
+      "nama": "di atas 1000",
+      "masukan": "1001,900,800,700",
+      "galat": "Ambang harus empat bilangan bulat 1 sampai 1000 yang turun, misalnya 950,900,800,700."
+    },
+    {
+      "nama": "nol",
+      "masukan": "950,900,800,0",
+      "galat": "Ambang harus empat bilangan bulat 1 sampai 1000 yang turun, misalnya 950,900,800,700."
+    },
+    {
+      "nama": "huruf",
+      "masukan": "950,900,800,7a",
+      "galat": "Ambang harus empat bilangan bulat 1 sampai 1000 yang turun, misalnya 950,900,800,700."
+    },
+    {
+      "nama": "negatif",
+      "masukan": "950,900,800,-1",
+      "galat": "Ambang harus empat bilangan bulat 1 sampai 1000 yang turun, misalnya 950,900,800,700."
+    },
+    {
+      "nama": "bagian kosong",
+      "masukan": "950,900,,700",
+      "galat": "Ambang harus empat bilangan bulat 1 sampai 1000 yang turun, misalnya 950,900,800,700."
+    },
+    {
+      "nama": "kosong",
+      "masukan": "",
+      "galat": "Ambang harus empat bilangan bulat 1 sampai 1000 yang turun, misalnya 950,900,800,700."
+    }
+  ],
+  "predikat": [
+    {
+      "nama": "bawaan",
+      "masukan": "9100:Amat Baik|7600:Baik|6100:Cukup|5100:Sedang|0:Kurang",
+      "hasil": "9100:Amat Baik|7600:Baik|6100:Cukup|5100:Sedang|0:Kurang"
+    },
+    {
+      "nama": "spasi",
+      "masukan": " 9000 : Sangat Baik | 0:Kurang ",
+      "hasil": "9000:Sangat Baik|0:Kurang"
+    },
+    {
+      "nama": "satu pasangan",
+      "masukan": "0:A",
+      "galat": "Predikat harus 2 sampai 7 pasangan nilai:nama dengan nilai turun dari 10000 dan yang terakhir 0."
+    },
+    {
+      "nama": "delapan pasangan",
+      "masukan": "7000:A|6000:B|5000:C|4000:D|3000:E|2000:F|1000:G|0:H",
+      "galat": "Predikat harus 2 sampai 7 pasangan nilai:nama dengan nilai turun dari 10000 dan yang terakhir 0."
+    },
+    {
+      "nama": "tujuh pasangan",
+      "masukan": "6000:A|5000:B|4000:C|3000:D|2000:E|1000:F|0:G",
+      "hasil": "6000:A|5000:B|4000:C|3000:D|2000:E|1000:F|0:G"
+    },
+    {
+      "nama": "terakhir bukan 0",
+      "masukan": "9000:A|100:B",
+      "galat": "Predikat harus 2 sampai 7 pasangan nilai:nama dengan nilai turun dari 10000 dan yang terakhir 0."
+    },
+    {
+      "nama": "tidak turun",
+      "masukan": "9000:A|9000:B|0:C",
+      "galat": "Predikat harus 2 sampai 7 pasangan nilai:nama dengan nilai turun dari 10000 dan yang terakhir 0."
+    },
+    {
+      "nama": "di atas 10000",
+      "masukan": "10001:A|0:B",
+      "galat": "Predikat harus 2 sampai 7 pasangan nilai:nama dengan nilai turun dari 10000 dan yang terakhir 0."
+    },
+    {
+      "nama": "tepat 10000",
+      "masukan": "10000:A|0:B",
+      "hasil": "10000:A|0:B"
+    },
+    {
+      "nama": "tanpa titik dua",
+      "masukan": "9000 A|0:B",
+      "galat": "Predikat harus 2 sampai 7 pasangan nilai:nama dengan nilai turun dari 10000 dan yang terakhir 0."
+    },
+    {
+      "nama": "ambang huruf",
+      "masukan": "x:A|0:B",
+      "galat": "Predikat harus 2 sampai 7 pasangan nilai:nama dengan nilai turun dari 10000 dan yang terakhir 0."
+    },
+    {
+      "nama": "nama kosong",
+      "masukan": "9000:|0:B",
+      "galat": "Nama predikat 1 sampai 50 karakter tanpa tanda | dan :."
+    },
+    {
+      "nama": "nama bertitik dua",
+      "masukan": "9000:A:B|0:C",
+      "galat": "Nama predikat 1 sampai 50 karakter tanpa tanda | dan :."
+    },
+    {
+      "nama": "nama 51",
+      "masukan": "9000:nnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnn|0:B",
+      "galat": "Nama predikat 1 sampai 50 karakter tanpa tanda | dan :."
+    },
+    {
+      "nama": "kosong",
+      "masukan": "",
+      "galat": "Predikat harus 2 sampai 7 pasangan nilai:nama dengan nilai turun dari 10000 dan yang terakhir 0."
+    }
+  ],
+  "tanpa_kbm": [
+    {
+      "nama": "kosong",
+      "masukan": "",
+      "hasil": ""
+    },
+    {
+      "nama": "spasi saja",
+      "masukan": "   ",
+      "hasil": ""
+    },
+    {
+      "nama": "satu rentang",
+      "masukan": "2026-12-01..2026-12-12:PAS Ganjil",
+      "hasil": "2026-12-01..2026-12-12:PAS Ganjil"
+    },
+    {
+      "nama": "dua rentang dengan spasi",
+      "masukan": " 2026-12-01..2026-12-12: PAS Ganjil | 2027-03-02..2027-03-06:PTS ",
+      "hasil": "2026-12-01..2026-12-12:PAS Ganjil|2027-03-02..2027-03-06:PTS"
+    },
+    {
+      "nama": "satu hari",
+      "masukan": "2026-12-01..2026-12-01:Rapat",
+      "hasil": "2026-12-01..2026-12-01:Rapat"
+    },
+    {
+      "nama": "31 hari",
+      "masukan": "2026-12-01..2026-12-31:Libur",
+      "hasil": "2026-12-01..2026-12-31:Libur"
+    },
+    {
+      "nama": "nama bertitik dua boleh",
+      "masukan": "2026-12-01..2026-12-02:Rapat: guru",
+      "hasil": "2026-12-01..2026-12-02:Rapat: guru"
+    },
+    {
+      "nama": "32 hari",
+      "masukan": "2026-12-01..2027-01-01:Panjang",
+      "galat": "Rentang \"Panjang\" paling panjang 31 hari."
+    },
+    {
+      "nama": "terbalik",
+      "masukan": "2026-12-12..2026-12-01:Balik",
+      "galat": "Rentang \"Balik\" berakhir sebelum mulai."
+    },
+    {
+      "nama": "tanggal mustahil",
+      "masukan": "2026-02-30..2026-03-01:Salah",
+      "galat": "Tanggal rentang \"Salah\" tidak valid."
+    },
+    {
+      "nama": "bentuk salah",
+      "masukan": "2026-12-01-2026-12-12:PAS",
+      "galat": "Rentang \"2026-12-01-2026-12-12:PAS\" harus berbentuk YYYY-MM-DD..YYYY-MM-DD:Nama."
+    },
+    {
+      "nama": "tanpa nama",
+      "masukan": "2026-12-01..2026-12-12:",
+      "galat": "Nama rentang 1 sampai 50 karakter."
+    },
+    {
+      "nama": "nama 51",
+      "masukan": "2026-12-01..2026-12-12:nnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnn",
+      "galat": "Nama rentang 1 sampai 50 karakter."
+    },
+    {
+      "nama": "31 rentang",
+      "masukan": "2027-01-01..2027-01-01:R0|2027-01-02..2027-01-02:R1|2027-01-03..2027-01-03:R2|2027-01-04..2027-01-04:R3|2027-01-05..2027-01-05:R4|2027-01-06..2027-01-06:R5|2027-01-07..2027-01-07:R6|2027-01-08..2027-01-08:R7|2027-01-09..2027-01-09:R8|2027-01-10..2027-01-10:R9|2027-01-11..2027-01-11:R10|2027-01-12..2027-01-12:R11|2027-01-13..2027-01-13:R12|2027-01-14..2027-01-14:R13|2027-01-15..2027-01-15:R14|2027-01-16..2027-01-16:R15|2027-01-17..2027-01-17:R16|2027-01-18..2027-01-18:R17|2027-01-19..2027-01-19:R18|2027-01-20..2027-01-20:R19|2027-01-21..2027-01-21:R20|2027-01-22..2027-01-22:R21|2027-01-23..2027-01-23:R22|2027-01-24..2027-01-24:R23|2027-01-25..2027-01-25:R24|2027-01-26..2027-01-26:R25|2027-01-27..2027-01-27:R26|2027-01-28..2027-01-28:R27|2027-01-29..2027-01-29:R28|2027-01-30..2027-01-30:R29|2027-01-31..2027-01-31:R30",
+      "galat": "Rentang tanpa KBM paling banyak 30."
+    }
+  ],
+  "pengaturan": [
+    {
+      "nama": "sah",
+      "draft": {
+        "ambang": " 950,900,800,700",
+        "predikat": "9100:Amat Baik|7600:Baik|6100:Cukup|5100:Sedang|0:Kurang",
+        "tanpa_kbm": ""
+      },
+      "hasil": [
+        ["hr_kinerja_ambang", "950,900,800,700"],
+        [
+          "hr_kinerja_predikat",
+          "9100:Amat Baik|7600:Baik|6100:Cukup|5100:Sedang|0:Kurang"
+        ],
+        ["hr_kinerja_tanpa_kbm", ""]
+      ]
+    },
+    {
+      "nama": "ambang salah",
+      "draft": {
+        "ambang": "1,2,3,4",
+        "predikat": "9100:Amat Baik|7600:Baik|6100:Cukup|5100:Sedang|0:Kurang",
+        "tanpa_kbm": ""
+      },
+      "galat": "Ambang harus empat bilangan bulat 1 sampai 1000 yang turun, misalnya 950,900,800,700."
+    },
+    {
+      "nama": "predikat salah",
+      "draft": {
+        "ambang": "950,900,800,700",
+        "predikat": "0:A",
+        "tanpa_kbm": ""
+      },
+      "galat": "Predikat harus 2 sampai 7 pasangan nilai:nama dengan nilai turun dari 10000 dan yang terakhir 0."
+    },
+    {
+      "nama": "rentang salah",
+      "draft": {
+        "ambang": "950,900,800,700",
+        "predikat": "9100:Amat Baik|7600:Baik|6100:Cukup|5100:Sedang|0:Kurang",
+        "tanpa_kbm": "2026-12-12..2026-12-01:Balik"
+      },
+      "galat": "Rentang \"Balik\" berakhir sebelum mulai."
+    }
+  ],
+  "berlaku": [
+    {
+      "nama": "kosong = bawaan",
+      "peta": {},
+      "hasil": {
+        "ambang": [950, 900, 800, 700],
+        "predikat": [
+          {
+            "ambang": 9100,
+            "nama": "Amat Baik"
+          },
+          {
+            "ambang": 7600,
+            "nama": "Baik"
+          },
+          {
+            "ambang": 6100,
+            "nama": "Cukup"
+          },
+          {
+            "ambang": 5100,
+            "nama": "Sedang"
+          },
+          {
+            "ambang": 0,
+            "nama": "Kurang"
+          }
+        ],
+        "tanpa_kbm": []
+      }
+    },
+    {
+      "nama": "nilai tersimpan",
+      "peta": {
+        "hr_kinerja_ambang": "900,800,700,600",
+        "hr_kinerja_predikat": "9000:A|0:B",
+        "hr_kinerja_tanpa_kbm": "2026-12-01..2026-12-12:PAS"
+      },
+      "hasil": {
+        "ambang": [900, 800, 700, 600],
+        "predikat": [
+          {
+            "ambang": 9000,
+            "nama": "A"
+          },
+          {
+            "ambang": 0,
+            "nama": "B"
+          }
+        ],
+        "tanpa_kbm": [
+          {
+            "mulai": "2026-12-01",
+            "selesai": "2026-12-12",
+            "nama": "PAS"
+          }
+        ]
+      }
+    },
+    {
+      "nama": "rusak = bawaan",
+      "peta": {
+        "hr_kinerja_ambang": "abc",
+        "hr_kinerja_predikat": "",
+        "hr_kinerja_tanpa_kbm": "salah"
+      },
+      "hasil": {
+        "ambang": [950, 900, 800, 700],
+        "predikat": [
+          {
+            "ambang": 9100,
+            "nama": "Amat Baik"
+          },
+          {
+            "ambang": 7600,
+            "nama": "Baik"
+          },
+          {
+            "ambang": 6100,
+            "nama": "Cukup"
+          },
+          {
+            "ambang": 5100,
+            "nama": "Sedang"
+          },
+          {
+            "ambang": 0,
+            "nama": "Kurang"
+          }
+        ],
+        "tanpa_kbm": []
+      }
+    }
+  ],
+  "skor_ambang": [
+    {
+      "permil": 1000,
+      "ambang": [950, 900, 800, 700],
+      "skor": 5
+    },
+    {
+      "permil": 950,
+      "ambang": [950, 900, 800, 700],
+      "skor": 5
+    },
+    {
+      "permil": 949,
+      "ambang": [950, 900, 800, 700],
+      "skor": 4
+    },
+    {
+      "permil": 900,
+      "ambang": [950, 900, 800, 700],
+      "skor": 4
+    },
+    {
+      "permil": 899,
+      "ambang": [950, 900, 800, 700],
+      "skor": 3
+    },
+    {
+      "permil": 800,
+      "ambang": [950, 900, 800, 700],
+      "skor": 3
+    },
+    {
+      "permil": 799,
+      "ambang": [950, 900, 800, 700],
+      "skor": 2
+    },
+    {
+      "permil": 700,
+      "ambang": [950, 900, 800, 700],
+      "skor": 2
+    },
+    {
+      "permil": 699,
+      "ambang": [950, 900, 800, 700],
+      "skor": 1
+    },
+    {
+      "permil": 0,
+      "ambang": [950, 900, 800, 700],
+      "skor": 1
+    },
+    {
+      "permil": 850,
+      "ambang": [900, 800, 700, 600],
+      "skor": 4
+    }
+  ],
+  "pilih_predikat": [
+    {
+      "predikat": null,
+      "nilai": 10000,
+      "hasil": "Amat Baik"
+    },
+    {
+      "predikat": null,
+      "nilai": 9100,
+      "hasil": "Amat Baik"
+    },
+    {
+      "predikat": null,
+      "nilai": 9099,
+      "hasil": "Baik"
+    },
+    {
+      "predikat": null,
+      "nilai": 7600,
+      "hasil": "Baik"
+    },
+    {
+      "predikat": null,
+      "nilai": 7000,
+      "hasil": "Cukup"
+    },
+    {
+      "predikat": null,
+      "nilai": 6100,
+      "hasil": "Cukup"
+    },
+    {
+      "predikat": null,
+      "nilai": 5100,
+      "hasil": "Sedang"
+    },
+    {
+      "predikat": null,
+      "nilai": 5099,
+      "hasil": "Kurang"
+    },
+    {
+      "predikat": null,
+      "nilai": 0,
+      "hasil": "Kurang"
+    },
+    {
+      "predikat": "9000:A|0:B",
+      "nilai": 8999,
+      "hasil": "B"
+    }
+  ]
+}

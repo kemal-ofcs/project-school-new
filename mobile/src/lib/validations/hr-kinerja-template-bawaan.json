@@ -1,0 +1,116 @@
+[
+  {
+    "id_template": "ktp-guru",
+    "nama": "Penilaian Kinerja Guru",
+    "kelompok": "Guru",
+    "keterangan": "Template bawaan. Bobot wajib dicek ulang yayasan sebelum dipakai.",
+    "aspek": [
+      {
+        "id_aspek": "ktp-guru:kehadiran",
+        "nama": "Kehadiran",
+        "tipe": "Otomatis Kehadiran",
+        "bobot": 10,
+        "panduan": "Dihitung dari absensi gerbang: tepat waktu bernilai penuh, terlambat setengah, Alfa dan hari tanpa catatan nol. Cuti, izin, dan sakit yang disetujui tidak dihitung."
+      },
+      {
+        "id_aspek": "ktp-guru:presensi-kelas",
+        "nama": "Keterisian presensi kelas",
+        "tipe": "Otomatis Presensi Kelas",
+        "bobot": 10,
+        "panduan": "Jam pelajaran terjadwal yang presensi kelasnya diisi atas nama guru ini."
+      },
+      {
+        "id_aspek": "ktp-guru:jurnal",
+        "nama": "Kelengkapan jurnal mengajar",
+        "tipe": "Otomatis Jurnal",
+        "bobot": 10,
+        "panduan": "Jam pelajaran berpresensi yang jurnal mengajarnya terisi."
+      },
+      {
+        "id_aspek": "ktp-guru:supervisi",
+        "nama": "Supervisi akademik",
+        "tipe": "Manual",
+        "bobot": 20,
+        "panduan": "Hasil observasi kelas: perencanaan, pelaksanaan pembelajaran, dan penilaian hasil belajar."
+      },
+      {
+        "id_aspek": "ktp-guru:pedagogik",
+        "nama": "Kompetensi pedagogik",
+        "tipe": "Manual",
+        "bobot": 15,
+        "panduan": "Memahami karakter peserta didik, mengelola pembelajaran, dan mengevaluasi hasil belajar."
+      },
+      {
+        "id_aspek": "ktp-guru:kepribadian",
+        "nama": "Kompetensi kepribadian",
+        "tipe": "Manual",
+        "bobot": 10,
+        "panduan": "Bertindak sesuai norma, menjadi teladan, disiplin, dan bertanggung jawab."
+      },
+      {
+        "id_aspek": "ktp-guru:sosial",
+        "nama": "Kompetensi sosial",
+        "tipe": "Manual",
+        "bobot": 10,
+        "panduan": "Berkomunikasi dengan peserta didik, rekan kerja, orang tua, dan masyarakat."
+      },
+      {
+        "id_aspek": "ktp-guru:profesional",
+        "nama": "Kompetensi profesional",
+        "tipe": "Manual",
+        "bobot": 15,
+        "panduan": "Penguasaan materi pelajaran dan pengembangan keprofesian berkelanjutan."
+      }
+    ]
+  },
+  {
+    "id_template": "ktp-tendik",
+    "nama": "Penilaian Kinerja Tenaga Kependidikan",
+    "kelompok": "Tendik",
+    "keterangan": "Template bawaan. Bobot wajib dicek ulang yayasan sebelum dipakai.",
+    "aspek": [
+      {
+        "id_aspek": "ktp-tendik:kehadiran",
+        "nama": "Kehadiran",
+        "tipe": "Otomatis Kehadiran",
+        "bobot": 20,
+        "panduan": "Dihitung dari absensi gerbang: tepat waktu bernilai penuh, terlambat setengah, Alfa dan hari tanpa catatan nol. Cuti, izin, dan sakit yang disetujui tidak dihitung."
+      },
+      {
+        "id_aspek": "ktp-tendik:kualitas",
+        "nama": "Kualitas hasil kerja",
+        "tipe": "Manual",
+        "bobot": 25,
+        "panduan": "Ketelitian, kerapian, dan kebenaran hasil pekerjaan."
+      },
+      {
+        "id_aspek": "ktp-tendik:tanggung-jawab",
+        "nama": "Ketepatan dan tanggung jawab",
+        "tipe": "Manual",
+        "bobot": 20,
+        "panduan": "Menyelesaikan tugas tepat waktu dan menanggung akibat pekerjaannya."
+      },
+      {
+        "id_aspek": "ktp-tendik:pelayanan",
+        "nama": "Pelayanan",
+        "tipe": "Manual",
+        "bobot": 15,
+        "panduan": "Melayani guru, peserta didik, orang tua, dan tamu dengan baik."
+      },
+      {
+        "id_aspek": "ktp-tendik:kerja-sama",
+        "nama": "Kerja sama",
+        "tipe": "Manual",
+        "bobot": 10,
+        "panduan": "Bekerja bersama rekan dan atasan."
+      },
+      {
+        "id_aspek": "ktp-tendik:integritas",
+        "nama": "Integritas dan kedisiplinan",
+        "tipe": "Manual",
+        "bobot": 10,
+        "panduan": "Jujur, menaati aturan sekolah, dan menjaga kerahasiaan data."
+      }
+    ]
+  }
+]

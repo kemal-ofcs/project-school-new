@@ -17,7 +17,7 @@ use super::{
         CommandError, MobileLoginResult, MobileRuntimeStatus, MobileSession, MobileSyncStatus,
         OperatorUser, SessionMode,
     },
-    hr_beban, hr_keluar, hr_pengajuan, hris, hris_cloud, operational, portability, rapel,
+    hr_beban, hr_keluar, hr_kinerja, hr_pengajuan, hris, hris_cloud, operational, portability, rapel,
     scanner, secrets, storage, sync, teaching_journal, turso, uks, wa_notification,
 };
 
@@ -3605,6 +3605,49 @@ pub async fn desktop_hr_exit_reasons_save(
     hr_keluar::simpan_alasan(&klien_cloud(&state)?, &draft)
         .await
         .map_err(hris_cloud::luring)
+}
+
+/// Template kinerja beserta aspeknya (cloud-only) dan pengaturan kinerja dari
+/// perangkat (HRIS Fase 5a).
+#[tauri::command]
+pub async fn desktop_hr_performance_templates(
+    state: State<'_, MobileState>,
+) -> Result<Value, CommandError> {
+    require_any_permission(
+        &state,
+        &[
+            "hr.performance.view",
+            "hr.performance.assess",
+            "hr.performance.finalize",
+            "hr.performance.config",
+        ],
+    )?;
+    let pengaturan = hr_kinerja::pengaturan_lokal(&state)?;
+    hr_kinerja::daftar_template(&klien_cloud(&state)?, pengaturan)
+        .await
+        .map_err(hris_cloud::luring)
+}
+
+/// Buat atau ubah template kinerja dan semua aspeknya dalam satu batch cloud.
+#[tauri::command]
+pub async fn desktop_hr_performance_template_save(
+    state: State<'_, MobileState>,
+    draft: Value,
+) -> Result<Value, CommandError> {
+    let operator = require_permission(&state, "hr.performance.config")?;
+    hr_kinerja::simpan_template(&klien_cloud(&state)?, &operator, &draft)
+        .await
+        .map_err(hris_cloud::luring)
+}
+
+/// Ambang, predikat, dan rentang tanpa KBM sekaligus (lokal + outbox).
+#[tauri::command]
+pub fn desktop_hr_performance_settings_save(
+    state: State<'_, MobileState>,
+    draft: Value,
+) -> Result<Value, CommandError> {
+    require_permission(&state, "hr.performance.config")?;
+    hr_kinerja::simpan_pengaturan(&state, &draft)
 }
 
 /// Berlakukan proses keluar: satu batch cloud menonaktifkan pegawai dan akun

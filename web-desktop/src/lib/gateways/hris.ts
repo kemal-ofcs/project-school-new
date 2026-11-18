@@ -17,6 +17,12 @@ import type {
   SpDraft,
 } from "@/lib/validations/hr-keluar";
 import type {
+  DataTemplateKinerja,
+  PengaturanKinerja,
+  PengaturanKinerjaDraft,
+  TemplateDraft,
+} from "@/lib/validations/hr-kinerja";
+import type {
   BerkasDokumenDraft,
   DaftarDokumen,
   DaftarKontrak,
@@ -513,6 +519,40 @@ export function simpanAlasanKeluar(
     "desktop_hr_exit_reasons_save",
     { draft },
     "/api/kepegawaian/offboarding/reasons",
+    draft,
+  );
+}
+
+// HRIS Fase 5: penilaian kinerja. Template cloud-only; pengaturan tersinkron.
+
+export function muatTemplateKinerja(): Promise<DataTemplateKinerja> {
+  return cloud(
+    "desktop_hr_performance_templates",
+    {},
+    "/api/kepegawaian/performance/templates",
+    {},
+  );
+}
+
+/** Buat (tanpa `id_template`) atau ubah template beserta semua aspeknya. */
+export function simpanTemplateKinerja(
+  draft: TemplateDraft,
+): Promise<{ sukses: true; id_template: string }> {
+  return cloud(
+    "desktop_hr_performance_template_save",
+    { draft },
+    "/api/kepegawaian/performance/template-save",
+    draft,
+  );
+}
+
+export function simpanPengaturanKinerja(
+  draft: PengaturanKinerjaDraft,
+): Promise<PengaturanKinerja> {
+  return mutasi(
+    "desktop_hr_performance_settings_save",
+    { draft },
+    "/api/kepegawaian/performance/settings",
     draft,
   );
 }

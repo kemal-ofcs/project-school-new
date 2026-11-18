@@ -24,6 +24,7 @@ import { PengaturanSurat } from "@/components/kepegawaian/PengaturanSurat";
 import { RincianPegawai } from "@/components/kepegawaian/RincianPegawai";
 import { TabBebanMengajar } from "@/components/kepegawaian/TabBebanMengajar";
 import { type AwalKeluar, TabKeluar } from "@/components/kepegawaian/TabKeluar";
+import { TabKinerja } from "@/components/kepegawaian/TabKinerja";
 import { TabKontrak } from "@/components/kepegawaian/TabKontrak";
 import { TabLaporanPtk } from "@/components/kepegawaian/TabLaporanPtk";
 import { TabSurat } from "@/components/kepegawaian/TabSurat";
@@ -56,7 +57,8 @@ type Tab =
   | "ptk"
   | "beban"
   | "surat"
-  | "keluar";
+  | "keluar"
+  | "kinerja";
 
 const TAB: { kunci: Tab; label: string }[] = [
   { kunci: "daftar", label: "Daftar" },
@@ -68,6 +70,7 @@ const TAB: { kunci: Tab; label: string }[] = [
   { kunci: "beban", label: "Beban Mengajar" },
   { kunci: "surat", label: "Surat" },
   { kunci: "keluar", label: "Keluar" },
+  { kunci: "kinerja", label: "Kinerja" },
 ];
 
 /** Tab yang hanya untuk pemegang `teachers.view` (area juga lolos lewat `employees.view`). */
@@ -116,6 +119,14 @@ export default function KepegawaianPage() {
   const lihatKeluar =
     hasPermission(user, "hr.offboard.view") ||
     hasPermission(user, "hr.offboard.manage");
+  const lihatKinerja = (
+    [
+      "hr.performance.view",
+      "hr.performance.assess",
+      "hr.performance.finalize",
+      "hr.performance.config",
+    ] as const
+  ).some((izin) => hasPermission(user, izin));
 
   return (
     <AppShell contentClassName="mx-auto w-full max-w-6xl space-y-6 px-4 py-6 sm:px-6 md:py-8 lg:px-8">
@@ -145,7 +156,8 @@ export default function KepegawaianPage() {
               hasPermission(user, "teachers.view")) &&
             (!TAB_SURAT.includes(kunci) ||
               hasPermission(user, "hr.duty.manage")) &&
-            (kunci !== "keluar" || lihatKeluar),
+            (kunci !== "keluar" || lihatKeluar) &&
+            (kunci !== "kinerja" || lihatKinerja),
         ).map(({ kunci, label }) => (
           <button
             key={kunci}
@@ -212,6 +224,12 @@ export default function KepegawaianPage() {
           <TabBebanMengajar onPesan={setPesan} onGalat={setGalat} />
         ) : tab === "surat" ? (
           <TabSurat org={org} onGalat={setGalat} />
+        ) : tab === "kinerja" ? (
+          <TabKinerja
+            bolehAtur={hasPermission(user, "hr.performance.config")}
+            onPesan={setPesan}
+            onGalat={setGalat}
+          />
         ) : (
           <TabOrganisasi
             org={org}
