@@ -13,9 +13,18 @@ import { type Client, createClient } from "@libsql/client";
 mock.module("server-only", () => ({}));
 
 const { initDatabaseSchema } = await import("@/lib/db-schema");
-const { drainTelegram, getTelegramConfig, saveTelegramConfig } = await import(
-  "./telegram"
-);
+const { runDatabaseMigrations } = await import("@/lib/db-migrations");
+const {
+  catatKepegawaian,
+  drainTelegram,
+  getTelegramConfig,
+  saveTelegramConfig,
+} = await import("./telegram");
+const { HARI_INI_SQL } = await import("@/lib/validations/hris");
+const vektor = (await import("@/lib/validations/telegram.vektor.json")).default;
+const vektorPengingat = (
+  await import("@/lib/validations/hr-pengingat.vektor.json")
+).default;
 const {
   TELEGRAM_SQL_JAM_WIB,
   TELEGRAM_SQL_PEMBAYARAN,
@@ -36,7 +45,8 @@ let jawaban: () => Response = () =>
 
 beforeAll(async () => {
   await initDatabaseSchema(client);
-});
+  await runDatabaseMigrations(client);
+}, 60_000);
 
 beforeEach(async () => {
   await client.batch(
@@ -196,17 +206,32 @@ describe("pengirim Telegram", () => {
     expect(String(baris.rows[0]?.last_error)).toContain("/bot***/");
   });
 
-  test("kejadian yang dimatikan setelah tercatat dibatalkan, tidak dikirim", async () => {
-    await aktifkan();
-    await client.execute(
-      "INSERT INTO notifikasi_telegram (id_notifikasi, kejadian, isi_pesan) VALUES ('pgj-baru:z', 'pengajuan_baru', 'x'), ('asing', 'gaji', 'y');",
-    );
-    await client.execute(
-      "UPDATE app_telegram_setting SET nilai = '0' WHERE kunci = 'kirim:pengajuan_baru';",
-    );
+  // Data `asing` sama dengan `telegram_kejadian_asing_menunggu` (Rust).
+  test("kejadian asing tetap Menunggu dan tidak menyumbat; yang dimatikan dibatalkan", async () => {
+    await aktifkan({ "kirim:pengajuan_baru": "0" });
+    const { jumlah_asing, kejadian_asing, dikenal, dibatalkan } = vektor.asing;
+    for (let n = 1; n <= jumlah_asing; n++) {
+      await client.execute({
+        sql: "INSERT INTO notifikasi_telegram (id_notifikasi, kejadian, isi_pesan) VALUES (?, ?, 'x');",
+        args: [`asing-${String(n).padStart(2, "0")}`, kejadian_asing],
+      });
+    }
+    await client.execute({
+      sql: "INSERT INTO notifikasi_telegram (id_notifikasi, kejadian, isi_pesan) VALUES (?, ?, 'y');",
+      args: dikenal,
+    });
     const hasil = await drainTelegram(client, "uji", { jedaMs: 0 });
-    expect(hasil.dibatalkan).toBe(2);
+    expect(hasil.dibatalkan).toBe(dibatalkan);
     expect(kiriman).toHaveLength(0);
+    const status = await client.execute(
+      "SELECT kejadian, status, COUNT(*) AS n FROM notifikasi_telegram GROUP BY kejadian, status ORDER BY kejadian;",
+    );
+    expect(status.rows.map((r) => [r.kejadian, r.status, Number(r.n)])).toEqual(
+      [
+        [kejadian_asing, "Menunggu", jumlah_asing],
+        [dikenal[1], "Dibatalkan", 1],
+      ],
+    );
   });
 
   test("SQL stok dan jam WIB berjalan pada skema nyata", async () => {
@@ -348,7 +373,12 @@ describe("konfigurasi Telegram", () => {
   const draft = {
     aktif: true,
     botToken: "",
-    grup: { inventaris: " -100111 ", keuangan: "", pimpinan: "" },
+    grup: {
+      inventaris: " -100111 ",
+      keuangan: "",
+      pimpinan: "",
+      kepegawaian: "",
+    },
     kirim: {
       pengajuan_baru: true,
       pengajuan_putus: true,
@@ -358,6 +388,15 @@ describe("konfigurasi Telegram", () => {
       tutup_buku: false,
       gaji_status: false,
       buka_buku_pimpinan: false,
+      kontrak_berakhir: false,
+      percobaan_berakhir: false,
+      kgb: false,
+      pensiun: false,
+      dokumen_kedaluwarsa: false,
+      sp_berakhir: false,
+      pengajuan_menunggu: false,
+      jp_tanpa_penanganan: false,
+      sk_pembagian_tugas: true,
     },
   };
 
@@ -394,8 +433,73 @@ describe("konfigurasi Telegram", () => {
       saveTelegramConfig(client, {
         ...draft,
         botToken: TOKEN,
-        grup: { inventaris: "t.me/abc", keuangan: "", pimpinan: "" },
+        grup: { ...draft.grup, inventaris: "t.me/abc" },
       }),
     ).rejects.toThrow("Id grup Inventaris tidak valid");
+  });
+});
+
+// Pasangan Rust: `telegram_kepegawaian_siklus` dan `telegram_kepegawaian_muat`
+// di `desktop/telegram.rs`, dengan data vektor yang sama.
+describe("kejadian kepegawaian", () => {
+  const hariIni = async () =>
+    String((await client.execute(HARI_INI_SQL)).rows[0]?.hari_ini ?? "");
+  const jalankan = async (daftar: readonly string[], hari: string) => {
+    for (const sql of daftar) {
+      await client.execute({ sql, args: sql.includes("?1") ? [hari] : [] });
+    }
+  };
+  const semuaId = async () =>
+    (
+      await client.execute(
+        "SELECT id_notifikasi FROM notifikasi_telegram ORDER BY id_notifikasi;",
+      )
+    ).rows.map((r) => String(r.id_notifikasi));
+
+  beforeEach(async () => {
+    await client.batch(
+      [
+        "DELETE FROM master_data;",
+        "DELETE FROM hr_profil;",
+        "DELETE FROM hr_kontrak;",
+        "DELETE FROM hr_dokumen;",
+        "DELETE FROM hr_sp;",
+        "DELETE FROM hr_pengajuan;",
+        "DELETE FROM hr_pengajuan_keputusan;",
+        "DELETE FROM akademik_tahun_ajaran;",
+        "DELETE FROM akademik_rombel;",
+        "DELETE FROM jadwal_mengajar;",
+        "DELETE FROM hr_jp_penanganan;",
+      ],
+      "write",
+    );
+  });
+
+  test("siklus: jendela 30 lalu 7, tanpa ganda, runner mati, dinyalakan di H-5", async () => {
+    const hari = await hariIni();
+    await jalankan(vektor.siklus.sql, hari);
+    for (const langkah of vektor.siklus.langkah) {
+      await jalankan(langkah.sql, hari);
+      await catatKepegawaian(client, () => langkah.kirim, 8);
+      expect([langkah.nama, await semuaId()]).toEqual([
+        langkah.nama,
+        langkah.ids,
+      ]);
+    }
+  });
+
+  test("data pemuat kartu: semua pengingat tercatat, tanpa data terlarang", async () => {
+    const hari = await hariIni();
+    await jalankan(vektorPengingat.muat.sql, hari);
+    await catatKepegawaian(client, () => true, 8);
+    expect((await semuaId()).map((id) => id.split(":")[0])).toEqual(
+      vektor.muat.awalan,
+    );
+    const isi = (
+      await client.execute("SELECT isi_pesan FROM notifikasi_telegram;")
+    ).rows.map((r) => String(r.isi_pesan));
+    for (const teks of vektor.muat.terlarang) {
+      expect(isi.filter((pesan) => pesan.includes(teks))).toEqual([]);
+    }
   });
 });

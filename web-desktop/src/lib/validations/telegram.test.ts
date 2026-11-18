@@ -1,5 +1,7 @@
 import { describe, expect, test } from "bun:test";
+import { type ItemPengingat, KEJADIAN_PENGINGAT } from "./hr-pengingat";
 import {
+  antreanKepegawaian,
   type BarisStokMenipis,
   BIDANG_KEJADIAN,
   galatTelegram,
@@ -16,8 +18,11 @@ import {
   pesanTutupBuku,
   potong,
   samarkanToken,
+  TELEGRAM_BIDANG,
+  TELEGRAM_KEJADIAN,
   tokenBotValid,
 } from "./telegram";
+import vektor from "./telegram.vektor.json";
 
 // Vektor yang sama diuji di `desktop/telegram.rs` (modul `tests`).
 describe("aturan murni Telegram", () => {
@@ -325,5 +330,53 @@ describe("aturan murni Telegram", () => {
     expect(BIDANG_KEJADIAN.pengajuan_baru).toBe("keuangan");
     expect(BIDANG_KEJADIAN.pengajuan_putus).toBe("inventaris");
     expect(BIDANG_KEJADIAN.stok_menipis).toBe("inventaris");
+    expect(TELEGRAM_BIDANG).toEqual([
+      "inventaris",
+      "keuangan",
+      "pimpinan",
+      "kepegawaian",
+    ]);
+    expect(TELEGRAM_KEJADIAN).toHaveLength(17);
+    expect(TELEGRAM_KEJADIAN.slice(8)).toEqual([...KEJADIAN_PENGINGAT]);
+    for (const kejadian of KEJADIAN_PENGINGAT) {
+      expect(BIDANG_KEJADIAN[kejadian]).toBe("kepegawaian");
+    }
+  });
+});
+
+// Vektor yang sama diuji di `desktop/telegram.rs` (`telegram_vektor_kepegawaian`).
+describe("pesan Telegram kepegawaian", () => {
+  const items = vektor.items as ItemPengingat[];
+
+  test.each(
+    vektor.kepegawaian.map((k) => [k.nama, k] as const),
+  )("%s", (_, kasus) => {
+    const hasil = antreanKepegawaian(items, kasus.hari_ini, kasus.jam, (k) =>
+      kasus.siap.includes(k),
+    ).map((a) => [a.id, a.kejadian, a.isi]);
+    expect(hasil).toEqual(kasus.hasil);
+  });
+
+  test("tanpa NIK, gaji, tingkat SP, jenis pengajuan; pensiun hanya bulan", () => {
+    const semua = vektor.kepegawaian[0]?.hasil ?? [];
+    const pensiun = semua.find(([id]) => id?.startsWith("pensiun:"));
+    expect(pensiun?.[2]).not.toMatch(/\d{2}\/\d{2}\/\d{4}/);
+    for (const [, , isi] of semua) {
+      expect(isi).not.toMatch(/SP\d|Sakit|Izin|Cuti|Rp|NIK/);
+    }
+  });
+
+  test("daftar dipotong 30 baris", () => {
+    const hasil = antreanKepegawaian(
+      Array.from(
+        { length: vektor.banyak.jumlah },
+        () => vektor.banyak.item as ItemPengingat,
+      ),
+      "2026-11-19",
+      8,
+      () => true,
+    );
+    expect(hasil.map((a) => a.isi)).toEqual([vektor.banyak.isi]);
+    expect(hasil[0]?.isi.split("\n")).toHaveLength(32);
   });
 });

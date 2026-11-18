@@ -14,10 +14,19 @@
 
 import { formatRupiah } from "@/lib/validations/accounting";
 import { labelPeriode } from "@/lib/validations/billing";
+import {
+  type ItemPengingat,
+  KEJADIAN_PENGINGAT,
+} from "@/lib/validations/hr-pengingat";
 import { formatJumlah } from "@/lib/validations/inventory";
 import { tanggalTampil } from "@/lib/validations/tutup-buku";
 
-export const TELEGRAM_BIDANG = ["inventaris", "keuangan", "pimpinan"] as const;
+export const TELEGRAM_BIDANG = [
+  "inventaris",
+  "keuangan",
+  "pimpinan",
+  "kepegawaian",
+] as const;
 export type BidangTelegram = (typeof TELEGRAM_BIDANG)[number];
 
 export const TELEGRAM_KEJADIAN = [
@@ -29,6 +38,7 @@ export const TELEGRAM_KEJADIAN = [
   "tutup_buku",
   "gaji_status",
   "buka_buku_pimpinan",
+  ...KEJADIAN_PENGINGAT,
 ] as const;
 export type KejadianTelegram = (typeof TELEGRAM_KEJADIAN)[number];
 
@@ -45,12 +55,22 @@ export const BIDANG_KEJADIAN: Record<KejadianTelegram, BidangTelegram> = {
   tutup_buku: "keuangan",
   gaji_status: "pimpinan",
   buka_buku_pimpinan: "pimpinan",
+  kontrak_berakhir: "kepegawaian",
+  percobaan_berakhir: "kepegawaian",
+  kgb: "kepegawaian",
+  pensiun: "kepegawaian",
+  dokumen_kedaluwarsa: "kepegawaian",
+  sp_berakhir: "kepegawaian",
+  pengajuan_menunggu: "kepegawaian",
+  jp_tanpa_penanganan: "kepegawaian",
+  sk_pembagian_tugas: "kepegawaian",
 };
 
 export const LABEL_BIDANG: Record<BidangTelegram, string> = {
   inventaris: "Inventaris",
   keuangan: "Keuangan",
   pimpinan: "Pimpinan",
+  kepegawaian: "Kepegawaian",
 };
 
 export const LABEL_KEJADIAN: Record<KejadianTelegram, string> = {
@@ -62,6 +82,16 @@ export const LABEL_KEJADIAN: Record<KejadianTelegram, string> = {
   tutup_buku: "Tutup buku dan buka kembali",
   gaji_status: "Status proses gaji (hanya jumlah pegawai dan total)",
   buka_buku_pimpinan: "Buku dibuka kembali",
+  kontrak_berakhir: "Kontrak GTT/PTT berakhir (30 dan 7 hari sebelumnya)",
+  percobaan_berakhir: "Masa percobaan berakhir (7 hari sebelumnya)",
+  kgb: "Jadwal kenaikan gaji berkala (30 hari sebelumnya)",
+  pensiun: "Pegawai memasuki usia pensiun (90 hari sebelumnya, hanya bulan)",
+  dokumen_kedaluwarsa: "Dokumen pegawai kedaluwarsa (30 hari sebelumnya)",
+  sp_berakhir: "Masa SP berakhir (tanpa tingkat dan isi SP)",
+  pengajuan_menunggu:
+    "Pengajuan pegawai belum diputus lebih dari 2 hari (sekali sehari)",
+  jp_tanpa_penanganan: "JP hari ini tanpa penanganan (sekali sehari, 06.00)",
+  sk_pembagian_tugas: "SK pembagian tugas, 7 hari sebelum semester mulai",
 };
 
 /** Kunci `app_telegram_setting`. Cermin konstanta `KUNCI_*` di Rust. */
@@ -73,6 +103,8 @@ export const kunciKirim = (kejadian: KejadianTelegram) => `kirim:${kejadian}`;
 
 /** Ringkasan stok dan rekap pembayaran dikirim mulai jam ini (WIB), sekali per tanggal. */
 export const JAM_RINGKASAN_STOK = 7;
+/** Ringkasan JP tanpa penanganan mulai jam ini (WIB), sebelum jam pertama. */
+export const JAM_RINGKASAN_JP = 6;
 export const MAKS_BARIS_STOK = 30;
 /** Baris antrean per siklus; batas Telegram ±20 pesan/menit per grup. */
 export const TELEGRAM_BATCH = 20;
@@ -453,6 +485,197 @@ export function pesanGajiStatus(isi: IsiGajiStatus): string | null {
     baris.push(`Alasan: ${potong(isi.catatan, 300)}`);
   }
   return baris.join("\n");
+}
+
+// Kepegawaian (HRIS Fase 6, `prd-hris/fase-6.md` §24.2). Isi dari
+// `ItemPengingat` (`muatPengingat`); tidak pernah NIK, gaji, alasan atau jenis
+// pengajuan, tingkat atau isi SP, atau tanggal lahir.
+
+const atauStrip = (teks: string) => (teks.trim() === "" ? "-" : teks.trim());
+const urutTeks = (a: string, b: string) => (a < b ? -1 : a > b ? 1 : 0);
+
+/** Cermin `baris_orang`: `nama — jabatan — unit`, kosong = `-`. */
+export function barisOrang(
+  item: Pick<ItemPengingat, "nama" | "jabatan" | "unit">,
+): string {
+  return potong(
+    `${atauStrip(item.nama)} — ${atauStrip(item.jabatan)} — ${atauStrip(item.unit)}`,
+    200,
+  );
+}
+
+function kapan(tanggal: string, sisa: number): string {
+  return `${tanggalTampil(tanggal)} (${sisa === 0 ? "hari ini" : `${sisa} hari lagi`})`;
+}
+
+/** Paling banyak `MAKS_BARIS_STOK` baris, sisanya "dan N lainnya.". */
+function daftarTerbatas(baris: string[]): string[] {
+  return baris.length > MAKS_BARIS_STOK
+    ? [
+        ...baris.slice(0, MAKS_BARIS_STOK),
+        `dan ${baris.length - MAKS_BARIS_STOK} lainnya.`,
+      ]
+    : baris;
+}
+
+/** Cermin `pesan_kontrak_berakhir`. */
+export function pesanKontrakBerakhir(item: ItemPengingat): string {
+  return `📄 Kontrak berakhir ${kapan(item.tanggal, item.sisa)}\n${barisOrang(item)}`;
+}
+
+/** Cermin `pesan_percobaan_berakhir`. */
+export function pesanPercobaanBerakhir(item: ItemPengingat): string {
+  return `⏳ Masa percobaan berakhir ${kapan(item.tanggal, item.sisa)}\n${barisOrang(item)}`;
+}
+
+/** Cermin `pesan_kgb`. */
+export function pesanKgb(item: ItemPengingat): string {
+  return `📈 Kenaikan gaji berkala jatuh tempo ${kapan(item.tanggal, item.sisa)}\n${barisOrang(item)}`;
+}
+
+/** Cermin `pesan_pensiun`: hanya bulan dan tahun, tanggalnya membuka tanggal lahir. */
+export function pesanPensiun(item: ItemPengingat): string {
+  return `🎓 Memasuki usia pensiun ${labelPeriode(item.tanggal.slice(0, 7))}\n${barisOrang(item)}`;
+}
+
+/** Cermin `pesan_dokumen_kedaluwarsa`. `keterangan` = nama jenis dokumen. */
+export function pesanDokumenKedaluwarsa(item: ItemPengingat): string {
+  return `🪪 Dokumen ${potong(item.keterangan, 60)} kedaluwarsa ${kapan(item.tanggal, item.sisa)}\n${barisOrang(item)}`;
+}
+
+/** Cermin `pesan_sp_berakhir`: tanpa tingkat dan isi SP. */
+export function pesanSpBerakhir(item: ItemPengingat): string {
+  return `📋 Masa SP berakhir: ${barisOrang(item)}`;
+}
+
+/** Cermin `pesan_pengajuan_menunggu`: tanpa jenis dan alasan pengajuan. */
+export function pesanPengajuanMenunggu(
+  items: readonly ItemPengingat[],
+): string | null {
+  if (items.length === 0) return null;
+  return [
+    `🕒 ${items.length} pengajuan pegawai belum diputus lebih dari 2 hari`,
+    ...daftarTerbatas(
+      items.map((item) => `• ${barisOrang(item)} (${-item.sisa} hari)`),
+    ),
+  ].join("\n");
+}
+
+/**
+ * Cermin `pesan_jp_tanpa_penanganan`: satu baris per unit rombel (urut nama
+ * unit) berisi jumlah JP dan guru yang izin.
+ */
+export function pesanJpTanpaPenanganan(
+  items: readonly ItemPengingat[],
+  hariIni: string,
+): string | null {
+  if (items.length === 0) return null;
+  const perUnit = new Map<string, { jp: number; guru: string[] }>();
+  for (const item of items) {
+    const unit = atauStrip(item.unit);
+    const isi = perUnit.get(unit) ?? { jp: 0, guru: [] };
+    const guru = `${atauStrip(item.nama)} — ${atauStrip(item.jabatan)}`;
+    isi.jp++;
+    if (!isi.guru.includes(guru)) isi.guru.push(guru);
+    perUnit.set(unit, isi);
+  }
+  return [
+    `🚪 ${items.length} JP hari ini (${tanggalTampil(hariIni)}) belum ada penanganan`,
+    ...daftarTerbatas(
+      [...perUnit]
+        .sort(([a], [b]) => urutTeks(a, b))
+        .map(([unit, isi]) =>
+          potong(`• ${unit}: ${isi.jp} JP, ${isi.guru.join("; ")}`, 300),
+        ),
+    ),
+  ].join("\n");
+}
+
+/**
+ * Cermin `pesan_sk_pembagian_tugas`: semua item satu semester, satu per unit
+ * yang punya rombel aktif.
+ */
+export function pesanSkPembagianTugas(
+  items: readonly ItemPengingat[],
+): string | null {
+  const pertama = items[0];
+  if (!pertama) return null;
+  const unit = [
+    ...new Set(items.map((item) => item.unit.trim()).filter((u) => u !== "")),
+  ].sort(urutTeks);
+  const baris = [
+    `🗂️ Semester ${pertama.keterangan} mulai ${kapan(pertama.tanggal, pertama.sisa)}`,
+    "Siapkan SK pembagian tugas mengajar.",
+  ];
+  if (unit.length > 0) baris.push(`Unit: ${unit.join(", ")}`);
+  return baris.join("\n");
+}
+
+export interface AntreanTelegram {
+  id: string;
+  kejadian: KejadianTelegram;
+  isi: string;
+}
+
+const RINGKASAN_KEPEGAWAIAN: readonly string[] = [
+  "pengajuan_menunggu",
+  "jp_tanpa_penanganan",
+  "sk_pembagian_tugas",
+];
+
+/**
+ * Cermin `antrean_kepegawaian`: baris antrean dari item pengingat. Item
+ * berkunci kosong (hanya untuk kartu) dan kejadian yang tidak `siap`
+ * dilewati; JP dicatat mulai `JAM_RINGKASAN_JP`, lainnya mulai
+ * `JAM_RINGKASAN_STOK`. Pengingat berjendela satu pesan per orang;
+ * pengajuan, JP, dan SK satu ringkasan per kunci. Id = kunci, jadi
+ * `INSERT OR IGNORE` tidak pernah menggandakan.
+ */
+export function antreanKepegawaian(
+  items: readonly ItemPengingat[],
+  hariIni: string,
+  jam: number,
+  siap: (kejadian: KejadianTelegram) => boolean,
+): AntreanTelegram[] {
+  const hasil: AntreanTelegram[] = [];
+  const kelompok = new Map<string, ItemPengingat[]>();
+  for (const item of items) {
+    if (item.kunci === "" || !siap(item.kejadian)) continue;
+    const mulai =
+      item.kejadian === "jp_tanpa_penanganan"
+        ? JAM_RINGKASAN_JP
+        : JAM_RINGKASAN_STOK;
+    if (jam < mulai) continue;
+    if (RINGKASAN_KEPEGAWAIAN.includes(item.kejadian)) {
+      kelompok.set(item.kunci, [...(kelompok.get(item.kunci) ?? []), item]);
+      continue;
+    }
+    const pesan =
+      item.kejadian === "kontrak_berakhir"
+        ? pesanKontrakBerakhir
+        : item.kejadian === "percobaan_berakhir"
+          ? pesanPercobaanBerakhir
+          : item.kejadian === "kgb"
+            ? pesanKgb
+            : item.kejadian === "pensiun"
+              ? pesanPensiun
+              : item.kejadian === "dokumen_kedaluwarsa"
+                ? pesanDokumenKedaluwarsa
+                : pesanSpBerakhir;
+    hasil.push({ id: item.kunci, kejadian: item.kejadian, isi: pesan(item) });
+  }
+  for (const [kunci, daftar] of kelompok) {
+    const kejadian = daftar[0]?.kejadian;
+    if (!kejadian) continue;
+    const isi =
+      kejadian === "pengajuan_menunggu"
+        ? pesanPengajuanMenunggu(daftar)
+        : kejadian === "jp_tanpa_penanganan"
+          ? pesanJpTanpaPenanganan(daftar, hariIni)
+          : pesanSkPembagianTugas(daftar);
+    if (isi !== null) hasil.push({ id: kunci, kejadian, isi });
+  }
+  return hasil;
 }
 
 export interface PermintaanTelegram {

@@ -1,0 +1,451 @@
+{
+  "catatan": "Vektor pesan dan antrean Telegram kepegawaian (HRIS Fase 6). Dipakai `desktop/telegram.rs` (modul tests) dan `validations/telegram.test.ts`; `siklus`, `asing`, dan `muat` dipakai juga tes local_file Rust dan `services/telegram.test.ts`. Hasil antrean: [id, kejadian, isi].",
+  "items": [
+    {
+      "kejadian": "kontrak_berakhir",
+      "id_karyawan": "P2",
+      "nama": "Budi",
+      "jabatan": "Staf TU",
+      "unit": "SMA",
+      "tanggal": "2026-11-25",
+      "sisa": 6,
+      "kunci": "ktr-7:K2",
+      "keterangan": "",
+      "izin": ""
+    },
+    {
+      "kejadian": "kontrak_berakhir",
+      "id_karyawan": "P4",
+      "nama": "Dodi",
+      "jabatan": "Guru",
+      "unit": "SMA",
+      "tanggal": "2026-12-09",
+      "sisa": 20,
+      "kunci": "ktr-30:K4",
+      "keterangan": "",
+      "izin": ""
+    },
+    {
+      "kejadian": "kontrak_berakhir",
+      "id_karyawan": "P9",
+      "nama": "Lewat",
+      "jabatan": "Guru",
+      "unit": "SMA",
+      "tanggal": "2026-11-16",
+      "sisa": -3,
+      "kunci": "",
+      "keterangan": "",
+      "izin": ""
+    },
+    {
+      "kejadian": "percobaan_berakhir",
+      "id_karyawan": "P2",
+      "nama": "Budi",
+      "jabatan": "Staf TU",
+      "unit": "SMA",
+      "tanggal": "2026-11-22",
+      "sisa": 3,
+      "kunci": "coba:K2",
+      "keterangan": "",
+      "izin": ""
+    },
+    {
+      "kejadian": "kgb",
+      "id_karyawan": "P1",
+      "nama": "Ani",
+      "jabatan": "Guru",
+      "unit": "SMP",
+      "tanggal": "2026-12-01",
+      "sisa": 12,
+      "kunci": "kgb:P1:2026-12-01",
+      "keterangan": "",
+      "izin": ""
+    },
+    {
+      "kejadian": "pensiun",
+      "id_karyawan": "P1",
+      "nama": "Ani",
+      "jabatan": "Guru",
+      "unit": "SMP",
+      "tanggal": "2026-12-09",
+      "sisa": 20,
+      "kunci": "pensiun:P1:2026-12-09",
+      "keterangan": "",
+      "izin": ""
+    },
+    {
+      "kejadian": "dokumen_kedaluwarsa",
+      "id_karyawan": "P2",
+      "nama": "Budi",
+      "jabatan": "Staf TU",
+      "unit": "SMA",
+      "tanggal": "2026-11-14",
+      "sisa": -5,
+      "kunci": "",
+      "keterangan": "SIM",
+      "izin": ""
+    },
+    {
+      "kejadian": "dokumen_kedaluwarsa",
+      "id_karyawan": "P3",
+      "nama": "Cici",
+      "jabatan": "",
+      "unit": "SMP",
+      "tanggal": "2026-12-14",
+      "sisa": 25,
+      "kunci": "dok:D3:2026-12-14",
+      "keterangan": "STR",
+      "izin": ""
+    },
+    {
+      "kejadian": "sp_berakhir",
+      "id_karyawan": "P3",
+      "nama": "Cici",
+      "jabatan": "",
+      "unit": "SMP",
+      "tanggal": "2026-11-19",
+      "sisa": 0,
+      "kunci": "sp-akhir:S1",
+      "keterangan": "",
+      "izin": ""
+    },
+    {
+      "kejadian": "pengajuan_menunggu",
+      "id_karyawan": "P4",
+      "nama": "Dodi",
+      "jabatan": "Guru",
+      "unit": "SMA",
+      "tanggal": "2026-11-16",
+      "sisa": -3,
+      "kunci": "pgj-tunggu:2026-11-19",
+      "keterangan": "",
+      "izin": "hr.request.decide"
+    },
+    {
+      "kejadian": "pengajuan_menunggu",
+      "id_karyawan": "P2",
+      "nama": "Budi",
+      "jabatan": "Staf TU",
+      "unit": "",
+      "tanggal": "2026-11-17",
+      "sisa": -2,
+      "kunci": "pgj-tunggu:2026-11-19",
+      "keterangan": "",
+      "izin": "hr.request.decide_major"
+    },
+    {
+      "kejadian": "jp_tanpa_penanganan",
+      "id_karyawan": "P4",
+      "nama": "Dodi",
+      "jabatan": "Guru",
+      "unit": "SMA",
+      "tanggal": "2026-11-19",
+      "sisa": 0,
+      "kunci": "jp-kosong:2026-11-19",
+      "keterangan": "10A jam ke-3",
+      "izin": ""
+    },
+    {
+      "kejadian": "jp_tanpa_penanganan",
+      "id_karyawan": "P1",
+      "nama": "Ani",
+      "jabatan": "Guru",
+      "unit": "SMP",
+      "tanggal": "2026-11-19",
+      "sisa": 0,
+      "kunci": "jp-kosong:2026-11-19",
+      "keterangan": "7A jam ke-1",
+      "izin": ""
+    },
+    {
+      "kejadian": "jp_tanpa_penanganan",
+      "id_karyawan": "P1",
+      "nama": "Ani",
+      "jabatan": "Guru",
+      "unit": "SMP",
+      "tanggal": "2026-11-19",
+      "sisa": 0,
+      "kunci": "jp-kosong:2026-11-19",
+      "keterangan": "7B jam ke-2",
+      "izin": ""
+    },
+    {
+      "kejadian": "jp_tanpa_penanganan",
+      "id_karyawan": "P3",
+      "nama": "Cici",
+      "jabatan": "",
+      "unit": "SMP",
+      "tanggal": "2026-11-19",
+      "sisa": 0,
+      "kunci": "jp-kosong:2026-11-19",
+      "keterangan": "8A jam ke-4",
+      "izin": ""
+    },
+    {
+      "kejadian": "sk_pembagian_tugas",
+      "id_karyawan": "",
+      "nama": "",
+      "jabatan": "",
+      "unit": "SMP",
+      "tanggal": "2026-11-24",
+      "sisa": 5,
+      "kunci": "sk-tugas:TA1",
+      "keterangan": "Genap 2026/2027",
+      "izin": ""
+    },
+    {
+      "kejadian": "sk_pembagian_tugas",
+      "id_karyawan": "",
+      "nama": "",
+      "jabatan": "",
+      "unit": "SMA",
+      "tanggal": "2026-11-24",
+      "sisa": 5,
+      "kunci": "sk-tugas:TA1",
+      "keterangan": "Genap 2026/2027",
+      "izin": ""
+    },
+    {
+      "kejadian": "sk_pembagian_tugas",
+      "id_karyawan": "",
+      "nama": "",
+      "jabatan": "",
+      "unit": "",
+      "tanggal": "2026-11-24",
+      "sisa": 5,
+      "kunci": "sk-tugas:TA1",
+      "keterangan": "Genap 2026/2027",
+      "izin": ""
+    },
+    {
+      "kejadian": "sk_pembagian_tugas",
+      "id_karyawan": "",
+      "nama": "",
+      "jabatan": "",
+      "unit": "SMP",
+      "tanggal": "2026-11-09",
+      "sisa": -10,
+      "kunci": "",
+      "keterangan": "Ganjil 2026/2027",
+      "izin": ""
+    }
+  ],
+  "kepegawaian": [
+    {
+      "nama": "pukul 08.00, semua sakelar menyala",
+      "hari_ini": "2026-11-19",
+      "jam": 8,
+      "siap": [
+        "kontrak_berakhir",
+        "percobaan_berakhir",
+        "kgb",
+        "pensiun",
+        "dokumen_kedaluwarsa",
+        "sp_berakhir",
+        "pengajuan_menunggu",
+        "jp_tanpa_penanganan",
+        "sk_pembagian_tugas"
+      ],
+      "hasil": [
+        [
+          "ktr-7:K2",
+          "kontrak_berakhir",
+          "📄 Kontrak berakhir 25/11/2026 (6 hari lagi)\nBudi — Staf TU — SMA"
+        ],
+        [
+          "ktr-30:K4",
+          "kontrak_berakhir",
+          "📄 Kontrak berakhir 09/12/2026 (20 hari lagi)\nDodi — Guru — SMA"
+        ],
+        [
+          "coba:K2",
+          "percobaan_berakhir",
+          "⏳ Masa percobaan berakhir 22/11/2026 (3 hari lagi)\nBudi — Staf TU — SMA"
+        ],
+        [
+          "kgb:P1:2026-12-01",
+          "kgb",
+          "📈 Kenaikan gaji berkala jatuh tempo 01/12/2026 (12 hari lagi)\nAni — Guru — SMP"
+        ],
+        [
+          "pensiun:P1:2026-12-09",
+          "pensiun",
+          "🎓 Memasuki usia pensiun Desember 2026\nAni — Guru — SMP"
+        ],
+        [
+          "dok:D3:2026-12-14",
+          "dokumen_kedaluwarsa",
+          "🪪 Dokumen STR kedaluwarsa 14/12/2026 (25 hari lagi)\nCici — - — SMP"
+        ],
+        ["sp-akhir:S1", "sp_berakhir", "📋 Masa SP berakhir: Cici — - — SMP"],
+        [
+          "pgj-tunggu:2026-11-19",
+          "pengajuan_menunggu",
+          "🕒 2 pengajuan pegawai belum diputus lebih dari 2 hari\n• Dodi — Guru — SMA (3 hari)\n• Budi — Staf TU — - (2 hari)"
+        ],
+        [
+          "jp-kosong:2026-11-19",
+          "jp_tanpa_penanganan",
+          "🚪 4 JP hari ini (19/11/2026) belum ada penanganan\n• SMA: 1 JP, Dodi — Guru\n• SMP: 3 JP, Ani — Guru; Cici — -"
+        ],
+        [
+          "sk-tugas:TA1",
+          "sk_pembagian_tugas",
+          "🗂️ Semester Genap 2026/2027 mulai 24/11/2026 (5 hari lagi)\nSiapkan SK pembagian tugas mengajar.\nUnit: SMA, SMP"
+        ]
+      ]
+    },
+    {
+      "nama": "pukul 06.00: hanya ringkasan JP",
+      "hari_ini": "2026-11-19",
+      "jam": 6,
+      "siap": [
+        "kontrak_berakhir",
+        "percobaan_berakhir",
+        "kgb",
+        "pensiun",
+        "dokumen_kedaluwarsa",
+        "sp_berakhir",
+        "pengajuan_menunggu",
+        "jp_tanpa_penanganan",
+        "sk_pembagian_tugas"
+      ],
+      "hasil": [
+        [
+          "jp-kosong:2026-11-19",
+          "jp_tanpa_penanganan",
+          "🚪 4 JP hari ini (19/11/2026) belum ada penanganan\n• SMA: 1 JP, Dodi — Guru\n• SMP: 3 JP, Ani — Guru; Cici — -"
+        ]
+      ]
+    },
+    {
+      "nama": "pukul 05.00: belum ada yang dicatat",
+      "hari_ini": "2026-11-19",
+      "jam": 5,
+      "siap": [
+        "kontrak_berakhir",
+        "percobaan_berakhir",
+        "kgb",
+        "pensiun",
+        "dokumen_kedaluwarsa",
+        "sp_berakhir",
+        "pengajuan_menunggu",
+        "jp_tanpa_penanganan",
+        "sk_pembagian_tugas"
+      ],
+      "hasil": []
+    },
+    {
+      "nama": "sakelar mati tidak mencatat",
+      "hari_ini": "2026-11-19",
+      "jam": 8,
+      "siap": [],
+      "hasil": []
+    },
+    {
+      "nama": "hanya SP dan pensiun menyala",
+      "hari_ini": "2026-11-19",
+      "jam": 8,
+      "siap": ["sp_berakhir", "pensiun"],
+      "hasil": [
+        [
+          "pensiun:P1:2026-12-09",
+          "pensiun",
+          "🎓 Memasuki usia pensiun Desember 2026\nAni — Guru — SMP"
+        ],
+        ["sp-akhir:S1", "sp_berakhir", "📋 Masa SP berakhir: Cici — - — SMP"]
+      ]
+    }
+  ],
+  "banyak": {
+    "item": {
+      "kejadian": "pengajuan_menunggu",
+      "id_karyawan": "PX",
+      "nama": "Pegawai",
+      "jabatan": "Guru",
+      "unit": "SMP",
+      "tanggal": "2026-11-10",
+      "sisa": -9,
+      "kunci": "pgj-tunggu:2026-11-19",
+      "keterangan": "",
+      "izin": "hr.request.decide"
+    },
+    "jumlah": 32,
+    "isi": "🕒 32 pengajuan pegawai belum diputus lebih dari 2 hari\n• Pegawai — Guru — SMP (9 hari)\n• Pegawai — Guru — SMP (9 hari)\n• Pegawai — Guru — SMP (9 hari)\n• Pegawai — Guru — SMP (9 hari)\n• Pegawai — Guru — SMP (9 hari)\n• Pegawai — Guru — SMP (9 hari)\n• Pegawai — Guru — SMP (9 hari)\n• Pegawai — Guru — SMP (9 hari)\n• Pegawai — Guru — SMP (9 hari)\n• Pegawai — Guru — SMP (9 hari)\n• Pegawai — Guru — SMP (9 hari)\n• Pegawai — Guru — SMP (9 hari)\n• Pegawai — Guru — SMP (9 hari)\n• Pegawai — Guru — SMP (9 hari)\n• Pegawai — Guru — SMP (9 hari)\n• Pegawai — Guru — SMP (9 hari)\n• Pegawai — Guru — SMP (9 hari)\n• Pegawai — Guru — SMP (9 hari)\n• Pegawai — Guru — SMP (9 hari)\n• Pegawai — Guru — SMP (9 hari)\n• Pegawai — Guru — SMP (9 hari)\n• Pegawai — Guru — SMP (9 hari)\n• Pegawai — Guru — SMP (9 hari)\n• Pegawai — Guru — SMP (9 hari)\n• Pegawai — Guru — SMP (9 hari)\n• Pegawai — Guru — SMP (9 hari)\n• Pegawai — Guru — SMP (9 hari)\n• Pegawai — Guru — SMP (9 hari)\n• Pegawai — Guru — SMP (9 hari)\n• Pegawai — Guru — SMP (9 hari)\ndan 2 lainnya."
+  },
+  "siklus": {
+    "catatan": "Data cloud uji siklus pengirim, ?1 = hari ini WIB. Setiap langkah menjalankan `sql`, lalu satu siklus catat (pukul 08.00, semua sakelar kepegawaian = `kirim`), lalu membandingkan semua id di notifikasi_telegram (urut id).",
+    "sql": [
+      "INSERT INTO master_data (id_unik, kode_karyawan, nama, divisi, jabatan_status, id_shift, jenis_personil, unit, tanggal_daftar, status_aktif, tanggal_mulai_aktif, id_keluar) VALUES ('T1', 'KT1', 'Tono', 'TU', 'Staf TU', 1, 'PEGAWAI', 'SMA', '2020-01-01', 'Aktif', NULL, NULL);",
+      "INSERT INTO hr_kontrak (id_kontrak, id_karyawan, status, id_ref, tanggal_mulai, tanggal_selesai, percobaan_selesai) VALUES ('KT1', 'T1', 'PTT', NULL, '2025-01-01', date(?1, '+9 days'), NULL);"
+    ],
+    "langkah": [
+      {
+        "nama": "sakelar mati tidak mencatat",
+        "sql": [],
+        "kirim": false,
+        "ids": []
+      },
+      {
+        "nama": "H-9: jendela 30 dicatat",
+        "sql": [],
+        "kirim": true,
+        "ids": ["ktr-30:KT1"]
+      },
+      {
+        "nama": "siklus kedua tidak menggandakan",
+        "sql": [],
+        "kirim": true,
+        "ids": ["ktr-30:KT1"]
+      },
+      {
+        "nama": "runner mati 3 hari, lanjut di H-6: jendela 7",
+        "sql": [
+          "UPDATE hr_kontrak SET tanggal_selesai = date(?1, '+6 days') WHERE id_kontrak = 'KT1';"
+        ],
+        "kirim": true,
+        "ids": ["ktr-30:KT1", "ktr-7:KT1"]
+      },
+      {
+        "nama": "Telegram dinyalakan di H-5 hanya mengirim H-7",
+        "sql": [
+          "DELETE FROM notifikasi_telegram WHERE ?1 <> '';",
+          "UPDATE hr_kontrak SET tanggal_selesai = date(?1, '+5 days') WHERE id_kontrak = 'KT1';"
+        ],
+        "kirim": true,
+        "ids": ["ktr-7:KT1"]
+      }
+    ]
+  },
+  "asing": {
+    "catatan": "Antrean berisi 25 kejadian asing (dicatat versi lebih baru) lalu satu kejadian dikenal yang sakelarnya mati. Satu siklus kirim: kejadian asing tetap Menunggu dan tidak menyumbat batch 20; yang dikenal dibatalkan.",
+    "jumlah_asing": 25,
+    "kejadian_asing": "kinerja_baru",
+    "dikenal": ["pgj-baru:z", "pengajuan_baru"],
+    "dibatalkan": 1
+  },
+  "muat": {
+    "catatan": "Satu siklus catat (pukul 08.00, semua sakelar kepegawaian menyala) di atas data `muat` dari `hr-pengingat.vektor.json`. `awalan` = awalan id semua baris antrean (urut id); `terlarang` = teks dari data yang tidak boleh ada di pesan mana pun.",
+    "awalan": [
+      "coba",
+      "dok",
+      "jp-kosong",
+      "kgb",
+      "ktr-30",
+      "ktr-7",
+      "pensiun",
+      "pgj-tunggu",
+      "sk-tugas",
+      "sp-akhir"
+    ],
+    "terlarang": [
+      "SP1",
+      "Terlambat",
+      "Keluarga",
+      "Sakit",
+      "j-izin",
+      "j-sakit",
+      "hr.request"
+    ]
+  }
+}

@@ -257,7 +257,7 @@ export function NotifikasiTelegramCard() {
           ) : null}
         </div>
 
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="grid gap-4 sm:grid-cols-2">
           {TELEGRAM_BIDANG.map((bidang) => (
             <div key={bidang} className="grid gap-1.5">
               <label
@@ -295,35 +295,41 @@ export function NotifikasiTelegramCard() {
           ))}
         </div>
 
-        <fieldset className="grid gap-2">
-          <legend className="mb-1 text-xs font-bold text-slate-300">
-            Kejadian yang dikirim
-          </legend>
-          {TELEGRAM_KEJADIAN.map((kejadian) => (
-            <label
-              key={kejadian}
-              className="flex items-start gap-3 text-sm text-slate-200"
-            >
-              <input
-                type="checkbox"
-                checked={kirim[kejadian]}
-                onChange={(event) =>
-                  setKirim((lama) => ({
-                    ...lama,
-                    [kejadian]: event.target.checked,
-                  }))
-                }
-                className="mt-0.5 size-4"
-              />
-              <span>
-                {LABEL_KEJADIAN[kejadian]}
-                <span className="block text-xs text-slate-500">
-                  Ke grup {LABEL_BIDANG[BIDANG_KEJADIAN[kejadian]]}
-                </span>
-              </span>
-            </label>
-          ))}
-        </fieldset>
+        {TELEGRAM_BIDANG.map((bidang) => (
+          <fieldset key={bidang} className="grid gap-2">
+            <legend className="mb-1 text-xs font-bold text-slate-300">
+              Kejadian ke grup {LABEL_BIDANG[bidang]}
+            </legend>
+            {bidang === "kepegawaian" ? (
+              <p className="text-xs text-amber-300">
+                Perbarui semua aplikasi Desktop dan Mobile sebelum menyalakan
+                kejadian di bawah ini. Versi lama membatalkan pesan kepegawaian
+                yang belum terkirim.
+              </p>
+            ) : null}
+            {TELEGRAM_KEJADIAN.filter(
+              (kejadian) => BIDANG_KEJADIAN[kejadian] === bidang,
+            ).map((kejadian) => (
+              <label
+                key={kejadian}
+                className="flex items-start gap-3 text-sm text-slate-200"
+              >
+                <input
+                  type="checkbox"
+                  checked={kirim[kejadian]}
+                  onChange={(event) =>
+                    setKirim((lama) => ({
+                      ...lama,
+                      [kejadian]: event.target.checked,
+                    }))
+                  }
+                  className="mt-0.5 size-4"
+                />
+                <span>{LABEL_KEJADIAN[kejadian]}</span>
+              </label>
+            ))}
+          </fieldset>
+        ))}
 
         <label className="flex items-center gap-3 text-xs font-bold text-slate-300">
           <input

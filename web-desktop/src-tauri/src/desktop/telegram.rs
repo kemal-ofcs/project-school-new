@@ -19,6 +19,7 @@ use serde_json::{json, Value};
 use super::{
     accounting::format_rupiah,
     billing::label_periode,
+    hr_pengingat::{muat_pengingat, ItemPengingat, KEJADIAN_PENGINGAT},
     inventory::format_jumlah,
     models::CommandError,
     turso::{Statement, TursoClient},
@@ -26,8 +27,9 @@ use super::{
     wa_sender::status_after_failure,
 };
 
-pub const BIDANG: [&str; 3] = ["inventaris", "keuangan", "pimpinan"];
-pub const KEJADIAN: [&str; 8] = [
+pub const BIDANG: [&str; 4] = ["inventaris", "keuangan", "pimpinan", "kepegawaian"];
+/// Delapan kejadian v66 lalu `KEJADIAN_PENGINGAT` (diperiksa tes).
+pub const KEJADIAN: [&str; 17] = [
     "pengajuan_baru",
     "pengajuan_putus",
     "stok_menipis",
@@ -36,6 +38,15 @@ pub const KEJADIAN: [&str; 8] = [
     "tutup_buku",
     "gaji_status",
     "buka_buku_pimpinan",
+    "kontrak_berakhir",
+    "percobaan_berakhir",
+    "kgb",
+    "pensiun",
+    "dokumen_kedaluwarsa",
+    "sp_berakhir",
+    "pengajuan_menunggu",
+    "jp_tanpa_penanganan",
+    "sk_pembagian_tugas",
 ];
 
 /// Grup tujuan setiap kejadian. Cermin `BIDANG_KEJADIAN`.
@@ -44,6 +55,15 @@ pub fn bidang_kejadian(kejadian: &str) -> Option<&'static str> {
         "pengajuan_baru" | "pembayaran_harian" | "kasbon_baru" | "tutup_buku" => Some("keuangan"),
         "pengajuan_putus" | "stok_menipis" => Some("inventaris"),
         "gaji_status" | "buka_buku_pimpinan" => Some("pimpinan"),
+        "kontrak_berakhir"
+        | "percobaan_berakhir"
+        | "kgb"
+        | "pensiun"
+        | "dokumen_kedaluwarsa"
+        | "sp_berakhir"
+        | "pengajuan_menunggu"
+        | "jp_tanpa_penanganan"
+        | "sk_pembagian_tugas" => Some("kepegawaian"),
         _ => None,
     }
 }
@@ -52,6 +72,7 @@ fn label_bidang(bidang: &str) -> &'static str {
     match bidang {
         "keuangan" => "Keuangan",
         "pimpinan" => "Pimpinan",
+        "kepegawaian" => "Kepegawaian",
         _ => "Inventaris",
     }
 }
@@ -60,6 +81,8 @@ const KUNCI_TOKEN: &str = "bot_token";
 const KUNCI_AKTIF: &str = "aktif";
 const KUNCI_AKTIF_SEJAK: &str = "aktif_sejak";
 const JAM_RINGKASAN_STOK: i64 = 7;
+/// Cermin `JAM_RINGKASAN_JP`: ringkasan JP tanpa penanganan sebelum jam pertama.
+const JAM_RINGKASAN_JP: i64 = 6;
 const MAKS_BARIS_STOK: usize = 30;
 const TELEGRAM_BATCH: i64 = 20;
 const TELEGRAM_TIMEOUT: Duration = Duration::from_secs(15);
@@ -430,6 +453,216 @@ pub fn pesan_gaji_status(
         baris.push(format!("Alasan: {}", potong(catatan, 300)));
     }
     Some(baris.join("\n"))
+}
+
+// ── Kepegawaian (HRIS Fase 6, `prd-hris/fase-6.md` §24.2) ───────────────────
+// Isi dari `ItemPengingat` (`muat_pengingat`); tidak pernah NIK, gaji, alasan
+// atau jenis pengajuan, tingkat atau isi SP, atau tanggal lahir.
+
+fn atau_strip(teks: &str) -> &str {
+    let teks = teks.trim();
+    if teks.is_empty() {
+        "-"
+    } else {
+        teks
+    }
+}
+
+/// Cermin `barisOrang`: `nama — jabatan — unit`, kosong = `-`.
+pub fn baris_orang(item: &ItemPengingat) -> String {
+    potong(
+        &format!(
+            "{} — {} — {}",
+            atau_strip(&item.nama),
+            atau_strip(&item.jabatan),
+            atau_strip(&item.unit)
+        ),
+        200,
+    )
+}
+
+fn kapan(tanggal: &str, sisa: i64) -> String {
+    let sisa = if sisa == 0 {
+        "hari ini".to_owned()
+    } else {
+        format!("{sisa} hari lagi")
+    };
+    format!("{} ({sisa})", tanggal_tampil(tanggal))
+}
+
+/// Paling banyak `MAKS_BARIS_STOK` baris, sisanya "dan N lainnya.".
+fn daftar_terbatas(mut baris: Vec<String>) -> Vec<String> {
+    if baris.len() > MAKS_BARIS_STOK {
+        let lebih = baris.len() - MAKS_BARIS_STOK;
+        baris.truncate(MAKS_BARIS_STOK);
+        baris.push(format!("dan {lebih} lainnya."));
+    }
+    baris
+}
+
+/// Cermin `pesanKontrakBerakhir`.
+pub fn pesan_kontrak_berakhir(item: &ItemPengingat) -> String {
+    format!("📄 Kontrak berakhir {}\n{}", kapan(&item.tanggal, item.sisa), baris_orang(item))
+}
+
+/// Cermin `pesanPercobaanBerakhir`.
+pub fn pesan_percobaan_berakhir(item: &ItemPengingat) -> String {
+    format!("⏳ Masa percobaan berakhir {}\n{}", kapan(&item.tanggal, item.sisa), baris_orang(item))
+}
+
+/// Cermin `pesanKgb`.
+pub fn pesan_kgb(item: &ItemPengingat) -> String {
+    format!(
+        "📈 Kenaikan gaji berkala jatuh tempo {}\n{}",
+        kapan(&item.tanggal, item.sisa),
+        baris_orang(item)
+    )
+}
+
+/// Cermin `pesanPensiun`: hanya bulan dan tahun, tanggalnya membuka tanggal lahir.
+pub fn pesan_pensiun(item: &ItemPengingat) -> String {
+    let bulan: String = item.tanggal.chars().take(7).collect();
+    format!("🎓 Memasuki usia pensiun {}\n{}", label_periode(&bulan), baris_orang(item))
+}
+
+/// Cermin `pesanDokumenKedaluwarsa`. `keterangan` = nama jenis dokumen.
+pub fn pesan_dokumen_kedaluwarsa(item: &ItemPengingat) -> String {
+    format!(
+        "🪪 Dokumen {} kedaluwarsa {}\n{}",
+        potong(&item.keterangan, 60),
+        kapan(&item.tanggal, item.sisa),
+        baris_orang(item)
+    )
+}
+
+/// Cermin `pesanSpBerakhir`: tanpa tingkat dan isi SP.
+pub fn pesan_sp_berakhir(item: &ItemPengingat) -> String {
+    format!("📋 Masa SP berakhir: {}", baris_orang(item))
+}
+
+/// Cermin `pesanPengajuanMenunggu`: tanpa jenis dan alasan pengajuan.
+pub fn pesan_pengajuan_menunggu(items: &[&ItemPengingat]) -> Option<String> {
+    if items.is_empty() {
+        return None;
+    }
+    let mut baris = vec![format!(
+        "🕒 {} pengajuan pegawai belum diputus lebih dari 2 hari",
+        items.len()
+    )];
+    baris.extend(daftar_terbatas(
+        items.iter().map(|item| format!("• {} ({} hari)", baris_orang(item), -item.sisa)).collect(),
+    ));
+    Some(baris.join("\n"))
+}
+
+/// Cermin `pesanJpTanpaPenanganan`: satu baris per unit rombel (urut nama
+/// unit) berisi jumlah JP dan guru yang izin.
+pub fn pesan_jp_tanpa_penanganan(items: &[&ItemPengingat], hari_ini: &str) -> Option<String> {
+    if items.is_empty() {
+        return None;
+    }
+    let mut per_unit: Vec<(String, i64, Vec<String>)> = Vec::new();
+    for item in items {
+        let unit = atau_strip(&item.unit).to_owned();
+        let guru = format!("{} — {}", atau_strip(&item.nama), atau_strip(&item.jabatan));
+        let posisi = match per_unit.iter().position(|(u, _, _)| *u == unit) {
+            Some(posisi) => posisi,
+            None => {
+                per_unit.push((unit, 0, Vec::new()));
+                per_unit.len() - 1
+            }
+        };
+        let (_, jp, daftar) = &mut per_unit[posisi];
+        *jp += 1;
+        if !daftar.contains(&guru) {
+            daftar.push(guru);
+        }
+    }
+    per_unit.sort_by(|a, b| a.0.cmp(&b.0));
+    let mut baris = vec![format!(
+        "🚪 {} JP hari ini ({}) belum ada penanganan",
+        items.len(),
+        tanggal_tampil(hari_ini)
+    )];
+    baris.extend(daftar_terbatas(
+        per_unit
+            .iter()
+            .map(|(unit, jp, guru)| potong(&format!("• {unit}: {jp} JP, {}", guru.join("; ")), 300))
+            .collect(),
+    ));
+    Some(baris.join("\n"))
+}
+
+/// Cermin `pesanSkPembagianTugas`: semua item satu semester, satu per unit
+/// yang punya rombel aktif.
+pub fn pesan_sk_pembagian_tugas(items: &[&ItemPengingat]) -> Option<String> {
+    let pertama = items.first()?;
+    let mut unit: Vec<&str> = items.iter().map(|item| item.unit.trim()).filter(|u| !u.is_empty()).collect();
+    unit.sort_unstable();
+    unit.dedup();
+    let mut baris = vec![
+        format!("🗂️ Semester {} mulai {}", pertama.keterangan, kapan(&pertama.tanggal, pertama.sisa)),
+        "Siapkan SK pembagian tugas mengajar.".to_owned(),
+    ];
+    if !unit.is_empty() {
+        baris.push(format!("Unit: {}", unit.join(", ")));
+    }
+    Some(baris.join("\n"))
+}
+
+const RINGKASAN_KEPEGAWAIAN: [&str; 3] = ["pengajuan_menunggu", "jp_tanpa_penanganan", "sk_pembagian_tugas"];
+
+/// Cermin `antreanKepegawaian`: (id, kejadian, isi) dari item pengingat. Item
+/// berkunci kosong (hanya untuk kartu) dan kejadian yang tidak `siap`
+/// dilewati; JP dicatat mulai `JAM_RINGKASAN_JP`, lainnya mulai
+/// `JAM_RINGKASAN_STOK`. Pengingat berjendela satu pesan per orang; pengajuan,
+/// JP, dan SK satu ringkasan per kunci. Id = kunci, jadi `INSERT OR IGNORE`
+/// tidak pernah menggandakan.
+pub fn antrean_kepegawaian(
+    items: &[ItemPengingat],
+    hari_ini: &str,
+    jam: i64,
+    siap: impl Fn(&str) -> bool,
+) -> Vec<(String, String, String)> {
+    let mut hasil = Vec::new();
+    let mut kelompok: Vec<(&str, Vec<&ItemPengingat>)> = Vec::new();
+    for item in items {
+        if item.kunci.is_empty() || !siap(&item.kejadian) {
+            continue;
+        }
+        let mulai = if item.kejadian == "jp_tanpa_penanganan" { JAM_RINGKASAN_JP } else { JAM_RINGKASAN_STOK };
+        if jam < mulai {
+            continue;
+        }
+        if RINGKASAN_KEPEGAWAIAN.contains(&item.kejadian.as_str()) {
+            match kelompok.iter_mut().find(|(kunci, _)| *kunci == item.kunci) {
+                Some((_, daftar)) => daftar.push(item),
+                None => kelompok.push((item.kunci.as_str(), vec![item])),
+            }
+            continue;
+        }
+        let isi = match item.kejadian.as_str() {
+            "kontrak_berakhir" => pesan_kontrak_berakhir(item),
+            "percobaan_berakhir" => pesan_percobaan_berakhir(item),
+            "kgb" => pesan_kgb(item),
+            "pensiun" => pesan_pensiun(item),
+            "dokumen_kedaluwarsa" => pesan_dokumen_kedaluwarsa(item),
+            _ => pesan_sp_berakhir(item),
+        };
+        hasil.push((item.kunci.clone(), item.kejadian.clone(), isi));
+    }
+    for (kunci, daftar) in kelompok {
+        let kejadian = daftar[0].kejadian.as_str();
+        let isi = match kejadian {
+            "pengajuan_menunggu" => pesan_pengajuan_menunggu(&daftar),
+            "jp_tanpa_penanganan" => pesan_jp_tanpa_penanganan(&daftar, hari_ini),
+            _ => pesan_sk_pembagian_tugas(&daftar),
+        };
+        if let Some(isi) = isi {
+            hasil.push((kunci.to_owned(), kejadian.to_owned(), isi));
+        }
+    }
+    hasil
 }
 
 pub fn permintaan_kirim(token: &str, chat_id: &str, teks: &str) -> (String, Value) {
@@ -944,7 +1177,32 @@ async fn catat_kejadian(turso: &TursoClient, pengaturan: &Pengaturan) -> Result<
             }
         }
     }
-    catat_harian(turso, pengaturan).await
+    catat_harian(turso, pengaturan).await?;
+    let jam = turso
+        .query_one(SQL_JAM_WIB, vec![])
+        .await?
+        .to_objects()
+        .first()
+        .map_or(-1, |jam| int(jam, "jam"));
+    catat_kepegawaian(turso, |kejadian| pengaturan.siap(kejadian), jam).await
+}
+
+/// Cermin `catatKepegawaian`: pengingat kepegawaian dari pemuat yang sama
+/// dengan kartu "Perlu perhatian". Berjendela, bukan `aktif_sejak`: jendela
+/// yang masih terbuka tetap dicatat walau runner mati beberapa hari.
+async fn catat_kepegawaian(
+    turso: &TursoClient,
+    siap: impl Fn(&str) -> bool,
+    jam: i64,
+) -> Result<(), CommandError> {
+    if jam < JAM_RINGKASAN_JP || !KEJADIAN_PENGINGAT.iter().any(|kejadian| siap(*kejadian)) {
+        return Ok(());
+    }
+    let (hari_ini, items) = muat_pengingat(turso).await?;
+    for (id, kejadian, isi) in antrean_kepegawaian(&items, &hari_ini, jam, siap) {
+        antrekan(turso, &id, &kejadian, &isi).await?;
+    }
+    Ok(())
 }
 
 /// Cermin `catatBukaBuku`: awalan id menentukan grup tujuannya.
@@ -1068,10 +1326,18 @@ pub async fn drain(
         .await?;
     catat_kejadian(turso, &pengaturan).await?;
 
+    // Kejadian yang tidak dikenal versi ini (dicatat versi yang lebih baru)
+    // dibiarkan `Menunggu` untuk pengirim yang mengenalnya, dan tidak ikut
+    // dibaca supaya tidak menyumbat batch.
+    let mut args: Vec<Value> = KEJADIAN.iter().map(|kejadian| json!(kejadian)).collect();
+    args.push(json!(TELEGRAM_BATCH));
     let rows = turso
         .query_one(
-            "SELECT id_notifikasi, kejadian, isi_pesan, attempt_count FROM notifikasi_telegram WHERE status = 'Menunggu' AND (klaim_sampai IS NULL OR klaim_sampai < datetime('now')) ORDER BY created_at ASC, id_notifikasi ASC LIMIT ?;",
-            vec![json!(TELEGRAM_BATCH)],
+            &format!(
+                "SELECT id_notifikasi, kejadian, isi_pesan, attempt_count FROM notifikasi_telegram WHERE status = 'Menunggu' AND kejadian IN ({}) AND (klaim_sampai IS NULL OR klaim_sampai < datetime('now')) ORDER BY created_at ASC, id_notifikasi ASC LIMIT ?;",
+                vec!["?"; KEJADIAN.len()].join(", ")
+            ),
+            args,
         )
         .await?
         .to_objects();
@@ -1080,8 +1346,12 @@ pub async fn drain(
     for row in &rows {
         let id = text(row, "id_notifikasi");
         let kejadian = text(row, "kejadian");
-        let chat_id = bidang_kejadian(&kejadian)
+        let Some(bidang) = bidang_kejadian(&kejadian) else {
+            continue;
+        };
+        let chat_id = Some(bidang)
             .filter(|_| pengaturan.kirim(&kejadian))
+
             .map(|bidang| pengaturan.grup(bidang).to_owned())
             .filter(|chat_id| !chat_id.is_empty());
         let Some(chat_id) = chat_id else {
@@ -1390,6 +1660,166 @@ mod tests {
         assert_eq!(bidang_kejadian("gaji_status"), Some("pimpinan"));
         assert_eq!(bidang_kejadian("buka_buku_pimpinan"), Some("pimpinan"));
         assert_eq!(bidang_kejadian("gaji"), None);
+        assert_eq!(&KEJADIAN[8..], &KEJADIAN_PENGINGAT[..]);
+        for kejadian in KEJADIAN_PENGINGAT {
+            assert_eq!(bidang_kejadian(kejadian), Some("kepegawaian"), "{kejadian}");
+        }
+        assert_eq!(label_bidang("kepegawaian"), "Kepegawaian");
+    }
+
+    fn vektor() -> Value {
+        serde_json::from_str(include_str!("../../../src/lib/validations/telegram.vektor.json")).expect("vektor")
+    }
+
+    // Vektor yang sama diuji di `validations/telegram.test.ts`.
+    #[test]
+    fn telegram_vektor_kepegawaian() {
+        let v = vektor();
+        let items: Vec<ItemPengingat> = serde_json::from_value(v["items"].clone()).expect("items");
+        for kasus in v["kepegawaian"].as_array().expect("kepegawaian") {
+            let siap: Vec<String> = serde_json::from_value(kasus["siap"].clone()).unwrap();
+            let hasil = antrean_kepegawaian(
+                &items,
+                kasus["hari_ini"].as_str().unwrap(),
+                kasus["jam"].as_i64().unwrap(),
+                |k| siap.iter().any(|s| s == k),
+            );
+            let hasil: Vec<Value> = hasil.into_iter().map(|(id, k, isi)| json!([id, k, isi])).collect();
+            assert_eq!(json!(hasil), kasus["hasil"], "{}", kasus["nama"]);
+        }
+        let item: ItemPengingat = serde_json::from_value(v["banyak"]["item"].clone()).unwrap();
+        let banyak = vec![item; usize::try_from(v["banyak"]["jumlah"].as_u64().unwrap()).unwrap()];
+        let hasil = antrean_kepegawaian(&banyak, "2026-11-19", 8, |_| true);
+        assert_eq!(hasil.len(), 1);
+        assert_eq!(json!(hasil[0].2), v["banyak"]["isi"]);
+    }
+
+    async fn hub_uji(dir: &std::path::Path) -> (TursoClient, rusqlite::Connection, String) {
+        let hub = dir.join("sppg-hub.db");
+        let client = TursoClient::local_file(
+            url::Url::parse("https://telegram.sppg.invalid").expect("origin uji"),
+            &hub,
+            reqwest::Client::new(),
+        );
+        client.ensure_schema().await.expect("provisioning lokal");
+        let c = rusqlite::Connection::open(&hub).expect("buka hub");
+        let hari_ini: String = c.query_row(super::super::hris::HARI_INI_SQL, [], |r| r.get(0)).expect("hari ini");
+        (client, c, hari_ini)
+    }
+
+    fn jalankan(c: &rusqlite::Connection, daftar: &Value, hari_ini: &str) {
+        for sql in daftar.as_array().expect("sql") {
+            let sql = sql.as_str().unwrap();
+            if sql.contains("?1") {
+                c.execute(sql, [hari_ini]).expect(sql);
+            } else {
+                c.execute(sql, []).expect(sql);
+            }
+        }
+    }
+
+    fn semua_id(c: &rusqlite::Connection) -> Vec<String> {
+        let mut stmt = c.prepare("SELECT id_notifikasi FROM notifikasi_telegram ORDER BY id_notifikasi;").unwrap();
+        stmt.query_map([], |r| r.get(0)).unwrap().map(Result::unwrap).collect()
+    }
+
+    fn runtime() -> tokio::runtime::Runtime {
+        tokio::runtime::Builder::new_current_thread().enable_all().build().expect("runtime uji")
+    }
+
+    /// Sama dengan `services/telegram.test.ts` ("siklus: jendela 30 lalu 7 ...").
+    #[test]
+    fn telegram_kepegawaian_siklus() {
+        runtime().block_on(async {
+            let dir = tempfile::tempdir().expect("direktori sementara");
+            let (client, c, hari_ini) = hub_uji(dir.path()).await;
+            let v = vektor();
+            jalankan(&c, &v["siklus"]["sql"], &hari_ini);
+            for langkah in v["siklus"]["langkah"].as_array().unwrap() {
+                jalankan(&c, &langkah["sql"], &hari_ini);
+                let kirim = langkah["kirim"].as_bool().unwrap();
+                catat_kepegawaian(&client, |_| kirim, 8).await.expect("catat");
+                assert_eq!(json!(semua_id(&c)), langkah["ids"], "{}", langkah["nama"]);
+            }
+        });
+    }
+
+    /// Data `muat` dari `hr-pengingat.vektor.json`, sama dengan
+    /// `services/telegram.test.ts` ("data pemuat kartu ...").
+    #[test]
+    fn telegram_kepegawaian_muat() {
+        runtime().block_on(async {
+            let dir = tempfile::tempdir().expect("direktori sementara");
+            let (client, c, hari_ini) = hub_uji(dir.path()).await;
+            let pengingat: Value =
+                serde_json::from_str(include_str!("../../../src/lib/validations/hr-pengingat.vektor.json")).unwrap();
+            jalankan(&c, &pengingat["muat"]["sql"], &hari_ini);
+            catat_kepegawaian(&client, |_| true, 8).await.expect("catat");
+            let awalan: Vec<String> =
+                semua_id(&c).iter().map(|id| id.split(':').next().unwrap_or("").to_owned()).collect();
+            let v = vektor();
+            assert_eq!(json!(awalan), v["muat"]["awalan"]);
+            let mut stmt = c.prepare("SELECT isi_pesan FROM notifikasi_telegram;").unwrap();
+            let isi: Vec<String> = stmt.query_map([], |r| r.get(0)).unwrap().map(Result::unwrap).collect();
+            for teks in v["muat"]["terlarang"].as_array().unwrap() {
+                let teks = teks.as_str().unwrap();
+                assert!(isi.iter().all(|pesan| !pesan.contains(teks)), "{teks}");
+            }
+        });
+    }
+
+    /// Sama dengan `services/telegram.test.ts` ("kejadian asing tetap Menunggu ...").
+    #[test]
+    fn telegram_kejadian_asing_menunggu() {
+        runtime().block_on(async {
+            let dir = tempfile::tempdir().expect("direktori sementara");
+            let (client, c, _) = hub_uji(dir.path()).await;
+            let v = vektor();
+            let asing = &v["asing"];
+            let kejadian_asing = asing["kejadian_asing"].as_str().unwrap();
+            let jumlah = asing["jumlah_asing"].as_i64().unwrap();
+            for n in 1..=jumlah {
+                c.execute(
+                    "INSERT INTO notifikasi_telegram (id_notifikasi, kejadian, isi_pesan) VALUES (?1, ?2, 'x');",
+                    [format!("asing-{n:02}"), kejadian_asing.to_owned()],
+                )
+                .unwrap();
+            }
+            c.execute(
+                "INSERT INTO notifikasi_telegram (id_notifikasi, kejadian, isi_pesan) VALUES (?1, ?2, 'y');",
+                [asing["dikenal"][0].as_str().unwrap(), asing["dikenal"][1].as_str().unwrap()],
+            )
+            .unwrap();
+            for (kunci, nilai) in [
+                ("bot_token", "123456789:AAHdqTcvCH1vGWJxfSeofSAs0K5PALDsaw0"),
+                ("aktif", "1"),
+                ("grup:keuangan", "-222"),
+                ("kirim:pengajuan_baru", "0"),
+            ] {
+                c.execute("INSERT OR REPLACE INTO app_telegram_setting (kunci, nilai) VALUES (?1, ?2);", [kunci, nilai])
+                    .unwrap();
+            }
+            c.execute(
+                "INSERT OR REPLACE INTO app_telegram_setting (kunci, nilai) VALUES ('aktif_sejak', datetime('now', '-1 hour'));",
+                [],
+            )
+            .unwrap();
+            let hasil = drain(&client, &reqwest::Client::new(), "uji").await.expect("drain");
+            assert_eq!(hasil["dibatalkan"], asing["dibatalkan"]);
+            assert_eq!(hasil["terkirim"], json!(0));
+            let mut stmt = c
+                .prepare("SELECT kejadian, status, COUNT(*) FROM notifikasi_telegram GROUP BY kejadian, status ORDER BY kejadian;")
+                .unwrap();
+            let status: Vec<(String, String, i64)> =
+                stmt.query_map([], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?))).unwrap().map(Result::unwrap).collect();
+            assert_eq!(
+                status,
+                vec![
+                    (kejadian_asing.to_owned(), "Menunggu".to_owned(), jumlah),
+                    (asing["dikenal"][1].as_str().unwrap().to_owned(), "Dibatalkan".to_owned(), 1),
+                ]
+            );
+        });
     }
 
     #[test]
@@ -1397,11 +1827,15 @@ mod tests {
         let sah = json!({
             "aktif": true,
             "botToken": "",
-            "grup": { "inventaris": "-100111", "keuangan": "", "pimpinan": "-100333" },
+            "grup": { "inventaris": "-100111", "keuangan": "", "pimpinan": "-100333", "kepegawaian": "" },
             "kirim": {
                 "pengajuan_baru": true, "pengajuan_putus": false, "stok_menipis": true,
                 "pembayaran_harian": false, "kasbon_baru": true, "tutup_buku": false,
                 "gaji_status": true, "buka_buku_pimpinan": false,
+                "kontrak_berakhir": false, "percobaan_berakhir": false, "kgb": false,
+                "pensiun": false, "dokumen_kedaluwarsa": false, "sp_berakhir": false,
+                "pengajuan_menunggu": false, "jp_tanpa_penanganan": false,
+                "sk_pembagian_tugas": true,
             },
         });
         let draft = baca_draft(&sah).unwrap();
@@ -1411,7 +1845,8 @@ mod tests {
             vec![
                 ("inventaris", "-100111".to_owned()),
                 ("keuangan", String::new()),
-                ("pimpinan", "-100333".to_owned())
+                ("pimpinan", "-100333".to_owned()),
+                ("kepegawaian", String::new())
             ]
         );
         assert_eq!(
@@ -1424,7 +1859,16 @@ mod tests {
                 ("kasbon_baru", true),
                 ("tutup_buku", false),
                 ("gaji_status", true),
-                ("buka_buku_pimpinan", false)
+                ("buka_buku_pimpinan", false),
+                ("kontrak_berakhir", false),
+                ("percobaan_berakhir", false),
+                ("kgb", false),
+                ("pensiun", false),
+                ("dokumen_kedaluwarsa", false),
+                ("sp_berakhir", false),
+                ("pengajuan_menunggu", false),
+                ("jp_tanpa_penanganan", false),
+                ("sk_pembagian_tugas", true)
             ]
         );
 

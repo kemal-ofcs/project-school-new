@@ -304,15 +304,25 @@ sesudah semua fase HRIS.
 | 3 | Pemuat cloud `muat_pengingat` ↔ `muatPengingat` (termasuk JP hari ini dari cloud) | `cargo test hr_pengingat` (`TursoClient::local_file`: data dan angka sama dengan tes TS); `services/hr-pengingat.test.ts` |
 | 4 | Command `desktop_hr_attention` + rute + gateway + `PerluPerhatianCard` di `/kepegawaian` dan `/dashboard` | `audit:contract` (430 command Desktop, 320 rute Web); `tsc` + Biome; `audit:a11y`, `audit:ui-guard`, `audit:page-guard` |
 
-**6b — Telegram `kepegawaian`** (batas: Fase 6 lengkap):
+**6b — Telegram `kepegawaian`** (batas: Fase 6 lengkap). Satu sesi; langkah
+5–9 ditulis semua dulu, lalu satu putaran cek (CLAUDE.md, "cara kerja hemat
+konteks"). Kolom "Isi tes" adalah kasus yang wajib ADA di tes, bukan perintah
+per langkah.
 
-| # | Langkah | Gerbang |
+| # | Langkah | Isi tes |
 | :-- | :-- | :-- |
-| 5 | Kejadian asing dilewati, tidak dibatalkan (temuan 1), Rust dan TS | `telegram.test.ts` + `cargo test telegram` per nama: kejadian asing tetap `Menunggu` |
+| 5 | Kejadian asing dilewati, tidak dibatalkan (temuan 1), Rust dan TS | kejadian asing tetap `Menunggu` |
 | 6 | Bidang `kepegawaian`, sembilan kejadian, label, `BIDANG_KEJADIAN` ↔ `bidang_kejadian`, sembilan `pesan_*` kembar, `JAM_RINGKASAN_JP` | vektor pesan `telegram.vektor.json` (tidak memuat NIK/gaji/tingkat SP/jenis pengajuan; pensiun hanya bulan; potong 30 baris) |
-| 7 | `catat_kepegawaian` (berjendela) dan ringkasan harian lewat `muat_pengingat`; id §24.2.2 | `cargo test telegram` (`local_file`: dua siklus tidak menggandakan, jendela 30 lalu 7, runner mati 3 hari, Telegram dinyalakan di H-5 hanya mengirim H-7, sakelar mati tidak mencatat); `services/telegram.test.ts` dengan data sama |
-| 8 | `NotifikasiTelegramCard`: grup Kepegawaian + sembilan sakelar + catatan perbarui perangkat | `tsc` + Biome; `audit:a11y`, `audit:confirm` |
-| 9 | `sync-rust-modules`, `sync-frontend-lib`, paragraf `references/18` "HRIS pengingat (Fase 6, tetap v71)", catatan "Sudah dibangun" | `audit:contract` (430/435 command, 131 permission, 145 rute, 81 snapshot), `audit:schema`; `cargo test hr_pengingat` Mobile |
+| 7 | `catat_kepegawaian` (berjendela) dan ringkasan harian lewat `muat_pengingat`; id §24.2.2 | `local_file` Rust + `services/telegram.test.ts` data sama: dua siklus tidak menggandakan, jendela 30 lalu 7, runner mati 3 hari, Telegram dinyalakan di H-5 hanya mengirim H-7, sakelar mati tidak mencatat |
+| 8 | `NotifikasiTelegramCard`: grup Kepegawaian + sembilan sakelar + catatan perbarui perangkat | — |
+| 9 | `sync-rust-modules`, `sync-frontend-lib`, paragraf `references/18` "HRIS pengingat (Fase 6, tetap v71)", catatan "Sudah dibangun" | — |
+
+Putaran cek Claude di akhir 6b: `tsc` + Biome berkas yang diubah,
+`telegram.test.ts` dan `services/telegram.test.ts` sekali, satu
+`cargo test telegram` Desktop, `audit:contract` (angka tetap 430/435 command,
+131 permission, 145 rute, 81 snapshot). Pemilik: `jalankan-antislop` lalu
+`jalankan-check` (termasuk `audit:a11y`, `audit:confirm`, `audit:schema`,
+`cargo test` Mobile).
 
 ### 24.8 Pertanyaan untuk pemilik (Fase 6)
 
@@ -453,3 +463,54 @@ Mobile); `cargo test` per nama `hris_vektor` dan `hr_pengingat` (Desktop);
 `audit:ui-guard`, `audit:page-guard`. Belum: `bun run check` penuh, suite
 Rust penuh, `cargo test hr_pengingat` di Mobile (langkah 9), uji browser
 kartu.
+
+**Sudah dibangun: sub-fase 6b** (19 Nov 2026). Fase 6 lengkap; tetap v71,
+tanpa tabel, kolom, rute sync, atau izin baru.
+
+- **Langkah 5, kejadian asing.** `drainTelegram` ↔ `drain` hanya membaca
+  baris `Menunggu` yang kejadiannya dikenal (`kejadian IN (...)` dari
+  `TELEGRAM_KEJADIAN`/`KEJADIAN`), jadi kejadian versi lebih baru tetap
+  `Menunggu` dan tidak menyumbat batch 20; penjaga `Object.hasOwn` /
+  `bidang_kejadian` → `None` tetap melewatinya. Kejadian dikenal yang
+  sakelarnya mati atau grupnya kosong tetap `Dibatalkan`.
+- **Langkah 6, bidang dan pesan.** `TELEGRAM_BIDANG`/`BIDANG` empat,
+  `TELEGRAM_KEJADIAN` = delapan v66 + `KEJADIAN_PENGINGAT` (Rust: daftar
+  harfiah 17, tes memeriksa `KEJADIAN[8..] == KEJADIAN_PENGINGAT`),
+  `BIDANG_KEJADIAN` ↔ `bidang_kejadian`, `LABEL_*`, `JAM_RINGKASAN_JP` = 6.
+  Sembilan `pesan_*` kembar plus `baris_orang`; `antrean_kepegawaian` ↔
+  `antreanKepegawaian` menyusun (id, kejadian, isi) dari `ItemPengingat`:
+  kunci `""` dilewati, satu pesan per orang untuk enam kejadian berjendela,
+  satu ringkasan per kunci untuk pengajuan, JP, dan SK. Vektor baru
+  `telegram.vektor.json` (jam 08.00/06.00/05.00, sakelar mati, sebagian
+  sakelar, 32 pengajuan dipotong 30 baris).
+- **Langkah 7, pencatat.** `catatKepegawaian` ↔ `catat_kepegawaian` dipanggil
+  di akhir `catatKejadian` dengan jam dari `TELEGRAM_SQL_JAM_WIB`; tanpa
+  sakelar kepegawaian yang siap atau sebelum 06.00 pemuat tidak dijalankan.
+  Tes `local_file` Rust (`telegram_kepegawaian_siklus`,
+  `telegram_kepegawaian_muat`, `telegram_kejadian_asing_menunggu`) dan
+  `services/telegram.test.ts` memakai data vektor yang sama: sakelar mati,
+  jendela 30, siklus kedua, runner mati 3 hari lalu jendela 7, dinyalakan di
+  H-5 hanya H-7, data `muat` 6a tanpa teks terlarang (tingkat SP, alasan,
+  jenis, izin), 25 kejadian asing + satu dikenal yang dimatikan.
+- **Langkah 8, layar.** `NotifikasiTelegramCard`: grup Kepegawaian ikut daftar
+  grup (kisi dua kolom), sakelar dikelompokkan per grup, dan di grup
+  Kepegawaian catatan "perbarui semua Desktop dan Mobile dulu".
+- **Langkah 9.** `sync-rust-modules.ts` dan `sync-frontend-lib.ts` dijalankan;
+  paragraf `references/18` "HRIS pengingat (Fase 6, tetap v71)" dan satu
+  frasa bidang keempat di `references/17`.
+
+**Keputusan kecil yang diambil saat membangun** (tinjau bila tidak sesuai):
+
+- Ringkasan JP: satu baris per unit rombel, `• SMP: 3 JP, Ani — Guru; Cici — -`.
+- Pesan per orang menyebut tanggal dan "N hari lagi"/"hari ini"; pensiun
+  hanya "Desember 2026".
+- Pemuat dijalankan setiap siklus runner selama ada sakelar kepegawaian yang
+  menyala (sekitar sepuluh SELECT ke cloud); id deterministik membuat
+  pencatatan ulang tidak berefek.
+
+**Gerbang yang dijalankan:** `tsc` Desktop dan Mobile, Biome berkas yang
+diubah, `bun test` `validations/telegram.test.ts` (16) dan
+`services/telegram.test.ts` (15) Desktop, `cargo test telegram` Desktop (14),
+`audit:contract` (430/435 command, 131 permission, 145 rute, 81 snapshot),
+`audit:sql`, `audit:list-bound`. Belum: `bun run check` penuh, `cargo test`
+Mobile, tes salinan Mobile, uji browser kartu dan sakelar.

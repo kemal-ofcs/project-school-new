@@ -3,10 +3,13 @@ import "server-only";
 import type { Client, InStatement } from "@libsql/client";
 import { z } from "zod";
 import { ApiRequestError } from "@/lib/server/http/api-response";
+import { muatPengingat } from "@/lib/services/hr-pengingat";
 import { statusSetelahGagal } from "@/lib/services/wa-sender";
+import { KEJADIAN_PENGINGAT } from "@/lib/validations/hr-pengingat";
 import {
   AWALAN_BUKA,
   AWALAN_BUKA_PIMPINAN,
+  antreanKepegawaian,
   type BarisStokMenipis,
   BIDANG_KEJADIAN,
   type BidangTelegram,
@@ -19,6 +22,7 @@ import {
   idRekapPembayaran,
   idStokMenipis,
   idTutupBuku,
+  JAM_RINGKASAN_JP,
   JAM_RINGKASAN_STOK,
   type KejadianTelegram,
   KUNCI_AKTIF,
@@ -82,6 +86,7 @@ export const telegramDraftSchema = z
         inventaris: chatIdSchema,
         keuangan: chatIdSchema,
         pimpinan: chatIdSchema,
+        kepegawaian: chatIdSchema,
       })
       .strict(),
     kirim: z
@@ -94,6 +99,15 @@ export const telegramDraftSchema = z
         tutup_buku: z.boolean(),
         gaji_status: z.boolean(),
         buka_buku_pimpinan: z.boolean(),
+        kontrak_berakhir: z.boolean(),
+        percobaan_berakhir: z.boolean(),
+        kgb: z.boolean(),
+        pensiun: z.boolean(),
+        dokumen_kedaluwarsa: z.boolean(),
+        sp_berakhir: z.boolean(),
+        pengajuan_menunggu: z.boolean(),
+        jp_tanpa_penanganan: z.boolean(),
+        sk_pembagian_tugas: z.boolean(),
       })
       .strict(),
   })
@@ -435,6 +449,29 @@ async function catatKejadian(client: Client, pengaturan: Pengaturan) {
     }
   }
   await catatHarian(client, pengaturan);
+  const jam = Number(
+    (await client.execute(TELEGRAM_SQL_JAM_WIB)).rows[0]?.jam ?? -1,
+  );
+  await catatKepegawaian(client, (k) => pengaturan.siap(k), jam);
+}
+
+/**
+ * Cermin `catat_kepegawaian`: pengingat kepegawaian dari pemuat yang sama
+ * dengan kartu "Perlu perhatian". Berjendela, bukan `aktif_sejak`: jendela
+ * yang masih terbuka tetap dicatat walau runner mati beberapa hari.
+ */
+export async function catatKepegawaian(
+  client: Client,
+  siap: (kejadian: KejadianTelegram) => boolean,
+  jam: number,
+) {
+  if (jam < JAM_RINGKASAN_JP || !KEJADIAN_PENGINGAT.some((k) => siap(k))) {
+    return;
+  }
+  const { hari_ini, items } = await muatPengingat(client);
+  for (const baris of antreanKepegawaian(items, hari_ini, jam, siap)) {
+    await antrekan(client, baris.id, baris.kejadian, baris.isi);
+  }
 }
 
 /** Cermin `catat_buka_buku`: awalan id menentukan grup tujuannya. */
@@ -549,9 +586,12 @@ export async function drainTelegram(
   );
   await catatKejadian(client, pengaturan);
 
+  // Kejadian yang tidak dikenal versi ini (dicatat versi yang lebih baru)
+  // dibiarkan `Menunggu` untuk pengirim yang mengenalnya, dan tidak ikut
+  // dibaca supaya tidak menyumbat batch.
   const antrean = await client.execute({
-    sql: "SELECT id_notifikasi, kejadian, isi_pesan, attempt_count FROM notifikasi_telegram WHERE status = 'Menunggu' AND (klaim_sampai IS NULL OR klaim_sampai < datetime('now')) ORDER BY created_at ASC, id_notifikasi ASC LIMIT ?;",
-    args: [TELEGRAM_BATCH],
+    sql: `SELECT id_notifikasi, kejadian, isi_pesan, attempt_count FROM notifikasi_telegram WHERE status = 'Menunggu' AND kejadian IN (${TELEGRAM_KEJADIAN.map(() => "?").join(", ")}) AND (klaim_sampai IS NULL OR klaim_sampai < datetime('now')) ORDER BY created_at ASC, id_notifikasi ASC LIMIT ?;`,
+    args: [...TELEGRAM_KEJADIAN, TELEGRAM_BATCH],
   });
 
   let terkirim = 0;
@@ -559,10 +599,11 @@ export async function drainTelegram(
   let dibatalkan = 0;
   for (const row of antrean.rows) {
     const id = teks(row.id_notifikasi);
-    const kejadian = teks(row.kejadian) as KejadianTelegram;
+    const nama = teks(row.kejadian);
+    if (!Object.hasOwn(BIDANG_KEJADIAN, nama)) continue;
+    const kejadian = nama as KejadianTelegram;
     const bidang = BIDANG_KEJADIAN[kejadian];
-    const chatId =
-      bidang && pengaturan.kirim(kejadian) ? pengaturan.grup(bidang) : "";
+    const chatId = pengaturan.kirim(kejadian) ? pengaturan.grup(bidang) : "";
     if (chatId === "") {
       const batal = await client.execute({
         sql: "UPDATE notifikasi_telegram SET status = 'Dibatalkan', last_error = ? WHERE id_notifikasi = ? AND status = 'Menunggu' AND (klaim_sampai IS NULL OR klaim_sampai < datetime('now'));",
