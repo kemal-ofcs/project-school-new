@@ -227,6 +227,9 @@ export default function KepegawaianPage() {
         ) : tab === "kinerja" ? (
           <TabKinerja
             bolehAtur={hasPermission(user, "hr.performance.config")}
+            bolehNilai={hasPermission(user, "hr.performance.assess")}
+            bolehPutus={hasPermission(user, "hr.performance.finalize")}
+            bolehLihat={hasPermission(user, "hr.performance.view")}
             onPesan={setPesan}
             onGalat={setGalat}
           />

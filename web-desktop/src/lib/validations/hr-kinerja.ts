@@ -13,7 +13,16 @@
 
 import { z } from "zod";
 import { tanggalValid } from "./hari-kerja";
+import type { HolidayWhitelistEntry } from "./holiday-whitelist";
+import { KEPALA_UNIT_SQL } from "./hr-beban";
+import { PESAN_DI_LUAR_CAKUPAN, PESAN_DIRI_SENDIRI } from "./hr-keluar";
 import TEMPLATE_BAWAAN_JSON from "./hr-kinerja-template-bawaan.json";
+import {
+  type Jadwal,
+  PENGAJUAN_BERLAKU_SQL,
+  tanggalRentang,
+  tanggalWajib,
+} from "./hr-pengajuan";
 
 type Hasil<T> = { ok: true; nilai: T } | { ok: false; galat: string };
 
@@ -563,6 +572,866 @@ export function skorAmbang(permil: number, ambang: readonly number[]): number {
   return 1;
 }
 
+// SQL penilaian (5b). Penjaga keadaan memakai ?1 = id_penilaian.
+
+/** Belum Final dan belum Batal. */
+export const TERBUKA_SQL =
+  "NOT EXISTS (SELECT 1 FROM hr_kinerja_keputusan k WHERE k.id_penilaian = ?1 AND k.jenis IN ('Final', 'Batal'))";
+const AKHIR_AJUKAN_SQL =
+  "COALESCE((SELECT a.jenis FROM hr_kinerja_keputusan a WHERE a.id_penilaian = ?1 AND a.jenis IN ('Ajukan', 'Kembalikan') ORDER BY a.urut DESC LIMIT 1), '')";
+/** Draf: terbuka, dan keputusan Ajukan/Kembalikan terakhir bukan Ajukan. */
+export const DRAF_SQL = `${TERBUKA_SQL} AND ${AKHIR_AJUKAN_SQL} <> 'Ajukan'`;
+/** Diajukan: terbuka, dan keputusan Ajukan/Kembalikan terakhir adalah Ajukan. */
+export const DIAJUKAN_SQL = `${TERBUKA_SQL} AND ${AKHIR_AJUKAN_SQL} = 'Ajukan'`;
+
+export const TAHUN_AJARAN_SQL =
+  "SELECT id_tahun_ajaran, nama_tahun, semester, tanggal_mulai, tanggal_selesai FROM akademik_tahun_ajaran ORDER BY tanggal_mulai, id_tahun_ajaran\n-- batas: dua semester per tahun ajaran sekolah\n;";
+/**
+ * Pegawai (bukan siswa) untuk penilaian; ?1 kosong = semua. Atasan hanya
+ * bila aktif dan belum keluar.
+ */
+export const KINERJA_PEGAWAI_SQL =
+  "SELECT m.id_unik, m.nama, COALESCE(m.unit, '') AS unit, COALESCE(m.divisi, '') AS divisi, CASE WHEN g.id_guru IS NOT NULL OR LOWER(TRIM(COALESCE(m.jenis_personil, ''))) = 'guru' THEN 'Guru' ELSE 'Tendik' END AS kelompok, s.hari_kerja, s.kode_shift, COALESCE(m.tanggal_daftar, '') AS tanggal_daftar, COALESCE(m.id_keluar, '') AS id_keluar, COALESCE(m.tanggal_selesai_aktif, '') AS tanggal_selesai_aktif, COALESCE(m.status_aktif, 'Aktif') AS status_aktif, CASE WHEN EXISTS (SELECT 1 FROM master_data a WHERE a.id_unik = m.id_atasan AND a.status_aktif = 'Aktif' AND a.id_keluar IS NULL) THEN m.id_atasan ELSE '' END AS id_atasan, COALESCE(j.nama, m.jabatan_status, '') AS jabatan FROM master_data m LEFT JOIN guru_data g ON g.id_guru = m.id_unik LEFT JOIN tbl_shift s ON s.id_shift = m.id_shift LEFT JOIN hr_jabatan j ON j.id_jabatan = m.id_jabatan WHERE (?1 = '' OR m.id_unik = ?1) AND LOWER(TRIM(COALESCE(m.jenis_personil, ''))) <> 'siswa' AND NOT EXISTS (SELECT 1 FROM siswa_data sd WHERE sd.id_siswa = m.id_unik) ORDER BY m.nama, m.id_unik\n-- batas: pegawai sekolah (guru dan tendik), dibatasi jumlah personil lembaga\n;";
+/**
+ * Kolom `LAPORAN_KEHADIRAN_SQL.hari` apa adanya + saringan satu pegawai
+ * (?3), bukan `GATE_SUMMARY_SUBQUERY` (§23.1 temuan 1).
+ */
+export const KINERJA_HARI_SQL =
+  "SELECT json_object('id', id_karyawan, 'tanggal', tanggal, 'hadir', MAX(CASE WHEN (COALESCE(TRIM(jam_masuk), '') <> '' AND COALESCE(status_kehadiran, '') <> 'Alfa') OR status_kehadiran IN ('Hadir', 'Terlambat') THEN 1 ELSE 0 END), 'telat', MAX(COALESCE(menit_terlambat, 0)), 'menit', SUM(COALESCE(menit_terlambat, 0)), 'sakit', MAX(CASE WHEN status_kehadiran = 'Sakit' THEN 1 ELSE 0 END), 'izin', MAX(CASE WHEN status_kehadiran = 'Izin' THEN 1 ELSE 0 END), 'dispensasi', MAX(CASE WHEN status_kehadiran IN ('Dispen', 'Dispensasi') THEN 1 ELSE 0 END), 'alfa', MAX(CASE WHEN status_kehadiran = 'Alfa' THEN 1 ELSE 0 END)) FROM absensi_harian WHERE id_karyawan = ?3 AND tanggal BETWEEN ?1 AND ?2 GROUP BY id_karyawan, tanggal ORDER BY tanggal\n-- batas: satu baris per tanggal dalam satu periode penilaian\n;";
+/**
+ * Kolom `PENGAJUAN_RENTANG_SQL` + satu pegawai (?3), predikat
+ * `PENGAJUAN_BERLAKU_SQL` harfiah.
+ */
+export const KINERJA_PENGAJUAN_SQL = `SELECT p.id_pengajuan, p.id_karyawan, p.tanggal_mulai, p.tanggal_selesai, p.kelompok, p.dampak_gaji, p.potong_jatah, p.jam_mulai_ke, p.jam_sampai_ke, p.setengah_hari FROM hr_pengajuan p WHERE p.id_karyawan = ?3 AND p.tanggal_mulai <= ?2 AND p.tanggal_selesai >= ?1 AND ${PENGAJUAN_BERLAKU_SQL} ORDER BY p.tanggal_mulai, p.id_pengajuan\n-- batas: pengajuan satu pegawai dalam satu periode penilaian\n;`;
+/**
+ * Pengajuan Menunggu (tanpa keputusan atas sidik kini) per pegawai dalam
+ * rentang; ?3 kosong = semua. Tanda `pengajuan_menunggu`.
+ */
+export const KINERJA_MENUNGGU_SQL =
+  "SELECT p.id_karyawan, COUNT(*) AS jumlah FROM hr_pengajuan p WHERE (?3 = '' OR p.id_karyawan = ?3) AND p.tanggal_mulai <= ?2 AND p.tanggal_selesai >= ?1 AND NOT EXISTS (SELECT 1 FROM hr_pengajuan_keputusan b WHERE b.id_pengajuan = p.id_pengajuan AND b.jenis = 'Batal') AND NOT EXISTS (SELECT 1 FROM hr_pengajuan_keputusan k WHERE k.id_pengajuan = p.id_pengajuan AND k.sidik = p.sidik AND k.jenis IN ('Setujui', 'Tolak', 'Setujui Urgent')) GROUP BY p.id_karyawan ORDER BY p.id_karyawan\n-- batas: satu baris per pegawai\n;";
+/** Salinan harfiah `KEPALA_UNIT_SQL` dengan jenis tugas `tgs-ka-tu` (Q-103). */
+export const KEPALA_TU_SQL = KEPALA_UNIT_SQL.replaceAll(
+  "'tgs-kepsek'",
+  "'tgs-ka-tu'",
+);
+/** SP yang berlaku pada suatu saat di dalam periode (Q-109, informasi). */
+export const KINERJA_SP_SQL =
+  "SELECT id_sp, tingkat, tanggal, berlaku_sampai, COALESCE(nomor, '') AS nomor, pelanggaran FROM hr_sp WHERE id_karyawan = ?1 AND dicabut_pada IS NULL AND tanggal <= ?3 AND berlaku_sampai >= ?2 ORDER BY tanggal, id_sp\n-- batas: surat peringatan satu pegawai\n;";
+
+const PENILAIAN_KOLOM =
+  "SELECT p.id_penilaian, p.id_karyawan, COALESCE(m.nama, p.id_karyawan) AS nama, COALESCE(p.id_ref, '') AS id_ref, COALESCE(p.alasan_koreksi, '') AS alasan_koreksi, p.periode_jenis, p.periode_kunci, p.periode_nama, p.periode_mulai, p.periode_selesai, p.id_template, p.template_nama, p.kelompok, COALESCE(p.unit, '') AS unit, COALESCE(p.jabatan, '') AS jabatan, COALESCE(p.status_kepegawaian, '') AS status_kepegawaian, COALESCE(p.id_penilai, '') AS id_penilai, COALESCE(p.penilai_nama, '') AS penilai_nama, p.penilai_oleh, COALESCE(p.catatan, '') AS catatan, COALESCE(p.dihitung_sampai, '') AS dihitung_sampai, p.dibuat_oleh, p.created_at, p.updated_at FROM hr_kinerja_penilaian p LEFT JOIN master_data m ON m.id_unik = p.id_karyawan";
+export const PENILAIAN_SATU_SQL = `${PENILAIAN_KOLOM} WHERE p.id_penilaian = ?1;`;
+export const PENILAIAN_PERIODE_SQL = `${PENILAIAN_KOLOM} WHERE p.periode_jenis = ?1 AND p.periode_kunci = ?2 ORDER BY nama, p.created_at, p.id_penilaian\n-- batas: satu penilaian akar per pegawai per periode, ditambah koreksinya\n;`;
+export const PENILAIAN_PEGAWAI_SQL = `${PENILAIAN_KOLOM} WHERE p.id_karyawan = ?1 ORDER BY p.periode_mulai DESC, p.created_at, p.id_penilaian\n-- batas: dua penilaian per tahun sepanjang masa kerja satu pegawai\n;`;
+/** Akar ?1 dan koreksinya. */
+export const KELUARGA_SQL = `${PENILAIAN_KOLOM} WHERE p.id_penilaian = ?1 OR p.id_ref = ?1 ORDER BY p.created_at, p.id_penilaian\n-- batas: satu penilaian akar dan koreksinya\n;`;
+/** ?1 = larik JSON id penilaian. */
+export const KEPUTUSAN_KINERJA_SQL =
+  "SELECT k.id_keputusan, k.id_penilaian, k.urut, k.jenis, COALESCE(k.alasan, '') AS alasan, k.nilai_akhir, COALESCE(k.predikat, '') AS predikat, k.oleh, COALESCE(k.id_karyawan_oleh, '') AS id_karyawan_oleh, k.created_at FROM hr_kinerja_keputusan k WHERE k.id_penilaian IN (SELECT value FROM json_each(?1)) ORDER BY k.id_penilaian, k.urut\n-- batas: beberapa keputusan per penilaian yang dibaca\n;";
+/** ?1 = larik JSON id penilaian. */
+export const NILAI_KINERJA_SQL =
+  "SELECT id_penilaian, id_aspek, aspek_nama, tipe, bobot, urutan, skor, skor_hitung, catatan, rincian FROM hr_kinerja_nilai WHERE id_penilaian IN (SELECT value FROM json_each(?1)) ORDER BY id_penilaian, urutan, id_aspek\n-- batas: paling banyak 20 aspek per penilaian yang dibaca\n;";
+/** Akar hidup (tidak dibatalkan) yang bertumpuk dengan ?1..?2; ?3 kosong = semua pegawai. */
+export const AKAR_RENTANG_SQL =
+  "SELECT x.id_penilaian, x.id_karyawan, x.periode_mulai, x.periode_selesai FROM hr_kinerja_penilaian x WHERE x.id_ref IS NULL AND x.periode_mulai <= ?2 AND x.periode_selesai >= ?1 AND (?3 = '' OR x.id_karyawan = ?3) AND NOT EXISTS (SELECT 1 FROM hr_kinerja_keputusan b WHERE b.id_penilaian = x.id_penilaian AND b.jenis = 'Batal') ORDER BY x.id_karyawan, x.periode_mulai\n-- batas: satu penilaian akar per pegawai per periode\n;";
+export const KEPUTUSAN_ADA_SQL =
+  "SELECT 1 FROM hr_kinerja_keputusan WHERE id_keputusan = ?1;";
+
+const KOLOM_PENILAIAN =
+  "INSERT INTO hr_kinerja_penilaian (id_penilaian, id_karyawan, id_ref, alasan_koreksi, periode_jenis, periode_kunci, periode_nama, periode_mulai, periode_selesai, id_template, template_nama, kelompok, unit, jabatan, status_kepegawaian, id_penilai, penilai_nama, penilai_oleh, catatan, dihitung_sampai, dibuat_oleh, created_at, updated_at)";
+/**
+ * Penilaian akar baru; tumpang tindih ditolak di statement yang sama (Q-94).
+ * ?16 penilai_oleh juga menjadi `dibuat_oleh`.
+ */
+export const BUAT_PENILAIAN_SQL = `${KOLOM_PENILAIAN} SELECT ?1, ?2, NULL, NULL, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?16, datetime('now'), datetime('now') WHERE NOT EXISTS (SELECT 1 FROM hr_kinerja_penilaian x WHERE x.id_karyawan = ?2 AND x.id_ref IS NULL AND x.periode_mulai <= ?7 AND x.periode_selesai >= ?6 AND NOT EXISTS (SELECT 1 FROM hr_kinerja_keputusan b WHERE b.id_penilaian = x.id_penilaian AND b.jenis = 'Batal'));`;
+/** Koreksi atas akar ?10: hanya bila akar Final, tidak Batal, dan tanpa koreksi terbuka. */
+export const KOREKSI_PENILAIAN_SQL = `${KOLOM_PENILAIAN} SELECT ?1, a.id_karyawan, a.id_penilaian, ?2, a.periode_jenis, a.periode_kunci, a.periode_nama, a.periode_mulai, a.periode_selesai, ?3, ?4, a.kelompok, a.unit, a.jabatan, a.status_kepegawaian, ?5, ?6, ?7, ?8, ?9, ?7, datetime('now'), datetime('now') FROM hr_kinerja_penilaian a WHERE a.id_penilaian = ?10 AND a.id_ref IS NULL AND EXISTS (SELECT 1 FROM hr_kinerja_keputusan f WHERE f.id_penilaian = a.id_penilaian AND f.jenis = 'Final') AND NOT EXISTS (SELECT 1 FROM hr_kinerja_keputusan b WHERE b.id_penilaian = a.id_penilaian AND b.jenis = 'Batal') AND NOT EXISTS (SELECT 1 FROM hr_kinerja_penilaian x WHERE x.id_ref = a.id_penilaian AND NOT EXISTS (SELECT 1 FROM hr_kinerja_keputusan k WHERE k.id_penilaian = x.id_penilaian AND k.jenis IN ('Final', 'Batal')));`;
+export const UBAH_PENILAIAN_SQL = `UPDATE hr_kinerja_penilaian SET id_template = ?2, template_nama = ?3, id_penilai = ?4, penilai_nama = ?5, penilai_oleh = ?6, catatan = ?7, dihitung_sampai = ?8, updated_at = datetime('now') WHERE id_penilaian = ?1 AND ${DRAF_SQL};`;
+export const SAMPAI_PENILAIAN_SQL = `UPDATE hr_kinerja_penilaian SET dihitung_sampai = ?2, updated_at = datetime('now') WHERE id_penilaian = ?1 AND ${DRAF_SQL};`;
+/** Baris nilai hanya ditulis ulang selama Draf. */
+export const HAPUS_NILAI_SQL = `DELETE FROM hr_kinerja_nilai WHERE id_penilaian = ?1 AND ${DRAF_SQL};`;
+export const SIMPAN_NILAI_SQL = `INSERT INTO hr_kinerja_nilai (id_nilai, id_penilaian, id_aspek, aspek_nama, tipe, bobot, urutan, skor, skor_hitung, catatan, rincian) SELECT ?1 || ':' || ?2, ?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10 WHERE EXISTS (SELECT 1 FROM hr_kinerja_penilaian p WHERE p.id_penilaian = ?1) AND ${DRAF_SQL};`;
+const KEPUTUSAN_KOLOM =
+  "INSERT INTO hr_kinerja_keputusan (id_keputusan, id_penilaian, urut, jenis, alasan, nilai_akhir, predikat, oleh, id_karyawan_oleh, created_at) SELECT ?2, ?1, (SELECT COALESCE(MAX(u.urut), 0) + 1 FROM hr_kinerja_keputusan u WHERE u.id_penilaian = ?1), ?3, ?4, ?5, ?6, ?7, ?8, datetime('now') WHERE";
+/** Keputusan append-only; `urut` = MAX + 1 di statement yang sama. Ajukan dijaga `DRAF_SQL`. */
+export const KEPUTUSAN_DRAF_SQL = `${KEPUTUSAN_KOLOM} EXISTS (SELECT 1 FROM hr_kinerja_penilaian p WHERE p.id_penilaian = ?1) AND ${DRAF_SQL};`;
+/** Kembalikan dan Final dijaga `DIAJUKAN_SQL`. */
+export const KEPUTUSAN_DIAJUKAN_SQL = `${KEPUTUSAN_KOLOM} ${DIAJUKAN_SQL};`;
+/** Batal dijaga `TERBUKA_SQL`. */
+export const KEPUTUSAN_TERBUKA_SQL = `${KEPUTUSAN_KOLOM} ${TERBUKA_SQL};`;
+
+// Penilaian: aturan murni (5b, §23.2.2–23.2.6)
+
+export const JENIS_PERIODE = ["Semester", "Tahun Ajaran"] as const;
+export type JenisPeriode = (typeof JENIS_PERIODE)[number];
+export const AKSI_SIMPAN = ["Buat", "Simpan", "Muat ulang", "Koreksi"] as const;
+export type AksiSimpan = (typeof AKSI_SIMPAN)[number];
+export const JENIS_KEPUTUSAN = [
+  "Ajukan",
+  "Kembalikan",
+  "Final",
+  "Batal",
+] as const;
+export type JenisKeputusan = (typeof JENIS_KEPUTUSAN)[number];
+export const AKSI_KINERJA = [...AKSI_SIMPAN, ...JENIS_KEPUTUSAN] as const;
+export const STATUS_DRAF = "Draf";
+export const STATUS_DIAJUKAN = "Diajukan";
+export const STATUS_FINAL = "Final";
+export const STATUS_DIBATALKAN = "Dibatalkan";
+export type StatusKinerja =
+  | typeof STATUS_DRAF
+  | typeof STATUS_DIAJUKAN
+  | typeof STATUS_FINAL
+  | typeof STATUS_DIBATALKAN;
+export const MAKS_CATATAN_ASPEK = 1000;
+export const MAKS_CATATAN = 2000;
+export const MAKS_ALASAN = 500;
+export const MAKS_ALASAN_KOREKSI = 1000;
+/** Kelompok pengajuan berlaku yang mengeluarkan tanggal dari pembagi (§23.2.3 baris 5). */
+export const KELOMPOK_DIKECUALIKAN: readonly string[] = [
+  "Cuti",
+  "Izin",
+  "Sakit",
+];
+/** Dinas Luar dihitung tepat waktu, seperti laporan sekolah (§23.2.3 baris 4). */
+export const KELOMPOK_DINAS_LUAR = "Dinas Luar";
+
+export const PESAN_IZIN = "Anda tidak punya izin untuk aksi penilaian ini.";
+export const PESAN_OTOMATIS_BERUBAH =
+  "Angka aspek otomatis berubah sejak layar dimuat. Periksa angka barunya, lalu ajukan sekali lagi.";
+export const PESAN_KEADAAN_BERUBAH =
+  "Penilaian ini baru saja diubah orang lain. Muat ulang, lalu coba lagi.";
+export const PESAN_BELUM_FINAL_SENDIRI =
+  "Penilaian atas diri Anda baru bisa dilihat sesudah final.";
+export const PESAN_TIDAK_DITEMUKAN = "Penilaian kinerja tidak ditemukan.";
+
+export interface TahunAjaran {
+  id_tahun_ajaran: string;
+  nama_tahun: string;
+  semester: string;
+  tanggal_mulai: string;
+  tanggal_selesai: string;
+}
+
+export interface Periode {
+  jenis: string;
+  kunci: string;
+  nama: string;
+  mulai: string;
+  selesai: string;
+}
+
+/** Cermin `periode_dari_tahun_ajaran` (Q-94). */
+export function periodeDariTahunAjaran(
+  jenis: string,
+  kunciMasuk: string,
+  baris: TahunAjaran[],
+): Hasil<Periode> {
+  if (!(JENIS_PERIODE as readonly string[]).includes(jenis)) {
+    return {
+      ok: false,
+      galat: "Jenis periode harus Semester atau Tahun Ajaran.",
+    };
+  }
+  const kunci = kunciMasuk.trim();
+  const semester = jenis === "Semester";
+  const dipilih = baris.filter((t) =>
+    semester ? t.id_tahun_ajaran === kunci : t.nama_tahun.trim() === kunci,
+  );
+  const pertama = dipilih[0];
+  if (kunci === "" || !pertama) {
+    return { ok: false, galat: "Periode tidak ditemukan." };
+  }
+  const nama = semester
+    ? `${pertama.nama_tahun.trim()} Semester ${pertama.semester}`
+    : `Tahun Ajaran ${kunci}`;
+  if (
+    dipilih.some(
+      (t) =>
+        !tanggalValid(t.tanggal_mulai) ||
+        !tanggalValid(t.tanggal_selesai) ||
+        t.tanggal_selesai < t.tanggal_mulai,
+    )
+  ) {
+    return { ok: false, galat: `Tanggal ${nama} tidak valid.` };
+  }
+  const mulai = dipilih.map((t) => t.tanggal_mulai).sort()[0] as string;
+  const selesai = dipilih
+    .map((t) => t.tanggal_selesai)
+    .sort()
+    .at(-1) as string;
+  return { ok: true, nilai: { jenis, kunci, nama, mulai, selesai } };
+}
+
+export interface RentangAktif {
+  mulai: string;
+  akhir: string;
+  /** `false` = tanda `periode_tidak_penuh`. */
+  penuh: boolean;
+}
+
+/** Cermin `rentang_aktif` (§23.2.2). Kosong/tidak valid = tidak memotong. */
+export function rentangAktif(
+  periodeMulai: string,
+  periodeSelesai: string,
+  tanggalDaftar: string,
+  tanggalKeluar: string,
+): RentangAktif | null {
+  const sah = (t: string) => (tanggalValid(t.trim()) ? t.trim() : null);
+  const daftar = sah(tanggalDaftar);
+  const keluar = sah(tanggalKeluar);
+  const mulai = daftar && daftar > periodeMulai ? daftar : periodeMulai;
+  const akhir = keluar && keluar < periodeSelesai ? keluar : periodeSelesai;
+  if (mulai > akhir) return null;
+  return {
+    mulai,
+    akhir,
+    penuh: mulai === periodeMulai && akhir === periodeSelesai,
+  };
+}
+
+/** Cermin `periksa_buat` (§23.2.2): hanya untuk penilaian akar baru. */
+export function periksaBuat(
+  aktif: boolean,
+  sudahKeluar: boolean,
+  periodeMulai: string,
+  hariIni: string,
+  rentang: RentangAktif | null,
+): Hasil<null> {
+  if (sudahKeluar) {
+    return {
+      ok: false,
+      galat: "Pegawai ini sudah keluar; penilaian baru tidak bisa dibuat.",
+    };
+  }
+  if (!aktif)
+    return { ok: false, galat: "Pegawai nonaktif tidak bisa dinilai." };
+  if (periodeMulai > hariIni) {
+    return { ok: false, galat: "Periode ini belum dimulai." };
+  }
+  if (!rentang) {
+    return { ok: false, galat: "Pegawai ini tidak aktif selama periode itu." };
+  }
+  return { ok: true, nilai: null };
+}
+
+/** Cermin `pesan_bertumpuk`. */
+export const pesanBertumpuk = (mulai: string, selesai: string) =>
+  `Pegawai ini sudah punya penilaian untuk periode ${mulai} s.d. ${selesai}.`;
+
+export interface IsianNilai {
+  id_aspek: string;
+  skor: number | null;
+  catatan: string | null;
+}
+
+export interface PenilaianSah {
+  aksi: string;
+  id_penilaian: string | null;
+  id_karyawan: string | null;
+  periode_jenis: string | null;
+  periode_kunci: string | null;
+  id_template: string | null;
+  catatan: string | null;
+  alasan_koreksi: string | null;
+  nilai: IsianNilai[];
+}
+
+export interface PenilaianDraft {
+  aksi: string;
+  id_penilaian?: string;
+  id_karyawan?: string;
+  periode_jenis?: string;
+  periode_kunci?: string;
+  id_template?: string;
+  catatan?: string;
+  alasan_koreksi?: string;
+  nilai?: unknown;
+}
+
+const teksDraft = (nilai: unknown) => (typeof nilai === "string" ? nilai : "");
+
+function opsional(
+  nilai: unknown,
+  label: string,
+  maks: number,
+): Hasil<string | null> {
+  const isi = kosongJadiNull(teksDraft(nilai));
+  if (isi && panjang(isi) > maks) {
+    return { ok: false, galat: `${label} maksimal ${maks} karakter.` };
+  }
+  return { ok: true, nilai: isi };
+}
+
+/** Cermin `validasi_penilaian`: bentuk isian `save`, tanpa data template. */
+export function validasiPenilaian(draft: PenilaianDraft): Hasil<PenilaianSah> {
+  const aksi = teksDraft(draft.aksi);
+  if (!(AKSI_SIMPAN as readonly string[]).includes(aksi)) {
+    return { ok: false, galat: "Aksi penilaian tidak dikenal." };
+  }
+  const idPenilaian = kosongJadiNull(teksDraft(draft.id_penilaian));
+  let idKaryawan: string | null = null;
+  let periodeJenis: string | null = null;
+  let periodeKunci: string | null = null;
+  if (aksi === "Buat") {
+    idKaryawan = kosongJadiNull(teksDraft(draft.id_karyawan));
+    if (!idKaryawan) return { ok: false, galat: "Pilih pegawai yang dinilai." };
+    periodeJenis = teksDraft(draft.periode_jenis);
+    if (!(JENIS_PERIODE as readonly string[]).includes(periodeJenis)) {
+      return {
+        ok: false,
+        galat: "Jenis periode harus Semester atau Tahun Ajaran.",
+      };
+    }
+    periodeKunci = kosongJadiNull(teksDraft(draft.periode_kunci));
+    if (!periodeKunci) return { ok: false, galat: "Pilih periode penilaian." };
+  } else if (!idPenilaian) {
+    return { ok: false, galat: "Penilaian wajib dipilih." };
+  }
+  const catatan = opsional(draft.catatan, "Catatan penilaian", MAKS_CATATAN);
+  if (!catatan.ok) return catatan;
+  let alasanKoreksi: string | null = null;
+  if (aksi === "Koreksi") {
+    const alasan = opsional(
+      draft.alasan_koreksi,
+      "Alasan koreksi",
+      MAKS_ALASAN_KOREKSI,
+    );
+    if (!alasan.ok) return alasan;
+    if (!alasan.nilai)
+      return { ok: false, galat: "Alasan koreksi wajib diisi." };
+    alasanKoreksi = alasan.nilai;
+  }
+  const mentah = draft.nilai ?? [];
+  if (!Array.isArray(mentah) || mentah.length > MAKS_ASPEK) {
+    return { ok: false, galat: "Isian nilai tidak valid." };
+  }
+  const nilai: IsianNilai[] = [];
+  for (const n of mentah as Record<string, unknown>[]) {
+    const idAspek = teksDraft(n?.id_aspek).trim();
+    if (idAspek === "") return { ok: false, galat: "Isian nilai tidak valid." };
+    if (nilai.some((x) => x.id_aspek === idAspek)) {
+      return { ok: false, galat: "Aspek ganda dalam isian nilai." };
+    }
+    const s = n.skor;
+    if (
+      s !== undefined &&
+      s !== null &&
+      !(typeof s === "number" && Number.isInteger(s) && s >= 1 && s <= 5)
+    ) {
+      return { ok: false, galat: "Skor harus bilangan bulat 1 sampai 5." };
+    }
+    const cat = opsional(n.catatan, "Catatan aspek", MAKS_CATATAN_ASPEK);
+    if (!cat.ok) return cat;
+    nilai.push({
+      id_aspek: idAspek,
+      skor: typeof s === "number" ? s : null,
+      catatan: cat.nilai,
+    });
+  }
+  return {
+    ok: true,
+    nilai: {
+      aksi,
+      id_penilaian: idPenilaian,
+      id_karyawan: idKaryawan,
+      periode_jenis: periodeJenis,
+      periode_kunci: periodeKunci,
+      id_template: kosongJadiNull(teksDraft(draft.id_template)),
+      catatan: catatan.nilai,
+      alasan_koreksi: alasanKoreksi,
+      nilai,
+    },
+  };
+}
+
+/** Satu baris `hr_kinerja_nilai` tanpa `id_nilai`/`id_penilaian`. */
+export interface BarisNilai {
+  id_aspek: string;
+  aspek_nama: string;
+  tipe: string;
+  bobot: number;
+  urutan: number;
+  skor: number | null;
+  skor_hitung: number | null;
+  catatan: string | null;
+  rincian: string | null;
+}
+
+/** Hitungan satu tipe aspek otomatis; `skor` null = tidak bisa dihitung (D = 0). */
+export interface Otomatis {
+  skor: number | null;
+  rincian: string;
+}
+
+/** Cermin `muat_ulang_template`. */
+export function muatUlangTemplate(
+  baru: BarisNilai[],
+  lama: BarisNilai[],
+): BarisNilai[] {
+  return baru.map((b) => {
+    const l = lama.find((x) => x.id_aspek === b.id_aspek);
+    return l
+      ? { ...b, skor: l.skor, skor_hitung: l.skor_hitung, catatan: l.catatan }
+      : b;
+  });
+}
+
+/** Cermin `isian_tersimpan`: skor otomatis yang sama dengan hitungannya dilepas. */
+export function isianTersimpan(baris: BarisNilai[]): IsianNilai[] {
+  return baris.map((b) => ({
+    id_aspek: b.id_aspek,
+    skor:
+      b.skor !== null && (b.tipe === TIPE_MANUAL || b.skor_hitung !== b.skor)
+        ? b.skor
+        : null,
+    catatan: b.catatan,
+  }));
+}
+
+/** Cermin `susun_nilai` (Q-100). */
+export function susunNilai(
+  baris: BarisNilai[],
+  isian: IsianNilai[],
+  otomatis: Record<string, Otomatis>,
+): Hasil<BarisNilai[]> {
+  if (isian.some((i) => !baris.some((b) => b.id_aspek === i.id_aspek))) {
+    return {
+      ok: false,
+      galat: "Aspek penilaian tidak dikenal; muat ulang template.",
+    };
+  }
+  const hasil: BarisNilai[] = [];
+  for (const b of baris) {
+    const isi = isian.find((i) => i.id_aspek === b.id_aspek);
+    const baru: BarisNilai = {
+      ...b,
+      skor: isi?.skor ?? null,
+      catatan: isi?.catatan ?? null,
+      skor_hitung: null,
+      rincian: null,
+    };
+    if (b.tipe !== TIPE_MANUAL) {
+      const o = otomatis[b.tipe];
+      if (o) {
+        baru.rincian = o.rincian;
+        baru.skor_hitung = o.skor;
+      }
+      const h = baru.skor_hitung;
+      if (h !== null && baru.skor === null) {
+        baru.skor = h;
+      } else if (h !== null && baru.skor !== h && baru.catatan === null) {
+        return {
+          ok: false,
+          galat: `Skor aspek "${b.aspek_nama}" yang diubah dari hitungan wajib diberi catatan alasannya.`,
+        };
+      } else if (h === null && baru.skor !== null && baru.catatan === null) {
+        return {
+          ok: false,
+          galat: `Aspek "${b.aspek_nama}" belum bisa dihitung otomatis; beri catatan alasan skornya.`,
+        };
+      }
+    }
+    hasil.push(baru);
+  }
+  return { ok: true, nilai: hasil };
+}
+
+export const skorLengkap = (baris: BarisNilai[]) =>
+  baris.length > 0 && baris.every((b) => b.skor !== null);
+
+/** Cermin `nilai_akhir` (§23.2.5): Σ bobot × 25 × (skor − 1), null bila ada skor kosong. */
+export function nilaiAkhir(baris: BarisNilai[]): number | null {
+  let total = 0;
+  for (const b of baris) {
+    if (b.skor === null) return null;
+    total += b.bobot * 25 * (b.skor - 1);
+  }
+  return total;
+}
+
+/** Cermin `format_nilai`: 7750 → `77,50`. */
+export const formatNilai = (nilai: number) =>
+  `${Math.trunc(nilai / 100)},${String(nilai % 100).padStart(2, "0")}`;
+
+export interface KeputusanRingkas {
+  urut: number;
+  jenis: string;
+}
+
+/** Cermin `status_kinerja` (§23.2.6, berurutan). */
+export function statusKinerja(keputusan: KeputusanRingkas[]): StatusKinerja {
+  if (keputusan.some((k) => k.jenis === "Batal")) return STATUS_DIBATALKAN;
+  if (keputusan.some((k) => k.jenis === "Final")) return STATUS_FINAL;
+  let terakhir: KeputusanRingkas | null = null;
+  for (const k of keputusan) {
+    if (k.jenis !== "Ajukan" && k.jenis !== "Kembalikan") continue;
+    if (!terakhir || k.urut > terakhir.urut) terakhir = k;
+  }
+  return terakhir?.jenis === "Ajukan" ? STATUS_DIAJUKAN : STATUS_DRAF;
+}
+
+export interface KeadaanKinerja {
+  status: string;
+  koreksi: boolean;
+  sendiri: boolean;
+  boleh_assess: boolean;
+  boleh_finalize: boolean;
+  dalam_cakupan: boolean;
+  skor_lengkap: boolean;
+  otomatis_sama: boolean;
+  akar_final: boolean;
+  koreksi_terbuka: boolean;
+}
+
+export const KEADAAN_KOSONG: KeadaanKinerja = {
+  status: "",
+  koreksi: false,
+  sendiri: false,
+  boleh_assess: false,
+  boleh_finalize: false,
+  dalam_cakupan: false,
+  skor_lengkap: false,
+  otomatis_sama: false,
+  akar_final: false,
+  koreksi_terbuka: false,
+};
+
+/** Cermin `periksa_aksi_kinerja` (§23.2.6, §23.4). */
+export function periksaAksiKinerja(
+  aksi: string,
+  alasan: string,
+  k: KeadaanKinerja,
+): Hasil<null> {
+  if (!(AKSI_KINERJA as readonly string[]).includes(aksi)) {
+    return { ok: false, galat: "Aksi penilaian tidak dikenal." };
+  }
+  if (aksi !== "Koreksi" && panjang(alasan.trim()) > MAKS_ALASAN) {
+    return { ok: false, galat: `Alasan maksimal ${MAKS_ALASAN} karakter.` };
+  }
+  if (k.sendiri) return { ok: false, galat: PESAN_DIRI_SENDIRI };
+  const pengisi = k.boleh_assess || (k.koreksi && k.boleh_finalize);
+  const izin =
+    aksi === "Buat"
+      ? k.boleh_assess
+      : aksi === "Simpan" || aksi === "Muat ulang" || aksi === "Ajukan"
+        ? pengisi
+        : aksi === "Batal"
+          ? k.boleh_assess || k.boleh_finalize
+          : k.boleh_finalize;
+  if (!izin) return { ok: false, galat: PESAN_IZIN };
+  if (!k.dalam_cakupan) return { ok: false, galat: PESAN_DI_LUAR_CAKUPAN };
+  const tanpaAlasan = alasan.trim() === "";
+  const tolak = (galat: string): Hasil<null> => ({ ok: false, galat });
+  switch (aksi) {
+    case "Buat":
+      break;
+    case "Simpan":
+    case "Muat ulang":
+      if (k.status !== STATUS_DRAF) {
+        return tolak(
+          "Penilaian yang sudah diajukan atau selesai tidak bisa disunting.",
+        );
+      }
+      break;
+    case "Koreksi":
+      if (!k.akar_final) {
+        return tolak("Koreksi hanya untuk penilaian yang sudah final.");
+      }
+      if (k.koreksi_terbuka) {
+        return tolak("Penilaian ini masih punya koreksi yang belum selesai.");
+      }
+      break;
+    case "Ajukan":
+      if (k.status !== STATUS_DRAF)
+        return tolak("Hanya draf yang bisa diajukan.");
+      if (!k.skor_lengkap) {
+        return tolak("Isi skor semua aspek sebelum mengajukan.");
+      }
+      if (!k.otomatis_sama) return tolak(PESAN_OTOMATIS_BERUBAH);
+      break;
+    case "Kembalikan":
+    case "Final":
+      if (k.status !== STATUS_DIAJUKAN) {
+        return tolak("Penilaian ini tidak sedang diajukan.");
+      }
+      if (aksi === "Kembalikan" && tanpaAlasan) {
+        return tolak("Alasan pengembalian wajib diisi.");
+      }
+      break;
+    default:
+      if (k.status === STATUS_FINAL) {
+        return tolak("Penilaian final tidak bisa dibatalkan; buat koreksi.");
+      }
+      if (k.status === STATUS_DIBATALKAN) {
+        return tolak("Penilaian ini sudah dibatalkan.");
+      }
+      if (tanpaAlasan) return tolak("Alasan pembatalan wajib diisi.");
+  }
+  return { ok: true, nilai: null };
+}
+
+/** Cermin `boleh_baca_kinerja` (Q-105). */
+export const bolehBacaKinerja = (
+  sendiri: boolean,
+  status: string,
+  bolehView: boolean,
+) => !sendiri || (status === STATUS_FINAL && bolehView);
+
+export interface InfoTanda {
+  status: string;
+  penilai_oleh: string;
+  id_penilai: string;
+  penilai_bawaan: string;
+  final_oleh: string;
+  nilai: BarisNilai[];
+  periode_penuh: boolean;
+  periode_selesai: string;
+  dihitung_sampai: string;
+  pengajuan_menunggu: boolean;
+  asn: boolean;
+}
+
+export type TandaKinerja =
+  | "bukan_penilai_bawaan"
+  | "dinilai_dan_difinalkan_sama"
+  | "otomatis_diubah"
+  | "otomatis_manual"
+  | "periode_tidak_penuh"
+  | "periode_belum_selesai"
+  | "pengajuan_menunggu"
+  | "asn"
+  | "otomatis_berubah";
+
+const samaOrang = (a: string, b: string) =>
+  a.trim() !== "" && a.trim().toLowerCase() === b.trim().toLowerCase();
+
+/** Cermin `tanda_kinerja`; `otomatis_berubah` dihitung terpisah di rincian. */
+export function tandaKinerja(i: InfoTanda): TandaKinerja[] {
+  const tanda: TandaKinerja[] = [];
+  const bawaan = i.penilai_bawaan.trim();
+  if (bawaan !== "" && i.id_penilai.trim() !== bawaan) {
+    tanda.push("bukan_penilai_bawaan");
+  }
+  if (i.status === STATUS_FINAL && samaOrang(i.final_oleh, i.penilai_oleh)) {
+    tanda.push("dinilai_dan_difinalkan_sama");
+  }
+  const otomatis = i.nilai.filter((b) => b.tipe !== TIPE_MANUAL);
+  if (
+    otomatis.some((b) => b.skor_hitung !== null && b.skor !== b.skor_hitung)
+  ) {
+    tanda.push("otomatis_diubah");
+  }
+  if (otomatis.some((b) => b.skor_hitung === null)) {
+    tanda.push("otomatis_manual");
+  }
+  if (!i.periode_penuh) tanda.push("periode_tidak_penuh");
+  if (i.dihitung_sampai !== "" && i.dihitung_sampai < i.periode_selesai) {
+    tanda.push("periode_belum_selesai");
+  }
+  if (i.pengajuan_menunggu) tanda.push("pengajuan_menunggu");
+  if (i.asn) tanda.push("asn");
+  return tanda;
+}
+
+export interface KandidatBerlaku {
+  id_penilaian: string;
+  final_pada: string;
+  koreksi: boolean;
+}
+
+/** Cermin `kinerja_berlaku`: Final paling akhir (seri: koreksi menang). */
+export function kinerjaBerlaku(kandidat: KandidatBerlaku[]): string | null {
+  let pilih: KandidatBerlaku | null = null;
+  for (const k of kandidat) {
+    if (
+      !pilih ||
+      k.final_pada > pilih.final_pada ||
+      (k.final_pada === pilih.final_pada && k.koreksi && !pilih.koreksi)
+    ) {
+      pilih = k;
+    }
+  }
+  return pilih?.id_penilaian ?? null;
+}
+
+export interface MasukanPenilai {
+  id_karyawan: string;
+  kelompok: string;
+  id_atasan: string;
+  kepala_unit: string;
+  kepala_tu: string;
+}
+
+export interface PenilaiBawaan {
+  id: string;
+  sumber: "atasan" | "kepala_unit" | "kepala_tu";
+}
+
+/** Cermin `penilai_bawaan` (Q-103). */
+export function penilaiBawaan(m: MasukanPenilai): PenilaiBawaan | null {
+  const calon: [string, PenilaiBawaan["sumber"]][] = [
+    [m.id_atasan, "atasan"],
+    m.kelompok === "Guru"
+      ? [m.kepala_unit, "kepala_unit"]
+      : [m.kepala_tu, "kepala_tu"],
+  ];
+  for (const [mentah, sumber] of calon) {
+    const id = mentah.trim();
+    if (id !== "" && id !== m.id_karyawan.trim()) return { id, sumber };
+  }
+  return null;
+}
+
+// Aspek otomatis kehadiran (§23.2.3)
+
+export interface HariKehadiran {
+  tanggal: string;
+  hadir: boolean;
+  telat: boolean;
+  sakit: boolean;
+  izin: boolean;
+  dispensasi: boolean;
+  alfa: boolean;
+}
+
+const angkaJson = (nilai: unknown) => {
+  const n = typeof nilai === "string" ? Number(nilai.trim()) : nilai;
+  return typeof n === "number" && Number.isInteger(n) ? n : null;
+};
+
+/** Cermin `HariKehadiran::dari_json`: satu baris `KINERJA_HARI_SQL`. */
+export function hariKehadiran(v: Record<string, unknown>): HariKehadiran {
+  const satu = (k: string) => angkaJson(v[k]) === 1;
+  return {
+    tanggal: teksDraft(v.tanggal),
+    hadir: satu("hadir"),
+    telat: (angkaJson(v.telat) ?? 0) > 0,
+    sakit: satu("sakit"),
+    izin: satu("izin"),
+    dispensasi: satu("dispensasi"),
+    alfa: satu("alfa"),
+  };
+}
+
+export interface PengajuanKehadiran {
+  mulai: string;
+  selesai: string;
+  kelompok: string;
+}
+
+/** Cermin `PengajuanKehadiran::dari_json`: satu baris `KINERJA_PENGAJUAN_SQL`. */
+export const pengajuanKehadiran = (
+  v: Record<string, unknown>,
+): PengajuanKehadiran => ({
+  mulai: teksDraft(v.tanggal_mulai),
+  selesai: teksDraft(v.tanggal_selesai),
+  kelompok: teksDraft(v.kelompok),
+});
+
+export interface MasukanKehadiran {
+  mulai: string;
+  akhir: string;
+  hari_ini: string;
+  jadwal: Jadwal;
+  hari: HariKehadiran[];
+  pengajuan: PengajuanKehadiran[];
+  libur: ReadonlySet<string>;
+  whitelist: HolidayWhitelistEntry[];
+  ambang: readonly number[];
+}
+
+export interface Kehadiran {
+  hari: number;
+  tepat: number;
+  telat: number;
+  alfa: number;
+  kosong: number;
+  dikecualikan: number;
+  permil: number | null;
+  ambang: number[];
+  skor: number | null;
+  sampai: string;
+  rincian: string;
+  tanggal_telat: string[];
+  tanggal_alfa: string[];
+  tanggal_kosong: string[];
+}
+
+function kodeTercatat(h: HariKehadiran | undefined): string | null {
+  if (!h) return null;
+  if (h.hadir) return h.telat ? "T" : "H";
+  if (h.sakit) return "S";
+  if (h.izin) return "I";
+  if (h.dispensasi) return "D";
+  if (h.alfa) return "A";
+  return null;
+}
+
+/** Cermin `hitung_kehadiran` (Q-95); klasifikasi per tanggal mengikuti §23.2.3. */
+export function hitungKehadiran(m: MasukanKehadiran): Kehadiran {
+  const sampai = m.akhir < m.hari_ini ? m.akhir : m.hari_ini;
+  const tanggal = m.mulai <= sampai ? tanggalRentang(m.mulai, sampai) : [];
+  const dijadwalkan = new Set(
+    tanggal.length > 0
+      ? tanggalWajib(m.jadwal, m.libur, m.whitelist, m.mulai, sampai)
+      : [],
+  );
+  const catatan = new Map(m.hari.map((h) => [h.tanggal, h]));
+  const k: Kehadiran = {
+    hari: 0,
+    tepat: 0,
+    telat: 0,
+    alfa: 0,
+    kosong: 0,
+    dikecualikan: 0,
+    permil: null,
+    ambang: [...m.ambang],
+    skor: null,
+    sampai,
+    rincian: "",
+    tanggal_telat: [],
+    tanggal_alfa: [],
+    tanggal_kosong: [],
+  };
+  for (const t of tanggal) {
+    const kelompok = m.pengajuan
+      .filter((p) => p.mulai <= t && t <= p.selesai)
+      .map((p) => p.kelompok);
+    const kode = kodeTercatat(catatan.get(t));
+    const tercatatAtauJadwal = kode !== null || dijadwalkan.has(t);
+    if (kode === "H") k.tepat++;
+    else if (kode === "T" && kelompok.length > 0) k.tepat++;
+    else if (kode === "T") {
+      k.telat++;
+      k.tanggal_telat.push(t);
+    } else if (tercatatAtauJadwal && kelompok.includes(KELOMPOK_DINAS_LUAR)) {
+      k.tepat++;
+    } else if (
+      tercatatAtauJadwal &&
+      kelompok.some((g) => KELOMPOK_DIKECUALIKAN.includes(g))
+    ) {
+      k.dikecualikan++;
+    } else if (kode === "S" || kode === "I" || kode === "D") {
+      k.dikecualikan++;
+    } else if (kode !== null) {
+      k.alfa++;
+      k.tanggal_alfa.push(t);
+    } else if (dijadwalkan.has(t)) {
+      k.kosong++;
+      k.tanggal_kosong.push(t);
+    }
+  }
+  k.hari = k.tepat + k.telat + k.alfa + k.kosong;
+  k.permil =
+    k.hari > 0
+      ? Math.floor(((2 * k.tepat + k.telat) * 1000) / (2 * k.hari))
+      : null;
+  k.skor = k.permil === null ? null : skorAmbang(k.permil, m.ambang);
+  k.rincian = `K|${k.hari}|${k.tepat}|${k.telat}|${k.alfa}|${k.kosong}|${k.dikecualikan}|${k.permil ?? ""}|${m.ambang.join(",")}|${sampai}`;
+  return k;
+}
+
 // Bentuk data untuk layar
 
 export interface AspekKinerja {
@@ -591,6 +1460,134 @@ export interface TemplateKinerja {
 export interface DataTemplateKinerja {
   template: TemplateKinerja[];
   pengaturan: PengaturanKinerja;
+}
+
+// Bentuk data penilaian untuk layar (5b)
+
+export interface PenilaianKinerja {
+  id_penilaian: string;
+  id_karyawan: string;
+  nama: string;
+  id_ref: string;
+  alasan_koreksi: string;
+  periode_jenis: JenisPeriode;
+  periode_kunci: string;
+  periode_nama: string;
+  periode_mulai: string;
+  periode_selesai: string;
+  id_template: string;
+  template_nama: string;
+  kelompok: KelompokKinerja;
+  unit: string;
+  jabatan: string;
+  status_kepegawaian: string;
+  id_penilai: string;
+  penilai_nama: string;
+  penilai_oleh: string;
+  catatan: string;
+  dihitung_sampai: string;
+  dibuat_oleh: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface PenilaianDaftar extends PenilaianKinerja {
+  status: StatusKinerja;
+  tanda: TandaKinerja[];
+  nilai_akhir: number | null;
+  predikat: string | null;
+  perlu_saya: boolean;
+  penilai_bawaan: PenilaiBawaan | null;
+}
+
+export interface BelumDinilai {
+  id_karyawan: string;
+  nama: string;
+  unit: string;
+  kelompok: KelompokKinerja;
+  jabatan: string;
+  status_kepegawaian: string;
+  perlu_saya: boolean;
+  penilai_bawaan: PenilaiBawaan | null;
+  periode_tidak_penuh: boolean;
+}
+
+export interface SesiKinerja {
+  id_karyawan: string;
+  unit: string;
+  lingkup_semua: boolean;
+}
+
+export interface DaftarKinerja {
+  periode: Periode;
+  hari_ini: string;
+  penilaian: PenilaianDaftar[];
+  belum_dinilai: BelumDinilai[];
+  sesi: SesiKinerja;
+}
+
+export interface RiwayatKinerja {
+  penilaian: (PenilaianKinerja & {
+    status: StatusKinerja;
+    nilai_akhir?: number;
+    predikat?: string;
+    berlaku: boolean;
+  })[];
+  hari_ini: string;
+}
+
+export interface KeputusanKinerja {
+  id_keputusan: string;
+  id_penilaian: string;
+  urut: number;
+  jenis: JenisKeputusan;
+  alasan: string;
+  nilai_akhir: number | null;
+  predikat: string;
+  oleh: string;
+  id_karyawan_oleh: string;
+  created_at: string;
+}
+
+export interface KeluargaKinerja {
+  id_penilaian: string;
+  id_ref: string;
+  alasan_koreksi: string;
+  status: StatusKinerja;
+  created_at: string;
+  nilai_akhir: number | null;
+  predikat: string | null;
+  berlaku: boolean;
+}
+
+export interface SpKinerja {
+  id_sp: string;
+  tingkat: string;
+  tanggal: string;
+  berlaku_sampai: string;
+  nomor: string;
+  pelanggaran: string;
+}
+
+export interface RincianKinerja {
+  penilaian: PenilaianKinerja;
+  status: StatusKinerja;
+  tanda: TandaKinerja[];
+  nilai: BarisNilai[];
+  keputusan: KeputusanKinerja[];
+  nilai_akhir: number | null;
+  predikat: string | null;
+  kehadiran: Kehadiran | null;
+  hidup: Record<string, Otomatis>;
+  rentang: RentangAktif | null;
+  keluarga: KeluargaKinerja[];
+  berlaku: string | null;
+  sp: SpKinerja[];
+  penilai_bawaan: (PenilaiBawaan & { nama: string | null }) | null;
+  pengaturan: PengaturanKinerja;
+  unit_pegawai: string;
+  sendiri: boolean;
+  hari_ini: string;
 }
 
 // Zod (rute Web; `.strict()`, enum diperiksa `validasiTemplate`)
@@ -627,3 +1624,46 @@ export const pengaturanKinerjaSchema = z
   .strict();
 
 export const kosongSchema = z.object({}).strict();
+
+const isianNilaiSchema = z
+  .object({
+    id_aspek: z.string().max(200),
+    skor: z.number().nullable().optional(),
+    catatan: z.string().max(5000).nullable().optional(),
+  })
+  .strict();
+
+export const penilaianDraftSchema = z
+  .object({
+    aksi: z.enum(AKSI_SIMPAN),
+    id_penilaian: z.string().max(200).optional(),
+    id_karyawan: z.string().max(200).optional(),
+    periode_jenis: z.enum(JENIS_PERIODE).optional(),
+    periode_kunci: z.string().max(200).optional(),
+    id_template: z.string().max(200).optional(),
+    catatan: z.string().max(10000).optional(),
+    alasan_koreksi: z.string().max(5000).optional(),
+    nilai: z.array(isianNilaiSchema).max(MAKS_ASPEK).optional(),
+  })
+  .strict();
+
+export const keputusanDraftSchema = z
+  .object({
+    id_penilaian: z.string().min(1).max(200),
+    jenis: z.enum(JENIS_KEPUTUSAN),
+    alasan: z.string().max(5000).optional(),
+    rincian: z.record(z.string().max(200), z.string().max(500)).optional(),
+  })
+  .strict();
+
+export const daftarKinerjaSchema = z
+  .object({
+    periode_jenis: z.enum(JENIS_PERIODE).optional(),
+    periode_kunci: z.string().max(200).optional(),
+    id_karyawan: z.string().max(200).optional(),
+  })
+  .strict();
+
+export const rincianKinerjaSchema = z
+  .object({ id_penilaian: z.string().min(1).max(200) })
+  .strict();

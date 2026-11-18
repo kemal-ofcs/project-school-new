@@ -3644,6 +3644,61 @@ pub fn desktop_hr_performance_settings_save(
     hr_kinerja::simpan_pengaturan(&state, &draft)
 }
 
+/// Penilaian kinerja satu periode atau riwayat satu pegawai (HRIS Fase 5b).
+#[tauri::command]
+pub async fn desktop_hr_performance_list(
+    state: State<'_, DesktopState>,
+    draft: Value,
+) -> Result<Value, CommandError> {
+    let operator = require_any_permission(
+        &state,
+        &["hr.performance.view", "hr.performance.assess", "hr.performance.finalize"],
+    )?;
+    hr_kinerja::daftar_kinerja(&klien_cloud(&state)?, &operator, &draft)
+        .await
+        .map_err(hris_cloud::luring)
+}
+
+/// Rincian satu penilaian dengan hitungan otomatis hidup.
+#[tauri::command]
+pub async fn desktop_hr_performance_detail(
+    state: State<'_, DesktopState>,
+    id_penilaian: String,
+) -> Result<Value, CommandError> {
+    let operator = require_any_permission(
+        &state,
+        &["hr.performance.view", "hr.performance.assess", "hr.performance.finalize"],
+    )?;
+    hr_kinerja::rincian_kinerja(&klien_cloud(&state)?, &operator, &id_penilaian)
+        .await
+        .map_err(hris_cloud::luring)
+}
+
+/// Buat, simpan draf, muat ulang template, atau buat koreksi; izin per aksi
+/// dinilai `periksa_aksi_kinerja`.
+#[tauri::command]
+pub async fn desktop_hr_performance_save(
+    state: State<'_, DesktopState>,
+    draft: Value,
+) -> Result<Value, CommandError> {
+    let operator = require_any_permission(&state, &["hr.performance.assess", "hr.performance.finalize"])?;
+    hr_kinerja::simpan_kinerja(&klien_cloud(&state)?, &operator, &draft)
+        .await
+        .map_err(hris_cloud::luring)
+}
+
+/// Ajukan, Kembalikan, Final, atau Batal dalam satu batch cloud berpenjaga.
+#[tauri::command]
+pub async fn desktop_hr_performance_decide(
+    state: State<'_, DesktopState>,
+    draft: Value,
+) -> Result<Value, CommandError> {
+    let operator = require_any_permission(&state, &["hr.performance.assess", "hr.performance.finalize"])?;
+    hr_kinerja::putuskan_kinerja(&klien_cloud(&state)?, &operator, &draft)
+        .await
+        .map_err(hris_cloud::luring)
+}
+
 /// Berlakukan proses keluar: satu batch cloud menonaktifkan pegawai dan akun
 /// tertautnya serta mencabut sesi Web-nya.
 #[tauri::command]

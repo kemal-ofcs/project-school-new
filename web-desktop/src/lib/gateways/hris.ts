@@ -17,9 +17,14 @@ import type {
   SpDraft,
 } from "@/lib/validations/hr-keluar";
 import type {
+  DaftarKinerja,
   DataTemplateKinerja,
+  JenisKeputusan,
   PengaturanKinerja,
   PengaturanKinerjaDraft,
+  PenilaianDraft,
+  RincianKinerja,
+  RiwayatKinerja,
   TemplateDraft,
 } from "@/lib/validations/hr-kinerja";
 import type {
@@ -553,6 +558,71 @@ export function simpanPengaturanKinerja(
     "desktop_hr_performance_settings_save",
     { draft },
     "/api/kepegawaian/performance/settings",
+    draft,
+  );
+}
+
+/** Penilaian satu periode (`periode_jenis` + `periode_kunci`). */
+export function muatDaftarKinerja(
+  periodeJenis: string,
+  periodeKunci: string,
+): Promise<DaftarKinerja> {
+  const draft = { periode_jenis: periodeJenis, periode_kunci: periodeKunci };
+  return cloud(
+    "desktop_hr_performance_list",
+    { draft },
+    "/api/kepegawaian/performance/query",
+    draft,
+  );
+}
+
+/** Riwayat penilaian satu pegawai (tab Kinerja di rincian pegawai). */
+export function muatRiwayatKinerja(
+  idKaryawan: string,
+): Promise<RiwayatKinerja> {
+  const draft = { id_karyawan: idKaryawan };
+  return cloud(
+    "desktop_hr_performance_list",
+    { draft },
+    "/api/kepegawaian/performance/query",
+    draft,
+  );
+}
+
+export function muatRincianKinerja(
+  idPenilaian: string,
+): Promise<RincianKinerja> {
+  return cloud(
+    "desktop_hr_performance_detail",
+    { idPenilaian },
+    "/api/kepegawaian/performance/detail",
+    { id_penilaian: idPenilaian },
+  );
+}
+
+/** Buat, Simpan, Muat ulang, atau Koreksi. */
+export function simpanPenilaianKinerja(
+  draft: PenilaianDraft,
+): Promise<{ sukses: true; id_penilaian: string }> {
+  return cloud(
+    "desktop_hr_performance_save",
+    { draft },
+    "/api/kepegawaian/performance/save",
+    draft,
+  );
+}
+
+/** Ajukan, Kembalikan, Final, atau Batal. */
+export function putuskanPenilaianKinerja(draft: {
+  id_penilaian: string;
+  jenis: JenisKeputusan;
+  alasan?: string;
+  rincian?: Record<string, string>;
+}): Promise<{ sukses: true; id_penilaian: string; id_keputusan: string }> {
+  return cloud(
+    "desktop_hr_performance_decide",
+    { draft },
+    "/api/kepegawaian/performance/decide",
     draft,
   );
 }

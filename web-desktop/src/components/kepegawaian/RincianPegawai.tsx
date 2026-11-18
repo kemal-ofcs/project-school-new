@@ -34,9 +34,11 @@ import {
   TOMBOL_UTAMA,
 } from "./gaya";
 import { PendidikPegawai } from "./PendidikPegawai";
+import { KinerjaPegawai } from "./PenilaianKinerja";
 import { SuratPeringatanPegawai } from "./SuratPeringatanPegawai";
 
 type TabRincian =
+  | "kinerja"
   | "kerja"
   | "pribadi"
   | "keuangan"
@@ -140,6 +142,9 @@ export function RincianPegawai({
       : []),
     ...(boleh("hr.document.view")
       ? [{ kunci: "dokumen" as const, label: "Dokumen" }]
+      : []),
+    ...(boleh("hr.performance.view")
+      ? [{ kunci: "kinerja" as const, label: "Kinerja" }]
       : []),
   ];
   const [tab, setTab] = useState<TabRincian>("kerja");
@@ -276,6 +281,8 @@ export function RincianPegawai({
               idKaryawan={id}
               bolehUbah={boleh("hr.document.manage")}
             />
+          ) : tab === "kinerja" ? (
+            <KinerjaPegawai idKaryawan={id} />
           ) : (
             panelProfil()
           )}

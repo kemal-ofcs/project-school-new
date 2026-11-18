@@ -2006,5 +2006,3562 @@
       "nilai": 8999,
       "hasil": "B"
     }
+  ],
+  "kehadiran": [
+    {
+      "nama": "§23.2.3: tepat 17, telat 2, alfa 1 = 900 = skor 4",
+      "masukan": {
+        "mulai": "2024-01-01",
+        "akhir": "2024-01-26",
+        "hari_ini": "2024-12-31",
+        "divisi": "Guru",
+        "hari_kerja": "1,2,3,4,5",
+        "kode_shift": 77,
+        "hari": [
+          {
+            "id": "G1",
+            "tanggal": "2024-01-01",
+            "hadir": 1,
+            "telat": 0,
+            "menit": 0,
+            "sakit": 0,
+            "izin": 0,
+            "dispensasi": 0,
+            "alfa": 0
+          },
+          {
+            "id": "G1",
+            "tanggal": "2024-01-02",
+            "hadir": 1,
+            "telat": 0,
+            "menit": 0,
+            "sakit": 0,
+            "izin": 0,
+            "dispensasi": 0,
+            "alfa": 0
+          },
+          {
+            "id": "G1",
+            "tanggal": "2024-01-03",
+            "hadir": 1,
+            "telat": 0,
+            "menit": 0,
+            "sakit": 0,
+            "izin": 0,
+            "dispensasi": 0,
+            "alfa": 0
+          },
+          {
+            "id": "G1",
+            "tanggal": "2024-01-04",
+            "hadir": 1,
+            "telat": 0,
+            "menit": 0,
+            "sakit": 0,
+            "izin": 0,
+            "dispensasi": 0,
+            "alfa": 0
+          },
+          {
+            "id": "G1",
+            "tanggal": "2024-01-05",
+            "hadir": 1,
+            "telat": 0,
+            "menit": 0,
+            "sakit": 0,
+            "izin": 0,
+            "dispensasi": 0,
+            "alfa": 0
+          },
+          {
+            "id": "G1",
+            "tanggal": "2024-01-08",
+            "hadir": 1,
+            "telat": 0,
+            "menit": 0,
+            "sakit": 0,
+            "izin": 0,
+            "dispensasi": 0,
+            "alfa": 0
+          },
+          {
+            "id": "G1",
+            "tanggal": "2024-01-09",
+            "hadir": 1,
+            "telat": 0,
+            "menit": 0,
+            "sakit": 0,
+            "izin": 0,
+            "dispensasi": 0,
+            "alfa": 0
+          },
+          {
+            "id": "G1",
+            "tanggal": "2024-01-10",
+            "hadir": 1,
+            "telat": 0,
+            "menit": 0,
+            "sakit": 0,
+            "izin": 0,
+            "dispensasi": 0,
+            "alfa": 0
+          },
+          {
+            "id": "G1",
+            "tanggal": "2024-01-11",
+            "hadir": 1,
+            "telat": 0,
+            "menit": 0,
+            "sakit": 0,
+            "izin": 0,
+            "dispensasi": 0,
+            "alfa": 0
+          },
+          {
+            "id": "G1",
+            "tanggal": "2024-01-12",
+            "hadir": 1,
+            "telat": 0,
+            "menit": 0,
+            "sakit": 0,
+            "izin": 0,
+            "dispensasi": 0,
+            "alfa": 0
+          },
+          {
+            "id": "G1",
+            "tanggal": "2024-01-15",
+            "hadir": 1,
+            "telat": 0,
+            "menit": 0,
+            "sakit": 0,
+            "izin": 0,
+            "dispensasi": 0,
+            "alfa": 0
+          },
+          {
+            "id": "G1",
+            "tanggal": "2024-01-16",
+            "hadir": 1,
+            "telat": 0,
+            "menit": 0,
+            "sakit": 0,
+            "izin": 0,
+            "dispensasi": 0,
+            "alfa": 0
+          },
+          {
+            "id": "G1",
+            "tanggal": "2024-01-17",
+            "hadir": 1,
+            "telat": 0,
+            "menit": 0,
+            "sakit": 0,
+            "izin": 0,
+            "dispensasi": 0,
+            "alfa": 0
+          },
+          {
+            "id": "G1",
+            "tanggal": "2024-01-18",
+            "hadir": 1,
+            "telat": 0,
+            "menit": 0,
+            "sakit": 0,
+            "izin": 0,
+            "dispensasi": 0,
+            "alfa": 0
+          },
+          {
+            "id": "G1",
+            "tanggal": "2024-01-19",
+            "hadir": 1,
+            "telat": 0,
+            "menit": 0,
+            "sakit": 0,
+            "izin": 0,
+            "dispensasi": 0,
+            "alfa": 0
+          },
+          {
+            "id": "G1",
+            "tanggal": "2024-01-22",
+            "hadir": 1,
+            "telat": 0,
+            "menit": 0,
+            "sakit": 0,
+            "izin": 0,
+            "dispensasi": 0,
+            "alfa": 0
+          },
+          {
+            "id": "G1",
+            "tanggal": "2024-01-23",
+            "hadir": 1,
+            "telat": 0,
+            "menit": 0,
+            "sakit": 0,
+            "izin": 0,
+            "dispensasi": 0,
+            "alfa": 0
+          },
+          {
+            "id": "G1",
+            "tanggal": "2024-01-24",
+            "hadir": 1,
+            "telat": 5,
+            "menit": 5,
+            "sakit": 0,
+            "izin": 0,
+            "dispensasi": 0,
+            "alfa": 0
+          },
+          {
+            "id": "G1",
+            "tanggal": "2024-01-25",
+            "hadir": 1,
+            "telat": 30,
+            "menit": 30,
+            "sakit": 0,
+            "izin": 0,
+            "dispensasi": 0,
+            "alfa": 0
+          },
+          {
+            "id": "G1",
+            "tanggal": "2024-01-26",
+            "hadir": 0,
+            "telat": 0,
+            "menit": 0,
+            "sakit": 0,
+            "izin": 0,
+            "dispensasi": 0,
+            "alfa": 1
+          }
+        ],
+        "pengajuan": [],
+        "libur": [],
+        "whitelist": [],
+        "ambang": [950, 900, 800, 700]
+      },
+      "hasil": {
+        "hari": 20,
+        "tepat": 17,
+        "telat": 2,
+        "alfa": 1,
+        "kosong": 0,
+        "dikecualikan": 0,
+        "permil": 900,
+        "ambang": [950, 900, 800, 700],
+        "skor": 4,
+        "sampai": "2024-01-26",
+        "rincian": "K|20|17|2|1|0|0|900|950,900,800,700|2024-01-26",
+        "tanggal_telat": ["2024-01-24", "2024-01-25"],
+        "tanggal_alfa": ["2024-01-26"],
+        "tanggal_kosong": []
+      }
+    },
+    {
+      "nama": "tepat 20, telat 1 = 976 = skor 5",
+      "masukan": {
+        "mulai": "2024-01-01",
+        "akhir": "2024-01-29",
+        "hari_ini": "2024-12-31",
+        "divisi": "Guru",
+        "hari_kerja": "1,2,3,4,5",
+        "kode_shift": 77,
+        "hari": [
+          {
+            "id": "G1",
+            "tanggal": "2024-01-01",
+            "hadir": 1,
+            "telat": 0,
+            "menit": 0,
+            "sakit": 0,
+            "izin": 0,
+            "dispensasi": 0,
+            "alfa": 0
+          },
+          {
+            "id": "G1",
+            "tanggal": "2024-01-02",
+            "hadir": 1,
+            "telat": 0,
+            "menit": 0,
+            "sakit": 0,
+            "izin": 0,
+            "dispensasi": 0,
+            "alfa": 0
+          },
+          {
+            "id": "G1",
+            "tanggal": "2024-01-03",
+            "hadir": 1,
+            "telat": 0,
+            "menit": 0,
+            "sakit": 0,
+            "izin": 0,
+            "dispensasi": 0,
+            "alfa": 0
+          },
+          {
+            "id": "G1",
+            "tanggal": "2024-01-04",
+            "hadir": 1,
+            "telat": 0,
+            "menit": 0,
+            "sakit": 0,
+            "izin": 0,
+            "dispensasi": 0,
+            "alfa": 0
+          },
+          {
+            "id": "G1",
+            "tanggal": "2024-01-05",
+            "hadir": 1,
+            "telat": 0,
+            "menit": 0,
+            "sakit": 0,
+            "izin": 0,
+            "dispensasi": 0,
+            "alfa": 0
+          },
+          {
+            "id": "G1",
+            "tanggal": "2024-01-08",
+            "hadir": 1,
+            "telat": 0,
+            "menit": 0,
+            "sakit": 0,
+            "izin": 0,
+            "dispensasi": 0,
+            "alfa": 0
+          },
+          {
+            "id": "G1",
+            "tanggal": "2024-01-09",
+            "hadir": 1,
+            "telat": 0,
+            "menit": 0,
+            "sakit": 0,
+            "izin": 0,
+            "dispensasi": 0,
+            "alfa": 0
+          },
+          {
+            "id": "G1",
+            "tanggal": "2024-01-10",
+            "hadir": 1,
+            "telat": 0,
+            "menit": 0,
+            "sakit": 0,
+            "izin": 0,
+            "dispensasi": 0,
+            "alfa": 0
+          },
+          {
+            "id": "G1",
+            "tanggal": "2024-01-11",
+            "hadir": 1,
+            "telat": 0,
+            "menit": 0,
+            "sakit": 0,
+            "izin": 0,
+            "dispensasi": 0,
+            "alfa": 0
+          },
+          {
+            "id": "G1",
+            "tanggal": "2024-01-12",
+            "hadir": 1,
+            "telat": 0,
+            "menit": 0,
+            "sakit": 0,
+            "izin": 0,
+            "dispensasi": 0,
+            "alfa": 0
+          },
+          {
+            "id": "G1",
+            "tanggal": "2024-01-15",
+            "hadir": 1,
+            "telat": 0,
+            "menit": 0,
+            "sakit": 0,
+            "izin": 0,
+            "dispensasi": 0,
+            "alfa": 0
+          },
+          {
+            "id": "G1",
+            "tanggal": "2024-01-16",
+            "hadir": 1,
+            "telat": 0,
+            "menit": 0,
+            "sakit": 0,
+            "izin": 0,
+            "dispensasi": 0,
+            "alfa": 0
+          },
+          {
+            "id": "G1",
+            "tanggal": "2024-01-17",
+            "hadir": 1,
+            "telat": 0,
+            "menit": 0,
+            "sakit": 0,
+            "izin": 0,
+            "dispensasi": 0,
+            "alfa": 0
+          },
+          {
+            "id": "G1",
+            "tanggal": "2024-01-18",
+            "hadir": 1,
+            "telat": 0,
+            "menit": 0,
+            "sakit": 0,
+            "izin": 0,
+            "dispensasi": 0,
+            "alfa": 0
+          },
+          {
+            "id": "G1",
+            "tanggal": "2024-01-19",
+            "hadir": 1,
+            "telat": 0,
+            "menit": 0,
+            "sakit": 0,
+            "izin": 0,
+            "dispensasi": 0,
+            "alfa": 0
+          },
+          {
+            "id": "G1",
+            "tanggal": "2024-01-22",
+            "hadir": 1,
+            "telat": 0,
+            "menit": 0,
+            "sakit": 0,
+            "izin": 0,
+            "dispensasi": 0,
+            "alfa": 0
+          },
+          {
+            "id": "G1",
+            "tanggal": "2024-01-23",
+            "hadir": 1,
+            "telat": 0,
+            "menit": 0,
+            "sakit": 0,
+            "izin": 0,
+            "dispensasi": 0,
+            "alfa": 0
+          },
+          {
+            "id": "G1",
+            "tanggal": "2024-01-24",
+            "hadir": 1,
+            "telat": 0,
+            "menit": 0,
+            "sakit": 0,
+            "izin": 0,
+            "dispensasi": 0,
+            "alfa": 0
+          },
+          {
+            "id": "G1",
+            "tanggal": "2024-01-25",
+            "hadir": 1,
+            "telat": 0,
+            "menit": 0,
+            "sakit": 0,
+            "izin": 0,
+            "dispensasi": 0,
+            "alfa": 0
+          },
+          {
+            "id": "G1",
+            "tanggal": "2024-01-26",
+            "hadir": 1,
+            "telat": 0,
+            "menit": 0,
+            "sakit": 0,
+            "izin": 0,
+            "dispensasi": 0,
+            "alfa": 0
+          },
+          {
+            "id": "G1",
+            "tanggal": "2024-01-29",
+            "hadir": 1,
+            "telat": 1,
+            "menit": 1,
+            "sakit": 0,
+            "izin": 0,
+            "dispensasi": 0,
+            "alfa": 0
+          }
+        ],
+        "pengajuan": [],
+        "libur": [],
+        "whitelist": [],
+        "ambang": [950, 900, 800, 700]
+      },
+      "hasil": {
+        "hari": 21,
+        "tepat": 20,
+        "telat": 1,
+        "alfa": 0,
+        "kosong": 0,
+        "dikecualikan": 0,
+        "permil": 976,
+        "ambang": [950, 900, 800, 700],
+        "skor": 5,
+        "sampai": "2024-01-29",
+        "rincian": "K|21|20|1|0|0|0|976|950,900,800,700|2024-01-29",
+        "tanggal_telat": ["2024-01-29"],
+        "tanggal_alfa": [],
+        "tanggal_kosong": []
+      }
+    },
+    {
+      "nama": "kosong 3 = 0 = skor 1",
+      "masukan": {
+        "mulai": "2024-01-08",
+        "akhir": "2024-01-10",
+        "hari_ini": "2024-12-31",
+        "divisi": "Guru",
+        "hari_kerja": "1,2,3,4,5",
+        "kode_shift": 77,
+        "hari": [],
+        "pengajuan": [],
+        "libur": [],
+        "whitelist": [],
+        "ambang": [950, 900, 800, 700]
+      },
+      "hasil": {
+        "hari": 3,
+        "tepat": 0,
+        "telat": 0,
+        "alfa": 0,
+        "kosong": 3,
+        "dikecualikan": 0,
+        "permil": 0,
+        "ambang": [950, 900, 800, 700],
+        "skor": 1,
+        "sampai": "2024-01-10",
+        "rincian": "K|3|0|0|0|3|0|0|950,900,800,700|2024-01-10",
+        "tanggal_telat": [],
+        "tanggal_alfa": [],
+        "tanggal_kosong": ["2024-01-08", "2024-01-09", "2024-01-10"]
+      }
+    },
+    {
+      "nama": "tepat 10 + cuti 4 berlaku: D = 10 = 1000 = skor 5",
+      "masukan": {
+        "mulai": "2024-01-01",
+        "akhir": "2024-01-18",
+        "hari_ini": "2024-12-31",
+        "divisi": "Guru",
+        "hari_kerja": "1,2,3,4,5",
+        "kode_shift": 77,
+        "hari": [
+          {
+            "id": "G1",
+            "tanggal": "2024-01-01",
+            "hadir": 1,
+            "telat": 0,
+            "menit": 0,
+            "sakit": 0,
+            "izin": 0,
+            "dispensasi": 0,
+            "alfa": 0
+          },
+          {
+            "id": "G1",
+            "tanggal": "2024-01-02",
+            "hadir": 1,
+            "telat": 0,
+            "menit": 0,
+            "sakit": 0,
+            "izin": 0,
+            "dispensasi": 0,
+            "alfa": 0
+          },
+          {
+            "id": "G1",
+            "tanggal": "2024-01-03",
+            "hadir": 1,
+            "telat": 0,
+            "menit": 0,
+            "sakit": 0,
+            "izin": 0,
+            "dispensasi": 0,
+            "alfa": 0
+          },
+          {
+            "id": "G1",
+            "tanggal": "2024-01-04",
+            "hadir": 1,
+            "telat": 0,
+            "menit": 0,
+            "sakit": 0,
+            "izin": 0,
+            "dispensasi": 0,
+            "alfa": 0
+          },
+          {
+            "id": "G1",
+            "tanggal": "2024-01-05",
+            "hadir": 1,
+            "telat": 0,
+            "menit": 0,
+            "sakit": 0,
+            "izin": 0,
+            "dispensasi": 0,
+            "alfa": 0
+          },
+          {
+            "id": "G1",
+            "tanggal": "2024-01-08",
+            "hadir": 1,
+            "telat": 0,
+            "menit": 0,
+            "sakit": 0,
+            "izin": 0,
+            "dispensasi": 0,
+            "alfa": 0
+          },
+          {
+            "id": "G1",
+            "tanggal": "2024-01-09",
+            "hadir": 1,
+            "telat": 0,
+            "menit": 0,
+            "sakit": 0,
+            "izin": 0,
+            "dispensasi": 0,
+            "alfa": 0
+          },
+          {
+            "id": "G1",
+            "tanggal": "2024-01-10",
+            "hadir": 1,
+            "telat": 0,
+            "menit": 0,
+            "sakit": 0,
+            "izin": 0,
+            "dispensasi": 0,
+            "alfa": 0
+          },
+          {
+            "id": "G1",
+            "tanggal": "2024-01-11",
+            "hadir": 1,
+            "telat": 0,
+            "menit": 0,
+            "sakit": 0,
+            "izin": 0,
+            "dispensasi": 0,
+            "alfa": 0
+          },
+          {
+            "id": "G1",
+            "tanggal": "2024-01-12",
+            "hadir": 1,
+            "telat": 0,
+            "menit": 0,
+            "sakit": 0,
+            "izin": 0,
+            "dispensasi": 0,
+            "alfa": 0
+          }
+        ],
+        "pengajuan": [
+          {
+            "tanggal_mulai": "2024-01-15",
+            "tanggal_selesai": "2024-01-18",
+            "kelompok": "Cuti"
+          }
+        ],
+        "libur": [],
+        "whitelist": [],
+        "ambang": [950, 900, 800, 700]
+      },
+      "hasil": {
+        "hari": 10,
+        "tepat": 10,
+        "telat": 0,
+        "alfa": 0,
+        "kosong": 0,
+        "dikecualikan": 4,
+        "permil": 1000,
+        "ambang": [950, 900, 800, 700],
+        "skor": 5,
+        "sampai": "2024-01-18",
+        "rincian": "K|10|10|0|0|0|4|1000|950,900,800,700|2024-01-18",
+        "tanggal_telat": [],
+        "tanggal_alfa": [],
+        "tanggal_kosong": []
+      }
+    },
+    {
+      "nama": "telat di hari berizin per jam = tepat",
+      "masukan": {
+        "mulai": "2024-01-08",
+        "akhir": "2024-01-08",
+        "hari_ini": "2024-12-31",
+        "divisi": "Guru",
+        "hari_kerja": "1,2,3,4,5",
+        "kode_shift": 77,
+        "hari": [
+          {
+            "id": "G1",
+            "tanggal": "2024-01-08",
+            "hadir": 1,
+            "telat": 95,
+            "menit": 95,
+            "sakit": 0,
+            "izin": 0,
+            "dispensasi": 0,
+            "alfa": 0
+          }
+        ],
+        "pengajuan": [
+          {
+            "tanggal_mulai": "2024-01-08",
+            "tanggal_selesai": "2024-01-08",
+            "kelompok": "Izin"
+          }
+        ],
+        "libur": [],
+        "whitelist": [],
+        "ambang": [950, 900, 800, 700]
+      },
+      "hasil": {
+        "hari": 1,
+        "tepat": 1,
+        "telat": 0,
+        "alfa": 0,
+        "kosong": 0,
+        "dikecualikan": 0,
+        "permil": 1000,
+        "ambang": [950, 900, 800, 700],
+        "skor": 5,
+        "sampai": "2024-01-08",
+        "rincian": "K|1|1|0|0|0|0|1000|950,900,800,700|2024-01-08",
+        "tanggal_telat": [],
+        "tanggal_alfa": [],
+        "tanggal_kosong": []
+      }
+    },
+    {
+      "nama": "Dinas Luar dua hari tanpa scan = tepat 2",
+      "masukan": {
+        "mulai": "2024-01-08",
+        "akhir": "2024-01-09",
+        "hari_ini": "2024-12-31",
+        "divisi": "Guru",
+        "hari_kerja": "1,2,3,4,5",
+        "kode_shift": 77,
+        "hari": [],
+        "pengajuan": [
+          {
+            "tanggal_mulai": "2024-01-08",
+            "tanggal_selesai": "2024-01-09",
+            "kelompok": "Dinas Luar"
+          }
+        ],
+        "libur": [],
+        "whitelist": [],
+        "ambang": [950, 900, 800, 700]
+      },
+      "hasil": {
+        "hari": 2,
+        "tepat": 2,
+        "telat": 0,
+        "alfa": 0,
+        "kosong": 0,
+        "dikecualikan": 0,
+        "permil": 1000,
+        "ambang": [950, 900, 800, 700],
+        "skor": 5,
+        "sampai": "2024-01-09",
+        "rincian": "K|2|2|0|0|0|0|1000|950,900,800,700|2024-01-09",
+        "tanggal_telat": [],
+        "tanggal_alfa": [],
+        "tanggal_kosong": []
+      }
+    },
+    {
+      "nama": "multi-sesi, sesi kedua terlambat = satu hari telat",
+      "masukan": {
+        "mulai": "2024-01-08",
+        "akhir": "2024-01-08",
+        "hari_ini": "2024-12-31",
+        "divisi": "Guru",
+        "hari_kerja": "1,2,3,4,5",
+        "kode_shift": 77,
+        "hari": [
+          {
+            "id": "G1",
+            "tanggal": "2024-01-08",
+            "hadir": 1,
+            "telat": 15,
+            "menit": 15,
+            "sakit": 0,
+            "izin": 0,
+            "dispensasi": 0,
+            "alfa": 0
+          }
+        ],
+        "pengajuan": [],
+        "libur": [],
+        "whitelist": [],
+        "ambang": [950, 900, 800, 700]
+      },
+      "hasil": {
+        "hari": 1,
+        "tepat": 0,
+        "telat": 1,
+        "alfa": 0,
+        "kosong": 0,
+        "dikecualikan": 0,
+        "permil": 500,
+        "ambang": [950, 900, 800, 700],
+        "skor": 1,
+        "sampai": "2024-01-08",
+        "rincian": "K|1|0|1|0|0|0|500|950,900,800,700|2024-01-08",
+        "tanggal_telat": ["2024-01-08"],
+        "tanggal_alfa": [],
+        "tanggal_kosong": []
+      }
+    },
+    {
+      "nama": "libur dilewati, libur ber-whitelist wajib, akhir pekan tidak dihitung",
+      "masukan": {
+        "mulai": "2024-01-08",
+        "akhir": "2024-01-14",
+        "hari_ini": "2024-12-31",
+        "divisi": "Guru",
+        "hari_kerja": "1,2,3,4,5",
+        "kode_shift": 77,
+        "hari": [
+          {
+            "id": "G1",
+            "tanggal": "2024-01-08",
+            "hadir": 1,
+            "telat": 0,
+            "menit": 0,
+            "sakit": 0,
+            "izin": 0,
+            "dispensasi": 0,
+            "alfa": 0
+          },
+          {
+            "id": "G1",
+            "tanggal": "2024-01-09",
+            "hadir": 1,
+            "telat": 0,
+            "menit": 0,
+            "sakit": 0,
+            "izin": 0,
+            "dispensasi": 0,
+            "alfa": 0
+          },
+          {
+            "id": "G1",
+            "tanggal": "2024-01-11",
+            "hadir": 1,
+            "telat": 0,
+            "menit": 0,
+            "sakit": 0,
+            "izin": 0,
+            "dispensasi": 0,
+            "alfa": 0
+          },
+          {
+            "id": "G1",
+            "tanggal": "2024-01-12",
+            "hadir": 1,
+            "telat": 0,
+            "menit": 0,
+            "sakit": 0,
+            "izin": 0,
+            "dispensasi": 0,
+            "alfa": 0
+          }
+        ],
+        "pengajuan": [],
+        "libur": ["2024-01-10", "2024-01-11"],
+        "whitelist": [
+          {
+            "id": "w1",
+            "scope_type": "DIVISI",
+            "scope_value": "Guru",
+            "tanggal_libur": "2024-01-11",
+            "status_aktif": 1
+          }
+        ],
+        "ambang": [950, 900, 800, 700]
+      },
+      "hasil": {
+        "hari": 4,
+        "tepat": 4,
+        "telat": 0,
+        "alfa": 0,
+        "kosong": 0,
+        "dikecualikan": 0,
+        "permil": 1000,
+        "ambang": [950, 900, 800, 700],
+        "skor": 5,
+        "sampai": "2024-01-14",
+        "rincian": "K|4|4|0|0|0|0|1000|950,900,800,700|2024-01-14",
+        "tanggal_telat": [],
+        "tanggal_alfa": [],
+        "tanggal_kosong": []
+      }
+    },
+    {
+      "nama": "libur ber-whitelist tanpa catatan = kosong",
+      "masukan": {
+        "mulai": "2024-01-10",
+        "akhir": "2024-01-11",
+        "hari_ini": "2024-12-31",
+        "divisi": "Guru",
+        "hari_kerja": "1,2,3,4,5",
+        "kode_shift": 77,
+        "hari": [],
+        "pengajuan": [],
+        "libur": ["2024-01-10", "2024-01-11"],
+        "whitelist": [
+          {
+            "id": "w1",
+            "scope_type": "DIVISI",
+            "scope_value": "Guru",
+            "tanggal_libur": "2024-01-11",
+            "status_aktif": 1
+          }
+        ],
+        "ambang": [950, 900, 800, 700]
+      },
+      "hasil": {
+        "hari": 1,
+        "tepat": 0,
+        "telat": 0,
+        "alfa": 0,
+        "kosong": 1,
+        "dikecualikan": 0,
+        "permil": 0,
+        "ambang": [950, 900, 800, 700],
+        "skor": 1,
+        "sampai": "2024-01-11",
+        "rincian": "K|1|0|0|0|1|0|0|950,900,800,700|2024-01-11",
+        "tanggal_telat": [],
+        "tanggal_alfa": [],
+        "tanggal_kosong": ["2024-01-11"]
+      }
+    },
+    {
+      "nama": "Koreksi Admin S/I/Dispen dikecualikan; Alfa berpengajuan Sakit dikecualikan; Alfa = alfa",
+      "masukan": {
+        "mulai": "2024-01-08",
+        "akhir": "2024-01-12",
+        "hari_ini": "2024-12-31",
+        "divisi": "Guru",
+        "hari_kerja": "1,2,3,4,5",
+        "kode_shift": 77,
+        "hari": [
+          {
+            "id": "G1",
+            "tanggal": "2024-01-08",
+            "hadir": 0,
+            "telat": 0,
+            "menit": 0,
+            "sakit": 1,
+            "izin": 0,
+            "dispensasi": 0,
+            "alfa": 0
+          },
+          {
+            "id": "G1",
+            "tanggal": "2024-01-09",
+            "hadir": 0,
+            "telat": 0,
+            "menit": 0,
+            "sakit": 0,
+            "izin": 1,
+            "dispensasi": 0,
+            "alfa": 0
+          },
+          {
+            "id": "G1",
+            "tanggal": "2024-01-10",
+            "hadir": 0,
+            "telat": 0,
+            "menit": 0,
+            "sakit": 0,
+            "izin": 0,
+            "dispensasi": 1,
+            "alfa": 0
+          },
+          {
+            "id": "G1",
+            "tanggal": "2024-01-11",
+            "hadir": 0,
+            "telat": 0,
+            "menit": 0,
+            "sakit": 0,
+            "izin": 0,
+            "dispensasi": 0,
+            "alfa": 1
+          },
+          {
+            "id": "G1",
+            "tanggal": "2024-01-12",
+            "hadir": 0,
+            "telat": 0,
+            "menit": 0,
+            "sakit": 0,
+            "izin": 0,
+            "dispensasi": 0,
+            "alfa": 1
+          }
+        ],
+        "pengajuan": [
+          {
+            "tanggal_mulai": "2024-01-11",
+            "tanggal_selesai": "2024-01-11",
+            "kelompok": "Sakit"
+          }
+        ],
+        "libur": [],
+        "whitelist": [],
+        "ambang": [950, 900, 800, 700]
+      },
+      "hasil": {
+        "hari": 1,
+        "tepat": 0,
+        "telat": 0,
+        "alfa": 1,
+        "kosong": 0,
+        "dikecualikan": 4,
+        "permil": 0,
+        "ambang": [950, 900, 800, 700],
+        "skor": 1,
+        "sampai": "2024-01-12",
+        "rincian": "K|1|0|0|1|0|4|0|950,900,800,700|2024-01-12",
+        "tanggal_telat": [],
+        "tanggal_alfa": ["2024-01-12"],
+        "tanggal_kosong": []
+      }
+    },
+    {
+      "nama": "D = 0: skor dan permil kosong",
+      "masukan": {
+        "mulai": "2024-01-08",
+        "akhir": "2024-01-08",
+        "hari_ini": "2024-12-31",
+        "divisi": "Guru",
+        "hari_kerja": "1,2,3,4,5",
+        "kode_shift": 77,
+        "hari": [],
+        "pengajuan": [
+          {
+            "tanggal_mulai": "2024-01-08",
+            "tanggal_selesai": "2024-01-08",
+            "kelompok": "Cuti"
+          }
+        ],
+        "libur": [],
+        "whitelist": [],
+        "ambang": [950, 900, 800, 700]
+      },
+      "hasil": {
+        "hari": 0,
+        "tepat": 0,
+        "telat": 0,
+        "alfa": 0,
+        "kosong": 0,
+        "dikecualikan": 1,
+        "permil": null,
+        "ambang": [950, 900, 800, 700],
+        "skor": null,
+        "sampai": "2024-01-08",
+        "rincian": "K|0|0|0|0|0|1||950,900,800,700|2024-01-08",
+        "tanggal_telat": [],
+        "tanggal_alfa": [],
+        "tanggal_kosong": []
+      }
+    },
+    {
+      "nama": "dihitung sampai hari ini",
+      "masukan": {
+        "mulai": "2024-01-08",
+        "akhir": "2024-01-19",
+        "hari_ini": "2024-01-09",
+        "divisi": "Guru",
+        "hari_kerja": "1,2,3,4,5",
+        "kode_shift": 77,
+        "hari": [
+          {
+            "id": "G1",
+            "tanggal": "2024-01-08",
+            "hadir": 1,
+            "telat": 0,
+            "menit": 0,
+            "sakit": 0,
+            "izin": 0,
+            "dispensasi": 0,
+            "alfa": 0
+          }
+        ],
+        "pengajuan": [],
+        "libur": [],
+        "whitelist": [],
+        "ambang": [950, 900, 800, 700]
+      },
+      "hasil": {
+        "hari": 2,
+        "tepat": 1,
+        "telat": 0,
+        "alfa": 0,
+        "kosong": 1,
+        "dikecualikan": 0,
+        "permil": 500,
+        "ambang": [950, 900, 800, 700],
+        "skor": 1,
+        "sampai": "2024-01-09",
+        "rincian": "K|2|1|0|0|1|0|500|950,900,800,700|2024-01-09",
+        "tanggal_telat": [],
+        "tanggal_alfa": [],
+        "tanggal_kosong": ["2024-01-09"]
+      }
+    },
+    {
+      "nama": "Dinas Luar menang atas Cuti di tanggal yang sama",
+      "masukan": {
+        "mulai": "2024-01-08",
+        "akhir": "2024-01-08",
+        "hari_ini": "2024-12-31",
+        "divisi": "Guru",
+        "hari_kerja": "1,2,3,4,5",
+        "kode_shift": 77,
+        "hari": [],
+        "pengajuan": [
+          {
+            "tanggal_mulai": "2024-01-08",
+            "tanggal_selesai": "2024-01-08",
+            "kelompok": "Cuti"
+          },
+          {
+            "tanggal_mulai": "2024-01-08",
+            "tanggal_selesai": "2024-01-08",
+            "kelompok": "Dinas Luar"
+          }
+        ],
+        "libur": [],
+        "whitelist": [],
+        "ambang": [950, 900, 800, 700]
+      },
+      "hasil": {
+        "hari": 1,
+        "tepat": 1,
+        "telat": 0,
+        "alfa": 0,
+        "kosong": 0,
+        "dikecualikan": 0,
+        "permil": 1000,
+        "ambang": [950, 900, 800, 700],
+        "skor": 5,
+        "sampai": "2024-01-08",
+        "rincian": "K|1|1|0|0|0|0|1000|950,900,800,700|2024-01-08",
+        "tanggal_telat": [],
+        "tanggal_alfa": [],
+        "tanggal_kosong": []
+      }
+    },
+    {
+      "nama": "hadir di akhir pekan tetap tepat; DL akhir pekan tanpa catatan tidak dihitung",
+      "masukan": {
+        "mulai": "2024-01-13",
+        "akhir": "2024-01-14",
+        "hari_ini": "2024-12-31",
+        "divisi": "Guru",
+        "hari_kerja": "1,2,3,4,5",
+        "kode_shift": 77,
+        "hari": [
+          {
+            "id": "G1",
+            "tanggal": "2024-01-13",
+            "hadir": 1,
+            "telat": 0,
+            "menit": 0,
+            "sakit": 0,
+            "izin": 0,
+            "dispensasi": 0,
+            "alfa": 0
+          }
+        ],
+        "pengajuan": [
+          {
+            "tanggal_mulai": "2024-01-14",
+            "tanggal_selesai": "2024-01-14",
+            "kelompok": "Dinas Luar"
+          }
+        ],
+        "libur": [],
+        "whitelist": [],
+        "ambang": [950, 900, 800, 700]
+      },
+      "hasil": {
+        "hari": 1,
+        "tepat": 1,
+        "telat": 0,
+        "alfa": 0,
+        "kosong": 0,
+        "dikecualikan": 0,
+        "permil": 1000,
+        "ambang": [950, 900, 800, 700],
+        "skor": 5,
+        "sampai": "2024-01-14",
+        "rincian": "K|1|1|0|0|0|0|1000|950,900,800,700|2024-01-14",
+        "tanggal_telat": [],
+        "tanggal_alfa": [],
+        "tanggal_kosong": []
+      }
+    },
+    {
+      "nama": "mulai sesudah hari ini: tanpa tanggal",
+      "masukan": {
+        "mulai": "2024-02-01",
+        "akhir": "2024-02-10",
+        "hari_ini": "2024-01-20",
+        "divisi": "Guru",
+        "hari_kerja": "1,2,3,4,5",
+        "kode_shift": 77,
+        "hari": [],
+        "pengajuan": [],
+        "libur": [],
+        "whitelist": [],
+        "ambang": [950, 900, 800, 700]
+      },
+      "hasil": {
+        "hari": 0,
+        "tepat": 0,
+        "telat": 0,
+        "alfa": 0,
+        "kosong": 0,
+        "dikecualikan": 0,
+        "permil": null,
+        "ambang": [950, 900, 800, 700],
+        "skor": null,
+        "sampai": "2024-01-20",
+        "rincian": "K|0|0|0|0|0|0||950,900,800,700|2024-01-20",
+        "tanggal_telat": [],
+        "tanggal_alfa": [],
+        "tanggal_kosong": []
+      }
+    },
+    {
+      "nama": "shift kosong = tujuh hari wajib",
+      "masukan": {
+        "mulai": "2024-01-13",
+        "akhir": "2024-01-14",
+        "hari_ini": "2024-12-31",
+        "divisi": "Guru",
+        "hari_kerja": null,
+        "kode_shift": 77,
+        "hari": [],
+        "pengajuan": [],
+        "libur": [],
+        "whitelist": [],
+        "ambang": [950, 900, 800, 700]
+      },
+      "hasil": {
+        "hari": 2,
+        "tepat": 0,
+        "telat": 0,
+        "alfa": 0,
+        "kosong": 2,
+        "dikecualikan": 0,
+        "permil": 0,
+        "ambang": [950, 900, 800, 700],
+        "skor": 1,
+        "sampai": "2024-01-14",
+        "rincian": "K|2|0|0|0|2|0|0|950,900,800,700|2024-01-14",
+        "tanggal_telat": [],
+        "tanggal_alfa": [],
+        "tanggal_kosong": ["2024-01-13", "2024-01-14"]
+      }
+    }
+  ],
+  "periode": [
+    {
+      "nama": "semester",
+      "jenis": "Semester",
+      "kunci": "ta-2",
+      "tahun": [
+        {
+          "id_tahun_ajaran": "ta-1",
+          "nama_tahun": "2023/2024",
+          "semester": "Ganjil",
+          "tanggal_mulai": "2023-07-17",
+          "tanggal_selesai": "2023-12-22"
+        },
+        {
+          "id_tahun_ajaran": "ta-2",
+          "nama_tahun": "2023/2024",
+          "semester": "Genap",
+          "tanggal_mulai": "2024-01-08",
+          "tanggal_selesai": "2024-06-21"
+        },
+        {
+          "id_tahun_ajaran": "ta-3",
+          "nama_tahun": "2024/2025",
+          "semester": "Ganjil",
+          "tanggal_mulai": "2024-07-15",
+          "tanggal_selesai": "2024-07-01"
+        }
+      ],
+      "hasil": {
+        "jenis": "Semester",
+        "kunci": "ta-2",
+        "nama": "2023/2024 Semester Genap",
+        "mulai": "2024-01-08",
+        "selesai": "2024-06-21"
+      }
+    },
+    {
+      "nama": "tahun ajaran = MIN..MAX",
+      "jenis": "Tahun Ajaran",
+      "kunci": " 2023/2024 ",
+      "tahun": [
+        {
+          "id_tahun_ajaran": "ta-1",
+          "nama_tahun": "2023/2024",
+          "semester": "Ganjil",
+          "tanggal_mulai": "2023-07-17",
+          "tanggal_selesai": "2023-12-22"
+        },
+        {
+          "id_tahun_ajaran": "ta-2",
+          "nama_tahun": "2023/2024",
+          "semester": "Genap",
+          "tanggal_mulai": "2024-01-08",
+          "tanggal_selesai": "2024-06-21"
+        },
+        {
+          "id_tahun_ajaran": "ta-3",
+          "nama_tahun": "2024/2025",
+          "semester": "Ganjil",
+          "tanggal_mulai": "2024-07-15",
+          "tanggal_selesai": "2024-07-01"
+        }
+      ],
+      "hasil": {
+        "jenis": "Tahun Ajaran",
+        "kunci": "2023/2024",
+        "nama": "Tahun Ajaran 2023/2024",
+        "mulai": "2023-07-17",
+        "selesai": "2024-06-21"
+      }
+    },
+    {
+      "nama": "jenis asing ditolak",
+      "jenis": "Bulanan",
+      "kunci": "ta-2",
+      "tahun": [
+        {
+          "id_tahun_ajaran": "ta-1",
+          "nama_tahun": "2023/2024",
+          "semester": "Ganjil",
+          "tanggal_mulai": "2023-07-17",
+          "tanggal_selesai": "2023-12-22"
+        },
+        {
+          "id_tahun_ajaran": "ta-2",
+          "nama_tahun": "2023/2024",
+          "semester": "Genap",
+          "tanggal_mulai": "2024-01-08",
+          "tanggal_selesai": "2024-06-21"
+        },
+        {
+          "id_tahun_ajaran": "ta-3",
+          "nama_tahun": "2024/2025",
+          "semester": "Ganjil",
+          "tanggal_mulai": "2024-07-15",
+          "tanggal_selesai": "2024-07-01"
+        }
+      ],
+      "galat": "Jenis periode harus Semester atau Tahun Ajaran."
+    },
+    {
+      "nama": "kunci tidak ada",
+      "jenis": "Semester",
+      "kunci": "ta-9",
+      "tahun": [
+        {
+          "id_tahun_ajaran": "ta-1",
+          "nama_tahun": "2023/2024",
+          "semester": "Ganjil",
+          "tanggal_mulai": "2023-07-17",
+          "tanggal_selesai": "2023-12-22"
+        },
+        {
+          "id_tahun_ajaran": "ta-2",
+          "nama_tahun": "2023/2024",
+          "semester": "Genap",
+          "tanggal_mulai": "2024-01-08",
+          "tanggal_selesai": "2024-06-21"
+        },
+        {
+          "id_tahun_ajaran": "ta-3",
+          "nama_tahun": "2024/2025",
+          "semester": "Ganjil",
+          "tanggal_mulai": "2024-07-15",
+          "tanggal_selesai": "2024-07-01"
+        }
+      ],
+      "galat": "Periode tidak ditemukan."
+    },
+    {
+      "nama": "kunci kosong",
+      "jenis": "Tahun Ajaran",
+      "kunci": "",
+      "tahun": [
+        {
+          "id_tahun_ajaran": "ta-1",
+          "nama_tahun": "2023/2024",
+          "semester": "Ganjil",
+          "tanggal_mulai": "2023-07-17",
+          "tanggal_selesai": "2023-12-22"
+        },
+        {
+          "id_tahun_ajaran": "ta-2",
+          "nama_tahun": "2023/2024",
+          "semester": "Genap",
+          "tanggal_mulai": "2024-01-08",
+          "tanggal_selesai": "2024-06-21"
+        },
+        {
+          "id_tahun_ajaran": "ta-3",
+          "nama_tahun": "2024/2025",
+          "semester": "Ganjil",
+          "tanggal_mulai": "2024-07-15",
+          "tanggal_selesai": "2024-07-01"
+        }
+      ],
+      "galat": "Periode tidak ditemukan."
+    },
+    {
+      "nama": "tanggal terbalik",
+      "jenis": "Semester",
+      "kunci": "ta-3",
+      "tahun": [
+        {
+          "id_tahun_ajaran": "ta-1",
+          "nama_tahun": "2023/2024",
+          "semester": "Ganjil",
+          "tanggal_mulai": "2023-07-17",
+          "tanggal_selesai": "2023-12-22"
+        },
+        {
+          "id_tahun_ajaran": "ta-2",
+          "nama_tahun": "2023/2024",
+          "semester": "Genap",
+          "tanggal_mulai": "2024-01-08",
+          "tanggal_selesai": "2024-06-21"
+        },
+        {
+          "id_tahun_ajaran": "ta-3",
+          "nama_tahun": "2024/2025",
+          "semester": "Ganjil",
+          "tanggal_mulai": "2024-07-15",
+          "tanggal_selesai": "2024-07-01"
+        }
+      ],
+      "galat": "Tanggal 2024/2025 Semester Ganjil tidak valid."
+    }
+  ],
+  "rentang_aktif": [
+    {
+      "nama": "penuh",
+      "periode": ["2024-01-08", "2024-06-21"],
+      "tanggal_daftar": "2020-01-01",
+      "tanggal_keluar": "",
+      "hasil": {
+        "mulai": "2024-01-08",
+        "akhir": "2024-06-21",
+        "penuh": true
+      }
+    },
+    {
+      "nama": "masuk di tengah",
+      "periode": ["2024-01-08", "2024-06-21"],
+      "tanggal_daftar": "2024-03-01",
+      "tanggal_keluar": "",
+      "hasil": {
+        "mulai": "2024-03-01",
+        "akhir": "2024-06-21",
+        "penuh": false
+      }
+    },
+    {
+      "nama": "keluar di tengah",
+      "periode": ["2024-01-08", "2024-06-21"],
+      "tanggal_daftar": "",
+      "tanggal_keluar": "2024-02-29",
+      "hasil": {
+        "mulai": "2024-01-08",
+        "akhir": "2024-02-29",
+        "penuh": false
+      }
+    },
+    {
+      "nama": "tanggal rusak tidak memotong",
+      "periode": ["2024-01-08", "2024-06-21"],
+      "tanggal_daftar": "2024-02-30",
+      "tanggal_keluar": "kemarin",
+      "hasil": {
+        "mulai": "2024-01-08",
+        "akhir": "2024-06-21",
+        "penuh": true
+      }
+    },
+    {
+      "nama": "masuk sesudah periode",
+      "periode": ["2024-01-08", "2024-06-21"],
+      "tanggal_daftar": "2024-07-01",
+      "tanggal_keluar": "",
+      "hasil": null
+    },
+    {
+      "nama": "keluar sebelum periode",
+      "periode": ["2024-01-08", "2024-06-21"],
+      "tanggal_daftar": "",
+      "tanggal_keluar": "2023-12-31",
+      "hasil": null
+    }
+  ],
+  "periksa_buat": [
+    {
+      "nama": "sah",
+      "aktif": true,
+      "sudah_keluar": false,
+      "periode_mulai": "2024-01-08",
+      "hari_ini": "2024-01-08",
+      "rentang": true
+    },
+    {
+      "nama": "keluar lebih dulu",
+      "aktif": false,
+      "sudah_keluar": true,
+      "periode_mulai": "2024-01-08",
+      "hari_ini": "2024-03-01",
+      "rentang": true,
+      "galat": "Pegawai ini sudah keluar; penilaian baru tidak bisa dibuat."
+    },
+    {
+      "nama": "nonaktif",
+      "aktif": false,
+      "sudah_keluar": false,
+      "periode_mulai": "2024-01-08",
+      "hari_ini": "2024-03-01",
+      "rentang": true,
+      "galat": "Pegawai nonaktif tidak bisa dinilai."
+    },
+    {
+      "nama": "belum dimulai",
+      "aktif": true,
+      "sudah_keluar": false,
+      "periode_mulai": "2024-01-08",
+      "hari_ini": "2024-01-07",
+      "rentang": true,
+      "galat": "Periode ini belum dimulai."
+    },
+    {
+      "nama": "tidak aktif di periode",
+      "aktif": true,
+      "sudah_keluar": false,
+      "periode_mulai": "2024-01-08",
+      "hari_ini": "2024-03-01",
+      "rentang": false,
+      "galat": "Pegawai ini tidak aktif selama periode itu."
+    }
+  ],
+  "validasi_penilaian": [
+    {
+      "nama": "buat",
+      "draft": {
+        "aksi": "Buat",
+        "id_karyawan": " G1 ",
+        "periode_jenis": "Semester",
+        "periode_kunci": "ta-2",
+        "id_template": "",
+        "catatan": "  baik  "
+      },
+      "hasil": {
+        "aksi": "Buat",
+        "id_penilaian": null,
+        "id_karyawan": "G1",
+        "periode_jenis": "Semester",
+        "periode_kunci": "ta-2",
+        "id_template": null,
+        "catatan": "baik",
+        "alasan_koreksi": null,
+        "nilai": []
+      }
+    },
+    {
+      "nama": "simpan dengan nilai",
+      "draft": {
+        "aksi": "Simpan",
+        "id_penilaian": "knj-1",
+        "nilai": [
+          {
+            "id_aspek": "a1",
+            "skor": 4,
+            "catatan": " ok "
+          },
+          {
+            "id_aspek": "a2",
+            "skor": null
+          }
+        ]
+      },
+      "hasil": {
+        "aksi": "Simpan",
+        "id_penilaian": "knj-1",
+        "id_karyawan": null,
+        "periode_jenis": null,
+        "periode_kunci": null,
+        "id_template": null,
+        "catatan": null,
+        "alasan_koreksi": null,
+        "nilai": [
+          {
+            "id_aspek": "a1",
+            "skor": 4,
+            "catatan": "ok"
+          },
+          {
+            "id_aspek": "a2",
+            "skor": null,
+            "catatan": null
+          }
+        ]
+      }
+    },
+    {
+      "nama": "muat ulang dengan template lain",
+      "draft": {
+        "aksi": "Muat ulang",
+        "id_penilaian": "knj-1",
+        "id_template": "ktp-satpam"
+      },
+      "hasil": {
+        "aksi": "Muat ulang",
+        "id_penilaian": "knj-1",
+        "id_karyawan": null,
+        "periode_jenis": null,
+        "periode_kunci": null,
+        "id_template": "ktp-satpam",
+        "catatan": null,
+        "alasan_koreksi": null,
+        "nilai": []
+      }
+    },
+    {
+      "nama": "koreksi",
+      "draft": {
+        "aksi": "Koreksi",
+        "id_penilaian": "knj-1",
+        "alasan_koreksi": " salah jadwal "
+      },
+      "hasil": {
+        "aksi": "Koreksi",
+        "id_penilaian": "knj-1",
+        "id_karyawan": null,
+        "periode_jenis": null,
+        "periode_kunci": null,
+        "id_template": null,
+        "catatan": null,
+        "alasan_koreksi": "salah jadwal",
+        "nilai": []
+      }
+    },
+    {
+      "nama": "aksi asing",
+      "draft": {
+        "aksi": "Hapus",
+        "id_penilaian": "knj-1"
+      },
+      "galat": "Aksi penilaian tidak dikenal."
+    },
+    {
+      "nama": "buat tanpa pegawai",
+      "draft": {
+        "aksi": "Buat",
+        "periode_jenis": "Semester",
+        "periode_kunci": "ta-2"
+      },
+      "galat": "Pilih pegawai yang dinilai."
+    },
+    {
+      "nama": "buat jenis asing",
+      "draft": {
+        "aksi": "Buat",
+        "id_karyawan": "G1",
+        "periode_jenis": "Bulanan",
+        "periode_kunci": "ta-2"
+      },
+      "galat": "Jenis periode harus Semester atau Tahun Ajaran."
+    },
+    {
+      "nama": "buat tanpa periode",
+      "draft": {
+        "aksi": "Buat",
+        "id_karyawan": "G1",
+        "periode_jenis": "Semester",
+        "periode_kunci": " "
+      },
+      "galat": "Pilih periode penilaian."
+    },
+    {
+      "nama": "simpan tanpa id",
+      "draft": {
+        "aksi": "Simpan"
+      },
+      "galat": "Penilaian wajib dipilih."
+    },
+    {
+      "nama": "catatan terlalu panjang",
+      "draft": {
+        "aksi": "Simpan",
+        "id_penilaian": "knj-1",
+        "catatan": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+      },
+      "galat": "Catatan penilaian maksimal 2000 karakter."
+    },
+    {
+      "nama": "koreksi tanpa alasan",
+      "draft": {
+        "aksi": "Koreksi",
+        "id_penilaian": "knj-1",
+        "alasan_koreksi": " "
+      },
+      "galat": "Alasan koreksi wajib diisi."
+    },
+    {
+      "nama": "alasan koreksi terlalu panjang",
+      "draft": {
+        "aksi": "Koreksi",
+        "id_penilaian": "knj-1",
+        "alasan_koreksi": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+      },
+      "galat": "Alasan koreksi maksimal 1000 karakter."
+    },
+    {
+      "nama": "nilai bukan larik",
+      "draft": {
+        "aksi": "Simpan",
+        "id_penilaian": "knj-1",
+        "nilai": {}
+      },
+      "galat": "Isian nilai tidak valid."
+    },
+    {
+      "nama": "aspek kosong",
+      "draft": {
+        "aksi": "Simpan",
+        "id_penilaian": "knj-1",
+        "nilai": [
+          {
+            "id_aspek": " ",
+            "skor": 3
+          }
+        ]
+      },
+      "galat": "Isian nilai tidak valid."
+    },
+    {
+      "nama": "aspek ganda",
+      "draft": {
+        "aksi": "Simpan",
+        "id_penilaian": "knj-1",
+        "nilai": [
+          {
+            "id_aspek": "a1",
+            "skor": 3
+          },
+          {
+            "id_aspek": "a1",
+            "skor": 4
+          }
+        ]
+      },
+      "galat": "Aspek ganda dalam isian nilai."
+    },
+    {
+      "nama": "skor 6",
+      "draft": {
+        "aksi": "Simpan",
+        "id_penilaian": "knj-1",
+        "nilai": [
+          {
+            "id_aspek": "a1",
+            "skor": 6
+          }
+        ]
+      },
+      "galat": "Skor harus bilangan bulat 1 sampai 5."
+    },
+    {
+      "nama": "skor 0",
+      "draft": {
+        "aksi": "Simpan",
+        "id_penilaian": "knj-1",
+        "nilai": [
+          {
+            "id_aspek": "a1",
+            "skor": 0
+          }
+        ]
+      },
+      "galat": "Skor harus bilangan bulat 1 sampai 5."
+    },
+    {
+      "nama": "skor pecahan",
+      "draft": {
+        "aksi": "Simpan",
+        "id_penilaian": "knj-1",
+        "nilai": [
+          {
+            "id_aspek": "a1",
+            "skor": 3.5
+          }
+        ]
+      },
+      "galat": "Skor harus bilangan bulat 1 sampai 5."
+    },
+    {
+      "nama": "skor teks",
+      "draft": {
+        "aksi": "Simpan",
+        "id_penilaian": "knj-1",
+        "nilai": [
+          {
+            "id_aspek": "a1",
+            "skor": "4"
+          }
+        ]
+      },
+      "galat": "Skor harus bilangan bulat 1 sampai 5."
+    },
+    {
+      "nama": "catatan aspek terlalu panjang",
+      "draft": {
+        "aksi": "Simpan",
+        "id_penilaian": "knj-1",
+        "nilai": [
+          {
+            "id_aspek": "a1",
+            "skor": 3,
+            "catatan": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+          }
+        ]
+      },
+      "galat": "Catatan aspek maksimal 1000 karakter."
+    }
+  ],
+  "susun_nilai": [
+    {
+      "nama": "otomatis dari hitungan, tipe tanpa hitungan manual bercatatan",
+      "baris": [
+        {
+          "id_aspek": "k",
+          "aspek_nama": "Kehadiran",
+          "tipe": "Otomatis Kehadiran",
+          "bobot": 40,
+          "urutan": 0,
+          "skor": null,
+          "skor_hitung": null,
+          "catatan": null,
+          "rincian": null
+        },
+        {
+          "id_aspek": "p",
+          "aspek_nama": "Presensi",
+          "tipe": "Otomatis Presensi Kelas",
+          "bobot": 20,
+          "urutan": 1,
+          "skor": null,
+          "skor_hitung": null,
+          "catatan": null,
+          "rincian": null
+        },
+        {
+          "id_aspek": "m",
+          "aspek_nama": "Supervisi",
+          "tipe": "Manual",
+          "bobot": 40,
+          "urutan": 2,
+          "skor": null,
+          "skor_hitung": null,
+          "catatan": null,
+          "rincian": null
+        }
+      ],
+      "isian": [
+        {
+          "id_aspek": "p",
+          "skor": 3,
+          "catatan": "dari supervisi"
+        },
+        {
+          "id_aspek": "m",
+          "skor": 5,
+          "catatan": null
+        }
+      ],
+      "otomatis": {
+        "Otomatis Kehadiran": {
+          "skor": 4,
+          "rincian": "K|20|17|2|1|0|0|900|950,900,800,700|2024-01-26"
+        }
+      },
+      "hasil": [
+        {
+          "id_aspek": "k",
+          "aspek_nama": "Kehadiran",
+          "tipe": "Otomatis Kehadiran",
+          "bobot": 40,
+          "urutan": 0,
+          "skor": 4,
+          "skor_hitung": 4,
+          "catatan": null,
+          "rincian": "K|20|17|2|1|0|0|900|950,900,800,700|2024-01-26"
+        },
+        {
+          "id_aspek": "p",
+          "aspek_nama": "Presensi",
+          "tipe": "Otomatis Presensi Kelas",
+          "bobot": 20,
+          "urutan": 1,
+          "skor": 3,
+          "skor_hitung": null,
+          "catatan": "dari supervisi",
+          "rincian": null
+        },
+        {
+          "id_aspek": "m",
+          "aspek_nama": "Supervisi",
+          "tipe": "Manual",
+          "bobot": 40,
+          "urutan": 2,
+          "skor": 5,
+          "skor_hitung": null,
+          "catatan": null,
+          "rincian": null
+        }
+      ]
+    },
+    {
+      "nama": "skor otomatis sama dengan hitungan tanpa catatan",
+      "baris": [
+        {
+          "id_aspek": "k",
+          "aspek_nama": "Kehadiran",
+          "tipe": "Otomatis Kehadiran",
+          "bobot": 40,
+          "urutan": 0,
+          "skor": null,
+          "skor_hitung": null,
+          "catatan": null,
+          "rincian": null
+        },
+        {
+          "id_aspek": "p",
+          "aspek_nama": "Presensi",
+          "tipe": "Otomatis Presensi Kelas",
+          "bobot": 20,
+          "urutan": 1,
+          "skor": null,
+          "skor_hitung": null,
+          "catatan": null,
+          "rincian": null
+        },
+        {
+          "id_aspek": "m",
+          "aspek_nama": "Supervisi",
+          "tipe": "Manual",
+          "bobot": 40,
+          "urutan": 2,
+          "skor": null,
+          "skor_hitung": null,
+          "catatan": null,
+          "rincian": null
+        }
+      ],
+      "isian": [
+        {
+          "id_aspek": "k",
+          "skor": 4,
+          "catatan": null
+        }
+      ],
+      "otomatis": {
+        "Otomatis Kehadiran": {
+          "skor": 4,
+          "rincian": "K|20|17|2|1|0|0|900|950,900,800,700|2024-01-26"
+        }
+      },
+      "hasil": [
+        {
+          "id_aspek": "k",
+          "aspek_nama": "Kehadiran",
+          "tipe": "Otomatis Kehadiran",
+          "bobot": 40,
+          "urutan": 0,
+          "skor": 4,
+          "skor_hitung": 4,
+          "catatan": null,
+          "rincian": "K|20|17|2|1|0|0|900|950,900,800,700|2024-01-26"
+        },
+        {
+          "id_aspek": "p",
+          "aspek_nama": "Presensi",
+          "tipe": "Otomatis Presensi Kelas",
+          "bobot": 20,
+          "urutan": 1,
+          "skor": null,
+          "skor_hitung": null,
+          "catatan": null,
+          "rincian": null
+        },
+        {
+          "id_aspek": "m",
+          "aspek_nama": "Supervisi",
+          "tipe": "Manual",
+          "bobot": 40,
+          "urutan": 2,
+          "skor": null,
+          "skor_hitung": null,
+          "catatan": null,
+          "rincian": null
+        }
+      ]
+    },
+    {
+      "nama": "skor otomatis diubah dengan catatan",
+      "baris": [
+        {
+          "id_aspek": "k",
+          "aspek_nama": "Kehadiran",
+          "tipe": "Otomatis Kehadiran",
+          "bobot": 40,
+          "urutan": 0,
+          "skor": null,
+          "skor_hitung": null,
+          "catatan": null,
+          "rincian": null
+        },
+        {
+          "id_aspek": "p",
+          "aspek_nama": "Presensi",
+          "tipe": "Otomatis Presensi Kelas",
+          "bobot": 20,
+          "urutan": 1,
+          "skor": null,
+          "skor_hitung": null,
+          "catatan": null,
+          "rincian": null
+        },
+        {
+          "id_aspek": "m",
+          "aspek_nama": "Supervisi",
+          "tipe": "Manual",
+          "bobot": 40,
+          "urutan": 2,
+          "skor": null,
+          "skor_hitung": null,
+          "catatan": null,
+          "rincian": null
+        }
+      ],
+      "isian": [
+        {
+          "id_aspek": "k",
+          "skor": 5,
+          "catatan": "jadwal berubah"
+        }
+      ],
+      "otomatis": {
+        "Otomatis Kehadiran": {
+          "skor": 4,
+          "rincian": "K|20|17|2|1|0|0|900|950,900,800,700|2024-01-26"
+        }
+      },
+      "hasil": [
+        {
+          "id_aspek": "k",
+          "aspek_nama": "Kehadiran",
+          "tipe": "Otomatis Kehadiran",
+          "bobot": 40,
+          "urutan": 0,
+          "skor": 5,
+          "skor_hitung": 4,
+          "catatan": "jadwal berubah",
+          "rincian": "K|20|17|2|1|0|0|900|950,900,800,700|2024-01-26"
+        },
+        {
+          "id_aspek": "p",
+          "aspek_nama": "Presensi",
+          "tipe": "Otomatis Presensi Kelas",
+          "bobot": 20,
+          "urutan": 1,
+          "skor": null,
+          "skor_hitung": null,
+          "catatan": null,
+          "rincian": null
+        },
+        {
+          "id_aspek": "m",
+          "aspek_nama": "Supervisi",
+          "tipe": "Manual",
+          "bobot": 40,
+          "urutan": 2,
+          "skor": null,
+          "skor_hitung": null,
+          "catatan": null,
+          "rincian": null
+        }
+      ]
+    },
+    {
+      "nama": "skor otomatis diubah tanpa catatan ditolak",
+      "baris": [
+        {
+          "id_aspek": "k",
+          "aspek_nama": "Kehadiran",
+          "tipe": "Otomatis Kehadiran",
+          "bobot": 40,
+          "urutan": 0,
+          "skor": null,
+          "skor_hitung": null,
+          "catatan": null,
+          "rincian": null
+        },
+        {
+          "id_aspek": "p",
+          "aspek_nama": "Presensi",
+          "tipe": "Otomatis Presensi Kelas",
+          "bobot": 20,
+          "urutan": 1,
+          "skor": null,
+          "skor_hitung": null,
+          "catatan": null,
+          "rincian": null
+        },
+        {
+          "id_aspek": "m",
+          "aspek_nama": "Supervisi",
+          "tipe": "Manual",
+          "bobot": 40,
+          "urutan": 2,
+          "skor": null,
+          "skor_hitung": null,
+          "catatan": null,
+          "rincian": null
+        }
+      ],
+      "isian": [
+        {
+          "id_aspek": "k",
+          "skor": 5,
+          "catatan": null
+        }
+      ],
+      "otomatis": {
+        "Otomatis Kehadiran": {
+          "skor": 4,
+          "rincian": "K|20|17|2|1|0|0|900|950,900,800,700|2024-01-26"
+        }
+      },
+      "galat": "Skor aspek \"Kehadiran\" yang diubah dari hitungan wajib diberi catatan alasannya."
+    },
+    {
+      "nama": "aspek tanpa hitungan tanpa catatan ditolak",
+      "baris": [
+        {
+          "id_aspek": "k",
+          "aspek_nama": "Kehadiran",
+          "tipe": "Otomatis Kehadiran",
+          "bobot": 40,
+          "urutan": 0,
+          "skor": null,
+          "skor_hitung": null,
+          "catatan": null,
+          "rincian": null
+        },
+        {
+          "id_aspek": "p",
+          "aspek_nama": "Presensi",
+          "tipe": "Otomatis Presensi Kelas",
+          "bobot": 20,
+          "urutan": 1,
+          "skor": null,
+          "skor_hitung": null,
+          "catatan": null,
+          "rincian": null
+        },
+        {
+          "id_aspek": "m",
+          "aspek_nama": "Supervisi",
+          "tipe": "Manual",
+          "bobot": 40,
+          "urutan": 2,
+          "skor": null,
+          "skor_hitung": null,
+          "catatan": null,
+          "rincian": null
+        }
+      ],
+      "isian": [
+        {
+          "id_aspek": "p",
+          "skor": 3,
+          "catatan": null
+        }
+      ],
+      "otomatis": {
+        "Otomatis Kehadiran": {
+          "skor": 4,
+          "rincian": "K|20|17|2|1|0|0|900|950,900,800,700|2024-01-26"
+        }
+      },
+      "galat": "Aspek \"Presensi\" belum bisa dihitung otomatis; beri catatan alasan skornya."
+    },
+    {
+      "nama": "D = 0 juga manual",
+      "baris": [
+        {
+          "id_aspek": "k",
+          "aspek_nama": "Kehadiran",
+          "tipe": "Otomatis Kehadiran",
+          "bobot": 40,
+          "urutan": 0,
+          "skor": null,
+          "skor_hitung": null,
+          "catatan": null,
+          "rincian": null
+        }
+      ],
+      "isian": [
+        {
+          "id_aspek": "k",
+          "skor": 3,
+          "catatan": null
+        }
+      ],
+      "otomatis": {
+        "Otomatis Kehadiran": {
+          "skor": null,
+          "rincian": "K|0|0|0|0|0|1||950,900,800,700|2024-01-08"
+        }
+      },
+      "galat": "Aspek \"Kehadiran\" belum bisa dihitung otomatis; beri catatan alasan skornya."
+    },
+    {
+      "nama": "aspek asing ditolak",
+      "baris": [
+        {
+          "id_aspek": "k",
+          "aspek_nama": "Kehadiran",
+          "tipe": "Otomatis Kehadiran",
+          "bobot": 40,
+          "urutan": 0,
+          "skor": null,
+          "skor_hitung": null,
+          "catatan": null,
+          "rincian": null
+        },
+        {
+          "id_aspek": "p",
+          "aspek_nama": "Presensi",
+          "tipe": "Otomatis Presensi Kelas",
+          "bobot": 20,
+          "urutan": 1,
+          "skor": null,
+          "skor_hitung": null,
+          "catatan": null,
+          "rincian": null
+        },
+        {
+          "id_aspek": "m",
+          "aspek_nama": "Supervisi",
+          "tipe": "Manual",
+          "bobot": 40,
+          "urutan": 2,
+          "skor": null,
+          "skor_hitung": null,
+          "catatan": null,
+          "rincian": null
+        }
+      ],
+      "isian": [
+        {
+          "id_aspek": "x",
+          "skor": 3,
+          "catatan": null
+        }
+      ],
+      "otomatis": {
+        "Otomatis Kehadiran": {
+          "skor": 4,
+          "rincian": "K|20|17|2|1|0|0|900|950,900,800,700|2024-01-26"
+        }
+      },
+      "galat": "Aspek penilaian tidak dikenal; muat ulang template."
+    },
+    {
+      "nama": "rincian dan hitungan lama dibuang",
+      "baris": [
+        {
+          "id_aspek": "m",
+          "aspek_nama": "Supervisi",
+          "tipe": "Manual",
+          "bobot": 100,
+          "urutan": 0,
+          "skor": 2,
+          "skor_hitung": 3,
+          "catatan": "lama",
+          "rincian": "K|x"
+        }
+      ],
+      "isian": [
+        {
+          "id_aspek": "m",
+          "skor": 4,
+          "catatan": null
+        }
+      ],
+      "otomatis": {
+        "Otomatis Kehadiran": {
+          "skor": 4,
+          "rincian": "K|20|17|2|1|0|0|900|950,900,800,700|2024-01-26"
+        }
+      },
+      "hasil": [
+        {
+          "id_aspek": "m",
+          "aspek_nama": "Supervisi",
+          "tipe": "Manual",
+          "bobot": 100,
+          "urutan": 0,
+          "skor": 4,
+          "skor_hitung": null,
+          "catatan": null,
+          "rincian": null
+        }
+      ]
+    }
+  ],
+  "isian_tersimpan": [
+    {
+      "nama": "otomatis mengikuti hitungan kecuali diubah",
+      "baris": [
+        {
+          "id_aspek": "k",
+          "aspek_nama": "k",
+          "tipe": "Otomatis Kehadiran",
+          "bobot": 40,
+          "urutan": 0,
+          "skor": 4,
+          "skor_hitung": 4,
+          "catatan": null,
+          "rincian": "K|20|17|2|1|0|0|900|950,900,800,700|2024-01-26"
+        },
+        {
+          "id_aspek": "j",
+          "aspek_nama": "j",
+          "tipe": "Otomatis Jurnal",
+          "bobot": 10,
+          "urutan": 1,
+          "skor": 5,
+          "skor_hitung": 3,
+          "catatan": "alasan",
+          "rincian": "J|x"
+        },
+        {
+          "id_aspek": "p",
+          "aspek_nama": "p",
+          "tipe": "Otomatis Presensi Kelas",
+          "bobot": 10,
+          "urutan": 2,
+          "skor": 3,
+          "skor_hitung": null,
+          "catatan": "manual",
+          "rincian": null
+        },
+        {
+          "id_aspek": "m",
+          "aspek_nama": "m",
+          "tipe": "Manual",
+          "bobot": 40,
+          "urutan": 3,
+          "skor": 2,
+          "skor_hitung": null,
+          "catatan": null,
+          "rincian": null
+        }
+      ],
+      "hasil": [
+        {
+          "id_aspek": "k",
+          "skor": null,
+          "catatan": null
+        },
+        {
+          "id_aspek": "j",
+          "skor": 5,
+          "catatan": "alasan"
+        },
+        {
+          "id_aspek": "p",
+          "skor": 3,
+          "catatan": "manual"
+        },
+        {
+          "id_aspek": "m",
+          "skor": 2,
+          "catatan": null
+        }
+      ]
+    }
+  ],
+  "muat_ulang": [
+    {
+      "nama": "skor aspek yang masih ada dipertahankan",
+      "baru": [
+        {
+          "id_aspek": "a",
+          "aspek_nama": "a",
+          "tipe": "Manual",
+          "bobot": 60,
+          "urutan": 0,
+          "skor": null,
+          "skor_hitung": null,
+          "catatan": null,
+          "rincian": null
+        },
+        {
+          "id_aspek": "c",
+          "aspek_nama": "c",
+          "tipe": "Manual",
+          "bobot": 40,
+          "urutan": 1,
+          "skor": null,
+          "skor_hitung": null,
+          "catatan": null,
+          "rincian": null
+        }
+      ],
+      "lama": [
+        {
+          "id_aspek": "a",
+          "aspek_nama": "a",
+          "tipe": "Manual",
+          "bobot": 50,
+          "urutan": 0,
+          "skor": 4,
+          "skor_hitung": null,
+          "catatan": "ok",
+          "rincian": null
+        },
+        {
+          "id_aspek": "b",
+          "aspek_nama": "b",
+          "tipe": "Manual",
+          "bobot": 50,
+          "urutan": 1,
+          "skor": 2,
+          "skor_hitung": null,
+          "catatan": null,
+          "rincian": null
+        }
+      ],
+      "hasil": [
+        {
+          "id_aspek": "a",
+          "aspek_nama": "a",
+          "tipe": "Manual",
+          "bobot": 60,
+          "urutan": 0,
+          "skor": 4,
+          "skor_hitung": null,
+          "catatan": "ok",
+          "rincian": null
+        },
+        {
+          "id_aspek": "c",
+          "aspek_nama": "c",
+          "tipe": "Manual",
+          "bobot": 40,
+          "urutan": 1,
+          "skor": null,
+          "skor_hitung": null,
+          "catatan": null,
+          "rincian": null
+        }
+      ]
+    }
+  ],
+  "status": [
+    {
+      "keputusan": [],
+      "hasil": "Draf"
+    },
+    {
+      "keputusan": [
+        {
+          "urut": 1,
+          "jenis": "Ajukan"
+        }
+      ],
+      "hasil": "Diajukan"
+    },
+    {
+      "keputusan": [
+        {
+          "urut": 1,
+          "jenis": "Ajukan"
+        },
+        {
+          "urut": 2,
+          "jenis": "Kembalikan"
+        }
+      ],
+      "hasil": "Draf"
+    },
+    {
+      "keputusan": [
+        {
+          "urut": 1,
+          "jenis": "Ajukan"
+        },
+        {
+          "urut": 2,
+          "jenis": "Kembalikan"
+        },
+        {
+          "urut": 3,
+          "jenis": "Ajukan"
+        }
+      ],
+      "hasil": "Diajukan"
+    },
+    {
+      "keputusan": [
+        {
+          "urut": 1,
+          "jenis": "Ajukan"
+        },
+        {
+          "urut": 2,
+          "jenis": "Final"
+        }
+      ],
+      "hasil": "Final"
+    },
+    {
+      "keputusan": [
+        {
+          "urut": 1,
+          "jenis": "Ajukan"
+        },
+        {
+          "urut": 2,
+          "jenis": "Batal"
+        }
+      ],
+      "hasil": "Dibatalkan"
+    },
+    {
+      "keputusan": [
+        {
+          "urut": 3,
+          "jenis": "Ajukan"
+        },
+        {
+          "urut": 1,
+          "jenis": "Ajukan"
+        },
+        {
+          "urut": 2,
+          "jenis": "Kembalikan"
+        }
+      ],
+      "hasil": "Diajukan"
+    },
+    {
+      "keputusan": [
+        {
+          "urut": 2,
+          "jenis": "Kembalikan"
+        },
+        {
+          "urut": 1,
+          "jenis": "Ajukan"
+        }
+      ],
+      "hasil": "Draf"
+    }
+  ],
+  "aksi": [
+    {
+      "nama": "buat",
+      "aksi": "Buat",
+      "alasan": "",
+      "keadaan": {
+        "status": "",
+        "boleh_assess": true,
+        "dalam_cakupan": true,
+        "skor_lengkap": true,
+        "otomatis_sama": true
+      }
+    },
+    {
+      "nama": "aksi asing",
+      "aksi": "Hapus",
+      "alasan": "",
+      "keadaan": {
+        "status": "Draf",
+        "boleh_assess": true,
+        "dalam_cakupan": true,
+        "skor_lengkap": true,
+        "otomatis_sama": true
+      },
+      "galat": "Aksi penilaian tidak dikenal."
+    },
+    {
+      "nama": "diri sendiri, juga superadmin",
+      "aksi": "Buat",
+      "alasan": "",
+      "keadaan": {
+        "status": "",
+        "boleh_assess": true,
+        "dalam_cakupan": true,
+        "skor_lengkap": true,
+        "otomatis_sama": true,
+        "sendiri": true,
+        "boleh_finalize": true
+      },
+      "galat": "Tindakan ini tidak bisa dilakukan untuk diri sendiri."
+    },
+    {
+      "nama": "buat tanpa assess",
+      "aksi": "Buat",
+      "alasan": "",
+      "keadaan": {
+        "status": "",
+        "boleh_assess": false,
+        "dalam_cakupan": true,
+        "skor_lengkap": true,
+        "otomatis_sama": true,
+        "boleh_finalize": true
+      },
+      "galat": "Anda tidak punya izin untuk aksi penilaian ini."
+    },
+    {
+      "nama": "unit lain",
+      "aksi": "Buat",
+      "alasan": "",
+      "keadaan": {
+        "status": "",
+        "boleh_assess": true,
+        "dalam_cakupan": false,
+        "skor_lengkap": true,
+        "otomatis_sama": true
+      },
+      "galat": "Pegawai ini di luar unit Anda."
+    },
+    {
+      "nama": "simpan draf",
+      "aksi": "Simpan",
+      "alasan": "",
+      "keadaan": {
+        "status": "Draf",
+        "boleh_assess": true,
+        "dalam_cakupan": true,
+        "skor_lengkap": true,
+        "otomatis_sama": true
+      }
+    },
+    {
+      "nama": "simpan sesudah final",
+      "aksi": "Simpan",
+      "alasan": "",
+      "keadaan": {
+        "status": "Final",
+        "boleh_assess": true,
+        "dalam_cakupan": true,
+        "skor_lengkap": true,
+        "otomatis_sama": true
+      },
+      "galat": "Penilaian yang sudah diajukan atau selesai tidak bisa disunting."
+    },
+    {
+      "nama": "muat ulang saat diajukan",
+      "aksi": "Muat ulang",
+      "alasan": "",
+      "keadaan": {
+        "status": "Diajukan",
+        "boleh_assess": true,
+        "dalam_cakupan": true,
+        "skor_lengkap": true,
+        "otomatis_sama": true
+      },
+      "galat": "Penilaian yang sudah diajukan atau selesai tidak bisa disunting."
+    },
+    {
+      "nama": "pemutus mengisi koreksi",
+      "aksi": "Simpan",
+      "alasan": "",
+      "keadaan": {
+        "status": "Draf",
+        "boleh_assess": false,
+        "dalam_cakupan": true,
+        "skor_lengkap": true,
+        "otomatis_sama": true,
+        "boleh_finalize": true,
+        "koreksi": true
+      }
+    },
+    {
+      "nama": "pemutus tidak mengisi akar",
+      "aksi": "Simpan",
+      "alasan": "",
+      "keadaan": {
+        "status": "Draf",
+        "boleh_assess": false,
+        "dalam_cakupan": true,
+        "skor_lengkap": true,
+        "otomatis_sama": true,
+        "boleh_finalize": true
+      },
+      "galat": "Anda tidak punya izin untuk aksi penilaian ini."
+    },
+    {
+      "nama": "ajukan",
+      "aksi": "Ajukan",
+      "alasan": "",
+      "keadaan": {
+        "status": "Draf",
+        "boleh_assess": true,
+        "dalam_cakupan": true,
+        "skor_lengkap": true,
+        "otomatis_sama": true
+      }
+    },
+    {
+      "nama": "ajukan bukan draf",
+      "aksi": "Ajukan",
+      "alasan": "",
+      "keadaan": {
+        "status": "Diajukan",
+        "boleh_assess": true,
+        "dalam_cakupan": true,
+        "skor_lengkap": true,
+        "otomatis_sama": true
+      },
+      "galat": "Hanya draf yang bisa diajukan."
+    },
+    {
+      "nama": "ajukan skor belum lengkap",
+      "aksi": "Ajukan",
+      "alasan": "",
+      "keadaan": {
+        "status": "Draf",
+        "boleh_assess": true,
+        "dalam_cakupan": true,
+        "skor_lengkap": false,
+        "otomatis_sama": true
+      },
+      "galat": "Isi skor semua aspek sebelum mengajukan."
+    },
+    {
+      "nama": "ajukan otomatis berubah",
+      "aksi": "Ajukan",
+      "alasan": "",
+      "keadaan": {
+        "status": "Draf",
+        "boleh_assess": true,
+        "dalam_cakupan": true,
+        "skor_lengkap": true,
+        "otomatis_sama": false
+      },
+      "galat": "Angka aspek otomatis berubah sejak layar dimuat. Periksa angka barunya, lalu ajukan sekali lagi."
+    },
+    {
+      "nama": "kembalikan tanpa finalize",
+      "aksi": "Kembalikan",
+      "alasan": "kurang",
+      "keadaan": {
+        "status": "Diajukan",
+        "boleh_assess": true,
+        "dalam_cakupan": true,
+        "skor_lengkap": true,
+        "otomatis_sama": true
+      },
+      "galat": "Anda tidak punya izin untuk aksi penilaian ini."
+    },
+    {
+      "nama": "kembalikan tanpa alasan",
+      "aksi": "Kembalikan",
+      "alasan": "",
+      "keadaan": {
+        "status": "Diajukan",
+        "boleh_assess": true,
+        "dalam_cakupan": true,
+        "skor_lengkap": true,
+        "otomatis_sama": true,
+        "boleh_finalize": true
+      },
+      "galat": "Alasan pengembalian wajib diisi."
+    },
+    {
+      "nama": "kembalikan",
+      "aksi": "Kembalikan",
+      "alasan": "lengkapi supervisi",
+      "keadaan": {
+        "status": "Diajukan",
+        "boleh_assess": true,
+        "dalam_cakupan": true,
+        "skor_lengkap": true,
+        "otomatis_sama": true,
+        "boleh_finalize": true
+      }
+    },
+    {
+      "nama": "kembalikan draf",
+      "aksi": "Kembalikan",
+      "alasan": "x",
+      "keadaan": {
+        "status": "Draf",
+        "boleh_assess": true,
+        "dalam_cakupan": true,
+        "skor_lengkap": true,
+        "otomatis_sama": true,
+        "boleh_finalize": true
+      },
+      "galat": "Penilaian ini tidak sedang diajukan."
+    },
+    {
+      "nama": "final",
+      "aksi": "Final",
+      "alasan": "",
+      "keadaan": {
+        "status": "Diajukan",
+        "boleh_assess": false,
+        "dalam_cakupan": true,
+        "skor_lengkap": true,
+        "otomatis_sama": true,
+        "boleh_finalize": true
+      }
+    },
+    {
+      "nama": "final unit lain",
+      "aksi": "Final",
+      "alasan": "",
+      "keadaan": {
+        "status": "Diajukan",
+        "boleh_assess": true,
+        "dalam_cakupan": false,
+        "skor_lengkap": true,
+        "otomatis_sama": true,
+        "boleh_finalize": true
+      },
+      "galat": "Pegawai ini di luar unit Anda."
+    },
+    {
+      "nama": "alasan terlalu panjang",
+      "aksi": "Kembalikan",
+      "alasan": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+      "keadaan": {
+        "status": "Diajukan",
+        "boleh_assess": true,
+        "dalam_cakupan": true,
+        "skor_lengkap": true,
+        "otomatis_sama": true,
+        "boleh_finalize": true
+      },
+      "galat": "Alasan maksimal 500 karakter."
+    },
+    {
+      "nama": "batal draf",
+      "aksi": "Batal",
+      "alasan": "salah pegawai",
+      "keadaan": {
+        "status": "Draf",
+        "boleh_assess": true,
+        "dalam_cakupan": true,
+        "skor_lengkap": true,
+        "otomatis_sama": true
+      }
+    },
+    {
+      "nama": "batal tanpa alasan",
+      "aksi": "Batal",
+      "alasan": "",
+      "keadaan": {
+        "status": "Draf",
+        "boleh_assess": true,
+        "dalam_cakupan": true,
+        "skor_lengkap": true,
+        "otomatis_sama": true
+      },
+      "galat": "Alasan pembatalan wajib diisi."
+    },
+    {
+      "nama": "batal final",
+      "aksi": "Batal",
+      "alasan": "x",
+      "keadaan": {
+        "status": "Final",
+        "boleh_assess": true,
+        "dalam_cakupan": true,
+        "skor_lengkap": true,
+        "otomatis_sama": true,
+        "boleh_finalize": true
+      },
+      "galat": "Penilaian final tidak bisa dibatalkan; buat koreksi."
+    },
+    {
+      "nama": "batal lagi",
+      "aksi": "Batal",
+      "alasan": "x",
+      "keadaan": {
+        "status": "Dibatalkan",
+        "boleh_assess": true,
+        "dalam_cakupan": true,
+        "skor_lengkap": true,
+        "otomatis_sama": true
+      },
+      "galat": "Penilaian ini sudah dibatalkan."
+    },
+    {
+      "nama": "batal tanpa izin",
+      "aksi": "Batal",
+      "alasan": "x",
+      "keadaan": {
+        "status": "Draf",
+        "boleh_assess": false,
+        "dalam_cakupan": true,
+        "skor_lengkap": true,
+        "otomatis_sama": true
+      },
+      "galat": "Anda tidak punya izin untuk aksi penilaian ini."
+    },
+    {
+      "nama": "koreksi",
+      "aksi": "Koreksi",
+      "alasan": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+      "keadaan": {
+        "status": "Final",
+        "boleh_assess": false,
+        "dalam_cakupan": true,
+        "skor_lengkap": true,
+        "otomatis_sama": true,
+        "boleh_finalize": true,
+        "akar_final": true
+      }
+    },
+    {
+      "nama": "koreksi tanpa finalize",
+      "aksi": "Koreksi",
+      "alasan": "",
+      "keadaan": {
+        "status": "Final",
+        "boleh_assess": true,
+        "dalam_cakupan": true,
+        "skor_lengkap": true,
+        "otomatis_sama": true,
+        "akar_final": true
+      },
+      "galat": "Anda tidak punya izin untuk aksi penilaian ini."
+    },
+    {
+      "nama": "koreksi akar belum final",
+      "aksi": "Koreksi",
+      "alasan": "",
+      "keadaan": {
+        "status": "Draf",
+        "boleh_assess": true,
+        "dalam_cakupan": true,
+        "skor_lengkap": true,
+        "otomatis_sama": true,
+        "boleh_finalize": true
+      },
+      "galat": "Koreksi hanya untuk penilaian yang sudah final."
+    },
+    {
+      "nama": "koreksi terbuka",
+      "aksi": "Koreksi",
+      "alasan": "",
+      "keadaan": {
+        "status": "Final",
+        "boleh_assess": true,
+        "dalam_cakupan": true,
+        "skor_lengkap": true,
+        "otomatis_sama": true,
+        "boleh_finalize": true,
+        "akar_final": true,
+        "koreksi_terbuka": true
+      },
+      "galat": "Penilaian ini masih punya koreksi yang belum selesai."
+    }
+  ],
+  "boleh_baca": [
+    {
+      "sendiri": false,
+      "status": "Draf",
+      "view": false,
+      "hasil": true
+    },
+    {
+      "sendiri": true,
+      "status": "Draf",
+      "view": true,
+      "hasil": false
+    },
+    {
+      "sendiri": true,
+      "status": "Diajukan",
+      "view": true,
+      "hasil": false
+    },
+    {
+      "sendiri": true,
+      "status": "Final",
+      "view": false,
+      "hasil": false
+    },
+    {
+      "sendiri": true,
+      "status": "Final",
+      "view": true,
+      "hasil": true
+    }
+  ],
+  "tanda": [
+    {
+      "nama": "tanpa tanda",
+      "info": {
+        "status": "Draf",
+        "penilai_oleh": "kepsek",
+        "id_penilai": "K1",
+        "penilai_bawaan": "K1",
+        "final_oleh": "",
+        "nilai": [],
+        "periode_penuh": true,
+        "periode_selesai": "2024-06-21",
+        "dihitung_sampai": "2024-06-21",
+        "pengajuan_menunggu": false,
+        "asn": false
+      },
+      "hasil": []
+    },
+    {
+      "nama": "bukan penilai bawaan",
+      "info": {
+        "status": "Draf",
+        "penilai_oleh": "kepsek",
+        "id_penilai": "W1",
+        "penilai_bawaan": "K1",
+        "final_oleh": "",
+        "nilai": [],
+        "periode_penuh": true,
+        "periode_selesai": "2024-06-21",
+        "dihitung_sampai": "2024-06-21",
+        "pengajuan_menunggu": false,
+        "asn": false
+      },
+      "hasil": ["bukan_penilai_bawaan"]
+    },
+    {
+      "nama": "tanpa penilai bawaan tidak ditandai",
+      "info": {
+        "status": "Draf",
+        "penilai_oleh": "kepsek",
+        "id_penilai": "",
+        "penilai_bawaan": "",
+        "final_oleh": "",
+        "nilai": [],
+        "periode_penuh": true,
+        "periode_selesai": "2024-06-21",
+        "dihitung_sampai": "2024-06-21",
+        "pengajuan_menunggu": false,
+        "asn": false
+      },
+      "hasil": []
+    },
+    {
+      "nama": "dinilai dan difinalkan orang yang sama",
+      "info": {
+        "status": "Final",
+        "penilai_oleh": "kepsek",
+        "id_penilai": "K1",
+        "penilai_bawaan": "K1",
+        "final_oleh": " KepSek ",
+        "nilai": [],
+        "periode_penuh": true,
+        "periode_selesai": "2024-06-21",
+        "dihitung_sampai": "2024-06-21",
+        "pengajuan_menunggu": false,
+        "asn": false
+      },
+      "hasil": ["dinilai_dan_difinalkan_sama"]
+    },
+    {
+      "nama": "final orang lain",
+      "info": {
+        "status": "Final",
+        "penilai_oleh": "kepsek",
+        "id_penilai": "K1",
+        "penilai_bawaan": "K1",
+        "final_oleh": "yayasan",
+        "nilai": [],
+        "periode_penuh": true,
+        "periode_selesai": "2024-06-21",
+        "dihitung_sampai": "2024-06-21",
+        "pengajuan_menunggu": false,
+        "asn": false
+      },
+      "hasil": []
+    },
+    {
+      "nama": "otomatis diubah dan manual",
+      "info": {
+        "status": "Draf",
+        "penilai_oleh": "kepsek",
+        "id_penilai": "K1",
+        "penilai_bawaan": "K1",
+        "final_oleh": "",
+        "nilai": [
+          {
+            "id_aspek": "k",
+            "aspek_nama": "k",
+            "tipe": "Otomatis Kehadiran",
+            "bobot": 50,
+            "urutan": 0,
+            "skor": 5,
+            "skor_hitung": 4,
+            "catatan": "x",
+            "rincian": "K|20|17|2|1|0|0|900|950,900,800,700|2024-01-26"
+          },
+          {
+            "id_aspek": "p",
+            "aspek_nama": "p",
+            "tipe": "Otomatis Presensi Kelas",
+            "bobot": 20,
+            "urutan": 1,
+            "skor": 3,
+            "skor_hitung": null,
+            "catatan": "x",
+            "rincian": null
+          },
+          {
+            "id_aspek": "m",
+            "aspek_nama": "m",
+            "tipe": "Manual",
+            "bobot": 30,
+            "urutan": 2,
+            "skor": 4,
+            "skor_hitung": null,
+            "catatan": null,
+            "rincian": null
+          }
+        ],
+        "periode_penuh": true,
+        "periode_selesai": "2024-06-21",
+        "dihitung_sampai": "2024-06-21",
+        "pengajuan_menunggu": false,
+        "asn": false
+      },
+      "hasil": ["otomatis_diubah", "otomatis_manual"]
+    },
+    {
+      "nama": "semua tanda periode",
+      "info": {
+        "status": "Draf",
+        "penilai_oleh": "kepsek",
+        "id_penilai": "K1",
+        "penilai_bawaan": "K1",
+        "final_oleh": "",
+        "nilai": [],
+        "periode_penuh": false,
+        "periode_selesai": "2024-06-21",
+        "dihitung_sampai": "2024-03-01",
+        "pengajuan_menunggu": true,
+        "asn": true
+      },
+      "hasil": [
+        "periode_tidak_penuh",
+        "periode_belum_selesai",
+        "pengajuan_menunggu",
+        "asn"
+      ]
+    },
+    {
+      "nama": "dihitung sampai kosong",
+      "info": {
+        "status": "Draf",
+        "penilai_oleh": "kepsek",
+        "id_penilai": "K1",
+        "penilai_bawaan": "K1",
+        "final_oleh": "",
+        "nilai": [],
+        "periode_penuh": true,
+        "periode_selesai": "2024-06-21",
+        "dihitung_sampai": "",
+        "pengajuan_menunggu": false,
+        "asn": false
+      },
+      "hasil": []
+    }
+  ],
+  "nilai_akhir": [
+    {
+      "nama": "§23.2.5 template Guru",
+      "baris": [
+        {
+          "id_aspek": "a0",
+          "aspek_nama": "a0",
+          "tipe": "Manual",
+          "bobot": 10,
+          "urutan": 0,
+          "skor": 4,
+          "skor_hitung": null,
+          "catatan": null,
+          "rincian": null
+        },
+        {
+          "id_aspek": "a1",
+          "aspek_nama": "a1",
+          "tipe": "Manual",
+          "bobot": 10,
+          "urutan": 1,
+          "skor": 5,
+          "skor_hitung": null,
+          "catatan": null,
+          "rincian": null
+        },
+        {
+          "id_aspek": "a2",
+          "aspek_nama": "a2",
+          "tipe": "Manual",
+          "bobot": 10,
+          "urutan": 2,
+          "skor": 4,
+          "skor_hitung": null,
+          "catatan": null,
+          "rincian": null
+        },
+        {
+          "id_aspek": "a3",
+          "aspek_nama": "a3",
+          "tipe": "Manual",
+          "bobot": 20,
+          "urutan": 3,
+          "skor": 4,
+          "skor_hitung": null,
+          "catatan": null,
+          "rincian": null
+        },
+        {
+          "id_aspek": "a4",
+          "aspek_nama": "a4",
+          "tipe": "Manual",
+          "bobot": 15,
+          "urutan": 4,
+          "skor": 3,
+          "skor_hitung": null,
+          "catatan": null,
+          "rincian": null
+        },
+        {
+          "id_aspek": "a5",
+          "aspek_nama": "a5",
+          "tipe": "Manual",
+          "bobot": 10,
+          "urutan": 5,
+          "skor": 4,
+          "skor_hitung": null,
+          "catatan": null,
+          "rincian": null
+        },
+        {
+          "id_aspek": "a6",
+          "aspek_nama": "a6",
+          "tipe": "Manual",
+          "bobot": 10,
+          "urutan": 6,
+          "skor": 4,
+          "skor_hitung": null,
+          "catatan": null,
+          "rincian": null
+        },
+        {
+          "id_aspek": "a7",
+          "aspek_nama": "a7",
+          "tipe": "Manual",
+          "bobot": 15,
+          "urutan": 7,
+          "skor": 3,
+          "skor_hitung": null,
+          "catatan": null,
+          "rincian": null
+        }
+      ],
+      "hasil": 7000
+    },
+    {
+      "nama": "perusahaan 40/35/25",
+      "baris": [
+        {
+          "id_aspek": "a0",
+          "aspek_nama": "a0",
+          "tipe": "Manual",
+          "bobot": 40,
+          "urutan": 0,
+          "skor": 4,
+          "skor_hitung": null,
+          "catatan": null,
+          "rincian": null
+        },
+        {
+          "id_aspek": "a1",
+          "aspek_nama": "a1",
+          "tipe": "Manual",
+          "bobot": 35,
+          "urutan": 1,
+          "skor": 5,
+          "skor_hitung": null,
+          "catatan": null,
+          "rincian": null
+        },
+        {
+          "id_aspek": "a2",
+          "aspek_nama": "a2",
+          "tipe": "Manual",
+          "bobot": 25,
+          "urutan": 2,
+          "skor": 3,
+          "skor_hitung": null,
+          "catatan": null,
+          "rincian": null
+        }
+      ],
+      "hasil": 7750
+    },
+    {
+      "nama": "semua 5",
+      "baris": [
+        {
+          "id_aspek": "a0",
+          "aspek_nama": "a0",
+          "tipe": "Manual",
+          "bobot": 60,
+          "urutan": 0,
+          "skor": 5,
+          "skor_hitung": null,
+          "catatan": null,
+          "rincian": null
+        },
+        {
+          "id_aspek": "a1",
+          "aspek_nama": "a1",
+          "tipe": "Manual",
+          "bobot": 40,
+          "urutan": 1,
+          "skor": 5,
+          "skor_hitung": null,
+          "catatan": null,
+          "rincian": null
+        }
+      ],
+      "hasil": 10000
+    },
+    {
+      "nama": "semua 1",
+      "baris": [
+        {
+          "id_aspek": "a0",
+          "aspek_nama": "a0",
+          "tipe": "Manual",
+          "bobot": 60,
+          "urutan": 0,
+          "skor": 1,
+          "skor_hitung": null,
+          "catatan": null,
+          "rincian": null
+        },
+        {
+          "id_aspek": "a1",
+          "aspek_nama": "a1",
+          "tipe": "Manual",
+          "bobot": 40,
+          "urutan": 1,
+          "skor": 1,
+          "skor_hitung": null,
+          "catatan": null,
+          "rincian": null
+        }
+      ],
+      "hasil": 0
+    },
+    {
+      "nama": "skor kosong",
+      "baris": [
+        {
+          "id_aspek": "a0",
+          "aspek_nama": "a0",
+          "tipe": "Manual",
+          "bobot": 60,
+          "urutan": 0,
+          "skor": 5,
+          "skor_hitung": null,
+          "catatan": null,
+          "rincian": null
+        },
+        {
+          "id_aspek": "a1",
+          "aspek_nama": "a1",
+          "tipe": "Manual",
+          "bobot": 40,
+          "urutan": 1,
+          "skor": null,
+          "skor_hitung": null,
+          "catatan": null,
+          "rincian": null
+        }
+      ],
+      "hasil": null
+    }
+  ],
+  "kinerja_berlaku": [
+    {
+      "kandidat": [],
+      "hasil": null
+    },
+    {
+      "kandidat": [
+        {
+          "id_penilaian": "akar",
+          "final_pada": "2024-07-01 08:00:00",
+          "koreksi": false
+        }
+      ],
+      "hasil": "akar"
+    },
+    {
+      "kandidat": [
+        {
+          "id_penilaian": "akar",
+          "final_pada": "2024-07-01 08:00:00",
+          "koreksi": false
+        },
+        {
+          "id_penilaian": "kor1",
+          "final_pada": "2024-08-01 08:00:00",
+          "koreksi": true
+        }
+      ],
+      "hasil": "kor1"
+    },
+    {
+      "kandidat": [
+        {
+          "id_penilaian": "kor1",
+          "final_pada": "2024-07-01 08:00:00",
+          "koreksi": true
+        },
+        {
+          "id_penilaian": "akar",
+          "final_pada": "2024-07-01 08:00:00",
+          "koreksi": false
+        }
+      ],
+      "hasil": "kor1"
+    }
+  ],
+  "penilai_bawaan": [
+    {
+      "nama": "atasan menang",
+      "masukan": {
+        "id_karyawan": "G1",
+        "kelompok": "Guru",
+        "id_atasan": "W1",
+        "kepala_unit": "K1",
+        "kepala_tu": ""
+      },
+      "hasil": {
+        "id": "W1",
+        "sumber": "atasan"
+      }
+    },
+    {
+      "nama": "guru: kepala unit",
+      "masukan": {
+        "id_karyawan": "G1",
+        "kelompok": "Guru",
+        "id_atasan": "",
+        "kepala_unit": "K1",
+        "kepala_tu": "T9"
+      },
+      "hasil": {
+        "id": "K1",
+        "sumber": "kepala_unit"
+      }
+    },
+    {
+      "nama": "tendik: kepala TU",
+      "masukan": {
+        "id_karyawan": "G1",
+        "kelompok": "Tendik",
+        "id_atasan": "",
+        "kepala_unit": "K1",
+        "kepala_tu": "T9"
+      },
+      "hasil": {
+        "id": "T9",
+        "sumber": "kepala_tu"
+      }
+    },
+    {
+      "nama": "kepala sekolah tidak menilai dirinya",
+      "masukan": {
+        "id_karyawan": "K1",
+        "kelompok": "Guru",
+        "id_atasan": "",
+        "kepala_unit": "K1",
+        "kepala_tu": ""
+      },
+      "hasil": null
+    },
+    {
+      "nama": "tanpa calon",
+      "masukan": {
+        "id_karyawan": "G1",
+        "kelompok": "Tendik",
+        "id_atasan": "",
+        "kepala_unit": "K1",
+        "kepala_tu": ""
+      },
+      "hasil": null
+    }
   ]
 }

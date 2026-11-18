@@ -26,18 +26,29 @@ import {
   validasiTemplate,
 } from "@/lib/validations/hr-kinerja";
 import { INPUT, LABEL, pesanGalat, TOMBOL, TOMBOL_UTAMA } from "./gaya";
+import { DaftarPenilaianKinerja } from "./PenilaianKinerja";
 
 /**
- * Tab Kinerja di `/kepegawaian` (HRIS Fase 5, §23.5). Sub-fase 5a: template
- * per kelompok dan pengaturan (ambang skor otomatis, predikat, rentang tanpa
- * KBM). Data template cloud-only; menyunting butuh `hr.performance.config`.
+ * Tab Kinerja di `/kepegawaian` (HRIS Fase 5, §23.5): penilaian per periode
+ * (5b, `PenilaianKinerja.tsx`), lalu template per kelompok dan pengaturan
+ * (ambang skor otomatis, predikat, rentang tanpa KBM). Data penilaian dan
+ * template cloud-only; menyunting template butuh `hr.performance.config`.
  */
 export function TabKinerja({
   bolehAtur,
+  bolehNilai,
+  bolehPutus,
+  bolehLihat,
   onPesan,
   onGalat,
 }: {
   bolehAtur: boolean;
+  /** `hr.performance.assess`. */
+  bolehNilai: boolean;
+  /** `hr.performance.finalize`. */
+  bolehPutus: boolean;
+  /** `hr.performance.view`. */
+  bolehLihat: boolean;
   onPesan: (pesan: string) => void;
   onGalat: (pesan: string) => void;
 }) {
@@ -61,6 +72,15 @@ export function TabKinerja({
 
   return (
     <div className="space-y-8">
+      {bolehNilai || bolehPutus || bolehLihat ? (
+        <DaftarPenilaianKinerja
+          template={data.template}
+          bolehNilai={bolehNilai}
+          bolehPutus={bolehPutus}
+          onPesan={onPesan}
+          onGalat={onGalat}
+        />
+      ) : null}
       <section aria-labelledby="judul-template-kinerja" className="space-y-3">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <h2
