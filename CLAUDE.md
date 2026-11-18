@@ -148,6 +148,13 @@ Local dev database: root `absensi-sppg.db` is the reference SQLite DB for `bun r
 **"SPPG" survives only in technical identifiers, on purpose.** The app was renamed to Manajemen Sekolah, and nothing a user sees (UI, emails, seed data, card text) may say "SPPG". The identifiers below keep the old name because each one names something already stored on a device or in a deployment, and renaming it strands that data: env vars `SPPG_*` / `NEXT_PUBLIC_SPPG_RUNTIME` (every machine's `.env`), vault magics `SPPGTV2`/`SPPGTV3` and backup magic `SPPGBACKUPAESv1` / `.sppgbak` (existing vaults and backups become unreadable), key-derivation labels `sppg-vault-master-*` / `sppg-offline-identity-v2` (offline login fails), `sppg-hub.db` (the local hub database looks empty), cookies `sppg_session` / `sppg_wali` (everyone is logged out), storage keys `absensi_sppg_*` / `sppg_*`, and the file/folder names `absensi-sppg.db` and `.agents/skills/absensi-sppg-rules`. Test fixtures that contain "SPPG" are data, not branding, and stay too.
 
 <!-- antislop:start -->
+## Memori
+
+- Simpan hanya yang tidak tercatat di repo: keputusan/preferensi pemilik, hal yang ditunda, rujukan luar.
+- Satu berkas per topik, maksimal sekitar 1.000 karakter. Perbarui dengan MENIMPA keadaan lama; jangan menambah log "Status sesi N".
+- Progres fase, angka, daftar berkas, dan catatan "sudah dibangun" ditulis di PRD atau `references/`, bukan di memori.
+- Satu baris per memori di `MEMORY.md`, maksimal sekitar 120 karakter.
+
 ## antislop
 For UI, copy, people, mobile layout, or code comments work, load the `antislop` skill (core, installed as a plugin) and then the skill for the task:
 - UI / visual: `antislop-ui`
