@@ -189,6 +189,7 @@
     "allow-desktop-get-class-attendance-detail",
     "allow-desktop-get-roster-for-attendance",
     "allow-desktop-save-class-attendance",
+    "allow-desktop-save-class-attendance-gabungan",
     "allow-desktop-get-lesson-periods",
     "allow-desktop-save-lesson-period",
     "allow-desktop-delete-lesson-period",

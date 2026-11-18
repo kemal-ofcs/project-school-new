@@ -37,6 +37,7 @@ import {
   type LessonPeriodRow,
   type StudentAttendanceDetailItem,
   saveClassAttendance,
+  simpanPresensiGabungan,
 } from "@/lib/gateways/class-attendance";
 import { type JpTersusun, muatGantiSaya } from "@/lib/gateways/hr-pengajuan";
 import { subscribeSyncCompleted, syncNow } from "@/lib/gateways/sync-status";
@@ -53,6 +54,7 @@ import {
   hasUnsavedAttendanceMarks,
   hitungJp,
   jadwalBelBerlaku,
+  MAKS_ROMBEL_GABUNGAN,
   MAX_JAM_KE,
   pukulJamKe,
   REKONSILIASI_TEMPLATE_KINDS,
@@ -157,6 +159,14 @@ export default function PresensiKelasPage() {
     [],
   );
   const [savingAttendance, setSavingAttendance] = useState(false);
+  // Kelas gabungan: rombel TAMBAHAN di luar `selectedRombel`, dan rombel asal
+  // setiap siswa di roster yang dimuat. Simpan dipecah per rombel lewat peta
+  // itu, jadi roster yang dimuat untuk pilihan rombel lain tidak pernah
+  // tersimpan ke rombel yang salah.
+  const [rombelGabungan, setRombelGabungan] = useState<string[]>([]);
+  const [rombelSiswa, setRombelSiswa] = useState<Map<string, string>>(
+    new Map(),
+  );
   // Penjaga balapan wajib (AGENTS.md aturan 5). `savingAttendance` adalah
   // state React yang baru berlaku setelah render berikutnya, sehingga ketukan
   // ganda — sangat mudah terjadi di layar sentuh — bisa memicu dua penyimpanan
@@ -193,6 +203,30 @@ export default function PresensiKelasPage() {
     if (!rombelTa.some((r) => String(r.id_rombel) === selectedRombel))
       setSelectedRombel(String(rombelTa[0]?.id_rombel ?? ""));
   }, [rombelTa, selectedRombel, editingSessionId]);
+
+  const rombelDipilih = [
+    selectedRombel,
+    // Rombel tahun ajaran lain yang tertinggal di pilihan tidak ikut.
+    ...rombelGabungan.filter(
+      (id) =>
+        id !== selectedRombel &&
+        rombelTa.some((r) => String(r.id_rombel) === id),
+    ),
+  ].filter(Boolean);
+  const modeGabungan = !editingSessionId && rombelDipilih.length > 1;
+  const namaRombel = (id: string) =>
+    String(
+      rombelList.find((r) => String(r.id_rombel) === id)?.nama_rombel ?? id,
+    );
+  const rombelTerpilihRow = rombelTa.find(
+    (r) => String(r.id_rombel) === selectedRombel,
+  );
+  const unitRow = (r: Record<string, unknown> | undefined) =>
+    String(r?.id_unit ?? "").trim();
+  const rombelSejenis = (sama: (r: Record<string, unknown>) => boolean) =>
+    rombelTa
+      .filter((r) => String(r.id_rombel) !== selectedRombel && sama(r))
+      .map((r) => String(r.id_rombel));
 
   // Reconciliation states
   const [reconDate, setReconDate] = useState<string>(
@@ -382,8 +416,13 @@ export default function PresensiKelasPage() {
     setLoading(true);
     setFeedback(null);
     try {
-      const [roster, jadwal] = await Promise.all([
-        getRosterUntukPresensi(selectedRombel, selectedDate),
+      const daftarRombel = editingSessionId ? [selectedRombel] : rombelDipilih;
+      const [rosterPerRombel, jadwal] = await Promise.all([
+        Promise.all(
+          daftarRombel.map((idRombel) =>
+            getRosterUntukPresensi(idRombel, selectedDate),
+          ),
+        ),
         // Jadwal hari itu ikut dimuat bersama roster: keduanya berangkat dari
         // rombel dan tanggal yang sama, dan memuatnya terpisah berarti dua
         // perjalanan untuk satu tindakan pengguna.
@@ -392,13 +431,22 @@ export default function PresensiKelasPage() {
           tanggal: selectedDate,
         }).catch(() => [] as TeachingScheduleRow[]),
       ]);
+      const roster = rosterPerRombel.flat();
+      const peta = new Map<string, string>();
+      rosterPerRombel.forEach((daftar, i) => {
+        for (const item of daftar) peta.set(item.id_siswa, daftarRombel[i]);
+      });
+      setRombelSiswa(peta);
       setRosterItems(roster);
       setJadwalHariIni(jadwal.filter((row) => row.is_aktif === 1));
       setEditingSessionId(null);
       if (roster.length === 0) {
         setFeedback({
           tone: "warning",
-          message: "Belum ada siswa aktif terdaftar di rombel ini.",
+          message:
+            daftarRombel.length > 1
+              ? "Belum ada siswa aktif terdaftar di rombel-rombel ini."
+              : "Belum ada siswa aktif terdaftar di rombel ini.",
         });
       }
     } catch (err: unknown) {
@@ -410,7 +458,14 @@ export default function PresensiKelasPage() {
     } finally {
       setLoading(false);
     }
-  }, [selectedRombel, selectedDate, rosterItems, konfirmasi]);
+  }, [
+    selectedRombel,
+    selectedDate,
+    rosterItems,
+    konfirmasi,
+    editingSessionId,
+    rombelDipilih,
+  ]);
 
   // Load reconciliation anomalies
   const handleLoadReconciliation = useCallback(async () => {
@@ -563,6 +618,22 @@ export default function PresensiKelasPage() {
       return;
     }
 
+    // Roster dimuat untuk pilihan rombel lain: minta muat ulang daripada
+    // menyimpan siswa ke rombel yang tidak dipilih atau melewatkan rombel baru.
+    const rombelRoster = new Set(rombelSiswa.values());
+    if (
+      modeGabungan &&
+      (rombelRoster.size !== rombelDipilih.length ||
+        rombelDipilih.some((id) => !rombelRoster.has(id)))
+    ) {
+      setFeedback({
+        tone: "warning",
+        message:
+          "Pilihan rombel berubah sejak roster dimuat. Tekan 'Muat Roster Siswa' lagi.",
+      });
+      return;
+    }
+
     // Seluruh roster berstatus Hadir secara bawaan, jadi menyimpan tanpa
     // memeriksa akan menandai hadir siswa yang benar-benar tidak masuk.
     // Peringatan ini tidak pernah mengubah status siapa pun, gurunya yang
@@ -591,6 +662,31 @@ export default function PresensiKelasPage() {
     setFeedback(null);
 
     try {
+      if (modeGabungan) {
+        const drafts = rombelDipilih.map((idRombel) => ({
+          id_tahun_ajaran: selectedTa,
+          id_rombel: idRombel,
+          id_mapel: selectedMapel,
+          id_guru: selectedGuru,
+          tanggal: selectedDate,
+          jam_ke: selectedJamKe,
+          materi_pokok: materiPokok || null,
+          catatan: catatanSesi || null,
+          items: rosterItems
+            .filter((item) => rombelSiswa.get(item.id_siswa) === idRombel)
+            .map((item) => ({
+              id_siswa: item.id_siswa,
+              status: item.status,
+              catatan: item.catatan || null,
+            })),
+        }));
+        await simpanPresensiGabungan(drafts);
+        setFeedback({
+          tone: "success",
+          message: `Presensi kelas gabungan ${drafts.length} rombel tersimpan. Isi jurnalnya sekali di menu Jurnal Mengajar, lalu terapkan ke semua rombel.`,
+        });
+        return;
+      }
       const draft = {
         id_presensi_mapel: editingSessionId || undefined,
         id_tahun_ajaran: selectedTa,
@@ -650,6 +746,12 @@ export default function PresensiKelasPage() {
       setMateriPokok(data.session.materi_pokok || "");
       setCatatanSesi(data.session.catatan || "");
       setEditingSessionId(data.session.id_presensi_mapel);
+      setRombelGabungan([]);
+      setRombelSiswa(
+        new Map(
+          data.details.map((item) => [item.id_siswa, data.session.id_rombel]),
+        ),
+      );
       setRosterItems(data.details);
       setActiveTab("input");
       setFeedback({
@@ -890,6 +992,100 @@ export default function PresensiKelasPage() {
                       </option>
                     ))}
                   </PilihCari>
+                  {!editingSessionId && rombelTa.length > 1 ? (
+                    <details className="mt-2 rounded-xl border border-white/10 bg-slate-950/60 p-2">
+                      <summary className="cursor-pointer text-[11px] font-semibold text-slate-300">
+                        Gabung dengan rombel lain
+                        {rombelGabungan.length > 0
+                          ? ` (${rombelDipilih.length} rombel)`
+                          : ""}
+                      </summary>
+                      <p className="mt-2 text-[11px] leading-4 text-slate-400">
+                        Untuk satu jam mengajar di beberapa kelas sekaligus.
+                        Tersimpan satu presensi per rombel; honor JP guru tetap
+                        dihitung sekali.
+                      </p>
+                      <div className="mt-2 flex flex-wrap gap-1.5">
+                        {rombelTerpilihRow ? (
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setRombelGabungan(
+                                rombelSejenis(
+                                  (r) =>
+                                    String(r.tingkat) ===
+                                      String(rombelTerpilihRow.tingkat) &&
+                                    unitRow(r) === unitRow(rombelTerpilihRow),
+                                ),
+                              )
+                            }
+                            className="rounded-lg border border-white/10 bg-slate-800 px-2 py-1 text-[11px] text-sky-400"
+                          >
+                            Semua tingkat {String(rombelTerpilihRow.tingkat)}
+                          </button>
+                        ) : null}
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setRombelGabungan(
+                              rombelSejenis(
+                                (r) =>
+                                  unitRow(r) === unitRow(rombelTerpilihRow),
+                              ),
+                            )
+                          }
+                          className="rounded-lg border border-white/10 bg-slate-800 px-2 py-1 text-[11px] text-sky-400"
+                        >
+                          Semua rombel unit ini
+                        </button>
+                        {rombelGabungan.length > 0 ? (
+                          <button
+                            type="button"
+                            onClick={() => setRombelGabungan([])}
+                            className="rounded-lg border border-white/10 bg-slate-800 px-2 py-1 text-[11px] text-slate-400"
+                          >
+                            Kosongkan
+                          </button>
+                        ) : null}
+                      </div>
+                      <fieldset className="mt-2 grid max-h-40 grid-cols-2 gap-1 overflow-y-auto">
+                        <legend className="sr-only">
+                          Rombel yang digabung
+                        </legend>
+                        {rombelTa
+                          .filter((r) => String(r.id_rombel) !== selectedRombel)
+                          .map((r) => {
+                            const id = String(r.id_rombel);
+                            return (
+                              <label
+                                key={id}
+                                className="flex items-center gap-1.5 text-[11px] text-slate-300"
+                              >
+                                <input
+                                  type="checkbox"
+                                  checked={rombelGabungan.includes(id)}
+                                  onChange={(e) => {
+                                    const centang = e.target.checked;
+                                    setRombelGabungan((lama) =>
+                                      centang
+                                        ? [...lama, id]
+                                        : lama.filter((x) => x !== id),
+                                    );
+                                  }}
+                                  className="size-3.5 accent-sky-500"
+                                />
+                                {String(r.nama_rombel)}
+                              </label>
+                            );
+                          })}
+                      </fieldset>
+                      {rombelDipilih.length > MAKS_ROMBEL_GABUNGAN ? (
+                        <p className="mt-2 text-[11px] text-rose-400">
+                          Paling banyak {MAKS_ROMBEL_GABUNGAN} rombel sekaligus.
+                        </p>
+                      ) : null}
+                    </details>
+                  ) : null}
                 </div>
 
                 {/* Mata Pelajaran */}
@@ -1186,6 +1382,13 @@ export default function PresensiKelasPage() {
                             <span className="font-bold text-white block">
                               {item.nama_lengkap}
                             </span>
+                            {modeGabungan ? (
+                              <span className="block text-[10px] font-semibold text-sky-400">
+                                {namaRombel(
+                                  rombelSiswa.get(item.id_siswa) ?? "",
+                                )}
+                              </span>
+                            ) : null}
                             {item.nama_wali ? (
                               <span className="text-[10px] text-slate-500 font-mono">
                                 Wali: {item.nama_wali}

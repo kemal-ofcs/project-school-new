@@ -1,5 +1,11 @@
 import type { Client, Transaction } from "@libsql/client";
 import {
+  type KandidatSesi,
+  type KeadaanSesiAsal,
+  kandidatShiftSesi,
+  pilihShiftSesi,
+} from "@/lib/attendance/sesi-lanjutan";
+import {
   diDalamJendelaScanMasuk,
   type ExplicitInstant,
   formatJamOperasional,
@@ -573,57 +579,67 @@ async function processInTransaction(
         sql: "SELECT jam_masuk, jam_pulang FROM absensi_harian WHERE id_sesi = ? LIMIT 1;",
         args: [baseIdSesi],
       });
+      const baseDimulai = Boolean(baseSessionRes.rows[0]?.jam_masuk);
       const baseCompleted =
-        baseSessionRes.rows.length > 0 &&
-        Boolean(baseSessionRes.rows[0]?.jam_masuk) &&
-        Boolean(baseSessionRes.rows[0]?.jam_pulang);
+        baseDimulai && Boolean(baseSessionRes.rows[0]?.jam_pulang);
 
-      if (baseCompleted) {
-        const allShiftsRes = await transaction.execute({
-          sql: `SELECT * FROM tbl_shift
-                WHERE id_shift != ? AND kode_shift != 4 AND jam_kerja_normal_menit > 0
-                  AND (izinkan_multi_sesi = 1 OR izinkan_multi_sesi = '1' OR izinkan_multi_sesi = 'true')
-                ORDER BY id_shift ASC;`,
-          args: [employee.idShift],
+      // Flag multi-sesi dan shift lanjutan dibaca dari shift ASAL karyawan,
+      // dan sesi lanjutan berlaku hari itu saja: shift tetap di `master_data`
+      // tidak pernah dipindah. Aturannya `pilihShiftSesi`, kembar dengan
+      // `pilih_shift_sesi` di `scanner.rs`.
+      const multiSesiAsal = String(
+        baseShiftRow?.izinkan_multi_sesi ?? "0",
+      ).trim();
+      const asal: KeadaanSesiAsal = {
+        id_shift: employee.idShift,
+        multi_sesi: ["1", "true", "TRUE", "True"].includes(multiSesiAsal),
+        shift_lanjutan_id: Number(baseShiftRow?.shift_lanjutan_id ?? 0) || 0,
+        lengkap: baseCompleted,
+        dimulai: baseDimulai,
+        jendela_cocok:
+          baseShiftRow !== null &&
+          (mapShiftPolicy(baseShiftRow).kind === "flexible" ||
+            isCheckInWindowMatch(waktuScan, baseShiftRow)),
+      };
+      const semuaShiftLain = asal.multi_sesi
+        ? (
+            await transaction.execute({
+              sql: "SELECT id_shift FROM tbl_shift WHERE id_shift != ? ORDER BY id_shift ASC;",
+              args: [employee.idShift],
+            })
+          ).rows.map((row) => Number(row.id_shift))
+        : [];
+      const kandidatRows: Row[] = [];
+      const kandidat: KandidatSesi[] = [];
+      for (const idKandidat of kandidatShiftSesi(asal, semuaShiftLain)) {
+        const row = (
+          await transaction.execute({
+            sql: "SELECT * FROM tbl_shift WHERE id_shift = ? LIMIT 1;",
+            args: [idKandidat],
+          })
+        ).rows[0] as Row | undefined;
+        if (!row) continue;
+        kandidatRows.push(row);
+        kandidat.push({
+          id_shift: idKandidat,
+          fleksibel: mapShiftPolicy(row).kind === "flexible",
+          jendela_cocok: isCheckInWindowMatch(waktuScan, row),
         });
-
-        let matchedShiftRow: Row | null = null;
-        for (const cand of allShiftsRes.rows as Row[]) {
-          if (isCheckInWindowMatch(waktuScan, cand)) {
-            matchedShiftRow = cand;
-            break;
-          }
-        }
-
-        if (matchedShiftRow) {
-          session = {
-            modeTugas: "NORMAL",
-            shiftEfektif: Number(matchedShiftRow.id_shift),
-            idBackup: "",
-            idKaryawanAsal: "",
-            tanggalTugas: "",
-          };
-          shiftRow = matchedShiftRow;
-        } else {
-          session = {
-            modeTugas: "NORMAL",
-            shiftEfektif: employee.idShift,
-            idBackup: "",
-            idKaryawanAsal: "",
-            tanggalTugas: "",
-          };
-          shiftRow = baseShiftRow;
-        }
-      } else {
-        session = {
-          modeTugas: "NORMAL",
-          shiftEfektif: employee.idShift,
-          idBackup: "",
-          idKaryawanAsal: "",
-          tanggalTugas: "",
-        };
-        shiftRow = baseShiftRow;
       }
+      const shiftDipilih = pilihShiftSesi(asal, kandidat);
+      session = {
+        modeTugas: "NORMAL",
+        shiftEfektif: shiftDipilih,
+        idBackup: "",
+        idKaryawanAsal: "",
+        tanggalTugas: "",
+      };
+      shiftRow =
+        shiftDipilih === employee.idShift
+          ? baseShiftRow
+          : (kandidatRows.find(
+              (row) => Number(row.id_shift) === shiftDipilih,
+            ) ?? baseShiftRow);
     }
   }
 

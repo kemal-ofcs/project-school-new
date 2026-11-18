@@ -6,6 +6,7 @@ import { Icon } from "@/components/ui/Icon";
 import { Modal } from "@/components/ui/Modal";
 import { PilihCari } from "@/components/ui/PilihCari";
 import {
+  getDaftarPenugasanGuru,
   getJadwalMengajar,
   hapusJadwalMengajar,
   simpanJadwalMengajar,
@@ -93,6 +94,39 @@ export function JadwalPanel({
   // Unit tidak disimpan di jadwal (v60): ia diturunkan dari rombelnya.
   const [filterUnit, setFilterUnit] = useState("");
   const [draft, setDraft] = useState<JadwalDraft | null>(null);
+  // Pengampu per mapel dari tab Penugasan Guru untuk rombel + tahun ajaran
+  // draft. Memilih mapel mengisi pengajarnya; pengajar tetap bisa diganti.
+  const [pengampu, setPengampu] = useState<Map<string, string>>(new Map());
+  const guruDisentuhRef = useRef(false);
+  const draftRombel = draft?.id_rombel ?? "";
+  const draftTahun = draft?.id_tahun_ajaran ?? "";
+  useEffect(() => {
+    if (!draftRombel) return;
+    let batal = false;
+    getDaftarPenugasanGuru(draftRombel)
+      .then((rows) => {
+        if (batal) return;
+        const peta = new Map(
+          rows
+            .filter((row) => String(row.id_tahun_ajaran) === draftTahun)
+            .map((row) => [String(row.id_mapel), String(row.id_guru)]),
+        );
+        setPengampu(peta);
+        // Jadwal baru yang pengajarnya belum dipilih tangan ikut pengampunya.
+        setDraft((lama) =>
+          lama && !lama.id_jadwal && !guruDisentuhRef.current
+            ? { ...lama, id_guru: peta.get(lama.id_mapel) ?? lama.id_guru }
+            : lama,
+        );
+      })
+      // Penugasan hanya mengisi bawaan; gagal dimuat tidak menghalangi form.
+      .catch(() => {
+        if (!batal) setPengampu(new Map());
+      });
+    return () => {
+      batal = true;
+    };
+  }, [draftRombel, draftTahun]);
   const [periods, setPeriods] = useState<LessonPeriodRow[]>([]);
   const [tampilan, setTampilan] = useState<"grid" | "daftar">("grid");
 
@@ -158,6 +192,7 @@ export function JadwalPanel({
   );
 
   const bukaTambah = () => {
+    guruDisentuhRef.current = false;
     const idRombel = filterRombel || String(rombelTampil[0]?.id_rombel ?? "");
     const kbm = jamKbmAktif(belUntuk(idRombel, 1));
     setDraft({
@@ -549,9 +584,15 @@ export function JadwalPanel({
                 Mata pelajaran
                 <PilihCari
                   value={draft.id_mapel}
-                  onChange={(event) =>
-                    setDraft({ ...draft, id_mapel: event.target.value })
-                  }
+                  onChange={(event) => {
+                    const idMapel = event.target.value;
+                    guruDisentuhRef.current = false;
+                    setDraft({
+                      ...draft,
+                      id_mapel: idMapel,
+                      id_guru: pengampu.get(idMapel) ?? draft.id_guru,
+                    });
+                  }}
                   required
                   className="rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 font-normal text-slate-200 focus:border-sky-500 focus:outline-none"
                 >
@@ -570,9 +611,10 @@ export function JadwalPanel({
                 Pengajar
                 <PilihCari
                   value={draft.id_guru}
-                  onChange={(event) =>
-                    setDraft({ ...draft, id_guru: event.target.value })
-                  }
+                  onChange={(event) => {
+                    guruDisentuhRef.current = true;
+                    setDraft({ ...draft, id_guru: event.target.value });
+                  }}
                   required
                   className="rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 font-normal text-slate-200 focus:border-sky-500 focus:outline-none"
                 >
@@ -585,6 +627,15 @@ export function JadwalPanel({
                     </option>
                   ))}
                 </PilihCari>
+                {pengampu.get(draft.id_mapel) === draft.id_guru ? (
+                  <span className="text-[11px] font-normal text-slate-400">
+                    Sesuai tab Penugasan Guru.
+                  </span>
+                ) : pengampu.has(draft.id_mapel) ? (
+                  <span className="text-[11px] font-normal text-amber-400">
+                    Berbeda dari pengampu di tab Penugasan Guru.
+                  </span>
+                ) : null}
               </label>
 
               {jamKbm.length > 0 ? (

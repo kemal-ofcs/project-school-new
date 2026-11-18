@@ -674,7 +674,7 @@ fn configured_jp_max(
 ///
 /// Cerminan `normalizeJamKe` di `src/lib/validations/class-attendance.ts`;
 /// keduanya diuji dengan vektor yang sama.
-fn normalize_jam_ke(raw: &str) -> Result<String, CommandError> {
+pub fn normalize_jam_ke(raw: &str) -> Result<String, CommandError> {
     let compact: String = raw.chars().filter(|c| !c.is_whitespace()).collect();
     let tolak = || {
         CommandError::new(
@@ -1135,10 +1135,117 @@ pub fn get_roster_for_attendance(
 // ── 4. Simpan Sesi Presensi & Detail Roster (Atomic Transaksi + Outbox) ──────
 
 pub fn save_class_attendance(state: &DesktopState, draft: &Value) -> Result<Value, CommandError> {
+    let client_id = sync::ensure_client_id(state)?;
     let mut conn = storage::database(&state.data_dir)?;
     let tx = conn.transaction().map_err(|_| CommandError::internal())?;
+    let id_presensi = simpan_presensi_tx(&tx, &client_id, draft)?;
+    tx.commit().map_err(|_| CommandError::internal())?;
 
-    let now = sqlite_now(&tx);
+    Ok(json!({
+        "sukses": true,
+        "id_presensi_mapel": id_presensi,
+    }))
+}
+
+/// Batas rombel dalam satu presensi kelas gabungan. Cerminan
+/// `MAKS_ROMBEL_GABUNGAN` di `validations/class-attendance.ts`.
+pub const MAKS_ROMBEL_GABUNGAN: usize = 60;
+
+/// Pemeriksaan presensi kelas gabungan sebelum apa pun ditulis: `None` = sah.
+///
+/// Kelas gabungan disimpan sebagai SATU presensi per rombel, jadi yang dijaga
+/// hanyalah bahwa semuanya satu jam mengajar (guru, mapel, tanggal, jam, tahun
+/// ajaran sama; rombel berbeda) dan semuanya sesi baru. Honor JP tidak berlipat
+/// karena gaji menghitung gabungan per (tanggal, jam) di `summarize_teaching`.
+/// Cerminan `periksaPresensiGabungan`; vektor `presensi-gabungan.vektor.json`.
+pub fn periksa_presensi_gabungan(drafts: &[Value]) -> Option<String> {
+    if drafts.len() < 2 {
+        return Some("Presensi gabungan butuh minimal dua rombel.".to_owned());
+    }
+    if drafts.len() > MAKS_ROMBEL_GABUNGAN {
+        return Some(format!(
+            "Presensi gabungan paling banyak {MAKS_ROMBEL_GABUNGAN} rombel."
+        ));
+    }
+    let kunci = |draft: &Value| {
+        let jam = text(draft, "jam_ke");
+        let jam = normalize_jam_ke(jam).unwrap_or_else(|_| jam.to_owned());
+        format!(
+            "{}|{}|{}|{}|{}",
+            text(draft, "id_tahun_ajaran"),
+            text(draft, "id_mapel"),
+            text(draft, "id_guru"),
+            text(draft, "tanggal"),
+            jam
+        )
+    };
+    let kunci_pertama = kunci(&drafts[0]);
+    let mut rombel = std::collections::HashSet::new();
+    for draft in drafts {
+        if !text(draft, "id_presensi_mapel").is_empty() {
+            return Some("Presensi gabungan hanya untuk sesi baru. Sesi yang sudah tersimpan disunting satu per satu dari Riwayat.".to_owned());
+        }
+        if kunci(draft) != kunci_pertama {
+            return Some("Semua rombel dalam presensi gabungan wajib memakai tahun ajaran, mata pelajaran, guru, tanggal, dan jam pelajaran yang sama.".to_owned());
+        }
+        let id_rombel = text(draft, "id_rombel");
+        if id_rombel.is_empty() {
+            return Some("Rombel wajib diisi.".to_owned());
+        }
+        if !rombel.insert(id_rombel.to_owned()) {
+            return Some("Ada rombel yang dipilih dua kali.".to_owned());
+        }
+    }
+    None
+}
+
+/// Presensi kelas gabungan: satu sesi per rombel dalam SATU transaksi. Satu
+/// rombel yang ditolak membatalkan semuanya, dan pesannya diberi nama rombel.
+/// Cerminan `saveClassAttendanceGabungan` di `services/class-attendance.ts`.
+pub fn save_class_attendance_gabungan(
+    state: &DesktopState,
+    drafts: &[Value],
+) -> Result<Value, CommandError> {
+    if let Some(pesan) = periksa_presensi_gabungan(drafts) {
+        return Err(CommandError::new("VALIDATION_ERROR", pesan));
+    }
+    let client_id = sync::ensure_client_id(state)?;
+    let mut conn = storage::database(&state.data_dir)?;
+    let tx = conn.transaction().map_err(|_| CommandError::internal())?;
+    let mut ids = Vec::with_capacity(drafts.len());
+    for draft in drafts {
+        let id = simpan_presensi_tx(&tx, &client_id, draft).map_err(|galat| {
+            let id_rombel = text(draft, "id_rombel");
+            let nama = tx
+                .query_row(
+                    "SELECT nama_rombel FROM akademik_rombel WHERE id_rombel = ?1;",
+                    params![id_rombel],
+                    |row| row.get::<_, Option<String>>(0),
+                )
+                .ok()
+                .flatten()
+                .unwrap_or_else(|| id_rombel.to_owned());
+            CommandError::new(galat.code, format!("Rombel {nama}: {}", galat.message))
+        })?;
+        ids.push(id);
+    }
+    tx.commit().map_err(|_| CommandError::internal())?;
+
+    Ok(json!({
+        "sukses": true,
+        "id_presensi_mapel": ids,
+    }))
+}
+
+/// Validasi + tulis SATU sesi presensi di dalam transaksi milik pemanggil.
+/// Dipakai simpan biasa dan simpan gabungan supaya keduanya lewat aturan yang
+/// persis sama.
+fn simpan_presensi_tx(
+    tx: &rusqlite::Transaction<'_>,
+    client_id: &str,
+    draft: &Value,
+) -> Result<String, CommandError> {
+    let now = sqlite_now(tx);
     let is_new = text(draft, "id_presensi_mapel").is_empty();
     let id_presensi = if is_new {
         new_attendance_id("pm_")
@@ -1177,8 +1284,8 @@ pub fn save_class_attendance(state: &DesktopState, draft: &Value) -> Result<Valu
     // databasenya, yang kedua kebijakan sekolahnya. Pesan errornya menyebut
     // angka yang benar-benar dipakai sekolah itu, bukan pagar terluarnya.
     // Batasnya milik unit rombel itu (v60), dengan cadangan nilai sekolah.
-    let unit_rombel = rombel_unit(&tx, id_rombel)?;
-    let batas_sekolah = configured_jp_max(&tx, unit_rombel.as_deref())?;
+    let unit_rombel = rombel_unit(tx, id_rombel)?;
+    let batas_sekolah = configured_jp_max(tx, unit_rombel.as_deref())?;
     if let Some((_, akhir)) = jam_ke_range(jam_ke) {
         if akhir > batas_sekolah {
             return Err(CommandError::new(
@@ -1194,7 +1301,7 @@ pub fn save_class_attendance(state: &DesktopState, draft: &Value) -> Result<Valu
     // diperiksa adalah IRISAN jamnya, bukan teksnya: `1-2` dan `2` adalah dua
     // baris berbeda bagi `=`, padahal keduanya memakai jam ke-2 yang sama.
     if let Some(bentrok) = find_overlapping_session(
-        &tx,
+        tx,
         id_tahun_ajaran,
         id_rombel,
         id_mapel,
@@ -1284,8 +1391,6 @@ pub fn save_class_attendance(state: &DesktopState, draft: &Value) -> Result<Valu
     )
     .map_err(|e| CommandError::new("DB_ERROR", format!("Gagal menyimpan sesi presensi: {e}")))?;
 
-    let client_id = sync::ensure_client_id(state)?;
-
     // 2. Simpan setiap baris detail ke presensi_mapel_detail & daftarkan ke outbox
     let mut siswa_terkirim: Vec<String> = Vec::with_capacity(items.len());
     for item in &items {
@@ -1346,8 +1451,8 @@ pub fn save_class_attendance(state: &DesktopState, draft: &Value) -> Result<Valu
         });
 
         sync::enqueue(
-            &tx,
-            &client_id,
+            tx,
+            client_id,
             "class-attendance-detail",
             "save",
             &id_detail,
@@ -1390,8 +1495,8 @@ pub fn save_class_attendance(state: &DesktopState, draft: &Value) -> Result<Valu
         .map_err(|_| CommandError::internal())?;
 
         sync::enqueue(
-            &tx,
-            &client_id,
+            tx,
+            client_id,
             "class-attendance-detail",
             "delete",
             &id_detail,
@@ -1426,8 +1531,8 @@ pub fn save_class_attendance(state: &DesktopState, draft: &Value) -> Result<Valu
     });
 
     sync::enqueue(
-        &tx,
-        &client_id,
+        tx,
+        client_id,
         "class-attendance",
         op,
         &id_presensi,
@@ -1516,7 +1621,7 @@ pub fn save_class_attendance(state: &DesktopState, draft: &Value) -> Result<Valu
                                 let rombel_tampil = if nama_rombel.is_empty() { "-" } else { &nama_rombel };
                                 let mapel_tampil = if nama_mapel.is_empty() { "Mata Pelajaran" } else { &nama_mapel };
                                 let pesan = super::wa_notification::compose_wa_message(
-                                    &tx,
+                                    tx,
                                     "bolos",
                                     &[
                                         ("nama", nama_tampil.to_string()),
@@ -1533,7 +1638,7 @@ pub fn save_class_attendance(state: &DesktopState, draft: &Value) -> Result<Valu
                                     "tujuan_nomor": canon_phone,
                                     "isi_pesan": pesan,
                                 });
-                                let _ = super::wa_notification::queue_wa_notification_tx(&tx, &client_id, &draft_notif)?;
+                                let _ = super::wa_notification::queue_wa_notification_tx(tx, client_id, &draft_notif)?;
                             }
                         }
                     }
@@ -1542,12 +1647,7 @@ pub fn save_class_attendance(state: &DesktopState, draft: &Value) -> Result<Valu
         }
     }
 
-    tx.commit().map_err(|_| CommandError::internal())?;
-
-    Ok(json!({
-        "sukses": true,
-        "id_presensi_mapel": id_presensi,
-    }))
+    Ok(id_presensi)
 }
 
 // ── 5. Hapus Sesi Presensi & Detail (Atomic + Outbox Delete) ─────────────────
@@ -2480,5 +2580,45 @@ mod tests_v60_unit_bel {
                 "{jenis} {mulai}-{selesai}"
             );
         }
+    }
+}
+
+#[cfg(test)]
+mod tests_presensi_gabungan {
+    use super::{periksa_presensi_gabungan, MAKS_ROMBEL_GABUNGAN};
+    use serde_json::{json, Value};
+
+    // Vektor kembar "periksaPresensiGabungan (vektor)" di `class-attendance.test.ts`.
+    const VEKTOR: &str = include_str!("../../../src/lib/validations/presensi-gabungan.vektor.json");
+
+    #[test]
+    fn presensi_gabungan_vektor() {
+        let vektor: Value = serde_json::from_str(VEKTOR).expect("vektor terbaca");
+        for kasus in vektor["kasus"].as_array().expect("daftar kasus") {
+            let drafts = kasus["drafts"].as_array().expect("drafts");
+            let harapan = kasus["hasil"].as_str().map(str::to_owned);
+            assert_eq!(
+                periksa_presensi_gabungan(drafts),
+                harapan,
+                "{}",
+                kasus["nama"]
+            );
+        }
+    }
+
+    #[test]
+    fn presensi_gabungan_batas_rombel() {
+        let draft = |i: usize| {
+            json!({
+                "id_tahun_ajaran": "ta1", "id_rombel": format!("r{i}"), "id_mapel": "m1",
+                "id_guru": "g1", "tanggal": "2026-11-18", "jam_ke": "1"
+            })
+        };
+        let lebih: Vec<Value> = (0..=MAKS_ROMBEL_GABUNGAN).map(draft).collect();
+        assert_eq!(
+            periksa_presensi_gabungan(&lebih),
+            Some(format!("Presensi gabungan paling banyak {MAKS_ROMBEL_GABUNGAN} rombel."))
+        );
+        assert_eq!(periksa_presensi_gabungan(&lebih[..MAKS_ROMBEL_GABUNGAN]), None);
     }
 }

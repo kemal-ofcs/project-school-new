@@ -1,6 +1,7 @@
 use rusqlite::{params, OptionalExtension};
 use serde_json::{json, Value};
 
+use super::class_attendance::normalize_jam_ke;
 use super::{config::DesktopState, models::CommandError, storage, sync};
 
 fn text<'a>(value: &'a Value, key: &str) -> &'a str {
@@ -273,9 +274,95 @@ pub fn save_teaching_journal(
         &payload,
         None,
     )?;
+
+    // Kelas gabungan: jurnal yang sama untuk sesi lain guru ini pada tanggal,
+    // mapel, dan jam yang sama yang belum berjurnal, dalam transaksi yang sama.
+    // Cerminan `saveTeachingJournal` di `services/teaching-journal.ts`.
+    let mut jumlah_gabungan = 0usize;
+    if draft.get("terapkan_gabungan").and_then(Value::as_bool) == Some(true) {
+        let baris: Vec<(String, String, String)> = {
+            let mut stmt = tx
+                .prepare(SESI_GABUNGAN_TANPA_JURNAL_SQL)
+                .map_err(|_| CommandError::internal())?;
+            let rows = stmt
+                .query_map(params![id_presensi_mapel], |row| {
+                    Ok((row.get(0)?, row.get(1)?, row.get(2)?))
+                })
+                .map_err(|_| CommandError::internal())?
+                .filter_map(Result::ok)
+                .collect();
+            rows
+        };
+        for id_sesi in pilih_sesi_gabungan(&baris) {
+            let id_gabungan = new_journal_id();
+            tx.execute(
+                r#"
+                INSERT INTO jurnal_mengajar (
+                    id_jurnal, id_presensi_mapel, materi_disampaikan, kendala, tindak_lanjut,
+                    paraf_nama, paraf_operator, paraf_at, created_at, updated_at
+                ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10);
+                "#,
+                params![
+                    id_gabungan,
+                    id_sesi,
+                    materi,
+                    kendala,
+                    tindak_lanjut,
+                    paraf_nama,
+                    paraf_operator,
+                    paraf_at,
+                    now,
+                    now
+                ],
+            )
+            .map_err(|e| {
+                CommandError::new("DB_ERROR", format!("Gagal menyimpan jurnal mengajar: {e}"))
+            })?;
+            sync::enqueue(
+                &tx,
+                &client_id,
+                "teaching-journal",
+                "save",
+                &id_gabungan,
+                &json!({
+                    "id_jurnal": id_gabungan,
+                    "id_presensi_mapel": id_sesi,
+                    "materi_disampaikan": materi,
+                    "kendala": kendala,
+                    "tindak_lanjut": tindak_lanjut,
+                    "paraf_nama": paraf_nama,
+                    "paraf_operator": paraf_operator,
+                    "paraf_at": paraf_at,
+                    "created_at": now,
+                    "updated_at": now,
+                }),
+                None,
+            )?;
+            jumlah_gabungan += 1;
+        }
+    }
     tx.commit().map_err(|_| CommandError::internal())?;
 
-    Ok(json!({ "sukses": true, "id_jurnal": id }))
+    Ok(json!({ "sukses": true, "id_jurnal": id, "jumlah_gabungan": jumlah_gabungan }))
+}
+
+/// Sesi lain dari kelas gabungan yang sama dengan sesi `?1` dan BELUM punya
+/// jurnal. Teksnya harfiah sama dengan `SESI_GABUNGAN_TANPA_JURNAL_SQL` di
+/// `validations/class-attendance.ts` (diperiksa `class-attendance.test.ts`).
+pub const SESI_GABUNGAN_TANPA_JURNAL_SQL: &str = "SELECT p.id_presensi_mapel, p.jam_ke, utama.jam_ke AS jam_utama FROM presensi_mapel p JOIN presensi_mapel utama ON utama.id_presensi_mapel = ?1 WHERE p.id_presensi_mapel <> utama.id_presensi_mapel AND p.id_guru = utama.id_guru AND p.tanggal = utama.tanggal AND p.id_mapel = utama.id_mapel AND NOT EXISTS (SELECT 1 FROM jurnal_mengajar j WHERE j.id_presensi_mapel = p.id_presensi_mapel) ORDER BY p.id_presensi_mapel\n-- batas: satu guru, satu tanggal, satu mapel; paling banyak sebanyak rombel kelas gabungan\n;";
+
+/// Id sesi yang jamnya SAMA dengan sesi utama; baris = (id, jam_ke, jam_utama).
+/// Jam utama yang tidak terbaca berarti tidak ada gabungan.
+/// Cerminan `pilihSesiGabungan` di `validations/class-attendance.ts`.
+pub fn pilih_sesi_gabungan(baris: &[(String, String, String)]) -> Vec<String> {
+    baris
+        .iter()
+        .filter(|(_, jam_ke, jam_utama)| match normalize_jam_ke(jam_utama) {
+            Ok(utama) => normalize_jam_ke(jam_ke).map(|jam| jam == utama).unwrap_or(false),
+            Err(_) => false,
+        })
+        .map(|(id, _, _)| id.clone())
+        .collect()
 }
 
 pub fn delete_teaching_journal(
@@ -406,5 +493,43 @@ mod tests {
 
         let after_del = get_teaching_journal(&state, "sesi_01").expect("get journal after delete");
         assert!(after_del.is_null());
+    }
+}
+
+#[cfg(test)]
+mod tests_sesi_gabungan {
+    use super::pilih_sesi_gabungan;
+    use serde_json::Value;
+
+    // Vektor kembar `sesi_jurnal` di `class-attendance.test.ts`.
+    const VEKTOR: &str = include_str!("../../../src/lib/validations/presensi-gabungan.vektor.json");
+
+    fn baris(nilai: &Value) -> Vec<(String, String, String)> {
+        nilai
+            .as_array()
+            .expect("baris")
+            .iter()
+            .map(|b| {
+                (
+                    b["id_presensi_mapel"].as_str().unwrap_or("").to_owned(),
+                    b["jam_ke"].as_str().unwrap_or("").to_owned(),
+                    b["jam_utama"].as_str().unwrap_or("").to_owned(),
+                )
+            })
+            .collect()
+    }
+
+    #[test]
+    fn sesi_gabungan_vektor() {
+        let vektor: Value = serde_json::from_str(VEKTOR).expect("vektor terbaca");
+        let kasus = &vektor["sesi_jurnal"];
+        let harapan: Vec<String> = kasus["hasil"]
+            .as_array()
+            .expect("hasil")
+            .iter()
+            .map(|v| v.as_str().unwrap_or("").to_owned())
+            .collect();
+        assert_eq!(pilih_sesi_gabungan(&baris(&kasus["baris"])), harapan);
+        assert!(pilih_sesi_gabungan(&baris(&kasus["utama_rusak"])).is_empty());
     }
 }

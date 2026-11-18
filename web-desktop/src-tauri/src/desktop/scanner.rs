@@ -727,32 +727,6 @@ fn enqueue_scan(
     Ok(())
 }
 
-/// Memindahkan karyawan ke shift lanjutan yang ditunjuk admin pada shift asal.
-///
-/// Perpindahan ini menyentuh `master_data`, tabel yang ikut disinkronkan, jadi
-/// wajib mendaftarkan event outbox `employee/update` supaya terminal lain
-/// melihat shift yang sama.
-fn pindahkan_shift_karyawan(
-    transaction: &Transaction<'_>,
-    client_id: &str,
-    employee_id: &str,
-    shift_id: i64,
-) -> Result<(), CommandError> {
-    let changed = transaction
-        .execute(
-            "UPDATE master_data SET id_shift = ? WHERE id_unik = ? AND COALESCE(id_shift, 0) <> ?;",
-            params![shift_id, employee_id, shift_id],
-        )
-        .map_err(|_| CommandError::internal())?;
-    if changed == 0 {
-        return Ok(());
-    }
-
-    // Payload dan pendaftaran outbox-nya dipakai bersama dengan pemeliharaan
-    // status_backup di administration.rs, jadi satu helper untuk keduanya.
-    sync::enqueue_employee_snapshot(transaction, client_id, employee_id)
-}
-
 fn rejected_log(
     timestamp: &str,
     date: &str,
@@ -874,6 +848,73 @@ fn load_shift(transaction: &Transaction<'_>, shift_id: i64) -> Result<Option<Shi
         )
         .optional()
         .map_err(|_| CommandError::internal())
+}
+
+/// Keadaan shift asal karyawan saat sebuah scan masuk. Cerminan
+/// `KeadaanSesiAsal` di `attendance/sesi-lanjutan.ts`.
+pub struct KeadaanSesiAsal {
+    pub id_shift: i64,
+    pub multi_sesi: bool,
+    pub shift_lanjutan_id: i64,
+    pub lengkap: bool,
+    pub dimulai: bool,
+    pub jendela_cocok: bool,
+}
+
+/// Shift lain yang bisa menampung sesi scan ini.
+pub struct KandidatSesi {
+    pub id_shift: i64,
+    pub fleksibel: bool,
+    pub jendela_cocok: bool,
+}
+
+/// Shift tempat scan dicatat untuk karyawan multi-sesi; sama dengan
+/// `asal.id_shift` bila tidak berpindah. Alasan setiap cabang ada di
+/// `pilihShiftSesi` (`attendance/sesi-lanjutan.ts`); vektornya
+/// `validations/sesi-lanjutan.vektor.json`.
+pub fn pilih_shift_sesi(asal: &KeadaanSesiAsal, kandidat: &[KandidatSesi]) -> i64 {
+    if !asal.multi_sesi {
+        return asal.id_shift;
+    }
+    let lanjutan = if asal.shift_lanjutan_id > 0 && asal.shift_lanjutan_id != asal.id_shift {
+        asal.shift_lanjutan_id
+    } else {
+        0
+    };
+    let cocok = |k: &&KandidatSesi| k.id_shift != asal.id_shift && !k.fleksibel && k.jendela_cocok;
+
+    if asal.lengkap {
+        return kandidat
+            .iter()
+            .filter(|k| lanjutan == 0 || k.id_shift == lanjutan)
+            .find(cocok)
+            .map(|k| k.id_shift)
+            .unwrap_or(asal.id_shift);
+    }
+    if asal.dimulai || asal.jendela_cocok || lanjutan == 0 {
+        return asal.id_shift;
+    }
+    kandidat
+        .iter()
+        .filter(|k| k.id_shift == lanjutan)
+        .find(cocok)
+        .map(|k| k.id_shift)
+        .unwrap_or(asal.id_shift)
+}
+
+/// Id shift yang perlu dimuat sebagai kandidat. Cerminan `kandidatShiftSesi`.
+pub fn kandidat_shift_sesi(asal: &KeadaanSesiAsal, semua_shift_lain: &[i64]) -> Vec<i64> {
+    if !asal.multi_sesi {
+        return Vec::new();
+    }
+    if asal.shift_lanjutan_id > 0 && asal.shift_lanjutan_id != asal.id_shift {
+        return vec![asal.shift_lanjutan_id];
+    }
+    if asal.lengkap {
+        semua_shift_lain.to_vec()
+    } else {
+        Vec::new()
+    }
 }
 
 fn is_check_in_window_matched(time_str: &str, shift: &Shift) -> bool {
@@ -1702,132 +1743,89 @@ fn submit_internal(
                 employee.id,
                 employee.shift_id
             );
-            let base_completed: bool = transaction
+            let (base_started, base_completed): (bool, bool) = transaction
                 .query_row(
-                    "SELECT 1 FROM absensi_harian WHERE id_sesi = ? AND jam_masuk != '' AND jam_pulang != '' LIMIT 1;",
+                    "SELECT COALESCE(jam_masuk, '') <> '', COALESCE(jam_masuk, '') <> '' AND COALESCE(jam_pulang, '') <> '' FROM absensi_harian WHERE id_sesi = ? LIMIT 1;",
                     params![base_session_id],
-                    |_| Ok(true),
+                    |row| Ok((row.get(0)?, row.get(1)?)),
                 )
                 .optional()
                 .map_err(|_| CommandError::internal())?
-                .unwrap_or(false);
+                .unwrap_or((false, false));
 
-            if base_completed {
-                // Flag multi-sesi dibaca dari shift ASAL karyawan, sesuai label
-                // di form Shift: "karyawan yang selesai bekerja pada shift ini
-                // dapat langsung scan masuk ke shift berikutnya". Sebelumnya
-                // flag justru dibaca dari shift KANDIDAT (`izinkan_multi_sesi`
-                // pada baris `id_shift != ?`), sehingga mengaktifkannya di
-                // shift karyawan sendiri tidak berefek apa pun dan satu-satunya
-                // cara scan lagi adalah memindahkan karyawan ke shift lain.
-                let base_multi_session_raw: Option<String> = transaction
-                    .query_row(
-                        "SELECT CAST(COALESCE(izinkan_multi_sesi, 0) AS TEXT) FROM tbl_shift WHERE id_shift = ?;",
-                        params![employee.shift_id],
-                        |row| row.get(0),
-                    )
-                    .optional()
-                    .map_err(|_| CommandError::internal())?;
-                let base_allows_multi_session = matches!(
-                    base_multi_session_raw.as_deref(),
-                    Some("1") | Some("true") | Some("TRUE") | Some("True")
-                );
-
-                // Shift tujuan yang ditunjuk admin pada shift asal. 0 berarti
-                // belum ditentukan, sehingga scanner kembali mencocokkan jendela
-                // seluruh shift seperti perilaku sebelumnya.
-                let continuation_shift_id: i64 = transaction
-                    .query_row(
-                        "SELECT COALESCE(shift_lanjutan_id, 0) FROM tbl_shift WHERE id_shift = ?;",
-                        params![employee.shift_id],
-                        |row| row.get(0),
-                    )
-                    .optional()
-                    .map_err(|_| CommandError::internal())?
-                    .unwrap_or(0);
-
-                let candidate_shift_ids: Vec<i64> = if !base_allows_multi_session {
-                    Vec::new()
-                } else if continuation_shift_id > 0 && continuation_shift_id != employee.shift_id {
-                    vec![continuation_shift_id]
-                } else {
-                    let mut statement = transaction
-                        .prepare(
-                            "SELECT id_shift FROM tbl_shift WHERE id_shift != ? ORDER BY id_shift ASC;",
-                        )
-                        .map_err(|_| CommandError::internal())?;
-                    let ids = statement
-                        .query_map(params![employee.shift_id], |row| row.get::<_, i64>(0))
-                        .map_err(|_| CommandError::internal())?
-                        .collect::<Result<Vec<_>, _>>()
-                        .map_err(|_| CommandError::internal())?;
-                    drop(statement);
-                    ids
-                };
-
-                let mut matched_shift = None;
-                let mut matched_shift_id = employee.shift_id;
-
-                for c_id in candidate_shift_ids {
-                    if let Ok(Some(cand_shift)) = load_shift(&transaction, c_id) {
-                        // Shift fleksibel menerima jam berapa pun sehingga akan
-                        // selalu "cocok" dan menelan setiap sesi lanjutan.
-                        // Dulu ini dijaga `kode_shift != 4`, sebuah angka ajaib
-                        // yang menghukum shift reguler mana pun berkode 4.
-                        if cand_shift.policy.kind == ShiftKind::Flexible {
-                            continue;
-                        }
-                        if is_check_in_window_matched(&moment.time, &cand_shift) {
-                            matched_shift = Some(cand_shift);
-                            matched_shift_id = c_id;
-                            break;
-                        }
-                    }
-                }
-
-                if let Some(cand_shift) = matched_shift {
-                    // Karyawan resmi berpindah ke shift lanjutan, sehingga
-                    // hari-hari berikutnya memakai jadwal shift itu.
-                    pindahkan_shift_karyawan(
-                        &transaction,
-                        &client_id,
-                        &employee.id,
-                        matched_shift_id,
-                    )?;
-                    (
-                        Session {
-                            mode: "NORMAL",
-                            shift_id: matched_shift_id,
-                            backup_id: String::new(),
-                            original_employee_id: String::new(),
-                            task_date: String::new(),
-                        },
-                        Some(cand_shift),
-                    )
-                } else {
-                    (
-                        Session {
-                            mode: "NORMAL",
-                            shift_id: employee.shift_id,
-                            backup_id: String::new(),
-                            original_employee_id: String::new(),
-                            task_date: String::new(),
-                        },
-                        base_shift,
-                    )
-                }
-            } else {
-                (
-                    Session {
-                        mode: "NORMAL",
-                        shift_id: employee.shift_id,
-                        backup_id: String::new(),
-                        original_employee_id: String::new(),
-                        task_date: String::new(),
-                    },
-                    base_shift,
+            // Flag multi-sesi dan shift lanjutan dibaca dari shift ASAL
+            // karyawan, sesuai label form Shift. Sesi lanjutan berlaku hari itu
+            // saja: shift tetap di `master_data` TIDAK dipindah (keputusan
+            // 2026-11-18). Pemindahan lama membuat scan pagi esoknya dinilai
+            // terhadap shift siang dan ditolak "Terlalu Awal".
+            let (base_multi_raw, continuation_shift_id): (String, i64) = transaction
+                .query_row(
+                    "SELECT CAST(COALESCE(izinkan_multi_sesi, 0) AS TEXT), COALESCE(shift_lanjutan_id, 0) FROM tbl_shift WHERE id_shift = ?;",
+                    params![employee.shift_id],
+                    |row| Ok((row.get(0)?, row.get(1)?)),
                 )
+                .optional()
+                .map_err(|_| CommandError::internal())?
+                .unwrap_or_else(|| ("0".to_owned(), 0));
+            let asal = KeadaanSesiAsal {
+                id_shift: employee.shift_id,
+                multi_sesi: matches!(base_multi_raw.as_str(), "1" | "true" | "TRUE" | "True"),
+                shift_lanjutan_id: continuation_shift_id,
+                lengkap: base_completed,
+                dimulai: base_started,
+                jendela_cocok: base_shift.as_ref().is_some_and(|s| {
+                    s.policy.kind == ShiftKind::Flexible
+                        || is_check_in_window_matched(&moment.time, s)
+                }),
+            };
+
+            let semua_shift_lain: Vec<i64> = if asal.multi_sesi {
+                let mut statement = transaction
+                    .prepare("SELECT id_shift FROM tbl_shift WHERE id_shift != ? ORDER BY id_shift ASC;")
+                    .map_err(|_| CommandError::internal())?;
+                let ids = statement
+                    .query_map(params![employee.shift_id], |row| row.get::<_, i64>(0))
+                    .map_err(|_| CommandError::internal())?
+                    .collect::<Result<Vec<_>, _>>()
+                    .map_err(|_| CommandError::internal())?;
+                drop(statement);
+                ids
+            } else {
+                Vec::new()
+            };
+
+            let mut kandidat = Vec::new();
+            let mut kandidat_shift: Vec<(i64, Shift)> = Vec::new();
+            for c_id in kandidat_shift_sesi(&asal, &semua_shift_lain) {
+                if let Ok(Some(cand_shift)) = load_shift(&transaction, c_id) {
+                    kandidat.push(KandidatSesi {
+                        id_shift: c_id,
+                        fleksibel: cand_shift.policy.kind == ShiftKind::Flexible,
+                        jendela_cocok: is_check_in_window_matched(&moment.time, &cand_shift),
+                    });
+                    kandidat_shift.push((c_id, cand_shift));
+                }
             }
+
+            let dipilih = pilih_shift_sesi(&asal, &kandidat);
+            let shift_dipilih = if dipilih == employee.shift_id {
+                base_shift
+            } else {
+                kandidat_shift
+                    .into_iter()
+                    .find(|(id, _)| *id == dipilih)
+                    .map(|(_, shift)| shift)
+            };
+            (
+                Session {
+                    mode: "NORMAL",
+                    shift_id: dipilih,
+                    backup_id: String::new(),
+                    original_employee_id: String::new(),
+                    task_date: String::new(),
+                },
+                shift_dipilih,
+            )
         }
     };
 
@@ -3607,7 +3605,7 @@ mod tests {
     }
 
     #[test]
-    fn shift_lanjutan_eksplisit_memindahkan_shift_karyawan() {
+    fn shift_lanjutan_eksplisit_tidak_memindahkan_shift_karyawan() {
         let (_directory, state) = fixture();
         seed_shift_sore(&state, 1);
         {
@@ -3641,26 +3639,63 @@ mod tests {
         );
         assert_eq!(sesi_kedua["idSesi"], "NORMAL-20260812-K001-2");
 
-        let connection = storage::database(&state.data_dir).expect("local database");
-        // Kolom shift karyawan ikut berpindah ke shift lanjutan.
-        let shift_karyawan: i64 = connection
-            .query_row(
-                "SELECT id_shift FROM master_data WHERE id_unik = 'K001';",
-                [],
-                |row| row.get(0),
-            )
-            .expect("shift karyawan");
-        assert_eq!(shift_karyawan, 2);
+        // Sesi lanjutan berlaku hari itu saja (keputusan 2026-11-18): shift
+        // tetap karyawan tidak berubah dan tidak ada event outbox karyawan.
+        {
+            let connection = storage::database(&state.data_dir).expect("local database");
+            let shift_karyawan: i64 = connection
+                .query_row(
+                    "SELECT id_shift FROM master_data WHERE id_unik = 'K001';",
+                    [],
+                    |row| row.get(0),
+                )
+                .expect("shift karyawan");
+            assert_eq!(shift_karyawan, 1);
+            let event_karyawan: i64 = connection
+                .query_row(
+                    "SELECT COUNT(*) FROM desktop_sync_outbox WHERE domain = 'employee' AND operation = 'update';",
+                    [],
+                    |row| row.get(0),
+                )
+                .expect("outbox employee");
+            assert_eq!(event_karyawan, 0);
+        }
 
-        // master_data ikut disinkronkan, jadi perpindahan wajib punya event outbox.
-        let event_karyawan: i64 = connection
-            .query_row(
-                "SELECT COUNT(*) FROM desktop_sync_outbox WHERE domain = 'employee' AND operation = 'update';",
-                [],
-                |row| row.get(0),
-            )
-            .expect("outbox employee");
-        assert_eq!(event_karyawan, 1);
+        // Dulu karyawan pindah ke shift sore, sehingga scan pagi esoknya
+        // ditolak "Terlalu Awal". Sekarang ia tetap masuk shift asalnya.
+        let besok = scan(
+            &state,
+            "K001",
+            "TOKEN-TEST",
+            moment("2026-08-13", "07:00:00"),
+        );
+        assert_eq!(besok["sukses"], true);
+        assert_eq!(besok["idSesi"], "NORMAL-20260813-K001-1");
+    }
+
+    #[test]
+    fn scan_pertama_di_jendela_shift_lanjutan_masuk_ke_shift_itu() {
+        let (_directory, state) = fixture();
+        seed_shift_sore(&state, 1);
+        {
+            let connection = storage::database(&state.data_dir).expect("local database");
+            connection
+                .execute(
+                    "UPDATE tbl_shift SET shift_lanjutan_id = 2 WHERE id_shift = 1;",
+                    [],
+                )
+                .expect("set shift lanjutan");
+        }
+
+        // Hari itu ia hanya masuk shift sore.
+        let masuk = scan(
+            &state,
+            "K001",
+            "TOKEN-TEST",
+            moment("2026-08-12", "16:05:00"),
+        );
+        assert_eq!(masuk["sukses"], true);
+        assert_eq!(masuk["idSesi"], "NORMAL-20260812-K001-2");
     }
 
     #[test]
@@ -3949,5 +3984,68 @@ mod tests {
             )
             .expect("rolled back counts");
         assert_eq!(counts, (0, 0, 0));
+    }
+}
+
+#[cfg(test)]
+mod tests_sesi_lanjutan {
+    use super::{kandidat_shift_sesi, pilih_shift_sesi, KandidatSesi, KeadaanSesiAsal};
+    use serde_json::Value;
+
+    // Vektor kembar `sesi-lanjutan.test.ts`.
+    const VEKTOR: &str = include_str!("../../../src/lib/validations/sesi-lanjutan.vektor.json");
+
+    fn asal(v: &Value) -> KeadaanSesiAsal {
+        KeadaanSesiAsal {
+            id_shift: v["id_shift"].as_i64().unwrap_or(0),
+            multi_sesi: v["multi_sesi"].as_bool().unwrap_or(false),
+            shift_lanjutan_id: v["shift_lanjutan_id"].as_i64().unwrap_or(0),
+            lengkap: v["lengkap"].as_bool().unwrap_or(false),
+            dimulai: v["dimulai"].as_bool().unwrap_or(false),
+            jendela_cocok: v["jendela_cocok"].as_bool().unwrap_or(false),
+        }
+    }
+
+    #[test]
+    fn sesi_lanjutan_vektor() {
+        let vektor: Value = serde_json::from_str(VEKTOR).expect("vektor terbaca");
+        for kasus in vektor["kasus"].as_array().expect("kasus") {
+            let kandidat: Vec<KandidatSesi> = kasus["kandidat"]
+                .as_array()
+                .expect("kandidat")
+                .iter()
+                .map(|k| KandidatSesi {
+                    id_shift: k["id_shift"].as_i64().unwrap_or(0),
+                    fleksibel: k["fleksibel"].as_bool().unwrap_or(false),
+                    jendela_cocok: k["jendela_cocok"].as_bool().unwrap_or(false),
+                })
+                .collect();
+            assert_eq!(
+                pilih_shift_sesi(&asal(&kasus["asal"]), &kandidat),
+                kasus["hasil"].as_i64().unwrap_or(-1),
+                "{}",
+                kasus["nama"]
+            );
+        }
+        for kasus in vektor["kandidat_dimuat"].as_array().expect("kandidat_dimuat") {
+            let semua: Vec<i64> = kasus["semua"]
+                .as_array()
+                .expect("semua")
+                .iter()
+                .filter_map(Value::as_i64)
+                .collect();
+            let harapan: Vec<i64> = kasus["hasil"]
+                .as_array()
+                .expect("hasil")
+                .iter()
+                .filter_map(Value::as_i64)
+                .collect();
+            assert_eq!(
+                kandidat_shift_sesi(&asal(&kasus["asal"]), &semua),
+                harapan,
+                "{}",
+                kasus["nama"]
+            );
+        }
     }
 }

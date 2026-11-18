@@ -24,6 +24,7 @@ import {
   type TeachingJournal,
 } from "@/lib/gateways/teaching-journal";
 import { useHydrated } from "@/lib/hooks/useHydrated";
+import { normalizeJamKe } from "@/lib/validations/class-attendance";
 
 export default function MobileJurnalMengajarPage() {
   const isHydrated = useHydrated();
@@ -69,6 +70,7 @@ export default function MobileJurnalMengajarPage() {
   const [kendala, setKendala] = useState("");
   const [tindakLanjut, setTindakLanjut] = useState("");
   const [parafNama, setParafNama] = useState("");
+  const [terapkanGabungan, setTerapkanGabungan] = useState(true);
   const isSubmittingRef = useRef(false);
 
   // Client guard untuk Mobile static export
@@ -173,6 +175,24 @@ export default function MobileJurnalMengajarPage() {
     return map;
   }, [journals]);
 
+  // Kelas gabungan yang terlihat di daftar: sesi lain guru yang sama pada
+  // tanggal, mapel, dan jam yang sama yang belum berjurnal. Ini hanya
+  // pratinjau; backend mencari ulang sendiri (`SESI_GABUNGAN_TANPA_JURNAL_SQL`).
+  const sesiGabungan = useMemo(() => {
+    if (!targetSession || targetJournal) return [];
+    const jam = normalizeJamKe(targetSession.jam_ke);
+    if (jam === null) return [];
+    return sessions.filter(
+      (s) =>
+        s.id_presensi_mapel !== targetSession.id_presensi_mapel &&
+        s.id_guru === targetSession.id_guru &&
+        s.tanggal === targetSession.tanggal &&
+        s.id_mapel === targetSession.id_mapel &&
+        normalizeJamKe(s.jam_ke) === jam &&
+        !journalMap.has(s.id_presensi_mapel),
+    );
+  }, [sessions, journalMap, targetSession, targetJournal]);
+
   const handleOpenForm = (
     session: ClassAttendanceSession,
     existing?: TeachingJournal,
@@ -180,6 +200,7 @@ export default function MobileJurnalMengajarPage() {
     triggerHaptic("light");
     setTargetSession(session);
     setTargetJournal(existing || null);
+    setTerapkanGabungan(true);
     setMateriDisampaikan(existing?.materi_disampaikan || "");
     setKendala(existing?.kendala || "");
     setTindakLanjut(existing?.tindak_lanjut || "");
@@ -203,19 +224,22 @@ export default function MobileJurnalMengajarPage() {
 
     isSubmittingRef.current = true;
     try {
-      await saveTeachingJournal({
+      const hasil = await saveTeachingJournal({
         id_jurnal: targetJournal?.id_jurnal,
         id_presensi_mapel: targetSession.id_presensi_mapel,
         materi_disampaikan: materiDisampaikan.trim(),
         kendala: kendala.trim() || null,
         tindak_lanjut: tindakLanjut.trim() || null,
         paraf_nama: parafNama.trim() || null,
+        terapkan_gabungan: sesiGabungan.length > 0 && terapkanGabungan,
       });
       triggerHaptic("success");
       setActiveModal(null);
       setFeedback({
         type: "success",
-        message: "Jurnal mengajar dan paraf digital berhasil disimpan.",
+        message: hasil.jumlah_gabungan
+          ? `Jurnal mengajar tersimpan untuk ${hasil.jumlah_gabungan + 1} rombel kelas gabungan.`
+          : "Jurnal mengajar dan paraf digital berhasil disimpan.",
       });
       await loadData();
     } catch (err: unknown) {
@@ -649,6 +673,26 @@ export default function MobileJurnalMengajarPage() {
                   />
                 </div>
               </div>
+
+              {sesiGabungan.length > 0 ? (
+                <label className="flex min-h-11 items-start gap-2 rounded-xl border border-sky-500/30 bg-sky-500/10 p-3 text-xs text-slate-200">
+                  <input
+                    type="checkbox"
+                    checked={terapkanGabungan}
+                    onChange={(e) => setTerapkanGabungan(e.target.checked)}
+                    className="mt-0.5 size-5 accent-sky-500"
+                  />
+                  <span>
+                    Terapkan juga ke {sesiGabungan.length} rombel kelas
+                    gabungan:{" "}
+                    {sesiGabungan.map((s) => s.nama_rombel).join(", ")}.
+                    <span className="block text-[11px] text-slate-400">
+                      Hanya rombel yang belum punya jurnal; jurnal yang sudah
+                      ada tidak ditimpa.
+                    </span>
+                  </span>
+                </label>
+              ) : null}
 
               <div className="flex items-center justify-end gap-2 pt-2 border-t border-white/10">
                 <button

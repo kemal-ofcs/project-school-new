@@ -673,3 +673,104 @@ export function buildPresentWithoutGateScanWarning(
     "Periksa sekali lagi sebelum menyimpan. Lanjutkan?"
   );
 }
+
+/**
+ * Batas rombel dalam satu presensi kelas gabungan (misalnya psikotes seluruh
+ * unit). Cerminan `MAKS_ROMBEL_GABUNGAN` di `class_attendance.rs`.
+ */
+export const MAKS_ROMBEL_GABUNGAN = 60;
+
+/** Kepala satu sesi dalam presensi gabungan. */
+export interface KepalaPresensiGabungan {
+  id_presensi_mapel?: string | null;
+  id_tahun_ajaran: string;
+  id_rombel: string;
+  id_mapel: string;
+  id_guru: string;
+  tanggal: string;
+  jam_ke: string;
+}
+
+/**
+ * Pemeriksaan presensi kelas gabungan sebelum apa pun ditulis: `null` = sah,
+ * selain itu pesan penolakannya.
+ *
+ * Kelas gabungan disimpan sebagai SATU presensi per rombel (leger, laporan, dan
+ * rekonsiliasi tetap membaca per rombel), jadi yang dijaga di sini hanyalah
+ * bahwa semuanya memang satu jam mengajar: guru, mapel, tanggal, jam, dan tahun
+ * ajaran sama, rombelnya berbeda. Honor JP tidak berlipat karena gaji sudah
+ * menghitung gabungan per (tanggal, jam) — lihat `summarizeTeaching`.
+ *
+ * Hanya untuk sesi baru: sesi yang sudah tersimpan disunting satu per satu.
+ * Cerminan `periksa_presensi_gabungan` di `class_attendance.rs`, diuji dengan
+ * vektor `presensi-gabungan.vektor.json` yang sama.
+ */
+export function periksaPresensiGabungan(
+  drafts: readonly KepalaPresensiGabungan[],
+): string | null {
+  if (drafts.length < 2) {
+    return "Presensi gabungan butuh minimal dua rombel.";
+  }
+  if (drafts.length > MAKS_ROMBEL_GABUNGAN) {
+    return `Presensi gabungan paling banyak ${MAKS_ROMBEL_GABUNGAN} rombel.`;
+  }
+  const bersih = (nilai: string | null | undefined) =>
+    String(nilai ?? "").trim();
+  const pertama = drafts[0];
+  const kunci = (draft: KepalaPresensiGabungan) =>
+    [
+      bersih(draft.id_tahun_ajaran),
+      bersih(draft.id_mapel),
+      bersih(draft.id_guru),
+      bersih(draft.tanggal),
+      normalizeJamKe(draft.jam_ke) ?? bersih(draft.jam_ke),
+    ].join("|");
+  const kunciPertama = kunci(pertama);
+  const rombel = new Set<string>();
+  for (const draft of drafts) {
+    if (bersih(draft.id_presensi_mapel)) {
+      return "Presensi gabungan hanya untuk sesi baru. Sesi yang sudah tersimpan disunting satu per satu dari Riwayat.";
+    }
+    if (kunci(draft) !== kunciPertama) {
+      return "Semua rombel dalam presensi gabungan wajib memakai tahun ajaran, mata pelajaran, guru, tanggal, dan jam pelajaran yang sama.";
+    }
+    const idRombel = bersih(draft.id_rombel);
+    if (!idRombel) return "Rombel wajib diisi.";
+    if (rombel.has(idRombel)) return "Ada rombel yang dipilih dua kali.";
+    rombel.add(idRombel);
+  }
+  return null;
+}
+
+/**
+ * Sesi lain dari kelas gabungan yang sama dengan sesi `?1` dan BELUM punya
+ * jurnal: guru, tanggal, dan mapel sama. Jamnya disaring `pilihSesiGabungan`,
+ * karena `jam_ke` lama bisa ditulis dengan ejaan berbeda (`1-2` vs `1 - 2`).
+ * Jurnal yang sudah ada tidak pernah ditimpa. Teksnya harfiah sama dengan
+ * `SESI_GABUNGAN_TANPA_JURNAL_SQL` di `teaching_journal.rs`.
+ */
+export const SESI_GABUNGAN_TANPA_JURNAL_SQL =
+  "SELECT p.id_presensi_mapel, p.jam_ke, utama.jam_ke AS jam_utama FROM presensi_mapel p JOIN presensi_mapel utama ON utama.id_presensi_mapel = ?1 WHERE p.id_presensi_mapel <> utama.id_presensi_mapel AND p.id_guru = utama.id_guru AND p.tanggal = utama.tanggal AND p.id_mapel = utama.id_mapel AND NOT EXISTS (SELECT 1 FROM jurnal_mengajar j WHERE j.id_presensi_mapel = p.id_presensi_mapel) ORDER BY p.id_presensi_mapel\n-- batas: satu guru, satu tanggal, satu mapel; paling banyak sebanyak rombel kelas gabungan\n;";
+
+/** Baris hasil `SESI_GABUNGAN_TANPA_JURNAL_SQL`. */
+export interface BarisSesiGabungan {
+  id_presensi_mapel: string;
+  jam_ke: string;
+  jam_utama: string;
+}
+
+/**
+ * Id sesi yang jamnya SAMA dengan sesi utama. Jam utama yang tidak terbaca
+ * berarti tidak ada gabungan, bukan "semua cocok".
+ * Cerminan `pilih_sesi_gabungan` di `teaching_journal.rs`.
+ */
+export function pilihSesiGabungan(
+  rows: readonly BarisSesiGabungan[],
+): string[] {
+  return rows
+    .filter((row) => {
+      const utama = normalizeJamKe(row.jam_utama);
+      return utama !== null && normalizeJamKe(row.jam_ke) === utama;
+    })
+    .map((row) => row.id_presensi_mapel);
+}

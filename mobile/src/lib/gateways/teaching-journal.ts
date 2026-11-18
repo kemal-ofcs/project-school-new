@@ -39,6 +39,8 @@ export interface SaveTeachingJournalDraft {
   kendala?: string | null;
   tindak_lanjut?: string | null;
   paraf_nama?: string | null;
+  /** Salin jurnal ini ke sesi kelas gabungan lain yang belum berjurnal. */
+  terapkan_gabungan?: boolean;
 }
 
 export async function getTeachingJournal(
@@ -81,18 +83,19 @@ export async function listTeachingJournals(
 
 export async function saveTeachingJournal(draft: SaveTeachingJournalDraft) {
   if (isDesktopRuntime()) {
-    const result = await invokeDesktop<{ sukses: boolean; id_jurnal: string }>(
-      "desktop_save_teaching_journal",
-      { draft },
-    );
+    const result = await invokeDesktop<{
+      sukses: boolean;
+      id_jurnal: string;
+      jumlah_gabungan?: number;
+    }>("desktop_save_teaching_journal", { draft });
     kickDesktopSync();
     return result;
   }
-  return requestWebApi<{ sukses: boolean; id_jurnal: string }>(
-    "/api/academic/journal/save",
-    "POST",
-    { draft },
-  );
+  return requestWebApi<{
+    sukses: boolean;
+    id_jurnal: string;
+    jumlah_gabungan?: number;
+  }>("/api/academic/journal/save", "POST", { draft });
 }
 
 export async function deleteTeachingJournal(idJurnal: string) {

@@ -173,6 +173,27 @@ export async function hapusPresensiKelas(idPresensiMapel: string) {
   );
 }
 
+/**
+ * Presensi kelas gabungan: satu sesi per rombel, tersimpan semua atau tidak
+ * sama sekali. Aturannya `periksaPresensiGabungan`.
+ */
+export async function simpanPresensiGabungan(
+  drafts: SaveClassAttendanceDraft[],
+) {
+  if (isDesktopRuntime()) {
+    const result = await invokeDesktop<{
+      sukses: boolean;
+      id_presensi_mapel: string[];
+    }>("desktop_save_class_attendance_gabungan", { drafts });
+    kickDesktopSync();
+    return result;
+  }
+  return requestWebApi<{
+    sukses: boolean;
+    id_presensi_mapel: string[];
+  }>("/api/academic/attendance/save-gabungan", "POST", { drafts });
+}
+
 export const saveClassAttendance = simpanPresensiKelas;
 export const deleteClassAttendance = hapusPresensiKelas;
 

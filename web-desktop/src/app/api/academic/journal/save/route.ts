@@ -28,6 +28,7 @@ export async function POST(request: NextRequest) {
         kendala?: string | null;
         tindak_lanjut?: string | null;
         paraf_nama?: string | null;
+        terapkan_gabungan?: boolean;
       };
       id_jurnal?: string;
       id_presensi_mapel?: string;
@@ -49,6 +50,8 @@ export async function POST(request: NextRequest) {
       kendala: draft.kendala,
       tindak_lanjut: draft.tindak_lanjut,
       paraf_nama: draft.paraf_nama,
+      terapkan_gabungan:
+        "terapkan_gabungan" in draft && draft.terapkan_gabungan === true,
     });
     return noStoreJson(result);
   } catch (error) {

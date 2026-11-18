@@ -18,6 +18,7 @@ import {
   type ParentNotificationSource,
   parseJpDurationForUnit,
   parseJpMaxForUnit,
+  periksaPresensiGabungan,
   REKONSILIASI_TEMPLATE_KINDS,
   rentangJamKe,
 } from "@/lib/validations/class-attendance";
@@ -329,9 +330,19 @@ export async function getRosterForAttendance(
   }));
 }
 
-export async function saveClassAttendance(draft: SaveClassAttendanceDraft) {
-  await ensureDbInitialized();
+type PernyataanSql = {
+  sql: string;
+  args: Array<string | number | boolean | null>;
+};
 
+/**
+ * Validasi + susunan pernyataan simpan SATU sesi, tanpa menulis apa pun.
+ * Dipakai simpan biasa dan simpan gabungan, supaya keduanya lewat aturan yang
+ * persis sama dan presensi gabungan bisa ditulis dalam satu `db.batch`.
+ */
+async function siapkanSimpanPresensi(
+  draft: SaveClassAttendanceDraft,
+): Promise<{ statements: PernyataanSql[]; idPresensi: string }> {
   const idTahunAjaran = draft.id_tahun_ajaran.trim();
   const idRombel = draft.id_rombel.trim();
   const idMapel = draft.id_mapel.trim();
@@ -465,10 +476,7 @@ export async function saveClassAttendance(draft: SaveClassAttendanceDraft) {
     };
   });
 
-  const statements: Array<{
-    sql: string;
-    args: Array<string | number | boolean | null>;
-  }> = [
+  const statements: PernyataanSql[] = [
     {
       sql: `
         INSERT INTO presensi_mapel (
@@ -642,9 +650,51 @@ export async function saveClassAttendance(draft: SaveClassAttendanceDraft) {
     }
   }
 
-  await db.batch(statements, "write");
+  return { statements, idPresensi };
+}
 
+export async function saveClassAttendance(draft: SaveClassAttendanceDraft) {
+  await ensureDbInitialized();
+  const { statements, idPresensi } = await siapkanSimpanPresensi(draft);
+  await db.batch(statements, "write");
   return { sukses: true, id_presensi_mapel: idPresensi };
+}
+
+/**
+ * Presensi kelas gabungan: satu sesi per rombel, ditulis SEKALIGUS dalam satu
+ * `db.batch` — satu rombel yang ditolak membatalkan semuanya, sehingga tidak
+ * ada kelas gabungan yang tersimpan setengah. Pesan penolakan diberi nama
+ * rombelnya. Cerminan `save_class_attendance_gabungan` di `class_attendance.rs`.
+ */
+export async function saveClassAttendanceGabungan(
+  drafts: SaveClassAttendanceDraft[],
+) {
+  await ensureDbInitialized();
+  const pesan = periksaPresensiGabungan(drafts);
+  if (pesan) throw new ApiRequestError(pesan, 400);
+
+  const statements: PernyataanSql[] = [];
+  const ids: string[] = [];
+  for (const draft of drafts) {
+    try {
+      const hasil = await siapkanSimpanPresensi(draft);
+      statements.push(...hasil.statements);
+      ids.push(hasil.idPresensi);
+    } catch (error) {
+      if (!(error instanceof ApiRequestError)) throw error;
+      const rombel = await db.execute({
+        sql: "SELECT nama_rombel FROM akademik_rombel WHERE id_rombel = ?;",
+        args: [draft.id_rombel],
+      });
+      const nama = String(rombel.rows[0]?.nama_rombel ?? draft.id_rombel);
+      throw new ApiRequestError(
+        `Rombel ${nama}: ${error.message}`,
+        error.status,
+      );
+    }
+  }
+  await db.batch(statements, "write");
+  return { sukses: true, id_presensi_mapel: ids };
 }
 
 /** Pesan penolakan yang SAMA dengan `delete_class_attendance` di `class_attendance.rs`. */

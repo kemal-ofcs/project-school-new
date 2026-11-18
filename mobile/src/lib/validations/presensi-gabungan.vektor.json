@@ -1,0 +1,185 @@
+{
+  "keterangan": "Vektor kembar periksaPresensiGabungan (class-attendance.ts) dan periksa_presensi_gabungan (class_attendance.rs). hasil null = sah.",
+  "kasus": [
+    {
+      "nama": "dua rombel, jam rentang ditulis beda spasi tetap sama",
+      "drafts": [
+        {
+          "id_tahun_ajaran": "ta1",
+          "id_rombel": "r1",
+          "id_mapel": "m1",
+          "id_guru": "g1",
+          "tanggal": "2026-11-18",
+          "jam_ke": "1-2"
+        },
+        {
+          "id_tahun_ajaran": "ta1",
+          "id_rombel": "r2",
+          "id_mapel": "m1",
+          "id_guru": "g1",
+          "tanggal": "2026-11-18",
+          "jam_ke": "1 - 2"
+        }
+      ],
+      "hasil": null
+    },
+    {
+      "nama": "satu rombel ditolak",
+      "drafts": [
+        {
+          "id_tahun_ajaran": "ta1",
+          "id_rombel": "r1",
+          "id_mapel": "m1",
+          "id_guru": "g1",
+          "tanggal": "2026-11-18",
+          "jam_ke": "1"
+        }
+      ],
+      "hasil": "Presensi gabungan butuh minimal dua rombel."
+    },
+    {
+      "nama": "sesi lama ditolak",
+      "drafts": [
+        {
+          "id_tahun_ajaran": "ta1",
+          "id_rombel": "r1",
+          "id_mapel": "m1",
+          "id_guru": "g1",
+          "tanggal": "2026-11-18",
+          "jam_ke": "1"
+        },
+        {
+          "id_presensi_mapel": "pm_lama",
+          "id_tahun_ajaran": "ta1",
+          "id_rombel": "r2",
+          "id_mapel": "m1",
+          "id_guru": "g1",
+          "tanggal": "2026-11-18",
+          "jam_ke": "1"
+        }
+      ],
+      "hasil": "Presensi gabungan hanya untuk sesi baru. Sesi yang sudah tersimpan disunting satu per satu dari Riwayat."
+    },
+    {
+      "nama": "jam berbeda ditolak",
+      "drafts": [
+        {
+          "id_tahun_ajaran": "ta1",
+          "id_rombel": "r1",
+          "id_mapel": "m1",
+          "id_guru": "g1",
+          "tanggal": "2026-11-18",
+          "jam_ke": "1"
+        },
+        {
+          "id_tahun_ajaran": "ta1",
+          "id_rombel": "r2",
+          "id_mapel": "m1",
+          "id_guru": "g1",
+          "tanggal": "2026-11-18",
+          "jam_ke": "2"
+        }
+      ],
+      "hasil": "Semua rombel dalam presensi gabungan wajib memakai tahun ajaran, mata pelajaran, guru, tanggal, dan jam pelajaran yang sama."
+    },
+    {
+      "nama": "guru berbeda ditolak",
+      "drafts": [
+        {
+          "id_tahun_ajaran": "ta1",
+          "id_rombel": "r1",
+          "id_mapel": "m1",
+          "id_guru": "g1",
+          "tanggal": "2026-11-18",
+          "jam_ke": "1"
+        },
+        {
+          "id_tahun_ajaran": "ta1",
+          "id_rombel": "r2",
+          "id_mapel": "m1",
+          "id_guru": "g2",
+          "tanggal": "2026-11-18",
+          "jam_ke": "1"
+        }
+      ],
+      "hasil": "Semua rombel dalam presensi gabungan wajib memakai tahun ajaran, mata pelajaran, guru, tanggal, dan jam pelajaran yang sama."
+    },
+    {
+      "nama": "rombel kembar ditolak",
+      "drafts": [
+        {
+          "id_tahun_ajaran": "ta1",
+          "id_rombel": "r1",
+          "id_mapel": "m1",
+          "id_guru": "g1",
+          "tanggal": "2026-11-18",
+          "jam_ke": "1"
+        },
+        {
+          "id_tahun_ajaran": "ta1",
+          "id_rombel": " r1 ",
+          "id_mapel": "m1",
+          "id_guru": "g1",
+          "tanggal": "2026-11-18",
+          "jam_ke": "1"
+        }
+      ],
+      "hasil": "Ada rombel yang dipilih dua kali."
+    },
+    {
+      "nama": "rombel kosong ditolak",
+      "drafts": [
+        {
+          "id_tahun_ajaran": "ta1",
+          "id_rombel": "r1",
+          "id_mapel": "m1",
+          "id_guru": "g1",
+          "tanggal": "2026-11-18",
+          "jam_ke": "1"
+        },
+        {
+          "id_tahun_ajaran": "ta1",
+          "id_rombel": "",
+          "id_mapel": "m1",
+          "id_guru": "g1",
+          "tanggal": "2026-11-18",
+          "jam_ke": "1"
+        }
+      ],
+      "hasil": "Rombel wajib diisi."
+    }
+  ],
+  "sesi_jurnal": {
+    "keterangan": "Vektor pilihSesiGabungan / pilih_sesi_gabungan.",
+    "baris": [
+      {
+        "id_presensi_mapel": "pm2",
+        "jam_ke": "1 - 2",
+        "jam_utama": "1-2"
+      },
+      {
+        "id_presensi_mapel": "pm3",
+        "jam_ke": "1",
+        "jam_utama": "1-2"
+      },
+      {
+        "id_presensi_mapel": "pm4",
+        "jam_ke": "1-2",
+        "jam_utama": "1-2"
+      },
+      {
+        "id_presensi_mapel": "pm5",
+        "jam_ke": "abc",
+        "jam_utama": "1-2"
+      }
+    ],
+    "hasil": ["pm2", "pm4"],
+    "utama_rusak": [
+      {
+        "id_presensi_mapel": "pm9",
+        "jam_ke": "abc",
+        "jam_utama": "abc"
+      }
+    ]
+  }
+}

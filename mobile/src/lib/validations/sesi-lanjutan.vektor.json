@@ -1,0 +1,195 @@
+{
+  "keterangan": "Vektor kembar pilihShiftSesi (attendance/sesi-lanjutan.ts) dan pilih_shift_sesi (scanner.rs). Shift 1 = pagi (asal), 2 = siang (lanjutan), 3 = malam, 4 = fleksibel.",
+  "kasus": [
+    {
+      "nama": "multi-sesi mati: selalu shift asal",
+      "asal": {
+        "id_shift": 1,
+        "multi_sesi": false,
+        "shift_lanjutan_id": 2,
+        "lengkap": true,
+        "dimulai": true,
+        "jendela_cocok": false
+      },
+      "kandidat": [
+        { "id_shift": 2, "fleksibel": false, "jendela_cocok": true }
+      ],
+      "hasil": 1
+    },
+    {
+      "nama": "sesi asal lengkap, scan di jendela shift lanjutan",
+      "asal": {
+        "id_shift": 1,
+        "multi_sesi": true,
+        "shift_lanjutan_id": 2,
+        "lengkap": true,
+        "dimulai": true,
+        "jendela_cocok": false
+      },
+      "kandidat": [
+        { "id_shift": 2, "fleksibel": false, "jendela_cocok": true }
+      ],
+      "hasil": 2
+    },
+    {
+      "nama": "sesi asal lengkap tanpa lanjutan ditunjuk: shift lain pertama yang cocok, fleksibel dilewati",
+      "asal": {
+        "id_shift": 1,
+        "multi_sesi": true,
+        "shift_lanjutan_id": 0,
+        "lengkap": true,
+        "dimulai": true,
+        "jendela_cocok": false
+      },
+      "kandidat": [
+        { "id_shift": 2, "fleksibel": false, "jendela_cocok": false },
+        { "id_shift": 3, "fleksibel": false, "jendela_cocok": true },
+        { "id_shift": 4, "fleksibel": true, "jendela_cocok": true }
+      ],
+      "hasil": 3
+    },
+    {
+      "nama": "sesi asal lengkap, lanjutan ditunjuk tapi jamnya tidak cocok: shift lain tidak dicoba",
+      "asal": {
+        "id_shift": 1,
+        "multi_sesi": true,
+        "shift_lanjutan_id": 2,
+        "lengkap": true,
+        "dimulai": true,
+        "jendela_cocok": false
+      },
+      "kandidat": [
+        { "id_shift": 2, "fleksibel": false, "jendela_cocok": false },
+        { "id_shift": 3, "fleksibel": false, "jendela_cocok": true }
+      ],
+      "hasil": 1
+    },
+    {
+      "nama": "scan pertama hari itu di jendela shift lanjutan (hanya masuk shift siang)",
+      "asal": {
+        "id_shift": 1,
+        "multi_sesi": true,
+        "shift_lanjutan_id": 2,
+        "lengkap": false,
+        "dimulai": false,
+        "jendela_cocok": false
+      },
+      "kandidat": [
+        { "id_shift": 2, "fleksibel": false, "jendela_cocok": true }
+      ],
+      "hasil": 2
+    },
+    {
+      "nama": "scan pertama di jendela shift asal tetap shift asal",
+      "asal": {
+        "id_shift": 1,
+        "multi_sesi": true,
+        "shift_lanjutan_id": 2,
+        "lengkap": false,
+        "dimulai": false,
+        "jendela_cocok": true
+      },
+      "kandidat": [
+        { "id_shift": 2, "fleksibel": false, "jendela_cocok": true }
+      ],
+      "hasil": 1
+    },
+    {
+      "nama": "scan pertama di luar jendela asal tanpa lanjutan ditunjuk: tidak menebak shift lain",
+      "asal": {
+        "id_shift": 1,
+        "multi_sesi": true,
+        "shift_lanjutan_id": 0,
+        "lengkap": false,
+        "dimulai": false,
+        "jendela_cocok": false
+      },
+      "kandidat": [
+        { "id_shift": 3, "fleksibel": false, "jendela_cocok": true }
+      ],
+      "hasil": 1
+    },
+    {
+      "nama": "sesi asal sudah dimulai belum pulang: tetap shift asal",
+      "asal": {
+        "id_shift": 1,
+        "multi_sesi": true,
+        "shift_lanjutan_id": 2,
+        "lengkap": false,
+        "dimulai": true,
+        "jendela_cocok": false
+      },
+      "kandidat": [
+        { "id_shift": 2, "fleksibel": false, "jendela_cocok": true }
+      ],
+      "hasil": 1
+    },
+    {
+      "nama": "lanjutan menunjuk dirinya sendiri dianggap belum ditunjuk",
+      "asal": {
+        "id_shift": 1,
+        "multi_sesi": true,
+        "shift_lanjutan_id": 1,
+        "lengkap": false,
+        "dimulai": false,
+        "jendela_cocok": false
+      },
+      "kandidat": [],
+      "hasil": 1
+    }
+  ],
+  "kandidat_dimuat": [
+    {
+      "nama": "mati",
+      "asal": {
+        "id_shift": 1,
+        "multi_sesi": false,
+        "shift_lanjutan_id": 2,
+        "lengkap": true,
+        "dimulai": true,
+        "jendela_cocok": false
+      },
+      "semua": [2, 3],
+      "hasil": []
+    },
+    {
+      "nama": "lanjutan ditunjuk",
+      "asal": {
+        "id_shift": 1,
+        "multi_sesi": true,
+        "shift_lanjutan_id": 2,
+        "lengkap": false,
+        "dimulai": false,
+        "jendela_cocok": false
+      },
+      "semua": [2, 3],
+      "hasil": [2]
+    },
+    {
+      "nama": "belum ditunjuk, asal lengkap",
+      "asal": {
+        "id_shift": 1,
+        "multi_sesi": true,
+        "shift_lanjutan_id": 0,
+        "lengkap": true,
+        "dimulai": true,
+        "jendela_cocok": false
+      },
+      "semua": [2, 3],
+      "hasil": [2, 3]
+    },
+    {
+      "nama": "belum ditunjuk, asal belum lengkap",
+      "asal": {
+        "id_shift": 1,
+        "multi_sesi": true,
+        "shift_lanjutan_id": 0,
+        "lengkap": false,
+        "dimulai": false,
+        "jendela_cocok": false
+      },
+      "semua": [2, 3],
+      "hasil": []
+    }
+  ]
+}

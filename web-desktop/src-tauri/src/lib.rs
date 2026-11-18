@@ -201,6 +201,7 @@ pub fn run() {
             desktop::commands::desktop_get_class_attendance_detail,
             desktop::commands::desktop_get_roster_for_attendance,
             desktop::commands::desktop_save_class_attendance,
+            desktop::commands::desktop_save_class_attendance_gabungan,
             desktop::commands::desktop_get_lesson_periods,
             desktop::commands::desktop_save_lesson_period,
             desktop::commands::desktop_delete_lesson_period,

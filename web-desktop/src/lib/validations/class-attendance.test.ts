@@ -1,4 +1,6 @@
 import { describe, expect, test } from "bun:test";
+import { existsSync, readFileSync } from "node:fs";
+import { join } from "node:path";
 import {
   aturJamSelesaiBel,
   aturNomorJamBel,
@@ -13,6 +15,7 @@ import {
   jamKeBeririsan,
   jamKeSekarang,
   jpUnitKey,
+  MAKS_ROMBEL_GABUNGAN,
   nomorJamKbmKosong,
   normalizeJamBel,
   normalizeJamKe,
@@ -21,12 +24,16 @@ import {
   parseJpDurationForUnit,
   parseJpMaxForUnit,
   parseJpMaxPerDay,
+  periksaPresensiGabungan,
+  pilihSesiGabungan,
   pukulJamKe,
   rentangJamKe,
+  SESI_GABUNGAN_TANPA_JURNAL_SQL,
   susunJamKe,
   teksPengumumanBel,
   usulkanSesiSekarang,
 } from "@/lib/validations/class-attendance";
+import vektorGabungan from "./presensi-gabungan.vektor.json";
 
 /**
  * Vektor `jam_ke` — WAJIB identik dengan `normalisasi_jam_ke_menerima_angka_dan_rentang`
@@ -642,5 +649,66 @@ describe("jadwal bel per unit dan hari", () => {
     expect(teksPengumumanBel({ jenis: "Pulang", jam_ke: 1 })).toContain(
       "pulang",
     );
+  });
+});
+
+// Vektor kembar `presensi_gabungan_vektor` di desktop/class_attendance.rs.
+describe("periksaPresensiGabungan (vektor)", () => {
+  for (const kasus of vektorGabungan.kasus) {
+    test(kasus.nama, () => {
+      expect(periksaPresensiGabungan(kasus.drafts)).toBe(kasus.hasil);
+    });
+  }
+
+  test("lebih dari batas rombel ditolak", () => {
+    const drafts = Array.from({ length: MAKS_ROMBEL_GABUNGAN + 1 }, (_, i) => ({
+      id_tahun_ajaran: "ta1",
+      id_rombel: `r${i}`,
+      id_mapel: "m1",
+      id_guru: "g1",
+      tanggal: "2026-11-18",
+      jam_ke: "1",
+    }));
+    expect(periksaPresensiGabungan(drafts)).toBe(
+      `Presensi gabungan paling banyak ${MAKS_ROMBEL_GABUNGAN} rombel.`,
+    );
+    expect(periksaPresensiGabungan(drafts.slice(0, MAKS_ROMBEL_GABUNGAN))).toBe(
+      null,
+    );
+  });
+});
+
+// Vektor kembar `tests_sesi_gabungan` di desktop/teaching_journal.rs.
+describe("pilihSesiGabungan (vektor)", () => {
+  test("hanya jam yang sama dengan sesi utama", () => {
+    expect(pilihSesiGabungan(vektorGabungan.sesi_jurnal.baris)).toEqual(
+      vektorGabungan.sesi_jurnal.hasil,
+    );
+    expect(pilihSesiGabungan(vektorGabungan.sesi_jurnal.utama_rusak)).toEqual(
+      [],
+    );
+  });
+
+  test("teks SQL sama harfiah dengan teaching_journal.rs", () => {
+    let diperiksa = 0;
+    for (const dir of ["desktop", "mobile"]) {
+      const lokasi = [
+        join(
+          import.meta.dir,
+          `../../../src-tauri/src/${dir}/teaching_journal.rs`,
+        ),
+        join(
+          import.meta.dir,
+          `../../../../mobile/src-tauri/src/${dir}/teaching_journal.rs`,
+        ),
+      ].find(existsSync);
+      if (!lokasi) continue;
+      diperiksa++;
+      const rust = readFileSync(lokasi, "utf8").replace(/\s+/g, "");
+      expect(rust).toContain(
+        JSON.stringify(SESI_GABUNGAN_TANPA_JURNAL_SQL).replace(/\s+/g, ""),
+      );
+    }
+    expect(diperiksa).toBeGreaterThan(0);
   });
 });

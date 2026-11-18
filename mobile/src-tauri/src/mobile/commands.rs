@@ -2664,6 +2664,16 @@ pub fn desktop_save_class_attendance(
     class_attendance::save_class_attendance(&state, &draft)
 }
 
+/// Presensi kelas gabungan: satu sesi per rombel dalam satu transaksi.
+#[tauri::command]
+pub fn desktop_save_class_attendance_gabungan(
+    state: State<'_, MobileState>,
+    drafts: Vec<Value>,
+) -> Result<Value, CommandError> {
+    require_permission(&state, "class_attendance.manage")?;
+    class_attendance::save_class_attendance_gabungan(&state, &drafts)
+}
+
 /// Jadwal bel sekolah. Dibaca layar presensi, jadi cukup butuh SESI.
 #[tauri::command]
 pub fn desktop_get_lesson_periods(state: State<'_, MobileState>) -> Result<Value, CommandError> {

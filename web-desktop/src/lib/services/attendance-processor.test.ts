@@ -609,10 +609,15 @@ describe("guard dan konsistensi integrasi Web", () => {
     expect(await tableCount("log_scan")).toBe(0);
   });
 
-  test("auto multi-sesi aktif ketika shift target memiliki izinkan_multi_sesi = 1", async () => {
-    // Shift 1: 07:00 - 15:00, Shift 2: 15:00 - 23:00 (izinkan_multi_sesi = 1)
-    await client.execute(
-      "UPDATE tbl_shift SET izinkan_multi_sesi = 1 WHERE kode_shift = 2;",
+  test("multi-sesi dibaca dari shift ASAL karyawan (cermin scanner.rs)", async () => {
+    // Shift 1: 07:00 - 15:00 (asal, multi-sesi), Shift 2: 15:00 - 23:00.
+    // Flagnya di shift asal, bukan di shift tujuan (keputusan 2026-11-18).
+    await client.batch(
+      [
+        "UPDATE tbl_shift SET izinkan_multi_sesi = 0, shift_lanjutan_id = 0;",
+        "UPDATE tbl_shift SET izinkan_multi_sesi = 1 WHERE id_shift = 1;",
+      ],
+      "write",
     );
 
     // 1. Scan Masuk Shift 1
@@ -630,6 +635,32 @@ describe("guard dan konsistensi integrasi Web", () => {
     expect(in2.sukses).toBe(true);
     expect(in2.shiftEfektif).toBe(2);
     expect(in2.idSesi).toBe(`NORMAL-20260812-${EMPLOYEE.id}-2`);
+
+    // Sesi lanjutan berlaku hari itu saja: shift tetap karyawan tidak pindah,
+    // jadi esok paginya scan masuk shift 1 lagi, bukan ditolak "Terlalu Awal".
+    const shiftTetap = await client.execute({
+      sql: "SELECT id_shift FROM master_data WHERE id_unik = ?;",
+      args: [EMPLOYEE.id],
+    });
+    expect(Number(shiftTetap.rows[0]?.id_shift)).toBe(1);
+    const besok = await scanAt(jakarta("2026-08-13", "07:00"));
+    expect(besok.sukses).toBe(true);
+    expect(besok.shiftEfektif).toBe(1);
+  });
+
+  test("scan pertama di jendela shift lanjutan yang ditunjuk masuk ke shift itu", async () => {
+    await client.batch(
+      [
+        "UPDATE tbl_shift SET izinkan_multi_sesi = 0, shift_lanjutan_id = 0;",
+        "UPDATE tbl_shift SET izinkan_multi_sesi = 1, shift_lanjutan_id = 2 WHERE id_shift = 1;",
+      ],
+      "write",
+    );
+    // Hari itu hanya masuk shift siang.
+    const masuk = await scanAt(jakarta("2026-08-14", "15:00"));
+    expect(masuk.sukses).toBe(true);
+    expect(masuk.shiftEfektif).toBe(2);
+    expect(masuk.idSesi).toBe(`NORMAL-20260814-${EMPLOYEE.id}-2`);
   });
 
   test("scan ulang setelah pulang ditolak aman jika shift target izinkan_multi_sesi = 0", async () => {

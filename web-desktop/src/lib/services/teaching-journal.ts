@@ -2,6 +2,11 @@ import "server-only";
 
 import { db, ensureDbInitialized } from "@/lib/db";
 import { ApiRequestError } from "@/lib/server/http/api-response";
+import {
+  type BarisSesiGabungan,
+  pilihSesiGabungan,
+  SESI_GABUNGAN_TANPA_JURNAL_SQL,
+} from "@/lib/validations/class-attendance";
 
 export interface TeachingJournalRecord {
   id_jurnal: string;
@@ -168,6 +173,8 @@ export async function saveTeachingJournal(
     kendala?: string | null;
     tindak_lanjut?: string | null;
     paraf_nama?: string | null;
+    /** Salin jurnal ini ke sesi kelas gabungan lain yang belum berjurnal. */
+    terapkan_gabungan?: boolean;
   },
 ) {
   await ensureDbInitialized();
@@ -206,8 +213,7 @@ export async function saveTeachingJournal(
     existingId ||
     `jrn_${crypto.randomUUID().replace(/-/g, "")}`;
 
-  await db.execute({
-    sql: `
+  const sqlSimpan = `
       INSERT INTO jurnal_mengajar (
         id_jurnal, id_presensi_mapel, materi_disampaikan, kendala, tindak_lanjut,
         paraf_nama, paraf_operator, paraf_at, created_at, updated_at
@@ -221,19 +227,47 @@ export async function saveTeachingJournal(
         paraf_operator = excluded.paraf_operator,
         paraf_at = excluded.paraf_at,
         updated_at = excluded.updated_at;
-    `,
-    args: [
-      id,
-      idPresensi,
-      draft.materi_disampaikan?.trim() || null,
-      draft.kendala?.trim() || null,
-      draft.tindak_lanjut?.trim() || null,
-      draft.paraf_nama?.trim() || null,
-      operator,
-    ],
-  });
+    `;
+  const isi = [
+    draft.materi_disampaikan?.trim() || null,
+    draft.kendala?.trim() || null,
+    draft.tindak_lanjut?.trim() || null,
+    draft.paraf_nama?.trim() || null,
+    operator,
+  ];
 
-  return { sukses: true, id_jurnal: id };
+  // Kelas gabungan: jurnal yang sama untuk sesi lain guru ini pada tanggal,
+  // mapel, dan jam yang sama yang belum berjurnal, dalam batch yang sama.
+  // Cerminan `save_teaching_journal` di `teaching_journal.rs`.
+  const gabungan = draft.terapkan_gabungan
+    ? pilihSesiGabungan(
+        (
+          await db.execute({
+            sql: SESI_GABUNGAN_TANPA_JURNAL_SQL,
+            args: [idPresensi],
+          })
+        ).rows.map(
+          (row): BarisSesiGabungan => ({
+            id_presensi_mapel: String(row.id_presensi_mapel ?? ""),
+            jam_ke: String(row.jam_ke ?? ""),
+            jam_utama: String(row.jam_utama ?? ""),
+          }),
+        ),
+      )
+    : [];
+
+  await db.batch(
+    [
+      { sql: sqlSimpan, args: [id, idPresensi, ...isi] },
+      ...gabungan.map((idSesi) => ({
+        sql: sqlSimpan,
+        args: [`jrn_${crypto.randomUUID().replace(/-/g, "")}`, idSesi, ...isi],
+      })),
+    ],
+    "write",
+  );
+
+  return { sukses: true, id_jurnal: id, jumlah_gabungan: gabungan.length };
 }
 
 export async function deleteTeachingJournal(idJurnal: string) {
