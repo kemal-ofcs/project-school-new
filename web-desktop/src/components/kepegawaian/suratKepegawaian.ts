@@ -7,9 +7,24 @@ import type {
   SemesterBeban,
   SetupSurat,
 } from "@/lib/validations/hr-beban";
+import {
+  formatNilai,
+  kalimatRincian,
+  type RincianKinerja,
+  STATUS_FINAL,
+  TIPE_MANUAL,
+  uraiRincian,
+} from "@/lib/validations/hr-kinerja";
 import { tambahHari } from "@/lib/validations/hr-pengajuan";
 import bawaan from "@/lib/validations/hr-surat-bawaan.json";
-import { cetakA4, esc, kop, ROOT_ID, tanggalPanjang } from "../cetak-a4";
+import {
+  cetakA4,
+  esc,
+  kop,
+  ROOT_ID,
+  tandaTangan,
+  tanggalPanjang,
+} from "../cetak-a4";
 import { masaKerja } from "./gaya";
 
 /**
@@ -228,6 +243,7 @@ const GAYA_SURAT = `
   #${ROOT_ID} .tengah { text-align: center; }
   #${ROOT_ID} .dicabut { border: 2px solid #000; padding: 4px 8px; margin: 8px 0; text-align: center; }
   #${ROOT_ID} .terima { margin-top: 24px; width: 40%; page-break-inside: avoid; }
+  #${ROOT_ID} .kanan { margin-top: 24px; text-align: right; }
 `;
 
 const atau = (teks: string | null | undefined) => esc(teks?.trim() || "-");
@@ -802,6 +818,104 @@ export function suratPengalamanKerja(d: DasarCetak, p: IsianKeluar): string {
     <p>Demikian surat keterangan ini dibuat untuk dipergunakan sebagaimana mestinya.</p>`,
     penanda,
   );
+}
+
+// 8. Lembar Hasil Penilaian Kinerja (HRIS Fase 5c, §23.2.7, Q-107)
+
+/** `datetime('now')` UTC tersimpan → tanggal WIB `YYYY-MM-DD`; rusak = `""`. */
+export function tanggalWibDari(utc: string): string {
+  const waktu = new Date(`${utc.trim().replace(" ", "T")}Z`);
+  if (Number.isNaN(waktu.getTime())) return "";
+  return new Date(waktu.getTime() + 7 * 3_600_000).toISOString().slice(0, 10);
+}
+
+export type IsianLembarKinerja = Pick<
+  RincianKinerja,
+  "penilaian" | "status" | "nilai" | "nilai_akhir" | "predikat" | "rentang"
+>;
+
+/**
+ * Hanya penilaian Final, tanpa nomor (tidak lewat `DialogCetakSurat`). Angka
+ * aspek otomatis dari `rincian` beku, jadi lembar yang dicetak ulang tetap
+ * sama walau absensi atau jadwal berubah. "Mengetahui" = kepala unit pada
+ * tanggal Final; bila penilainya kepala unit itu, ketua yayasan. Tanpa data
+ * pribadi.
+ */
+export function lembarKinerja(d: DasarCetak, r: IsianLembarKinerja): string {
+  if (r.status !== STATUS_FINAL) {
+    throw new Error("Hanya penilaian Final yang bisa dicetak.");
+  }
+  const p = r.penilaian;
+  const o = identitas(d.setup, p.id_karyawan);
+  const guru = p.kelompok === "Guru";
+  const kepala = d.setup.kepala.find((k) => k.kunci_unit === kunci(p.unit));
+  const mengetahui =
+    kepala && p.id_penilai !== "" && kepala.id_karyawan === p.id_penilai
+      ? ketuaYayasan(d.setup)
+      : kepalaUnit(d.setup, p.unit);
+  const periode = `${p.periode_nama} (${tanggalPanjang(p.periode_mulai, false)} s.d. ${tanggalPanjang(p.periode_selesai, false)})`;
+  const aktif =
+    r.rentang && !r.rentang.penuh
+      ? `${tanggalPanjang(r.rentang.mulai, false)} s.d. ${tanggalPanjang(r.rentang.akhir, false)}`
+      : "";
+  const baris = r.nilai
+    .map((b, i) => {
+      const otomatis = b.tipe !== TIPE_MANUAL;
+      const diubah =
+        otomatis && b.skor_hitung !== null && b.skor !== b.skor_hitung
+          ? `Hitungan ${b.skor_hitung}, diubah penilai. `
+          : "";
+      return `<tr><td>${i + 1}</td><td>${esc(b.aspek_nama)}${otomatis ? '<br><span class="kecil">otomatis</span>' : ""}</td><td class="angka">${b.bobot}</td><td class="angka">${b.skor ?? "-"}</td><td class="angka">${b.skor === null ? "-" : (b.skor - 1) * 25}</td><td>${esc(diubah)}${esc(b.catatan ?? "")}</td></tr>`;
+    })
+    .join("");
+  const rumus = r.nilai.flatMap((b) => {
+    const u = b.tipe === TIPE_MANUAL ? null : uraiRincian(b.rincian);
+    return u
+      ? [
+          `<li><strong>${esc(b.aspek_nama)}</strong>: ${esc(kalimatRincian(u))} Dihitung sampai ${esc(tanggalPanjang(u.sampai, false) || u.sampai)}.</li>`,
+        ]
+      : [];
+  });
+  const kota = d.setup.pengaturan.hr_surat_kota?.trim() ?? "";
+  const penilai = identitas(d.setup, p.id_penilai);
+  return `
+    ${kop(d.setup.kop, p.unit || d.setup.kop.cabang)}
+    <h1>LEMBAR HASIL PENILAIAN KINERJA ${guru ? "GURU" : "TENAGA KEPENDIDIKAN"}</h1>
+    <div class="nomor">${esc(p.periode_nama)}</div>
+    ${
+      p.id_ref
+        ? `<div class="dicabut"><strong>KOREKSI</strong> atas penilaian sebelumnya${p.alasan_koreksi.trim() ? `: ${esc(p.alasan_koreksi.trim())}` : ""}</div>`
+        : ""
+    }
+    ${tabelData([
+      ["Nama", namaGelar(o.nama || p.nama, o.gelar)],
+      ["NIP", o.nip],
+      ...(guru ? ([["NUPTK", o.nuptk]] as [string, string][]) : []),
+      ["Jabatan", p.jabatan || o.jabatan],
+      ["Unit kerja", p.unit || o.unit],
+      [
+        "Status kepegawaian",
+        statusKini(d.setup, p.id_karyawan) || p.status_kepegawaian,
+      ],
+      ["Kelompok", guru ? "Guru" : "Tenaga kependidikan"],
+      ["Periode penilaian", periode],
+      ...(aktif ? ([["Masa aktif dinilai", aktif]] as [string, string][]) : []),
+      ["Template", p.template_nama],
+    ])}
+    <table>
+      <thead><tr><th>No</th><th>Aspek</th><th>Bobot</th><th>Skor (1–5)</th><th>Nilai (0–100)</th><th>Catatan</th></tr></thead>
+      <tbody>${baris || '<tr><td colspan="6">-</td></tr>'}</tbody>
+      <tfoot><tr><td colspan="4"><strong>Nilai akhir</strong> = Σ bobot × nilai aspek ÷ 100</td><td class="angka"><strong>${r.nilai_akhir === null ? "-" : formatNilai(r.nilai_akhir)}</strong></td><td><strong>${atau(r.predikat)}</strong></td></tr></tfoot>
+    </table>
+    ${rumus.length ? `<p><strong>Rumus aspek otomatis</strong></p><ol>${rumus.join("")}</ol>` : ""}
+    <p><strong>Catatan penilai</strong></p>
+    ${p.catatan.trim() ? paragraf(p.catatan) : "<p>-</p>"}
+    <div class="kanan">${kota ? `${esc(kota)}, ` : ""}${esc(tanggalPanjang(d.tanggal, false))}</div>
+    <div class="tanda">
+      ${tandaTangan("Penilai", namaGelar(p.penilai_nama, penilai.gelar) || null, penilai.nip)}
+      ${tandaTangan("Pegawai yang dinilai", namaGelar(o.nama || p.nama, o.gelar) || null, o.nip)}
+      ${tandaTangan(`Mengetahui, ${mengetahui.jabatan}`, mengetahui.nama || null, mengetahui.nip)}
+    </div>`;
 }
 
 /** Cetak salah satu surat di atas lewat dialog cetak (`cetak-a4.ts`). */

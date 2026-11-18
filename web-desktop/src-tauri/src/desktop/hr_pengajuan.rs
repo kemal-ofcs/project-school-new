@@ -2466,7 +2466,7 @@ fn beririsan(a: &str, b: &str) -> bool {
     }
 }
 
-fn ta_memuat(j: &JadwalJp, t: &str) -> bool {
+pub fn ta_memuat(j: &JadwalJp, t: &str) -> bool {
     j.ta_mulai.as_str() <= t && t <= j.ta_selesai.as_str()
 }
 

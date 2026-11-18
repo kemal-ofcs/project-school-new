@@ -3471,13 +3471,17 @@ pub fn desktop_hr_teaching_load(
 
 /// Bahan cetak SK dan surat pada `tanggal` (kosong = hari ini WIB): kop,
 /// pengaturan surat, kepala per unit, identitas guru; dari SQLite lokal.
-/// Juga untuk pembaca SP (`hr.warning.view`) dan surat keluar (`hr.offboard.view`).
+/// Juga untuk pembaca SP (`hr.warning.view`), surat keluar (`hr.offboard.view`),
+/// dan Lembar Hasil Penilaian Kinerja (`hr.performance.view`/`.finalize`).
 #[tauri::command]
 pub fn desktop_hr_letter_setup(
     state: State<'_, DesktopState>,
     tanggal: Option<String>,
 ) -> Result<Value, CommandError> {
-    require_any_permission(&state, &["hr.duty.manage", "hr.warning.view", "hr.offboard.view"])?;
+    require_any_permission(
+        &state,
+        &["hr.duty.manage", "hr.warning.view", "hr.offboard.view", "hr.performance.view", "hr.performance.finalize"],
+    )?;
     hr_beban::letter_setup(&state, tanggal.as_deref().unwrap_or(""))
 }
 

@@ -264,8 +264,10 @@ describe("hr-kinerja: template di database Web", () => {
   });
 });
 
-// Alur 5b, pasangan `hr_kinerja_penilaian_cloud` di `hr_kinerja.rs` dengan
-// data (`DATA_PENILAIAN_SQL`) dan angka yang sama.
+// Alur 5b/5c, pasangan `hr_kinerja_penilaian_cloud` di `hr_kinerja.rs` dengan
+// data (`DATA_PENILAIAN_SQL`) dan angka yang sama. Mengajar G1: 9 satuan, 2
+// dikecualikan (izin jam 1-3 ditangani, DL), terisi 6, berjurnal 5, 1 JP
+// pengganti, sesi kembar Jumat 12, dua jurnal Senin 8.
 const DATA_PENILAIAN_SQL = `
   INSERT INTO tbl_shift (id_shift, kode_shift, nama_shift, jam_masuk, jam_pulang, jam_kerja_normal_menit, hari_kerja) VALUES (77, 77, 'Lima hari', '07:00', '15:00', 420, '1,2,3,4,5');
   INSERT INTO master_data (id_unik, kode_karyawan, nama, divisi, id_shift, jenis_personil, unit, tanggal_daftar, status_aktif, id_keluar, tanggal_selesai_aktif) VALUES
@@ -293,6 +295,18 @@ const DATA_PENILAIAN_SQL = `
     ('pgn-3', 'G1', 'jns-cuti', 'Cuti', 1, 'Dibayar', 'hr.request.decide', '2024-01-18', '2024-01-18', NULL, NULL, 0, 'cuti', 's3', 'tu', 'x');
   INSERT INTO hr_pengajuan_keputusan (id_keputusan, id_pengajuan, jenis, sidik, oleh, waktu_perangkat) VALUES
     ('pk-1', 'pgn-1', 'Setujui', 's1', 'kepsek', 'x'), ('pk-2', 'pgn-2', 'Setujui', 's2', 'kepsek', 'x');
+  INSERT INTO akademik_rombel (id_rombel, id_tahun_ajaran, tingkat, nama_rombel) VALUES ('r7a', 'ta-2', 7, '7A'), ('r7b', 'ta-2', 7, '7B'), ('r8a', 'ta-2', 8, '8A');
+  INSERT INTO jadwal_mengajar (id_jadwal, id_tahun_ajaran, id_rombel, id_mapel, id_guru, hari, jam_ke) VALUES
+    ('jd-1', 'ta-2', 'r7a', 'mp-1', 'G1', 1, '1-2'), ('jd-2', 'ta-2', 'r7a', 'mp-1', 'G1', 2, '1'),
+    ('jd-3', 'ta-2', 'r7b', 'mp-1', 'G1', 5, '3'), ('jd-4', 'ta-2', 'r7b', 'mp-1', 'G1', 4, '2');
+  INSERT INTO presensi_mapel (id_presensi_mapel, id_tahun_ajaran, id_rombel, id_mapel, id_guru, tanggal, jam_ke, created_at, updated_at) VALUES
+    ('pm-1', 'ta-2', 'r7a', 'mp-1', 'G1', '2024-01-08', '1-2', 'x', 'x'), ('pm-2', 'ta-2', 'r7a', 'mp-1', 'G1', '2024-01-15', '1-2', 'x', 'x'),
+    ('pm-3', 'ta-2', 'r7a', 'mp-1', 'G1', '2024-01-09', '1', 'x', 'x'), ('pm-4', 'ta-2', 'r7b', 'mp-1', 'G1', '2024-01-12', '3', 'x', 'x'),
+    ('pm-5', 'ta-2', 'r7b', 'mp-1', 'G1', '2024-01-12', '3', 'x', 'x'), ('pm-6', 'ta-2', 'r8a', 'mp-2', 'G1', '2024-01-10', '4', 'x', 'x');
+  INSERT INTO jurnal_mengajar (id_jurnal, id_presensi_mapel, created_at, updated_at) VALUES
+    ('jm-1', 'pm-1', 'x', 'x'), ('jm-1b', 'pm-1', 'x', 'x'), ('jm-2', 'pm-2', 'x', 'x'), ('jm-4', 'pm-4', 'x', 'x');
+  INSERT INTO hr_jp_penanganan (id_penanganan, id_pengajuan, tanggal, id_jadwal, status, dicatat_oleh, waktu_perangkat) VALUES
+    ('jp:pgn-1:2024-01-16:jd-2', 'pgn-1', '2024-01-16', 'jd-2', 'Tugas Mandiri', 'piket', 'x');
 `;
 
 const sesi = (
@@ -346,17 +360,20 @@ describe("hr-kinerja: alur penilaian di database Web", () => {
       buat("G1", "Semester", "ta-2"),
     );
     const rincianAwal = "K|9|6|1|1|1|0|722|950,900,800,700|2024-01-19";
-    const kehadiran = (
-      await client.execute({
-        sql: "SELECT skor, skor_hitung, rincian FROM hr_kinerja_nilai WHERE id_penilaian = ?1 AND tipe = 'Otomatis Kehadiran';",
-        args: [id],
-      })
-    ).rows[0];
-    expect([
-      Number(kehadiran?.skor),
-      Number(kehadiran?.skor_hitung),
-      kehadiran?.rincian,
-    ]).toEqual([2, 2, rincianAwal]);
+    const rincianPk = "PK|9|2|6|1|1|857|950,900,800,700|2024-01-19";
+    const rincianJ = "J|6|5|833|950,900,800,700|2024-01-19";
+    const tersimpan = async (tipe: string) => {
+      const r = (
+        await client.execute({
+          sql: "SELECT skor, skor_hitung, rincian FROM hr_kinerja_nilai WHERE id_penilaian = ?1 AND tipe = ?2;",
+          args: [id, tipe],
+        })
+      ).rows[0];
+      return [Number(r?.skor), Number(r?.skor_hitung), r?.rincian];
+    };
+    expect(await tersimpan(TIPE_KEHADIRAN)).toEqual([2, 2, rincianAwal]);
+    expect(await tersimpan(K.TIPE_PRESENSI)).toEqual([3, 3, rincianPk]);
+    expect(await tersimpan(K.TIPE_JURNAL)).toEqual([3, 3, rincianJ]);
     expect(
       await galat(
         S.simpanKinerja(
@@ -373,33 +390,43 @@ describe("hr-kinerja: alur penilaian di database Web", () => {
     expect(rinci.status).toBe("Draf");
     expect(rinci.penilai_bawaan?.id).toBe("K1");
     expect(rinci.tanda).toContain("pengajuan_menunggu");
-    expect(rinci.tanda).toContain("otomatis_manual");
+    expect(rinci.tanda).not.toContain("otomatis_manual");
     expect(rinci.kehadiran?.tanggal_kosong).toEqual(["2024-01-18"]);
+    expect(rinci.hidup[K.TIPE_PRESENSI]?.rincian).toBe(rincianPk);
+    expect(rinci.mengajar?.belum_terisi).toEqual([
+      { tanggal: "2024-01-18", jam: 2, id_rombel: "r7b", nama_rombel: "7B" },
+    ]);
+    expect(rinci.mengajar?.tanpa_jurnal[0]?.tanggal).toBe("2024-01-09");
 
-    const isian = (denganCatatan: boolean) => ({
+    const idTipe = (tipe: string) =>
+      rinci.nilai.find((b) => b.tipe === tipe)?.id_aspek as string;
+    const isian = (ubahPresensi: boolean) => ({
       aksi: "Simpan",
       id_penilaian: id,
       catatan: "Baik",
-      nilai: rinci.nilai
-        .filter((b) => b.tipe !== TIPE_KEHADIRAN)
-        .map((b) => ({
-          id_aspek: b.id_aspek,
-          skor: 4,
-          catatan:
-            b.tipe !== TIPE_MANUAL && denganCatatan ? "dari supervisi" : null,
-        })),
+      nilai: [
+        ...rinci.nilai
+          .filter((b) => b.tipe === TIPE_MANUAL)
+          .map((b) => ({ id_aspek: b.id_aspek, skor: 4 })),
+        ...(ubahPresensi
+          ? [{ id_aspek: idTipe(K.TIPE_PRESENSI), skor: 4 }]
+          : []),
+      ],
     });
-    expect(await galat(S.simpanKinerja(client, kepsek, isian(false)))).toBe(
-      'Aspek "Keterisian presensi kelas" belum bisa dihitung otomatis; beri catatan alasan skornya.',
+    expect(await galat(S.simpanKinerja(client, kepsek, isian(true)))).toBe(
+      'Skor aspek "Keterisian presensi kelas" yang diubah dari hitungan wajib diberi catatan alasannya.',
     );
-    await S.simpanKinerja(client, kepsek, isian(true));
+    await S.simpanKinerja(client, kepsek, isian(false));
 
-    const aspekK = rinci.nilai.find((b) => b.tipe === TIPE_KEHADIRAN)
-      ?.id_aspek as string;
+    // Layar mengirim `rincian` ketiga aspek otomatis.
     const ajukan = (r: string, target = id) => ({
       id_penilaian: target,
       jenis: "Ajukan",
-      rincian: { [aspekK]: r },
+      rincian: {
+        [idTipe(TIPE_KEHADIRAN)]: r,
+        [idTipe(K.TIPE_PRESENSI)]: rincianPk,
+        [idTipe(K.TIPE_JURNAL)]: rincianJ,
+      },
     });
     await client.execute(
       "INSERT INTO absensi_harian (tanggal, id_karyawan, nama, kelas_divisi, jam_masuk, status_kehadiran, status_absen, sumber, update_terakhir, menit_terlambat, id_shift, bulan, tahun, id_sesi) VALUES ('2024-01-18', 'G1', 'Guru Satu', 'Guru', '06:59', 'Hadir', 'Masuk', 'Scanner', 'x', 0, 77, 'Januari', 2024, 's-18');",
@@ -430,15 +457,15 @@ describe("hr-kinerja: alur penilaian di database Web", () => {
       yayasan,
       putus("Kembalikan", "lengkapi supervisi"),
     );
-    await S.simpanKinerja(client, kepsek, isian(true));
+    await S.simpanKinerja(client, kepsek, isian(false));
     await S.putuskanKinerja(client, kepsek, ajukan(rincianBaru));
     const terkunci =
       "Penilaian yang sudah diajukan atau selesai tidak bisa disunting.";
-    expect(await galat(S.simpanKinerja(client, kepsek, isian(true)))).toBe(
+    expect(await galat(S.simpanKinerja(client, kepsek, isian(false)))).toBe(
       terkunci,
     );
 
-    // Final beku: 500 + 90 × 75 = 7250 = Cukup.
+    // Final beku: tiga aspek otomatis skor 3 (30 × 50) + 70 × 75 = 6750 = Cukup.
     await S.putuskanKinerja(client, yayasan, putus("Final", ""));
     const final = (
       await client.execute({
@@ -450,14 +477,14 @@ describe("hr-kinerja: alur penilaian di database Web", () => {
       Number(final?.nilai_akhir),
       final?.predikat,
       Number(final?.urut),
-    ]).toEqual([7250, "Cukup", 4]);
+    ]).toEqual([6750, "Cukup", 4]);
     await client.execute(
       "UPDATE absensi_harian SET menit_terlambat = 0, status_kehadiran = 'Hadir' WHERE id_sesi = 's-10';",
     );
     const beku = await S.rincianKinerja(client, yayasan, id);
-    expect([beku.status, beku.nilai_akhir]).toEqual(["Final", 7250]);
+    expect([beku.status, beku.nilai_akhir]).toEqual(["Final", 6750]);
     expect(beku.tanda).toContain("otomatis_berubah");
-    expect(await galat(S.simpanKinerja(client, kepsek, isian(true)))).toBe(
+    expect(await galat(S.simpanKinerja(client, kepsek, isian(false)))).toBe(
       terkunci,
     );
 

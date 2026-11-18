@@ -5,6 +5,7 @@ import { hasPermission } from "@/lib/auth/access";
 import type { OperatorUser } from "@/lib/auth/operator-user";
 import type { PermissionKey } from "@/lib/rbac/catalog";
 import { ApiRequestError } from "@/lib/server/http/api-response";
+import { barisJadwalJp, barisPengajuanJp } from "@/lib/services/hr-pengajuan";
 import type { HolidayWhitelistEntry } from "@/lib/validations/holiday-whitelist";
 import { KEPALA_UNIT_SQL } from "@/lib/validations/hr-beban";
 import { kelompokStatus } from "@/lib/validations/hr-keluar";
@@ -22,6 +23,7 @@ import {
   HAPUS_NILAI_SQL,
   hariKehadiran,
   hitungKehadiran,
+  hitungMengajar,
   isianTersimpan,
   JENIS_KEPUTUSAN,
   type KandidatBerlaku,
@@ -36,14 +38,17 @@ import {
   type KeadaanKinerja,
   type Kehadiran,
   KINERJA_HARI_SQL,
+  KINERJA_JADWAL_SQL,
   KINERJA_MENUNGGU_SQL,
   KINERJA_PEGAWAI_SQL,
   KINERJA_PENGAJUAN_SQL,
+  KINERJA_PRESENSI_SQL,
   KINERJA_SP_SQL,
   KOREKSI_PENILAIAN_SQL,
   kinerjaBerlaku,
   LEPAS_BAWAAN_SQL,
   type MasukanPenilai,
+  type Mengajar,
   muatUlangTemplate,
   NILAI_KINERJA_SQL,
   nilaiAkhir,
@@ -68,6 +73,7 @@ import {
   periodeDariTahunAjaran,
   pesanBertumpuk,
   predikatNilai,
+  presensiKinerja,
   type RentangAktif,
   type RincianKinerja,
   type RiwayatKinerja,
@@ -87,8 +93,10 @@ import {
   TEMPLATE_SATU_SQL,
   type TemplateDraft,
   type TemplateKinerja,
+  TIPE_JURNAL,
   TIPE_KEHADIRAN,
   TIPE_MANUAL,
+  TIPE_PRESENSI,
   tandaKinerja,
   UBAH_PENILAIAN_SQL,
   validasiPengaturanKinerja,
@@ -99,6 +107,7 @@ import {
   dalamCakupan,
   jadwalDariBaris,
   LIBUR_SQL,
+  PENANGANAN_SQL,
   UNIT_PERSONIL_SQL,
   WHITELIST_SQL,
 } from "@/lib/validations/hr-pengajuan";
@@ -360,23 +369,35 @@ function masukanPenilai(
   };
 }
 
-/** Cermin `hitung_otomatis`: kehadiran atas rentang aktif. */
+interface Hitungan {
+  kehadiran: Kehadiran | null;
+  mengajar: Mengajar | null;
+}
+
+/** Cermin `hitung_otomatis`: kehadiran dan mengajar atas rentang aktif. */
 async function hitungOtomatis(
   client: Client,
   p: Row,
   rentang: RentangAktif | null,
   hari: string,
-  ambang: readonly number[],
-): Promise<Kehadiran | null> {
-  if (!rentang) return null;
-  const args = [rentang.mulai, rentang.akhir, teks(p, "id_unik")];
-  const [catatan, pengajuan, libur, whitelist] = await Promise.all([
-    barisJson(client, KINERJA_HARI_SQL, args),
-    baris(client, KINERJA_PENGAJUAN_SQL, args),
-    baris(client, LIBUR_SQL, [rentang.mulai, rentang.akhir]),
-    baris(client, WHITELIST_SQL),
-  ]);
-  return hitungKehadiran({
+  atur: PengaturanKinerja,
+): Promise<Hitungan> {
+  if (!rentang) return { kehadiran: null, mengajar: null };
+  const idGuru = teks(p, "id_unik");
+  const args = [rentang.mulai, rentang.akhir, idGuru];
+  const [catatan, pengajuan, libur, whitelist, jadwal, presensi, penanganan] =
+    await Promise.all([
+      barisJson(client, KINERJA_HARI_SQL, args),
+      baris(client, KINERJA_PENGAJUAN_SQL, args),
+      baris(client, LIBUR_SQL, [rentang.mulai, rentang.akhir]),
+      baris(client, WHITELIST_SQL),
+      baris(client, KINERJA_JADWAL_SQL, args),
+      baris(client, KINERJA_PRESENSI_SQL, args),
+      baris(client, PENANGANAN_SQL, [rentang.mulai, rentang.akhir]),
+    ]);
+  const setLibur = new Set(libur.map((r) => teks(r, "tanggal")));
+  const idBerlaku = new Set(pengajuan.map((r) => teks(r, "id_pengajuan")));
+  const kehadiran = hitungKehadiran({
     mulai: rentang.mulai,
     akhir: rentang.akhir,
     hari_ini: hari,
@@ -387,7 +408,7 @@ async function hitungOtomatis(
     }),
     hari: catatan.map(hariKehadiran),
     pengajuan: pengajuan.map((r) => pengajuanKehadiran({ ...r })),
-    libur: new Set(libur.map((r) => teks(r, "tanggal"))),
+    libur: setLibur,
     whitelist: whitelist.map(
       (w): HolidayWhitelistEntry => ({
         id: teks(w, "id"),
@@ -398,13 +419,50 @@ async function hitungOtomatis(
         status_aktif: angka(w, "status_aktif"),
       }),
     ),
-    ambang,
+    ambang: atur.ambang,
   });
+  const mengajar = hitungMengajar({
+    mulai: rentang.mulai,
+    akhir: rentang.akhir,
+    hari_ini: hari,
+    id_guru: idGuru,
+    jadwal: jadwal.map(barisJadwalJp),
+    presensi: presensi.map((r) => presensiKinerja({ ...r })),
+    pengajuan: pengajuan.map(barisPengajuanJp),
+    // `PENANGANAN_SQL` disaring ke pengajuan berlaku guru ini.
+    ditangani: new Set(
+      penanganan
+        .filter((h) => idBerlaku.has(teks(h, "id_pengajuan")))
+        .map((h) => teks(h, "id_penanganan")),
+    ),
+    libur: setLibur,
+    tanpa_kbm: atur.tanpa_kbm,
+    ambang: atur.ambang,
+  });
+  return { kehadiran, mengajar };
 }
 
-/** Presensi kelas dan jurnal menyusul di 5c; sampai itu diisi manual. */
-const petaOtomatis = (k: Kehadiran | null): Record<string, Otomatis> =>
-  k ? { [TIPE_KEHADIRAN]: { skor: k.skor, rincian: k.rincian } } : {};
+/** Cermin `peta_otomatis`; skor `null` (D = 0) diisi manual. */
+function petaOtomatis(h: Hitungan): Record<string, Otomatis> {
+  const peta: Record<string, Otomatis> = {};
+  if (h.kehadiran) {
+    peta[TIPE_KEHADIRAN] = {
+      skor: h.kehadiran.skor,
+      rincian: h.kehadiran.rincian,
+    };
+  }
+  if (h.mengajar) {
+    peta[TIPE_PRESENSI] = {
+      skor: h.mengajar.skor_presensi,
+      rincian: h.mengajar.rincian_presensi,
+    };
+    peta[TIPE_JURNAL] = {
+      skor: h.mengajar.skor_jurnal,
+      rincian: h.mengajar.rincian_jurnal,
+    };
+  }
+  return peta;
+}
 
 const barisNilai = (v: Row): BarisNilai => ({
   id_aspek: teks(v, "id_aspek"),
@@ -740,10 +798,10 @@ export async function rincianKinerja(
   const selesai = teks(p, "periode_selesai");
   const orang = (await pegawai(client, idK))[0];
   const rentang = orang ? rentangPegawai(orang, mulai, selesai) : null;
-  const kehadiran = orang
-    ? await hitungOtomatis(client, orang, rentang, hari, atur.ambang)
-    : null;
-  const hidup = petaOtomatis(kehadiran);
+  const hitungan = orang
+    ? await hitungOtomatis(client, orang, rentang, hari, atur)
+    : { kehadiran: null, mengajar: null };
+  const hidup = petaOtomatis(hitungan);
   const barisP = milik(nilai, id).map(barisNilai);
 
   const kepsek = await kepala(client, KEPALA_UNIT_SQL, selesai);
@@ -822,7 +880,8 @@ export async function rincianKinerja(
     keputusan: milik(keputusan, id).map((k) => ({ ...k })),
     nilai_akhir: nilaiP,
     predikat: predikatP,
-    kehadiran,
+    kehadiran: hitungan.kehadiran,
+    mengajar: hitungan.mengajar,
     hidup,
     rentang,
     keluarga: riwayat,
@@ -886,16 +945,10 @@ export async function simpanKinerja(
     if (awal) galat(awal);
     const kelompok = teks(orang, "kelompok");
     const template = await templateAspek(client, sah.id_template, kelompok);
-    const kehadiran = await hitungOtomatis(
-      client,
-      orang,
-      rentang,
-      hari,
-      atur.ambang,
+    const otomatis = petaOtomatis(
+      await hitungOtomatis(client, orang, rentang, hari, atur),
     );
-    const nilai = wajib(
-      susunNilai(template.aspek, sah.nilai, petaOtomatis(kehadiran)),
-    );
+    const nilai = wajib(susunNilai(template.aspek, sah.nilai, otomatis));
     const statusKini = (await statusKiniPegawai(client, hari)).get(idK) ?? "";
     const id = idBaru("knj-");
     await client.batch(
@@ -954,7 +1007,7 @@ export async function simpanKinerja(
     teks(orang, "unit"),
   );
   const otomatis = petaOtomatis(
-    await hitungOtomatis(client, orang, rentang, hari, atur.ambang),
+    await hitungOtomatis(client, orang, rentang, hari, atur),
   );
   const dihitung = sampai(rentang, hari);
 
@@ -1111,7 +1164,7 @@ export async function putuskanKinerja(
       teks(p, "periode_selesai"),
     );
     const otomatis = petaOtomatis(
-      await hitungOtomatis(client, orang, rentang, hari, atur.ambang),
+      await hitungOtomatis(client, orang, rentang, hari, atur),
     );
     keadaan.otomatis_sama = tersimpan.every((b) => {
       const o = otomatis[b.tipe];

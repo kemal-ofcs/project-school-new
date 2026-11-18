@@ -1,12 +1,19 @@
 import { describe, expect, test } from "bun:test";
 import type { RekapBeban, SetupSurat } from "@/lib/validations/hr-beban";
+import {
+  type BarisNilai,
+  type PenilaianKinerja,
+  TIPE_MANUAL,
+} from "@/lib/validations/hr-kinerja";
 import bawaan from "@/lib/validations/hr-surat-bawaan.json";
 import {
   barisSkPtm,
   dasarSurat,
   gabungJabatan,
+  type IsianLembarKinerja,
   kepalaUnit,
   ketuaYayasan,
+  lembarKinerja,
   nomorSurat,
   romawi,
   suratKeteranganAktif,
@@ -17,6 +24,7 @@ import {
   suratPeringatan,
   suratTugasLuar,
   suratTugasTambahan,
+  tanggalWibDari,
   unitSkTugas,
   uraiDasar,
 } from "./suratKepegawaian";
@@ -439,3 +447,235 @@ ${JAHAT}`,
     expect(ptm).toContain('<ol type="a">');
   });
 });
+
+describe("lembarKinerja (Fase 5c)", () => {
+  const kepala = {
+    kunci_unit: "smp",
+    unit: "SMP",
+    id_karyawan: "K1",
+    nama: "Ani",
+    gelar: "S.Pd.",
+    nip: "1980",
+  };
+  const penilaian = (
+    isi: Partial<PenilaianKinerja> = {},
+  ): PenilaianKinerja => ({
+    id_penilaian: "knj-1",
+    id_karyawan: "G1",
+    nama: "Guru Satu",
+    id_ref: "",
+    alasan_koreksi: "",
+    periode_jenis: "Semester",
+    periode_kunci: "ta-2",
+    periode_nama: "2023/2024 Semester Genap",
+    periode_mulai: "2024-01-08",
+    periode_selesai: "2024-01-19",
+    id_template: "ktp-guru",
+    template_nama: "Kinerja Guru",
+    kelompok: "Guru",
+    unit: "SMP",
+    jabatan: "Guru Mapel",
+    status_kepegawaian: "GTY",
+    id_penilai: "K1",
+    penilai_nama: "Ani",
+    penilai_oleh: "kepsek",
+    catatan: "",
+    dihitung_sampai: "2024-01-19",
+    dibuat_oleh: "kepsek",
+    created_at: "x",
+    updated_at: "x",
+    ...isi,
+  });
+  const baris = (isi: Partial<BarisNilai>): BarisNilai => ({
+    id_aspek: "a",
+    aspek_nama: "Aspek",
+    tipe: TIPE_MANUAL,
+    bobot: 10,
+    urutan: 0,
+    skor: 4,
+    skor_hitung: null,
+    catatan: null,
+    rincian: null,
+    ...isi,
+  });
+  const nilai: BarisNilai[] = [
+    baris({
+      id_aspek: "k",
+      aspek_nama: "Kehadiran",
+      tipe: "Otomatis Kehadiran",
+      skor: 3,
+      skor_hitung: 3,
+      rincian: "K|9|7|1|1|0|0|833|950,900,800,700|2024-01-19",
+    }),
+    baris({
+      id_aspek: "pk",
+      aspek_nama: "Keterisian presensi kelas",
+      tipe: "Otomatis Presensi Kelas",
+      skor: 4,
+      skor_hitung: 3,
+      catatan: "PTS tidak dicatat",
+      rincian: "PK|9|2|6|1|1|857|950,900,800,700|2024-01-19",
+    }),
+    baris({
+      id_aspek: "j",
+      aspek_nama: "Kelengkapan jurnal",
+      tipe: "Otomatis Jurnal",
+      skor: 3,
+      skor_hitung: 3,
+      rincian: "J|6|5|833|950,900,800,700|2024-01-19",
+    }),
+    baris({ id_aspek: "m", aspek_nama: "Supervisi", bobot: 70 }),
+  ];
+  const isian = (
+    isi: Partial<IsianLembarKinerja> = {},
+  ): IsianLembarKinerja => ({
+    penilaian: penilaian(),
+    status: "Final",
+    nilai,
+    nilai_akhir: 7000,
+    predikat: "Cukup",
+    rentang: { mulai: "2024-01-08", akhir: "2024-01-19", penuh: true },
+    ...isi,
+  });
+  const dasar = (isi: Partial<SetupSurat> = {}) => ({
+    setup: setup({
+      kepala: [kepala],
+      pengaturan: {
+        hr_surat_kota: "Bandung",
+        hr_surat_yayasan_ketua: "Pak Ketua",
+        hr_surat_yayasan_nama: "Yayasan Contoh",
+      },
+      pegawai: [
+        {
+          id_unik: "G1",
+          nama: "Guru Satu",
+          gelar: "S.Pd.",
+          nip: "1990",
+          nuptk: "123",
+          jabatan: "Guru",
+          unit: "SMP",
+          tmt: "2020-01-01",
+          guru: 1,
+        },
+      ],
+      status: [{ id_unik: "G1", status: "GTY" }],
+      ...isi,
+    }),
+    nomor: "",
+    tanggal: "2024-01-22",
+  });
+
+  test("tanggal Final UTC dibaca sebagai tanggal WIB", () => {
+    expect(tanggalWibDari("2024-01-21 18:30:00")).toBe("2024-01-22");
+    expect(tanggalWibDari("2024-01-21 16:59:59")).toBe("2024-01-21");
+    expect(tanggalWibDari("rusak")).toBe("");
+  });
+
+  test("hanya penilaian Final", () => {
+    expect(() => lembarKinerja(dasar(), isian({ status: "Diajukan" }))).toThrow(
+      "Hanya penilaian Final yang bisa dicetak.",
+    );
+  });
+
+  test("rumus aspek otomatis dari rincian beku, termasuk dihitung sampai", () => {
+    const html = lembarKinerja(dasar(), isian());
+    expect(html).toContain("LEMBAR HASIL PENILAIAN KINERJA GURU");
+    expect(html).toContain(
+      "(2 × tepat 7 + terlambat 1) ÷ (2 × 9 hari wajib) = 83,3%",
+    );
+    expect(html).toContain("presensi terisi 6 ÷ 7 JP terjadwal = 85,7%");
+    expect(html).toContain("1 belum ditangani");
+    expect(html).toContain("JP berjurnal 5 ÷ 6 JP terisi = 83,3%");
+    expect(html).toContain("Dihitung sampai 19 Januari 2024.");
+    expect(html).toContain("Hitungan 3, diubah penilai. PTS tidak dicatat");
+    expect(html).toContain("<strong>70,00</strong>");
+    expect(html).toContain("Cukup");
+    expect(html).toContain("Bandung, 22 Januari 2024");
+    expect(html).toContain("NUPTK");
+    expect(html).not.toContain("KOREKSI");
+  });
+
+  test("penilai kepala unit: mengetahui ketua yayasan; selain itu kepala unit", () => {
+    const sendiri = lembarKinerja(dasar(), isian());
+    expect(sendiri).toContain("Mengetahui, Ketua Yayasan Contoh");
+    expect(sendiri).toContain("Pak Ketua");
+    const wakil = lembarKinerja(
+      dasar(),
+      isian({
+        penilaian: penilaian({ id_penilai: "W1", penilai_nama: "Wakasek" }),
+      }),
+    );
+    expect(wakil).toContain("Mengetahui, Kepala SMP");
+    expect(wakil).toContain("Ani, S.Pd.");
+  });
+
+  test("koreksi dan periode tidak penuh", () => {
+    const html = lembarKinerja(
+      dasar(),
+      isian({
+        penilaian: penilaian({
+          id_ref: "knj-0",
+          alasan_koreksi: "absensi dikoreksi",
+        }),
+        rentang: { mulai: "2024-01-10", akhir: "2024-01-19", penuh: false },
+      }),
+    );
+    expect(html).toContain(
+      "<strong>KOREKSI</strong> atas penilaian sebelumnya: absensi dikoreksi",
+    );
+    expect(html).toContain("Masa aktif dinilai");
+    expect(html).toContain("10 Januari 2024 s.d. 19 Januari 2024");
+  });
+
+  test("D = 0 dan data kosong tidak merusak lembar", () => {
+    const html = lembarKinerja(
+      setupKosong(),
+      isian({
+        penilaian: penilaian({ kelompok: "Tendik", unit: "", id_penilai: "" }),
+        nilai: [
+          baris({
+            aspek_nama: "Kehadiran",
+            tipe: "Otomatis Kehadiran",
+            skor: 4,
+            catatan: "manual",
+            rincian: "K|0|0|0|0|0|0||950,900,800,700|2024-01-19",
+          }),
+        ],
+        nilai_akhir: null,
+        predikat: null,
+        rentang: null,
+      }),
+    );
+    expect(html).toContain("TENAGA KEPENDIDIKAN");
+    expect(html).toContain("tidak bisa dihitung, skor diisi penilai");
+    expect(html).not.toContain("NUPTK");
+    expect(html).not.toContain("undefined");
+    expect(html).not.toContain("null");
+  });
+
+  test("nilai jahat di-escape", () => {
+    const html = lembarKinerja(
+      dasar({ pengaturan: { hr_surat_kota: JAHAT } }),
+      isian({
+        penilaian: penilaian({
+          nama: JAHAT,
+          id_karyawan: "X",
+          catatan: JAHAT,
+          template_nama: JAHAT,
+          penilai_nama: JAHAT,
+          periode_nama: JAHAT,
+          id_ref: "knj-0",
+          alasan_koreksi: JAHAT,
+        }),
+        nilai: [baris({ aspek_nama: JAHAT, catatan: JAHAT })],
+        predikat: JAHAT,
+      }),
+    );
+    expect(html).not.toContain("<script>");
+    expect(html).toContain("&lt;script&gt;&quot;&amp;");
+  });
+});
+
+function setupKosong() {
+  return { setup: setup(), nomor: "", tanggal: "" };
+}

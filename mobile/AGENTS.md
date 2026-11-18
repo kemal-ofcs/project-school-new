@@ -61,7 +61,7 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
    - `password_reset.approve` masuk `SENSITIVE_MUTATION_PERMISSIONS` bersama `password_reset.delete`.
    - `generateRecoveryCodes`/`normalizeRecoveryCode` (TS) dan padanan Rust-nya wajib tetap identik, termasuk membuang setiap karakter non-alfanumerik.
 13. **Invarian Kritis Arsitektur Sinkronisasi & Keamanan**:
-    - **Paritas SNAPSHOT_SOURCES**: Seluruh 28 tabel snapshot wajib terdaftar di `SNAPSHOT_SOURCES` (`turso.rs:625`) dan `SNAPSHOT_TABLES` (`sync.rs`).
+    - **Paritas SNAPSHOT_SOURCES**: Setiap tabel snapshot (jumlahnya dihitung di kode, bukan dari dokumen) wajib terdaftar di `SNAPSHOT_SOURCES` (`turso.rs`) dan `SNAPSHOT_TABLES` (`sync.rs`).
     - **Format Scanner `id|token`**: Scanner strictly expects `id|token`. Setiap entitas personil wajib menghasilkan token acak dan menyimpan `qr_code = format!("{id}|{token}")`.
     - **Larangan UNIQUE Constraint**: Dilarang memasang `UNIQUE` constraint pada kolom bisnis tabel yang disinkronkan selain PK (cegah outbox macet permanen).
     - **Mutasi Multi-Tabel Atomik**: Hapus/nonaktifkan personil wajib memperbarui `master_data.status_aktif = 'Nonaktif'` secara atomik (cegah zombie resurrection).

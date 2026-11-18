@@ -5563,5 +5563,1512 @@
       },
       "hasil": null
     }
+  ],
+  "mengajar": [
+    {
+      "nama": "gabungan dua rombel jam 3, empat Senin satu libur: 10/12 = 833 -> 3; jurnal 9/10 = 900 -> 4",
+      "masukan": {
+        "mulai": "2024-01-01",
+        "akhir": "2024-01-22",
+        "hari_ini": "2026-11-18",
+        "id_guru": "G1",
+        "jadwal": [
+          {
+            "id_jadwal": "jd-a",
+            "id_guru": "G1",
+            "hari": 1,
+            "jam_ke": "1-2",
+            "id_rombel": "A",
+            "nama_rombel": "Kelas A",
+            "id_mapel": "mp-1",
+            "nama_mapel": "Mapel mp-1",
+            "unit": "SMP",
+            "ta_mulai": "2024-01-01",
+            "ta_selesai": "2024-06-30"
+          },
+          {
+            "id_jadwal": "jd-b",
+            "id_guru": "G1",
+            "hari": 1,
+            "jam_ke": "3",
+            "id_rombel": "B",
+            "nama_rombel": "Kelas B",
+            "id_mapel": "mp-1",
+            "nama_mapel": "Mapel mp-1",
+            "unit": "SMP",
+            "ta_mulai": "2024-01-01",
+            "ta_selesai": "2024-06-30"
+          },
+          {
+            "id_jadwal": "jd-c",
+            "id_guru": "G1",
+            "hari": 1,
+            "jam_ke": "3",
+            "id_rombel": "C",
+            "nama_rombel": "Kelas C",
+            "id_mapel": "mp-1",
+            "nama_mapel": "Mapel mp-1",
+            "unit": "SMP",
+            "ta_mulai": "2024-01-01",
+            "ta_selesai": "2024-06-30"
+          }
+        ],
+        "presensi": [
+          {
+            "id_rombel": "A",
+            "tanggal": "2024-01-08",
+            "jam_ke": "1-2",
+            "berjurnal": 1
+          },
+          {
+            "id_rombel": "B",
+            "tanggal": "2024-01-08",
+            "jam_ke": "3",
+            "berjurnal": 1
+          },
+          {
+            "id_rombel": "C",
+            "tanggal": "2024-01-08",
+            "jam_ke": "3",
+            "berjurnal": 1
+          },
+          {
+            "id_rombel": "A",
+            "tanggal": "2024-01-15",
+            "jam_ke": "1-2",
+            "berjurnal": 1
+          },
+          {
+            "id_rombel": "B",
+            "tanggal": "2024-01-15",
+            "jam_ke": "3",
+            "berjurnal": 1
+          },
+          {
+            "id_rombel": "C",
+            "tanggal": "2024-01-15",
+            "jam_ke": "3",
+            "berjurnal": 1
+          },
+          {
+            "id_rombel": "B",
+            "tanggal": "2024-01-22",
+            "jam_ke": "3",
+            "berjurnal": 0
+          },
+          {
+            "id_rombel": "C",
+            "tanggal": "2024-01-22",
+            "jam_ke": "3",
+            "berjurnal": 1
+          }
+        ],
+        "pengajuan": [],
+        "ditangani": [],
+        "libur": ["2024-01-01"],
+        "tanpa_kbm": [],
+        "ambang": [950, 900, 800, 700]
+      },
+      "hasil": {
+        "satuan": 12,
+        "dikecualikan": 0,
+        "terisi": 10,
+        "berjurnal": 9,
+        "pengganti": 0,
+        "tanpa_penanganan": 0,
+        "permil_presensi": 833,
+        "skor_presensi": 3,
+        "permil_jurnal": 900,
+        "skor_jurnal": 4,
+        "ambang": [950, 900, 800, 700],
+        "sampai": "2024-01-22",
+        "rincian_presensi": "PK|12|0|10|0|0|833|950,900,800,700|2024-01-22",
+        "rincian_jurnal": "J|10|9|900|950,900,800,700|2024-01-22",
+        "belum_terisi": [
+          {
+            "tanggal": "2024-01-22",
+            "jam": 1,
+            "id_rombel": "A",
+            "nama_rombel": "Kelas A"
+          },
+          {
+            "tanggal": "2024-01-22",
+            "jam": 2,
+            "id_rombel": "A",
+            "nama_rombel": "Kelas A"
+          }
+        ],
+        "tanpa_jurnal": [
+          {
+            "tanggal": "2024-01-22",
+            "jam": 3,
+            "id_rombel": "B",
+            "nama_rombel": "Kelas B"
+          }
+        ]
+      }
+    },
+    {
+      "nama": "izin berlaku jam 1-2 menutup Senin yang kosong: 10/10 = 1000 -> 5, tanpa penanganan 2",
+      "masukan": {
+        "mulai": "2024-01-01",
+        "akhir": "2024-01-22",
+        "hari_ini": "2026-11-18",
+        "id_guru": "G1",
+        "jadwal": [
+          {
+            "id_jadwal": "jd-a",
+            "id_guru": "G1",
+            "hari": 1,
+            "jam_ke": "1-2",
+            "id_rombel": "A",
+            "nama_rombel": "Kelas A",
+            "id_mapel": "mp-1",
+            "nama_mapel": "Mapel mp-1",
+            "unit": "SMP",
+            "ta_mulai": "2024-01-01",
+            "ta_selesai": "2024-06-30"
+          },
+          {
+            "id_jadwal": "jd-b",
+            "id_guru": "G1",
+            "hari": 1,
+            "jam_ke": "3",
+            "id_rombel": "B",
+            "nama_rombel": "Kelas B",
+            "id_mapel": "mp-1",
+            "nama_mapel": "Mapel mp-1",
+            "unit": "SMP",
+            "ta_mulai": "2024-01-01",
+            "ta_selesai": "2024-06-30"
+          },
+          {
+            "id_jadwal": "jd-c",
+            "id_guru": "G1",
+            "hari": 1,
+            "jam_ke": "3",
+            "id_rombel": "C",
+            "nama_rombel": "Kelas C",
+            "id_mapel": "mp-1",
+            "nama_mapel": "Mapel mp-1",
+            "unit": "SMP",
+            "ta_mulai": "2024-01-01",
+            "ta_selesai": "2024-06-30"
+          }
+        ],
+        "presensi": [
+          {
+            "id_rombel": "A",
+            "tanggal": "2024-01-08",
+            "jam_ke": "1-2",
+            "berjurnal": 1
+          },
+          {
+            "id_rombel": "B",
+            "tanggal": "2024-01-08",
+            "jam_ke": "3",
+            "berjurnal": 1
+          },
+          {
+            "id_rombel": "C",
+            "tanggal": "2024-01-08",
+            "jam_ke": "3",
+            "berjurnal": 1
+          },
+          {
+            "id_rombel": "A",
+            "tanggal": "2024-01-15",
+            "jam_ke": "1-2",
+            "berjurnal": 1
+          },
+          {
+            "id_rombel": "B",
+            "tanggal": "2024-01-15",
+            "jam_ke": "3",
+            "berjurnal": 1
+          },
+          {
+            "id_rombel": "C",
+            "tanggal": "2024-01-15",
+            "jam_ke": "3",
+            "berjurnal": 1
+          },
+          {
+            "id_rombel": "B",
+            "tanggal": "2024-01-22",
+            "jam_ke": "3",
+            "berjurnal": 0
+          },
+          {
+            "id_rombel": "C",
+            "tanggal": "2024-01-22",
+            "jam_ke": "3",
+            "berjurnal": 1
+          }
+        ],
+        "pengajuan": [
+          {
+            "id_pengajuan": "pg-1",
+            "id_karyawan": "G1",
+            "tanggal_mulai": "2024-01-22",
+            "tanggal_selesai": "2024-01-22",
+            "jam_mulai_ke": 1,
+            "jam_sampai_ke": 2
+          }
+        ],
+        "ditangani": [],
+        "libur": ["2024-01-01"],
+        "tanpa_kbm": [],
+        "ambang": [950, 900, 800, 700]
+      },
+      "hasil": {
+        "satuan": 12,
+        "dikecualikan": 2,
+        "terisi": 10,
+        "berjurnal": 9,
+        "pengganti": 0,
+        "tanpa_penanganan": 2,
+        "permil_presensi": 1000,
+        "skor_presensi": 5,
+        "permil_jurnal": 900,
+        "skor_jurnal": 4,
+        "ambang": [950, 900, 800, 700],
+        "sampai": "2024-01-22",
+        "rincian_presensi": "PK|12|2|10|0|2|1000|950,900,800,700|2024-01-22",
+        "rincian_jurnal": "J|10|9|900|950,900,800,700|2024-01-22",
+        "belum_terisi": [],
+        "tanpa_jurnal": [
+          {
+            "tanggal": "2024-01-22",
+            "jam": 3,
+            "id_rombel": "B",
+            "nama_rombel": "Kelas B"
+          }
+        ]
+      }
+    },
+    {
+      "nama": "JP izin yang sudah ditangani tidak dihitung tanpa penanganan",
+      "masukan": {
+        "mulai": "2024-01-01",
+        "akhir": "2024-01-22",
+        "hari_ini": "2026-11-18",
+        "id_guru": "G1",
+        "jadwal": [
+          {
+            "id_jadwal": "jd-a",
+            "id_guru": "G1",
+            "hari": 1,
+            "jam_ke": "1-2",
+            "id_rombel": "A",
+            "nama_rombel": "Kelas A",
+            "id_mapel": "mp-1",
+            "nama_mapel": "Mapel mp-1",
+            "unit": "SMP",
+            "ta_mulai": "2024-01-01",
+            "ta_selesai": "2024-06-30"
+          },
+          {
+            "id_jadwal": "jd-b",
+            "id_guru": "G1",
+            "hari": 1,
+            "jam_ke": "3",
+            "id_rombel": "B",
+            "nama_rombel": "Kelas B",
+            "id_mapel": "mp-1",
+            "nama_mapel": "Mapel mp-1",
+            "unit": "SMP",
+            "ta_mulai": "2024-01-01",
+            "ta_selesai": "2024-06-30"
+          },
+          {
+            "id_jadwal": "jd-c",
+            "id_guru": "G1",
+            "hari": 1,
+            "jam_ke": "3",
+            "id_rombel": "C",
+            "nama_rombel": "Kelas C",
+            "id_mapel": "mp-1",
+            "nama_mapel": "Mapel mp-1",
+            "unit": "SMP",
+            "ta_mulai": "2024-01-01",
+            "ta_selesai": "2024-06-30"
+          }
+        ],
+        "presensi": [
+          {
+            "id_rombel": "A",
+            "tanggal": "2024-01-08",
+            "jam_ke": "1-2",
+            "berjurnal": 1
+          },
+          {
+            "id_rombel": "B",
+            "tanggal": "2024-01-08",
+            "jam_ke": "3",
+            "berjurnal": 1
+          },
+          {
+            "id_rombel": "C",
+            "tanggal": "2024-01-08",
+            "jam_ke": "3",
+            "berjurnal": 1
+          },
+          {
+            "id_rombel": "A",
+            "tanggal": "2024-01-15",
+            "jam_ke": "1-2",
+            "berjurnal": 1
+          },
+          {
+            "id_rombel": "B",
+            "tanggal": "2024-01-15",
+            "jam_ke": "3",
+            "berjurnal": 1
+          },
+          {
+            "id_rombel": "C",
+            "tanggal": "2024-01-15",
+            "jam_ke": "3",
+            "berjurnal": 1
+          },
+          {
+            "id_rombel": "B",
+            "tanggal": "2024-01-22",
+            "jam_ke": "3",
+            "berjurnal": 0
+          },
+          {
+            "id_rombel": "C",
+            "tanggal": "2024-01-22",
+            "jam_ke": "3",
+            "berjurnal": 1
+          }
+        ],
+        "pengajuan": [
+          {
+            "id_pengajuan": "pg-1",
+            "id_karyawan": "G1",
+            "tanggal_mulai": "2024-01-22",
+            "tanggal_selesai": "2024-01-22",
+            "jam_mulai_ke": 1,
+            "jam_sampai_ke": 2
+          }
+        ],
+        "ditangani": ["jp:pg-1:2024-01-22:jd-a"],
+        "libur": ["2024-01-01"],
+        "tanpa_kbm": [],
+        "ambang": [950, 900, 800, 700]
+      },
+      "hasil": {
+        "satuan": 12,
+        "dikecualikan": 2,
+        "terisi": 10,
+        "berjurnal": 9,
+        "pengganti": 0,
+        "tanpa_penanganan": 0,
+        "permil_presensi": 1000,
+        "skor_presensi": 5,
+        "permil_jurnal": 900,
+        "skor_jurnal": 4,
+        "ambang": [950, 900, 800, 700],
+        "sampai": "2024-01-22",
+        "rincian_presensi": "PK|12|2|10|0|0|1000|950,900,800,700|2024-01-22",
+        "rincian_jurnal": "J|10|9|900|950,900,800,700|2024-01-22",
+        "belum_terisi": [],
+        "tanpa_jurnal": [
+          {
+            "tanggal": "2024-01-22",
+            "jam": 3,
+            "id_rombel": "B",
+            "nama_rombel": "Kelas B"
+          }
+        ]
+      }
+    },
+    {
+      "nama": "sesi kembar dari dua perangkat tidak menggandakan",
+      "masukan": {
+        "mulai": "2024-01-01",
+        "akhir": "2024-01-22",
+        "hari_ini": "2026-11-18",
+        "id_guru": "G1",
+        "jadwal": [
+          {
+            "id_jadwal": "jd-a",
+            "id_guru": "G1",
+            "hari": 1,
+            "jam_ke": "1-2",
+            "id_rombel": "A",
+            "nama_rombel": "Kelas A",
+            "id_mapel": "mp-1",
+            "nama_mapel": "Mapel mp-1",
+            "unit": "SMP",
+            "ta_mulai": "2024-01-01",
+            "ta_selesai": "2024-06-30"
+          },
+          {
+            "id_jadwal": "jd-b",
+            "id_guru": "G1",
+            "hari": 1,
+            "jam_ke": "3",
+            "id_rombel": "B",
+            "nama_rombel": "Kelas B",
+            "id_mapel": "mp-1",
+            "nama_mapel": "Mapel mp-1",
+            "unit": "SMP",
+            "ta_mulai": "2024-01-01",
+            "ta_selesai": "2024-06-30"
+          },
+          {
+            "id_jadwal": "jd-c",
+            "id_guru": "G1",
+            "hari": 1,
+            "jam_ke": "3",
+            "id_rombel": "C",
+            "nama_rombel": "Kelas C",
+            "id_mapel": "mp-1",
+            "nama_mapel": "Mapel mp-1",
+            "unit": "SMP",
+            "ta_mulai": "2024-01-01",
+            "ta_selesai": "2024-06-30"
+          }
+        ],
+        "presensi": [
+          {
+            "id_rombel": "A",
+            "tanggal": "2024-01-08",
+            "jam_ke": "1-2",
+            "berjurnal": 1
+          },
+          {
+            "id_rombel": "B",
+            "tanggal": "2024-01-08",
+            "jam_ke": "3",
+            "berjurnal": 1
+          },
+          {
+            "id_rombel": "C",
+            "tanggal": "2024-01-08",
+            "jam_ke": "3",
+            "berjurnal": 1
+          },
+          {
+            "id_rombel": "A",
+            "tanggal": "2024-01-15",
+            "jam_ke": "1-2",
+            "berjurnal": 1
+          },
+          {
+            "id_rombel": "B",
+            "tanggal": "2024-01-15",
+            "jam_ke": "3",
+            "berjurnal": 1
+          },
+          {
+            "id_rombel": "C",
+            "tanggal": "2024-01-15",
+            "jam_ke": "3",
+            "berjurnal": 1
+          },
+          {
+            "id_rombel": "B",
+            "tanggal": "2024-01-22",
+            "jam_ke": "3",
+            "berjurnal": 0
+          },
+          {
+            "id_rombel": "C",
+            "tanggal": "2024-01-22",
+            "jam_ke": "3",
+            "berjurnal": 1
+          },
+          {
+            "id_rombel": "A",
+            "tanggal": "2024-01-08",
+            "jam_ke": "1-2",
+            "berjurnal": 0
+          },
+          {
+            "id_rombel": "C",
+            "tanggal": "2024-01-15",
+            "jam_ke": "3",
+            "berjurnal": 1
+          }
+        ],
+        "pengajuan": [],
+        "ditangani": [],
+        "libur": ["2024-01-01"],
+        "tanpa_kbm": [],
+        "ambang": [950, 900, 800, 700]
+      },
+      "hasil": {
+        "satuan": 12,
+        "dikecualikan": 0,
+        "terisi": 10,
+        "berjurnal": 9,
+        "pengganti": 0,
+        "tanpa_penanganan": 0,
+        "permil_presensi": 833,
+        "skor_presensi": 3,
+        "permil_jurnal": 900,
+        "skor_jurnal": 4,
+        "ambang": [950, 900, 800, 700],
+        "sampai": "2024-01-22",
+        "rincian_presensi": "PK|12|0|10|0|0|833|950,900,800,700|2024-01-22",
+        "rincian_jurnal": "J|10|9|900|950,900,800,700|2024-01-22",
+        "belum_terisi": [
+          {
+            "tanggal": "2024-01-22",
+            "jam": 1,
+            "id_rombel": "A",
+            "nama_rombel": "Kelas A"
+          },
+          {
+            "tanggal": "2024-01-22",
+            "jam": 2,
+            "id_rombel": "A",
+            "nama_rombel": "Kelas A"
+          }
+        ],
+        "tanpa_jurnal": [
+          {
+            "tanggal": "2024-01-22",
+            "jam": 3,
+            "id_rombel": "B",
+            "nama_rombel": "Kelas B"
+          }
+        ]
+      }
+    },
+    {
+      "nama": "agama: guru lain di rombel dan jam yang sama tidak ikut dihitung",
+      "masukan": {
+        "mulai": "2024-01-01",
+        "akhir": "2024-01-22",
+        "hari_ini": "2026-11-18",
+        "id_guru": "G1",
+        "jadwal": [
+          {
+            "id_jadwal": "jd-a",
+            "id_guru": "G1",
+            "hari": 1,
+            "jam_ke": "1-2",
+            "id_rombel": "A",
+            "nama_rombel": "Kelas A",
+            "id_mapel": "mp-1",
+            "nama_mapel": "Mapel mp-1",
+            "unit": "SMP",
+            "ta_mulai": "2024-01-01",
+            "ta_selesai": "2024-06-30"
+          },
+          {
+            "id_jadwal": "jd-b",
+            "id_guru": "G1",
+            "hari": 1,
+            "jam_ke": "3",
+            "id_rombel": "B",
+            "nama_rombel": "Kelas B",
+            "id_mapel": "mp-1",
+            "nama_mapel": "Mapel mp-1",
+            "unit": "SMP",
+            "ta_mulai": "2024-01-01",
+            "ta_selesai": "2024-06-30"
+          },
+          {
+            "id_jadwal": "jd-c",
+            "id_guru": "G1",
+            "hari": 1,
+            "jam_ke": "3",
+            "id_rombel": "C",
+            "nama_rombel": "Kelas C",
+            "id_mapel": "mp-1",
+            "nama_mapel": "Mapel mp-1",
+            "unit": "SMP",
+            "ta_mulai": "2024-01-01",
+            "ta_selesai": "2024-06-30"
+          },
+          {
+            "id_jadwal": "jd-g2",
+            "id_guru": "G2",
+            "hari": 1,
+            "jam_ke": "3",
+            "id_rombel": "B",
+            "nama_rombel": "Kelas B",
+            "id_mapel": "mp-agama",
+            "nama_mapel": "Mapel mp-agama",
+            "unit": "SMP",
+            "ta_mulai": "2024-01-01",
+            "ta_selesai": "2024-06-30"
+          }
+        ],
+        "presensi": [
+          {
+            "id_rombel": "A",
+            "tanggal": "2024-01-08",
+            "jam_ke": "1-2",
+            "berjurnal": 1
+          },
+          {
+            "id_rombel": "B",
+            "tanggal": "2024-01-08",
+            "jam_ke": "3",
+            "berjurnal": 1
+          },
+          {
+            "id_rombel": "C",
+            "tanggal": "2024-01-08",
+            "jam_ke": "3",
+            "berjurnal": 1
+          },
+          {
+            "id_rombel": "A",
+            "tanggal": "2024-01-15",
+            "jam_ke": "1-2",
+            "berjurnal": 1
+          },
+          {
+            "id_rombel": "B",
+            "tanggal": "2024-01-15",
+            "jam_ke": "3",
+            "berjurnal": 1
+          },
+          {
+            "id_rombel": "C",
+            "tanggal": "2024-01-15",
+            "jam_ke": "3",
+            "berjurnal": 1
+          },
+          {
+            "id_rombel": "B",
+            "tanggal": "2024-01-22",
+            "jam_ke": "3",
+            "berjurnal": 0
+          },
+          {
+            "id_rombel": "C",
+            "tanggal": "2024-01-22",
+            "jam_ke": "3",
+            "berjurnal": 1
+          }
+        ],
+        "pengajuan": [],
+        "ditangani": [],
+        "libur": ["2024-01-01"],
+        "tanpa_kbm": [],
+        "ambang": [950, 900, 800, 700]
+      },
+      "hasil": {
+        "satuan": 12,
+        "dikecualikan": 0,
+        "terisi": 10,
+        "berjurnal": 9,
+        "pengganti": 0,
+        "tanpa_penanganan": 0,
+        "permil_presensi": 833,
+        "skor_presensi": 3,
+        "permil_jurnal": 900,
+        "skor_jurnal": 4,
+        "ambang": [950, 900, 800, 700],
+        "sampai": "2024-01-22",
+        "rincian_presensi": "PK|12|0|10|0|0|833|950,900,800,700|2024-01-22",
+        "rincian_jurnal": "J|10|9|900|950,900,800,700|2024-01-22",
+        "belum_terisi": [
+          {
+            "tanggal": "2024-01-22",
+            "jam": 1,
+            "id_rombel": "A",
+            "nama_rombel": "Kelas A"
+          },
+          {
+            "tanggal": "2024-01-22",
+            "jam": 2,
+            "id_rombel": "A",
+            "nama_rombel": "Kelas A"
+          }
+        ],
+        "tanpa_jurnal": [
+          {
+            "tanggal": "2024-01-22",
+            "jam": 3,
+            "id_rombel": "B",
+            "nama_rombel": "Kelas B"
+          }
+        ]
+      }
+    },
+    {
+      "nama": "presensi sebagai pengganti hanya informasi",
+      "masukan": {
+        "mulai": "2024-01-01",
+        "akhir": "2024-01-22",
+        "hari_ini": "2026-11-18",
+        "id_guru": "G1",
+        "jadwal": [
+          {
+            "id_jadwal": "jd-a",
+            "id_guru": "G1",
+            "hari": 1,
+            "jam_ke": "1-2",
+            "id_rombel": "A",
+            "nama_rombel": "Kelas A",
+            "id_mapel": "mp-1",
+            "nama_mapel": "Mapel mp-1",
+            "unit": "SMP",
+            "ta_mulai": "2024-01-01",
+            "ta_selesai": "2024-06-30"
+          },
+          {
+            "id_jadwal": "jd-b",
+            "id_guru": "G1",
+            "hari": 1,
+            "jam_ke": "3",
+            "id_rombel": "B",
+            "nama_rombel": "Kelas B",
+            "id_mapel": "mp-1",
+            "nama_mapel": "Mapel mp-1",
+            "unit": "SMP",
+            "ta_mulai": "2024-01-01",
+            "ta_selesai": "2024-06-30"
+          },
+          {
+            "id_jadwal": "jd-c",
+            "id_guru": "G1",
+            "hari": 1,
+            "jam_ke": "3",
+            "id_rombel": "C",
+            "nama_rombel": "Kelas C",
+            "id_mapel": "mp-1",
+            "nama_mapel": "Mapel mp-1",
+            "unit": "SMP",
+            "ta_mulai": "2024-01-01",
+            "ta_selesai": "2024-06-30"
+          }
+        ],
+        "presensi": [
+          {
+            "id_rombel": "A",
+            "tanggal": "2024-01-08",
+            "jam_ke": "1-2",
+            "berjurnal": 1
+          },
+          {
+            "id_rombel": "B",
+            "tanggal": "2024-01-08",
+            "jam_ke": "3",
+            "berjurnal": 1
+          },
+          {
+            "id_rombel": "C",
+            "tanggal": "2024-01-08",
+            "jam_ke": "3",
+            "berjurnal": 1
+          },
+          {
+            "id_rombel": "A",
+            "tanggal": "2024-01-15",
+            "jam_ke": "1-2",
+            "berjurnal": 1
+          },
+          {
+            "id_rombel": "B",
+            "tanggal": "2024-01-15",
+            "jam_ke": "3",
+            "berjurnal": 1
+          },
+          {
+            "id_rombel": "C",
+            "tanggal": "2024-01-15",
+            "jam_ke": "3",
+            "berjurnal": 1
+          },
+          {
+            "id_rombel": "B",
+            "tanggal": "2024-01-22",
+            "jam_ke": "3",
+            "berjurnal": 0
+          },
+          {
+            "id_rombel": "C",
+            "tanggal": "2024-01-22",
+            "jam_ke": "3",
+            "berjurnal": 1
+          },
+          {
+            "id_rombel": "D",
+            "tanggal": "2024-01-09",
+            "jam_ke": "5-6",
+            "berjurnal": 1
+          },
+          {
+            "id_rombel": "B",
+            "tanggal": "2024-01-29",
+            "jam_ke": "3",
+            "berjurnal": 1
+          }
+        ],
+        "pengajuan": [],
+        "ditangani": [],
+        "libur": ["2024-01-01"],
+        "tanpa_kbm": [],
+        "ambang": [950, 900, 800, 700]
+      },
+      "hasil": {
+        "satuan": 12,
+        "dikecualikan": 0,
+        "terisi": 10,
+        "berjurnal": 9,
+        "pengganti": 2,
+        "tanpa_penanganan": 0,
+        "permil_presensi": 833,
+        "skor_presensi": 3,
+        "permil_jurnal": 900,
+        "skor_jurnal": 4,
+        "ambang": [950, 900, 800, 700],
+        "sampai": "2024-01-22",
+        "rincian_presensi": "PK|12|0|10|2|0|833|950,900,800,700|2024-01-22",
+        "rincian_jurnal": "J|10|9|900|950,900,800,700|2024-01-22",
+        "belum_terisi": [
+          {
+            "tanggal": "2024-01-22",
+            "jam": 1,
+            "id_rombel": "A",
+            "nama_rombel": "Kelas A"
+          },
+          {
+            "tanggal": "2024-01-22",
+            "jam": 2,
+            "id_rombel": "A",
+            "nama_rombel": "Kelas A"
+          }
+        ],
+        "tanpa_jurnal": [
+          {
+            "tanggal": "2024-01-22",
+            "jam": 3,
+            "id_rombel": "B",
+            "nama_rombel": "Kelas B"
+          }
+        ]
+      }
+    },
+    {
+      "nama": "rentang tanpa KBM melewati Senin 15",
+      "masukan": {
+        "mulai": "2024-01-01",
+        "akhir": "2024-01-22",
+        "hari_ini": "2026-11-18",
+        "id_guru": "G1",
+        "jadwal": [
+          {
+            "id_jadwal": "jd-a",
+            "id_guru": "G1",
+            "hari": 1,
+            "jam_ke": "1-2",
+            "id_rombel": "A",
+            "nama_rombel": "Kelas A",
+            "id_mapel": "mp-1",
+            "nama_mapel": "Mapel mp-1",
+            "unit": "SMP",
+            "ta_mulai": "2024-01-01",
+            "ta_selesai": "2024-06-30"
+          },
+          {
+            "id_jadwal": "jd-b",
+            "id_guru": "G1",
+            "hari": 1,
+            "jam_ke": "3",
+            "id_rombel": "B",
+            "nama_rombel": "Kelas B",
+            "id_mapel": "mp-1",
+            "nama_mapel": "Mapel mp-1",
+            "unit": "SMP",
+            "ta_mulai": "2024-01-01",
+            "ta_selesai": "2024-06-30"
+          },
+          {
+            "id_jadwal": "jd-c",
+            "id_guru": "G1",
+            "hari": 1,
+            "jam_ke": "3",
+            "id_rombel": "C",
+            "nama_rombel": "Kelas C",
+            "id_mapel": "mp-1",
+            "nama_mapel": "Mapel mp-1",
+            "unit": "SMP",
+            "ta_mulai": "2024-01-01",
+            "ta_selesai": "2024-06-30"
+          }
+        ],
+        "presensi": [
+          {
+            "id_rombel": "A",
+            "tanggal": "2024-01-08",
+            "jam_ke": "1-2",
+            "berjurnal": 1
+          },
+          {
+            "id_rombel": "B",
+            "tanggal": "2024-01-08",
+            "jam_ke": "3",
+            "berjurnal": 1
+          },
+          {
+            "id_rombel": "C",
+            "tanggal": "2024-01-08",
+            "jam_ke": "3",
+            "berjurnal": 1
+          },
+          {
+            "id_rombel": "A",
+            "tanggal": "2024-01-15",
+            "jam_ke": "1-2",
+            "berjurnal": 1
+          },
+          {
+            "id_rombel": "B",
+            "tanggal": "2024-01-15",
+            "jam_ke": "3",
+            "berjurnal": 1
+          },
+          {
+            "id_rombel": "C",
+            "tanggal": "2024-01-15",
+            "jam_ke": "3",
+            "berjurnal": 1
+          },
+          {
+            "id_rombel": "B",
+            "tanggal": "2024-01-22",
+            "jam_ke": "3",
+            "berjurnal": 0
+          },
+          {
+            "id_rombel": "C",
+            "tanggal": "2024-01-22",
+            "jam_ke": "3",
+            "berjurnal": 1
+          }
+        ],
+        "pengajuan": [],
+        "ditangani": [],
+        "libur": ["2024-01-01"],
+        "tanpa_kbm": [
+          {
+            "mulai": "2024-01-15",
+            "selesai": "2024-01-19",
+            "nama": "PTS"
+          }
+        ],
+        "ambang": [950, 900, 800, 700]
+      },
+      "hasil": {
+        "satuan": 8,
+        "dikecualikan": 0,
+        "terisi": 6,
+        "berjurnal": 5,
+        "pengganti": 0,
+        "tanpa_penanganan": 0,
+        "permil_presensi": 750,
+        "skor_presensi": 2,
+        "permil_jurnal": 833,
+        "skor_jurnal": 3,
+        "ambang": [950, 900, 800, 700],
+        "sampai": "2024-01-22",
+        "rincian_presensi": "PK|8|0|6|0|0|750|950,900,800,700|2024-01-22",
+        "rincian_jurnal": "J|6|5|833|950,900,800,700|2024-01-22",
+        "belum_terisi": [
+          {
+            "tanggal": "2024-01-22",
+            "jam": 1,
+            "id_rombel": "A",
+            "nama_rombel": "Kelas A"
+          },
+          {
+            "tanggal": "2024-01-22",
+            "jam": 2,
+            "id_rombel": "A",
+            "nama_rombel": "Kelas A"
+          }
+        ],
+        "tanpa_jurnal": [
+          {
+            "tanggal": "2024-01-22",
+            "jam": 3,
+            "id_rombel": "B",
+            "nama_rombel": "Kelas B"
+          }
+        ]
+      }
+    },
+    {
+      "nama": "tanggal di luar semester jadwal tidak menjadi satuan; presensinya terbaca pengganti",
+      "masukan": {
+        "mulai": "2024-01-01",
+        "akhir": "2024-01-22",
+        "hari_ini": "2026-11-18",
+        "id_guru": "G1",
+        "jadwal": [
+          {
+            "id_jadwal": "jd-a",
+            "id_guru": "G1",
+            "hari": 1,
+            "jam_ke": "1-2",
+            "id_rombel": "A",
+            "nama_rombel": "Kelas A",
+            "id_mapel": "mp-1",
+            "nama_mapel": "Mapel mp-1",
+            "unit": "SMP",
+            "ta_mulai": "2024-01-10",
+            "ta_selesai": "2024-06-30"
+          },
+          {
+            "id_jadwal": "jd-b",
+            "id_guru": "G1",
+            "hari": 1,
+            "jam_ke": "3",
+            "id_rombel": "B",
+            "nama_rombel": "Kelas B",
+            "id_mapel": "mp-1",
+            "nama_mapel": "Mapel mp-1",
+            "unit": "SMP",
+            "ta_mulai": "2024-01-10",
+            "ta_selesai": "2024-06-30"
+          },
+          {
+            "id_jadwal": "jd-c",
+            "id_guru": "G1",
+            "hari": 1,
+            "jam_ke": "3",
+            "id_rombel": "C",
+            "nama_rombel": "Kelas C",
+            "id_mapel": "mp-1",
+            "nama_mapel": "Mapel mp-1",
+            "unit": "SMP",
+            "ta_mulai": "2024-01-10",
+            "ta_selesai": "2024-06-30"
+          }
+        ],
+        "presensi": [
+          {
+            "id_rombel": "A",
+            "tanggal": "2024-01-08",
+            "jam_ke": "1-2",
+            "berjurnal": 1
+          },
+          {
+            "id_rombel": "B",
+            "tanggal": "2024-01-08",
+            "jam_ke": "3",
+            "berjurnal": 1
+          },
+          {
+            "id_rombel": "C",
+            "tanggal": "2024-01-08",
+            "jam_ke": "3",
+            "berjurnal": 1
+          },
+          {
+            "id_rombel": "A",
+            "tanggal": "2024-01-15",
+            "jam_ke": "1-2",
+            "berjurnal": 1
+          },
+          {
+            "id_rombel": "B",
+            "tanggal": "2024-01-15",
+            "jam_ke": "3",
+            "berjurnal": 1
+          },
+          {
+            "id_rombel": "C",
+            "tanggal": "2024-01-15",
+            "jam_ke": "3",
+            "berjurnal": 1
+          },
+          {
+            "id_rombel": "B",
+            "tanggal": "2024-01-22",
+            "jam_ke": "3",
+            "berjurnal": 0
+          },
+          {
+            "id_rombel": "C",
+            "tanggal": "2024-01-22",
+            "jam_ke": "3",
+            "berjurnal": 1
+          }
+        ],
+        "pengajuan": [],
+        "ditangani": [],
+        "libur": ["2024-01-01"],
+        "tanpa_kbm": [],
+        "ambang": [950, 900, 800, 700]
+      },
+      "hasil": {
+        "satuan": 8,
+        "dikecualikan": 0,
+        "terisi": 6,
+        "berjurnal": 5,
+        "pengganti": 4,
+        "tanpa_penanganan": 0,
+        "permil_presensi": 750,
+        "skor_presensi": 2,
+        "permil_jurnal": 833,
+        "skor_jurnal": 3,
+        "ambang": [950, 900, 800, 700],
+        "sampai": "2024-01-22",
+        "rincian_presensi": "PK|8|0|6|4|0|750|950,900,800,700|2024-01-22",
+        "rincian_jurnal": "J|6|5|833|950,900,800,700|2024-01-22",
+        "belum_terisi": [
+          {
+            "tanggal": "2024-01-22",
+            "jam": 1,
+            "id_rombel": "A",
+            "nama_rombel": "Kelas A"
+          },
+          {
+            "tanggal": "2024-01-22",
+            "jam": 2,
+            "id_rombel": "A",
+            "nama_rombel": "Kelas A"
+          }
+        ],
+        "tanpa_jurnal": [
+          {
+            "tanggal": "2024-01-22",
+            "jam": 3,
+            "id_rombel": "B",
+            "nama_rombel": "Kelas B"
+          }
+        ]
+      }
+    },
+    {
+      "nama": "dihitung sampai hari ini",
+      "masukan": {
+        "mulai": "2024-01-01",
+        "akhir": "2024-01-22",
+        "hari_ini": "2024-01-15",
+        "id_guru": "G1",
+        "jadwal": [
+          {
+            "id_jadwal": "jd-a",
+            "id_guru": "G1",
+            "hari": 1,
+            "jam_ke": "1-2",
+            "id_rombel": "A",
+            "nama_rombel": "Kelas A",
+            "id_mapel": "mp-1",
+            "nama_mapel": "Mapel mp-1",
+            "unit": "SMP",
+            "ta_mulai": "2024-01-01",
+            "ta_selesai": "2024-06-30"
+          },
+          {
+            "id_jadwal": "jd-b",
+            "id_guru": "G1",
+            "hari": 1,
+            "jam_ke": "3",
+            "id_rombel": "B",
+            "nama_rombel": "Kelas B",
+            "id_mapel": "mp-1",
+            "nama_mapel": "Mapel mp-1",
+            "unit": "SMP",
+            "ta_mulai": "2024-01-01",
+            "ta_selesai": "2024-06-30"
+          },
+          {
+            "id_jadwal": "jd-c",
+            "id_guru": "G1",
+            "hari": 1,
+            "jam_ke": "3",
+            "id_rombel": "C",
+            "nama_rombel": "Kelas C",
+            "id_mapel": "mp-1",
+            "nama_mapel": "Mapel mp-1",
+            "unit": "SMP",
+            "ta_mulai": "2024-01-01",
+            "ta_selesai": "2024-06-30"
+          }
+        ],
+        "presensi": [
+          {
+            "id_rombel": "A",
+            "tanggal": "2024-01-08",
+            "jam_ke": "1-2",
+            "berjurnal": 1
+          },
+          {
+            "id_rombel": "B",
+            "tanggal": "2024-01-08",
+            "jam_ke": "3",
+            "berjurnal": 1
+          },
+          {
+            "id_rombel": "C",
+            "tanggal": "2024-01-08",
+            "jam_ke": "3",
+            "berjurnal": 1
+          },
+          {
+            "id_rombel": "A",
+            "tanggal": "2024-01-15",
+            "jam_ke": "1-2",
+            "berjurnal": 1
+          },
+          {
+            "id_rombel": "B",
+            "tanggal": "2024-01-15",
+            "jam_ke": "3",
+            "berjurnal": 1
+          },
+          {
+            "id_rombel": "C",
+            "tanggal": "2024-01-15",
+            "jam_ke": "3",
+            "berjurnal": 1
+          },
+          {
+            "id_rombel": "B",
+            "tanggal": "2024-01-22",
+            "jam_ke": "3",
+            "berjurnal": 0
+          },
+          {
+            "id_rombel": "C",
+            "tanggal": "2024-01-22",
+            "jam_ke": "3",
+            "berjurnal": 1
+          }
+        ],
+        "pengajuan": [],
+        "ditangani": [],
+        "libur": ["2024-01-01"],
+        "tanpa_kbm": [],
+        "ambang": [950, 900, 800, 700]
+      },
+      "hasil": {
+        "satuan": 8,
+        "dikecualikan": 0,
+        "terisi": 8,
+        "berjurnal": 8,
+        "pengganti": 0,
+        "tanpa_penanganan": 0,
+        "permil_presensi": 1000,
+        "skor_presensi": 5,
+        "permil_jurnal": 1000,
+        "skor_jurnal": 5,
+        "ambang": [950, 900, 800, 700],
+        "sampai": "2024-01-15",
+        "rincian_presensi": "PK|8|0|8|0|0|1000|950,900,800,700|2024-01-15",
+        "rincian_jurnal": "J|8|8|1000|950,900,800,700|2024-01-15",
+        "belum_terisi": [],
+        "tanpa_jurnal": []
+      }
+    },
+    {
+      "nama": "presensi 3-4 menutup jadwal 3 dan 4",
+      "masukan": {
+        "mulai": "2024-01-02",
+        "akhir": "2024-01-02",
+        "hari_ini": "2026-11-18",
+        "id_guru": "G1",
+        "jadwal": [
+          {
+            "id_jadwal": "jd-x",
+            "id_guru": "G1",
+            "hari": 2,
+            "jam_ke": "3",
+            "id_rombel": "A",
+            "nama_rombel": "Kelas A",
+            "id_mapel": "mp-1",
+            "nama_mapel": "Mapel mp-1",
+            "unit": "SMP",
+            "ta_mulai": "2024-01-01",
+            "ta_selesai": "2024-06-30"
+          },
+          {
+            "id_jadwal": "jd-y",
+            "id_guru": "G1",
+            "hari": 2,
+            "jam_ke": "4",
+            "id_rombel": "A",
+            "nama_rombel": "Kelas A",
+            "id_mapel": "mp-1",
+            "nama_mapel": "Mapel mp-1",
+            "unit": "SMP",
+            "ta_mulai": "2024-01-01",
+            "ta_selesai": "2024-06-30"
+          }
+        ],
+        "presensi": [
+          {
+            "id_rombel": "A",
+            "tanggal": "2024-01-02",
+            "jam_ke": "3-4",
+            "berjurnal": 1
+          }
+        ],
+        "pengajuan": [],
+        "ditangani": [],
+        "libur": [],
+        "tanpa_kbm": [],
+        "ambang": [950, 900, 800, 700]
+      },
+      "hasil": {
+        "satuan": 2,
+        "dikecualikan": 0,
+        "terisi": 2,
+        "berjurnal": 2,
+        "pengganti": 0,
+        "tanpa_penanganan": 0,
+        "permil_presensi": 1000,
+        "skor_presensi": 5,
+        "permil_jurnal": 1000,
+        "skor_jurnal": 5,
+        "ambang": [950, 900, 800, 700],
+        "sampai": "2024-01-02",
+        "rincian_presensi": "PK|2|0|2|0|0|1000|950,900,800,700|2024-01-02",
+        "rincian_jurnal": "J|2|2|1000|950,900,800,700|2024-01-02",
+        "belum_terisi": [],
+        "tanpa_jurnal": []
+      }
+    },
+    {
+      "nama": "kelas gabungan tiga rombel, presensi dua sesi, jurnal satu",
+      "masukan": {
+        "mulai": "2024-01-08",
+        "akhir": "2024-01-08",
+        "hari_ini": "2026-11-18",
+        "id_guru": "G1",
+        "jadwal": [
+          {
+            "id_jadwal": "jd-b",
+            "id_guru": "G1",
+            "hari": 1,
+            "jam_ke": "3",
+            "id_rombel": "B",
+            "nama_rombel": "Kelas B",
+            "id_mapel": "mp-1",
+            "nama_mapel": "Mapel mp-1",
+            "unit": "SMP",
+            "ta_mulai": "2024-01-01",
+            "ta_selesai": "2024-06-30"
+          },
+          {
+            "id_jadwal": "jd-c",
+            "id_guru": "G1",
+            "hari": 1,
+            "jam_ke": "3",
+            "id_rombel": "C",
+            "nama_rombel": "Kelas C",
+            "id_mapel": "mp-1",
+            "nama_mapel": "Mapel mp-1",
+            "unit": "SMP",
+            "ta_mulai": "2024-01-01",
+            "ta_selesai": "2024-06-30"
+          },
+          {
+            "id_jadwal": "jd-e",
+            "id_guru": "G1",
+            "hari": 1,
+            "jam_ke": "3",
+            "id_rombel": "E",
+            "nama_rombel": "Kelas E",
+            "id_mapel": "mp-1",
+            "nama_mapel": "Mapel mp-1",
+            "unit": "SMP",
+            "ta_mulai": "2024-01-01",
+            "ta_selesai": "2024-06-30"
+          }
+        ],
+        "presensi": [
+          {
+            "id_rombel": "B",
+            "tanggal": "2024-01-08",
+            "jam_ke": "3",
+            "berjurnal": 1
+          },
+          {
+            "id_rombel": "C",
+            "tanggal": "2024-01-08",
+            "jam_ke": "3",
+            "berjurnal": 0
+          }
+        ],
+        "pengajuan": [],
+        "ditangani": [],
+        "libur": ["2024-01-01"],
+        "tanpa_kbm": [],
+        "ambang": [950, 900, 800, 700]
+      },
+      "hasil": {
+        "satuan": 3,
+        "dikecualikan": 0,
+        "terisi": 2,
+        "berjurnal": 1,
+        "pengganti": 0,
+        "tanpa_penanganan": 0,
+        "permil_presensi": 666,
+        "skor_presensi": 1,
+        "permil_jurnal": 500,
+        "skor_jurnal": 1,
+        "ambang": [950, 900, 800, 700],
+        "sampai": "2024-01-08",
+        "rincian_presensi": "PK|3|0|2|0|0|666|950,900,800,700|2024-01-08",
+        "rincian_jurnal": "J|2|1|500|950,900,800,700|2024-01-08",
+        "belum_terisi": [
+          {
+            "tanggal": "2024-01-08",
+            "jam": 3,
+            "id_rombel": "E",
+            "nama_rombel": "Kelas E"
+          }
+        ],
+        "tanpa_jurnal": [
+          {
+            "tanggal": "2024-01-08",
+            "jam": 3,
+            "id_rombel": "C",
+            "nama_rombel": "Kelas C"
+          }
+        ]
+      }
+    },
+    {
+      "nama": "D = 0: tanpa jadwal, diisi manual",
+      "masukan": {
+        "mulai": "2024-01-01",
+        "akhir": "2024-01-22",
+        "hari_ini": "2026-11-18",
+        "id_guru": "G1",
+        "jadwal": [],
+        "presensi": [],
+        "pengajuan": [],
+        "ditangani": [],
+        "libur": ["2024-01-01"],
+        "tanpa_kbm": [],
+        "ambang": [950, 900, 800, 700]
+      },
+      "hasil": {
+        "satuan": 0,
+        "dikecualikan": 0,
+        "terisi": 0,
+        "berjurnal": 0,
+        "pengganti": 0,
+        "tanpa_penanganan": 0,
+        "permil_presensi": null,
+        "skor_presensi": null,
+        "permil_jurnal": null,
+        "skor_jurnal": null,
+        "ambang": [950, 900, 800, 700],
+        "sampai": "2024-01-22",
+        "rincian_presensi": "PK|0|0|0|0|0||950,900,800,700|2024-01-22",
+        "rincian_jurnal": "J|0|0||950,900,800,700|2024-01-22",
+        "belum_terisi": [],
+        "tanpa_jurnal": []
+      }
+    }
   ]
 }

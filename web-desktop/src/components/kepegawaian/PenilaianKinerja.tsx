@@ -14,6 +14,7 @@ import {
   muatDaftarKinerja,
   muatRincianKinerja,
   muatRiwayatKinerja,
+  muatSetupSurat,
   putuskanPenilaianKinerja,
   simpanPenilaianKinerja,
 } from "@/lib/gateways/hris";
@@ -26,11 +27,12 @@ import {
   JENIS_PERIODE,
   type JenisKeputusan,
   type JenisPeriode,
-  type Kehadiran,
+  kalimatRincian,
   nilaiAkhir,
   PESAN_OTOMATIS_BERUBAH,
   type RincianKinerja,
   type RiwayatKinerja,
+  type SatuanMengajar,
   STATUS_DIAJUKAN,
   STATUS_DIBATALKAN,
   STATUS_DRAF,
@@ -39,7 +41,11 @@ import {
   type TahunAjaran,
   type TandaKinerja,
   type TemplateKinerja,
+  TIPE_JURNAL,
+  TIPE_KEHADIRAN,
   TIPE_MANUAL,
+  TIPE_PRESENSI,
+  uraiRincian,
 } from "@/lib/validations/hr-kinerja";
 import {
   INPUT,
@@ -49,6 +55,7 @@ import {
   TOMBOL,
   TOMBOL_UTAMA,
 } from "./gaya";
+import { cetakSurat, lembarKinerja, tanggalWibDari } from "./suratKepegawaian";
 
 /**
  * Alur penilaian kinerja (HRIS Fase 5b, §23.2.2–23.2.6): daftar per periode,
@@ -213,6 +220,19 @@ export function DaftarPenilaianKinerja({
       isSubmittingRef.current = false;
       setMenyimpan(false);
     }
+  };
+
+  // Dialog cetak dibuka sesudah modal rincian ditutup: Escape di `Modal`
+  // menutup setiap modal yang terbuka (§21).
+  const cetak = (r: RincianKinerja) => {
+    setBuka(null);
+    const final = r.keputusan.filter((k) => k.jenis === "Final").at(-1);
+    const tanggal = tanggalWibDari(final?.created_at ?? "");
+    muatSetupSurat(tanggal)
+      .then((setup) =>
+        cetakSurat(lembarKinerja({ setup, nomor: "", tanggal }, r)),
+      )
+      .catch((error) => onGalat(pesanGalat(error)));
   };
 
   const penilaian = (data?.penilaian ?? []).filter(
@@ -401,6 +421,7 @@ export function DaftarPenilaianKinerja({
             setBuka(null);
             void muat();
           }}
+          onCetak={cetak}
           onPesan={onPesan}
         />
       ) : null}
@@ -431,75 +452,56 @@ function isianAwal(r: RincianKinerja): Isian {
   );
 }
 
-/** Pecah `rincian` kehadiran beku: `K|D|tepat|telat|alfa|kosong|dikecualikan|P|ambang|sampai`. */
-function uraiKehadiran(rincian: string | null) {
-  const b = (rincian ?? "").split("|");
-  if (b[0] !== "K" || b.length !== 10) return null;
-  return {
-    hari: b[1],
-    tepat: b[2],
-    telat: b[3],
-    alfa: b[4],
-    kosong: b[5],
-    dikecualikan: b[6],
-    permil: b[7] === "" ? null : Number(b[7]),
-    ambang: b[8],
-    sampai: b[9],
-  };
-}
+const MAKS_DAFTAR = 30;
 
-const persen = (permil: number | null) =>
-  permil === null ? "-" : `${Math.trunc(permil / 10)},${permil % 10}%`;
+const teksSatuan = (s: SatuanMengajar) =>
+  `${s.tanggal} ${s.nama_rombel} jam ${s.jam}`;
 
-function PanelKehadiran({
-  hidup,
-  beku,
-}: {
-  hidup: Kehadiran | null;
-  beku: string | null;
-}) {
-  const angka = beku ? uraiKehadiran(beku) : null;
-  const tampil = angka ?? (hidup ? uraiKehadiran(hidup.rincian) : null);
-  if (!tampil) {
+/**
+ * Rumus dan angka satu aspek otomatis: dari `rincian` beku sesudah Draf,
+ * selain itu dari hitungan hidup beserta tanggal (dan rombel) yang menurunkan
+ * nilainya.
+ */
+function PanelOtomatis({ b, data }: { b: BarisNilai; data: RincianKinerja }) {
+  const beku = data.status === STATUS_DRAF ? null : b.rincian;
+  const r = uraiRincian(beku ?? data.hidup[b.tipe]?.rincian ?? null);
+  if (!r) {
     return (
       <p className="text-sm text-slate-400">
-        Pegawai tidak aktif di periode ini; kehadiran tidak bisa dihitung.
+        Pegawai tidak aktif di periode ini; aspek ini tidak bisa dihitung.
       </p>
     );
   }
+  const k = data.kehadiran;
+  const m = data.mengajar;
+  const daftar: [string, string[]][] = beku
+    ? []
+    : b.tipe === TIPE_KEHADIRAN && k
+      ? [
+          ["Tanpa catatan", k.tanggal_kosong],
+          ["Alfa", k.tanggal_alfa],
+          ["Terlambat", k.tanggal_telat],
+        ]
+      : b.tipe === TIPE_PRESENSI && m
+        ? [["Presensi belum terisi", m.belum_terisi.map(teksSatuan)]]
+        : b.tipe === TIPE_JURNAL && m
+          ? [["Jurnal belum diisi", m.tanpa_jurnal.map(teksSatuan)]]
+          : [];
   return (
     <div className="space-y-1 rounded-xl border border-white/10 p-3 text-sm text-slate-300">
       <p>
-        Tepat {tampil.tepat} hari, terlambat {tampil.telat}, alfa {tampil.alfa},
-        tanpa catatan {tampil.kosong} dari {tampil.hari} hari wajib (
-        {tampil.dikecualikan} hari cuti/izin/sakit tidak dihitung). Dihitung
-        sampai {tampil.sampai}.
+        {kalimatRincian(r)} Dihitung sampai {r.sampai}.
       </p>
-      <p>
-        Nilai kehadiran = (2 × tepat + terlambat) ÷ (2 × hari wajib) ={" "}
-        <span className="font-semibold text-white">
-          {persen(tampil.permil)}
-        </span>
-        . Ambang skor 5/4/3/2:{" "}
-        {tampil.ambang
-          .split(",")
-          .map((a) => persen(Number(a)))
-          .join(" / ")}
-        .
-      </p>
-      {!beku && hidup ? (
-        <>
-          {hidup.tanggal_kosong.length > 0 ? (
-            <p>Tanpa catatan: {hidup.tanggal_kosong.join(", ")}</p>
-          ) : null}
-          {hidup.tanggal_alfa.length > 0 ? (
-            <p>Alfa: {hidup.tanggal_alfa.join(", ")}</p>
-          ) : null}
-          {hidup.tanggal_telat.length > 0 ? (
-            <p>Terlambat: {hidup.tanggal_telat.join(", ")}</p>
-          ) : null}
-        </>
-      ) : null}
+      {daftar
+        .filter(([, isi]) => isi.length > 0)
+        .map(([label, isi]) => (
+          <p key={label}>
+            {label}: {isi.slice(0, MAKS_DAFTAR).join(", ")}
+            {isi.length > MAKS_DAFTAR
+              ? `, dan ${isi.length - MAKS_DAFTAR} lainnya`
+              : ""}
+          </p>
+        ))}
     </div>
   );
 }
@@ -510,6 +512,7 @@ function ModalPenilaian({
   bolehNilai,
   bolehPutus,
   onClose,
+  onCetak,
   onPesan,
 }: {
   idAwal: string;
@@ -517,6 +520,7 @@ function ModalPenilaian({
   bolehNilai: boolean;
   bolehPutus: boolean;
   onClose: () => void;
+  onCetak: (r: RincianKinerja) => void;
   onPesan: (pesan: string) => void;
 }) {
   const [id, setId] = useState(idAwal);
@@ -754,14 +758,10 @@ function ModalPenilaian({
                 {panduan ? (
                   <p className="text-xs text-slate-400">{panduan}</p>
                 ) : null}
-                {b.tipe === "Otomatis Kehadiran" ? (
-                  <PanelKehadiran
-                    hidup={data.kehadiran}
-                    beku={data.status === STATUS_DRAF ? null : b.rincian}
-                  />
-                ) : otomatis && !hidup ? (
+                {otomatis ? <PanelOtomatis b={b} data={data} /> : null}
+                {bisaIsi && otomatis && hidup && hidup.skor === null ? (
                   <p className="text-xs text-slate-400">
-                    Hitungan otomatis aspek ini belum tersedia; isi skor beserta
+                    Aspek ini tidak bisa dihitung otomatis; isi skor beserta
                     catatan alasannya.
                   </p>
                 ) : null}
@@ -881,6 +881,18 @@ function ModalPenilaian({
               onClick={() => void muatUlang()}
             >
               Muat ulang template
+            </button>
+          </div>
+        ) : null}
+
+        {data.status === STATUS_FINAL ? (
+          <div className="flex justify-end border-t border-white/10 pt-3">
+            <button
+              type="button"
+              className={TOMBOL}
+              onClick={() => onCetak(data)}
+            >
+              Cetak lembar hasil
             </button>
           </div>
         ) : null}

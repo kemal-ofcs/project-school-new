@@ -16,10 +16,12 @@ use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 
 use super::config::DesktopState;
-use super::hari_kerja::{parse_hari_kerja, tanggal_valid};
+use super::class_attendance::jam_ke_range;
+use super::hari_kerja::{hari_iso, parse_hari_kerja, tanggal_valid};
 use super::hr_keluar::kelompok_status;
 use super::hr_pengajuan::{
-    dalam_cakupan, tanggal_rentang, tanggal_wajib, Jadwal, LIBUR_SQL, UNIT_PERSONIL_SQL, WHITELIST_SQL,
+    dalam_cakupan, jp_terdampak, ta_memuat, tanggal_rentang, tanggal_wajib, Jadwal, JadwalJp, PengajuanJp, LIBUR_SQL,
+    PENANGANAN_SQL, UNIT_PERSONIL_SQL, WHITELIST_SQL,
 };
 use super::hris::{self, new_id, rows_json_with, HARI_INI_SQL, STATUS_KINI_SQL};
 use super::models::{CommandError, OperatorUser};
@@ -114,6 +116,11 @@ pub const KINERJA_MENUNGGU_SQL: &str = "SELECT p.id_karyawan, COUNT(*) AS jumlah
 /// Salinan harfiah `KEPALA_UNIT_SQL` dengan jenis tugas `tgs-ka-tu` (Q-103).
 pub const KEPALA_TU_SQL: &str = "SELECT LOWER(TRIM(COALESCE(t.unit, ''))) AS kunci_unit, COALESCE(t.unit, '') AS unit, t.id_karyawan, m.nama, COALESCE(g.gelar, '') AS gelar, COALESCE(g.nip, '') AS nip FROM hr_tugas_tambahan t JOIN master_data m ON m.id_unik = t.id_karyawan LEFT JOIN guru_data g ON g.id_guru = t.id_karyawan WHERE t.id_jenis = 'tgs-ka-tu' AND t.dibatalkan_pada IS NULL AND t.tanggal_mulai <= ?1 AND (COALESCE(t.tanggal_selesai, '') = '' OR t.tanggal_selesai >= ?1) AND NOT EXISTS (SELECT 1 FROM hr_tugas_tambahan b WHERE b.id_jenis = 'tgs-ka-tu' AND b.dibatalkan_pada IS NULL AND b.tanggal_mulai <= ?1 AND (COALESCE(b.tanggal_selesai, '') = '' OR b.tanggal_selesai >= ?1) AND LOWER(TRIM(COALESCE(b.unit, ''))) = LOWER(TRIM(COALESCE(t.unit, ''))) AND (b.tanggal_mulai > t.tanggal_mulai OR (b.tanggal_mulai = t.tanggal_mulai AND b.id_tugas > t.id_tugas))) ORDER BY 1\n-- batas: satu kepala per unit sekolah\n;";
 /// SP yang berlaku pada suatu saat di dalam periode (Q-109, informasi).
+/// `JADWAL_JP_SQL` + satu guru (?3); sisanya salinan harfiah (§23.2.4).
+pub const KINERJA_JADWAL_SQL: &str = "SELECT j.id_jadwal, j.id_guru, j.hari, j.jam_ke, j.id_rombel, COALESCE(r.nama_rombel, j.id_rombel) AS nama_rombel, j.id_mapel, COALESCE(mp.nama_mapel, j.id_mapel) AS nama_mapel, COALESCE(u.nama_unit, '') AS unit, t.tanggal_mulai AS ta_mulai, t.tanggal_selesai AS ta_selesai FROM jadwal_mengajar j JOIN akademik_tahun_ajaran t ON t.id_tahun_ajaran = j.id_tahun_ajaran LEFT JOIN akademik_rombel r ON r.id_rombel = j.id_rombel LEFT JOIN akademik_mapel mp ON mp.id_mapel = j.id_mapel LEFT JOIN akademik_unit u ON u.id_unit = r.id_unit WHERE j.is_aktif = 1 AND t.tanggal_mulai <= ?2 AND t.tanggal_selesai >= ?1 AND j.id_guru = ?3 ORDER BY j.id_guru, j.hari, CAST(j.jam_ke AS INTEGER), j.jam_ke, j.id_jadwal\n-- batas: jadwal mingguan semester yang bertumpuk rentang, sebesar rombel kali jam pelajaran\n;";
+/// Presensi kelas atas nama satu guru (?3). `jurnal_mengajar.id_presensi_mapel`
+/// tidak unik, jadi `EXISTS`, bukan JOIN.
+pub const KINERJA_PRESENSI_SQL: &str = "SELECT p.id_presensi_mapel, p.id_rombel, p.tanggal, p.jam_ke, CASE WHEN EXISTS (SELECT 1 FROM jurnal_mengajar jm WHERE jm.id_presensi_mapel = p.id_presensi_mapel) THEN 1 ELSE 0 END AS berjurnal FROM presensi_mapel p WHERE p.id_guru = ?3 AND p.tanggal >= ?1 AND p.tanggal <= ?2 ORDER BY p.tanggal, p.id_rombel, CAST(p.jam_ke AS INTEGER), p.jam_ke, p.id_presensi_mapel\n-- batas: sesi presensi kelas satu guru dalam satu periode penilaian\n;";
 pub const KINERJA_SP_SQL: &str = "SELECT id_sp, tingkat, tanggal, berlaku_sampai, COALESCE(nomor, '') AS nomor, pelanggaran FROM hr_sp WHERE id_karyawan = ?1 AND dicabut_pada IS NULL AND tanggal <= ?3 AND berlaku_sampai >= ?2 ORDER BY tanggal, id_sp\n-- batas: surat peringatan satu pegawai\n;";
 
 pub const PENILAIAN_SATU_SQL: &str = "SELECT p.id_penilaian, p.id_karyawan, COALESCE(m.nama, p.id_karyawan) AS nama, COALESCE(p.id_ref, '') AS id_ref, COALESCE(p.alasan_koreksi, '') AS alasan_koreksi, p.periode_jenis, p.periode_kunci, p.periode_nama, p.periode_mulai, p.periode_selesai, p.id_template, p.template_nama, p.kelompok, COALESCE(p.unit, '') AS unit, COALESCE(p.jabatan, '') AS jabatan, COALESCE(p.status_kepegawaian, '') AS status_kepegawaian, COALESCE(p.id_penilai, '') AS id_penilai, COALESCE(p.penilai_nama, '') AS penilai_nama, p.penilai_oleh, COALESCE(p.catatan, '') AS catatan, COALESCE(p.dihitung_sampai, '') AS dihitung_sampai, p.dibuat_oleh, p.created_at, p.updated_at FROM hr_kinerja_penilaian p LEFT JOIN master_data m ON m.id_unik = p.id_karyawan WHERE p.id_penilaian = ?1;";
@@ -375,7 +382,7 @@ pub struct Predikat {
     pub nama: String,
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct RentangTanpaKbm {
     pub mulai: String,
     pub selesai: String,
@@ -1324,6 +1331,218 @@ pub fn hitung_kehadiran(m: &MasukanKehadiran<'_>) -> Kehadiran {
     k
 }
 
+// Aspek otomatis presensi kelas dan jurnal (§23.2.4)
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct PresensiKinerja {
+    pub id_rombel: String,
+    pub tanggal: String,
+    pub jam_ke: String,
+    pub berjurnal: bool,
+}
+
+impl PresensiKinerja {
+    /// Satu baris `KINERJA_PRESENSI_SQL`.
+    pub fn dari_json(v: &Value) -> Self {
+        Self {
+            id_rombel: teks_draft(v, "id_rombel"),
+            tanggal: teks_draft(v, "tanggal"),
+            jam_ke: teks_draft(v, "jam_ke"),
+            berjurnal: angka_json(v.get("berjurnal")) == Some(1),
+        }
+    }
+}
+
+pub struct MasukanMengajar<'a> {
+    pub mulai: &'a str,
+    pub akhir: &'a str,
+    pub hari_ini: &'a str,
+    pub id_guru: &'a str,
+    pub jadwal: &'a [JadwalJp],
+    pub presensi: &'a [PresensiKinerja],
+    /// Hanya pengajuan berlaku guru itu (`KINERJA_PENGAJUAN_SQL`).
+    pub pengajuan: &'a [PengajuanJp],
+    /// `id_penanganan` yang tercatat untuk pengajuan itu.
+    pub ditangani: &'a HashSet<String>,
+    pub libur: &'a HashSet<String>,
+    pub tanpa_kbm: &'a [RentangTanpaKbm],
+    pub ambang: &'a [i64; 4],
+}
+
+/// Satu (rombel, tanggal, jam) untuk layar: belum terisi atau tanpa jurnal.
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct SatuanMengajar {
+    pub tanggal: String,
+    pub jam: i64,
+    pub id_rombel: String,
+    pub nama_rombel: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct Mengajar {
+    pub satuan: i64,
+    pub dikecualikan: i64,
+    pub terisi: i64,
+    pub berjurnal: i64,
+    /// Informasi saja: JP presensi atas nama guru ini di luar jadwalnya.
+    pub pengganti: i64,
+    /// Informasi saja (Q-98): satuan dikecualikan tanpa `hr_jp_penanganan`.
+    pub tanpa_penanganan: i64,
+    pub permil_presensi: Option<i64>,
+    pub skor_presensi: Option<i64>,
+    pub permil_jurnal: Option<i64>,
+    pub skor_jurnal: Option<i64>,
+    pub ambang: [i64; 4],
+    pub sampai: String,
+    /// `PK|satuan|dikecualikan|terisi|pengganti|tanpa_penanganan|P|a5,a4,a3,a2|sampai`.
+    pub rincian_presensi: String,
+    /// `J|terisi|berjurnal|P|a5,a4,a3,a2|sampai`.
+    pub rincian_jurnal: String,
+    pub belum_terisi: Vec<SatuanMengajar>,
+    pub tanpa_jurnal: Vec<SatuanMengajar>,
+}
+
+struct Satuan {
+    nama_rombel: String,
+    kecuali: bool,
+    ditangani: bool,
+}
+
+/// Cermin `hitungMengajar` (Q-96..Q-99). Satuan = (rombel, tanggal, jam)
+/// jadwal guru itu; terisi = presensi atas namanya di rombel dan tanggal yang
+/// sama yang `jam_ke`-nya memuat jam itu (mapel tidak dicocokkan); berjurnal =
+/// salah satu sesi penutupnya berjurnal. Sengaja per rombel, bukan per
+/// (tanggal, jam) seperti honor JP (`summarize_teaching`).
+pub fn hitung_mengajar(m: &MasukanMengajar<'_>) -> Mengajar {
+    let sampai = m.akhir.min(m.hari_ini).to_owned();
+    let tanggal = if m.mulai <= sampai.as_str() { tanggal_rentang(m.mulai, &sampai) } else { Vec::new() };
+    let jadwal: Vec<JadwalJp> = m.jadwal.iter().filter(|j| j.id_guru == m.id_guru).cloned().collect();
+    let mut jp_kena: HashMap<(String, String), bool> = HashMap::new();
+    for jp in jp_terdampak(m.pengajuan, &jadwal, m.libur, m.mulai, &sampai) {
+        *jp_kena.entry((jp.tanggal.clone(), jp.id_jadwal.clone())).or_default() |= m.ditangani.contains(&jp.id_penanganan);
+    }
+    let tanpa_kbm = |t: &str| m.tanpa_kbm.iter().any(|r| r.mulai.as_str() <= t && t <= r.selesai.as_str());
+
+    // Kunci (tanggal, jam, rombel): urutan layar tanggal → jam → rombel.
+    let mut satuan: std::collections::BTreeMap<(String, u32, String), Satuan> = std::collections::BTreeMap::new();
+    for t in &tanggal {
+        if m.libur.contains(t) || tanpa_kbm(t) {
+            continue;
+        }
+        let Some(hari) = hari_iso(t) else {
+            continue;
+        };
+        for j in jadwal.iter().filter(|j| j.hari == hari && ta_memuat(j, t)) {
+            let Some((awal, akhir)) = jam_ke_range(&j.jam_ke) else {
+                continue;
+            };
+            let kena = jp_kena.get(&(t.clone(), j.id_jadwal.clone())).copied();
+            for jam in awal..=akhir {
+                let s = satuan.entry((t.clone(), jam, j.id_rombel.clone())).or_insert(Satuan {
+                    nama_rombel: j.nama_rombel.clone(),
+                    kecuali: false,
+                    ditangani: false,
+                });
+                s.kecuali |= kena.is_some();
+                s.ditangani |= kena == Some(true);
+            }
+        }
+    }
+
+    let dalam = |p: &PresensiKinerja| m.mulai <= p.tanggal.as_str() && p.tanggal.as_str() <= sampai.as_str();
+    let mut k = Mengajar {
+        satuan: satuan.len() as i64,
+        dikecualikan: 0,
+        terisi: 0,
+        berjurnal: 0,
+        pengganti: 0,
+        tanpa_penanganan: 0,
+        permil_presensi: None,
+        skor_presensi: None,
+        permil_jurnal: None,
+        skor_jurnal: None,
+        ambang: *m.ambang,
+        sampai: sampai.clone(),
+        rincian_presensi: String::new(),
+        rincian_jurnal: String::new(),
+        belum_terisi: Vec::new(),
+        tanpa_jurnal: Vec::new(),
+    };
+    for ((t, jam, rombel), s) in &satuan {
+        if s.kecuali {
+            k.dikecualikan += 1;
+            k.tanpa_penanganan += i64::from(!s.ditangani);
+            continue;
+        }
+        let item = || SatuanMengajar {
+            tanggal: t.clone(),
+            jam: i64::from(*jam),
+            id_rombel: rombel.clone(),
+            nama_rombel: s.nama_rombel.clone(),
+        };
+        let sesi: Vec<&PresensiKinerja> = m
+            .presensi
+            .iter()
+            .filter(|p| {
+                &p.id_rombel == rombel
+                    && &p.tanggal == t
+                    && jam_ke_range(&p.jam_ke).is_some_and(|(a, b)| a <= *jam && *jam <= b)
+            })
+            .collect();
+        if sesi.is_empty() {
+            k.belum_terisi.push(item());
+            continue;
+        }
+        k.terisi += 1;
+        if sesi.iter().any(|p| p.berjurnal) {
+            k.berjurnal += 1;
+        } else {
+            k.tanpa_jurnal.push(item());
+        }
+    }
+
+    let terjadwal = |rombel: &str, t: &str, jam: u32| {
+        let hari = hari_iso(t);
+        jadwal.iter().any(|j| {
+            j.id_rombel == rombel
+                && Some(j.hari) == hari
+                && ta_memuat(j, t)
+                && jam_ke_range(&j.jam_ke).is_some_and(|(a, b)| a <= jam && jam <= b)
+        })
+    };
+    let mut pengganti: HashSet<(String, String, u32)> = HashSet::new();
+    for p in m.presensi.iter().filter(|p| dalam(p)) {
+        if let Some((a, b)) = jam_ke_range(&p.jam_ke) {
+            for jam in a..=b {
+                if !terjadwal(&p.id_rombel, &p.tanggal, jam) {
+                    pengganti.insert((p.id_rombel.clone(), p.tanggal.clone(), jam));
+                }
+            }
+        }
+    }
+    k.pengganti = pengganti.len() as i64;
+
+    let d = k.satuan - k.dikecualikan;
+    k.permil_presensi = (d > 0).then(|| k.terisi * 1000 / d);
+    k.skor_presensi = k.permil_presensi.map(|p| skor_ambang(p, m.ambang));
+    k.permil_jurnal = (k.terisi > 0).then(|| k.berjurnal * 1000 / k.terisi);
+    k.skor_jurnal = k.permil_jurnal.map(|p| skor_ambang(p, m.ambang));
+    let a = m.ambang;
+    let ambang = format!("{},{},{},{}", a[0], a[1], a[2], a[3]);
+    let teks_p = |p: Option<i64>| p.map(|p| p.to_string()).unwrap_or_default();
+    k.rincian_presensi = format!(
+        "PK|{}|{}|{}|{}|{}|{}|{ambang}|{sampai}",
+        k.satuan,
+        k.dikecualikan,
+        k.terisi,
+        k.pengganti,
+        k.tanpa_penanganan,
+        teks_p(k.permil_presensi)
+    );
+    k.rincian_jurnal = format!("J|{}|{}|{}|{ambang}|{sampai}", k.terisi, k.berjurnal, teks_p(k.permil_jurnal));
+    k
+}
+
 // Akses cloud dan lokal
 
 fn galat(pesan: impl Into<String>) -> CommandError {
@@ -1580,22 +1799,31 @@ fn masukan_penilai(p: &Value, kepsek: &HashMap<String, String>, katu: &HashMap<S
     }
 }
 
-/// Kehadiran atas rentang aktif; `None` bila tidak aktif di periode itu.
+/// Hitungan otomatis atas rentang aktif; keduanya `None` bila pegawai tidak
+/// aktif di periode itu.
+#[derive(Debug, Default)]
+struct Hitungan {
+    kehadiran: Option<Kehadiran>,
+    mengajar: Option<Mengajar>,
+}
+
 async fn hitung_otomatis(
     client: &TursoClient,
     p: &Value,
     rentang: Option<&RentangAktif>,
     hari_ini: &str,
-    ambang: &[i64; 4],
-) -> Result<Option<Kehadiran>, CommandError> {
+    pengaturan: &PengaturanKinerja,
+) -> Result<Hitungan, CommandError> {
     let Some(r) = rentang else {
-        return Ok(None);
+        return Ok(Hitungan::default());
     };
-    let args = vec![json!(r.mulai), json!(r.akhir), json!(teks(p, "id_unik"))];
+    let ambang = &pengaturan.ambang;
+    let id_guru = teks(p, "id_unik");
+    let args = vec![json!(r.mulai), json!(r.akhir), json!(id_guru)];
     let hari: Vec<HariKehadiran> =
         baris_json(client, KINERJA_HARI_SQL, args.clone()).await?.iter().map(HariKehadiran::dari_json).collect();
-    let pengajuan: Vec<PengajuanKehadiran> =
-        baris(client, KINERJA_PENGAJUAN_SQL, args).await?.iter().map(PengajuanKehadiran::dari_json).collect();
+    let baris_pengajuan = baris(client, KINERJA_PENGAJUAN_SQL, args.clone()).await?;
+    let pengajuan: Vec<PengajuanKehadiran> = baris_pengajuan.iter().map(PengajuanKehadiran::dari_json).collect();
     let libur: HashSet<String> = baris(client, LIBUR_SQL, vec![json!(r.mulai), json!(r.akhir)])
         .await?
         .iter()
@@ -1617,7 +1845,7 @@ async fn hitung_otomatis(
         divisi: teks(p, "divisi"),
         kode_shift: angka_json(p.get("kode_shift")),
     };
-    Ok(Some(hitung_kehadiran(&MasukanKehadiran {
+    let kehadiran = hitung_kehadiran(&MasukanKehadiran {
         mulai: &r.mulai,
         akhir: &r.akhir,
         hari_ini,
@@ -1627,15 +1855,52 @@ async fn hitung_otomatis(
         libur: &libur,
         whitelist: &whitelist,
         ambang,
-    })))
+    });
+
+    let jadwal_jp: Vec<JadwalJp> = baris(client, KINERJA_JADWAL_SQL, args.clone())
+        .await?
+        .into_iter()
+        .filter_map(|b| serde_json::from_value(b).ok())
+        .collect();
+    let presensi: Vec<PresensiKinerja> =
+        baris(client, KINERJA_PRESENSI_SQL, args).await?.iter().map(PresensiKinerja::dari_json).collect();
+    let pengajuan_jp: Vec<PengajuanJp> =
+        baris_pengajuan.into_iter().filter_map(|b| serde_json::from_value(b).ok()).collect();
+    let id_berlaku: HashSet<&str> = pengajuan_jp.iter().map(|p| p.id_pengajuan.as_str()).collect();
+    // `PENANGANAN_SQL` disaring ke pengajuan berlaku guru ini.
+    let ditangani: HashSet<String> = baris(client, PENANGANAN_SQL, vec![json!(r.mulai), json!(r.akhir)])
+        .await?
+        .iter()
+        .filter(|h| id_berlaku.contains(teks(h, "id_pengajuan").as_str()))
+        .map(|h| teks(h, "id_penanganan"))
+        .collect();
+    let mengajar = hitung_mengajar(&MasukanMengajar {
+        mulai: &r.mulai,
+        akhir: &r.akhir,
+        hari_ini,
+        id_guru: &id_guru,
+        jadwal: &jadwal_jp,
+        presensi: &presensi,
+        pengajuan: &pengajuan_jp,
+        ditangani: &ditangani,
+        libur: &libur,
+        tanpa_kbm: &pengaturan.tanpa_kbm,
+        ambang,
+    });
+    Ok(Hitungan { kehadiran: Some(kehadiran), mengajar: Some(mengajar) })
 }
 
-/// Hitungan per tipe aspek otomatis. Presensi kelas dan jurnal menyusul di
-/// 5c; sampai itu diisi manual (`otomatis_manual`).
-fn peta_otomatis(kehadiran: Option<&Kehadiran>) -> HashMap<String, Otomatis> {
-    kehadiran
-        .map(|k| HashMap::from([(TIPE_KEHADIRAN.to_owned(), Otomatis { skor: k.skor, rincian: k.rincian.clone() })]))
-        .unwrap_or_default()
+/// Hitungan per tipe aspek otomatis; skor `None` (D = 0) diisi manual.
+fn peta_otomatis(h: &Hitungan) -> HashMap<String, Otomatis> {
+    let mut peta = HashMap::new();
+    if let Some(k) = &h.kehadiran {
+        peta.insert(TIPE_KEHADIRAN.to_owned(), Otomatis { skor: k.skor, rincian: k.rincian.clone() });
+    }
+    if let Some(m) = &h.mengajar {
+        peta.insert(TIPE_PRESENSI.to_owned(), Otomatis { skor: m.skor_presensi, rincian: m.rincian_presensi.clone() });
+        peta.insert(TIPE_JURNAL.to_owned(), Otomatis { skor: m.skor_jurnal, rincian: m.rincian_jurnal.clone() });
+    }
+    peta
 }
 
 fn baris_nilai(v: &Value) -> BarisNilai {
@@ -1930,11 +2195,11 @@ pub async fn rincian_kinerja(client: &TursoClient, operator: &OperatorUser, id_p
     let (mulai, selesai) = (teks(&p, "periode_mulai"), teks(&p, "periode_selesai"));
     let orang = pegawai(client, &id_k).await?.into_iter().next();
     let rentang = orang.as_ref().and_then(|o| rentang_pegawai(o, &mulai, &selesai));
-    let kehadiran = match &orang {
-        Some(o) => hitung_otomatis(client, o, rentang.as_ref(), &hari_ini, &pengaturan.ambang).await?,
-        None => None,
+    let hitungan = match &orang {
+        Some(o) => hitung_otomatis(client, o, rentang.as_ref(), &hari_ini, &pengaturan).await?,
+        None => Hitungan::default(),
     };
-    let hidup = peta_otomatis(kehadiran.as_ref());
+    let hidup = peta_otomatis(&hitungan);
     let baris_p: Vec<BarisNilai> = milik(&nilai, id).map(baris_nilai).collect();
 
     let kepsek = kepala(client, hr_beban::KEPALA_UNIT_SQL, &selesai).await?;
@@ -2011,7 +2276,8 @@ pub async fn rincian_kinerja(client: &TursoClient, operator: &OperatorUser, id_p
         "keputusan": milik(&keputusan, id).collect::<Vec<_>>(),
         "nilai_akhir": nilai_akhir_p,
         "predikat": predikat_p,
-        "kehadiran": kehadiran,
+        "kehadiran": hitungan.kehadiran,
+        "mengajar": hitungan.mengajar,
         "hidup": hidup,
         "rentang": rentang,
         "keluarga": riwayat,
@@ -2063,8 +2329,8 @@ pub async fn simpan_kinerja(client: &TursoClient, operator: &OperatorUser, draft
         }
         let kelompok = teks(&orang, "kelompok");
         let (id_t, nama_t, salinan) = template_aspek(client, sah.id_template.as_deref(), &kelompok).await?;
-        let kehadiran = hitung_otomatis(client, &orang, rentang.as_ref(), &hari_ini, &pengaturan.ambang).await?;
-        let nilai = susun_nilai(&salinan, &sah.nilai, &peta_otomatis(kehadiran.as_ref())).map_err(galat)?;
+        let hitungan = hitung_otomatis(client, &orang, rentang.as_ref(), &hari_ini, &pengaturan).await?;
+        let nilai = susun_nilai(&salinan, &sah.nilai, &peta_otomatis(&hitungan)).map_err(galat)?;
         let status_kini = baris(client, STATUS_KINI_SQL, vec![json!(hari_ini)])
             .await?
             .iter()
@@ -2114,8 +2380,7 @@ pub async fn simpan_kinerja(client: &TursoClient, operator: &OperatorUser, draft
     let orang = satu_pegawai(client, &id_k).await?;
     let rentang = rentang_pegawai(&orang, &teks(&p, "periode_mulai"), &teks(&p, "periode_selesai"));
     let mut keadaan = keadaan_dasar(client, operator, &id_k, &teks(&orang, "unit")).await?;
-    let kehadiran = hitung_otomatis(client, &orang, rentang.as_ref(), &hari_ini, &pengaturan.ambang).await?;
-    let otomatis = peta_otomatis(kehadiran.as_ref());
+    let otomatis = peta_otomatis(&hitung_otomatis(client, &orang, rentang.as_ref(), &hari_ini, &pengaturan).await?);
     let dihitung = sampai(rentang.as_ref(), &hari_ini);
 
     if sah.aksi == "Koreksi" {
@@ -2233,8 +2498,7 @@ pub async fn putuskan_kinerja(client: &TursoClient, operator: &OperatorUser, dra
     match jenis.as_str() {
         "Ajukan" => {
             let rentang = rentang_pegawai(&orang, &teks(&p, "periode_mulai"), &teks(&p, "periode_selesai"));
-            let kehadiran = hitung_otomatis(client, &orang, rentang.as_ref(), &hari_ini, &pengaturan.ambang).await?;
-            let otomatis = peta_otomatis(kehadiran.as_ref());
+            let otomatis = peta_otomatis(&hitung_otomatis(client, &orang, rentang.as_ref(), &hari_ini, &pengaturan).await?);
             let layar = draft.get("rincian").cloned().unwrap_or(Value::Null);
             keadaan.otomatis_sama = tersimpan.iter().all(|b| match otomatis.get(&b.tipe) {
                 Some(o) if b.tipe != TIPE_MANUAL => layar.get(&b.id_aspek).and_then(Value::as_str) == Some(o.rincian.as_str()),
@@ -2630,9 +2894,45 @@ mod tests {
         }
     }
 
+    #[test]
+    fn hr_kinerja_vektor_mengajar() {
+        let v = vektor();
+        for k in v["mengajar"].as_array().expect("mengajar") {
+            let m = &k["masukan"];
+            let s = |kunci: &str| m[kunci].as_str().unwrap_or_default().to_owned();
+            let jadwal: Vec<JadwalJp> = dari(&m["jadwal"]);
+            let presensi: Vec<PresensiKinerja> =
+                m["presensi"].as_array().unwrap().iter().map(PresensiKinerja::dari_json).collect();
+            let pengajuan: Vec<PengajuanJp> = dari(&m["pengajuan"]);
+            let ditangani: HashSet<String> = dari(&m["ditangani"]);
+            let libur: HashSet<String> = dari(&m["libur"]);
+            let tanpa_kbm: Vec<RentangTanpaKbm> = dari(&m["tanpa_kbm"]);
+            let ambang: [i64; 4] = dari(&m["ambang"]);
+            let hasil = hitung_mengajar(&MasukanMengajar {
+                mulai: &s("mulai"),
+                akhir: &s("akhir"),
+                hari_ini: &s("hari_ini"),
+                id_guru: &s("id_guru"),
+                jadwal: &jadwal,
+                presensi: &presensi,
+                pengajuan: &pengajuan,
+                ditangani: &ditangani,
+                libur: &libur,
+                tanpa_kbm: &tanpa_kbm,
+                ambang: &ambang,
+            });
+            assert_eq!(json!(hasil), k["hasil"], "{}", k["nama"]);
+        }
+    }
+
     /// Pasangan pemeriksaan harfiah TS di `hr-kinerja.test.ts`.
     #[test]
     fn hr_kinerja_sql_salinan() {
+        assert_eq!(
+            KINERJA_JADWAL_SQL,
+            super::super::hr_pengajuan::JADWAL_JP_SQL
+                .replace("t.tanggal_selesai >= ?1 ORDER BY", "t.tanggal_selesai >= ?1 AND j.id_guru = ?3 ORDER BY")
+        );
         assert!(KINERJA_PENGAJUAN_SQL.contains(super::super::hr_pengajuan::PENGAJUAN_BERLAKU_SQL));
         assert_eq!(KEPALA_TU_SQL.replace("'tgs-ka-tu'", "'tgs-kepsek'"), hr_beban::KEPALA_UNIT_SQL);
         assert!(DRAF_SQL.starts_with(TERBUKA_SQL) && DIAJUKAN_SQL.starts_with(TERBUKA_SQL));
@@ -2646,7 +2946,11 @@ mod tests {
     /// Data dan angka sama dengan `services/hr-kinerja.test.ts` ("alur
     /// penilaian"). Semester uji 2024-01-08..19, libur 11 Jan, G1 (SMP):
     /// H 8, 9, 12, 15; telat 10; telat 16 + izin berlaku; Alfa 17; 18 kosong
-    /// (cuti Menunggu); 19 Dinas Luar berlaku.
+    /// (cuti Menunggu); 19 Dinas Luar berlaku. Jadwal G1: Senin `1-2` dan
+    /// Selasa 1 di 7A, Kamis 2 dan Jumat 3 di 7B = 9 satuan; Selasa 16 (izin
+    /// jam 1-3, ditangani) dan Jumat 19 (DL) dikecualikan; terisi 6 (Kamis 18
+    /// kosong), berjurnal 5 (Selasa 9 tanpa jurnal); Rabu 10 di 8A sebagai
+    /// pengganti; Jumat 12 sesi kembar, Senin 8 dua jurnal.
     pub(super) const DATA_PENILAIAN_SQL: &str = "
         INSERT INTO tbl_shift (id_shift, kode_shift, nama_shift, jam_masuk, jam_pulang, jam_kerja_normal_menit, hari_kerja) VALUES (77, 77, 'Lima hari', '07:00', '15:00', 420, '1,2,3,4,5');
         INSERT INTO master_data (id_unik, kode_karyawan, nama, divisi, id_shift, jenis_personil, unit, tanggal_daftar, status_aktif, id_keluar, tanggal_selesai_aktif) VALUES
@@ -2674,6 +2978,18 @@ mod tests {
           ('pgn-3', 'G1', 'jns-cuti', 'Cuti', 1, 'Dibayar', 'hr.request.decide', '2024-01-18', '2024-01-18', NULL, NULL, 0, 'cuti', 's3', 'tu', 'x');
         INSERT INTO hr_pengajuan_keputusan (id_keputusan, id_pengajuan, jenis, sidik, oleh, waktu_perangkat) VALUES
           ('pk-1', 'pgn-1', 'Setujui', 's1', 'kepsek', 'x'), ('pk-2', 'pgn-2', 'Setujui', 's2', 'kepsek', 'x');
+        INSERT INTO akademik_rombel (id_rombel, id_tahun_ajaran, tingkat, nama_rombel) VALUES ('r7a', 'ta-2', 7, '7A'), ('r7b', 'ta-2', 7, '7B'), ('r8a', 'ta-2', 8, '8A');
+        INSERT INTO jadwal_mengajar (id_jadwal, id_tahun_ajaran, id_rombel, id_mapel, id_guru, hari, jam_ke) VALUES
+          ('jd-1', 'ta-2', 'r7a', 'mp-1', 'G1', 1, '1-2'), ('jd-2', 'ta-2', 'r7a', 'mp-1', 'G1', 2, '1'),
+          ('jd-3', 'ta-2', 'r7b', 'mp-1', 'G1', 5, '3'), ('jd-4', 'ta-2', 'r7b', 'mp-1', 'G1', 4, '2');
+        INSERT INTO presensi_mapel (id_presensi_mapel, id_tahun_ajaran, id_rombel, id_mapel, id_guru, tanggal, jam_ke, created_at, updated_at) VALUES
+          ('pm-1', 'ta-2', 'r7a', 'mp-1', 'G1', '2024-01-08', '1-2', 'x', 'x'), ('pm-2', 'ta-2', 'r7a', 'mp-1', 'G1', '2024-01-15', '1-2', 'x', 'x'),
+          ('pm-3', 'ta-2', 'r7a', 'mp-1', 'G1', '2024-01-09', '1', 'x', 'x'), ('pm-4', 'ta-2', 'r7b', 'mp-1', 'G1', '2024-01-12', '3', 'x', 'x'),
+          ('pm-5', 'ta-2', 'r7b', 'mp-1', 'G1', '2024-01-12', '3', 'x', 'x'), ('pm-6', 'ta-2', 'r8a', 'mp-2', 'G1', '2024-01-10', '4', 'x', 'x');
+        INSERT INTO jurnal_mengajar (id_jurnal, id_presensi_mapel, created_at, updated_at) VALUES
+          ('jm-1', 'pm-1', 'x', 'x'), ('jm-1b', 'pm-1', 'x', 'x'), ('jm-2', 'pm-2', 'x', 'x'), ('jm-4', 'pm-4', 'x', 'x');
+        INSERT INTO hr_jp_penanganan (id_penanganan, id_pengajuan, tanggal, id_jadwal, status, dicatat_oleh, waktu_perangkat) VALUES
+          ('jp:pgn-1:2024-01-16:jd-2', 'pgn-1', '2024-01-16', 'jd-2', 'Tugas Mandiri', 'piket', 'x');
     ";
 
     fn operator_sesi(izin: &[&str], id_karyawan: &str, username: &str) -> OperatorUser {
@@ -2711,20 +3027,25 @@ mod tests {
                 json!({ "aksi": "Buat", "id_karyawan": id, "periode_jenis": jenis, "periode_kunci": kunci })
             };
 
-            // Buat: kehadiran terhitung, presensi/jurnal menunggu isian manual.
+            // Buat: ketiga aspek otomatis terhitung.
             let id = simpan_kinerja(&client, &kepsek, &buat("G1", "Semester", "ta-2")).await.expect("buat")["id_penilaian"]
                 .as_str()
                 .unwrap()
                 .to_owned();
             let rincian_awal = "K|9|6|1|1|1|0|722|950,900,800,700|2024-01-19";
-            let (skor, hitung, rincian): (i64, i64, String) = c
-                .query_row(
-                    "SELECT skor, skor_hitung, rincian FROM hr_kinerja_nilai WHERE id_penilaian = ?1 AND tipe = 'Otomatis Kehadiran';",
-                    [&id],
+            let rincian_pk = "PK|9|2|6|1|1|857|950,900,800,700|2024-01-19";
+            let rincian_j = "J|6|5|833|950,900,800,700|2024-01-19";
+            let beku = |tipe: &str| -> (i64, i64, String) {
+                c.query_row(
+                    "SELECT skor, skor_hitung, rincian FROM hr_kinerja_nilai WHERE id_penilaian = ?1 AND tipe = ?2;",
+                    [id.as_str(), tipe],
                     |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)),
                 )
-                .expect("nilai kehadiran");
-            assert_eq!((skor, hitung, rincian.as_str()), (2, 2, rincian_awal));
+                .expect("nilai otomatis")
+            };
+            assert_eq!(beku(TIPE_KEHADIRAN), (2, 2, rincian_awal.to_owned()));
+            assert_eq!(beku(TIPE_PRESENSI), (3, 3, rincian_pk.to_owned()));
+            assert_eq!(beku(TIPE_JURNAL), (3, 3, rincian_j.to_owned()));
             assert_eq!(
                 pesan(simpan_kinerja(&client, &kepsek, &buat("G1", "Tahun Ajaran", "2023/2024")).await),
                 "Pegawai ini sudah punya penilaian untuk periode 2024-01-08 s.d. 2024-01-19."
@@ -2734,43 +3055,44 @@ mod tests {
             assert_eq!(rinci["status"], "Draf");
             assert_eq!(rinci["penilai_bawaan"]["id"], "K1");
             let tanda = rinci["tanda"].as_array().unwrap();
-            assert!(tanda.contains(&json!("pengajuan_menunggu")) && tanda.contains(&json!("otomatis_manual")));
+            assert!(tanda.contains(&json!("pengajuan_menunggu")) && !tanda.contains(&json!("otomatis_manual")));
             assert_eq!(rinci["kehadiran"]["tanggal_kosong"], json!(["2024-01-18"]));
+            assert_eq!(rinci["hidup"][TIPE_PRESENSI]["rincian"], rincian_pk);
+            assert_eq!(rinci["mengajar"]["belum_terisi"], json!([{ "tanggal": "2024-01-18", "jam": 2, "id_rombel": "r7b", "nama_rombel": "7B" }]));
+            assert_eq!(rinci["mengajar"]["tanpa_jurnal"][0]["tanggal"], "2024-01-09");
 
-            // Simpan: aspek manual 4; presensi/jurnal wajib bercatatan.
-            let isian = |dengan_catatan: bool| {
-                let daftar: Vec<Value> = rinci["nilai"]
+            // Simpan: aspek manual 4; skor presensi yang diubah wajib bercatatan.
+            let id_tipe = |tipe: &str| {
+                rinci["nilai"].as_array().unwrap().iter().find(|b| b["tipe"] == tipe).unwrap()["id_aspek"].clone()
+            };
+            let isian = |ubah_presensi: bool| {
+                let mut daftar: Vec<Value> = rinci["nilai"]
                     .as_array()
                     .unwrap()
                     .iter()
-                    .filter(|b| b["tipe"] != TIPE_KEHADIRAN)
-                    .map(|b| {
-                        let manual_otomatis = b["tipe"] != TIPE_MANUAL;
-                        json!({
-                            "id_aspek": b["id_aspek"], "skor": 4,
-                            "catatan": if manual_otomatis && dengan_catatan { Some("dari supervisi") } else { None },
-                        })
-                    })
+                    .filter(|b| b["tipe"] == TIPE_MANUAL)
+                    .map(|b| json!({ "id_aspek": b["id_aspek"], "skor": 4 }))
                     .collect();
+                if ubah_presensi {
+                    daftar.push(json!({ "id_aspek": id_tipe(TIPE_PRESENSI), "skor": 4 }));
+                }
                 json!({ "aksi": "Simpan", "id_penilaian": id, "catatan": "Baik", "nilai": daftar })
             };
             assert_eq!(
-                pesan(simpan_kinerja(&client, &kepsek, &isian(false)).await),
-                "Aspek \"Keterisian presensi kelas\" belum bisa dihitung otomatis; beri catatan alasan skornya."
+                pesan(simpan_kinerja(&client, &kepsek, &isian(true)).await),
+                "Skor aspek \"Keterisian presensi kelas\" yang diubah dari hitungan wajib diberi catatan alasannya."
             );
-            simpan_kinerja(&client, &kepsek, &isian(true)).await.expect("simpan draf");
+            simpan_kinerja(&client, &kepsek, &isian(false)).await.expect("simpan draf");
 
-            // Otomatis berubah sesudah layar dimuat: Ajukan ditolak.
-            let aspek_k = rinci["nilai"]
-                .as_array()
-                .unwrap()
-                .iter()
-                .find(|b| b["tipe"] == TIPE_KEHADIRAN)
-                .unwrap()["id_aspek"]
-                .as_str()
-                .unwrap()
-                .to_owned();
-            let rincian_layar = |r: &str| Value::Object(serde_json::Map::from_iter([(aspek_k.clone(), json!(r))]));
+            // Otomatis berubah sesudah layar dimuat: Ajukan ditolak. Layar
+            // mengirim `rincian` ketiga aspek otomatis.
+            let rincian_layar = |r: &str| {
+                json!({
+                    id_tipe(TIPE_KEHADIRAN).as_str().unwrap(): r,
+                    id_tipe(TIPE_PRESENSI).as_str().unwrap(): rincian_pk,
+                    id_tipe(TIPE_JURNAL).as_str().unwrap(): rincian_j,
+                })
+            };
             let ajukan = |r: &str| json!({ "id_penilaian": id, "jenis": "Ajukan", "rincian": rincian_layar(r) });
             c.execute(
                 "INSERT INTO absensi_harian (tanggal, id_karyawan, nama, kelas_divisi, jam_masuk, status_kehadiran, status_absen, sumber, update_terakhir, menit_terlambat, id_shift, bulan, tahun, id_sesi) VALUES ('2024-01-18', 'G1', 'Guru Satu', 'Guru', '06:59', 'Hadir', 'Masuk', 'Scanner', 'x', 0, 77, 'Januari', 2024, 's-18');",
@@ -2790,14 +3112,14 @@ mod tests {
                 "Alasan pengembalian wajib diisi."
             );
             putuskan_kinerja(&client, &yayasan, &putus("Kembalikan", "lengkapi supervisi")).await.expect("kembalikan");
-            simpan_kinerja(&client, &kepsek, &isian(true)).await.expect("simpan lagi");
+            simpan_kinerja(&client, &kepsek, &isian(false)).await.expect("simpan lagi");
             putuskan_kinerja(&client, &kepsek, &ajukan(rincian_baru)).await.expect("ajukan lagi");
             assert_eq!(
-                pesan(simpan_kinerja(&client, &kepsek, &isian(true)).await),
+                pesan(simpan_kinerja(&client, &kepsek, &isian(false)).await),
                 "Penilaian yang sudah diajukan atau selesai tidak bisa disunting."
             );
 
-            // Final beku: 500 + 90 × 75 = 7250 = Cukup.
+            // Final beku: tiga aspek otomatis skor 3 (30 × 50) + 70 × 75 = 6750 = Cukup.
             putuskan_kinerja(&client, &yayasan, &putus("Final", "")).await.expect("final");
             let (nilai, predikat, urut): (i64, String, i64) = c
                 .query_row(
@@ -2806,14 +3128,14 @@ mod tests {
                     |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)),
                 )
                 .expect("keputusan final");
-            assert_eq!((nilai, predikat.as_str(), urut), (7250, "Cukup", 4));
+            assert_eq!((nilai, predikat.as_str(), urut), (6750, "Cukup", 4));
             c.execute("UPDATE absensi_harian SET menit_terlambat = 0, status_kehadiran = 'Hadir' WHERE id_sesi = 's-10';", [])
                 .expect("koreksi absensi");
             let beku = rincian_kinerja(&client, &yayasan, &id).await.expect("rincian final");
-            assert_eq!((beku["status"].clone(), beku["nilai_akhir"].clone()), (json!("Final"), json!(7250)));
+            assert_eq!((beku["status"].clone(), beku["nilai_akhir"].clone()), (json!("Final"), json!(6750)));
             assert!(beku["tanda"].as_array().unwrap().contains(&json!("otomatis_berubah")));
             assert_eq!(
-                pesan(simpan_kinerja(&client, &kepsek, &isian(true)).await),
+                pesan(simpan_kinerja(&client, &kepsek, &isian(false)).await),
                 "Penilaian yang sudah diajukan atau selesai tidak bisa disunting."
             );
 

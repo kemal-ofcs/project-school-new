@@ -5,7 +5,7 @@ import { parseHariKerja } from "./hari-kerja";
 import { KEPALA_UNIT_SQL } from "./hr-beban";
 import * as K from "./hr-kinerja";
 import vektor from "./hr-kinerja.vektor.json";
-import { PENGAJUAN_BERLAKU_SQL } from "./hr-pengajuan";
+import { JADWAL_JP_SQL, PENGAJUAN_BERLAKU_SQL } from "./hr-pengajuan";
 
 // Vektor yang sama dengan `mod tests` di `desktop/hr_kinerja.rs`.
 
@@ -53,6 +53,8 @@ describe("hr-kinerja: SQL dan pesan kembar", () => {
       K.KINERJA_MENUNGGU_SQL,
       K.KEPALA_TU_SQL,
       K.KINERJA_SP_SQL,
+      K.KINERJA_JADWAL_SQL,
+      K.KINERJA_PRESENSI_SQL,
       K.PENILAIAN_SATU_SQL,
       K.PENILAIAN_PERIODE_SQL,
       K.PENILAIAN_PEGAWAI_SQL,
@@ -103,7 +105,12 @@ describe("hr-kinerja: SQL dan pesan kembar", () => {
     expect(diperiksa).toBeGreaterThan(0);
   });
 
-  test("SQL 5b memuat salinan harfiah sumbernya", () => {
+  test("SQL 5b dan 5c memuat salinan harfiah sumbernya", () => {
+    expect(
+      K.KINERJA_JADWAL_SQL.replace(" AND j.id_guru = ?3 ORDER BY", " ORDER BY"),
+    ).toBe(JADWAL_JP_SQL);
+    expect(K.KINERJA_JADWAL_SQL).toContain("AND j.id_guru = ?3 ORDER BY");
+    expect(K.KINERJA_PRESENSI_SQL).toContain("CAST(p.jam_ke AS INTEGER)");
     expect(K.KINERJA_PENGAJUAN_SQL).toContain(PENGAJUAN_BERLAKU_SQL);
     expect(K.KEPALA_TU_SQL.replaceAll("'tgs-ka-tu'", "'tgs-kepsek'")).toBe(
       KEPALA_UNIT_SQL,
@@ -310,6 +317,20 @@ describe("hr-kinerja: vektor penilaian 5b", () => {
         ambang: m.ambang,
       });
       expect(hasil, k.nama).toEqual(k.hasil as K.Kehadiran);
+    }
+  });
+
+  test("presensi kelas dan jurnal §23.2.4", () => {
+    for (const k of vektor.mengajar) {
+      const m = k.masukan;
+      const hasil = K.hitungMengajar({
+        ...m,
+        presensi: m.presensi.map(K.presensiKinerja),
+        pengajuan: m.pengajuan.map((p) => ({ ...p, nama_guru: "" })),
+        ditangani: new Set(m.ditangani),
+        libur: new Set(m.libur),
+      });
+      expect(hasil, k.nama).toEqual(k.hasil as K.Mengajar);
     }
   });
 });

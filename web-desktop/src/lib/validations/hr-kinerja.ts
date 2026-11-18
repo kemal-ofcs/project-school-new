@@ -12,14 +12,20 @@
  */
 
 import { z } from "zod";
-import { tanggalValid } from "./hari-kerja";
+import { rentangJamKe } from "./class-attendance";
+import { hariIso, tanggalValid } from "./hari-kerja";
 import type { HolidayWhitelistEntry } from "./holiday-whitelist";
 import { KEPALA_UNIT_SQL } from "./hr-beban";
 import { PESAN_DI_LUAR_CAKUPAN, PESAN_DIRI_SENDIRI } from "./hr-keluar";
 import TEMPLATE_BAWAAN_JSON from "./hr-kinerja-template-bawaan.json";
 import {
+  JADWAL_JP_SQL,
   type Jadwal,
+  type JadwalJp,
+  jpTerdampak,
   PENGAJUAN_BERLAKU_SQL,
+  type PengajuanJp,
+  taMemuat,
   tanggalRentang,
   tanggalWajib,
 } from "./hr-pengajuan";
@@ -614,6 +620,17 @@ export const KEPALA_TU_SQL = KEPALA_UNIT_SQL.replaceAll(
   "'tgs-kepsek'",
   "'tgs-ka-tu'",
 );
+/** `JADWAL_JP_SQL` + satu guru (?3); sisanya salinan harfiah (§23.2.4). */
+export const KINERJA_JADWAL_SQL = JADWAL_JP_SQL.replace(
+  "t.tanggal_selesai >= ?1 ORDER BY",
+  "t.tanggal_selesai >= ?1 AND j.id_guru = ?3 ORDER BY",
+);
+/**
+ * Presensi kelas atas nama satu guru (?3). `jurnal_mengajar.id_presensi_mapel`
+ * tidak unik, jadi `EXISTS`, bukan JOIN.
+ */
+export const KINERJA_PRESENSI_SQL =
+  "SELECT p.id_presensi_mapel, p.id_rombel, p.tanggal, p.jam_ke, CASE WHEN EXISTS (SELECT 1 FROM jurnal_mengajar jm WHERE jm.id_presensi_mapel = p.id_presensi_mapel) THEN 1 ELSE 0 END AS berjurnal FROM presensi_mapel p WHERE p.id_guru = ?3 AND p.tanggal >= ?1 AND p.tanggal <= ?2 ORDER BY p.tanggal, p.id_rombel, CAST(p.jam_ke AS INTEGER), p.jam_ke, p.id_presensi_mapel\n-- batas: sesi presensi kelas satu guru dalam satu periode penilaian\n;";
 /** SP yang berlaku pada suatu saat di dalam periode (Q-109, informasi). */
 export const KINERJA_SP_SQL =
   "SELECT id_sp, tingkat, tanggal, berlaku_sampai, COALESCE(nomor, '') AS nomor, pelanggaran FROM hr_sp WHERE id_karyawan = ?1 AND dicabut_pada IS NULL AND tanggal <= ?3 AND berlaku_sampai >= ?2 ORDER BY tanggal, id_sp\n-- batas: surat peringatan satu pegawai\n;";
@@ -1054,6 +1071,111 @@ export function nilaiAkhir(baris: BarisNilai[]): number | null {
 export const formatNilai = (nilai: number) =>
   `${Math.trunc(nilai / 100)},${String(nilai % 100).padStart(2, "0")}`;
 
+/** Permil → `83,3%`; `null` → `-`. */
+export const persenPermil = (permil: number | null) =>
+  permil === null ? "-" : `${Math.trunc(permil / 10)},${permil % 10}%`;
+
+const angkaRincian = (teks: string | undefined) => Number(teks ?? 0);
+const permilRincian = (teks: string | undefined) =>
+  teks === undefined || teks === "" ? null : Number(teks);
+
+export type RincianTerurai =
+  | {
+      tipe: "K";
+      hari: number;
+      tepat: number;
+      telat: number;
+      alfa: number;
+      kosong: number;
+      dikecualikan: number;
+      permil: number | null;
+      ambang: number[];
+      sampai: string;
+    }
+  | {
+      tipe: "PK";
+      satuan: number;
+      dikecualikan: number;
+      terisi: number;
+      pengganti: number;
+      tanpa_penanganan: number;
+      permil: number | null;
+      ambang: number[];
+      sampai: string;
+    }
+  | {
+      tipe: "J";
+      terisi: number;
+      berjurnal: number;
+      permil: number | null;
+      ambang: number[];
+      sampai: string;
+    };
+
+/**
+ * Pecah `rincian` beku (`hitung_kehadiran`/`hitung_mengajar`) untuk layar dan
+ * cetak; bentuk asing = `null`.
+ */
+export function uraiRincian(rincian: string | null): RincianTerurai | null {
+  const b = (rincian ?? "").split("|");
+  const ambang = (teks: string | undefined) =>
+    (teks ?? "").split(",").map(Number);
+  if (b[0] === "K" && b.length === 10) {
+    return {
+      tipe: "K",
+      hari: angkaRincian(b[1]),
+      tepat: angkaRincian(b[2]),
+      telat: angkaRincian(b[3]),
+      alfa: angkaRincian(b[4]),
+      kosong: angkaRincian(b[5]),
+      dikecualikan: angkaRincian(b[6]),
+      permil: permilRincian(b[7]),
+      ambang: ambang(b[8]),
+      sampai: b[9] ?? "",
+    };
+  }
+  if (b[0] === "PK" && b.length === 9) {
+    return {
+      tipe: "PK",
+      satuan: angkaRincian(b[1]),
+      dikecualikan: angkaRincian(b[2]),
+      terisi: angkaRincian(b[3]),
+      pengganti: angkaRincian(b[4]),
+      tanpa_penanganan: angkaRincian(b[5]),
+      permil: permilRincian(b[6]),
+      ambang: ambang(b[7]),
+      sampai: b[8] ?? "",
+    };
+  }
+  if (b[0] === "J" && b.length === 6) {
+    return {
+      tipe: "J",
+      terisi: angkaRincian(b[1]),
+      berjurnal: angkaRincian(b[2]),
+      permil: permilRincian(b[3]),
+      ambang: ambang(b[4]),
+      sampai: b[5] ?? "",
+    };
+  }
+  return null;
+}
+
+/** Kalimat rumus satu aspek otomatis dari `rincian` beku (layar dan cetak). */
+export function kalimatRincian(r: RincianTerurai): string {
+  const hasil = (rumus: string) =>
+    r.permil === null
+      ? `${rumus}: tidak bisa dihitung, skor diisi penilai`
+      : `${rumus} = ${persenPermil(r.permil)}`;
+  const ambang = `ambang skor 5/4/3/2: ${r.ambang.map(persenPermil).join(" / ")}`;
+  if (r.tipe === "K") {
+    return `${hasil(`(2 × tepat ${r.tepat} + terlambat ${r.telat}) ÷ (2 × ${r.hari} hari wajib)`)}; alfa ${r.alfa}, tanpa catatan ${r.kosong}, ${r.dikecualikan} hari cuti/izin/sakit tidak dihitung; ${ambang}.`;
+  }
+  if (r.tipe === "PK") {
+    return `${hasil(`presensi terisi ${r.terisi} ÷ ${r.satuan - r.dikecualikan} JP terjadwal`)}; ${r.dikecualikan} JP cuti/izin/sakit/dinas luar tidak dihitung (${r.tanpa_penanganan} belum ditangani), ${r.pengganti} JP sebagai pengganti (informasi); ${ambang}.`;
+  }
+  return `${hasil(`JP berjurnal ${r.berjurnal} ÷ ${r.terisi} JP terisi`)}; ${ambang}.`;
+}
+
 export interface KeputusanRingkas {
   urut: number;
   jenis: string;
@@ -1432,6 +1554,226 @@ export function hitungKehadiran(m: MasukanKehadiran): Kehadiran {
   return k;
 }
 
+// Aspek otomatis presensi kelas dan jurnal (§23.2.4)
+
+export interface PresensiKinerja {
+  id_rombel: string;
+  tanggal: string;
+  jam_ke: string;
+  berjurnal: boolean;
+}
+
+/** Cermin `PresensiKinerja::dari_json`: satu baris `KINERJA_PRESENSI_SQL`. */
+export const presensiKinerja = (
+  v: Record<string, unknown>,
+): PresensiKinerja => ({
+  id_rombel: teksDraft(v.id_rombel),
+  tanggal: teksDraft(v.tanggal),
+  jam_ke: teksDraft(v.jam_ke),
+  berjurnal: angkaJson(v.berjurnal) === 1,
+});
+
+export interface MasukanMengajar {
+  mulai: string;
+  akhir: string;
+  hari_ini: string;
+  id_guru: string;
+  jadwal: readonly JadwalJp[];
+  presensi: readonly PresensiKinerja[];
+  /** Hanya pengajuan berlaku guru itu (`KINERJA_PENGAJUAN_SQL`). */
+  pengajuan: readonly PengajuanJp[];
+  /** `id_penanganan` yang tercatat untuk pengajuan itu. */
+  ditangani: ReadonlySet<string>;
+  libur: ReadonlySet<string>;
+  tanpa_kbm: readonly RentangTanpaKbm[];
+  ambang: readonly number[];
+}
+
+export interface SatuanMengajar {
+  tanggal: string;
+  jam: number;
+  id_rombel: string;
+  nama_rombel: string;
+}
+
+export interface Mengajar {
+  satuan: number;
+  dikecualikan: number;
+  terisi: number;
+  berjurnal: number;
+  pengganti: number;
+  tanpa_penanganan: number;
+  permil_presensi: number | null;
+  skor_presensi: number | null;
+  permil_jurnal: number | null;
+  skor_jurnal: number | null;
+  ambang: number[];
+  sampai: string;
+  rincian_presensi: string;
+  rincian_jurnal: string;
+  belum_terisi: SatuanMengajar[];
+  tanpa_jurnal: SatuanMengajar[];
+}
+
+const memuatJam = (jamKe: string, jam: number) => {
+  const r = rentangJamKe(jamKe);
+  return r !== null && r.awal <= jam && jam <= r.akhir;
+};
+
+/**
+ * Cermin `hitung_mengajar` (Q-96..Q-99): satuan (rombel, tanggal, jam) jadwal
+ * guru itu, terisi oleh presensi atas namanya (mapel tidak dicocokkan),
+ * berjurnal bila salah satu sesi penutupnya berjurnal. Sengaja per rombel,
+ * bukan per (tanggal, jam) seperti honor JP.
+ */
+export function hitungMengajar(m: MasukanMengajar): Mengajar {
+  const sampai = m.akhir < m.hari_ini ? m.akhir : m.hari_ini;
+  const tanggal = m.mulai <= sampai ? tanggalRentang(m.mulai, sampai) : [];
+  const jadwal = m.jadwal.filter((j) => j.id_guru === m.id_guru);
+  const jpKena = new Map<string, boolean>();
+  for (const jp of jpTerdampak(m.pengajuan, jadwal, m.libur, m.mulai, sampai)) {
+    const kunci = `${jp.tanggal}|${jp.id_jadwal}`;
+    jpKena.set(
+      kunci,
+      (jpKena.get(kunci) ?? false) || m.ditangani.has(jp.id_penanganan),
+    );
+  }
+  const tanpaKbm = (t: string) =>
+    m.tanpa_kbm.some((r) => r.mulai <= t && t <= r.selesai);
+
+  const satuan = new Map<
+    string,
+    {
+      tanggal: string;
+      jam: number;
+      id_rombel: string;
+      nama_rombel: string;
+      kecuali: boolean;
+      ditangani: boolean;
+    }
+  >();
+  for (const t of tanggal) {
+    if (m.libur.has(t) || tanpaKbm(t)) continue;
+    const hari = hariIso(t);
+    if (hari === null) continue;
+    for (const j of jadwal) {
+      if (j.hari !== hari || !taMemuat(j, t)) continue;
+      const r = rentangJamKe(j.jam_ke);
+      if (r === null) continue;
+      const kena = jpKena.get(`${t}|${j.id_jadwal}`);
+      for (let jam = r.awal; jam <= r.akhir; jam++) {
+        const kunci = `${t}|${jam}|${j.id_rombel}`;
+        const s = satuan.get(kunci) ?? {
+          tanggal: t,
+          jam,
+          id_rombel: j.id_rombel,
+          nama_rombel: j.nama_rombel,
+          kecuali: false,
+          ditangani: false,
+        };
+        s.kecuali ||= kena !== undefined;
+        s.ditangani ||= kena === true;
+        satuan.set(kunci, s);
+      }
+    }
+  }
+  // Urutan sama dengan BTreeMap Rust: tanggal → jam → rombel.
+  const urut = [...satuan.values()].sort((a, b) =>
+    a.tanggal !== b.tanggal
+      ? a.tanggal < b.tanggal
+        ? -1
+        : 1
+      : a.jam !== b.jam
+        ? a.jam - b.jam
+        : a.id_rombel < b.id_rombel
+          ? -1
+          : a.id_rombel > b.id_rombel
+            ? 1
+            : 0,
+  );
+
+  const k: Mengajar = {
+    satuan: satuan.size,
+    dikecualikan: 0,
+    terisi: 0,
+    berjurnal: 0,
+    pengganti: 0,
+    tanpa_penanganan: 0,
+    permil_presensi: null,
+    skor_presensi: null,
+    permil_jurnal: null,
+    skor_jurnal: null,
+    ambang: [...m.ambang],
+    sampai,
+    rincian_presensi: "",
+    rincian_jurnal: "",
+    belum_terisi: [],
+    tanpa_jurnal: [],
+  };
+  for (const s of urut) {
+    if (s.kecuali) {
+      k.dikecualikan++;
+      if (!s.ditangani) k.tanpa_penanganan++;
+      continue;
+    }
+    const item = {
+      tanggal: s.tanggal,
+      jam: s.jam,
+      id_rombel: s.id_rombel,
+      nama_rombel: s.nama_rombel,
+    };
+    const sesi = m.presensi.filter(
+      (p) =>
+        p.id_rombel === s.id_rombel &&
+        p.tanggal === s.tanggal &&
+        memuatJam(p.jam_ke, s.jam),
+    );
+    if (sesi.length === 0) {
+      k.belum_terisi.push(item);
+      continue;
+    }
+    k.terisi++;
+    if (sesi.some((p) => p.berjurnal)) k.berjurnal++;
+    else k.tanpa_jurnal.push(item);
+  }
+
+  const terjadwal = (rombel: string, t: string, jam: number) => {
+    const hari = hariIso(t);
+    return jadwal.some(
+      (j) =>
+        j.id_rombel === rombel &&
+        j.hari === hari &&
+        taMemuat(j, t) &&
+        memuatJam(j.jam_ke, jam),
+    );
+  };
+  const pengganti = new Set<string>();
+  for (const p of m.presensi) {
+    if (p.tanggal < m.mulai || p.tanggal > sampai) continue;
+    const r = rentangJamKe(p.jam_ke);
+    if (r === null) continue;
+    for (let jam = r.awal; jam <= r.akhir; jam++) {
+      if (!terjadwal(p.id_rombel, p.tanggal, jam)) {
+        pengganti.add(`${p.id_rombel}|${p.tanggal}|${jam}`);
+      }
+    }
+  }
+  k.pengganti = pengganti.size;
+
+  const d = k.satuan - k.dikecualikan;
+  k.permil_presensi = d > 0 ? Math.floor((k.terisi * 1000) / d) : null;
+  k.skor_presensi =
+    k.permil_presensi === null ? null : skorAmbang(k.permil_presensi, m.ambang);
+  k.permil_jurnal =
+    k.terisi > 0 ? Math.floor((k.berjurnal * 1000) / k.terisi) : null;
+  k.skor_jurnal =
+    k.permil_jurnal === null ? null : skorAmbang(k.permil_jurnal, m.ambang);
+  const ambang = m.ambang.join(",");
+  k.rincian_presensi = `PK|${k.satuan}|${k.dikecualikan}|${k.terisi}|${k.pengganti}|${k.tanpa_penanganan}|${k.permil_presensi ?? ""}|${ambang}|${sampai}`;
+  k.rincian_jurnal = `J|${k.terisi}|${k.berjurnal}|${k.permil_jurnal ?? ""}|${ambang}|${sampai}`;
+  return k;
+}
+
 // Bentuk data untuk layar
 
 export interface AspekKinerja {
@@ -1578,6 +1920,7 @@ export interface RincianKinerja {
   nilai_akhir: number | null;
   predikat: string | null;
   kehadiran: Kehadiran | null;
+  mengajar: Mengajar | null;
   hidup: Record<string, Otomatis>;
   rentang: RentangAktif | null;
   keluarga: KeluargaKinerja[];

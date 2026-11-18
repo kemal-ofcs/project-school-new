@@ -1039,7 +1039,7 @@ export async function sesuaikanCuti(
 
 // Sub-fase 2c: JP terdampak dan penanganannya (cermin `hr_pengajuan.rs`)
 
-const barisPengajuanJp = (r: Row): PengajuanJp => ({
+export const barisPengajuanJp = (r: Row): PengajuanJp => ({
   id_pengajuan: teks(r, "id_pengajuan"),
   id_karyawan: teks(r, "id_karyawan"),
   nama_guru: teks(r, "nama_guru"),
@@ -1049,7 +1049,7 @@ const barisPengajuanJp = (r: Row): PengajuanJp => ({
   jam_sampai_ke: angkaAtauNull(r.jam_sampai_ke),
 });
 
-const barisJadwalJp = (r: Row): JadwalJp => ({
+export const barisJadwalJp = (r: Row): JadwalJp => ({
   id_jadwal: teks(r, "id_jadwal"),
   id_guru: teks(r, "id_guru"),
   hari: kolomAngka(r, "hari"),

@@ -17,7 +17,8 @@ export const runtime = "nodejs";
 
 /**
  * Bahan cetak SK dan surat (kop, pengaturan, kepala unit, identitas guru).
- * Juga untuk pembaca SP (penanda tangan bawaan, cetak SP) dan surat keluar.
+ * Juga untuk pembaca SP (penanda tangan bawaan, cetak SP), surat keluar, dan
+ * Lembar Hasil Penilaian Kinerja.
  */
 export async function POST(request: NextRequest) {
   try {
@@ -26,6 +27,8 @@ export async function POST(request: NextRequest) {
       "hr.duty.manage",
       "hr.warning.view",
       "hr.offboard.view",
+      "hr.performance.view",
+      "hr.performance.finalize",
     ]);
     await ensureServerDatabaseInitialized();
     const parsed = suratSetupSchema.safeParse(await readJsonBody(request));

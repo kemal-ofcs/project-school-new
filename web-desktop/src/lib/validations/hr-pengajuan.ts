@@ -1444,7 +1444,7 @@ function beririsan(a: string, b: string): boolean {
   return x !== null && y !== null && x.awal <= y.akhir && y.awal <= x.akhir;
 }
 
-const taMemuat = (j: JadwalJp, t: string) =>
+export const taMemuat = (j: JadwalJp, t: string) =>
   j.ta_mulai <= t && t <= j.ta_selesai;
 
 /** Cermin `jp_terdampak` (§20.2.5, Q-46). */
