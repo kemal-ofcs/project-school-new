@@ -105,6 +105,13 @@ export default function MasterOperatorPage() {
   } | null>(null);
   const [operatorModal, setOperatorModal] = useState(false);
   const [akunMassal, setAkunMassal] = useState(false);
+  // Edit massal: akun yang dicentang, lalu role dan/atau status baru.
+  // Superadmin dan akun sendiri tidak bisa dicentang.
+  const [terpilih, setTerpilih] = useState<Set<number>>(new Set());
+  const [massalRole, setMassalRole] = useState(0);
+  const [massalStatus, setMassalStatus] = useState<"" | "Aktif" | "Nonaktif">(
+    "",
+  );
   const [editingOperator, setEditingOperator] = useState<OperatorRecord | null>(
     null,
   );
@@ -172,6 +179,58 @@ export default function MasterOperatorPage() {
       void loadData(true);
     });
   }, [loadData]);
+
+  const bisaDipilih = (operator: OperatorRecord) =>
+    !operator.isSuperadmin && operator.id !== user?.id;
+
+  const terapkanMassal = async () => {
+    if (!user || isSubmittingRef.current) return;
+    const sasaran = operators.filter(
+      (operator) => terpilih.has(operator.id) && bisaDipilih(operator),
+    );
+    if (sasaran.length === 0 || (massalRole < 1 && !massalStatus)) return;
+    isSubmittingRef.current = true;
+    setSaving(true);
+    const gagal: string[] = [];
+    try {
+      // Satu per satu lewat jalur Edit yang sama, dengan data akun itu
+      // sendiri; hanya role dan/atau status yang berganti.
+      for (const operator of sasaran) {
+        try {
+          await updateMasterOperator(user.id, operator.id, {
+            kodeOperator: operator.kodeOperator,
+            name: operator.name,
+            username: operator.username,
+            email: operator.email,
+            noHp: operator.noHp,
+            password: "",
+            roleId: massalRole > 0 ? massalRole : operator.roleId,
+            status: massalStatus || operator.status,
+            idKaryawan: operator.idKaryawan,
+          });
+        } catch (error: unknown) {
+          gagal.push(
+            `${operator.name}: ${error instanceof Error ? error.message : "gagal diubah"}`,
+          );
+        }
+      }
+      setTerpilih(new Set());
+      setMassalRole(0);
+      setMassalStatus("");
+      setFeedback(
+        gagal.length === 0
+          ? { tone: "success", message: `${sasaran.length} akun diperbarui.` }
+          : {
+              tone: "error",
+              message: `${sasaran.length - gagal.length} dari ${sasaran.length} akun diperbarui. ${gagal.join("; ")}`,
+            },
+      );
+      await loadData(true);
+    } finally {
+      isSubmittingRef.current = false;
+      setSaving(false);
+    }
+  };
 
   const openNewOperator = () => {
     const firstRole =
@@ -418,15 +477,90 @@ export default function MasterOperatorPage() {
           Memuat Master Operator...
         </div>
       ) : activeTab === "operators" ? (
-        <OperatorTable
-          operators={operators}
-          currentUserId={user.id}
-          saving={saving}
-          canResetTwoFactor={hasPermission(user, "two_factor.reset")}
-          onEdit={openEditOperator}
-          onResetTwoFactor={(item) => void resetOperatorTwoFactor(item)}
-          onDelete={(item) => setDeleteTarget({ type: "operator", item })}
-        />
+        <>
+          {terpilih.size > 0 ? (
+            <div className="flex flex-wrap items-end gap-3 rounded-2xl border border-sky-400/30 bg-slate-900/95 p-4">
+              <span className="self-center text-xs font-bold text-white">
+                {terpilih.size} akun dipilih
+              </span>
+              <label className="grid gap-1 text-[11px] font-semibold text-slate-400">
+                Ganti role
+                <select
+                  value={massalRole}
+                  onChange={(event) =>
+                    setMassalRole(Number(event.target.value))
+                  }
+                  className="app-input"
+                >
+                  <option value={0}>Tetap</option>
+                  {roles
+                    .filter(
+                      (role) => role.status === "Aktif" && !role.isSuperadmin,
+                    )
+                    .map((role) => (
+                      <option key={role.id} value={role.id}>
+                        {role.name}
+                      </option>
+                    ))}
+                </select>
+              </label>
+              <label className="grid gap-1 text-[11px] font-semibold text-slate-400">
+                Ganti status
+                <select
+                  value={massalStatus}
+                  onChange={(event) =>
+                    setMassalStatus(
+                      event.target.value as "" | "Aktif" | "Nonaktif",
+                    )
+                  }
+                  className="app-input"
+                >
+                  <option value="">Tetap</option>
+                  <option value="Aktif">Aktif</option>
+                  <option value="Nonaktif">Nonaktif</option>
+                </select>
+              </label>
+              <button
+                type="button"
+                data-konfirmasi
+                onClick={() => void terapkanMassal()}
+                disabled={saving || (massalRole < 1 && !massalStatus)}
+                className="min-h-11 rounded-xl bg-amber-300 px-4 text-xs font-black text-slate-950 disabled:opacity-50"
+              >
+                {saving ? "Menyimpan..." : `Terapkan ke ${terpilih.size} akun`}
+              </button>
+              <button
+                type="button"
+                onClick={() => setTerpilih(new Set())}
+                disabled={saving}
+                className="min-h-11 rounded-xl border border-white/10 px-4 text-xs font-bold text-slate-300"
+              >
+                Batal pilih
+              </button>
+            </div>
+          ) : null}
+          <OperatorTable
+            operators={operators}
+            currentUserId={user.id}
+            terpilih={terpilih}
+            bisaDipilih={bisaDipilih}
+            onPilih={(ids, centang) =>
+              setTerpilih((lama) => {
+                const baru = new Set(lama);
+                for (const id of ids) {
+                  if (centang) baru.add(id);
+                  else baru.delete(id);
+                }
+                return baru;
+              })
+            }
+            saving={saving}
+            canResetTwoFactor={hasPermission(user, "two_factor.reset")}
+            onEdit={openEditOperator}
+            onResetTwoFactor={(item) => void resetOperatorTwoFactor(item)}
+            onDelete={(item) => setDeleteTarget({ type: "operator", item })}
+          />
+        </>
       ) : (
         <RoleGrid
           roles={roles}
@@ -938,6 +1072,9 @@ function RoleFormModal({
 function OperatorTable({
   operators,
   currentUserId,
+  terpilih,
+  bisaDipilih,
+  onPilih,
   saving,
   canResetTwoFactor,
   onEdit,
@@ -946,18 +1083,36 @@ function OperatorTable({
 }: {
   operators: OperatorRecord[];
   currentUserId: number;
+  terpilih: Set<number>;
+  bisaDipilih: (operator: OperatorRecord) => boolean;
+  onPilih: (ids: number[], centang: boolean) => void;
   saving: boolean;
   canResetTwoFactor: boolean;
   onEdit: (operator: OperatorRecord) => void;
   onResetTwoFactor: (operator: OperatorRecord) => void;
   onDelete: (operator: OperatorRecord) => void;
 }) {
+  const dapatDipilih = operators.filter(bisaDipilih).map((o) => o.id);
+  const semuaTercentang =
+    dapatDipilih.length > 0 && dapatDipilih.every((id) => terpilih.has(id));
   return (
     <div className="overflow-hidden rounded-3xl border border-white/10 bg-slate-900/80">
       <div className="overflow-x-auto">
         <table className="w-full min-w-[760px] text-left text-xs">
           <thead className="border-b border-white/10 bg-slate-950/70 text-slate-400">
             <tr>
+              <th className="w-10 p-4">
+                <input
+                  type="checkbox"
+                  aria-label="Pilih semua akun yang bisa diubah"
+                  checked={semuaTercentang}
+                  disabled={dapatDipilih.length === 0}
+                  onChange={(event) =>
+                    onPilih(dapatDipilih, event.target.checked)
+                  }
+                  className="size-4 accent-sky-500"
+                />
+              </th>
               <th className="p-4">Operator</th>
               <th className="p-4">Kode / Username</th>
               <th className="p-4">Role</th>
@@ -969,6 +1124,18 @@ function OperatorTable({
           <tbody className="divide-y divide-white/10">
             {operators.map((operator) => (
               <tr key={operator.id} className="text-slate-300">
+                <td className="p-4">
+                  <input
+                    type="checkbox"
+                    aria-label={`Pilih ${operator.name}`}
+                    checked={terpilih.has(operator.id)}
+                    disabled={!bisaDipilih(operator)}
+                    onChange={(event) =>
+                      onPilih([operator.id], event.target.checked)
+                    }
+                    className="size-4 accent-sky-500 disabled:opacity-30"
+                  />
+                </td>
                 <td className="p-4">
                   <p className="font-bold text-white">{operator.name}</p>
                   {operator.id === currentUserId ? (
