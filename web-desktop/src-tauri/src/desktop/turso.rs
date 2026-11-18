@@ -7710,6 +7710,9 @@ impl TursoClient {
             .unwrap_or("")
             .trim();
         validate_operator_contact_akun(&email, &no_hp, !id_karyawan.is_empty())?;
+        if let Some(pesan) = validate_password_strength(password) {
+            return Err(CommandError::new("VALIDATION_ERROR", pesan));
+        }
 
         let role_row = self
             .query_one(
@@ -7932,6 +7935,9 @@ impl TursoClient {
         }
         if let Some(password) = draft.get("password").and_then(Value::as_str) {
             if !password.trim().is_empty() {
+                if let Some(pesan) = validate_password_strength(password.trim()) {
+                    return Err(CommandError::new("VALIDATION_ERROR", pesan));
+                }
                 updates.push("password_hash = ?");
                 args.push(json!(hash_password_pbkdf2(password.trim())));
             }
@@ -7996,6 +8002,14 @@ impl TursoClient {
                 vec![],
             ));
         }
+        // Setiap suntingan akun mencabut sesi Web akun itu, sama dengan
+        // `revokeOperatorSessions` di `editOperator`. Tanpa ini, password yang
+        // di-reset dari Desktop tidak mengeluarkan orang yang masih login di
+        // browser dengan password lama.
+        stmts.push(Statement::new(
+            "UPDATE app_session SET revoked_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now'), revoked_reason = 'operator-security-update' WHERE operator_id = ? AND revoked_at IS NULL;",
+            vec![json!(id)],
+        ));
         self.execute_atomic(stmts).await?;
         Ok(json!({ "sukses": true }))
     }
@@ -17221,6 +17235,26 @@ pub fn hash_password_pbkdf2_with_iterations(password: &str, iterations: u32) -> 
     )
 }
 
+/// Aturan kekuatan password akun operator. Cerminan `validatePasswordStrength`
+/// di `auth/password.ts`, dengan pesan yang sama; vektornya
+/// `validations/password-baru.vektor.json`. Dulu jalur Rust tidak memeriksa
+/// apa pun, sehingga Desktop/Mobile bisa menyimpan password satu karakter yang
+/// akan ditolak Web.
+pub fn validate_password_strength(password: &str) -> Option<&'static str> {
+    if password.chars().count() < 12 {
+        return Some("Password minimal 12 karakter.");
+    }
+    if !password.chars().any(|c| c.is_ascii_lowercase())
+        || !password.chars().any(|c| c.is_ascii_uppercase())
+    {
+        return Some("Password harus memiliki huruf kecil dan huruf besar.");
+    }
+    if !password.chars().any(|c| c.is_ascii_digit()) {
+        return Some("Password harus memiliki angka.");
+    }
+    None
+}
+
 pub fn hash_password_pbkdf2(password: &str) -> String {
     hash_password_pbkdf2_with_iterations(password, 600_000)
 }
@@ -17594,6 +17628,27 @@ mod tests {
         assert!(validate_operator_contact_akun("", "081234567890", false).is_err());
         assert!(validate_operator_contact_akun("", "", true).is_err());
         assert!(validate_operator_contact_akun("bukan-email", "081234567890", true).is_err());
+    }
+
+    #[test]
+    fn validate_password_strength_vektor() {
+        // Vektor kembar `password-baru.test.ts`; kasus "sama dengan password
+        // lama" bukan urusan aturan kekuatan.
+        let vektor: Value = serde_json::from_str(include_str!(
+            "../../../src/lib/validations/password-baru.vektor.json"
+        ))
+        .expect("vektor terbaca");
+        for kasus in vektor["kasus"].as_array().expect("kasus") {
+            if kasus["lama"] == kasus["baru"] {
+                continue;
+            }
+            assert_eq!(
+                validate_password_strength(kasus["baru"].as_str().unwrap_or("")),
+                kasus["hasil"].as_str(),
+                "{}",
+                kasus["baru"]
+            );
+        }
     }
 
     /// Layar "Lupa Password" terbuka tanpa login, jadi kontak lengkap tidak

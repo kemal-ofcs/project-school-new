@@ -1332,21 +1332,6 @@ export default function PresensiKelasPage() {
                     >
                       Tandai Semua Hadir
                     </button>
-                    {canManage ? (
-                      <button
-                        type="button"
-                        onClick={handleSaveAttendance}
-                        disabled={savingAttendance}
-                        className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 px-4 py-1.5 text-xs font-black text-slate-950 shadow-md shadow-emerald-950 transition hover:from-emerald-400 hover:to-teal-400 disabled:opacity-50"
-                      >
-                        <Icon name="check" className="size-3.5" />
-                        <span>
-                          {savingAttendance
-                            ? "Menyimpan..."
-                            : "Simpan Presensi"}
-                        </span>
-                      </button>
-                    ) : null}
                   </div>
                 </div>
 
@@ -1488,9 +1473,10 @@ export default function PresensiKelasPage() {
                   </table>
                 </div>
 
-                {/* Bottom Save Bar */}
+                {/* Satu-satunya tombol simpan, menempel di bawah layar supaya
+                    tetap terjangkau pada roster panjang (kelas gabungan). */}
                 {canManage ? (
-                  <div className="flex items-center justify-between rounded-2xl border border-white/10 bg-slate-900/80 p-4">
+                  <div className="sticky bottom-0 z-10 flex items-center justify-between rounded-2xl border border-white/10 bg-slate-900/95 p-4 backdrop-blur">
                     <p className="text-xs text-slate-400">
                       Pastikan seluruh kehadiran siswa terisi dengan akurat
                       sebelum menyimpan.

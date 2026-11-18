@@ -910,8 +910,8 @@ function OperatorFormModal({
         <FormField
           label={
             editingOperator
-              ? "Password baru (opsional, min. 8 karakter)"
-              : "Password (min. 8 karakter)"
+              ? "Password baru (opsional, min. 12 karakter, huruf besar, huruf kecil, angka)"
+              : "Password (min. 12 karakter, huruf besar, huruf kecil, angka)"
           }
           htmlFor="operator-password"
         >
@@ -919,7 +919,7 @@ function OperatorFormModal({
             id="operator-password"
             type="password"
             required={!editingOperator}
-            minLength={8}
+            minLength={12}
             autoComplete="new-password"
             value={draft.password}
             onChange={(event) =>

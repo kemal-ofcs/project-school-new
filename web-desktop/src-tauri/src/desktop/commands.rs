@@ -1039,14 +1039,8 @@ pub async fn desktop_change_own_password(
 /// Cerminan `periksaPasswordBaru` (dan `validatePasswordStrength`) di
 /// `auth/password.ts`; vektor `validations/password-baru.vektor.json`.
 pub fn periksa_password_baru(lama: &str, baru: &str) -> Option<&'static str> {
-    if baru.chars().count() < 12 {
-        return Some("Password minimal 12 karakter.");
-    }
-    if !baru.chars().any(|c| c.is_ascii_lowercase()) || !baru.chars().any(|c| c.is_ascii_uppercase()) {
-        return Some("Password harus memiliki huruf kecil dan huruf besar.");
-    }
-    if !baru.chars().any(|c| c.is_ascii_digit()) {
-        return Some("Password harus memiliki angka.");
+    if let Some(pesan) = super::turso::validate_password_strength(baru) {
+        return Some(pesan);
     }
     if baru == lama {
         return Some("Password baru tidak boleh sama dengan password lama.");
