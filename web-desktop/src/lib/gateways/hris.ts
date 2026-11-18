@@ -27,6 +27,7 @@ import type {
   RiwayatKinerja,
   TemplateDraft,
 } from "@/lib/validations/hr-kinerja";
+import type { PerluPerhatian } from "@/lib/validations/hr-pengingat";
 import type {
   BerkasDokumenDraft,
   DaftarDokumen,
@@ -429,6 +430,17 @@ export function simpanPengaturanSurat(
     { draft },
     "/api/kepegawaian/letters/settings",
     draft,
+  );
+}
+
+// HRIS Fase 6a: kartu "Perlu perhatian", dibaca dari cloud.
+
+export function getPerluPerhatian(): Promise<PerluPerhatian> {
+  return cloud(
+    "desktop_hr_attention",
+    {},
+    "/api/kepegawaian/attention/query",
+    {},
   );
 }
 

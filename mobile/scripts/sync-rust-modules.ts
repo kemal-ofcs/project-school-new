@@ -57,6 +57,8 @@ const filesToSync = [
   "hr_keluar.rs",
   // HRIS Fase 5: penilaian kinerja (cloud-only), kembar `validations/hr-kinerja.ts`.
   "hr_kinerja.rs",
+  // HRIS Fase 6: pengingat kepegawaian (baca cloud), kembar `validations/hr-pengingat.ts`.
+  "hr_pengingat.rs",
   // HRIS 1c: data pribadi, keuangan, pendidik, dokumen (cloud-only), kembar TS.
   "hris_cloud.rs",
   "commands.rs",

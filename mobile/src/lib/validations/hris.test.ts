@@ -81,6 +81,8 @@ describe("hris: aturan kembar", () => {
       H.KUNCI_PKWT_MAKS,
       H.KUNCI_BEBAN_MIN_JP,
       H.KUNCI_BEBAN_MAKS_JP,
+      H.KUNCI_KGB_TAHUN,
+      H.KUNCI_PENSIUN_USIA,
       H.ID_WALI_KELAS,
     ];
     let diperiksa = 0;
@@ -107,6 +109,9 @@ describe("hris: aturan kembar", () => {
         ["PKWT", H.ATURAN_PKWT],
         ["BEBAN_MIN", H.ATURAN_BEBAN_MIN],
         ["BEBAN_MAKS", H.ATURAN_BEBAN_MAKS],
+        ["SP_MASA", H.ATURAN_SP_MASA],
+        ["KGB", H.ATURAN_KGB],
+        ["PENSIUN", H.ATURAN_PENSIUN],
       ] as const) {
         expect(rust).toContain(
           `ATURAN_${nama}:Aturan=Aturan{bawaan:${aturan.bawaan},min:${aturan.min},maks:${aturan.maks},satuan:"${aturan.satuan}"};`,
@@ -137,6 +142,8 @@ const ATURAN_UJI: Record<string, H.Aturan> = {
   percobaan: H.ATURAN_PERCOBAAN,
   beban_min: H.ATURAN_BEBAN_MIN,
   beban_maks: H.ATURAN_BEBAN_MAKS,
+  kgb: H.ATURAN_KGB,
+  pensiun: H.ATURAN_PENSIUN,
 };
 const aturanDari = (nama: string) => ATURAN_UJI[nama] ?? H.ATURAN_PKWT;
 

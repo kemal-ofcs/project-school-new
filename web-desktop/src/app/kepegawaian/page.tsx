@@ -21,6 +21,7 @@ import { JenisDokumenOrganisasi } from "@/components/kepegawaian/JenisDokumenOrg
 import { JenisPengajuanOrganisasi } from "@/components/kepegawaian/JenisPengajuanOrganisasi";
 import { OrganisasiTugasKontrak } from "@/components/kepegawaian/OrganisasiTugasKontrak";
 import { PengaturanSurat } from "@/components/kepegawaian/PengaturanSurat";
+import { PerluPerhatianCard } from "@/components/kepegawaian/PerluPerhatianCard";
 import { RincianPegawai } from "@/components/kepegawaian/RincianPegawai";
 import { TabBebanMengajar } from "@/components/kepegawaian/TabBebanMengajar";
 import { type AwalKeluar, TabKeluar } from "@/components/kepegawaian/TabKeluar";
@@ -145,6 +146,7 @@ export default function KepegawaianPage() {
           {pesan}
         </FeedbackBanner>
       ) : null}
+      <PerluPerhatianCard onBukaTab={(t) => setTab(t as Tab)} />
       <div
         role="tablist"
         aria-label="Bagian halaman Kepegawaian"

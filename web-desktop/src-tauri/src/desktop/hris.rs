@@ -294,6 +294,9 @@ pub const KUNCI_BEBAN_MIN_JP: &str = "hr_beban_min_jp";
 pub const KUNCI_BEBAN_MAKS_JP: &str = "hr_beban_maks_jp";
 /// Masa berlaku SP dalam bulan (HRIS Fase 4, §22.2.1); dibekukan per SP.
 pub const KUNCI_SP_MASA_BULAN: &str = "hr_sp_masa_bulan";
+/// Siklus KGB dan usia pensiun untuk pengingat (HRIS Fase 6, §24.3).
+pub const KUNCI_KGB_TAHUN: &str = "hr_kgb_tahun";
+pub const KUNCI_PENSIUN_USIA: &str = "hr_pensiun_usia";
 
 #[derive(Debug, Clone, Copy)]
 pub struct Aturan {
@@ -308,6 +311,8 @@ pub const ATURAN_PKWT: Aturan = Aturan { bawaan: 60, min: 12, maks: 120, satuan:
 pub const ATURAN_BEBAN_MIN: Aturan = Aturan { bawaan: 24, min: 0, maks: 60, satuan: "JP" };
 pub const ATURAN_BEBAN_MAKS: Aturan = Aturan { bawaan: 40, min: 1, maks: 60, satuan: "JP" };
 pub const ATURAN_SP_MASA: Aturan = Aturan { bawaan: 6, min: 1, maks: 12, satuan: "bulan" };
+pub const ATURAN_KGB: Aturan = Aturan { bawaan: 2, min: 1, maks: 5, satuan: "tahun" };
+pub const ATURAN_PENSIUN: Aturan = Aturan { bawaan: 60, min: 50, maks: 70, satuan: "tahun" };
 
 /// Status kepegawaian per pegawai pada ?1 (Q-25): kontrak tidak dibatalkan
 /// terakhir yang sudah mulai, lalu `guru_data`, lalu kosong.
@@ -321,7 +326,7 @@ pub const BERKONTRAK_SQL: &str = "EXISTS (SELECT 1 FROM hr_kontrak k WHERE k.id_
 /// ?8 percobaan, ?9 catatan, ?10 pencatat.
 pub const SIMPAN_KONTRAK_SQL: &str = "INSERT OR IGNORE INTO hr_kontrak (id_kontrak, id_karyawan, status, id_ref, nomor, tanggal_mulai, tanggal_selesai, percobaan_selesai, catatan, dicatat_oleh, created_at) VALUES (?1, ?2, ?3, NULLIF(?4, ''), NULLIF(?5, ''), ?6, NULLIF(?7, ''), NULLIF(?8, ''), NULLIF(?9, ''), NULLIF(?10, ''), datetime('now'));";
 pub const KONTRAK_SQL: &str = "SELECT id_kontrak, id_karyawan, status, COALESCE(id_ref, '') AS id_ref, COALESCE(nomor, '') AS nomor, tanggal_mulai, COALESCE(tanggal_selesai, '') AS tanggal_selesai, COALESCE(percobaan_selesai, '') AS percobaan_selesai, COALESCE(catatan, '') AS catatan, COALESCE(dicatat_oleh, '') AS dicatat_oleh, created_at FROM hr_kontrak ORDER BY id_karyawan, tanggal_mulai, id_kontrak\n-- batas: kontrak pegawai sekolah, beberapa baris per orang sepanjang masa kerja\n;";
-pub const PENGATURAN_KONTRAK_SQL: &str = "SELECT key, value FROM setting_gex_system WHERE key IN ('hr_percobaan_maks_bulan', 'hr_pkwt_maks_bulan', 'hr_beban_min_jp', 'hr_beban_maks_jp', 'hr_sp_masa_bulan')\n-- batas: lima kunci pengaturan\n;";
+pub const PENGATURAN_KONTRAK_SQL: &str = "SELECT key, value FROM setting_gex_system WHERE key IN ('hr_percobaan_maks_bulan', 'hr_pkwt_maks_bulan', 'hr_beban_min_jp', 'hr_beban_maks_jp', 'hr_sp_masa_bulan', 'hr_kgb_tahun', 'hr_pensiun_usia')\n-- batas: tujuh kunci pengaturan\n;";
 pub const HARI_INI_SQL: &str = "SELECT date('now', '+7 hours') AS hari_ini;";
 
 // Fase 1b: tugas tambahan (§19.2.2)
@@ -1099,6 +1104,8 @@ pub(crate) fn pengaturan_kontrak(connection: &rusqlite::Connection) -> Result<Va
     let beban_min = nilai.get(KUNCI_BEBAN_MIN_JP).cloned().unwrap_or_default();
     let beban_maks = nilai.get(KUNCI_BEBAN_MAKS_JP).cloned().unwrap_or_default();
     let sp_masa = nilai.get(KUNCI_SP_MASA_BULAN).cloned().unwrap_or_default();
+    let kgb = nilai.get(KUNCI_KGB_TAHUN).cloned().unwrap_or_default();
+    let pensiun = nilai.get(KUNCI_PENSIUN_USIA).cloned().unwrap_or_default();
     let (min, maks) = batas_beban(Some(&beban_min), Some(&beban_maks));
     Ok(json!({
         "percobaan_maks_bulan": percobaan,
@@ -1106,12 +1113,16 @@ pub(crate) fn pengaturan_kontrak(connection: &rusqlite::Connection) -> Result<Va
         "beban_min_jp": beban_min,
         "beban_maks_jp": beban_maks,
         "sp_masa_bulan": sp_masa,
+        "kgb_tahun": kgb,
+        "pensiun_usia": pensiun,
         "berlaku": {
             "percobaan_maks_bulan": angka_pengaturan(Some(&percobaan), ATURAN_PERCOBAAN),
             "pkwt_maks_bulan": angka_pengaturan(Some(&pkwt), ATURAN_PKWT),
             "beban_min_jp": min,
             "beban_maks_jp": maks,
             "sp_masa_bulan": angka_pengaturan(Some(&sp_masa), ATURAN_SP_MASA),
+            "kgb_tahun": angka_pengaturan(Some(&kgb), ATURAN_KGB),
+            "pensiun_usia": angka_pengaturan(Some(&pensiun), ATURAN_PENSIUN),
         },
     }))
 }
@@ -1280,7 +1291,8 @@ pub fn batal_kontrak(state: &DesktopState, oleh: &str, id_kontrak: &str, alasan:
 }
 
 /// `desktop_hr_settings_save`: angka kontrak (Q-28), batas JP (§21.2.1), dan
-/// masa SP (§22.2.1); `""` = bawaan. Kelima isian wajib dibawa.
+/// masa SP (§22.2.1), siklus KGB dan usia pensiun (§24.3); `""` = bawaan.
+/// Ketujuh isian wajib dibawa.
 pub fn simpan_pengaturan(state: &DesktopState, draft: Value) -> Result<Value, CommandError> {
     let percobaan = validasi_angka_pengaturan(&teks(&draft, "percobaan_maks_bulan"), ATURAN_PERCOBAAN, "Masa percobaan")
         .map_err(invalid)?;
@@ -1290,6 +1302,9 @@ pub fn simpan_pengaturan(state: &DesktopState, draft: Value) -> Result<Value, Co
         validasi_batas_beban(&teks(&draft, "beban_min_jp"), &teks(&draft, "beban_maks_jp")).map_err(invalid)?;
     let sp_masa = validasi_angka_pengaturan(&teks(&draft, "sp_masa_bulan"), ATURAN_SP_MASA, "Masa berlaku SP")
         .map_err(invalid)?;
+    let kgb = validasi_angka_pengaturan(&teks(&draft, "kgb_tahun"), ATURAN_KGB, "Siklus KGB").map_err(invalid)?;
+    let pensiun =
+        validasi_angka_pengaturan(&teks(&draft, "pensiun_usia"), ATURAN_PENSIUN, "Usia pensiun").map_err(invalid)?;
     let client_id = sync::ensure_client_id(state)?;
     let mut connection = storage::database(&state.data_dir)?;
     let transaction = connection.transaction().map_err(db_error)?;
@@ -1298,6 +1313,8 @@ pub fn simpan_pengaturan(state: &DesktopState, draft: Value) -> Result<Value, Co
     tulis_setting(&transaction, &client_id, KUNCI_BEBAN_MIN_JP, &beban_min)?;
     tulis_setting(&transaction, &client_id, KUNCI_BEBAN_MAKS_JP, &beban_maks)?;
     tulis_setting(&transaction, &client_id, KUNCI_SP_MASA_BULAN, &sp_masa)?;
+    tulis_setting(&transaction, &client_id, KUNCI_KGB_TAHUN, &kgb)?;
+    tulis_setting(&transaction, &client_id, KUNCI_PENSIUN_USIA, &pensiun)?;
     let hasil = pengaturan_kontrak(&transaction)?;
     transaction.commit().map_err(db_error)?;
     Ok(hasil)
@@ -2009,6 +2026,8 @@ mod tests {
             "percobaan" => ATURAN_PERCOBAAN,
             "beban_min" => ATURAN_BEBAN_MIN,
             "beban_maks" => ATURAN_BEBAN_MAKS,
+            "kgb" => ATURAN_KGB,
+            "pensiun" => ATURAN_PENSIUN,
             _ => ATURAN_PKWT,
         }
     }

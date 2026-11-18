@@ -11,7 +11,7 @@ use super::{
         CommandError, DesktopLoginResult, DesktopRuntimeStatus, DesktopSession, DesktopSyncStatus,
         OperatorUser, SessionMode,
     },
-    hr_beban, hr_keluar, hr_kinerja, hr_pengajuan, hris, hris_cloud, operational, portability, rapel,
+    hr_beban, hr_keluar, hr_kinerja, hr_pengajuan, hr_pengingat, hris, hris_cloud, operational, portability, rapel,
     scanner, secrets, storage, sync, teaching_journal, turso, uks, wa_notification,
 };
 
@@ -3494,6 +3494,22 @@ pub fn desktop_hr_letter_settings_save(
 ) -> Result<Value, CommandError> {
     require_permission(&state, "hr.org.manage")?;
     hr_beban::letter_settings_save(&state, draft)
+}
+
+/// Kartu "Perlu perhatian" HRIS (Fase 6a): pengingat dari cloud yang boleh
+/// dilihat sesi. Sesi tanpa satu pun izin kartu mendapat daftar kosong, bukan
+/// galat, supaya dashboard tidak menampilkan pesan galat.
+#[tauri::command]
+pub async fn desktop_hr_attention(state: State<'_, DesktopState>) -> Result<Value, CommandError> {
+    let operator = match require_any_permission(&state, &hr_pengingat::IZIN_PENGINGAT) {
+        Err(galat) if galat.code == "DESKTOP_ACCESS_DENIED" => {
+            return Ok(serde_json::json!({ "hari_ini": "", "items": [] }));
+        }
+        hasil => hasil?,
+    };
+    hr_pengingat::perlu_perhatian(&klien_cloud(&state)?, &operator)
+        .await
+        .map_err(hris_cloud::luring)
 }
 
 /// Riwayat SP seorang pegawai (cloud-only, HRIS Fase 4a): status turunan,

@@ -462,7 +462,13 @@
     ["0", "beban_min", 0],
     ["61", "beban_min", 24],
     ["0", "beban_maks", 40],
-    ["60", "beban_maks", 60]
+    ["60", "beban_maks", 60],
+    ["", "kgb", 2],
+    ["3", "kgb", 3],
+    ["0", "kgb", 2],
+    ["", "pensiun", 60],
+    ["65", "pensiun", 65],
+    ["49", "pensiun", 60]
   ],
   "batas_beban": [
     [null, null, 24, 40],
@@ -521,6 +527,22 @@
       "Batas GTT/PTT",
       null,
       "Batas GTT/PTT harus 12 sampai 120 bulan, atau kosong untuk bawaan 60."
+    ],
+    ["5", "kgb", "Siklus KGB", "5", null],
+    [
+      "6",
+      "kgb",
+      "Siklus KGB",
+      null,
+      "Siklus KGB harus 1 sampai 5 tahun, atau kosong untuk bawaan 2."
+    ],
+    ["50", "pensiun", "Usia pensiun", "50", null],
+    [
+      "71",
+      "pensiun",
+      "Usia pensiun",
+      null,
+      "Usia pensiun harus 50 sampai 70 tahun, atau kosong untuk bawaan 60."
     ]
   ],
   "tugas_dasar": {

@@ -11,6 +11,8 @@ import {
 import {
   ATURAN_BEBAN_MAKS,
   ATURAN_BEBAN_MIN,
+  ATURAN_KGB,
+  ATURAN_PENSIUN,
   ATURAN_PERCOBAAN,
   ATURAN_PKWT,
   ATURAN_SP_MASA,
@@ -37,6 +39,8 @@ export function OrganisasiTugasKontrak({
   const [bebanMin, setBebanMin] = useState(org.pengaturan.beban_min_jp);
   const [bebanMaks, setBebanMaks] = useState(org.pengaturan.beban_maks_jp);
   const [spMasa, setSpMasa] = useState(org.pengaturan.sp_masa_bulan);
+  const [kgb, setKgb] = useState(org.pengaturan.kgb_tahun);
+  const [pensiun, setPensiun] = useState(org.pengaturan.pensiun_usia);
   const isSubmittingRef = useRef(false);
   const [menyimpan, setMenyimpan] = useState(false);
 
@@ -66,6 +70,8 @@ export function OrganisasiTugasKontrak({
           beban_min_jp: bebanMin,
           beban_maks_jp: bebanMaks,
           sp_masa_bulan: spMasa,
+          kgb_tahun: kgb,
+          pensiun_usia: pensiun,
         }),
       "Angka kepegawaian disimpan.",
     );
@@ -158,16 +164,18 @@ export function OrganisasiTugasKontrak({
           id="judul-angka-kontrak"
           className="text-base font-semibold text-white"
         >
-          Angka kontrak, beban mengajar, dan SP
+          Angka kontrak, beban mengajar, SP, KGB, dan pensiun
         </h2>
         <p className="text-sm text-slate-400">
           Dipakai untuk menandai kontrak di tab Kontrak dan guru di tab Beban
           Mengajar, tidak untuk menolak. Kosongkan untuk memakai angka bawaan.
           Batas JP per minggu mengikuti Permendikbud 15/2018; periksa ulang
           angkanya. Masa SP berlaku untuk SP yang dibuat sesudah disimpan.
+          Siklus KGB dihitung dari TMT pegawai GTY/PTY, usia pensiun dari
+          tanggal lahir di data pribadi; keduanya hanya untuk pengingat.
         </p>
         <form
-          className="grid gap-4 sm:grid-cols-2 lg:grid-cols-[1fr_1fr_1fr_1fr_1fr_auto] lg:items-end"
+          className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4 lg:items-end"
           onSubmit={simpanAngka}
         >
           <div>
@@ -237,6 +245,34 @@ export function OrganisasiTugasKontrak({
               value={spMasa}
               placeholder={`Bawaan ${ATURAN_SP_MASA.bawaan}`}
               onChange={(e) => setSpMasa(e.target.value)}
+              className={INPUT}
+            />
+          </div>
+          <div>
+            <label htmlFor="angka-kgb" className={LABEL}>
+              Siklus KGB (tahun)
+            </label>
+            <input
+              id="angka-kgb"
+              inputMode="numeric"
+              disabled={!bolehUbah}
+              value={kgb}
+              placeholder={`Bawaan ${ATURAN_KGB.bawaan}`}
+              onChange={(e) => setKgb(e.target.value)}
+              className={INPUT}
+            />
+          </div>
+          <div>
+            <label htmlFor="angka-pensiun" className={LABEL}>
+              Usia pensiun (tahun)
+            </label>
+            <input
+              id="angka-pensiun"
+              inputMode="numeric"
+              disabled={!bolehUbah}
+              value={pensiun}
+              placeholder={`Bawaan ${ATURAN_PENSIUN.bawaan}`}
+              onChange={(e) => setPensiun(e.target.value)}
               className={INPUT}
             />
           </div>

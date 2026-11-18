@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { AppShell } from "@/components/AppShell";
 import { EksporLaporanKehadiran } from "@/components/dashboard/EksporLaporanKehadiran";
+import { PerluPerhatianCard } from "@/components/kepegawaian/PerluPerhatianCard";
 import { Icon } from "@/components/ui/Icon";
 import { PilihCari } from "@/components/ui/PilihCari";
 import { AnimatedCounter } from "@/components/visual/AnimatedCounter";
@@ -341,6 +342,8 @@ export default function DashboardPage() {
             <p className="mt-1 text-xs text-rose-200">{loadError}</p>
           </div>
         )}
+
+        <PerluPerhatianCard />
 
         {/* 4 Metric Cards with 3D Tilt */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">

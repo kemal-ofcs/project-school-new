@@ -26,6 +26,7 @@ pub mod hr_beban;
 pub mod hr_keluar;
 pub mod hr_kinerja;
 pub mod hr_pengajuan;
+pub mod hr_pengingat;
 pub mod hris;
 pub mod hris_cloud;
 pub mod inventory;

@@ -367,6 +367,7 @@ pub fn run() {
             mobile::commands::desktop_hr_teaching_load,
             mobile::commands::desktop_hr_letter_setup,
             mobile::commands::desktop_hr_letter_settings_save,
+            mobile::commands::desktop_hr_attention,
             mobile::commands::desktop_hr_warnings,
             mobile::commands::desktop_hr_warning_save,
             mobile::commands::desktop_hr_warning_revoke,

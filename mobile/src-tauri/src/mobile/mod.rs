@@ -31,6 +31,8 @@ pub mod hr_keluar;
 pub mod hr_kinerja;
 // Pengajuan cuti/izin (HRIS Fase 2): SALINAN `desktop/hr_pengajuan.rs`.
 pub mod hr_pengajuan;
+// Pengingat kepegawaian (HRIS Fase 6): SALINAN `desktop/hr_pengingat.rs`.
+pub mod hr_pengingat;
 pub mod hris;
 pub mod hris_cloud;
 // Inventaris: SALINAN `desktop/inventory.rs` oleh sync-rust-modules.ts.

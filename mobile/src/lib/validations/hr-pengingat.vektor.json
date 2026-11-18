@@ -1,0 +1,766 @@
+{
+  "tambah_tahun": [
+    ["2024-02-29", 1, "2025-02-28"],
+    ["2024-02-29", 4, "2028-02-29"],
+    ["2020-03-01", 2, "2022-03-01"],
+    ["2026-11-19", 0, "2026-11-19"],
+    ["2026-02-30", 1, null],
+    ["", 1, null]
+  ],
+  "sisa_hari": [
+    ["2026-11-20", "2026-11-19", 1],
+    ["2026-11-01", "2026-11-19", -18],
+    ["2027-01-01", "2026-12-31", 1],
+    ["2026-13-01", "2026-11-19", null],
+    ["", "2026-11-19", null]
+  ],
+  "jendela": [
+    [0, [7, 30], 7],
+    [7, [7, 30], 7],
+    [8, [7, 30], 30],
+    [30, [7, 30], 30],
+    [31, [7, 30], null],
+    [-1, [7, 30], null],
+    [0, [0], 0],
+    [1, [0], null]
+  ],
+  "tanggal_kgb": [
+    ["2020-02-29", 2, "2026-11-19", "2028-02-29"],
+    ["2018-12-01", 2, "2026-11-19", "2026-12-01"],
+    ["2024-11-19", 2, "2026-11-19", "2026-11-19"],
+    ["2026-11-19", 2, "2026-11-19", "2028-11-19"],
+    ["2021-06-01", 5, "2026-11-19", "2031-06-01"],
+    ["", 2, "2026-11-19", null],
+    ["2020-01-01", 0, "2026-11-19", null]
+  ],
+  "tanggal_pensiun": [
+    ["1966-12-01", 60, "2026-12-01"],
+    ["1968-02-29", 59, "2027-02-28"],
+    ["1964-02-29", 60, "2024-02-29"],
+    ["", 60, null]
+  ],
+  "pengingat": [
+    {
+      "nama": "kosong",
+      "hari_ini": "2026-11-19",
+      "aturan": {
+        "kgb_tahun": 2,
+        "pensiun_usia": 60
+      },
+      "data": {
+        "pegawai": [],
+        "kontrak": [],
+        "dokumen": [],
+        "sp": [],
+        "pengajuan": [],
+        "semester": [],
+        "jp": [],
+        "ditangani": []
+      },
+      "hasil": []
+    },
+    {
+      "nama": "lengkap: jendela 30/7, kontrak lewat, 29 Feb, TMT kosong, pegawai keluar, JP ditangani",
+      "hari_ini": "2026-11-19",
+      "aturan": {
+        "kgb_tahun": 2,
+        "pensiun_usia": 60
+      },
+      "data": {
+        "pegawai": [
+          {
+            "id_karyawan": "P1",
+            "nama": "Ani",
+            "jabatan": "Guru",
+            "unit": "SMP",
+            "tmt": "2018-12-01",
+            "status": "GTY",
+            "tanggal_lahir": "1966-12-01"
+          },
+          {
+            "id_karyawan": "P2",
+            "nama": "Budi",
+            "jabatan": "Staf TU",
+            "unit": "SMA",
+            "tmt": "",
+            "status": "GTT",
+            "tanggal_lahir": ""
+          },
+          {
+            "id_karyawan": "P3",
+            "nama": "Cici",
+            "jabatan": "Guru",
+            "unit": "SMP",
+            "tmt": "2020-02-29",
+            "status": "PTY",
+            "tanggal_lahir": "1967-02-15"
+          },
+          {
+            "id_karyawan": "P4",
+            "nama": "Dodi",
+            "jabatan": "",
+            "unit": "SMA",
+            "tmt": "2024-11-19",
+            "status": "PTT",
+            "tanggal_lahir": ""
+          },
+          {
+            "id_karyawan": "P5",
+            "nama": "Eka",
+            "jabatan": "Satpam",
+            "unit": "",
+            "tmt": "",
+            "status": "GTT",
+            "tanggal_lahir": ""
+          },
+          {
+            "id_karyawan": "P6",
+            "nama": "Fajar",
+            "jabatan": "Guru",
+            "unit": "SMA",
+            "tmt": "",
+            "status": "GTT",
+            "tanggal_lahir": ""
+          }
+        ],
+        "kontrak": [
+          {
+            "id_kontrak": "K1",
+            "id_karyawan": "P2",
+            "status": "GTT",
+            "tanggal_selesai": "2026-11-25",
+            "percobaan_selesai": ""
+          },
+          {
+            "id_kontrak": "K2",
+            "id_karyawan": "P4",
+            "status": "PTT",
+            "tanggal_selesai": "2026-12-10",
+            "percobaan_selesai": "2026-11-22"
+          },
+          {
+            "id_kontrak": "K3",
+            "id_karyawan": "P1",
+            "status": "GTY",
+            "tanggal_selesai": "2026-11-30",
+            "percobaan_selesai": ""
+          },
+          {
+            "id_kontrak": "K4",
+            "id_karyawan": "P3",
+            "status": "GTT",
+            "tanggal_selesai": "2026-11-01",
+            "percobaan_selesai": ""
+          },
+          {
+            "id_kontrak": "K5",
+            "id_karyawan": "PX",
+            "status": "GTT",
+            "tanggal_selesai": "2026-11-20",
+            "percobaan_selesai": "2026-11-20"
+          },
+          {
+            "id_kontrak": "K6",
+            "id_karyawan": "P5",
+            "status": "GTT",
+            "tanggal_selesai": "2026-10-10",
+            "percobaan_selesai": ""
+          },
+          {
+            "id_kontrak": "K7",
+            "id_karyawan": "P6",
+            "status": "GTT",
+            "tanggal_selesai": "2026-12-20",
+            "percobaan_selesai": "2026-11-18"
+          }
+        ],
+        "dokumen": [
+          {
+            "id_dokumen": "D1",
+            "id_karyawan": "P1",
+            "nama_jenis": "STR",
+            "tanggal_kedaluwarsa": "2026-12-19"
+          },
+          {
+            "id_dokumen": "D2",
+            "id_karyawan": "P2",
+            "nama_jenis": "SIM",
+            "tanggal_kedaluwarsa": "2026-11-10"
+          },
+          {
+            "id_dokumen": "D3",
+            "id_karyawan": "PX",
+            "nama_jenis": "K3",
+            "tanggal_kedaluwarsa": "2026-11-20"
+          },
+          {
+            "id_dokumen": "D4",
+            "id_karyawan": "P3",
+            "nama_jenis": "K3",
+            "tanggal_kedaluwarsa": "2026-12-20"
+          }
+        ],
+        "sp": [
+          {
+            "id_sp": "S1",
+            "id_karyawan": "P3",
+            "berlaku_sampai": "2026-11-18"
+          },
+          {
+            "id_sp": "S2",
+            "id_karyawan": "P1",
+            "berlaku_sampai": "2026-11-19"
+          },
+          {
+            "id_sp": "S3",
+            "id_karyawan": "PX",
+            "berlaku_sampai": "2026-11-18"
+          }
+        ],
+        "pengajuan": [
+          {
+            "id_pengajuan": "A1",
+            "id_karyawan": "P4",
+            "izin_pemutus": "hr.request.decide",
+            "tanggal": "2026-11-15"
+          },
+          {
+            "id_pengajuan": "A2",
+            "id_karyawan": "PX",
+            "izin_pemutus": "hr.request.decide",
+            "tanggal": "2026-11-10"
+          }
+        ],
+        "semester": [
+          {
+            "id_tahun_ajaran": "ta-lama",
+            "nama_tahun": "2026/2027",
+            "semester": "Ganjil",
+            "tanggal_mulai": "2026-11-05",
+            "unit": ""
+          },
+          {
+            "id_tahun_ajaran": "ta-genap",
+            "nama_tahun": "2026/2027",
+            "semester": "Genap",
+            "tanggal_mulai": "2026-11-24",
+            "unit": "SMA"
+          },
+          {
+            "id_tahun_ajaran": "ta-genap",
+            "nama_tahun": "2026/2027",
+            "semester": "Genap",
+            "tanggal_mulai": "2026-11-24",
+            "unit": "SMP"
+          },
+          {
+            "id_tahun_ajaran": "ta-jauh",
+            "nama_tahun": "2027/2028",
+            "semester": "Ganjil",
+            "tanggal_mulai": "2026-11-27",
+            "unit": "SMP"
+          }
+        ],
+        "jp": [
+          {
+            "id_penanganan": "jp:A9:2026-11-19:JD1",
+            "id_pengajuan": "A9",
+            "id_karyawan": "P1",
+            "nama_guru": "Ani",
+            "tanggal": "2026-11-19",
+            "id_jadwal": "JD1",
+            "jam_ke": "1-2",
+            "id_rombel": "R1",
+            "nama_rombel": "7A",
+            "id_mapel": "M1",
+            "nama_mapel": "IPA",
+            "unit": "SMA"
+          },
+          {
+            "id_penanganan": "jp:A9:2026-11-19:JD2",
+            "id_pengajuan": "A9",
+            "id_karyawan": "P1",
+            "nama_guru": "Ani",
+            "tanggal": "2026-11-19",
+            "id_jadwal": "JD2",
+            "jam_ke": "3",
+            "id_rombel": "R2",
+            "nama_rombel": "8B",
+            "id_mapel": "M1",
+            "nama_mapel": "IPA",
+            "unit": "SMP"
+          },
+          {
+            "id_penanganan": "jp:A9:2026-11-20:JD3",
+            "id_pengajuan": "A9",
+            "id_karyawan": "P1",
+            "nama_guru": "Ani",
+            "tanggal": "2026-11-20",
+            "id_jadwal": "JD3",
+            "jam_ke": "4",
+            "id_rombel": "R2",
+            "nama_rombel": "8B",
+            "id_mapel": "M1",
+            "nama_mapel": "IPA",
+            "unit": "SMP"
+          }
+        ],
+        "ditangani": ["jp:A9:2026-11-19:JD2"]
+      },
+      "hasil": [
+        {
+          "kejadian": "kontrak_berakhir",
+          "id_karyawan": "P3",
+          "nama": "Cici",
+          "jabatan": "Guru",
+          "unit": "SMP",
+          "tanggal": "2026-11-01",
+          "sisa": -18,
+          "kunci": "",
+          "keterangan": "",
+          "izin": ""
+        },
+        {
+          "kejadian": "kontrak_berakhir",
+          "id_karyawan": "P2",
+          "nama": "Budi",
+          "jabatan": "Staf TU",
+          "unit": "SMA",
+          "tanggal": "2026-11-25",
+          "sisa": 6,
+          "kunci": "ktr-7:K1",
+          "keterangan": "",
+          "izin": ""
+        },
+        {
+          "kejadian": "kontrak_berakhir",
+          "id_karyawan": "P4",
+          "nama": "Dodi",
+          "jabatan": "",
+          "unit": "SMA",
+          "tanggal": "2026-12-10",
+          "sisa": 21,
+          "kunci": "ktr-30:K2",
+          "keterangan": "",
+          "izin": ""
+        },
+        {
+          "kejadian": "percobaan_berakhir",
+          "id_karyawan": "P4",
+          "nama": "Dodi",
+          "jabatan": "",
+          "unit": "SMA",
+          "tanggal": "2026-11-22",
+          "sisa": 3,
+          "kunci": "coba:K2",
+          "keterangan": "",
+          "izin": ""
+        },
+        {
+          "kejadian": "kgb",
+          "id_karyawan": "P1",
+          "nama": "Ani",
+          "jabatan": "Guru",
+          "unit": "SMP",
+          "tanggal": "2026-12-01",
+          "sisa": 12,
+          "kunci": "kgb:P1:2026-12-01",
+          "keterangan": "",
+          "izin": ""
+        },
+        {
+          "kejadian": "pensiun",
+          "id_karyawan": "P1",
+          "nama": "Ani",
+          "jabatan": "Guru",
+          "unit": "SMP",
+          "tanggal": "2026-12-01",
+          "sisa": 12,
+          "kunci": "pensiun:P1:2026-12-01",
+          "keterangan": "",
+          "izin": ""
+        },
+        {
+          "kejadian": "pensiun",
+          "id_karyawan": "P3",
+          "nama": "Cici",
+          "jabatan": "Guru",
+          "unit": "SMP",
+          "tanggal": "2027-02-15",
+          "sisa": 88,
+          "kunci": "pensiun:P3:2027-02-15",
+          "keterangan": "",
+          "izin": ""
+        },
+        {
+          "kejadian": "dokumen_kedaluwarsa",
+          "id_karyawan": "P2",
+          "nama": "Budi",
+          "jabatan": "Staf TU",
+          "unit": "SMA",
+          "tanggal": "2026-11-10",
+          "sisa": -9,
+          "kunci": "",
+          "keterangan": "SIM",
+          "izin": ""
+        },
+        {
+          "kejadian": "dokumen_kedaluwarsa",
+          "id_karyawan": "P1",
+          "nama": "Ani",
+          "jabatan": "Guru",
+          "unit": "SMP",
+          "tanggal": "2026-12-19",
+          "sisa": 30,
+          "kunci": "dok:D1:2026-12-19",
+          "keterangan": "STR",
+          "izin": ""
+        },
+        {
+          "kejadian": "sp_berakhir",
+          "id_karyawan": "P3",
+          "nama": "Cici",
+          "jabatan": "Guru",
+          "unit": "SMP",
+          "tanggal": "2026-11-19",
+          "sisa": 0,
+          "kunci": "sp-akhir:S1",
+          "keterangan": "",
+          "izin": ""
+        },
+        {
+          "kejadian": "pengajuan_menunggu",
+          "id_karyawan": "P4",
+          "nama": "Dodi",
+          "jabatan": "",
+          "unit": "SMA",
+          "tanggal": "2026-11-15",
+          "sisa": -4,
+          "kunci": "pgj-tunggu:2026-11-19",
+          "keterangan": "",
+          "izin": "hr.request.decide"
+        },
+        {
+          "kejadian": "jp_tanpa_penanganan",
+          "id_karyawan": "P1",
+          "nama": "Ani",
+          "jabatan": "Guru",
+          "unit": "SMA",
+          "tanggal": "2026-11-19",
+          "sisa": 0,
+          "kunci": "jp-kosong:2026-11-19",
+          "keterangan": "7A jam ke-1-2",
+          "izin": ""
+        },
+        {
+          "kejadian": "sk_pembagian_tugas",
+          "id_karyawan": "",
+          "nama": "",
+          "jabatan": "",
+          "unit": "",
+          "tanggal": "2026-11-05",
+          "sisa": -14,
+          "kunci": "",
+          "keterangan": "Ganjil 2026/2027",
+          "izin": ""
+        },
+        {
+          "kejadian": "sk_pembagian_tugas",
+          "id_karyawan": "",
+          "nama": "",
+          "jabatan": "",
+          "unit": "SMA",
+          "tanggal": "2026-11-24",
+          "sisa": 5,
+          "kunci": "sk-tugas:ta-genap",
+          "keterangan": "Genap 2026/2027",
+          "izin": ""
+        },
+        {
+          "kejadian": "sk_pembagian_tugas",
+          "id_karyawan": "",
+          "nama": "",
+          "jabatan": "",
+          "unit": "SMP",
+          "tanggal": "2026-11-24",
+          "sisa": 5,
+          "kunci": "sk-tugas:ta-genap",
+          "keterangan": "Genap 2026/2027",
+          "izin": ""
+        }
+      ]
+    }
+  ],
+  "saring_items": [
+    {
+      "kejadian": "kontrak_berakhir",
+      "id_karyawan": "P2",
+      "nama": "P2",
+      "jabatan": "",
+      "unit": "SMA",
+      "tanggal": "2026-11-19",
+      "sisa": 0,
+      "kunci": "ktr-7:K1",
+      "keterangan": "",
+      "izin": ""
+    },
+    {
+      "kejadian": "pensiun",
+      "id_karyawan": "P1",
+      "nama": "P1",
+      "jabatan": "",
+      "unit": "SMP",
+      "tanggal": "2026-11-19",
+      "sisa": 0,
+      "kunci": "pensiun:P1:2026-12-01",
+      "keterangan": "",
+      "izin": ""
+    },
+    {
+      "kejadian": "dokumen_kedaluwarsa",
+      "id_karyawan": "P1",
+      "nama": "P1",
+      "jabatan": "",
+      "unit": "SMP",
+      "tanggal": "2026-11-19",
+      "sisa": 0,
+      "kunci": "dok:D1:2026-12-19",
+      "keterangan": "",
+      "izin": ""
+    },
+    {
+      "kejadian": "sp_berakhir",
+      "id_karyawan": "P3",
+      "nama": "P3",
+      "jabatan": "",
+      "unit": "SMP",
+      "tanggal": "2026-11-19",
+      "sisa": 0,
+      "kunci": "sp-akhir:S1",
+      "keterangan": "",
+      "izin": ""
+    },
+    {
+      "kejadian": "pengajuan_menunggu",
+      "id_karyawan": "P4",
+      "nama": "P4",
+      "jabatan": "",
+      "unit": "SMA",
+      "tanggal": "2026-11-19",
+      "sisa": 0,
+      "kunci": "pgj:A1",
+      "keterangan": "",
+      "izin": "hr.request.decide"
+    },
+    {
+      "kejadian": "pengajuan_menunggu",
+      "id_karyawan": "P1",
+      "nama": "P1",
+      "jabatan": "",
+      "unit": "SMP",
+      "tanggal": "2026-11-19",
+      "sisa": 0,
+      "kunci": "pgj:A2",
+      "keterangan": "",
+      "izin": "hr.request.decide_major"
+    },
+    {
+      "kejadian": "jp_tanpa_penanganan",
+      "id_karyawan": "P1",
+      "nama": "P1",
+      "jabatan": "",
+      "unit": "SMP",
+      "tanggal": "2026-11-19",
+      "sisa": 0,
+      "kunci": "jp:J1",
+      "keterangan": "",
+      "izin": ""
+    },
+    {
+      "kejadian": "jp_tanpa_penanganan",
+      "id_karyawan": "P4",
+      "nama": "P4",
+      "jabatan": "",
+      "unit": "SMA",
+      "tanggal": "2026-11-19",
+      "sisa": 0,
+      "kunci": "jp:J3",
+      "keterangan": "",
+      "izin": ""
+    },
+    {
+      "kejadian": "sk_pembagian_tugas",
+      "id_karyawan": "",
+      "nama": "",
+      "jabatan": "",
+      "unit": "SMP",
+      "tanggal": "2026-11-19",
+      "sisa": 0,
+      "kunci": "sk:T1",
+      "keterangan": "",
+      "izin": ""
+    },
+    {
+      "kejadian": "kgb",
+      "id_karyawan": "P1",
+      "nama": "P1",
+      "jabatan": "",
+      "unit": "SMP",
+      "tanggal": "2026-11-19",
+      "sisa": 0,
+      "kunci": "kgb:P1",
+      "keterangan": "",
+      "izin": ""
+    },
+    {
+      "kejadian": "percobaan_berakhir",
+      "id_karyawan": "P4",
+      "nama": "P4",
+      "jabatan": "",
+      "unit": "SMA",
+      "tanggal": "2026-11-19",
+      "sisa": 0,
+      "kunci": "coba:K2",
+      "keterangan": "",
+      "izin": ""
+    }
+  ],
+  "saring": [
+    {
+      "nama": "superadmin melihat semua",
+      "sesi": {
+        "id_karyawan": "",
+        "unit": "",
+        "lingkup_semua": true,
+        "superadmin": true,
+        "izin": []
+      },
+      "kunci": [
+        "ktr-7:K1",
+        "pensiun:P1:2026-12-01",
+        "dok:D1:2026-12-19",
+        "sp-akhir:S1",
+        "pgj:A1",
+        "pgj:A2",
+        "jp:J1",
+        "jp:J3",
+        "sk:T1",
+        "kgb:P1",
+        "coba:K2"
+      ]
+    },
+    {
+      "nama": "kepala SMP: hanya unitnya",
+      "sesi": {
+        "id_karyawan": "KS",
+        "unit": "SMP",
+        "lingkup_semua": false,
+        "superadmin": false,
+        "izin": [
+          "hr.request.decide",
+          "hr.request.decide_major",
+          "hr.substitute.manage"
+        ]
+      },
+      "kunci": ["pgj:A2", "jp:J1"]
+    },
+    {
+      "nama": "diri sendiri: pengajuan dan JP sendiri tidak tampil",
+      "sesi": {
+        "id_karyawan": "P1",
+        "unit": "SMP",
+        "lingkup_semua": false,
+        "superadmin": false,
+        "izin": [
+          "hr.request.decide",
+          "hr.request.decide_major",
+          "hr.substitute.manage"
+        ]
+      },
+      "kunci": []
+    },
+    {
+      "nama": "lingkup semua tanpa izin pemutus besar",
+      "sesi": {
+        "id_karyawan": "",
+        "unit": "",
+        "lingkup_semua": true,
+        "superadmin": false,
+        "izin": ["hr.request.decide", "hr.substitute.manage"]
+      },
+      "kunci": ["pgj:A1", "jp:J1", "jp:J3"]
+    },
+    {
+      "nama": "akun tanpa unit dan tanpa lingkup semua",
+      "sesi": {
+        "id_karyawan": "",
+        "unit": "",
+        "lingkup_semua": false,
+        "superadmin": false,
+        "izin": [
+          "hr.request.decide",
+          "hr.request.decide_major",
+          "hr.substitute.manage"
+        ]
+      },
+      "kunci": []
+    },
+    {
+      "nama": "izin HR biasa tanpa cakupan",
+      "sesi": {
+        "id_karyawan": "P9",
+        "unit": "",
+        "lingkup_semua": false,
+        "superadmin": false,
+        "izin": ["hr.contract.manage", "hr.document.view", "hr.duty.manage"]
+      },
+      "kunci": ["ktr-7:K1", "dok:D1:2026-12-19", "sk:T1", "kgb:P1", "coba:K2"]
+    },
+    {
+      "nama": "pensiun butuh hr.personal.view, SP butuh hr.warning.view",
+      "sesi": {
+        "id_karyawan": "P9",
+        "unit": "SMP",
+        "lingkup_semua": false,
+        "superadmin": false,
+        "izin": ["hr.personal.view", "hr.warning.view"]
+      },
+      "kunci": ["pensiun:P1:2026-12-01", "sp-akhir:S1"]
+    }
+  ],
+  "muat": {
+    "catatan": "Data cloud uji pemuat, ?1 = hari ini WIB. Dipakai `hr_pengingat_muat_cloud` (Rust, local_file) dan `services/hr-pengingat.test.ts`. Hasil: [kejadian, id_karyawan, sisa, awalan kunci].",
+    "sql": [
+      "INSERT INTO master_data (id_unik, kode_karyawan, nama, divisi, jabatan_status, id_shift, jenis_personil, unit, tanggal_daftar, status_aktif, tanggal_mulai_aktif, id_keluar) VALUES ('P1', 'K1', 'Ani', 'Guru', 'Guru', 1, 'GURU', 'SMP', '2020-01-01', 'Aktif', date(?1, '-4 years', '+12 days'), NULL), ('P2', 'K2', 'Budi', 'TU', 'Staf TU', 1, 'PEGAWAI', 'SMA', '2020-01-01', 'Aktif', NULL, NULL), ('P3', 'K3', 'Cici', 'Guru', 'Guru', 1, 'GURU', 'SMP', '2020-01-01', 'Aktif', NULL, NULL), ('P4', 'K4', 'Dodi', 'Guru', 'Guru', 1, 'GURU', 'SMA', '2020-01-01', 'Aktif', NULL, NULL), ('P5', 'K5', 'Eka', 'Guru', 'Guru', 1, 'GURU', 'SMA', '2020-01-01', 'Aktif', NULL, 'KLR1'), ('KS', 'K6', 'Kepala SMP', 'Guru', 'Kepala Sekolah', 1, 'GURU', 'SMP', '2020-01-01', 'Aktif', NULL, NULL), ('S9', 'K7', 'Siswa', 'Siswa', NULL, 1, 'SISWA', 'SMP', '2020-01-01', 'Aktif', date(?1, '-4 years', '+12 days'), NULL);",
+      "INSERT INTO hr_profil (id_karyawan, tanggal_lahir) VALUES ('P1', date(?1, '+20 days', '-60 years')), ('P5', date(?1, '+20 days', '-60 years'));",
+      "INSERT INTO hr_kontrak (id_kontrak, id_karyawan, status, id_ref, tanggal_mulai, tanggal_selesai, percobaan_selesai) VALUES ('K1', 'P1', 'GTY', NULL, '2020-01-01', NULL, NULL), ('K2', 'P2', 'GTT', NULL, '2025-01-01', date(?1, '+6 days'), date(?1, '+3 days')), ('K3', 'P3', 'GTT', NULL, '2025-01-01', date(?1, '+6 days'), NULL), ('K3b', 'P3', 'GTT', NULL, date(?1, '+7 days'), date(?1, '+400 days'), NULL), ('K4', 'P4', 'PTT', NULL, '2025-01-01', date(?1, '+20 days'), NULL), ('K4x', 'P4', 'PTT', NULL, '2025-06-01', date(?1, '+3 days'), NULL), ('K4z', 'P4', 'Pembatalan', 'K4x', '2025-06-01', NULL, NULL), ('K5', 'P5', 'GTT', NULL, '2025-01-01', date(?1, '+5 days'), NULL);",
+      "INSERT INTO hr_dokumen_jenis (id_jenis, nama) VALUES ('jd-str', 'STR'), ('jd-sim', 'SIM') ON CONFLICT(id_jenis) DO NOTHING;",
+      "INSERT INTO hr_dokumen (id_dokumen, id_karyawan, id_jenis, tanggal_kedaluwarsa) VALUES ('D1', 'P1', 'jd-str', date(?1, '+10 days')), ('D1b', 'P1', 'jd-str', date(?1, '+700 days')), ('D2', 'P2', 'jd-sim', date(?1, '-5 days')), ('D3', 'P3', 'jd-sim', date(?1, '+25 days')), ('D5', 'P5', 'jd-sim', date(?1, '+2 days'));",
+      "INSERT INTO hr_sp (id_sp, id_karyawan, tingkat, usulan_tingkat, tanggal, masa_bulan, berlaku_sampai, pelanggaran, penanda_nama, penanda_jabatan, dicatat_oleh, dicabut_pada) VALUES ('S1', 'P3', 'SP1', 'SP1', date(?1, '-6 months'), 6, date(?1, '-1 day'), 'Terlambat', 'Kepala', 'Kepala', 'uji', NULL), ('S2', 'P2', 'SP1', 'SP1', date(?1, '-6 months'), 6, date(?1, '-1 day'), 'Terlambat', 'Kepala', 'Kepala', 'uji', datetime('now'));",
+      "INSERT INTO hr_pengajuan (id_pengajuan, id_karyawan, id_jenis, kelompok, dampak_gaji, izin_pemutus, tanggal_mulai, tanggal_selesai, alasan, sidik, diajukan_oleh, waktu_perangkat, updated_at) VALUES ('A1', 'P4', 'j-izin', 'Izin', 'Dibayar', 'hr.request.decide', date(?1, '-10 days'), date(?1, '-10 days'), 'Keluarga', 's1', 'uji', '2026-01-01 07:00:00', datetime('now', '-3 days')), ('A2', 'P2', 'j-izin', 'Izin', 'Dibayar', 'hr.request.decide', date(?1, '-10 days'), date(?1, '-10 days'), 'Keluarga', 's2', 'uji', '2026-01-01 07:00:00', datetime('now', '-3 days')), ('A3', 'P3', 'j-izin', 'Izin', 'Dibayar', 'hr.request.decide', date(?1, '-10 days'), date(?1, '-10 days'), 'Keluarga', 's3', 'uji', '2026-01-01 07:00:00', datetime('now', '-3 days')), ('A4', 'P1', 'j-sakit', 'Sakit', 'Dibayar', 'hr.request.decide', ?1, ?1, 'Sakit', 's4', 'uji', '2026-01-01 07:00:00', datetime('now'));",
+      "INSERT INTO hr_pengajuan_keputusan (id_keputusan, id_pengajuan, jenis, sidik, oleh, waktu_perangkat, diterima_cloud) SELECT 'KP2', 'A2', 'Tolak', 's2', 'uji', '2026-01-01 07:00:00', datetime('now') WHERE ?1 <> '' UNION ALL SELECT 'KP3', 'A3', 'Batal', 's3', 'uji', '2026-01-01 07:00:00', datetime('now');",
+      "INSERT INTO akademik_unit (id_unit, nama_unit, created_at, updated_at) VALUES ('u-smp', 'SMP', datetime('now'), datetime('now')), ('u-sma', 'SMA', datetime('now'), datetime('now')) ON CONFLICT(id_unit) DO NOTHING;",
+      "INSERT INTO akademik_tahun_ajaran (id_tahun_ajaran, nama_tahun, semester, tanggal_mulai, tanggal_selesai, is_aktif, created_at, updated_at) VALUES ('TA0', '2026/2027', 'Ganjil', date(?1, '-60 days'), date(?1, '+60 days'), 1, datetime('now'), datetime('now')), ('TA1', '2026/2027', 'Genap', date(?1, '+5 days'), date(?1, '+180 days'), 0, datetime('now'), datetime('now'));",
+      "INSERT INTO akademik_rombel (id_rombel, id_tahun_ajaran, tingkat, nama_rombel, is_aktif, id_unit) VALUES ('R1', 'TA0', 7, '7A', 1, 'u-smp'), ('R2', 'TA0', 7, '7B', 1, 'u-smp'), ('R3', 'TA1', 10, '10A', 1, 'u-sma'), ('R4', 'TA1', 10, '10B', 0, 'u-smp');",
+      "INSERT INTO jadwal_mengajar (id_jadwal, id_tahun_ajaran, id_rombel, id_mapel, id_guru, hari, jam_ke) VALUES ('JD1', 'TA0', 'R1', 'M1', 'P1', ((CAST(strftime('%w', ?1) AS INTEGER) + 6) % 7) + 1, '1'), ('JD2', 'TA0', 'R2', 'M1', 'P1', ((CAST(strftime('%w', ?1) AS INTEGER) + 6) % 7) + 1, '2');",
+      "INSERT INTO hr_jp_penanganan (id_penanganan, id_pengajuan, tanggal, id_jadwal, status, dicatat_oleh, waktu_perangkat) VALUES ('jp:A4:' || ?1 || ':JD2', 'A4', ?1, 'JD2', 'Tugas Mandiri', 'uji', '2026-01-01 07:00:00');"
+    ],
+    "hasil": [
+      ["kontrak_berakhir", "P2", 6, "ktr-7"],
+      ["kontrak_berakhir", "P4", 20, "ktr-30"],
+      ["percobaan_berakhir", "P2", 3, "coba"],
+      ["kgb", "P1", 12, "kgb"],
+      ["pensiun", "P1", 20, "pensiun"],
+      ["dokumen_kedaluwarsa", "P2", -5, ""],
+      ["dokumen_kedaluwarsa", "P3", 25, "dok"],
+      ["sp_berakhir", "P3", 0, "sp-akhir"],
+      ["pengajuan_menunggu", "P4", -3, "pgj-tunggu"],
+      ["jp_tanpa_penanganan", "P1", 0, "jp-kosong"],
+      ["sk_pembagian_tugas", "", 5, "sk-tugas"]
+    ],
+    "kepala_smp": {
+      "izin": ["hr.request.decide", "hr.substitute.manage"],
+      "hasil": [["jp_tanpa_penanganan", "P1", 0, "jp-kosong"]]
+    }
+  }
+}

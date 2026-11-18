@@ -14,6 +14,8 @@ import {
 import {
   AMBIL_BERKAS_SQL,
   AMBIL_LAMPIRAN_SQL,
+  ATURAN_KGB,
+  ATURAN_PENSIUN,
   ATURAN_PERCOBAAN,
   ATURAN_PKWT,
   ATURAN_SP_MASA,
@@ -57,6 +59,8 @@ import {
   type KontrakDraft,
   KUNCI_BEBAN_MAKS_JP,
   KUNCI_BEBAN_MIN_JP,
+  KUNCI_KGB_TAHUN,
+  KUNCI_PENSIUN_USIA,
   KUNCI_PERCOBAAN_MAKS,
   KUNCI_PKWT_MAKS,
   KUNCI_SP_MASA_BULAN,
@@ -264,6 +268,8 @@ export async function pengaturanKontrak(db: Db): Promise<PengaturanKontrak> {
   const bebanMin = nilai.get(KUNCI_BEBAN_MIN_JP) ?? "";
   const bebanMaks = nilai.get(KUNCI_BEBAN_MAKS_JP) ?? "";
   const spMasa = nilai.get(KUNCI_SP_MASA_BULAN) ?? "";
+  const kgb = nilai.get(KUNCI_KGB_TAHUN) ?? "";
+  const pensiun = nilai.get(KUNCI_PENSIUN_USIA) ?? "";
   const [min, maks] = batasBeban(bebanMin, bebanMaks);
   return {
     percobaan_maks_bulan: percobaan,
@@ -271,12 +277,16 @@ export async function pengaturanKontrak(db: Db): Promise<PengaturanKontrak> {
     beban_min_jp: bebanMin,
     beban_maks_jp: bebanMaks,
     sp_masa_bulan: spMasa,
+    kgb_tahun: kgb,
+    pensiun_usia: pensiun,
     berlaku: {
       percobaan_maks_bulan: angkaPengaturan(percobaan, ATURAN_PERCOBAAN),
       pkwt_maks_bulan: angkaPengaturan(pkwt, ATURAN_PKWT),
       beban_min_jp: min,
       beban_maks_jp: maks,
       sp_masa_bulan: angkaPengaturan(spMasa, ATURAN_SP_MASA),
+      kgb_tahun: angkaPengaturan(kgb, ATURAN_KGB),
+      pensiun_usia: angkaPengaturan(pensiun, ATURAN_PENSIUN),
     },
   };
 }
@@ -450,6 +460,18 @@ export async function simpanPengaturan(
     "Masa berlaku SP",
   );
   if (!spMasa.ok) galat(spMasa.galat);
+  const kgb = validasiAngkaPengaturan(
+    draft.kgb_tahun,
+    ATURAN_KGB,
+    "Siklus KGB",
+  );
+  if (!kgb.ok) galat(kgb.galat);
+  const pensiun = validasiAngkaPengaturan(
+    draft.pensiun_usia,
+    ATURAN_PENSIUN,
+    "Usia pensiun",
+  );
+  if (!pensiun.ok) galat(pensiun.galat);
   await client.batch(
     [
       {
@@ -460,6 +482,8 @@ export async function simpanPengaturan(
       { sql: UPSERT_SETTING_SQL, args: [KUNCI_BEBAN_MIN_JP, beban.nilai[0]] },
       { sql: UPSERT_SETTING_SQL, args: [KUNCI_BEBAN_MAKS_JP, beban.nilai[1]] },
       { sql: UPSERT_SETTING_SQL, args: [KUNCI_SP_MASA_BULAN, spMasa.nilai] },
+      { sql: UPSERT_SETTING_SQL, args: [KUNCI_KGB_TAHUN, kgb.nilai] },
+      { sql: UPSERT_SETTING_SQL, args: [KUNCI_PENSIUN_USIA, pensiun.nilai] },
     ],
     "write",
   );
