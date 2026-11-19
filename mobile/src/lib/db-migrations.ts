@@ -20,6 +20,7 @@ import {
   SEED_JENIS_SQL as SEED_JENIS_PENGAJUAN_SQL,
   seedJenisArgs,
 } from "@/lib/validations/hr-pengajuan";
+import { SEED_JENIS_REIMBURSE_SQL } from "@/lib/validations/hr-reimburse";
 import { MIGRASI_ORGANISASI_SQL } from "@/lib/validations/hris";
 import {
   JENIS_NILAI_BAWAAN,
@@ -27,6 +28,11 @@ import {
 } from "@/lib/validations/nilai-akhir";
 import { SQL_SALIN_DAPODIK_PMB } from "@/lib/validations/siswa-dapodik";
 import TARIF_PAYROLL_BAWAAN from "@/lib/validations/tarif-payroll-bawaan.json";
+import {
+  BANK_BAWAAN,
+  SEED_BANK_SQL,
+  seedBankArgs,
+} from "@/lib/validations/transfer";
 
 const RBAC_MIGRATION_VERSION = 1;
 const WEB_SESSION_MIGRATION_VERSION = 2;
@@ -100,6 +106,7 @@ const HRIS_PENGAJUAN_MIGRATION_VERSION = 69;
 const HRIS_KELUAR_MIGRATION_VERSION = 70;
 const HRIS_KINERJA_MIGRATION_VERSION = 71;
 const HRIS_REKRUTMEN_MIGRATION_VERSION = 72;
+const HRIS_TRANSFER_MIGRATION_VERSION = 73;
 
 /**
  * Bentuk `akademik_jam_pelajaran` sejak v60: jenis `Pulang`, cakupan unit +
@@ -4215,6 +4222,163 @@ export async function runDatabaseMigrations(client: Client) {
     sql: `INSERT OR IGNORE INTO schema_migration (version, name, applied_at)
           VALUES (?, 'hris-rekrutmen-pelatihan', ?);`,
     args: [HRIS_REKRUTMEN_MIGRATION_VERSION, now],
+  });
+
+  // v73: transfer gaji, pelaporan, reimbursement (HRIS Fase 8,
+  // `prd-hris/fase-8.md` §26.3). Kesepuluhnya cloud-only; DDL WAJIB identik
+  // dengan `turso.rs`.
+  await client.execute(`
+    CREATE TABLE IF NOT EXISTS app_bank (
+        id_bank TEXT PRIMARY KEY,
+        nama TEXT NOT NULL,
+        kode TEXT CHECK (kode IS NULL OR (length(kode) = 3 AND kode NOT GLOB '*[^0-9]*')),
+        alias TEXT NOT NULL DEFAULT '[]',
+        is_aktif INTEGER NOT NULL DEFAULT 1 CHECK (is_aktif IN (0, 1)),
+        is_bawaan INTEGER NOT NULL DEFAULT 0 CHECK (is_bawaan IN (0, 1)),
+        diubah_oleh TEXT,
+        created_at TEXT NOT NULL DEFAULT (datetime('now')),
+        updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+  `);
+  await client.execute(`
+    CREATE TABLE IF NOT EXISTS app_bank_rekening (
+        id_rekening TEXT PRIMARY KEY,
+        id_bank TEXT NOT NULL,
+        no_rekening TEXT NOT NULL CHECK (length(no_rekening) BETWEEN 5 AND 20 AND no_rekening NOT GLOB '*[^0-9]*'),
+        nama_rekening TEXT NOT NULL,
+        keterangan TEXT,
+        is_aktif INTEGER NOT NULL DEFAULT 1 CHECK (is_aktif IN (0, 1)),
+        diubah_oleh TEXT,
+        created_at TEXT NOT NULL DEFAULT (datetime('now')),
+        updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+  `);
+  await client.execute(`
+    CREATE TABLE IF NOT EXISTS app_bank_format (
+        id_format TEXT PRIMARY KEY,
+        nama TEXT NOT NULL,
+        id_bank TEXT,
+        jenis TEXT NOT NULL CHECK (jenis IN ('csv', 'txt', 'xlsx')),
+        pemisah TEXT CHECK (pemisah IS NULL OR pemisah IN (',', ';', char(9), '|')),
+        pakai_judul INTEGER NOT NULL DEFAULT 1 CHECK (pakai_judul IN (0, 1)),
+        kutip INTEGER NOT NULL DEFAULT 0 CHECK (kutip IN (0, 1)),
+        desimal INTEGER NOT NULL DEFAULT 0 CHECK (desimal IN (0, 1)),
+        cakupan TEXT NOT NULL DEFAULT 'semua' CHECK (cakupan IN ('semua', 'sesama', 'antarbank')),
+        kolom TEXT NOT NULL,
+        maks_berita INTEGER CHECK (maks_berita IS NULL OR maks_berita BETWEEN 1 AND 200),
+        is_aktif INTEGER NOT NULL DEFAULT 1 CHECK (is_aktif IN (0, 1)),
+        diubah_oleh TEXT,
+        created_at TEXT NOT NULL DEFAULT (datetime('now')),
+        updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+        CHECK ((jenis = 'xlsx') = (pemisah IS NULL))
+    );
+  `);
+  await client.execute(`
+    CREATE TABLE IF NOT EXISTS app_lapor_setting (
+        kunci TEXT PRIMARY KEY,
+        nilai TEXT NOT NULL,
+        diubah_oleh TEXT,
+        updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+  `);
+  await client.execute(`
+    CREATE TABLE IF NOT EXISTS hr_reimburse_jenis (
+        id_jenis TEXT PRIMARY KEY,
+        nama TEXT NOT NULL,
+        wajib_nota INTEGER NOT NULL DEFAULT 0 CHECK (wajib_nota IN (0, 1)),
+        batas_bulanan INTEGER CHECK (batas_bulanan IS NULL OR batas_bulanan BETWEEN 1 AND 1000000000),
+        is_aktif INTEGER NOT NULL DEFAULT 1 CHECK (is_aktif IN (0, 1)),
+        diubah_oleh TEXT,
+        created_at TEXT NOT NULL DEFAULT (datetime('now')),
+        updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+  `);
+  await client.execute(`
+    CREATE TABLE IF NOT EXISTS hr_reimburse (
+        id_klaim TEXT PRIMARY KEY,
+        id_karyawan TEXT NOT NULL,
+        id_jenis TEXT NOT NULL,
+        tanggal TEXT NOT NULL,
+        nominal INTEGER NOT NULL CHECK (nominal BETWEEN 1 AND 1000000000),
+        keperluan TEXT NOT NULL,
+        diajukan_oleh TEXT NOT NULL,
+        created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+  `);
+  await client.execute(`
+    CREATE TABLE IF NOT EXISTS hr_reimburse_keputusan (
+        id_keputusan TEXT PRIMARY KEY,
+        id_klaim TEXT NOT NULL,
+        aksi TEXT NOT NULL CHECK (aksi IN ('Setujui', 'Tolak', 'Batal')),
+        nominal_disetujui INTEGER CHECK (nominal_disetujui IS NULL OR nominal_disetujui BETWEEN 1 AND 1000000000),
+        alasan TEXT,
+        diputus_oleh TEXT NOT NULL,
+        created_at TEXT NOT NULL DEFAULT (datetime('now')),
+        CHECK ((aksi = 'Setujui') = (nominal_disetujui IS NOT NULL))
+    );
+  `);
+  await client.execute(`
+    CREATE TABLE IF NOT EXISTS hr_reimburse_berkas (
+        id_berkas TEXT PRIMARY KEY,
+        id_klaim TEXT NOT NULL,
+        urutan INTEGER NOT NULL CHECK (urutan BETWEEN 1 AND 5),
+        nama_berkas TEXT,
+        mime_type TEXT NOT NULL CHECK (mime_type IN ('image/jpeg', 'image/png', 'image/webp', 'application/pdf')),
+        data_base64 TEXT NOT NULL,
+        diunggah_oleh TEXT,
+        created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+  `);
+  await client.execute(`
+    CREATE TABLE IF NOT EXISTS hr_reimburse_bayar (
+        id_bayar TEXT PRIMARY KEY,
+        jenis TEXT NOT NULL CHECK (jenis IN ('Bayar', 'Pembatalan')),
+        id_ref TEXT,
+        id_karyawan TEXT NOT NULL,
+        tanggal TEXT NOT NULL,
+        total INTEGER NOT NULL CHECK (total >= 0),
+        keterangan TEXT,
+        dicatat_oleh TEXT NOT NULL,
+        created_at TEXT NOT NULL DEFAULT (datetime('now')),
+        CHECK ((jenis = 'Pembatalan') = (id_ref IS NOT NULL))
+    );
+  `);
+  await client.execute(`
+    CREATE TABLE IF NOT EXISTS hr_reimburse_bayar_baris (
+        id_baris TEXT PRIMARY KEY,
+        id_bayar TEXT NOT NULL,
+        id_klaim TEXT NOT NULL,
+        nominal INTEGER NOT NULL CHECK (nominal >= 0)
+    );
+  `);
+  for (const sql of [
+    "CREATE INDEX IF NOT EXISTS idx_hr_reimburse_karyawan ON hr_reimburse(id_karyawan, tanggal);",
+    "CREATE INDEX IF NOT EXISTS idx_hr_reimburse_tanggal ON hr_reimburse(tanggal);",
+    "CREATE INDEX IF NOT EXISTS idx_hr_reimburse_keputusan_klaim ON hr_reimburse_keputusan(id_klaim);",
+    "CREATE INDEX IF NOT EXISTS idx_hr_reimburse_berkas_klaim ON hr_reimburse_berkas(id_klaim);",
+    "CREATE INDEX IF NOT EXISTS idx_hr_reimburse_bayar_karyawan ON hr_reimburse_bayar(id_karyawan);",
+    "CREATE INDEX IF NOT EXISTS idx_hr_reimburse_bayar_ref ON hr_reimburse_bayar(id_ref);",
+    "CREATE INDEX IF NOT EXISTS idx_hr_reimburse_bayar_baris_bayar ON hr_reimburse_bayar_baris(id_bayar);",
+    "CREATE INDEX IF NOT EXISTS idx_hr_reimburse_bayar_baris_klaim ON hr_reimburse_bayar_baris(id_klaim);",
+  ]) {
+    await client.execute(sql);
+  }
+  // Bank bawaan dan jenis reimbursement bawaan. `INSERT OR IGNORE` berid
+  // tetap: yang sudah disunting tidak ditimpa. Kembar `ensure_hris_transfer_v73`.
+  await client.batch(
+    [
+      ...BANK_BAWAAN.map((bank) => ({
+        sql: SEED_BANK_SQL,
+        args: seedBankArgs(bank),
+      })),
+      { sql: SEED_JENIS_REIMBURSE_SQL, args: [] },
+    ],
+    "write",
+  );
+  await client.execute({
+    sql: `INSERT OR IGNORE INTO schema_migration (version, name, applied_at)
+          VALUES (?, 'hris-transfer-lapor-reimburse', ?);`,
+    args: [HRIS_TRANSFER_MIGRATION_VERSION, now],
   });
 }
 

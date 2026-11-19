@@ -149,6 +149,19 @@ export const PROMOTION_PLAN: readonly PromotionTable[] = [
     dependsOn: ["payroll_runs"],
   },
 
+  // Lapisan 5b — data pribadi, keuangan, pendidik, dan dokumen pegawai
+  // (HRIS 1c, v68, cloud-only).
+  { table: "hr_profil", uniqueColumns: [], dependsOn: ["master_data"] },
+  { table: "hr_pendidikan", uniqueColumns: [], dependsOn: ["master_data"] },
+  { table: "hr_sertifikasi", uniqueColumns: [], dependsOn: ["master_data"] },
+  { table: "hr_dokumen_jenis", uniqueColumns: [], dependsOn: [] },
+  {
+    table: "hr_dokumen",
+    uniqueColumns: [],
+    dependsOn: ["master_data", "hr_dokumen_jenis"],
+  },
+  { table: "hr_dokumen_berkas", uniqueColumns: [], dependsOn: ["hr_dokumen"] },
+
   // Lapisan 6 — surat peringatan dan pegawai keluar (v70, cloud-only).
   { table: "hr_keluar_alasan", uniqueColumns: [], dependsOn: [] },
   { table: "hr_sp", uniqueColumns: [], dependsOn: ["master_data"] },
@@ -192,6 +205,38 @@ export const PROMOTION_PLAN: readonly PromotionTable[] = [
     table: "hr_pelatihan_peserta",
     uniqueColumns: [],
     dependsOn: ["hr_pelatihan", "master_data", "hr_dokumen"],
+  },
+
+  // Lapisan 9 — transfer gaji, pelaporan, reimbursement (v73, cloud-only).
+  { table: "app_bank", uniqueColumns: [], dependsOn: [] },
+  { table: "app_bank_rekening", uniqueColumns: [], dependsOn: ["app_bank"] },
+  { table: "app_bank_format", uniqueColumns: [], dependsOn: ["app_bank"] },
+  { table: "app_lapor_setting", uniqueColumns: [], dependsOn: [] },
+  { table: "hr_reimburse_jenis", uniqueColumns: [], dependsOn: [] },
+  {
+    table: "hr_reimburse",
+    uniqueColumns: [],
+    dependsOn: ["hr_reimburse_jenis", "master_data"],
+  },
+  {
+    table: "hr_reimburse_keputusan",
+    uniqueColumns: [],
+    dependsOn: ["hr_reimburse"],
+  },
+  {
+    table: "hr_reimburse_berkas",
+    uniqueColumns: [],
+    dependsOn: ["hr_reimburse"],
+  },
+  {
+    table: "hr_reimburse_bayar",
+    uniqueColumns: [],
+    dependsOn: ["master_data"],
+  },
+  {
+    table: "hr_reimburse_bayar_baris",
+    uniqueColumns: [],
+    dependsOn: ["hr_reimburse_bayar", "hr_reimburse"],
   },
 ];
 

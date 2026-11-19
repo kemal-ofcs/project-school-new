@@ -614,6 +614,32 @@ export const PERMISSION_CATALOG = [
     name: "Kelola Pelatihan",
     group: "Kepegawaian",
   },
+  // HRIS Fase 8 (`prd-hris/fase-8.md` §26.4).
+  {
+    key: "hr.reimburse.view",
+    name: "Lihat Reimbursement",
+    group: "Kepegawaian",
+  },
+  {
+    key: "hr.reimburse.submit",
+    name: "Ajukan Reimbursement",
+    group: "Kepegawaian",
+  },
+  {
+    key: "hr.reimburse.decide",
+    name: "Putuskan Reimbursement",
+    group: "Kepegawaian",
+  },
+  {
+    key: "hr.reimburse.pay",
+    name: "Bayar Reimbursement",
+    group: "Kepegawaian",
+  },
+  {
+    key: "hr.reimburse.config",
+    name: "Atur Jenis Reimbursement",
+    group: "Kepegawaian",
+  },
 ] as const;
 
 export type PermissionKey = (typeof PERMISSION_CATALOG)[number]["key"];
@@ -736,6 +762,10 @@ export const SENSITIVE_MUTATION_PERMISSIONS = new Set<PermissionKey>([
   "hr.performance.config",
   // HRIS Fase 7 (§25.4): menghapus pelamar permanen tidak bisa dibatalkan.
   "hr.recruit.delete",
+  // HRIS Fase 8 (§26.4): memutus dan membayar klaim mengeluarkan uang;
+  // pemutus dan pembayar sengaja dipisah (Q-164).
+  "hr.reimburse.decide",
+  "hr.reimburse.pay",
 ]);
 
 /**
@@ -762,6 +792,8 @@ export const CONFIDENTIAL_PERMISSIONS = new Set<PermissionKey>([
   // Data pribadi pelamar (§25.4).
   "hr.recruit.view",
   "hr.recruit.manage",
+  // Klaim dan nota reimbursement pegawai (§26.4).
+  "hr.reimburse.view",
 ]);
 
 export const SYSTEM_ROLE_KEYS = [
@@ -839,6 +871,8 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<
     "hr.performance.config",
     "hr.recruit.view",
     "hr.training.view",
+    "hr.reimburse.view",
+    "hr.reimburse.decide",
   ],
   "kepala-sekolah": [
     "home.view",
@@ -855,6 +889,9 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<
     "hr.performance.view",
     "hr.performance.assess",
     "hr.training.view",
+    "hr.reimburse.view",
+    "hr.reimburse.submit",
+    "hr.reimburse.decide",
   ],
   kepegawaian: [
     "home.view",
@@ -885,6 +922,9 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<
     "hr.recruit.delete",
     "hr.training.view",
     "hr.training.manage",
+    "hr.reimburse.view",
+    "hr.reimburse.submit",
+    "hr.reimburse.config",
   ],
   "kepala-tu": [
     "home.view",
@@ -894,6 +934,7 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<
     "hr.request.urgent",
     "hr.request.decide",
     "hr.performance.assess",
+    "hr.reimburse.submit",
   ],
   "guru-piket": ["home.view", "sync.view", "hr.substitute.manage"],
 };

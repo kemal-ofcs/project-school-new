@@ -1,0 +1,1601 @@
+{
+  "bank": [
+    {
+      "nama": "bank baru dirapikan",
+      "draft": {
+        "nama": "  Bank  Kalsel ",
+        "kode": "122",
+        "alias": ["Kalsel", " BPD  Kalsel ", "kalsel"]
+      },
+      "nama_lama": null,
+      "hasil": {
+        "nama": "Bank Kalsel",
+        "kode": "122",
+        "alias": ["Kalsel", "BPD Kalsel"],
+        "is_aktif": 1
+      }
+    },
+    {
+      "nama": "ganti nama menambah nama lama ke alias",
+      "draft": {
+        "nama": "BSI Baru",
+        "kode": "451",
+        "alias": ["BSM"]
+      },
+      "nama_lama": "BSI",
+      "hasil": {
+        "nama": "BSI Baru",
+        "kode": "451",
+        "alias": ["BSM", "BSI"],
+        "is_aktif": 1
+      }
+    },
+    {
+      "nama": "nama lama sama dengan nama tidak ditambah",
+      "draft": {
+        "nama": "BCA",
+        "alias": []
+      },
+      "nama_lama": " bca ",
+      "hasil": {
+        "nama": "BCA",
+        "kode": null,
+        "alias": [],
+        "is_aktif": 1
+      }
+    },
+    {
+      "nama": "kode kosong = tanpa kode",
+      "draft": {
+        "nama": "Bank Desa",
+        "kode": " ",
+        "is_aktif": false
+      },
+      "nama_lama": null,
+      "hasil": {
+        "nama": "Bank Desa",
+        "kode": null,
+        "alias": [],
+        "is_aktif": 0
+      }
+    },
+    {
+      "nama": "kode bukan 3 digit",
+      "draft": {
+        "nama": "BCA",
+        "kode": "14"
+      },
+      "nama_lama": null,
+      "galat": "Kode bank harus 3 digit angka."
+    },
+    {
+      "nama": "alias bukan larik",
+      "draft": {
+        "nama": "BCA",
+        "alias": "Bank BCA"
+      },
+      "nama_lama": null,
+      "galat": "Alias tidak valid."
+    },
+    {
+      "nama": "kunci asing ditolak",
+      "draft": {
+        "nama": "BCA",
+        "warna": "biru"
+      },
+      "nama_lama": null,
+      "galat": "Isian 'warna' tidak dikenal."
+    },
+    {
+      "nama": "nama kosong",
+      "draft": {
+        "nama": "   "
+      },
+      "nama_lama": null,
+      "galat": "Nama bank wajib diisi."
+    },
+    {
+      "nama": "status aktif bukan bendera",
+      "draft": {
+        "nama": "BCA",
+        "is_aktif": "ya"
+      },
+      "nama_lama": null,
+      "galat": "Status aktif tidak valid."
+    }
+  ],
+  "rekening": [
+    {
+      "nama": "tanda baca dibuang",
+      "draft": {
+        "id_bank": "bnk-014",
+        "no_rekening": "123-456 7890",
+        "nama_rekening": " Yayasan  Uji ",
+        "keterangan": "Rekening gaji"
+      },
+      "hasil": {
+        "id_bank": "bnk-014",
+        "no_rekening": "1234567890",
+        "nama_rekening": "Yayasan Uji",
+        "keterangan": "Rekening gaji",
+        "is_aktif": 1
+      }
+    },
+    {
+      "nama": "nomor wajib",
+      "draft": {
+        "id_bank": "bnk-014",
+        "no_rekening": "",
+        "nama_rekening": "Yayasan"
+      },
+      "galat": "Nomor rekening wajib diisi."
+    },
+    {
+      "nama": "nomor berhuruf",
+      "draft": {
+        "id_bank": "bnk-014",
+        "no_rekening": "12ab5",
+        "nama_rekening": "Yayasan"
+      },
+      "galat": "Nomor rekening hanya boleh berisi angka."
+    },
+    {
+      "nama": "nomor terlalu pendek",
+      "draft": {
+        "id_bank": "bnk-014",
+        "no_rekening": "1234",
+        "nama_rekening": "Yayasan"
+      },
+      "galat": "Nomor rekening harus 5 sampai 20 digit."
+    },
+    {
+      "nama": "bank wajib",
+      "draft": {
+        "no_rekening": "1234567",
+        "nama_rekening": "Yayasan"
+      },
+      "galat": "Bank wajib dipilih."
+    },
+    {
+      "nama": "nama pemilik wajib",
+      "draft": {
+        "id_bank": "bnk-014",
+        "no_rekening": "1234567"
+      },
+      "galat": "Nama pemilik rekening wajib diisi."
+    }
+  ],
+  "format": [
+    {
+      "nama": "csv titik koma, kutip, desimal, berita 20",
+      "draft": {
+        "nama": " Format  BCA ",
+        "id_bank": "bnk-014",
+        "jenis": "csv",
+        "pemisah": ";",
+        "kutip": 1,
+        "desimal": true,
+        "cakupan": "sesama",
+        "kolom": [
+          {
+            "isian": "no_rekening",
+            "judul": "Rekening"
+          },
+          {
+            "isian": "nominal",
+            "judul": "Jumlah"
+          },
+          {
+            "isian": "teks_tetap",
+            "judul": "Kode",
+            "teks": " IFT "
+          }
+        ],
+        "maks_berita": 20
+      },
+      "hasil": {
+        "nama": "Format BCA",
+        "id_bank": "bnk-014",
+        "jenis": "csv",
+        "pemisah": ";",
+        "pakai_judul": 1,
+        "kutip": 1,
+        "desimal": 1,
+        "cakupan": "sesama",
+        "kolom": [
+          {
+            "isian": "no_rekening",
+            "judul": "Rekening",
+            "teks": null
+          },
+          {
+            "isian": "nominal",
+            "judul": "Jumlah",
+            "teks": null
+          },
+          {
+            "isian": "teks_tetap",
+            "judul": "Kode",
+            "teks": "IFT"
+          }
+        ],
+        "maks_berita": 20,
+        "is_aktif": 1
+      }
+    },
+    {
+      "nama": "txt tab tanpa judul",
+      "draft": {
+        "nama": "Tab",
+        "jenis": "txt",
+        "pemisah": "\t",
+        "pakai_judul": 0,
+        "kolom": [
+          {
+            "isian": "nama_karyawan",
+            "judul": "Nama"
+          }
+        ]
+      },
+      "hasil": {
+        "nama": "Tab",
+        "id_bank": null,
+        "jenis": "txt",
+        "pemisah": "\t",
+        "pakai_judul": 0,
+        "kutip": 0,
+        "desimal": 0,
+        "cakupan": "semua",
+        "kolom": [
+          {
+            "isian": "nama_karyawan",
+            "judul": "Nama",
+            "teks": null
+          }
+        ],
+        "maks_berita": null,
+        "is_aktif": 1
+      }
+    },
+    {
+      "nama": "xlsx pemisah kosong menjadi null",
+      "draft": {
+        "nama": "Excel",
+        "jenis": "xlsx",
+        "pemisah": "",
+        "kolom": [
+          {
+            "isian": "nominal",
+            "judul": "Nominal",
+            "teks": null
+          }
+        ]
+      },
+      "hasil": {
+        "nama": "Excel",
+        "id_bank": null,
+        "jenis": "xlsx",
+        "pemisah": null,
+        "pakai_judul": 1,
+        "kutip": 0,
+        "desimal": 0,
+        "cakupan": "semua",
+        "kolom": [
+          {
+            "isian": "nominal",
+            "judul": "Nominal",
+            "teks": null
+          }
+        ],
+        "maks_berita": null,
+        "is_aktif": 1
+      }
+    },
+    {
+      "nama": "xlsx dengan pemisah ditolak",
+      "draft": {
+        "nama": "Excel",
+        "jenis": "xlsx",
+        "pemisah": ",",
+        "kolom": [
+          {
+            "isian": "no_rekening",
+            "judul": "Rekening"
+          },
+          {
+            "isian": "nominal",
+            "judul": "Jumlah"
+          },
+          {
+            "isian": "teks_tetap",
+            "judul": "Kode",
+            "teks": " IFT "
+          }
+        ]
+      },
+      "galat": "Berkas Excel tidak memakai pemisah."
+    },
+    {
+      "nama": "pemisah asing",
+      "draft": {
+        "nama": "X",
+        "jenis": "csv",
+        "pemisah": "#",
+        "kolom": [
+          {
+            "isian": "no_rekening",
+            "judul": "Rekening"
+          },
+          {
+            "isian": "nominal",
+            "judul": "Jumlah"
+          },
+          {
+            "isian": "teks_tetap",
+            "judul": "Kode",
+            "teks": " IFT "
+          }
+        ]
+      },
+      "galat": "Pemisah tidak dikenal."
+    },
+    {
+      "nama": "jenis asing",
+      "draft": {
+        "nama": "X",
+        "jenis": "pdf",
+        "pemisah": ",",
+        "kolom": [
+          {
+            "isian": "no_rekening",
+            "judul": "Rekening"
+          },
+          {
+            "isian": "nominal",
+            "judul": "Jumlah"
+          },
+          {
+            "isian": "teks_tetap",
+            "judul": "Kode",
+            "teks": " IFT "
+          }
+        ]
+      },
+      "galat": "Jenis berkas tidak dikenal."
+    },
+    {
+      "nama": "kolom kosong",
+      "draft": {
+        "nama": "X",
+        "jenis": "csv",
+        "pemisah": ",",
+        "kolom": []
+      },
+      "galat": "Format wajib punya 1–30 kolom."
+    },
+    {
+      "nama": "isian kolom asing",
+      "draft": {
+        "nama": "X",
+        "jenis": "csv",
+        "pemisah": ",",
+        "kolom": [
+          {
+            "isian": "gaji_kotor",
+            "judul": "Gaji"
+          }
+        ]
+      },
+      "galat": "Kolom ke-1: isian tidak dikenal."
+    },
+    {
+      "nama": "judul kolom bertab",
+      "draft": {
+        "nama": "X",
+        "jenis": "csv",
+        "pemisah": ",",
+        "kolom": [
+          {
+            "isian": "nominal",
+            "judul": "Ju\tmlah"
+          }
+        ]
+      },
+      "galat": "Kolom ke-1: judul tidak boleh berisi tab atau baris baru."
+    },
+    {
+      "nama": "teks pada isian bukan teks tetap",
+      "draft": {
+        "nama": "X",
+        "jenis": "csv",
+        "pemisah": ",",
+        "kolom": [
+          {
+            "isian": "nominal",
+            "judul": "Jumlah",
+            "teks": "0"
+          }
+        ]
+      },
+      "galat": "Kolom ke-1: teks hanya untuk isian teks tetap."
+    },
+    {
+      "nama": "kunci asing di kolom",
+      "draft": {
+        "nama": "X",
+        "jenis": "csv",
+        "pemisah": ",",
+        "kolom": [
+          {
+            "isian": "nominal",
+            "judul": "Jumlah",
+            "lebar": 10
+          }
+        ]
+      },
+      "galat": "Kolom ke-1: Isian 'lebar' tidak dikenal."
+    },
+    {
+      "nama": "maks berita nol",
+      "draft": {
+        "nama": "X",
+        "jenis": "csv",
+        "pemisah": ",",
+        "kolom": [
+          {
+            "isian": "no_rekening",
+            "judul": "Rekening"
+          },
+          {
+            "isian": "nominal",
+            "judul": "Jumlah"
+          },
+          {
+            "isian": "teks_tetap",
+            "judul": "Kode",
+            "teks": " IFT "
+          }
+        ],
+        "maks_berita": 0
+      },
+      "galat": "Panjang berita harus bilangan bulat 1–200."
+    },
+    {
+      "nama": "maks berita pecahan",
+      "draft": {
+        "nama": "X",
+        "jenis": "csv",
+        "pemisah": ",",
+        "kolom": [
+          {
+            "isian": "no_rekening",
+            "judul": "Rekening"
+          },
+          {
+            "isian": "nominal",
+            "judul": "Jumlah"
+          },
+          {
+            "isian": "teks_tetap",
+            "judul": "Kode",
+            "teks": " IFT "
+          }
+        ],
+        "maks_berita": 2.5
+      },
+      "galat": "Panjang berita harus bilangan bulat 1–200."
+    },
+    {
+      "nama": "cakupan asing",
+      "draft": {
+        "nama": "X",
+        "jenis": "csv",
+        "pemisah": ",",
+        "kolom": [
+          {
+            "isian": "no_rekening",
+            "judul": "Rekening"
+          },
+          {
+            "isian": "nominal",
+            "judul": "Jumlah"
+          },
+          {
+            "isian": "teks_tetap",
+            "judul": "Kode",
+            "teks": " IFT "
+          }
+        ],
+        "cakupan": "lain"
+      },
+      "galat": "Cakupan tidak dikenal."
+    }
+  ],
+  "pilihan": [
+    {
+      "nama": "lengkap",
+      "draft": {
+        "run_id": " run-1 ",
+        "id_rekening": "rek-1",
+        "id_format": "",
+        "tanggal_efektif": "2026-11-25"
+      },
+      "hasil": {
+        "run_id": "run-1",
+        "id_rekening": "rek-1",
+        "id_format": null,
+        "tanggal_efektif": "2026-11-25"
+      }
+    },
+    {
+      "nama": "tanggal efektif kosong",
+      "draft": {
+        "run_id": "run-1",
+        "id_rekening": "rek-1",
+        "id_format": "fmt-1",
+        "tanggal_efektif": null
+      },
+      "hasil": {
+        "run_id": "run-1",
+        "id_rekening": "rek-1",
+        "id_format": "fmt-1",
+        "tanggal_efektif": null
+      }
+    },
+    {
+      "nama": "tanggal mustahil",
+      "draft": {
+        "run_id": "run-1",
+        "id_rekening": "rek-1",
+        "tanggal_efektif": "2026-02-30"
+      },
+      "galat": "Tanggal efektif tidak valid."
+    },
+    {
+      "nama": "tanpa run",
+      "draft": {
+        "id_rekening": "rek-1"
+      },
+      "galat": "Proses gaji wajib dipilih."
+    },
+    {
+      "nama": "tanpa rekening debet",
+      "draft": {
+        "run_id": "run-1"
+      },
+      "galat": "Rekening debet wajib dipilih."
+    },
+    {
+      "nama": "kunci asing",
+      "draft": {
+        "run_id": "run-1",
+        "id_rekening": "rek-1",
+        "catat": true
+      },
+      "galat": "Isian 'catat' tidak dikenal."
+    }
+  ],
+  "daftar_bank": [
+    {
+      "id_bank": "bnk-014",
+      "nama": "BCA",
+      "kode": "014",
+      "alias": "[\"Bank BCA\",\"Bank Central Asia\"]",
+      "is_aktif": 1
+    },
+    {
+      "id_bank": "bnk-008",
+      "nama": "Mandiri",
+      "kode": "008",
+      "alias": "[\"Bank Mandiri\"]",
+      "is_aktif": 1
+    },
+    {
+      "id_bank": "bnk-451",
+      "nama": "BSI",
+      "kode": "451",
+      "alias": "[\"Bank Syariah Indonesia\",\"Mandiri Syariah\"]",
+      "is_aktif": 1
+    },
+    {
+      "id_bank": "bnk-999",
+      "nama": "Bank Lama",
+      "kode": "999",
+      "alias": "[]",
+      "is_aktif": 0
+    },
+    {
+      "id_bank": "bnk-abc",
+      "nama": "Bank Desa",
+      "kode": "",
+      "alias": "rusak",
+      "is_aktif": 1
+    }
+  ],
+  "cocok_bank": [
+    {
+      "nama": "nama huruf kecil",
+      "teks": "bca",
+      "hasil": "bnk-014"
+    },
+    {
+      "nama": "alias berspasi ganda",
+      "teks": "  Bank   Central Asia ",
+      "hasil": "bnk-014"
+    },
+    {
+      "nama": "alias bank lain",
+      "teks": "mandiri syariah",
+      "hasil": "bnk-451"
+    },
+    {
+      "nama": "kosong",
+      "teks": "  ",
+      "hasil": null
+    },
+    {
+      "nama": "tidak dikenal",
+      "teks": "Bank Antah",
+      "hasil": null
+    },
+    {
+      "nama": "bank nonaktif tetap cocok",
+      "teks": "bank lama",
+      "hasil": "bnk-999"
+    },
+    {
+      "nama": "alias rusak dianggap kosong",
+      "teks": "rusak",
+      "hasil": null
+    }
+  ],
+  "jenis_transfer": [
+    {
+      "nama": "bank sama",
+      "bank_pegawai": "bnk-014",
+      "bank_debet": "bnk-014",
+      "hasil": "sesama"
+    },
+    {
+      "nama": "bank beda",
+      "bank_pegawai": "bnk-008",
+      "bank_debet": "bnk-014",
+      "hasil": "antarbank"
+    }
+  ],
+  "bank_bentrok": [
+    {
+      "nama": "alias bank baru dipakai nama bank lain",
+      "id": null,
+      "draft": {
+        "nama": "Bank Kita",
+        "alias": ["bca"]
+      },
+      "hasil": "BCA"
+    },
+    {
+      "nama": "menyunting bank sendiri",
+      "id": "bnk-014",
+      "draft": {
+        "nama": "BCA",
+        "alias": ["Bank BCA"]
+      },
+      "hasil": null
+    },
+    {
+      "nama": "nama baru dipakai alias bank lain",
+      "id": null,
+      "draft": {
+        "nama": "Bank Syariah  Indonesia"
+      },
+      "hasil": "BSI"
+    },
+    {
+      "nama": "tidak bentrok",
+      "id": null,
+      "draft": {
+        "nama": "Bank Kalsel"
+      },
+      "hasil": null
+    }
+  ],
+  "susun": [
+    {
+      "nama": "Excel umum: semua tanda kecuali tanpa_kode_bank",
+      "masukan": {
+        "run": {
+          "period_start": "2026-10-01",
+          "period_end": "2026-10-31"
+        },
+        "item": [
+          {
+            "id_karyawan": "p01",
+            "nama_karyawan": "Ani",
+            "kode_karyawan": "P01",
+            "net_salary": 5000000,
+            "id_keluar": "",
+            "bank": "BCA",
+            "no_rekening": "1111111",
+            "nama_rekening": "Ani"
+          },
+          {
+            "id_karyawan": "p02",
+            "nama_karyawan": "Budi, S.Pd",
+            "kode_karyawan": "P02",
+            "net_salary": 4000000,
+            "id_keluar": "",
+            "bank": "bank mandiri",
+            "no_rekening": "2222222",
+            "nama_rekening": "Budi, S.Pd"
+          },
+          {
+            "id_karyawan": "p03",
+            "nama_karyawan": "Cici",
+            "kode_karyawan": "P03",
+            "net_salary": 3000000,
+            "id_keluar": "",
+            "bank": "",
+            "no_rekening": "3333333",
+            "nama_rekening": "Cici"
+          },
+          {
+            "id_karyawan": "p04",
+            "nama_karyawan": "Dedi",
+            "kode_karyawan": "P04",
+            "net_salary": 3000000,
+            "id_keluar": "",
+            "bank": "BCA",
+            "no_rekening": " ",
+            "nama_rekening": "Dedi"
+          },
+          {
+            "id_karyawan": "p05",
+            "nama_karyawan": "Eka",
+            "kode_karyawan": "P05",
+            "net_salary": 2000000,
+            "id_keluar": "",
+            "bank": "Bank Antah",
+            "no_rekening": "5555555",
+            "nama_rekening": "Eka"
+          },
+          {
+            "id_karyawan": "p06",
+            "nama_karyawan": "Fajar",
+            "kode_karyawan": "P06",
+            "net_salary": 2000000,
+            "id_keluar": "",
+            "bank": "Bank Lama",
+            "no_rekening": "6666666",
+            "nama_rekening": "Fajar"
+          },
+          {
+            "id_karyawan": "p07",
+            "nama_karyawan": "Gita",
+            "kode_karyawan": "P07",
+            "net_salary": 0,
+            "id_keluar": "",
+            "bank": "BCA",
+            "no_rekening": "7777777",
+            "nama_rekening": "Gita"
+          },
+          {
+            "id_karyawan": "p08",
+            "nama_karyawan": "Hadi",
+            "kode_karyawan": "P08",
+            "net_salary": 1500000,
+            "id_keluar": "",
+            "bank": "BSI",
+            "no_rekening": "8888888",
+            "nama_rekening": "Siti Istri"
+          },
+          {
+            "id_karyawan": "p09",
+            "nama_karyawan": "Indah",
+            "kode_karyawan": "P09",
+            "net_salary": 1000000,
+            "id_keluar": "klr-1",
+            "bank": "Mandiri Syariah",
+            "no_rekening": "9999999",
+            "nama_rekening": ""
+          },
+          {
+            "id_karyawan": "p10",
+            "nama_karyawan": "Joko",
+            "kode_karyawan": "P10",
+            "net_salary": 1200000,
+            "id_keluar": "",
+            "bank": "Bank Desa",
+            "no_rekening": "1010101",
+            "nama_rekening": "Joko"
+          }
+        ],
+        "bank": [
+          {
+            "id_bank": "bnk-014",
+            "nama": "BCA",
+            "kode": "014",
+            "alias": "[\"Bank BCA\",\"Bank Central Asia\"]",
+            "is_aktif": 1
+          },
+          {
+            "id_bank": "bnk-008",
+            "nama": "Mandiri",
+            "kode": "008",
+            "alias": "[\"Bank Mandiri\"]",
+            "is_aktif": 1
+          },
+          {
+            "id_bank": "bnk-451",
+            "nama": "BSI",
+            "kode": "451",
+            "alias": "[\"Bank Syariah Indonesia\",\"Mandiri Syariah\"]",
+            "is_aktif": 1
+          },
+          {
+            "id_bank": "bnk-999",
+            "nama": "Bank Lama",
+            "kode": "999",
+            "alias": "[]",
+            "is_aktif": 0
+          },
+          {
+            "id_bank": "bnk-abc",
+            "nama": "Bank Desa",
+            "kode": "",
+            "alias": "rusak",
+            "is_aktif": 1
+          }
+        ],
+        "debet": {
+          "id_bank": "bnk-014",
+          "no_rekening": "1234567890",
+          "nama_rekening": "Yayasan Uji"
+        },
+        "format": null,
+        "tanggal_efektif": "2026-11-25"
+      },
+      "hasil": {
+        "berita": "Gaji 2026-10-01 s.d. 2026-10-31",
+        "rekening_debet": "1234567890",
+        "nama_debet": "Yayasan Uji",
+        "tanggal_efektif": "2026-11-25",
+        "baris": [
+          {
+            "nomor_urut": 1,
+            "id_karyawan": "p01",
+            "nama_karyawan": "Ani",
+            "kode_karyawan": "P01",
+            "nama_bank": "BCA",
+            "kode_bank": "014",
+            "no_rekening": "1111111",
+            "nama_rekening": "Ani",
+            "nominal": 5000000,
+            "jenis": "sesama",
+            "tanda": []
+          },
+          {
+            "nomor_urut": 2,
+            "id_karyawan": "p02",
+            "nama_karyawan": "Budi, S.Pd",
+            "kode_karyawan": "P02",
+            "nama_bank": "Mandiri",
+            "kode_bank": "008",
+            "no_rekening": "2222222",
+            "nama_rekening": "Budi, S.Pd",
+            "nominal": 4000000,
+            "jenis": "antarbank",
+            "tanda": []
+          },
+          {
+            "nomor_urut": 3,
+            "id_karyawan": "p08",
+            "nama_karyawan": "Hadi",
+            "kode_karyawan": "P08",
+            "nama_bank": "BSI",
+            "kode_bank": "451",
+            "no_rekening": "8888888",
+            "nama_rekening": "Siti Istri",
+            "nominal": 1500000,
+            "jenis": "antarbank",
+            "tanda": ["nama_berbeda"]
+          },
+          {
+            "nomor_urut": 4,
+            "id_karyawan": "p09",
+            "nama_karyawan": "Indah",
+            "kode_karyawan": "P09",
+            "nama_bank": "BSI",
+            "kode_bank": "451",
+            "no_rekening": "9999999",
+            "nama_rekening": "",
+            "nominal": 1000000,
+            "jenis": "antarbank",
+            "tanda": ["pegawai_keluar"]
+          },
+          {
+            "nomor_urut": 5,
+            "id_karyawan": "p10",
+            "nama_karyawan": "Joko",
+            "kode_karyawan": "P10",
+            "nama_bank": "Bank Desa",
+            "kode_bank": "",
+            "no_rekening": "1010101",
+            "nama_rekening": "Joko",
+            "nominal": 1200000,
+            "jenis": "antarbank",
+            "tanda": []
+          }
+        ],
+        "manual": [
+          {
+            "nomor_urut": null,
+            "id_karyawan": "p03",
+            "nama_karyawan": "Cici",
+            "kode_karyawan": "P03",
+            "nama_bank": "",
+            "kode_bank": "",
+            "no_rekening": "3333333",
+            "nama_rekening": "Cici",
+            "nominal": 3000000,
+            "jenis": null,
+            "tanda": ["tanpa_rekening"]
+          },
+          {
+            "nomor_urut": null,
+            "id_karyawan": "p04",
+            "nama_karyawan": "Dedi",
+            "kode_karyawan": "P04",
+            "nama_bank": "BCA",
+            "kode_bank": "014",
+            "no_rekening": "",
+            "nama_rekening": "Dedi",
+            "nominal": 3000000,
+            "jenis": "sesama",
+            "tanda": ["tanpa_rekening"]
+          },
+          {
+            "nomor_urut": null,
+            "id_karyawan": "p05",
+            "nama_karyawan": "Eka",
+            "kode_karyawan": "P05",
+            "nama_bank": "Bank Antah",
+            "kode_bank": "",
+            "no_rekening": "5555555",
+            "nama_rekening": "Eka",
+            "nominal": 2000000,
+            "jenis": null,
+            "tanda": ["bank_tidak_dikenal"]
+          },
+          {
+            "nomor_urut": null,
+            "id_karyawan": "p06",
+            "nama_karyawan": "Fajar",
+            "kode_karyawan": "P06",
+            "nama_bank": "Bank Lama",
+            "kode_bank": "999",
+            "no_rekening": "6666666",
+            "nama_rekening": "Fajar",
+            "nominal": 2000000,
+            "jenis": null,
+            "tanda": ["bank_tidak_dikenal"]
+          },
+          {
+            "nomor_urut": null,
+            "id_karyawan": "p07",
+            "nama_karyawan": "Gita",
+            "kode_karyawan": "P07",
+            "nama_bank": "BCA",
+            "kode_bank": "014",
+            "no_rekening": "7777777",
+            "nama_rekening": "Gita",
+            "nominal": 0,
+            "jenis": "sesama",
+            "tanda": ["nominal_nol"]
+          }
+        ],
+        "luar_cakupan": [],
+        "ringkasan": {
+          "jumlah_baris": 5,
+          "total": 12700000,
+          "total_run": 22700000,
+          "selisih": 10000000,
+          "jumlah_manual": 5,
+          "total_manual": 10000000,
+          "jumlah_luar_cakupan": 0,
+          "total_luar_cakupan": 0,
+          "per_bank": [
+            {
+              "nama_bank": "BCA",
+              "jumlah": 1,
+              "total": 5000000
+            },
+            {
+              "nama_bank": "Mandiri",
+              "jumlah": 1,
+              "total": 4000000
+            },
+            {
+              "nama_bank": "BSI",
+              "jumlah": 2,
+              "total": 2500000
+            },
+            {
+              "nama_bank": "Bank Desa",
+              "jumlah": 1,
+              "total": 1200000
+            }
+          ],
+          "per_jenis": {
+            "sesama": {
+              "jumlah": 1,
+              "total": 5000000
+            },
+            "antarbank": {
+              "jumlah": 4,
+              "total": 7700000
+            }
+          }
+        }
+      }
+    },
+    {
+      "nama": "format sesama berkode bank, berita 10: antarbank di luar cakupan",
+      "masukan": {
+        "run": {
+          "period_start": "2026-10-01",
+          "period_end": "2026-10-31"
+        },
+        "item": [
+          {
+            "id_karyawan": "p01",
+            "nama_karyawan": "Ani",
+            "kode_karyawan": "P01",
+            "net_salary": 5000000,
+            "id_keluar": "",
+            "bank": "BCA",
+            "no_rekening": "1111111",
+            "nama_rekening": "Ani"
+          },
+          {
+            "id_karyawan": "p02",
+            "nama_karyawan": "Budi, S.Pd",
+            "kode_karyawan": "P02",
+            "net_salary": 4000000,
+            "id_keluar": "",
+            "bank": "bank mandiri",
+            "no_rekening": "2222222",
+            "nama_rekening": "Budi, S.Pd"
+          },
+          {
+            "id_karyawan": "p03",
+            "nama_karyawan": "Cici",
+            "kode_karyawan": "P03",
+            "net_salary": 3000000,
+            "id_keluar": "",
+            "bank": "",
+            "no_rekening": "3333333",
+            "nama_rekening": "Cici"
+          },
+          {
+            "id_karyawan": "p04",
+            "nama_karyawan": "Dedi",
+            "kode_karyawan": "P04",
+            "net_salary": 3000000,
+            "id_keluar": "",
+            "bank": "BCA",
+            "no_rekening": " ",
+            "nama_rekening": "Dedi"
+          },
+          {
+            "id_karyawan": "p05",
+            "nama_karyawan": "Eka",
+            "kode_karyawan": "P05",
+            "net_salary": 2000000,
+            "id_keluar": "",
+            "bank": "Bank Antah",
+            "no_rekening": "5555555",
+            "nama_rekening": "Eka"
+          },
+          {
+            "id_karyawan": "p06",
+            "nama_karyawan": "Fajar",
+            "kode_karyawan": "P06",
+            "net_salary": 2000000,
+            "id_keluar": "",
+            "bank": "Bank Lama",
+            "no_rekening": "6666666",
+            "nama_rekening": "Fajar"
+          },
+          {
+            "id_karyawan": "p07",
+            "nama_karyawan": "Gita",
+            "kode_karyawan": "P07",
+            "net_salary": 0,
+            "id_keluar": "",
+            "bank": "BCA",
+            "no_rekening": "7777777",
+            "nama_rekening": "Gita"
+          },
+          {
+            "id_karyawan": "p08",
+            "nama_karyawan": "Hadi",
+            "kode_karyawan": "P08",
+            "net_salary": 1500000,
+            "id_keluar": "",
+            "bank": "BSI",
+            "no_rekening": "8888888",
+            "nama_rekening": "Siti Istri"
+          },
+          {
+            "id_karyawan": "p09",
+            "nama_karyawan": "Indah",
+            "kode_karyawan": "P09",
+            "net_salary": 1000000,
+            "id_keluar": "klr-1",
+            "bank": "Mandiri Syariah",
+            "no_rekening": "9999999",
+            "nama_rekening": ""
+          },
+          {
+            "id_karyawan": "p10",
+            "nama_karyawan": "Joko",
+            "kode_karyawan": "P10",
+            "net_salary": 1200000,
+            "id_keluar": "",
+            "bank": "Bank Desa",
+            "no_rekening": "1010101",
+            "nama_rekening": "Joko"
+          }
+        ],
+        "bank": [
+          {
+            "id_bank": "bnk-014",
+            "nama": "BCA",
+            "kode": "014",
+            "alias": "[\"Bank BCA\",\"Bank Central Asia\"]",
+            "is_aktif": 1
+          },
+          {
+            "id_bank": "bnk-008",
+            "nama": "Mandiri",
+            "kode": "008",
+            "alias": "[\"Bank Mandiri\"]",
+            "is_aktif": 1
+          },
+          {
+            "id_bank": "bnk-451",
+            "nama": "BSI",
+            "kode": "451",
+            "alias": "[\"Bank Syariah Indonesia\",\"Mandiri Syariah\"]",
+            "is_aktif": 1
+          },
+          {
+            "id_bank": "bnk-999",
+            "nama": "Bank Lama",
+            "kode": "999",
+            "alias": "[]",
+            "is_aktif": 0
+          },
+          {
+            "id_bank": "bnk-abc",
+            "nama": "Bank Desa",
+            "kode": "",
+            "alias": "rusak",
+            "is_aktif": 1
+          }
+        ],
+        "debet": {
+          "id_bank": "bnk-014",
+          "no_rekening": "1234567890",
+          "nama_rekening": "Yayasan Uji"
+        },
+        "format": {
+          "cakupan": "sesama",
+          "kolom": [
+            {
+              "isian": "kode_bank"
+            },
+            {
+              "isian": "nominal"
+            }
+          ],
+          "maks_berita": 10
+        },
+        "tanggal_efektif": "2026-11-25"
+      },
+      "hasil": {
+        "berita": "Gaji 2026-",
+        "rekening_debet": "1234567890",
+        "nama_debet": "Yayasan Uji",
+        "tanggal_efektif": "2026-11-25",
+        "baris": [
+          {
+            "nomor_urut": 1,
+            "id_karyawan": "p01",
+            "nama_karyawan": "Ani",
+            "kode_karyawan": "P01",
+            "nama_bank": "BCA",
+            "kode_bank": "014",
+            "no_rekening": "1111111",
+            "nama_rekening": "Ani",
+            "nominal": 5000000,
+            "jenis": "sesama",
+            "tanda": []
+          }
+        ],
+        "manual": [
+          {
+            "nomor_urut": null,
+            "id_karyawan": "p03",
+            "nama_karyawan": "Cici",
+            "kode_karyawan": "P03",
+            "nama_bank": "",
+            "kode_bank": "",
+            "no_rekening": "3333333",
+            "nama_rekening": "Cici",
+            "nominal": 3000000,
+            "jenis": null,
+            "tanda": ["tanpa_rekening"]
+          },
+          {
+            "nomor_urut": null,
+            "id_karyawan": "p04",
+            "nama_karyawan": "Dedi",
+            "kode_karyawan": "P04",
+            "nama_bank": "BCA",
+            "kode_bank": "014",
+            "no_rekening": "",
+            "nama_rekening": "Dedi",
+            "nominal": 3000000,
+            "jenis": "sesama",
+            "tanda": ["tanpa_rekening"]
+          },
+          {
+            "nomor_urut": null,
+            "id_karyawan": "p05",
+            "nama_karyawan": "Eka",
+            "kode_karyawan": "P05",
+            "nama_bank": "Bank Antah",
+            "kode_bank": "",
+            "no_rekening": "5555555",
+            "nama_rekening": "Eka",
+            "nominal": 2000000,
+            "jenis": null,
+            "tanda": ["bank_tidak_dikenal"]
+          },
+          {
+            "nomor_urut": null,
+            "id_karyawan": "p06",
+            "nama_karyawan": "Fajar",
+            "kode_karyawan": "P06",
+            "nama_bank": "Bank Lama",
+            "kode_bank": "999",
+            "no_rekening": "6666666",
+            "nama_rekening": "Fajar",
+            "nominal": 2000000,
+            "jenis": null,
+            "tanda": ["bank_tidak_dikenal"]
+          },
+          {
+            "nomor_urut": null,
+            "id_karyawan": "p07",
+            "nama_karyawan": "Gita",
+            "kode_karyawan": "P07",
+            "nama_bank": "BCA",
+            "kode_bank": "014",
+            "no_rekening": "7777777",
+            "nama_rekening": "Gita",
+            "nominal": 0,
+            "jenis": "sesama",
+            "tanda": ["nominal_nol"]
+          }
+        ],
+        "luar_cakupan": [
+          {
+            "nomor_urut": null,
+            "id_karyawan": "p02",
+            "nama_karyawan": "Budi, S.Pd",
+            "kode_karyawan": "P02",
+            "nama_bank": "Mandiri",
+            "kode_bank": "008",
+            "no_rekening": "2222222",
+            "nama_rekening": "Budi, S.Pd",
+            "nominal": 4000000,
+            "jenis": "antarbank",
+            "tanda": []
+          },
+          {
+            "nomor_urut": null,
+            "id_karyawan": "p08",
+            "nama_karyawan": "Hadi",
+            "kode_karyawan": "P08",
+            "nama_bank": "BSI",
+            "kode_bank": "451",
+            "no_rekening": "8888888",
+            "nama_rekening": "Siti Istri",
+            "nominal": 1500000,
+            "jenis": "antarbank",
+            "tanda": ["nama_berbeda"]
+          },
+          {
+            "nomor_urut": null,
+            "id_karyawan": "p09",
+            "nama_karyawan": "Indah",
+            "kode_karyawan": "P09",
+            "nama_bank": "BSI",
+            "kode_bank": "451",
+            "no_rekening": "9999999",
+            "nama_rekening": "",
+            "nominal": 1000000,
+            "jenis": "antarbank",
+            "tanda": ["pegawai_keluar"]
+          },
+          {
+            "nomor_urut": null,
+            "id_karyawan": "p10",
+            "nama_karyawan": "Joko",
+            "kode_karyawan": "P10",
+            "nama_bank": "Bank Desa",
+            "kode_bank": "",
+            "no_rekening": "1010101",
+            "nama_rekening": "Joko",
+            "nominal": 1200000,
+            "jenis": "antarbank",
+            "tanda": []
+          }
+        ],
+        "ringkasan": {
+          "jumlah_baris": 1,
+          "total": 5000000,
+          "total_run": 22700000,
+          "selisih": 17700000,
+          "jumlah_manual": 5,
+          "total_manual": 10000000,
+          "jumlah_luar_cakupan": 4,
+          "total_luar_cakupan": 7700000,
+          "per_bank": [
+            {
+              "nama_bank": "BCA",
+              "jumlah": 1,
+              "total": 5000000
+            }
+          ],
+          "per_jenis": {
+            "sesama": {
+              "jumlah": 1,
+              "total": 5000000
+            },
+            "antarbank": {
+              "jumlah": 0,
+              "total": 0
+            }
+          }
+        }
+      }
+    },
+    {
+      "nama": "debet bank tanpa kode, format berkode: sesama tanpa_kode_bank",
+      "masukan": {
+        "run": {
+          "period_start": "2026-10-01",
+          "period_end": "2026-10-31"
+        },
+        "item": [
+          {
+            "id_karyawan": "p10",
+            "nama_karyawan": "Joko",
+            "kode_karyawan": "P10",
+            "net_salary": 1200000,
+            "id_keluar": "",
+            "bank": "Bank Desa",
+            "no_rekening": "1010101",
+            "nama_rekening": "Joko"
+          },
+          {
+            "id_karyawan": "p01",
+            "nama_karyawan": "Ani",
+            "kode_karyawan": "P01",
+            "net_salary": 5000000,
+            "id_keluar": "",
+            "bank": "BCA",
+            "no_rekening": "1111111",
+            "nama_rekening": "Ani"
+          }
+        ],
+        "bank": [
+          {
+            "id_bank": "bnk-014",
+            "nama": "BCA",
+            "kode": "014",
+            "alias": "[\"Bank BCA\",\"Bank Central Asia\"]",
+            "is_aktif": 1
+          },
+          {
+            "id_bank": "bnk-008",
+            "nama": "Mandiri",
+            "kode": "008",
+            "alias": "[\"Bank Mandiri\"]",
+            "is_aktif": 1
+          },
+          {
+            "id_bank": "bnk-451",
+            "nama": "BSI",
+            "kode": "451",
+            "alias": "[\"Bank Syariah Indonesia\",\"Mandiri Syariah\"]",
+            "is_aktif": 1
+          },
+          {
+            "id_bank": "bnk-999",
+            "nama": "Bank Lama",
+            "kode": "999",
+            "alias": "[]",
+            "is_aktif": 0
+          },
+          {
+            "id_bank": "bnk-abc",
+            "nama": "Bank Desa",
+            "kode": "",
+            "alias": "rusak",
+            "is_aktif": 1
+          }
+        ],
+        "debet": {
+          "id_bank": "bnk-abc",
+          "no_rekening": "5550001",
+          "nama_rekening": "Yayasan Desa"
+        },
+        "format": {
+          "cakupan": "semua",
+          "kolom": [
+            {
+              "isian": "kode_bank"
+            }
+          ],
+          "maks_berita": null
+        },
+        "tanggal_efektif": "2026-11-25"
+      },
+      "hasil": {
+        "berita": "Gaji 2026-10-01 s.d. 2026-10-31",
+        "rekening_debet": "5550001",
+        "nama_debet": "Yayasan Desa",
+        "tanggal_efektif": "2026-11-25",
+        "baris": [
+          {
+            "nomor_urut": 1,
+            "id_karyawan": "p01",
+            "nama_karyawan": "Ani",
+            "kode_karyawan": "P01",
+            "nama_bank": "BCA",
+            "kode_bank": "014",
+            "no_rekening": "1111111",
+            "nama_rekening": "Ani",
+            "nominal": 5000000,
+            "jenis": "antarbank",
+            "tanda": []
+          }
+        ],
+        "manual": [
+          {
+            "nomor_urut": null,
+            "id_karyawan": "p10",
+            "nama_karyawan": "Joko",
+            "kode_karyawan": "P10",
+            "nama_bank": "Bank Desa",
+            "kode_bank": "",
+            "no_rekening": "1010101",
+            "nama_rekening": "Joko",
+            "nominal": 1200000,
+            "jenis": "sesama",
+            "tanda": ["tanpa_kode_bank"]
+          }
+        ],
+        "luar_cakupan": [],
+        "ringkasan": {
+          "jumlah_baris": 1,
+          "total": 5000000,
+          "total_run": 6200000,
+          "selisih": 1200000,
+          "jumlah_manual": 1,
+          "total_manual": 1200000,
+          "jumlah_luar_cakupan": 0,
+          "total_luar_cakupan": 0,
+          "per_bank": [
+            {
+              "nama_bank": "BCA",
+              "jumlah": 1,
+              "total": 5000000
+            }
+          ],
+          "per_jenis": {
+            "sesama": {
+              "jumlah": 0,
+              "total": 0
+            },
+            "antarbank": {
+              "jumlah": 1,
+              "total": 5000000
+            }
+          }
+        }
+      }
+    }
+  ],
+  "render": [
+    {
+      "nama": "csv koma tanpa kutip: teks berkoma dan berkutip tetap dikutip, desimal",
+      "format": {
+        "nama": "CSV",
+        "jenis": "csv",
+        "pemisah": ",",
+        "pakai_judul": 1,
+        "kutip": 0,
+        "desimal": 1,
+        "kolom": [
+          {
+            "isian": "nomor_urut",
+            "judul": "No",
+            "teks": null
+          },
+          {
+            "isian": "nama_karyawan",
+            "judul": "Nama, Lengkap",
+            "teks": null
+          },
+          {
+            "isian": "nominal",
+            "judul": "Jumlah",
+            "teks": null
+          },
+          {
+            "isian": "berita",
+            "judul": "Berita",
+            "teks": null
+          },
+          {
+            "isian": "teks_tetap",
+            "judul": "Kode",
+            "teks": "A\"B"
+          }
+        ]
+      },
+      "susun": 1,
+      "hasil": "No,\"Nama, Lengkap\",Jumlah,Berita,Kode\r\n1,Ani,5000000.00,Gaji 2026-,\"A\"\"B\"\r\n"
+    },
+    {
+      "nama": "txt pipa berkutip tanpa judul",
+      "format": {
+        "nama": "TXT",
+        "jenis": "txt",
+        "pemisah": "|",
+        "pakai_judul": 0,
+        "kutip": 1,
+        "desimal": 0,
+        "kolom": [
+          {
+            "isian": "no_rekening",
+            "judul": "Rek",
+            "teks": null
+          },
+          {
+            "isian": "nominal",
+            "judul": "Nominal",
+            "teks": null
+          },
+          {
+            "isian": "rekening_debet",
+            "judul": "Debet",
+            "teks": null
+          },
+          {
+            "isian": "tanggal_efektif",
+            "judul": "Tanggal",
+            "teks": null
+          }
+        ]
+      },
+      "susun": 0,
+      "hasil": "\"1111111\"|5000000|\"1234567890\"|\"2026-11-25\"\r\n\"2222222\"|4000000|\"1234567890\"|\"2026-11-25\"\r\n\"8888888\"|1500000|\"1234567890\"|\"2026-11-25\"\r\n\"9999999\"|1000000|\"1234567890\"|\"2026-11-25\"\r\n\"1010101\"|1200000|\"1234567890\"|\"2026-11-25\"\r\n"
+    }
+  ]
+}

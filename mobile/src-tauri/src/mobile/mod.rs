@@ -37,6 +37,8 @@ pub mod hr_pengajuan;
 pub mod hr_pengingat;
 // Rekrutmen (HRIS Fase 7a): SALINAN `desktop/hr_rekrutmen.rs`.
 pub mod hr_rekrutmen;
+// Reimbursement (HRIS Fase 8): SALINAN `desktop/hr_reimburse.rs`.
+pub mod hr_reimburse;
 pub mod hris;
 pub mod hris_cloud;
 // Inventaris: SALINAN `desktop/inventory.rs` oleh sync-rust-modules.ts.
@@ -62,6 +64,8 @@ pub mod portability;
 pub mod rapel;
 pub mod share;
 pub mod teaching_journal;
+// Berkas transfer gaji (HRIS Fase 8a): SALINAN `desktop/transfer.rs`.
+pub mod transfer;
 // Notifikasi grup Telegram (v66): SALINAN `desktop/telegram.rs` oleh sync-rust-modules.ts.
 pub mod telegram;
 // Buku Kunjungan UKS: SALINAN `desktop/uks.rs` oleh sync-rust-modules.ts.

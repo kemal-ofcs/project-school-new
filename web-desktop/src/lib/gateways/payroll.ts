@@ -6,6 +6,13 @@ import { isDesktopRuntime, isMobileRuntime } from "@/lib/runtime/app-runtime";
 import { invokeDesktop } from "@/lib/runtime/desktop-commands";
 import type { HasilPph } from "@/lib/validations/pajak";
 import type { PayrollCalcType } from "@/lib/validations/payroll-policy";
+import type {
+  AksiPengaturan,
+  BankTampil,
+  HasilBerkasTransfer,
+  PengaturanTransfer,
+  PilihanTransfer,
+} from "@/lib/validations/transfer";
 
 function kickDesktopSync() {
   requestSyncNow();
@@ -897,4 +904,76 @@ export async function getPayrollSlipDetail(
     }
   }
   throw new Error("Slip gaji tidak ditemukan.");
+}
+
+// HRIS Fase 8a: berkas transfer gaji, cloud-only. Desktop membaca dan menulis
+// langsung ke database cloud (tanpa outbox, jadi tanpa sinkronisasi); tanpa
+// koneksi, command melempar pesan butuh koneksi.
+
+function cloudTransfer<T>(
+  command: string,
+  args: Record<string, unknown>,
+  url: string,
+  body: unknown,
+): Promise<T> {
+  if (isDesktopRuntime()) return invokeDesktop<T>(command, args);
+  return requestWebApi<T>(url, "POST", body);
+}
+
+/** Bank aktif untuk isian bank profil keuangan (cukup sesi). */
+export function muatBankAktif(): Promise<{ bank: BankTampil[] }> {
+  return cloudTransfer(
+    "desktop_transfer_banks",
+    {},
+    "/api/payroll/transfer/banks/query",
+    {},
+  );
+}
+
+/** Semua (Pengaturan) atau yang aktif saja (pengunduh berkas). */
+export function muatPengaturanTransfer(): Promise<PengaturanTransfer> {
+  return cloudTransfer(
+    "desktop_transfer_settings",
+    {},
+    "/api/payroll/transfer/settings/query",
+    {},
+  );
+}
+
+/** Simpan atau nonaktifkan (`is_aktif: 0`) bank, rekening debet, atau format. */
+export function simpanPengaturanTransfer(draft: {
+  aksi: AksiPengaturan;
+  id: string | null;
+  data: Record<string, unknown>;
+}): Promise<{ sukses: true; id: string }> {
+  return cloudTransfer(
+    "desktop_transfer_settings_save",
+    { draft },
+    "/api/payroll/transfer/settings/save",
+    draft,
+  );
+}
+
+/** Pratinjau berkas transfer, tanpa jejak unduhan. */
+export function pratinjauTransfer(
+  draft: PilihanTransfer,
+): Promise<HasilBerkasTransfer> {
+  return cloudTransfer(
+    "desktop_transfer_preview",
+    { draft },
+    "/api/payroll/transfer/preview",
+    draft,
+  );
+}
+
+/** Data berkas transfer untuk diunduh; mencatat `TRANSFER_EXPORT`. */
+export function unduhTransfer(
+  draft: PilihanTransfer,
+): Promise<HasilBerkasTransfer> {
+  return cloudTransfer(
+    "desktop_transfer_export",
+    { draft },
+    "/api/payroll/transfer/export",
+    draft,
+  );
 }

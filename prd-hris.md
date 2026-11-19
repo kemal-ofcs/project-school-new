@@ -8,11 +8,11 @@ sudah dibangun** (§20.11–§20.13). **Fase 3 (tanpa versi skema, sub-fase
 3a/3b) sudah dibangun** (§21.11–§21.12). **Fase 4 (v70, sub-fase 4a/4b/4c)
 sudah dibangun** (§22.11–§22.13). **Fase 5 (v71, sentinel `-2047`, sub-fase
 5a/5b/5c) sudah dibangun** (§23.11–§23.13, 18 Nov 2026); Q-91 sampai Q-111
-disetujui (§23.10). **Fase 6 dirancang** (§24, tanpa versi skema, 19 Nov 2026); Q-112 sampai Q-129 disetujui (§24.10); 6a dan 6b dibangun (§24.11), Fase 6 lengkap. **Fase 7 dirancang** (§25, v72, sentinel `-2048`, 19 Nov 2026); Q-130 sampai Q-151 disetujui (§25.10); pengerjaan mulai dari 7a. Fase 8 baru berupa cakupan (§14); model data
+disetujui (§23.10). **Fase 6 dirancang** (§24, tanpa versi skema, 19 Nov 2026); Q-112 sampai Q-129 disetujui (§24.10); 6a dan 6b dibangun (§24.11), Fase 6 lengkap. **Fase 7 dirancang** (§25, v72, sentinel `-2048`, 19 Nov 2026); Q-130 sampai Q-151 disetujui (§25.10); pengerjaan mulai dari 7a. **Fase 8 dirancang** (§26, v73, sentinel `-2049`, 19 Nov 2026): transfer gaji ke bank, laporan PPh 21/BPJS, reimbursement; Q-152 sampai Q-167 disetujui (§26.10); pengerjaan mulai dari 8a. Sisa §14 untuk fase berikutnya; model data
 rinci ditulis di awal setiap fase, dalam bagian "Urutan pengerjaan Fase N",
 seperti `prd-hris.md` proyek `absensi-perusahaan`.
 
-Berkas per fase (nomor bagian tetap): Fase 0 §6 [`prd-hris/fase-0.md`](prd-hris/fase-0.md), Fase 1 §19 [`fase-1.md`](prd-hris/fase-1.md), Fase 2 §20 [`fase-2.md`](prd-hris/fase-2.md), Fase 3 §21 [`fase-3.md`](prd-hris/fase-3.md), Fase 4 §22 [`fase-4.md`](prd-hris/fase-4.md), Fase 5 §23 [`fase-5.md`](prd-hris/fase-5.md), Fase 6 §24 [`fase-6.md`](prd-hris/fase-6.md), Fase 7 §25 [`fase-7.md`](prd-hris/fase-7.md). Fase baru ditulis sebagai `prd-hris/fase-N.md`.
+Berkas per fase (nomor bagian tetap): Fase 0 §6 [`prd-hris/fase-0.md`](prd-hris/fase-0.md), Fase 1 §19 [`fase-1.md`](prd-hris/fase-1.md), Fase 2 §20 [`fase-2.md`](prd-hris/fase-2.md), Fase 3 §21 [`fase-3.md`](prd-hris/fase-3.md), Fase 4 §22 [`fase-4.md`](prd-hris/fase-4.md), Fase 5 §23 [`fase-5.md`](prd-hris/fase-5.md), Fase 6 §24 [`fase-6.md`](prd-hris/fase-6.md), Fase 7 §25 [`fase-7.md`](prd-hris/fase-7.md), Fase 8 §26 [`fase-8.md`](prd-hris/fase-8.md). Fase baru ditulis sebagai `prd-hris/fase-N.md`.
 
 Rujukan: `C:\dev\absensi-perusahaan\prd-hris.md` (HRIS perusahaan, fase 1–14
 sudah dibangun). Aturan bisnisnya dan vektor ujinya dipakai ulang di sini.
@@ -561,3 +561,7 @@ Ditulis di [`prd-hris/fase-6.md`](prd-hris/fase-6.md) (§24.x).
 ## 25. Urutan pengerjaan Fase 7
 
 Ditulis di [`prd-hris/fase-7.md`](prd-hris/fase-7.md) (§25.x).
+
+## 26. Urutan pengerjaan Fase 8
+
+Ditulis di [`prd-hris/fase-8.md`](prd-hris/fase-8.md) (§26.x): transfer gaji ke bank, laporan PPh 21/BPJS, reimbursement.

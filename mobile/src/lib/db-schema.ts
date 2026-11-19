@@ -2,8 +2,8 @@ import type { Client } from "@libsql/client";
 import { BRANDING } from "@/lib/constants/branding";
 import { runDatabaseMigrations } from "./db-migrations";
 
-export const CURRENT_SCHEMA_VERSION = 72;
-export const REQUIRED_TABLE_COUNT = 137;
+export const CURRENT_SCHEMA_VERSION = 73;
+export const REQUIRED_TABLE_COUNT = 147;
 
 export async function isDatabaseSchemaReady(client: Client) {
   try {
@@ -53,7 +53,9 @@ export async function isDatabaseSchemaReady(client: Client) {
             'hr_jenis_pengajuan', 'hr_pengajuan', 'hr_pengajuan_keputusan', 'hr_cuti_penyesuaian', 'hr_jp_penanganan', 'hr_pengajuan_berkas',
             'hr_sp', 'hr_keluar_alasan', 'hr_keluar', 'hr_keluar_rincian',
             'hr_kinerja_template', 'hr_kinerja_aspek', 'hr_kinerja_penilaian', 'hr_kinerja_nilai', 'hr_kinerja_keputusan',
-            'hr_lowongan', 'hr_pelamar', 'hr_pelamar_tahap', 'hr_pelamar_berkas', 'hr_pelatihan', 'hr_pelatihan_peserta'
+            'hr_lowongan', 'hr_pelamar', 'hr_pelamar_tahap', 'hr_pelamar_berkas', 'hr_pelatihan', 'hr_pelatihan_peserta',
+            'app_bank', 'app_bank_rekening', 'app_bank_format', 'app_lapor_setting',
+            'hr_reimburse_jenis', 'hr_reimburse', 'hr_reimburse_keputusan', 'hr_reimburse_berkas', 'hr_reimburse_bayar', 'hr_reimburse_bayar_baris'
           )
         ) AS table_count;
     `);

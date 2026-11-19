@@ -13,7 +13,7 @@ use super::{
     },
     hr_beban, hr_keluar, hr_kinerja, hr_pelatihan, hr_pengajuan, hr_pengingat, hr_rekrutmen, hris, hris_cloud, operational,
     portability, rapel,
-    scanner, secrets, storage, sync, teaching_journal, turso, uks, wa_notification,
+    scanner, secrets, storage, sync, teaching_journal, transfer, turso, uks, wa_notification,
 };
 
 /// Sesi login yang sah, tanpa menuntut izin tertentu.
@@ -3846,6 +3846,69 @@ pub async fn desktop_hr_applicant_delete(
 ) -> Result<Value, CommandError> {
     require_permission(&state, "hr.recruit.delete")?;
     hr_rekrutmen::hapus_pelamar(&klien_cloud(&state)?, &id_pelamar)
+        .await
+        .map_err(hris_cloud::luring)
+}
+
+/// Bank aktif untuk isian profil keuangan (HRIS Fase 8a, cloud-only). Cukup
+/// sesi: hanya nama, kode BI, dan alias bank.
+#[tauri::command]
+pub async fn desktop_transfer_banks(state: State<'_, DesktopState>) -> Result<Value, CommandError> {
+    require_session(&state)?;
+    transfer::bank_aktif(&klien_cloud(&state)?)
+        .await
+        .map_err(hris_cloud::luring)
+}
+
+/// Bank, rekening debet, dan format berkas. Pemegang `payroll.config.manage`
+/// melihat semuanya (Pengaturan); pemegang izin unduh hanya yang aktif.
+#[tauri::command]
+pub async fn desktop_transfer_settings(state: State<'_, DesktopState>) -> Result<Value, CommandError> {
+    require_any_permission(&state, &[transfer::IZIN_PENGATURAN, transfer::IZIN_UNDUH[0]])?;
+    let atur = require_permission(&state, transfer::IZIN_PENGATURAN).is_ok();
+    if !atur {
+        require_permission(&state, transfer::IZIN_UNDUH[1])?;
+    }
+    transfer::pengaturan(&klien_cloud(&state)?, atur)
+        .await
+        .map_err(hris_cloud::luring)
+}
+
+/// Simpan atau nonaktifkan satu bank, rekening debet, atau format berkas.
+#[tauri::command]
+pub async fn desktop_transfer_settings_save(
+    state: State<'_, DesktopState>,
+    draft: Value,
+) -> Result<Value, CommandError> {
+    let operator = require_permission(&state, transfer::IZIN_PENGATURAN)?;
+    transfer::simpan_pengaturan(&klien_cloud(&state)?, &operator.username, &draft)
+        .await
+        .map_err(hris_cloud::luring)
+}
+
+/// Pratinjau berkas transfer satu run APPROVED/PAID, tanpa jejak unduhan.
+/// Membuka nomor rekening semua pegawai, jadi wajib kedua izin unduh.
+#[tauri::command]
+pub async fn desktop_transfer_preview(
+    state: State<'_, DesktopState>,
+    draft: Value,
+) -> Result<Value, CommandError> {
+    let operator = require_permission(&state, transfer::IZIN_UNDUH[0])?;
+    require_permission(&state, transfer::IZIN_UNDUH[1])?;
+    transfer::berkas_transfer(&klien_cloud(&state)?, &operator.username, &draft, false)
+        .await
+        .map_err(hris_cloud::luring)
+}
+
+/// Data berkas transfer untuk diunduh; mencatat `TRANSFER_EXPORT` di cloud.
+#[tauri::command]
+pub async fn desktop_transfer_export(
+    state: State<'_, DesktopState>,
+    draft: Value,
+) -> Result<Value, CommandError> {
+    let operator = require_permission(&state, transfer::IZIN_UNDUH[0])?;
+    require_permission(&state, transfer::IZIN_UNDUH[1])?;
+    transfer::berkas_transfer(&klien_cloud(&state)?, &operator.username, &draft, true)
         .await
         .map_err(hris_cloud::luring)
 }
