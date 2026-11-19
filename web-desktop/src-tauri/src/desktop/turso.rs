@@ -12827,9 +12827,21 @@ async fn apply_event_to_turso(
                 }
             }
 
-            // Terapkan logs jika disertakan dalam event import offline
+            // Terapkan logs jika disertakan dalam event import offline. Import
+            // ulang baris yang sama memakai ulang event_key dengan
+            // `timestamp_scan` baru, jadi log lama referensi yang sama dibuang
+            // dulu, persis DELETE di `administration::import_offline`.
             if let Some(logs) = payload.get("logs").and_then(Value::as_array) {
                 for log in logs {
+                    let field = |key: &str| json!(log.get(key).and_then(Value::as_str).unwrap_or(""));
+                    if log.get("id_referensi").and_then(Value::as_str).is_some_and(|r| !r.is_empty()) {
+                        turso
+                            .query_one(
+                                "DELETE FROM log_scan WHERE tanggal_kerja = ? AND id_karyawan = ? AND jenis_scan = ? AND sumber_data IN ('Import Offline', 'Import Manual') AND COALESCE(id_referensi, '') = ?;",
+                                vec![field("tanggal_kerja"), field("id_karyawan"), field("jenis_scan"), field("id_referensi")],
+                            )
+                            .await?;
+                    }
                     insert_log_if_missing(turso, log).await?;
                 }
             }

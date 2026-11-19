@@ -631,6 +631,14 @@ pub fn list_corrections(state: &DesktopState, filter: &Value) -> Result<Value, C
     )
 }
 
+/// Import berhasil sebelumnya yang isinya sama persis. Kembar dengan
+/// `SQL_IMPORT_KEMBAR` di `src/lib/services/offline-import.ts`.
+pub(crate) const SQL_IMPORT_KEMBAR: &str = "SELECT event_key FROM import_offline
+  WHERE tanggal = ? AND id_unik = ? AND COALESCE(jam_masuk, '') = ?
+    AND COALESCE(jam_pulang, '') = ? AND COALESCE(status_kehadiran, '') = ?
+    AND status_proses = 'Sudah Diproses'
+  ORDER BY id_import DESC LIMIT 1;";
+
 pub fn list_imports(state: &DesktopState, filter: &Value) -> Result<Value, CommandError> {
     let connection = storage::database(&state.data_dir)?;
     let date = text(filter, "tanggal").replace("'", "''");
@@ -2169,6 +2177,18 @@ pub fn import_offline(
             } else {
                 "Perlu Verifikasi"
             };
+            // Import ulang baris yang sama (mis. perangkat lain sudah mengimpornya
+            // dan hasilnya sudah tertarik) memakai ulang event lamanya, sehingga
+            // log scan dan riwayat import tertimpa, tidak dobel.
+            let event_lama: Option<String> = transaction
+                .query_row(
+                    SQL_IMPORT_KEMBAR,
+                    params![&date, id, check_in_time, check_out_time, attendance_status],
+                    |result| result.get(0),
+                )
+                .optional()
+                .map_err(|_| CommandError::internal())?;
+            let event_key = event_lama.clone().unwrap_or_else(|| event_key.clone());
             let (year, month): (i64, i64) = transaction
                 .query_row(
                     "SELECT CAST(substr(?,1,4) AS INTEGER), CAST(substr(?,6,2) AS INTEGER);",
@@ -2215,7 +2235,7 @@ pub fn import_offline(
                 logs.push(log);
             }
             let import = json!({ "event_key": event_key, "timestamp_input": now, "tanggal": &date, "id_unik": id, "nama": name, "divisi": division, "jam_masuk": check_in_time, "jam_pulang": check_out_time, "status_kehadiran": attendance_status, "status_absen": record_status, "keterangan": text(row, "keterangan"), "status_proses": "Sudah Diproses", "diproses_pada": now, "pesan_error": "", "kode_operator": operator });
-            transaction.execute("INSERT INTO import_offline (id_import, event_key, timestamp_input, tanggal, id_unik, nama, divisi, jam_masuk, jam_pulang, status_kehadiran, status_absen, keterangan, status_proses, diproses_pada, pesan_error, kode_operator) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Sudah Diproses', ?, '', ?);", params![sync::new_local_id(), event_key, now, &date, id, name, division, check_in_time, check_out_time, attendance_status, record_status, text(row, "keterangan"), now, operator]).map_err(|_| CommandError::internal())?;
+            transaction.execute("INSERT INTO import_offline (id_import, event_key, timestamp_input, tanggal, id_unik, nama, divisi, jam_masuk, jam_pulang, status_kehadiran, status_absen, keterangan, status_proses, diproses_pada, pesan_error, kode_operator) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Sudah Diproses', ?, '', ?) ON CONFLICT(event_key) DO UPDATE SET timestamp_input = excluded.timestamp_input, nama = excluded.nama, divisi = excluded.divisi, status_absen = excluded.status_absen, keterangan = excluded.keterangan, diproses_pada = excluded.diproses_pada, kode_operator = excluded.kode_operator;", params![sync::new_local_id(), event_key, now, &date, id, name, division, check_in_time, check_out_time, attendance_status, record_status, text(row, "keterangan"), now, operator]).map_err(|_| CommandError::internal())?;
 
             sync::enqueue(
                 &transaction,
@@ -2258,7 +2278,7 @@ pub fn import_offline(
             }
 
             Ok(
-                json!({ "sukses": true, "pesan": format!("Import {id} berhasil diproses."), "eventKey": event_key }),
+                json!({ "sukses": true, "pesan": if event_lama.is_some() { format!("Import {id} sudah pernah diimpor; data lamanya diperbarui.") } else { format!("Import {id} berhasil diproses.") }, "eventKey": event_key }),
             )
         })();
         match process {
@@ -3760,6 +3780,35 @@ INSERT INTO hari_libur_whitelist (id, scope_type, scope_value, tanggal_libur, ke
         let import_res = import_offline(&state, &rows, "SPD001").expect("import offline");
         assert_eq!(import_res["berhasil"], 2);
         assert_eq!(import_res["gagal"], 0);
+    }
+
+    #[test]
+    fn import_ulang_baris_sama_memakai_ulang_event_tanpa_dobel() {
+        let (_directory, state) = fixture();
+        let rows = vec![json!({
+            "tanggal": "14/08/2026",
+            "id_unik": "K001",
+            "jam_masuk": "07:00",
+            "jam_pulang": "15:00",
+            "status_kehadiran": "Hadir",
+        })];
+        let pertama = import_offline(&state, &rows, "SPD001").expect("import pertama");
+        let kedua = import_offline(&state, &rows, "SPD001").expect("import kedua");
+        assert_eq!(pertama["berhasil"], 1, "{pertama}");
+        assert_eq!(kedua["berhasil"], 1, "{kedua}");
+        assert_eq!(pertama["results"][0]["eventKey"], kedua["results"][0]["eventKey"]);
+
+        let connection = storage::database(&state.data_dir).expect("local database");
+        let hitung = |sql: &str| -> i64 { connection.query_row(sql, [], |row| row.get(0)).expect(sql) };
+        assert_eq!(
+            hitung("SELECT COUNT(*) FROM import_offline WHERE id_unik = 'K001' AND tanggal = '2026-08-14';"),
+            1
+        );
+        assert_eq!(
+            hitung("SELECT COUNT(*) FROM log_scan WHERE id_karyawan = 'K001' AND tanggal_kerja = '2026-08-14';"),
+            2,
+            "satu Masuk dan satu Pulang"
+        );
     }
 
     #[test]

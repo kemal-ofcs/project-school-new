@@ -42,6 +42,7 @@ import {
 import { getDaftarShift } from "@/lib/gateways/shift";
 import { subscribeSyncCompleted, syncNow } from "@/lib/gateways/sync-status";
 import { useHydrated } from "@/lib/hooks/useHydrated";
+import { eventImportKembar } from "@/lib/validations/operational";
 
 type Tab = "correction" | "backup" | "import";
 
@@ -60,6 +61,7 @@ export default function OperationalPage() {
   const [employees, setEmployees] = useState<Record<string, unknown>[]>([]);
   const [shifts, setShifts] = useState<Record<string, unknown>[]>([]);
   const [records, setRecords] = useState<Record<string, unknown>[]>([]);
+  const importKembar = eventImportKembar(records);
   const [busy, setBusy] = useState(false);
   const isSubmittingRef = useRef(false);
 
@@ -1371,6 +1373,14 @@ export default function OperationalPage() {
                       >
                         {String(item.status_proses || item.status_absen || "-")}
                       </span>
+                      {importKembar.has(String(item.event_key)) ? (
+                        <span
+                          className="ml-1 px-2 py-0.5 rounded text-[11px] font-bold bg-amber-950 text-amber-300 border border-amber-800"
+                          title="Ada baris import lain yang sama persis. Hapus salah satunya agar log scan tidak dobel."
+                        >
+                          Dobel
+                        </span>
+                      ) : null}
                     </td>
                     <td
                       className="p-2.5 text-slate-400 max-w-xs truncate"

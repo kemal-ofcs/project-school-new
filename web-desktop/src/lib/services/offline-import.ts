@@ -57,6 +57,16 @@ function timestamp(date: string, time: string, nextDay = false) {
   return `${value.toISOString().slice(0, 10)} ${normalized}`;
 }
 
+/**
+ * Import berhasil sebelumnya yang isinya sama persis. Dieja kembar dengan
+ * `SQL_IMPORT_KEMBAR` di `src-tauri/src/desktop/administration.rs`.
+ */
+export const SQL_IMPORT_KEMBAR = `SELECT event_key FROM import_offline
+  WHERE tanggal = ? AND id_unik = ? AND COALESCE(jam_masuk, '') = ?
+    AND COALESCE(jam_pulang, '') = ? AND COALESCE(status_kehadiran, '') = ?
+    AND status_proses = 'Sudah Diproses'
+  ORDER BY id_import DESC LIMIT 1;`;
+
 interface NotifikasiImport {
   diantre: number;
   dibatasi: boolean;
@@ -68,7 +78,7 @@ async function processRow(
   operator: string,
   notifikasi: NotifikasiImport,
 ) {
-  const eventKey = `IMP-${randomUUID()}`;
+  let eventKey = `IMP-${randomUUID()}`;
   const now = new Date().toISOString();
   let date = normalizeDate(input.tanggal);
   const hadir = (input.status_kehadiran?.trim() || "Hadir") === "Hadir";
@@ -381,6 +391,21 @@ async function processRow(
   const worked = hasil.jamKerja;
   const overtime = hasil.lembur;
   const shortage = hasil.jamKerjaKurang;
+  // Import ulang baris yang sama (mis. setelah "failed to fetch" padahal
+  // server sudah menyimpan) memakai ulang event lamanya, sehingga log scan
+  // dan riwayat import tertimpa, tidak dobel.
+  const kembar = await transaction.execute({
+    sql: SQL_IMPORT_KEMBAR,
+    args: [
+      date,
+      id,
+      row.jam_masuk ?? "",
+      row.jam_pulang ?? "",
+      statusAttendance,
+    ],
+  });
+  const eventLama = kembar.rows[0]?.event_key;
+  if (eventLama) eventKey = String(eventLama);
   const [year, month] = date.split("-").map(Number);
   await transaction.execute({
     sql: `INSERT INTO absensi_harian (id_absensi, tanggal, id_karyawan, nama, kelas_divisi,
@@ -463,11 +488,16 @@ async function processRow(
   }
 
   await transaction.execute({
-    sql: `INSERT INTO import_offline (event_key, timestamp_input, tanggal, id_unik,
+    sql: `INSERT INTO import_offline (id_import, event_key, timestamp_input, tanggal, id_unik,
       nama, divisi, jam_masuk, jam_pulang, status_kehadiran, status_absen,
       keterangan, status_proses, diproses_pada, pesan_error, kode_operator)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Sudah Diproses', ?, '', ?);`,
+      VALUES ((SELECT id_import FROM import_offline WHERE event_key = ?), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Sudah Diproses', ?, '', ?)
+      ON CONFLICT(id_import) DO UPDATE SET timestamp_input = excluded.timestamp_input,
+      nama = excluded.nama, divisi = excluded.divisi, status_absen = excluded.status_absen,
+      keterangan = excluded.keterangan, diproses_pada = excluded.diproses_pada,
+      kode_operator = excluded.kode_operator;`,
     args: [
+      eventKey,
       eventKey,
       now,
       date,
@@ -506,7 +536,9 @@ async function processRow(
   return {
     sukses: true,
     eventKey,
-    pesan: `Import ${id} berhasil diproses.`,
+    pesan: eventLama
+      ? `Import ${id} sudah pernah diimpor; data lamanya diperbarui.`
+      : `Import ${id} berhasil diproses.`,
     sessionId,
   };
 }

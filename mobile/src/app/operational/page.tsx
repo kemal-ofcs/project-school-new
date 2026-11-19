@@ -38,6 +38,7 @@ import {
 } from "@/lib/gateways/offline-import";
 import { getDaftarShift } from "@/lib/gateways/shift";
 import { useConfirmDialog } from "@/lib/hooks/useConfirmDialog";
+import { eventImportKembar } from "@/lib/validations/operational";
 
 type OperationalTab = "koreksi" | "backup" | "manual";
 
@@ -82,6 +83,7 @@ export default function OperationalPage() {
   const [corrections, setCorrections] = useState<Record<string, unknown>[]>([]);
   const [backups, setBackups] = useState<Record<string, unknown>[]>([]);
   const [imports, setImports] = useState<Record<string, unknown>[]>([]);
+  const importKembar = eventImportKembar(imports);
   const [loadingList, setLoadingList] = useState<boolean>(false);
 
   // Feedback State
@@ -1255,6 +1257,11 @@ export default function OperationalPage() {
                           {String(item.jam_pulang || "--:--")} •{" "}
                           {String(item.status_kehadiran || "Hadir")}
                         </span>
+                        {importKembar.has(evKey) ? (
+                          <span className="text-[11px] font-bold text-amber-300 mt-0.5">
+                            Dobel dengan baris lain. Hapus salah satunya.
+                          </span>
+                        ) : null}
                       </div>
                       <button
                         type="button"
