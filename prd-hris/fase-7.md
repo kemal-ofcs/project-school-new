@@ -809,3 +809,96 @@ lulus, tanpa peringatan); `audit:contract`, `audit:schema`, `audit:sql`,
 `audit:list-bound`. Belum: `bun run check` penuh, suite Rust penuh, tes
 salinan Mobile dan `cargo test` Mobile, `tsc` Mobile, tes sentinel lama
 `turso.rs` lain yang daftarnya disunting.
+
+**Sudah dibangun: sub-fase 7b** (19 Nov 2026). Tanpa perubahan skema, izin,
+tabel snapshot, rute sync, atau `storage.rs`.
+
+- **Langkah 6, Jadikan personil.** `hris::simpan_kontrak` = `simpan_kontrak_id(state, oleh, draft, &new_id("kon-"))`;
+  `tulis_kontrak` kini mengembalikan apakah baris baru tertulis, dan outbox
+  `hr-contract/create` hanya diantre bila ya (id baru selalu tertulis, jadi
+  command lama tidak berubah). `simpanKontrak` mendapat `idKontrak` opsional.
+  `KLAIM_PELAMAR_SQL` + `PERSONIL_ADA_SQL` kembar; `jadikan_personil` ↔
+  `jadikanPersonil` dengan `aksi` `jadikan`/`lanjutkan`: kelompok dibaca dari
+  `PELAMAR_SQL` (lowongan di cloud), izin jalur personil `izin_personil` ↔
+  `izinPersonil`, semua validasi (status Diterima, keadaan klaim, draft
+  personil, `validasi_kontrak`) sebelum klaim, lalu `save_teacher`/
+  `create_employee` (Web: `saveTeacher`/`pesanBentrokIdentitasKaryawan` +
+  `tambahKaryawan`) dengan id `id_dari_pelamar`, lalu kontrak `kon-<hex>`.
+  Lanjutkan: personil dilewati bila ada di SQLite lokal (Web: di database);
+  Desktop berhenti dengan `PESAN_SINKRONKAN_DULU` bila `master_data` hanya ada
+  di cloud. `cfg_attr(... dead_code)` pada `id_dari_pelamar`/`IdPersonil`
+  dihapus. `create_employee`, `save_teacher`, `saveTeacher`, `tambahKaryawan`
+  tidak diubah.
+- **Langkah 7, aturan kembar** `desktop/hr_pelatihan.rs` ↔
+  `validations/hr-pelatihan.ts`: `validasi_pelatihan`, `status_pelatihan`
+  (empat keadaan), `validasi_hasil_peserta`, `rekap_pelatihan` (fungsi murni
+  atas baris `REKAP_PELATIHAN_SQL`), dan 15 SQL. Vektor
+  `hr-pelatihan.vektor.json`; `hr-pelatihan.test.ts` memeriksa SQL, pesan,
+  dan daftar CHECK harfiah ke Desktop dan Mobile.
+- **Langkah 8, transaksi cloud** `hr_pelatihan.rs` ↔ `services/hr-pelatihan.ts`:
+  pelatihan (`simpan`/`batal`), peserta (`tambah` lewat `TAMBAH_PESERTA_SQL`
+  yang memuat `PEGAWAI_SQL` + `Aktif` + tanpa `id_keluar` + pelatihan tidak
+  dibatalkan, `lepas` dijaga `id_dokumen IS NULL`, `hasil`), sertifikat
+  (`simpan` = `pernyataan_dokumen` ↔ `pernyataanDokumen`, inti baru yang
+  dipecah dari `simpan_dokumen`/`simpanDokumen`, + `TAUT_SERTIFIKAT_SQL` +
+  `BUANG_SERTIFIKAT_LEPAS_SQL` satu `execute_atomic`/`batch`, lalu dibaca
+  ulang; `hapus` = `hapus_dokumen`; `berkas_tambah` = `tambah_berkas`;
+  `berkas_hapus` dijaga peserta). `HAPUS_DOKUMEN_SQL` tiga statement di kedua
+  sisi; `hris.test.ts` memeriksa panjang array Rust.
+- **Langkah 9.** Enam command (`desktop_hr_applicant_hire` +
+  lima `desktop_hr_training*`) di `commands.rs`, `lib.rs`, `build.rs`,
+  `capabilities/default.json` Desktop dan Mobile; enam `route.ts`
+  (`recruitment/applicants/hire`, `training/query|save|participants|certificate`,
+  `training/certificate/file/query`; batas body berkas hanya di
+  `certificate`); sembilan fungsi gateway (`jadikanPersonil` lewat `mutasi`
+  dengan `kickDesktopSync`, delapan pelatihan lewat `cloud`). `hr_pelatihan.rs`
+  terdaftar di `sync-rust-modules.ts` dan `mobile/mod.rs`; kedua skrip sinkron
+  dijalankan.
+
+**Keputusan kecil yang diambil saat membangun** (tinjau bila tidak sesuai):
+
+- Jadikan personil dan Lanjutkan adalah dua `aksi` pada satu command/rute.
+  `jadikan` ditolak bila pelamar sudah diklaim (termasuk oleh perangkat ini =
+  "tekan kedua ditolak"); `lanjutkan` hanya bila `id_karyawan` = id
+  deterministiknya. Lanjutkan pada personil yang sudah lengkap = berhasil tanpa
+  menulis apa pun.
+- Izin `hr.recruit.manage` + `hr.contract.manage` di command/rute; izin jalur
+  personil di inti (`jadikan_personil` memanggil `require_permission` dari
+  sesi, rute Web memanggil `requireWebPermission` sesudah membaca pelamar).
+- Pemeriksaan draft personil sebelum klaim = pemeriksaan pertama jalur itu
+  sendiri, jadi pesannya beda antar-platform seperti sekarang: Desktop memakai
+  syarat `create_employee` ("Data karyawan belum lengkap atau tidak valid.")
+  dan `save_teacher` (nama, NUPTK, email); Web memakai `validateEmployeeDraft`
+  seperti rute `/api/employees` dan nama/NUPTK/email seperti `/api/teachers`.
+  Shift yang tidak ada baru ketahuan sesudah klaim (jalur Lanjutkan).
+- Id dari payload (`id_unik`, `id_guru`) diterima skema Web lalu diabaikan;
+  `kode_karyawan` Tendik bawaan `K<8>`, boleh disunting.
+- Rekap memakai `tanggal_selesai ≤ hari ini` (§25.2.6), bukan "Selesai"
+  (`< hari ini`), jadi pelatihan yang berakhir hari ini sudah dihitung.
+  Penyaringan Dibatalkan/belum selesai/Tidak Hadir ada di `rekap_pelatihan`
+  (supaya punya vektor), SQL hanya menyaring tahun, kelompok, dan unit.
+- Daftar per tahun memuat pelatihan yang mulai ATAU selesai di tahun itu.
+- Peserta tidak bisa ditambahkan ke pelatihan Dibatalkan; pelatihan Dibatalkan
+  tidak bisa diubah. Hasil peserta tetap bisa diubah.
+- Sertifikat baru wajib jenis dokumen aktif (`JENIS_AKTIF_SQL`); jenis yang
+  sama dengan sertifikat lama boleh walau sudah nonaktif. Catatan bawaan = nama
+  pelatihan. Dokumen selalu dibaca dari baris peserta, tidak pernah id dari
+  payload (Q-148).
+- Pembantu cloud `hr_rekrutmen.rs` (`teks`, `angka`, `baris`, `satu`, `tulis`,
+  `hari_ini`, `galat`, `id_wajib`) menjadi `pub(super)` dan dipakai
+  `hr_pelatihan.rs`; kembarannya di `services/hr-rekrutmen.ts` diekspor.
+
+**Angka sesudah 7b:** `audit:contract` 445 command Desktop / 450 Mobile, 136
+permission, 145 rute kanonik, 81 tabel snapshot; 335 `route.ts`.
+
+**Gerbang yang dijalankan:** `tsc` Desktop dan Biome berkas yang diubah;
+`bun test` per berkas `validations/hr-pelatihan.test.ts`,
+`validations/hr-rekrutmen.test.ts`, `validations/hris.test.ts`,
+`services/hr-pelatihan.test.ts`, `services/hr-rekrutmen.test.ts` (semua
+lulus); `cargo test hr_rekrutmen` Desktop (6 lulus, termasuk
+`hr_rekrutmen_jadikan_personil`) dan `cargo test hr_pelatihan` (3 lulus), tanpa
+peringatan baru; `audit:contract`, `audit:sql`, `audit:list-bound`. Tes kontrak
+`hris` tidak dijalankan terpisah: tidak ada tes lama yang memanggil
+`simpan_kontrak`, dan `simpan_kontrak_id` diuji lewat tes hire. Belum: `bun run
+check` penuh, suite Rust penuh, tes salinan Mobile, `cargo test` dan `tsc`
+Mobile, `audit:schema`.

@@ -437,6 +437,10 @@ describe("hris 1c: data cloud-only (kembar hris_cloud.rs)", () => {
           `${nama}:[&str;${daftar.length}]=${JSON.stringify(daftar).replace(/\s+/g, "")};`,
         );
       }
+      // Hapus dokumen juga melepas sertifikat pelatihan (HRIS Fase 7b).
+      expect(rust).toContain(
+        `HAPUS_DOKUMEN_SQL:[&str;${H.HAPUS_DOKUMEN_SQL.length}]=`,
+      );
       expect(rust).toContain(`TEKS_MAKS:usize=${H.TEKS_MAKS};`);
       expect(rust).toContain(`ALAMAT_MAKS:usize=${H.ALAMAT_MAKS};`);
       expect(rust).toContain("MAKS_BYTE_DOKUMEN:usize=1024*1024;");

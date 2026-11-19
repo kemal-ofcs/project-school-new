@@ -29,6 +29,8 @@ pub mod hr_beban;
 // SP dan pegawai keluar (HRIS Fase 4): SALINAN `desktop/hr_keluar.rs`.
 pub mod hr_keluar;
 pub mod hr_kinerja;
+// Pelatihan (HRIS Fase 7b): SALINAN `desktop/hr_pelatihan.rs`.
+pub mod hr_pelatihan;
 // Pengajuan cuti/izin (HRIS Fase 2): SALINAN `desktop/hr_pengajuan.rs`.
 pub mod hr_pengajuan;
 // Pengingat kepegawaian (HRIS Fase 6): SALINAN `desktop/hr_pengingat.rs`.

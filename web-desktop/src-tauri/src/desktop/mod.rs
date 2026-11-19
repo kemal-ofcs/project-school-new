@@ -25,6 +25,7 @@ pub mod hari_kerja;
 pub mod hr_beban;
 pub mod hr_keluar;
 pub mod hr_kinerja;
+pub mod hr_pelatihan;
 pub mod hr_pengajuan;
 pub mod hr_pengingat;
 pub mod hr_rekrutmen;

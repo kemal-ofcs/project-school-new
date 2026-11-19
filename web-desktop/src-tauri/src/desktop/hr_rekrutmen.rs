@@ -15,15 +15,19 @@
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 
+use rusqlite::{params, OptionalExtension};
+
+use super::config::DesktopState;
 use super::hari_kerja::tanggal_valid;
-use super::hris::{new_id, HARI_INI_SQL};
-use super::hris_cloud::{urai_berkas_dokumen, JENJANG};
+use super::hris::{new_id, simpan_kontrak_id, validasi_kontrak, KontrakIsian, HARI_INI_SQL};
+use super::hris_cloud::{nomor_identitas, urai_berkas_dokumen, JENJANG};
 use super::inventory::payload_text;
 use super::models::CommandError;
 use super::turso::{
-    is_valid_operator_email, is_valid_operator_phone, normalize_operator_email, normalize_operator_phone, Statement,
-    TursoClient,
+    email_personil, is_valid_operator_email, is_valid_operator_phone, normalize_operator_email,
+    normalize_operator_phone, Statement, TursoClient,
 };
+use super::{academic, commands, operational, storage};
 
 // Aturan murni (§25.2.1–§25.2.2)
 
@@ -57,6 +61,13 @@ pub const PESAN_PELAMAR_TERKUNCI: &str = "Pelamar ini sudah menjadi personil; da
 pub const PESAN_TAHAP_AKHIR: &str = "Pelamar sudah di tahap akhir. Batalkan tahap terakhir dulu bila keliru.";
 pub const PESAN_TAHAP_BERUBAH: &str = "Tahap pelamar baru saja berubah. Muat ulang lalu coba lagi.";
 pub const PESAN_BERKAS_PELAMAR_PENUH: &str = "Pelamar tidak ditemukan, sudah menjadi personil, atau sudah berisi 3 berkas.";
+pub const PESAN_BELUM_DITERIMA: &str = "Hanya pelamar berstatus Diterima yang bisa dijadikan personil.";
+pub const PESAN_KLAIM_GAGAL: &str = "Pelamar ini sudah dijadikan personil atau statusnya berubah.";
+pub const PESAN_TANPA_LANJUTAN: &str = "Pelamar ini belum dijadikan personil, jadi tidak ada yang perlu dilanjutkan.";
+/// Desktop saja (§25.2.3): `master_data` id itu sudah ada di cloud tetapi
+/// belum di perangkat ini, jadi jalur personil tidak boleh membuat token kedua.
+pub const PESAN_SINKRONKAN_DULU: &str =
+    "Data personil ini sudah ada di database pusat. Sinkronkan perangkat dulu, lalu tekan Lanjutkan lagi.";
 
 fn panjang(teks: &str) -> usize {
     teks.chars().count()
@@ -298,7 +309,6 @@ pub fn periksa_batal_tahap(tahap: &[TahapRingkas], id_tahap: &str, dijadikan: bo
 
 /// Id personil dan kontrak yang diturunkan dari id pelamar (§25.2.3).
 #[derive(Debug, Clone, PartialEq, Serialize)]
-#[cfg_attr(not(test), allow(dead_code))]
 pub struct IdPersonil {
     pub id_unik: String,
     pub kode_karyawan: String,
@@ -307,7 +317,6 @@ pub struct IdPersonil {
 
 /// Cermin `idDariPelamar`. Guru = bentuk `new_academic_id` (`ptk_<hex>`, kode
 /// kosong = jalur lama); Tendik = `createEmployeeIdentifiers(hex)`.
-#[cfg_attr(not(test), allow(dead_code))]
 pub fn id_dari_pelamar(id_pelamar: &str, kelompok: &str) -> Result<IdPersonil, String> {
     let hex = id_pelamar
         .strip_prefix("plm-")
@@ -376,6 +385,11 @@ pub const BERKAS_PELAMAR_SQL: &str = "SELECT id_berkas, urutan, COALESCE(nama_be
 pub const AMBIL_BERKAS_PELAMAR_SQL: &str = "SELECT id_berkas, id_pelamar, COALESCE(nama_berkas, '') AS nama_berkas, mime_type, data_base64 FROM hr_pelamar_berkas WHERE id_berkas = ?1 LIMIT 1;";
 pub const TAMBAH_BERKAS_PELAMAR_SQL: &str = "WITH slot(n) AS (VALUES (1), (2), (3)) INSERT INTO hr_pelamar_berkas (id_berkas, id_pelamar, urutan, nama_berkas, mime_type, data_base64, created_at) SELECT ?1, ?2, MIN(slot.n), ?3, ?4, ?5, datetime('now') FROM slot WHERE slot.n NOT IN (SELECT urutan FROM hr_pelamar_berkas WHERE id_pelamar = ?2) AND EXISTS (SELECT 1 FROM hr_pelamar WHERE id_pelamar = ?2 AND id_karyawan IS NULL) HAVING MIN(slot.n) IS NOT NULL;";
 pub const HAPUS_BERKAS_PELAMAR_SQL: &str = "DELETE FROM hr_pelamar_berkas WHERE id_berkas = ?1 AND EXISTS (SELECT 1 FROM hr_pelamar p WHERE p.id_pelamar = hr_pelamar_berkas.id_pelamar AND p.id_karyawan IS NULL);";
+/// Klaim Jadikan personil (§25.2.3). Penjaga di statement yang sama: belum
+/// diklaim dan tahap terakhir yang tidak dibatalkan `Diterima`, jadi dua
+/// perangkat yang menekan bersamaan berhenti di cloud.
+pub const KLAIM_PELAMAR_SQL: &str = "UPDATE hr_pelamar SET id_karyawan = ?2, dijadikan_oleh = ?3, dijadikan_pada = datetime('now') WHERE id_pelamar = ?1 AND id_karyawan IS NULL AND (SELECT t.tahap FROM hr_pelamar_tahap t WHERE t.id_pelamar = ?1 AND t.dibatalkan_pada IS NULL ORDER BY t.urutan DESC LIMIT 1) = 'Diterima';";
+pub const PERSONIL_ADA_SQL: &str = "SELECT 1 AS ada FROM master_data WHERE id_unik = ?1 LIMIT 1;";
 
 /// Pelamar yang lewat masa retensi (§25.2.4): belum menjadi personil, dan
 /// tutup efektif lowongannya + 12 bulan sudah lewat (hari ini WIB).
@@ -402,11 +416,11 @@ pub const HAPUS_PELAMAR_SQL: [&str; 4] = [
 
 // Akses cloud
 
-fn galat(pesan: impl Into<String>) -> CommandError {
+pub(super) fn galat(pesan: impl Into<String>) -> CommandError {
     CommandError::new("VALIDATION_ERROR", pesan)
 }
 
-fn teks(baris: &Value, kunci: &str) -> String {
+pub(super) fn teks(baris: &Value, kunci: &str) -> String {
     match baris.get(kunci) {
         Some(Value::String(s)) => s.clone(),
         Some(Value::Number(n)) => n.to_string(),
@@ -414,7 +428,7 @@ fn teks(baris: &Value, kunci: &str) -> String {
     }
 }
 
-fn angka(baris: &Value, kunci: &str) -> i64 {
+pub(super) fn angka(baris: &Value, kunci: &str) -> i64 {
     match baris.get(kunci) {
         Some(Value::Number(n)) => n.as_i64().unwrap_or(0),
         Some(Value::String(s)) => s.parse().unwrap_or(0),
@@ -422,7 +436,7 @@ fn angka(baris: &Value, kunci: &str) -> i64 {
     }
 }
 
-async fn baris(client: &TursoClient, sql: &str, args: Vec<Value>) -> Result<Vec<Value>, CommandError> {
+pub(super) async fn baris(client: &TursoClient, sql: &str, args: Vec<Value>) -> Result<Vec<Value>, CommandError> {
     Ok(client
         .query_one(sql, args)
         .await?
@@ -432,16 +446,16 @@ async fn baris(client: &TursoClient, sql: &str, args: Vec<Value>) -> Result<Vec<
         .collect())
 }
 
-async fn satu(client: &TursoClient, sql: &str, args: Vec<Value>) -> Result<Option<Value>, CommandError> {
+pub(super) async fn satu(client: &TursoClient, sql: &str, args: Vec<Value>) -> Result<Option<Value>, CommandError> {
     Ok(baris(client, sql, args).await?.into_iter().next())
 }
 
-async fn tulis(client: &TursoClient, sql: &str, args: Vec<Value>) -> Result<u64, CommandError> {
+pub(super) async fn tulis(client: &TursoClient, sql: &str, args: Vec<Value>) -> Result<u64, CommandError> {
     let hasil = client.execute_pipeline(vec![Statement::new(sql, args)]).await?;
     Ok(hasil.first().map_or(0, |h| h.rows_affected))
 }
 
-async fn hari_ini(client: &TursoClient) -> Result<String, CommandError> {
+pub(super) async fn hari_ini(client: &TursoClient) -> Result<String, CommandError> {
     satu(client, HARI_INI_SQL, vec![])
         .await?
         .map(|b| teks(&b, "hari_ini"))
@@ -449,7 +463,7 @@ async fn hari_ini(client: &TursoClient) -> Result<String, CommandError> {
         .ok_or_else(CommandError::internal)
 }
 
-fn id_wajib(draft: &Value, kunci: &str, pesan: &str) -> Result<String, CommandError> {
+pub(super) fn id_wajib(draft: &Value, kunci: &str, pesan: &str) -> Result<String, CommandError> {
     payload_text(draft, kunci).ok_or_else(|| galat(pesan))
 }
 
@@ -821,6 +835,125 @@ pub async fn bersihkan_pelamar(client: &TursoClient) -> Result<Value, CommandErr
     Ok(json!({ "dihapus": jumlah }))
 }
 
+/// Izin jalur personil menurut kelompok lowongan (Q-142).
+pub fn izin_personil(kelompok: &str) -> &'static str {
+    if kelompok == "Guru" {
+        "teachers.manage"
+    } else {
+        "employees.manage"
+    }
+}
+
+/// Draft `save_teacher` / `create_employee` dari isian form: id dari pelamar
+/// (id payload diabaikan), kode Tendik bawaan `K<8>`. Pemeriksaannya sama
+/// dengan pemeriksaan pertama kedua jalur itu, supaya isian yang pasti
+/// ditolak tidak sempat diklaim.
+fn draft_personil(isian: Option<&Value>, ids: &IdPersonil, guru: bool) -> Result<Value, CommandError> {
+    let mut d = isian.and_then(Value::as_object).cloned().unwrap_or_default();
+    d.remove("id_unik");
+    d.remove("id_guru");
+    let d = if guru {
+        d.insert("id_guru".into(), json!(ids.id_unik));
+        d.insert("is_edit".into(), json!(false));
+        let d = Value::Object(d);
+        if payload_text(&d, "nama").is_none() {
+            return Err(galat("Nama guru wajib diisi."));
+        }
+        if let Some(nuptk) = payload_text(&d, "nuptk") {
+            nomor_identitas("nuptk", &nuptk).map_err(galat)?;
+        }
+        d
+    } else {
+        let kode = d
+            .get("kode_karyawan")
+            .and_then(Value::as_str)
+            .map(str::trim)
+            .filter(|k| !k.is_empty())
+            .unwrap_or(ids.kode_karyawan.as_str())
+            .to_owned();
+        d.insert("id_unik".into(), json!(ids.id_unik));
+        d.insert("kode_karyawan".into(), json!(kode));
+        let d = Value::Object(d);
+        let nama = d.get("nama").and_then(Value::as_str).unwrap_or_default().trim().to_owned();
+        if nama.len() < 2 || d.get("id_shift").and_then(Value::as_i64).unwrap_or(0) == 0 {
+            return Err(CommandError::new(
+                "OPERATIONAL_VALIDATION_FAILED",
+                "Data karyawan belum lengkap atau tidak valid.",
+            ));
+        }
+        d
+    };
+    email_personil(&d)?;
+    Ok(d)
+}
+
+fn personil_lokal_ada(state: &DesktopState, id: &str) -> Result<bool, CommandError> {
+    storage::database(&state.data_dir)?
+        .query_row(PERSONIL_ADA_SQL, params![id], |_| Ok(()))
+        .optional()
+        .map(|ada| ada.is_some())
+        .map_err(|_| CommandError::internal())
+}
+
+/// `desktop_hr_applicant_hire` (§25.2.3): aksi `jadikan` (klaim lalu personil
+/// dan kontrak pertama) atau `lanjutkan` (klaim sudah ada, ulang langkah
+/// personil bila belum ada di perangkat, lalu kontrak). Semua validasi
+/// sebelum klaim; setiap langkah aman diulang lewat id deterministik.
+/// Izin `hr.recruit.manage` + `hr.contract.manage` diperiksa command; izin
+/// jalur personil dari kelompok lowongan di cloud, bukan dari payload.
+pub async fn jadikan_personil(
+    state: &DesktopState,
+    client: &TursoClient,
+    oleh: &str,
+    draft: &Value,
+) -> Result<Value, CommandError> {
+    client.ensure_schema_current().await?;
+    let id_pelamar = id_wajib(draft, "id_pelamar", PESAN_PELAMAR_TIDAK_ADA)?;
+    let pelamar = pelamar_satu(client, &id_pelamar).await?;
+    let kelompok = teks(&pelamar, "kelompok");
+    commands::require_permission(state, izin_personil(&kelompok))?;
+    let ids = id_dari_pelamar(&id_pelamar, &kelompok).map_err(galat)?;
+    let lanjutkan = match payload_text(draft, "aksi").as_deref().unwrap_or("jadikan") {
+        "jadikan" => false,
+        "lanjutkan" => true,
+        _ => return Err(galat("Aksi tidak dikenal.")),
+    };
+    if teks(&pelamar, "status") != "Diterima" {
+        return Err(galat(PESAN_BELUM_DITERIMA));
+    }
+    let diklaim = teks(&pelamar, "id_karyawan");
+    if lanjutkan && diklaim != ids.id_unik {
+        return Err(galat(PESAN_TANPA_LANJUTAN));
+    }
+    if !lanjutkan && !diklaim.is_empty() {
+        return Err(galat(PESAN_KLAIM_GAGAL));
+    }
+    let guru = kelompok == "Guru";
+    let personil = draft_personil(draft.get("personil"), &ids, guru)?;
+    let isian: KontrakIsian = serde_json::from_value(draft.get("kontrak").cloned().unwrap_or_else(|| json!({})))
+        .map_err(|_| galat("Data kontrak tidak valid."))?;
+    let kontrak = validasi_kontrak(&isian, guru).map_err(galat)?;
+
+    let klaim = vec![json!(id_pelamar), json!(ids.id_unik), json!(oleh)];
+    if !lanjutkan && tulis(client, KLAIM_PELAMAR_SQL, klaim).await? == 0 {
+        return Err(galat(PESAN_KLAIM_GAGAL));
+    }
+    if !personil_lokal_ada(state, &ids.id_unik)? {
+        if lanjutkan && satu(client, PERSONIL_ADA_SQL, vec![json!(ids.id_unik)]).await?.is_some() {
+            return Err(galat(PESAN_SINKRONKAN_DULU));
+        }
+        if guru {
+            academic::save_teacher(state, &personil)?;
+        } else {
+            operational::create_employee(state, &personil)?;
+        }
+    }
+    let mut kontrak = serde_json::to_value(kontrak).map_err(|_| CommandError::internal())?;
+    kontrak["id_karyawan"] = json!(ids.id_unik);
+    simpan_kontrak_id(state, oleh, kontrak, &ids.id_kontrak)?;
+    Ok(json!({ "sukses": true, "id_karyawan": ids.id_unik, "id_kontrak": ids.id_kontrak, "kelompok": kelompok }))
+}
+
 #[cfg(test)]
 mod tests {
     //! Vektor sama dengan `validations/hr-rekrutmen.test.ts`; alur cloud sama
@@ -1115,6 +1248,149 @@ mod tests {
             );
             simpan_lowongan(&client, "uji", &json!({ "aksi": "buka", "id_lowongan": baru })).await.expect("buka lagi");
             assert_eq!(hitung(&format!("SELECT COUNT(*) FROM hr_lowongan WHERE id_lowongan = '{baru}' AND ditutup_pada IS NULL;")), 1);
+        });
+    }
+
+    fn sesi(state: &DesktopState, izin: &[&str]) {
+        let operator = super::super::models::OperatorUser {
+            id: 2,
+            kode_operator: "OP2".into(),
+            nama_operator: "Uji".into(),
+            username: "uji".into(),
+            role: "Kepegawaian".into(),
+            role_id: 2,
+            role_key: "uji".into(),
+            is_superadmin: false,
+            permissions: izin.iter().map(|i| (*i).to_owned()).collect(),
+            permission_revision: 1,
+            require_scan_photo: false,
+            totp_enabled: false,
+            require_scan_ip_allowlist: false,
+            id_karyawan: None,
+            login_at: None,
+        };
+        *state.session.lock().unwrap() = Some(super::super::models::DesktopSession {
+            operator,
+            mode: super::super::models::SessionMode::Offline,
+            license: super::super::license::LicenseGrant::default(),
+        });
+    }
+
+    /// Jadikan personil (7b) di Desktop: SQLite perangkat + `local_file`
+    /// sebagai cloud, data sama dengan `services/hr-rekrutmen.test.ts`.
+    #[test]
+    fn hr_rekrutmen_jadikan_personil() {
+        let runtime = tokio::runtime::Builder::new_current_thread().build().expect("runtime uji");
+        runtime.block_on(async {
+            let lokal = tempfile::tempdir().expect("direktori lokal");
+            storage::initialize(lokal.path()).expect("skema lokal");
+            let state = DesktopState {
+                server_origin: std::sync::RwLock::new("http://localhost:3000".to_string()),
+                offline_max_age_hours: 24,
+                data_dir: lokal.path().to_path_buf(),
+                http: reqwest::Client::new(),
+                turso_config: std::sync::RwLock::new(None),
+                session: std::sync::Mutex::new(None),
+                vault_lock: std::sync::Mutex::new(()),
+            };
+            let awan = tempfile::tempdir().expect("direktori cloud");
+            let hub = awan.path().join("sppg-hub.db");
+            let client = klien("https://hr-hire.sppg.invalid", &hub);
+            client.ensure_schema().await.expect("provisioning lokal");
+            let c = rusqlite::Connection::open(&hub).expect("buka hub");
+            let db = storage::database(lokal.path()).expect("db lokal");
+            let lokal_n = |sql: &str| db.query_row(sql, [], |r| r.get::<_, i64>(0)).expect(sql);
+            let galat_dari = |h: Result<Value, CommandError>| h.err().map(|e| e.message).unwrap_or_default();
+
+            // Pelamar Diterima di lowongan Guru dan Tendik.
+            let mut diterima = Vec::new();
+            for (judul, kelompok, nama) in [("Guru IPA", "Guru", "Ani"), ("Staf TU", "Tendik", "Budi")] {
+                let low = json!({ "judul": judul, "kelompok": kelompok, "jumlah": 1, "tanggal_buka": "2020-01-01" });
+                let id_low = simpan_lowongan(&client, "uji", &low).await.unwrap()["id_lowongan"].as_str().unwrap().to_owned();
+                let p = json!({ "id_lowongan": id_low, "nama": nama, "tanggal_lamaran": "2020-02-01" });
+                let id = simpan_pelamar(&client, "uji", &p).await.unwrap()["id_pelamar"].as_str().unwrap().to_owned();
+                let t = json!({ "id_pelamar": id, "tahap": "Diterima", "tanggal": "2020-02-10" });
+                tahap_pelamar(&client, "uji", &t).await.expect("diterima");
+                diterima.push(id);
+            }
+            let (ani, budi) = (diterima[0].clone(), diterima[1].clone());
+            let guru = id_dari_pelamar(&ani, "Guru").unwrap();
+            let tendik = id_dari_pelamar(&budi, "Tendik").unwrap();
+            let klaim = |id: &str| {
+                c.query_row(&format!("SELECT COALESCE(id_karyawan, '') FROM hr_pelamar WHERE id_pelamar = '{id}';"), [], |r| {
+                    r.get::<_, String>(0)
+                })
+                .expect("pelamar")
+            };
+            let hire = |id: &str, aksi: &str, personil: Value, status: &str| {
+                json!({
+                    "aksi": aksi,
+                    "id_pelamar": id,
+                    "personil": personil,
+                    "kontrak": { "status": status, "tanggal_mulai": "2020-03-01", "tanggal_selesai": "2021-02-28" },
+                })
+            };
+
+            // Izin kurang: Guru butuh `teachers.manage`.
+            sesi(&state, &["hr.recruit.manage", "hr.contract.manage", "employees.manage"]);
+            let galat = jadikan_personil(&state, &client, "uji", &hire(&ani, "jadikan", json!({ "nama": "Ani" }), "GTT"))
+                .await
+                .expect_err("izin kurang");
+            assert_eq!(galat.code, "DESKTOP_ACCESS_DENIED");
+            assert_eq!(klaim(&ani), "");
+
+            // GTY untuk Tendik ditolak sebelum klaim.
+            let budi_draft = |status: &str| hire(&budi, "jadikan", json!({ "nama": "Budi", "id_shift": 1, "divisi": "Tata Usaha", "id_unik": "ASING" }), status);
+            assert_eq!(galat_dari(jadikan_personil(&state, &client, "uji", &budi_draft("GTY")).await), "Status GTY dan GTT hanya untuk guru.");
+            assert_eq!(klaim(&budi), "");
+
+            // Tendik: master_data + id_card + QR id|token + kontrak + outbox, tanpa guru_data.
+            let hasil = jadikan_personil(&state, &client, "uji", &budi_draft("PTT")).await.expect("tendik");
+            assert_eq!(hasil["id_karyawan"], json!(tendik.id_unik));
+            assert_eq!(klaim(&budi), tendik.id_unik);
+            let t = &tendik.id_unik;
+            assert_eq!(lokal_n(&format!("SELECT COUNT(*) FROM master_data WHERE id_unik = '{t}' AND kode_karyawan = '{}' AND qr_code = id_unik || '|' || token_absensi;", tendik.kode_karyawan)), 1);
+            assert_eq!(lokal_n(&format!("SELECT COUNT(*) FROM guru_data WHERE id_guru = '{t}';")), 0);
+            assert_eq!(lokal_n(&format!("SELECT COUNT(*) FROM id_card WHERE id_unik = '{t}';")), 1);
+            assert_eq!(lokal_n(&format!("SELECT COUNT(*) FROM hr_kontrak WHERE id_kontrak = '{}' AND status = 'PTT';", tendik.id_kontrak)), 1);
+            assert_eq!(lokal_n(&format!("SELECT COUNT(*) FROM desktop_sync_outbox WHERE entity_key IN ('{t}', '{}');", tendik.id_kontrak)), 2);
+
+            // Tekan kedua ditolak; data pelamar terkunci.
+            assert_eq!(galat_dari(jadikan_personil(&state, &client, "uji", &budi_draft("PTT")).await), PESAN_KLAIM_GAGAL);
+            let ubah = json!({ "id_pelamar": budi, "id_lowongan": daftar_pelamar(&client, "", &budi).await.unwrap()["pelamar"]["id_lowongan"], "nama": "Budi X", "tanggal_lamaran": "2020-02-01" });
+            assert_eq!(galat_dari(simpan_pelamar(&client, "uji", &ubah).await), PESAN_PELAMAR_TERKUNCI);
+
+            // Guru: klaim lalu gagal (shift tidak ada), lalu Lanjutkan.
+            sesi(&state, &["hr.recruit.manage", "hr.contract.manage", "teachers.manage"]);
+            let gagal = hire(&ani, "jadikan", json!({ "nama": "Ani", "id_shift": 999 }), "GTY");
+            assert_eq!(
+                galat_dari(jadikan_personil(&state, &client, "uji", &gagal).await),
+                "Shift yang dipilih tidak ditemukan. Muat ulang halaman lalu pilih shift lagi."
+            );
+            assert_eq!(klaim(&ani), guru.id_unik);
+            let g = &guru.id_unik;
+            assert_eq!(lokal_n(&format!("SELECT COUNT(*) FROM master_data WHERE id_unik = '{g}';")), 0);
+            let lanjut = hire(&ani, "lanjutkan", json!({ "nama": "Ani" }), "GTY");
+
+            // Lanjutkan di Desktop ditolak bila master_data hanya ada di cloud.
+            c.execute(&format!("INSERT INTO master_data (id_unik, kode_karyawan, nama, divisi, id_shift) VALUES ('{g}', '{g}', 'Ani', 'Guru', 1);"), [])
+                .expect("master_data cloud");
+            assert_eq!(galat_dari(jadikan_personil(&state, &client, "uji", &lanjut).await), PESAN_SINKRONKAN_DULU);
+            c.execute(&format!("DELETE FROM master_data WHERE id_unik = '{g}';"), []).expect("hapus");
+
+            jadikan_personil(&state, &client, "uji", &lanjut).await.expect("lanjutkan");
+            assert_eq!(lokal_n(&format!("SELECT COUNT(*) FROM master_data WHERE id_unik = '{g}' AND jenis_personil = 'GURU' AND qr_code = id_unik || '|' || token_absensi;")), 1);
+            assert_eq!(lokal_n(&format!("SELECT COUNT(*) FROM guru_data WHERE id_guru = '{g}' AND status_kepegawaian = 'GTY';")), 1);
+            assert_eq!(lokal_n(&format!("SELECT COUNT(*) FROM id_card WHERE id_unik = '{g}';")), 1);
+            // Lanjutkan diulang: kontrak berhenti di PK tanpa outbox kedua.
+            jadikan_personil(&state, &client, "uji", &lanjut).await.expect("lanjutkan lagi");
+            assert_eq!(lokal_n(&format!("SELECT COUNT(*) FROM hr_kontrak WHERE id_karyawan = '{g}';")), 1);
+            assert_eq!(lokal_n(&format!("SELECT COUNT(*) FROM desktop_sync_outbox WHERE entity_key = '{}';", guru.id_kontrak)), 1);
+            assert_eq!(
+                galat_dari(jadikan_personil(&state, &client, "uji", &hire(&budi, "lanjutkan", json!({}), "PTT")).await),
+                "Akses ditolak untuk tindakan ini."
+            );
+            assert_eq!(izin_personil("Guru"), "teachers.manage");
         });
     }
 }

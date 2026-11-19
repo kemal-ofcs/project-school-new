@@ -1,0 +1,404 @@
+{
+  "pelatihan": [
+    {
+      "nama": "lengkap, teks dirapikan, kosong = null",
+      "draft": {
+        "nama": " KKG Matematika ",
+        "jenis_penyelenggara": "KKG",
+        "penyelenggara": "",
+        "tanggal_mulai": "2026-03-01",
+        "tanggal_selesai": "2026-03-02",
+        "lokasi": "SDN 1",
+        "jumlah_jam": 16,
+        "biaya": 250000,
+        "keterangan": ""
+      },
+      "hasil": {
+        "id_pelatihan": null,
+        "nama": "KKG Matematika",
+        "jenis_penyelenggara": "KKG",
+        "penyelenggara": null,
+        "tanggal_mulai": "2026-03-01",
+        "tanggal_selesai": "2026-03-02",
+        "lokasi": "SDN 1",
+        "jumlah_jam": 16,
+        "biaya": 250000,
+        "keterangan": null
+      }
+    },
+    {
+      "nama": "biaya kosong = 0, masa depan boleh",
+      "draft": {
+        "id_pelatihan": "plt-1",
+        "nama": "Diklat",
+        "jenis_penyelenggara": "Dinas",
+        "tanggal_mulai": "2999-01-01",
+        "tanggal_selesai": "2999-01-01",
+        "jumlah_jam": 1
+      },
+      "hasil": {
+        "id_pelatihan": "plt-1",
+        "nama": "Diklat",
+        "jenis_penyelenggara": "Dinas",
+        "penyelenggara": null,
+        "tanggal_mulai": "2999-01-01",
+        "tanggal_selesai": "2999-01-01",
+        "lokasi": null,
+        "jumlah_jam": 1,
+        "biaya": 0,
+        "keterangan": null
+      }
+    },
+    {
+      "nama": "nama wajib",
+      "draft": {
+        "nama": " ",
+        "jenis_penyelenggara": "KKG",
+        "tanggal_mulai": "2026-03-01",
+        "tanggal_selesai": "2026-03-01",
+        "jumlah_jam": 1
+      },
+      "galat": "Nama pelatihan wajib diisi."
+    },
+    {
+      "nama": "nama terlalu panjang",
+      "draft": {
+        "nama": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+        "jenis_penyelenggara": "KKG",
+        "tanggal_mulai": "2026-03-01",
+        "tanggal_selesai": "2026-03-01",
+        "jumlah_jam": 1
+      },
+      "galat": "Nama pelatihan maksimal 150 karakter."
+    },
+    {
+      "nama": "jenis penyelenggara di luar CHECK",
+      "draft": {
+        "nama": "X",
+        "jenis_penyelenggara": "Seminar",
+        "tanggal_mulai": "2026-03-01",
+        "tanggal_selesai": "2026-03-01",
+        "jumlah_jam": 1
+      },
+      "galat": "Jenis penyelenggara wajib KKG, MGMP, Dinas, Internal, atau Lainnya."
+    },
+    {
+      "nama": "tanggal mulai tidak valid",
+      "draft": {
+        "nama": "X",
+        "jenis_penyelenggara": "KKG",
+        "tanggal_mulai": "2026-02-30",
+        "tanggal_selesai": "2026-03-01",
+        "jumlah_jam": 1
+      },
+      "galat": "Tanggal mulai tidak valid."
+    },
+    {
+      "nama": "selesai sebelum mulai",
+      "draft": {
+        "nama": "X",
+        "jenis_penyelenggara": "KKG",
+        "tanggal_mulai": "2026-03-02",
+        "tanggal_selesai": "2026-03-01",
+        "jumlah_jam": 1
+      },
+      "galat": "Tanggal selesai tidak boleh sebelum tanggal mulai."
+    },
+    {
+      "nama": "jam nol",
+      "draft": {
+        "nama": "X",
+        "jenis_penyelenggara": "KKG",
+        "tanggal_mulai": "2026-03-01",
+        "tanggal_selesai": "2026-03-01",
+        "jumlah_jam": 0
+      },
+      "galat": "Jumlah jam harus bilangan bulat 1 sampai 1000."
+    },
+    {
+      "nama": "jam pecahan",
+      "draft": {
+        "nama": "X",
+        "jenis_penyelenggara": "KKG",
+        "tanggal_mulai": "2026-03-01",
+        "tanggal_selesai": "2026-03-01",
+        "jumlah_jam": 1.5
+      },
+      "galat": "Jumlah jam harus bilangan bulat 1 sampai 1000."
+    },
+    {
+      "nama": "jam kosong",
+      "draft": {
+        "nama": "X",
+        "jenis_penyelenggara": "KKG",
+        "tanggal_mulai": "2026-03-01",
+        "tanggal_selesai": "2026-03-01"
+      },
+      "galat": "Jumlah jam harus bilangan bulat 1 sampai 1000."
+    },
+    {
+      "nama": "biaya negatif",
+      "draft": {
+        "nama": "X",
+        "jenis_penyelenggara": "KKG",
+        "tanggal_mulai": "2026-03-01",
+        "tanggal_selesai": "2026-03-01",
+        "jumlah_jam": 1,
+        "biaya": -1
+      },
+      "galat": "Biaya harus bilangan bulat 0 sampai 1000000000."
+    },
+    {
+      "nama": "biaya lewat batas",
+      "draft": {
+        "nama": "X",
+        "jenis_penyelenggara": "KKG",
+        "tanggal_mulai": "2026-03-01",
+        "tanggal_selesai": "2026-03-01",
+        "jumlah_jam": 1,
+        "biaya": 1000000001
+      },
+      "galat": "Biaya harus bilangan bulat 0 sampai 1000000000."
+    }
+  ],
+  "status": [
+    {
+      "nama": "dibatalkan menang atas tanggal",
+      "tanggal_mulai": "2026-03-01",
+      "tanggal_selesai": "2026-03-02",
+      "dibatalkan": true,
+      "hari_ini": "2026-01-01",
+      "hasil": "Dibatalkan"
+    },
+    {
+      "nama": "mulai sesudah hari ini",
+      "tanggal_mulai": "2026-03-01",
+      "tanggal_selesai": "2026-03-02",
+      "dibatalkan": false,
+      "hari_ini": "2026-02-28",
+      "hasil": "Dijadwalkan"
+    },
+    {
+      "nama": "hari pertama",
+      "tanggal_mulai": "2026-03-01",
+      "tanggal_selesai": "2026-03-02",
+      "dibatalkan": false,
+      "hari_ini": "2026-03-01",
+      "hasil": "Berlangsung"
+    },
+    {
+      "nama": "hari terakhir masih berlangsung",
+      "tanggal_mulai": "2026-03-01",
+      "tanggal_selesai": "2026-03-02",
+      "dibatalkan": false,
+      "hari_ini": "2026-03-02",
+      "hasil": "Berlangsung"
+    },
+    {
+      "nama": "sesudah hari terakhir",
+      "tanggal_mulai": "2026-03-01",
+      "tanggal_selesai": "2026-03-02",
+      "dibatalkan": false,
+      "hari_ini": "2026-03-03",
+      "hasil": "Selesai"
+    }
+  ],
+  "hasil_peserta": [
+    {
+      "nama": "hasil kosong boleh",
+      "draft": { "hasil": "", "catatan": "" },
+      "hasil": { "hasil": null, "catatan": null }
+    },
+    {
+      "nama": "Tidak Hadir",
+      "draft": { "hasil": "Tidak Hadir", "catatan": " sakit " },
+      "hasil": { "hasil": "Tidak Hadir", "catatan": "sakit" }
+    },
+    {
+      "nama": "hasil di luar CHECK",
+      "draft": { "hasil": "Hadir" },
+      "galat": "Hasil peserta harus Lulus, Tidak Lulus, atau Tidak Hadir."
+    }
+  ],
+  "rekap": [
+    {
+      "nama": "tahun dari tanggal selesai; lewati Dibatalkan, belum selesai, Tidak Hadir",
+      "hari_ini": "2026-06-30",
+      "baris": [
+        {
+          "id_karyawan": "G1",
+          "nama": "Ani",
+          "unit": "SD",
+          "kelompok": "Guru",
+          "tanggal_selesai": "2026-01-02",
+          "jenis_penyelenggara": "Dinas",
+          "jumlah_jam": 32,
+          "hasil": "",
+          "dibatalkan": false
+        },
+        {
+          "id_karyawan": "G1",
+          "nama": "Ani",
+          "unit": "SD",
+          "kelompok": "Guru",
+          "tanggal_selesai": "2026-03-02",
+          "jenis_penyelenggara": "KKG",
+          "jumlah_jam": 16,
+          "hasil": "Lulus",
+          "dibatalkan": false
+        },
+        {
+          "id_karyawan": "G1",
+          "nama": "Ani",
+          "unit": "SD",
+          "kelompok": "Guru",
+          "tanggal_selesai": "2026-04-01",
+          "jenis_penyelenggara": "KKG",
+          "jumlah_jam": 8,
+          "hasil": "Tidak Lulus",
+          "dibatalkan": false
+        },
+        {
+          "id_karyawan": "G1",
+          "nama": "Ani",
+          "unit": "SD",
+          "kelompok": "Guru",
+          "tanggal_selesai": "2026-05-01",
+          "jenis_penyelenggara": "Internal",
+          "jumlah_jam": 8,
+          "hasil": "",
+          "dibatalkan": true
+        },
+        {
+          "id_karyawan": "G1",
+          "nama": "Ani",
+          "unit": "SD",
+          "kelompok": "Guru",
+          "tanggal_selesai": "2026-07-01",
+          "jenis_penyelenggara": "MGMP",
+          "jumlah_jam": 8,
+          "hasil": "",
+          "dibatalkan": false
+        },
+        {
+          "id_karyawan": "T1",
+          "nama": "Budi",
+          "unit": "SD",
+          "kelompok": "Tendik",
+          "tanggal_selesai": "2026-03-02",
+          "jenis_penyelenggara": "KKG",
+          "jumlah_jam": 16,
+          "hasil": "Tidak Hadir",
+          "dibatalkan": false
+        },
+        {
+          "id_karyawan": "T1",
+          "nama": "Budi",
+          "unit": "SD",
+          "kelompok": "Tendik",
+          "tanggal_selesai": "2026-06-30",
+          "jenis_penyelenggara": "Lainnya",
+          "jumlah_jam": 4,
+          "hasil": "",
+          "dibatalkan": false
+        }
+      ],
+      "hasil": [
+        {
+          "id_karyawan": "G1",
+          "nama": "Ani",
+          "unit": "SD",
+          "kelompok": "Guru",
+          "tahun": "2026",
+          "jumlah_pelatihan": 3,
+          "total_jam": 56,
+          "jam_per_jenis": {
+            "Dinas": 32,
+            "Internal": 0,
+            "KKG": 24,
+            "Lainnya": 0,
+            "MGMP": 0
+          }
+        },
+        {
+          "id_karyawan": "T1",
+          "nama": "Budi",
+          "unit": "SD",
+          "kelompok": "Tendik",
+          "tahun": "2026",
+          "jumlah_pelatihan": 1,
+          "total_jam": 4,
+          "jam_per_jenis": {
+            "Dinas": 0,
+            "Internal": 0,
+            "KKG": 0,
+            "Lainnya": 4,
+            "MGMP": 0
+          }
+        }
+      ]
+    },
+    {
+      "nama": "satu pegawai dua tahun = dua baris",
+      "hari_ini": "2026-06-30",
+      "baris": [
+        {
+          "id_karyawan": "G1",
+          "nama": "Ani",
+          "unit": "SD",
+          "kelompok": "Guru",
+          "tanggal_selesai": "2025-12-31",
+          "jenis_penyelenggara": "KKG",
+          "jumlah_jam": 2,
+          "hasil": "",
+          "dibatalkan": false
+        },
+        {
+          "id_karyawan": "G1",
+          "nama": "Ani",
+          "unit": "SD",
+          "kelompok": "Guru",
+          "tanggal_selesai": "2026-01-01",
+          "jenis_penyelenggara": "KKG",
+          "jumlah_jam": 3,
+          "hasil": "",
+          "dibatalkan": false
+        }
+      ],
+      "hasil": [
+        {
+          "id_karyawan": "G1",
+          "nama": "Ani",
+          "unit": "SD",
+          "kelompok": "Guru",
+          "tahun": "2025",
+          "jumlah_pelatihan": 1,
+          "total_jam": 2,
+          "jam_per_jenis": {
+            "Dinas": 0,
+            "Internal": 0,
+            "KKG": 2,
+            "Lainnya": 0,
+            "MGMP": 0
+          }
+        },
+        {
+          "id_karyawan": "G1",
+          "nama": "Ani",
+          "unit": "SD",
+          "kelompok": "Guru",
+          "tahun": "2026",
+          "jumlah_pelatihan": 1,
+          "total_jam": 3,
+          "jam_per_jenis": {
+            "Dinas": 0,
+            "Internal": 0,
+            "KKG": 3,
+            "Lainnya": 0,
+            "MGMP": 0
+          }
+        }
+      ]
+    }
+  ]
+}

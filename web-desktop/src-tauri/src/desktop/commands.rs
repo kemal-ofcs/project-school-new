@@ -11,7 +11,8 @@ use super::{
         CommandError, DesktopLoginResult, DesktopRuntimeStatus, DesktopSession, DesktopSyncStatus,
         OperatorUser, SessionMode,
     },
-    hr_beban, hr_keluar, hr_kinerja, hr_pengajuan, hr_pengingat, hr_rekrutmen, hris, hris_cloud, operational, portability, rapel,
+    hr_beban, hr_keluar, hr_kinerja, hr_pelatihan, hr_pengajuan, hr_pengingat, hr_rekrutmen, hris, hris_cloud, operational,
+    portability, rapel,
     scanner, secrets, storage, sync, teaching_journal, turso, uks, wa_notification,
 };
 
@@ -3855,6 +3856,83 @@ pub async fn desktop_hr_applicant_delete(
 pub async fn desktop_hr_recruit_cleanup(state: State<'_, DesktopState>) -> Result<Value, CommandError> {
     require_session(&state)?;
     hr_rekrutmen::bersihkan_pelamar(&klien_cloud(&state)?)
+        .await
+        .map_err(hris_cloud::luring)
+}
+
+/// Jadikan pelamar Diterima personil + kontrak pertama, atau Lanjutkan
+/// (HRIS Fase 7b). Izin jalur personil (`teachers.manage`/`employees.manage`)
+/// dari kelompok lowongan di cloud, diperiksa `jadikan_personil`.
+#[tauri::command]
+pub async fn desktop_hr_applicant_hire(
+    state: State<'_, DesktopState>,
+    draft: Value,
+) -> Result<Value, CommandError> {
+    let operator = require_permission(&state, "hr.recruit.manage")?;
+    require_permission(&state, "hr.contract.manage")?;
+    hr_rekrutmen::jadikan_personil(&state, &klien_cloud(&state)?, &operator.username, &draft)
+        .await
+        .map_err(hris_cloud::luring)
+}
+
+/// Pelatihan (cloud-only): daftar per tahun, rincian + peserta, riwayat satu
+/// pegawai, atau rekap jam per pegawai per tahun.
+#[tauri::command]
+pub async fn desktop_hr_trainings(
+    state: State<'_, DesktopState>,
+    query: Value,
+) -> Result<Value, CommandError> {
+    require_any_permission(&state, &["hr.training.view", "hr.training.manage"])?;
+    hr_pelatihan::daftar_pelatihan(&klien_cloud(&state)?, &query)
+        .await
+        .map_err(hris_cloud::luring)
+}
+
+/// Buat, ubah, atau batalkan pelatihan.
+#[tauri::command]
+pub async fn desktop_hr_training_save(
+    state: State<'_, DesktopState>,
+    draft: Value,
+) -> Result<Value, CommandError> {
+    let operator = require_permission(&state, "hr.training.manage")?;
+    hr_pelatihan::simpan_pelatihan(&klien_cloud(&state)?, &operator.username, &draft)
+        .await
+        .map_err(hris_cloud::luring)
+}
+
+/// Tambah, lepas, atau catat hasil peserta pelatihan.
+#[tauri::command]
+pub async fn desktop_hr_training_participants_save(
+    state: State<'_, DesktopState>,
+    draft: Value,
+) -> Result<Value, CommandError> {
+    let operator = require_permission(&state, "hr.training.manage")?;
+    hr_pelatihan::simpan_peserta(&klien_cloud(&state)?, &operator.username, &draft)
+        .await
+        .map_err(hris_cloud::luring)
+}
+
+/// Sertifikat peserta (dokumen + tautan, hapus, tambah/hapus berkas); hanya
+/// dokumen yang tertaut ke peserta (Q-148).
+#[tauri::command]
+pub async fn desktop_hr_training_certificate_save(
+    state: State<'_, DesktopState>,
+    draft: Value,
+) -> Result<Value, CommandError> {
+    let operator = require_permission(&state, "hr.training.manage")?;
+    hr_pelatihan::simpan_sertifikat(&klien_cloud(&state)?, &operator.username, &draft)
+        .await
+        .map_err(hris_cloud::luring)
+}
+
+/// Isi satu berkas sertifikat yang tertaut ke peserta.
+#[tauri::command]
+pub async fn desktop_hr_training_certificate_file(
+    state: State<'_, DesktopState>,
+    id_berkas: String,
+) -> Result<Value, CommandError> {
+    require_any_permission(&state, &["hr.training.view", "hr.training.manage"])?;
+    hr_pelatihan::berkas_sertifikat(&klien_cloud(&state)?, &id_berkas)
         .await
         .map_err(hris_cloud::luring)
 }

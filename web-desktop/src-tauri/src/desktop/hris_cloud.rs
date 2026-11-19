@@ -68,10 +68,12 @@ pub const BERKAS_DOKUMEN_SQL: &str = "SELECT b.id_berkas, b.id_dokumen, b.urutan
 pub const AMBIL_BERKAS_SQL: &str = "SELECT id_berkas, id_dokumen, COALESCE(nama_berkas, '') AS nama_berkas, mime_type, data_base64 FROM hr_dokumen_berkas WHERE id_berkas = ?1 LIMIT 1;";
 /// ?1 id, ?2 pegawai, ?3 jenis, ?4 nomor, ?5 terbit, ?6 kedaluwarsa, ?7 catatan, ?8 pencatat.
 pub const SIMPAN_DOKUMEN_SQL: &str = "INSERT INTO hr_dokumen (id_dokumen, id_karyawan, id_jenis, nomor, tanggal_terbit, tanggal_kedaluwarsa, catatan, dicatat_oleh, created_at, updated_at) SELECT ?1, ?2, ?3, NULLIF(?4, ''), ?5, NULLIF(?6, ''), NULLIF(?7, ''), ?8, datetime('now'), datetime('now') FROM master_data m WHERE m.id_unik = ?2 AND LOWER(TRIM(COALESCE(m.jenis_personil, ''))) <> 'siswa' AND NOT EXISTS (SELECT 1 FROM siswa_data sd WHERE sd.id_siswa = m.id_unik) AND EXISTS (SELECT 1 FROM hr_dokumen_jenis WHERE id_jenis = ?3) ON CONFLICT(id_dokumen) DO UPDATE SET id_jenis = excluded.id_jenis, nomor = excluded.nomor, tanggal_terbit = excluded.tanggal_terbit, tanggal_kedaluwarsa = excluded.tanggal_kedaluwarsa, catatan = excluded.catatan, updated_at = excluded.updated_at WHERE hr_dokumen.id_karyawan = excluded.id_karyawan;";
-/// Satu transaksi: dokumen dihapus sungguhan bersama berkasnya (§19.2.5).
-pub const HAPUS_DOKUMEN_SQL: [&str; 2] = [
+/// Satu transaksi: dokumen dihapus sungguhan bersama berkasnya (§19.2.5);
+/// sertifikat pelatihan yang tertaut dilepas dari pesertanya (§25.2.5).
+pub const HAPUS_DOKUMEN_SQL: [&str; 3] = [
     "DELETE FROM hr_dokumen_berkas WHERE id_dokumen = ?1;",
     "DELETE FROM hr_dokumen WHERE id_dokumen = ?1;",
+    "UPDATE hr_pelatihan_peserta SET id_dokumen = NULL WHERE id_dokumen = ?1;",
 ];
 /// ?1 id, ?2 dokumen, ?3 nama, ?4 MIME, ?5 isi. Urutan = slot kosong terkecil
 /// 1–5; tanpa slot kosong atau tanpa dokumen, tidak ada baris yang ditulis.
@@ -616,27 +618,31 @@ pub async fn ambil_berkas(client: &TursoClient, id_berkas: &str) -> Result<Value
     }
 }
 
-pub async fn simpan_dokumen(client: &TursoClient, draft: Value, operator: &str) -> Result<Value, CommandError> {
+/// Inti `simpan_dokumen` tanpa menulis: validasi, id, dan statement
+/// `SIMPAN_DOKUMEN_SQL`. Sertifikat pelatihan menjalankannya bersama tautan
+/// pesertanya dalam satu transaksi.
+pub fn pernyataan_dokumen(draft: Value, operator: &str) -> Result<(String, Statement), CommandError> {
     let pemilik = pemilik(&draft)?;
     let isian: Dokumen = serde_json::from_value(draft).map_err(|_| galat_validasi("Data dokumen tidak valid."))?;
     let d = validasi_dokumen(&isian).map_err(galat_validasi)?;
     let id = id_atau_baru(pemilik.id.as_deref(), "dok-");
+    let args = vec![
+        json!(id),
+        json!(pemilik.id_karyawan.trim()),
+        json!(d.id_jenis),
+        json!(d.nomor),
+        json!(d.tanggal_terbit),
+        json!(d.tanggal_kedaluwarsa),
+        json!(d.catatan),
+        json!(operator),
+    ];
+    Ok((id, Statement::new(SIMPAN_DOKUMEN_SQL, args)))
+}
+
+pub async fn simpan_dokumen(client: &TursoClient, draft: Value, operator: &str) -> Result<Value, CommandError> {
+    let (id, statement) = pernyataan_dokumen(draft, operator)?;
     client.ensure_schema_current().await?;
-    let hasil = client
-        .execute_pipeline(vec![Statement::new(
-            SIMPAN_DOKUMEN_SQL,
-            vec![
-                json!(id),
-                json!(pemilik.id_karyawan.trim()),
-                json!(d.id_jenis),
-                json!(d.nomor),
-                json!(d.tanggal_terbit),
-                json!(d.tanggal_kedaluwarsa),
-                json!(d.catatan),
-                json!(operator),
-            ],
-        )])
-        .await?;
+    let hasil = client.execute_pipeline(vec![statement]).await?;
     if terpengaruh(&hasil) == 0 {
         return Err(galat_validasi(PESAN_DOKUMEN_DITOLAK));
     }

@@ -1795,4 +1795,5 @@ export const PTK_SQL =
 export const HAPUS_DOKUMEN_SQL = [
   "DELETE FROM hr_dokumen_berkas WHERE id_dokumen = ?1;",
   "DELETE FROM hr_dokumen WHERE id_dokumen = ?1;",
+  "UPDATE hr_pelatihan_peserta SET id_dokumen = NULL WHERE id_dokumen = ?1;",
 ] as const;

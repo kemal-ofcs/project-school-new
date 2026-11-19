@@ -27,10 +27,23 @@ import type {
   RiwayatKinerja,
   TemplateDraft,
 } from "@/lib/validations/hr-kinerja";
+import type {
+  DaftarPelatihan,
+  IsiBerkasSertifikat,
+  PelatihanDraft,
+  PelatihanQuery,
+  PesertaDraft,
+  RekapPelatihan,
+  RincianPelatihan,
+  RiwayatPelatihan,
+  SertifikatDraft,
+} from "@/lib/validations/hr-pelatihan";
 import type { PerluPerhatian } from "@/lib/validations/hr-pengingat";
 import type {
   BerkasPelamarDraft,
   DaftarLowongan,
+  HasilHire,
+  HireDraft,
   IsiBerkasPelamar,
   LowonganDraft,
   PelamarBaris,
@@ -776,5 +789,113 @@ export function bersihkanPelamar(): Promise<{ dihapus: number }> {
     {},
     "/api/kepegawaian/recruitment/cleanup",
     {},
+  );
+}
+
+/**
+ * Jadikan personil atau Lanjutkan (HRIS Fase 7b). Di Desktop personil dan
+ * kontraknya masuk SQLite + outbox, jadi sync didorong sesudahnya.
+ */
+export function jadikanPersonil(draft: HireDraft): Promise<HasilHire> {
+  return mutasi(
+    "desktop_hr_applicant_hire",
+    { draft },
+    "/api/kepegawaian/recruitment/applicants/hire",
+    draft,
+  );
+}
+
+// HRIS Fase 7b: pelatihan, cloud-only.
+
+export function muatPelatihan(tahun: string): Promise<DaftarPelatihan> {
+  const query = { mode: "daftar", tahun } as const;
+  return cloud(
+    "desktop_hr_trainings",
+    { query },
+    "/api/kepegawaian/training/query",
+    query,
+  );
+}
+
+export function muatRincianPelatihan(
+  idPelatihan: string,
+): Promise<RincianPelatihan> {
+  const query = { mode: "rincian", id_pelatihan: idPelatihan } as const;
+  return cloud(
+    "desktop_hr_trainings",
+    { query },
+    "/api/kepegawaian/training/query",
+    query,
+  );
+}
+
+export function muatRiwayatPelatihan(
+  idKaryawan: string,
+): Promise<RiwayatPelatihan> {
+  const query = { mode: "riwayat", id_karyawan: idKaryawan } as const;
+  return cloud(
+    "desktop_hr_trainings",
+    { query },
+    "/api/kepegawaian/training/query",
+    query,
+  );
+}
+
+export function muatRekapPelatihan(
+  saring: Pick<PelatihanQuery, "tahun" | "kelompok" | "unit">,
+): Promise<RekapPelatihan> {
+  const query = { mode: "rekap", ...saring } as const;
+  return cloud(
+    "desktop_hr_trainings",
+    { query },
+    "/api/kepegawaian/training/query",
+    query,
+  );
+}
+
+/** Aksi `simpan` (buat/ubah) atau `batal` (alasan wajib). */
+export function simpanPelatihan(
+  draft: PelatihanDraft,
+): Promise<{ sukses: true; id_pelatihan?: string }> {
+  return cloud(
+    "desktop_hr_training_save",
+    { draft },
+    "/api/kepegawaian/training/save",
+    draft,
+  );
+}
+
+/** Aksi `tambah`, `lepas`, atau `hasil`. */
+export function simpanPeserta(
+  draft: PesertaDraft,
+): Promise<{ sukses: true; id_peserta?: string }> {
+  return cloud(
+    "desktop_hr_training_participants_save",
+    { draft },
+    "/api/kepegawaian/training/participants",
+    draft,
+  );
+}
+
+/** Aksi `simpan`, `hapus`, `berkas_tambah`, atau `berkas_hapus`. */
+export function simpanSertifikat(
+  draft: SertifikatDraft,
+): Promise<{ sukses: true; id_dokumen?: string; id_berkas?: string }> {
+  return cloud(
+    "desktop_hr_training_certificate_save",
+    { draft },
+    "/api/kepegawaian/training/certificate",
+    draft,
+  );
+}
+
+export function ambilBerkasSertifikat(
+  id: string,
+): Promise<IsiBerkasSertifikat> {
+  return cloud(
+    "desktop_hr_training_certificate_file",
+    { idBerkas: id },
+    "/api/kepegawaian/training/certificate/file/query",
+    { id },
   );
 }

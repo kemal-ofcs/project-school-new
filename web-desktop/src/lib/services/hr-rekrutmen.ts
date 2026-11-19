@@ -2,6 +2,13 @@ import "server-only";
 
 import type { Client, InValue, Row } from "@libsql/client";
 import { ApiRequestError } from "@/lib/server/http/api-response";
+import { saveTeacher } from "@/lib/services/academic/personnel";
+import {
+  type KaryawanInput,
+  pesanBentrokIdentitasKaryawan,
+  tambahKaryawan,
+} from "@/lib/services/employee";
+import { simpanKontrak } from "@/lib/services/hris";
 import {
   AMBIL_BERKAS_PELAMAR_SQL,
   BATAL_TAHAP_SQL,
@@ -14,10 +21,14 @@ import {
   HAPUS_BERKAS_PELAMAR_SQL,
   HAPUS_PELAMAR_LAMA_SQL,
   HAPUS_PELAMAR_SQL,
+  type HasilHire,
   HITUNG_PELAMAR_LAMA_SQL,
   HITUNG_PELAMAR_SQL,
+  type HireData,
   type IsiBerkasPelamar,
+  idDariPelamar,
   idPelamarBaru,
+  KLAIM_PELAMAR_SQL,
   LAMARAN_PERTAMA_SQL,
   LOWONGAN_SATU_SQL,
   LOWONGAN_SQL,
@@ -26,14 +37,18 @@ import {
   MAKS_CATATAN_TAHAP,
   PELAMAR_LOWONGAN_RINGKAS_SQL,
   PELAMAR_SQL,
+  PERSONIL_ADA_SQL,
+  PESAN_BELUM_DITERIMA,
   PESAN_BERKAS_PELAMAR_PENUH,
   PESAN_KELOMPOK_TERKUNCI,
+  PESAN_KLAIM_GAGAL,
   PESAN_LOWONGAN_BELUM_DIBUKA,
   PESAN_LOWONGAN_BERUBAH,
   PESAN_LOWONGAN_TIDAK_ADA,
   PESAN_PELAMAR_TERKUNCI,
   PESAN_PELAMAR_TIDAK_ADA,
   PESAN_TAHAP_BERUBAH,
+  PESAN_TANPA_LANJUTAN,
   type PelamarBaris,
   type PelamarDraft,
   periksaBatalTahap,
@@ -56,23 +71,38 @@ import {
   validasiLowongan,
   validasiPelamar,
 } from "@/lib/validations/hr-rekrutmen";
-import { HARI_INI_SQL, uraiBerkasDokumen } from "@/lib/validations/hris";
+import {
+  HARI_INI_SQL,
+  nomorIdentitas,
+  uraiBerkasDokumen,
+  validasiKontrak,
+} from "@/lib/validations/hris";
+import {
+  emailPersonil,
+  firstValidationMessage,
+  PESAN_EMAIL_TIDAK_VALID,
+  validateEmployeeDraft,
+} from "@/lib/validations/stabilization";
 
 // Cermin I/O cloud `desktop/hr_rekrutmen.rs`. Tabelnya cloud-only, jadi Web
 // dan Desktop menulis ke database yang sama tanpa outbox.
 
 type Draft = Record<string, unknown>;
 
-const teks = (row: Row | Record<string, unknown> | undefined, kolom: string) =>
-  String(row?.[kolom] ?? "");
-const angka = (row: Row | Record<string, unknown> | undefined, kolom: string) =>
-  Number(row?.[kolom] ?? 0) || 0;
+export const teks = (
+  row: Row | Record<string, unknown> | undefined,
+  kolom: string,
+) => String(row?.[kolom] ?? "");
+export const angka = (
+  row: Row | Record<string, unknown> | undefined,
+  kolom: string,
+) => Number(row?.[kolom] ?? 0) || 0;
 
-function galat(pesan: string): never {
+export function galat(pesan: string): never {
   throw new ApiRequestError(pesan, 400);
 }
 
-function ambil<T>(
+export function ambil<T>(
   hasil: { ok: true; nilai: T } | { ok: false; galat: string },
 ) {
   if (!hasil.ok) galat(hasil.galat);
@@ -86,7 +116,7 @@ function idBaru(awalan: string): string {
   );
 }
 
-const isian = (draft: Draft, kunci: string) => {
+export const isian = (draft: Draft, kunci: string) => {
   const nilai = draft[kunci];
   return typeof nilai === "string" ? nilai.trim() || null : null;
 };
@@ -95,19 +125,19 @@ function objek(rows: Row[]): Record<string, unknown>[] {
   return rows.map((row) => ({ ...row }));
 }
 
-async function semua(client: Client, sql: string, args: InValue[] = []) {
+export async function semua(client: Client, sql: string, args: InValue[] = []) {
   return objek((await client.execute({ sql, args })).rows);
 }
 
-async function satu(client: Client, sql: string, args: InValue[] = []) {
+export async function satu(client: Client, sql: string, args: InValue[] = []) {
   return (await semua(client, sql, args))[0];
 }
 
-async function tulis(client: Client, sql: string, args: InValue[]) {
+export async function tulis(client: Client, sql: string, args: InValue[]) {
   return (await client.execute({ sql, args })).rowsAffected;
 }
 
-async function hariIni(client: Client) {
+export async function hariIni(client: Client) {
   return teks(await satu(client, HARI_INI_SQL), "hari_ini");
 }
 
@@ -453,4 +483,135 @@ export async function bersihkanPelamar(client: Client) {
     );
   }
   return { dihapus: jumlah };
+}
+
+/**
+ * Pelamar untuk Jadikan personil: rute membaca `kelompok` dari sini (lowongan
+ * di cloud) untuk izin jalur personilnya, bukan dari payload (Q-142).
+ */
+export function pelamarUntukPersonil(client: Client, idPelamar: string) {
+  return pelamarSatu(client, idPelamar.trim());
+}
+
+/**
+ * Cermin `jadikan_personil` (§25.2.3): `jadikan` = klaim lalu personil dan
+ * kontrak pertama; `lanjutkan` = klaim sudah ada, personil dilewati bila
+ * sudah ada di database, kontrak diulang (berhenti di PK). Semua validasi
+ * sebelum klaim. `saveTeacher`/`tambahKaryawan` tidak diubah, hanya dipanggil
+ * dengan pemeriksaan yang sama dengan rutenya.
+ */
+export async function jadikanPersonil(
+  client: Client,
+  oleh: string,
+  draft: HireData,
+  pelamar: PelamarBaris,
+): Promise<HasilHire> {
+  const ids = ambil(idDariPelamar(pelamar.id_pelamar, pelamar.kelompok));
+  const lanjutkan = draft.aksi === "lanjutkan";
+  if (pelamar.status !== "Diterima") galat(PESAN_BELUM_DITERIMA);
+  if (lanjutkan && pelamar.id_karyawan !== ids.id_unik)
+    galat(PESAN_TANPA_LANJUTAN);
+  if (!lanjutkan && pelamar.id_karyawan !== "") galat(PESAN_KLAIM_GAGAL);
+  const guru = pelamar.kelompok === "Guru";
+  const p = draft.personil;
+  let email: string | undefined;
+  try {
+    email = emailPersonil(p.email);
+  } catch {
+    galat(PESAN_EMAIL_TIDAK_VALID);
+  }
+  const kontrak = ambil(
+    validasiKontrak(
+      {
+        status: draft.kontrak.status,
+        nomor: draft.kontrak.nomor,
+        tanggal_mulai: draft.kontrak.tanggal_mulai,
+        tanggal_selesai: draft.kontrak.tanggal_selesai,
+        percobaan_selesai: draft.kontrak.percobaan_selesai,
+        catatan: draft.kontrak.catatan,
+      },
+      guru,
+    ),
+  );
+  const karyawan: KaryawanInput | null = guru
+    ? null
+    : {
+        id_unik: ids.id_unik,
+        kode_karyawan: p.kode_karyawan.trim() || ids.kode_karyawan,
+        nama: p.nama.trim(),
+        divisi: p.divisi.trim(),
+        jabatan_status: p.jabatan_status.trim() || undefined,
+        no_hp: p.no_hp.trim() || undefined,
+        lp: p.lp === "P" ? "P" : "L",
+        id_shift: p.id_shift ?? 0,
+        status_aktif: p.status_aktif,
+        catatan: p.catatan.trim() || undefined,
+        tanggal_mulai_aktif: p.tanggal_mulai_aktif,
+        unit: p.unit.trim() || undefined,
+        email,
+        id_bagian: p.id_bagian?.trim(),
+        id_jabatan: p.id_jabatan?.trim(),
+        id_atasan: p.id_atasan?.trim(),
+      };
+  if (karyawan) {
+    const pesan = firstValidationMessage(validateEmployeeDraft(karyawan));
+    if (pesan) galat(pesan);
+  } else {
+    if (!p.nama.trim()) galat("Nama guru wajib diisi.");
+    ambil(nomorIdentitas("nuptk", p.nuptk));
+  }
+
+  if (
+    !lanjutkan &&
+    (await tulis(client, KLAIM_PELAMAR_SQL, [
+      pelamar.id_pelamar,
+      ids.id_unik,
+      oleh,
+    ])) === 0
+  )
+    galat(PESAN_KLAIM_GAGAL);
+  if (!(await satu(client, PERSONIL_ADA_SQL, [ids.id_unik]))) {
+    if (karyawan) {
+      const bentrok = await pesanBentrokIdentitasKaryawan(
+        karyawan.id_unik,
+        karyawan.kode_karyawan,
+      );
+      if (bentrok) galat(bentrok);
+      await tambahKaryawan(karyawan);
+    } else {
+      await saveTeacher({
+        id_guru: ids.id_unik,
+        is_edit: false,
+        nama: p.nama,
+        kode_karyawan: p.kode_karyawan,
+        nip: p.nip,
+        nuptk: p.nuptk,
+        gelar: p.gelar,
+        spesialisasi_mapel: p.spesialisasi_mapel,
+        status_kepegawaian: p.status_kepegawaian,
+        no_hp: p.no_hp,
+        lp: p.lp,
+        id_shift: p.id_shift,
+        status_aktif: p.status_aktif,
+        unit: p.unit,
+        email,
+        id_bagian: p.id_bagian,
+        id_jabatan: p.id_jabatan,
+        id_atasan: p.id_atasan,
+        tanggal_mulai_aktif: p.tanggal_mulai_aktif,
+      });
+    }
+  }
+  await simpanKontrak(
+    client,
+    oleh,
+    { ...kontrak, id_karyawan: ids.id_unik },
+    ids.id_kontrak,
+  );
+  return {
+    sukses: true,
+    id_karyawan: ids.id_unik,
+    id_kontrak: ids.id_kontrak,
+    kelompok: pelamar.kelompok,
+  };
 }

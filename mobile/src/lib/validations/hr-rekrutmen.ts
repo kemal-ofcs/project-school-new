@@ -60,6 +60,12 @@ export const PESAN_TAHAP_BERUBAH =
   "Tahap pelamar baru saja berubah. Muat ulang lalu coba lagi.";
 export const PESAN_BERKAS_PELAMAR_PENUH =
   "Pelamar tidak ditemukan, sudah menjadi personil, atau sudah berisi 3 berkas.";
+export const PESAN_BELUM_DITERIMA =
+  "Hanya pelamar berstatus Diterima yang bisa dijadikan personil.";
+export const PESAN_KLAIM_GAGAL =
+  "Pelamar ini sudah dijadikan personil atau statusnya berubah.";
+export const PESAN_TANPA_LANJUTAN =
+  "Pelamar ini belum dijadikan personil, jadi tidak ada yang perlu dilanjutkan.";
 
 type Hasil<T> = { ok: true; nilai: T } | { ok: false; galat: string };
 const ok = <T>(nilai: T): Hasil<T> => ({ ok: true, nilai });
@@ -390,6 +396,13 @@ export function idDariPelamar(
   return gagal("Kelompok lowongan wajib Guru atau Tendik.");
 }
 
+/** Cermin `izin_personil`: izin jalur personil menurut kelompok (Q-142). */
+export function izinPersonil(
+  kelompok: string,
+): "teachers.manage" | "employees.manage" {
+  return kelompok === "Guru" ? "teachers.manage" : "employees.manage";
+}
+
 /** Cermin `id_pelamar_baru`: `plm-` + 32 hex. */
 export function idPelamarBaru(): string {
   const bytes = crypto.getRandomValues(new Uint8Array(16));
@@ -442,6 +455,10 @@ export const TAMBAH_BERKAS_PELAMAR_SQL =
   "WITH slot(n) AS (VALUES (1), (2), (3)) INSERT INTO hr_pelamar_berkas (id_berkas, id_pelamar, urutan, nama_berkas, mime_type, data_base64, created_at) SELECT ?1, ?2, MIN(slot.n), ?3, ?4, ?5, datetime('now') FROM slot WHERE slot.n NOT IN (SELECT urutan FROM hr_pelamar_berkas WHERE id_pelamar = ?2) AND EXISTS (SELECT 1 FROM hr_pelamar WHERE id_pelamar = ?2 AND id_karyawan IS NULL) HAVING MIN(slot.n) IS NOT NULL;";
 export const HAPUS_BERKAS_PELAMAR_SQL =
   "DELETE FROM hr_pelamar_berkas WHERE id_berkas = ?1 AND EXISTS (SELECT 1 FROM hr_pelamar p WHERE p.id_pelamar = hr_pelamar_berkas.id_pelamar AND p.id_karyawan IS NULL);";
+export const KLAIM_PELAMAR_SQL =
+  "UPDATE hr_pelamar SET id_karyawan = ?2, dijadikan_oleh = ?3, dijadikan_pada = datetime('now') WHERE id_pelamar = ?1 AND id_karyawan IS NULL AND (SELECT t.tahap FROM hr_pelamar_tahap t WHERE t.id_pelamar = ?1 AND t.dibatalkan_pada IS NULL ORDER BY t.urutan DESC LIMIT 1) = 'Diterima';";
+export const PERSONIL_ADA_SQL =
+  "SELECT 1 AS ada FROM master_data WHERE id_unik = ?1 LIMIT 1;";
 export const PELAMAR_LAMA_SQL =
   "SELECT p.id_pelamar FROM hr_pelamar p JOIN hr_lowongan l ON l.id_lowongan = p.id_lowongan WHERE p.id_karyawan IS NULL AND date(CASE WHEN l.ditutup_pada IS NULL THEN CASE WHEN l.tanggal_tutup < date('now', '+7 hours') THEN l.tanggal_tutup END WHEN l.tanggal_tutup < date('now', '+7 hours') THEN min(l.tanggal_tutup, date(l.ditutup_pada, '+7 hours')) ELSE date(l.ditutup_pada, '+7 hours') END, '+12 months') < date('now', '+7 hours')";
 export const HITUNG_PELAMAR_LAMA_SQL =
@@ -529,6 +546,68 @@ export const berkasPelamarSchema = z
   })
   .strict();
 export type BerkasPelamarDraft = z.input<typeof berkasPelamarSchema>;
+
+/**
+ * Isian form Guru/Pegawai untuk Jadikan personil (§25.2.3). Id dari payload
+ * diterima lalu diabaikan; backend menurunkannya dari id pelamar.
+ */
+const personilHireSchema = z
+  .object({
+    id_unik: teksBebas(80),
+    id_guru: teksBebas(80),
+    nama: teksBebas(200),
+    kode_karyawan: teksBebas(80),
+    nip: teksBebas(40),
+    nuptk: teksBebas(40),
+    gelar: teksBebas(60),
+    spesialisasi_mapel: teksBebas(200),
+    status_kepegawaian: teksBebas(40),
+    divisi: teksBebas(120),
+    jabatan_status: teksBebas(120),
+    no_hp: teksBebas(40),
+    lp: teksBebas(5),
+    id_shift: z.number().int().optional(),
+    status_aktif: z.enum(["Aktif", "Nonaktif"]).default("Aktif"),
+    unit: teksBebas(120),
+    email: z.string().max(200).optional(),
+    id_bagian: z.string().max(80).optional(),
+    id_jabatan: z.string().max(80).optional(),
+    id_atasan: z.string().max(80).optional(),
+    tanggal_mulai_aktif: z.string().max(20).optional(),
+    catatan: teksBebas(1000),
+  })
+  .strict();
+
+/** Kontrak pertama (Q-138), isian `kontrakDraftSchema` tanpa pegawai. */
+const kontrakHireSchema = z
+  .object({
+    status: z.string().max(20),
+    nomor: teksBebas(200),
+    tanggal_mulai: z.string().max(20),
+    tanggal_selesai: teksBebas(20),
+    percobaan_selesai: teksBebas(20),
+    catatan: teksBebas(1000),
+  })
+  .strict();
+
+/** Body `applicants/hire`, cermin `draft` `desktop_hr_applicant_hire`. */
+export const hireDraftSchema = z
+  .object({
+    aksi: z.enum(["jadikan", "lanjutkan"]).default("jadikan"),
+    id_pelamar: id,
+    personil: personilHireSchema,
+    kontrak: kontrakHireSchema,
+  })
+  .strict();
+export type HireDraft = z.input<typeof hireDraftSchema>;
+export type HireData = z.output<typeof hireDraftSchema>;
+
+export interface HasilHire {
+  sukses: true;
+  id_karyawan: string;
+  id_kontrak: string;
+  kelompok: KelompokLowongan;
+}
 
 export const idRekrutmenSchema = z.object({ id }).strict();
 export const kosongSchema = z.object({}).strict();

@@ -1215,8 +1215,9 @@ fn kontrak_payload(id: &str, id_karyawan: &str, id_ref: &str, k: &KontrakIsian, 
     })
 }
 
-fn tulis_kontrak(transaction: &Transaction<'_>, p: &Value) -> Result<(), CommandError> {
-    transaction
+/// `true` bila baris baru tertulis; id yang sudah ada berhenti di PK.
+fn tulis_kontrak(transaction: &Transaction<'_>, p: &Value) -> Result<bool, CommandError> {
+    let baru = transaction
         .execute(
             SIMPAN_KONTRAK_SQL,
             params![
@@ -1236,11 +1237,18 @@ fn tulis_kontrak(transaction: &Transaction<'_>, p: &Value) -> Result<(), Command
     transaction
         .execute(CERMIN_STATUS_SQL, params![teks(p, "id_karyawan")])
         .map_err(db_error)?;
-    Ok(())
+    Ok(baru > 0)
 }
 
 /// `desktop_hr_contract_create`.
 pub fn simpan_kontrak(state: &DesktopState, oleh: &str, draft: Value) -> Result<Value, CommandError> {
+    simpan_kontrak_id(state, oleh, draft, &new_id("kon-"))
+}
+
+/// Inti `simpan_kontrak` dengan id dari pemanggil. Id deterministik Jadikan
+/// personil (`kon-<hex>`, §25.2.3) yang diulang berhenti di PK tanpa outbox
+/// kedua.
+pub fn simpan_kontrak_id(state: &DesktopState, oleh: &str, draft: Value, id: &str) -> Result<Value, CommandError> {
     let id_karyawan = teks(&draft, "id_karyawan");
     let isian: KontrakIsian =
         serde_json::from_value(draft).map_err(|_| invalid("Data kontrak tidak valid."))?;
@@ -1250,10 +1258,10 @@ pub fn simpan_kontrak(state: &DesktopState, oleh: &str, draft: Value) -> Result<
     let guru = pegawai_guru(&transaction, &id_karyawan)?
         .ok_or_else(|| invalid("Kontrak hanya untuk pegawai (guru dan tendik)."))?;
     let k = validasi_kontrak(&isian, guru).map_err(invalid)?;
-    let id = new_id("kon-");
-    let payload = kontrak_payload(&id, &id_karyawan, "", &k, oleh);
-    tulis_kontrak(&transaction, &payload)?;
-    sync::enqueue(&transaction, &client_id, "hr-contract", "create", &id, &payload, None)?;
+    let payload = kontrak_payload(id, &id_karyawan, "", &k, oleh);
+    if tulis_kontrak(&transaction, &payload)? {
+        sync::enqueue(&transaction, &client_id, "hr-contract", "create", id, &payload, None)?;
+    }
     transaction.commit().map_err(db_error)?;
     Ok(payload)
 }

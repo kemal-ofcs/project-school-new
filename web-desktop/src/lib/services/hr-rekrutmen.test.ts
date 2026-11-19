@@ -5,9 +5,12 @@ import { join } from "node:path";
 import { type Client, createClient } from "@libsql/client";
 import { initDatabaseSchema } from "@/lib/db-schema";
 import {
+  hireDraftSchema,
+  idDariPelamar,
   MAKS_BERKAS_PELAMAR,
   PESAN_BERKAS_PELAMAR_PENUH,
   PESAN_KELOMPOK_TERKUNCI,
+  PESAN_KLAIM_GAGAL,
   PESAN_PELAMAR_TERKUNCI,
   PESAN_TAHAP_AKHIR,
   type RincianPelamar,
@@ -16,12 +19,21 @@ import { HARI_INI_SQL } from "@/lib/validations/hris";
 
 mock.module("server-only", () => ({}));
 
-const S = await import("./hr-rekrutmen");
+// Jalur Web rekrutmen (HRIS Fase 7a–7b) pada skema Web sungguhan. Pasangan
+// Rust: `hr_rekrutmen_alur_cloud` dan `hr_rekrutmen_jadikan_personil` di
+// `hr_rekrutmen.rs`, dengan data yang sama. Satu klien untuk seluruh berkas:
+// `saveTeacher`/`tambahKaryawan` memakai `db` global.
+const testDirectory: string = mkdtempSync(join(tmpdir(), "kos-rekrutmen-"));
+const client: Client = createClient({
+  url: `file:${join(testDirectory, "test.db")}`,
+});
 
-// Jalur Web rekrutmen (HRIS Fase 7a) pada skema Web sungguhan. Pasangan
-// Rust: `hr_rekrutmen_alur_cloud` di `hr_rekrutmen.rs`, dengan data yang sama.
-let client: Client;
-let testDirectory: string;
+mock.module("@/lib/db", () => ({
+  db: client,
+  ensureDbInitialized: async () => {},
+}));
+
+const S = await import("./hr-rekrutmen");
 
 const PNG =
   "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==";
@@ -39,8 +51,6 @@ const hitung = async (sql: string) =>
   Number((await client.execute(sql)).rows[0]?.[0] ?? 0);
 
 beforeAll(async () => {
-  testDirectory = mkdtempSync(join(tmpdir(), "kos-rekrutmen-"));
-  client = createClient({ url: `file:${join(testDirectory, "test.db")}` });
   await initDatabaseSchema(client);
 }, 60_000);
 
@@ -267,6 +277,151 @@ describe("hr-rekrutmen: alur di database Web", () => {
     expect(
       await hitung(
         `SELECT COUNT(*) FROM hr_lowongan WHERE id_lowongan = '${baru}' AND ditutup_pada IS NULL;`,
+      ),
+    ).toBe(1);
+  });
+
+  test("jadikan personil: tendik, guru, klaim, lanjutkan", async () => {
+    const diterima = async (judul: string, kelompok: "Guru" | "Tendik") => {
+      const id = (await pelamar(await lowongan(judul, kelompok), "Calon"))
+        .id_pelamar;
+      await tahap(id, "Diterima");
+      return id;
+    };
+    const ani = await diterima("Guru IPA", "Guru");
+    const budi = await diterima("Staf TU", "Tendik");
+    const ambil = (id: string, kelompok: string) => {
+      const h = idDariPelamar(id, kelompok);
+      if (!h.ok) throw new Error(h.galat);
+      return h.nilai;
+    };
+    const guru = ambil(ani, "Guru");
+    const tendik = ambil(budi, "Tendik");
+    const hire = (
+      id: string,
+      aksi: "jadikan" | "lanjutkan",
+      personil: Record<string, unknown>,
+      status: string,
+    ) =>
+      hireDraftSchema.parse({
+        aksi,
+        id_pelamar: id,
+        personil,
+        kontrak: {
+          status,
+          tanggal_mulai: "2020-03-01",
+          tanggal_selesai: "2021-02-28",
+        },
+      });
+    const jadikan = async (d: ReturnType<typeof hire>) =>
+      S.jadikanPersonil(
+        client,
+        "uji",
+        d,
+        await S.pelamarUntukPersonil(client, d.id_pelamar),
+      );
+    const klaim = async (id: string) =>
+      String(
+        (
+          await client.execute({
+            sql: "SELECT COALESCE(id_karyawan, '') AS k FROM hr_pelamar WHERE id_pelamar = ?;",
+            args: [id],
+          })
+        ).rows[0]?.k ?? "",
+      );
+    const budiDraft = (status: string) =>
+      hire(
+        budi,
+        "jadikan",
+        { nama: "Budi", id_shift: 1, divisi: "Tata Usaha", id_unik: "ASING" },
+        status,
+      );
+
+    // GTY untuk Tendik ditolak sebelum klaim.
+    expect(await galat(jadikan(budiDraft("GTY")))).toBe(
+      "Status GTY dan GTT hanya untuk guru.",
+    );
+    expect(await klaim(budi)).toBe("");
+
+    // Tendik: master_data + id_card + QR id|token + kontrak, tanpa guru_data.
+    expect((await jadikan(budiDraft("PTT"))).id_karyawan).toBe(tendik.id_unik);
+    const t = tendik.id_unik;
+    expect(await klaim(budi)).toBe(t);
+    expect(
+      await hitung(
+        `SELECT COUNT(*) FROM master_data WHERE id_unik = '${t}' AND kode_karyawan = '${tendik.kode_karyawan}' AND qr_code = id_unik || '|' || token_absensi;`,
+      ),
+    ).toBe(1);
+    expect(
+      await hitung(`SELECT COUNT(*) FROM guru_data WHERE id_guru = '${t}';`),
+    ).toBe(0);
+    expect(
+      await hitung(`SELECT COUNT(*) FROM id_card WHERE id_unik = '${t}';`),
+    ).toBe(1);
+    expect(
+      await hitung(
+        `SELECT COUNT(*) FROM hr_kontrak WHERE id_kontrak = '${tendik.id_kontrak}' AND status = 'PTT';`,
+      ),
+    ).toBe(1);
+
+    // Tekan kedua ditolak; data pelamar terkunci; Lanjutkan Web melewati
+    // personil yang sudah ada di database dan kontrak berhenti di PK.
+    expect(await galat(jadikan(budiDraft("PTT")))).toBe(PESAN_KLAIM_GAGAL);
+    expect(
+      await galat(
+        S.simpanPelamar(client, "uji", {
+          id_pelamar: budi,
+          id_lowongan: (await rincian(budi)).pelamar.id_lowongan,
+          nama: "Budi X",
+          tanggal_lamaran: "2020-02-01",
+        }),
+      ),
+    ).toBe(PESAN_PELAMAR_TERKUNCI);
+    await jadikan(
+      hire(
+        budi,
+        "lanjutkan",
+        { nama: "Budi", id_shift: 1, divisi: "Tata Usaha" },
+        "PTT",
+      ),
+    );
+    expect(
+      await hitung(`SELECT COUNT(*) FROM master_data WHERE id_unik = '${t}';`),
+    ).toBe(1);
+    expect(
+      await hitung(
+        `SELECT COUNT(*) FROM hr_kontrak WHERE id_karyawan = '${t}';`,
+      ),
+    ).toBe(1);
+
+    // Guru: klaim lalu gagal (shift tidak ada), lalu Lanjutkan.
+    expect(
+      await galat(
+        jadikan(hire(ani, "jadikan", { nama: "Ani", id_shift: 999 }, "GTY")),
+      ),
+    ).not.toBeNull();
+    const g = guru.id_unik;
+    expect(await klaim(ani)).toBe(g);
+    expect(
+      await hitung(`SELECT COUNT(*) FROM master_data WHERE id_unik = '${g}';`),
+    ).toBe(0);
+    await jadikan(hire(ani, "lanjutkan", { nama: "Ani" }, "GTY"));
+    expect(
+      await hitung(
+        `SELECT COUNT(*) FROM master_data WHERE id_unik = '${g}' AND jenis_personil = 'GURU' AND qr_code = id_unik || '|' || token_absensi;`,
+      ),
+    ).toBe(1);
+    expect(
+      await hitung(
+        `SELECT COUNT(*) FROM guru_data WHERE id_guru = '${g}' AND status_kepegawaian = 'GTY';`,
+      ),
+    ).toBe(1);
+    expect(
+      await hitung(`SELECT COUNT(*) FROM id_card WHERE id_unik = '${g}';`),
+    ).toBe(1);
+    expect(
+      await hitung(
+        `SELECT COUNT(*) FROM hr_kontrak WHERE id_kontrak = '${guru.id_kontrak}';`,
       ),
     ).toBe(1);
   });

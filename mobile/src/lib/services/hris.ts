@@ -352,10 +352,15 @@ async function tulisKontrak(tx: Transaction, k: KontrakBaris) {
   await tx.execute({ sql: CERMIN_STATUS_SQL, args: [k.id_karyawan] });
 }
 
+/**
+ * Cermin `simpan_kontrak`; `idKontrak` diisi Jadikan personil (`kon-<hex>`,
+ * §25.2.3), yang bila diulang berhenti di PK (`INSERT OR IGNORE`).
+ */
 export async function simpanKontrak(
   client: Client,
   oleh: string,
   draft: KontrakDraft,
+  idKontrak?: string,
 ) {
   const tx = await client.transaction("write");
   try {
@@ -375,7 +380,7 @@ export async function simpanKontrak(
     if (!valid.ok) galat(valid.galat);
     const baris: KontrakBaris = {
       ...valid.nilai,
-      id_kontrak: idBaru("kon-"),
+      id_kontrak: idKontrak ?? idBaru("kon-"),
       id_karyawan: draft.id_karyawan.trim(),
       id_ref: "",
       dicatat_oleh: oleh,
@@ -1085,17 +1090,20 @@ export async function getBerkasDokumen(
   return baris as unknown as IsiBerkasDokumen;
 }
 
-export async function simpanDokumen(
-  client: Client,
+/**
+ * Cermin `pernyataan_dokumen`: validasi, id, dan statement tanpa menulis.
+ * Sertifikat pelatihan menjalankannya bersama tautan peserta satu batch.
+ */
+export function pernyataanDokumen(
   operator: string,
   draft: z.output<typeof dokumenDraftSchema>,
 ) {
   const d = ambilValid(validasiDokumen(draft));
   const id = idAtauBaru(draft.id, "dok-");
-  await tulisPegawai(
-    client,
-    SIMPAN_DOKUMEN_SQL,
-    [
+  return {
+    id,
+    sql: SIMPAN_DOKUMEN_SQL,
+    args: [
       id,
       draft.id_karyawan,
       d.id_jenis,
@@ -1105,8 +1113,16 @@ export async function simpanDokumen(
       d.catatan,
       operator,
     ],
-    PESAN_DOKUMEN_DITOLAK,
-  );
+  };
+}
+
+export async function simpanDokumen(
+  client: Client,
+  operator: string,
+  draft: z.output<typeof dokumenDraftSchema>,
+) {
+  const { id, sql, args } = pernyataanDokumen(operator, draft);
+  await tulisPegawai(client, sql, args, PESAN_DOKUMEN_DITOLAK);
   return { id_dokumen: id };
 }
 

@@ -45,6 +45,8 @@ describe("hr-rekrutmen: SQL dan pesan kembar", () => {
       R.AMBIL_BERKAS_PELAMAR_SQL,
       R.TAMBAH_BERKAS_PELAMAR_SQL,
       R.HAPUS_BERKAS_PELAMAR_SQL,
+      R.KLAIM_PELAMAR_SQL,
+      R.PERSONIL_ADA_SQL,
       R.PELAMAR_LAMA_SQL,
       R.HITUNG_PELAMAR_LAMA_SQL,
       ...R.HAPUS_PELAMAR_LAMA_SQL,
@@ -58,6 +60,9 @@ describe("hr-rekrutmen: SQL dan pesan kembar", () => {
       R.PESAN_TAHAP_AKHIR,
       R.PESAN_TAHAP_BERUBAH,
       R.PESAN_BERKAS_PELAMAR_PENUH,
+      R.PESAN_BELUM_DITERIMA,
+      R.PESAN_KLAIM_GAGAL,
+      R.PESAN_TANPA_LANJUTAN,
       ...R.KELOMPOK_LOWONGAN,
       ...R.TAHAP_PROSES,
       ...R.TAHAP_AKHIR,
@@ -153,5 +158,7 @@ describe("hr-rekrutmen: vektor", () => {
     for (const k of vektor.id_personil)
       cocok(R.idDariPelamar(k.id_pelamar, k.kelompok), k);
     expect(R.idPelamarBaru()).toMatch(/^plm-[0-9a-f]{32}$/);
+    expect(R.izinPersonil("Guru")).toBe("teachers.manage");
+    expect(R.izinPersonil("Tendik")).toBe("employees.manage");
   });
 });
