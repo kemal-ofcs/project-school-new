@@ -1,7 +1,7 @@
 # HASIL.md — hasil `bun run check`
 
-- Waktu: 18 November 2026, 21:53 WIB
-- Commit: c7ac0b3 (+ 2 berkas berubah, belum commit)
+- Waktu: 19 November 2026, 07:25 WIB
+- Commit: 2cc6847 (+ 4 berkas berubah/baru, belum commit)
 - Perintah: `bun run check` (root)
 - Exit code: 0
 - Status: **LULUS**
@@ -19,4 +19,4 @@
 Tidak ada galat. Seluruh pengujian dan gerbang kualitas lulus.
 
 ## Catatan
-Semua pengujian unit TypeScript/Rust, audit integritas skema dan kontrak sinkronisasi, serta gerbang linting lulus dengan kode keluar 0.
+Semua gerbang kualitas dan pengujian unit TypeScript/Rust lulus dengan kode keluar 0.

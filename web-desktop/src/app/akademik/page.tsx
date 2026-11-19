@@ -4,6 +4,7 @@ import dynamic from "next/dynamic";
 import { redirect } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { AppShell } from "@/components/AppShell";
+import { PilihRombelBanyak } from "@/components/akademik/PilihRombelBanyak";
 import { FeedbackBanner } from "@/components/ui/FeedbackBanner";
 import { Icon } from "@/components/ui/Icon";
 import { Modal } from "@/components/ui/Modal";
@@ -316,6 +317,8 @@ export default function AkademikPage() {
     id_mapel: "",
     id_guru: "",
   });
+  // Kelas paralel dengan mapel dan pengampu yang sama, disimpan bersama.
+  const [rombelTambahan, setRombelTambahan] = useState<Set<string>>(new Set());
 
   const loadAllData = useCallback(async () => {
     setLoading(true);
@@ -510,7 +513,33 @@ export default function AkademikPage() {
       } else if (modalType === "mapel") {
         await simpanMapel(formMapel);
       } else if (modalType === "penugasan") {
-        await simpanPenugasanGuru(formPenugasan);
+        const sasaran = [
+          formPenugasan.id_rombel,
+          ...[...rombelTambahan].filter((id) => id !== formPenugasan.id_rombel),
+        ];
+        const gagal: string[] = [];
+        for (const id_rombel of sasaran) {
+          try {
+            await simpanPenugasanGuru({ ...formPenugasan, id_rombel });
+          } catch (err) {
+            const rom = rombelList.find(
+              (r) => String(r.id_rombel) === id_rombel,
+            );
+            gagal.push(
+              `${rom ? String(rom.nama_rombel) : id_rombel}: ${err instanceof Error ? err.message : "gagal disimpan"}`,
+            );
+          }
+        }
+        if (gagal.length === sasaran.length) throw new Error(gagal.join("; "));
+        if (gagal.length > 0) {
+          setFeedback({
+            tone: "error",
+            message: `Tersimpan di ${sasaran.length - gagal.length} dari ${sasaran.length} rombel. ${gagal.join("; ")}`,
+          });
+          setModalType(null);
+          void loadAllData();
+          return;
+        }
       }
       setFeedback({ tone: "success", message: "Data berhasil disimpan." });
       setModalType(null);
@@ -689,6 +718,7 @@ export default function AkademikPage() {
                         id_unit: null,
                       });
                     } else if (activeTab === "penugasan") {
+                      setRombelTambahan(new Set());
                       setFormPenugasan({
                         id_tahun_ajaran:
                           selectedTaForRombel ||
@@ -1968,6 +1998,25 @@ export default function AkademikPage() {
                       ))}
                     </PilihCari>
                   </div>
+                  <details
+                    className="rounded-xl border border-white/10 bg-slate-900/60 p-3"
+                    open={rombelTambahan.size > 0}
+                  >
+                    <summary className="cursor-pointer text-xs font-semibold text-slate-300">
+                      Rombel lain dengan mapel dan guru yang sama
+                      {rombelTambahan.size > 0
+                        ? ` (${rombelTambahan.size} dipilih)`
+                        : ""}
+                    </summary>
+                    <div className="mt-3">
+                      <PilihRombelBanyak
+                        rombelList={rombelList}
+                        terpilih={rombelTambahan}
+                        onChange={setRombelTambahan}
+                        kecuali={formPenugasan.id_rombel}
+                      />
+                    </div>
+                  </details>
                   <div>
                     <label
                       htmlFor="pen-mapel"

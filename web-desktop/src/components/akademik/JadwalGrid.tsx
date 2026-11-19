@@ -18,9 +18,13 @@ import {
   jpPerMapel,
   kunciSel,
   petakanGrid,
+  type RencanaSimpan,
   rencanaSimpan,
   salinKeGrid,
+  selisihGrid,
+  terapkanPerubahan,
 } from "./aturanJadwalGrid";
+import { PilihRombelBanyak } from "./PilihRombelBanyak";
 
 /**
  * Editor grid hari × jam ke untuk satu rombel: pilih mapel sebagai "kuas",
@@ -102,6 +106,8 @@ export function JadwalGrid({
   const [menyimpan, setMenyimpan] = useState(false);
   const [salinTahun, setSalinTahun] = useState(tahunAktif);
   const [salinRombel, setSalinRombel] = useState("");
+  // Kelas paralel yang ikut menerima perubahan grid ini saat disimpan.
+  const [rombelIkut, setRombelIkut] = useState<Set<string>>(new Set());
 
   // Filter unit di panel bisa menyembunyikan rombel yang sedang dibuka.
   useEffect(() => {
@@ -229,6 +235,7 @@ export function JadwalGrid({
     }
     // Pengajar kuas berasal dari penugasan rombel lama.
     setKuas(null);
+    setRombelIkut(new Set());
     ubah();
   };
 
@@ -271,48 +278,109 @@ export function JadwalGrid({
     setHariBerubah(new Set());
   };
 
+  const label = (hari: number, jamKe: string) =>
+    `${NAMA_HARI[hari] ?? hari} jam ${jamKe}`;
+
+  /** Urutan hapus → ubah → tambah dijelaskan di `rencanaSimpan`. */
+  const jalankan = async (
+    langkah: RencanaSimpan,
+    lama: readonly TeachingScheduleRow[],
+    rombel: string,
+    awalan: string,
+  ) => {
+    const gagal: string[] = [];
+    for (const id of langkah.hapus) {
+      const row = lama.find((item) => item.id_jadwal === id);
+      try {
+        await hapusJadwalMengajar(id);
+      } catch (error: unknown) {
+        gagal.push(
+          `${awalan}${row ? label(row.hari, row.jam_ke) : id}: ${pesanGalat(error, "gagal dihapus")}`,
+        );
+      }
+    }
+    for (const baris of [...langkah.ubah, ...langkah.tambah]) {
+      try {
+        await simpanJadwalMengajar({
+          ...baris,
+          id_tahun_ajaran: idTahun,
+          id_rombel: rombel,
+          is_aktif: 1,
+        });
+      } catch (error: unknown) {
+        gagal.push(
+          `${awalan}${label(baris.hari, baris.jam_ke)}: ${pesanGalat(error, "gagal disimpan")}`,
+        );
+      }
+    }
+    return gagal;
+  };
+
   const simpan = async () => {
     if (isSubmittingRef.current || jumlahPerubahan === 0) return;
     isSubmittingRef.current = true;
     setMenyimpan(true);
-    const gagal: string[] = [];
-    const label = (hari: number, jamKe: string) =>
-      `${NAMA_HARI[hari] ?? hari} jam ${jamKe}`;
-    // Urutan hapus → ubah → tambah dijelaskan di `rencanaSimpan`.
+    // Diambil sebelum `muat()` mengganti grid dengan isi database.
+    const perubahan = selisihGrid(peta.sel, sel);
+    const ikut = [...rombelIkut].filter((id) => id !== idRombel);
     try {
-      for (const id of rencana.hapus) {
-        const row = peta.bisaDiubah.find((item) => item.id_jadwal === id);
+      const gagal = await jalankan(rencana, peta.bisaDiubah, idRombel, "");
+      const dilewati: string[] = [];
+      for (const idIkut of ikut) {
+        const awalan = `${namaRombel(idIkut)} `;
         try {
-          await hapusJadwalMengajar(id);
-        } catch (error: unknown) {
-          gagal.push(
-            `${row ? label(row.hari, row.jam_ke) : id}: ${pesanGalat(error, "gagal dihapus")}`,
+          const [jadwal, tugas] = await Promise.all([
+            getJadwalMengajar({ id_rombel: idIkut, id_tahun_ajaran: idTahun }),
+            getDaftarPenugasanGuru(idIkut),
+          ]);
+          const tujuan = petakanGrid(jadwal);
+          const boleh = new Set(
+            mapelUntuk(idIkut).map((mapel) => String(mapel.id_mapel)),
           );
-        }
-      }
-      for (const baris of [...rencana.ubah, ...rencana.tambah]) {
-        try {
-          await simpanJadwalMengajar({
-            ...baris,
-            id_tahun_ajaran: idTahun,
-            id_rombel: idRombel,
-            is_aktif: 1,
+          const hasil = terapkanPerubahan(tujuan, perubahan, {
+            mapelBoleh: (id) => boleh.has(id),
+            guruPenugasan: new Map(
+              tugas
+                .filter((row) => String(row.id_tahun_ajaran) === idTahun)
+                .map((row) => [String(row.id_mapel), String(row.id_guru)]),
+            ),
           });
+          for (const kunci of hasil.dilewati) {
+            const [hari, jam] = kunci.split(":");
+            dilewati.push(`${awalan}${label(Number(hari), jam)}`);
+          }
+          gagal.push(
+            ...(await jalankan(
+              rencanaSimpan(tujuan.bisaDiubah, hasil.sel, hasil.hariBerubah),
+              tujuan.bisaDiubah,
+              idIkut,
+              awalan,
+            )),
+          );
         } catch (error: unknown) {
           gagal.push(
-            `${label(baris.hari, baris.jam_ke)}: ${pesanGalat(error, "gagal disimpan")}`,
+            `${namaRombel(idIkut)}: ${pesanGalat(error, "gagal dimuat")}`,
           );
         }
       }
       // Grid dimuat ulang dari database supaya yang tampil adalah yang benar-benar tersimpan.
       await muat();
       onTersimpan();
+      const catatanLewat =
+        dilewati.length > 0
+          ? ` Dilewati karena sudah berisi mapel lain atau mapelnya tidak berlaku di rombel itu: ${dilewati.join("; ")}.`
+          : "";
       if (gagal.length === 0) {
-        onFeedback("success", "Jadwal rombel tersimpan.");
+        onFeedback(
+          "success",
+          ikut.length > 0
+            ? `Jadwal tersimpan di ${ikut.length + 1} rombel.${catatanLewat}`
+            : "Jadwal rombel tersimpan.",
+        );
       } else {
         onFeedback(
           "error",
-          `${gagal.length} dari ${jumlahPerubahan} perubahan gagal. ${gagal.join("; ")}`,
+          `${gagal.length} perubahan gagal. ${gagal.join("; ")}${catatanLewat}`,
         );
       }
     } finally {
@@ -521,6 +589,30 @@ export function JadwalGrid({
               )}
             </div>
           ) : null}
+
+          <details
+            className="rounded-lg border border-white/10 p-2"
+            open={rombelIkut.size > 0}
+          >
+            <summary className="cursor-pointer text-xs font-semibold text-slate-300">
+              Terapkan juga ke rombel lain
+              {rombelIkut.size > 0 ? ` (${rombelIkut.size} dipilih)` : ""}
+            </summary>
+            <p className="mt-2 text-[11px] leading-4 text-slate-400">
+              Untuk kelas paralel yang belajar bersama. Saat disimpan, sel yang
+              kamu ubah di grid ini ikut diubah di rombel terpilih. Sel yang di
+              sana sudah berisi mapel lain tidak ditimpa. Pengajarnya dari
+              penugasan masing-masing rombel.
+            </p>
+            <div className="mt-2">
+              <PilihRombelBanyak
+                rombelList={rombelPilihan}
+                terpilih={rombelIkut}
+                onChange={setRombelIkut}
+                kecuali={idRombel}
+              />
+            </div>
+          </details>
         </div>
       ) : null}
 
@@ -730,7 +822,11 @@ export function JadwalGrid({
       {canManage && jumlahPerubahan > 0 ? (
         <div className="sticky bottom-0 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-sky-500/30 bg-slate-900/95 p-3">
           <span className="text-xs text-slate-300">
-            {jumlahPerubahan} perubahan belum disimpan.
+            {jumlahPerubahan} perubahan belum disimpan
+            {rombelIkut.size > 0
+              ? `, juga diterapkan ke ${rombelIkut.size} rombel lain`
+              : ""}
+            .
           </span>
           <div className="flex gap-2">
             <button

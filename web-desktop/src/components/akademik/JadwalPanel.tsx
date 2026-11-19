@@ -24,6 +24,7 @@ import {
   susunJamKe,
 } from "@/lib/validations/class-attendance";
 import { JadwalGrid } from "./JadwalGrid";
+import { JadwalPerGuru } from "./JadwalPerGuru";
 
 /**
  * Jadwal mengajar mingguan per rombel.
@@ -128,7 +129,7 @@ export function JadwalPanel({
     };
   }, [draftRombel, draftTahun]);
   const [periods, setPeriods] = useState<LessonPeriodRow[]>([]);
-  const [tampilan, setTampilan] = useState<"grid" | "daftar">("grid");
+  const [tampilan, setTampilan] = useState<"grid" | "guru" | "daftar">("grid");
 
   const unitRombel = (idRombel: string) =>
     String(
@@ -307,6 +308,7 @@ export function JadwalPanel({
             {(
               [
                 ["grid", "Grid per rombel"],
+                ["guru", "Per guru"],
                 ["daftar", "Daftar"],
               ] as const
             ).map(([nilai, label]) => (
@@ -325,7 +327,7 @@ export function JadwalPanel({
               </button>
             ))}
           </fieldset>
-          {unitList.length > 0 ? (
+          {unitList.length > 0 && tampilan !== "guru" ? (
             <>
               <label
                 htmlFor="filter-unit-jadwal"
@@ -403,6 +405,13 @@ export function JadwalPanel({
           canManage={canManage}
           onFeedback={onFeedback}
           onTersimpan={() => void muat()}
+        />
+      ) : tampilan === "guru" ? (
+        <JadwalPerGuru
+          tahunAjaranList={tahunAjaranList}
+          guruList={guruList}
+          rombelList={rombelList}
+          onFeedback={onFeedback}
         />
       ) : (
         <div className="overflow-x-auto rounded-xl border border-white/10">

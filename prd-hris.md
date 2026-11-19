@@ -8,7 +8,7 @@ sudah dibangun** (§20.11–§20.13). **Fase 3 (tanpa versi skema, sub-fase
 3a/3b) sudah dibangun** (§21.11–§21.12). **Fase 4 (v70, sub-fase 4a/4b/4c)
 sudah dibangun** (§22.11–§22.13). **Fase 5 (v71, sentinel `-2047`, sub-fase
 5a/5b/5c) sudah dibangun** (§23.11–§23.13, 18 Nov 2026); Q-91 sampai Q-111
-disetujui (§23.10). **Fase 6 dirancang** (§24, tanpa versi skema, 19 Nov 2026); Q-112 sampai Q-129 disetujui (§24.10); 6a dibangun (§24.11), berikutnya 6b. Fase 7 dan 8 baru berupa cakupan (§13–§14); model data
+disetujui (§23.10). **Fase 6 dirancang** (§24, tanpa versi skema, 19 Nov 2026); Q-112 sampai Q-129 disetujui (§24.10); 6a dan 6b dibangun (§24.11), Fase 6 lengkap. Fase 7 dan 8 baru berupa cakupan (§13–§14); model data
 rinci ditulis di awal setiap fase, dalam bagian "Urutan pengerjaan Fase N",
 seperti `prd-hris.md` proyek `absensi-perusahaan`.
 

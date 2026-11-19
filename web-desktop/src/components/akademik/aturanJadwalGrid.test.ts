@@ -4,8 +4,11 @@ import {
   jpPerMapel,
   kunciSel,
   petakanGrid,
+  petakanPerGuru,
   rencanaSimpan,
   salinKeGrid,
+  selisihGrid,
+  terapkanPerubahan,
 } from "./aturanJadwalGrid";
 
 const baris = (
@@ -168,4 +171,117 @@ test("jpPerMapel menjumlah grid dan baris terkunci", () => {
   expect(jp.get("mtk")).toBe(2);
   expect(jp.get("agama-i")).toBe(2);
   expect(jp.get("agama-k")).toBe(2);
+});
+
+describe("terapkanPerubahan", () => {
+  const pjok = { id_mapel: "pjok", id_guru: "g-pjok" };
+
+  test("isi sel kosong rombel lain, guru dari penugasan tujuan bila ada", () => {
+    const awal = petakanGrid([]).sel;
+    const akhir = new Map([
+      [kunciSel(1, 1), pjok],
+      [kunciSel(1, 2), pjok],
+    ]);
+    const tujuan = petakanGrid([baris("x", 1, "3", "mtk")]);
+    const hasil = terapkanPerubahan(tujuan, selisihGrid(awal, akhir), {
+      mapelBoleh: () => true,
+      guruPenugasan: new Map([["pjok", "g-lain"]]),
+    });
+    expect(hasil.sel.get("1:1")).toEqual({
+      id_mapel: "pjok",
+      id_guru: "g-lain",
+    });
+    expect(hasil.sel.get("1:3")?.id_mapel).toBe("mtk");
+    expect([...hasil.hariBerubah]).toEqual([1]);
+    expect(hasil.dilewati).toEqual([]);
+    const rencana = rencanaSimpan(
+      tujuan.bisaDiubah,
+      hasil.sel,
+      hasil.hariBerubah,
+    );
+    expect(rencana.tambah).toEqual([
+      { hari: 1, jam_ke: "1-2", id_mapel: "pjok", id_guru: "g-lain" },
+    ]);
+    expect(rencana.hapus).toEqual([]);
+  });
+
+  test("tidak menimpa mapel lain, sel terkunci, atau mapel unit lain", () => {
+    const perubahan = selisihGrid(
+      new Map(),
+      new Map([
+        [kunciSel(1, 1), pjok],
+        [kunciSel(2, 1), pjok],
+        [kunciSel(3, 1), pjok],
+      ]),
+    );
+    const tujuan = petakanGrid([
+      baris("m", 1, "1", "mtk"),
+      baris("a", 2, "1", "agama-i"),
+      baris("b", 2, "1", "agama-k"),
+    ]);
+    const hasil = terapkanPerubahan(tujuan, perubahan, {
+      mapelBoleh: () => true,
+      guruPenugasan: new Map(),
+    });
+    expect(hasil.dilewati.sort()).toEqual(["1:1", "2:1"]);
+    expect(hasil.sel.get("1:1")?.id_mapel).toBe("mtk");
+    expect(hasil.sel.get("3:1")).toEqual(pjok);
+
+    const unitLain = terapkanPerubahan(petakanGrid([]), perubahan, {
+      mapelBoleh: () => false,
+      guruPenugasan: new Map(),
+    });
+    expect(unitLain.dilewati).toHaveLength(3);
+    expect(unitLain.hariBerubah.size).toBe(0);
+  });
+
+  test("mengosongkan hanya menghapus mapel yang sama", () => {
+    const perubahan = selisihGrid(
+      new Map([
+        [kunciSel(1, 1), pjok],
+        [kunciSel(1, 2), pjok],
+      ]),
+      new Map(),
+    );
+    const tujuan = petakanGrid([
+      baris("p", 1, "1", "pjok", "g-x"),
+      baris("m", 1, "2", "mtk"),
+    ]);
+    const hasil = terapkanPerubahan(tujuan, perubahan, {
+      mapelBoleh: () => true,
+      guruPenugasan: new Map(),
+    });
+    expect(hasil.sel.has("1:1")).toBe(false);
+    expect(hasil.sel.get("1:2")?.id_mapel).toBe("mtk");
+    expect(
+      rencanaSimpan(tujuan.bisaDiubah, hasil.sel, hasil.hariBerubah).hapus,
+    ).toEqual(["p"]);
+  });
+});
+
+describe("petakanPerGuru", () => {
+  test("kelas gabungan satu sel, JP tatap muka dihitung sekali", () => {
+    const rombel = (
+      id: string,
+      r: string,
+      hari: number,
+      jam: string,
+      mapel = "pjok",
+    ) => ({
+      ...baris(id, hari, jam, mapel),
+      id_rombel: r,
+    });
+    const hasil = petakanPerGuru([
+      rombel("a", "7A", 1, "1-2"),
+      rombel("b", "7B", 1, "1-2"),
+      rombel("c", "7C", 1, "1-2"),
+      rombel("d", "8A", 2, "3"),
+      { ...rombel("e", "8B", 2, "4"), is_aktif: 0 },
+    ]);
+    expect(hasil.sel.get("1:1")).toEqual([
+      { id_mapel: "pjok", rombel: ["7A", "7B", "7C"] },
+    ]);
+    expect(hasil.jpRombel).toBe(7);
+    expect(hasil.jpTatapMuka).toBe(3);
+  });
 });

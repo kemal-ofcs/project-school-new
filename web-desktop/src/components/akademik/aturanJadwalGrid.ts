@@ -230,3 +230,100 @@ export function jpPerMapel(
   }
   return hasil;
 }
+
+export interface PerubahanSel {
+  kunci: string;
+  lama?: IsiSel;
+  baru?: IsiSel;
+}
+
+/** Sel yang isinya berbeda antara grid awal dan grid hasil suntingan. */
+export function selisihGrid(awal: Grid, akhir: Grid): PerubahanSel[] {
+  const hasil: PerubahanSel[] = [];
+  for (const kunci of new Set([...awal.keys(), ...akhir.keys()])) {
+    const lama = awal.get(kunci);
+    const baru = akhir.get(kunci);
+    if (lama && baru && samaIsi(lama, baru)) continue;
+    hasil.push({ kunci, lama, baru });
+  }
+  return hasil;
+}
+
+/**
+ * Perubahan satu grid ikut diterapkan ke rombel lain (kelas paralel yang
+ * belajar bersama, misalnya PJOK di lapangan).
+ *
+ * Rombel tujuan tidak pernah ditimpa: sel yang sudah berisi mapel lain, sel
+ * terkunci, atau mapel yang tidak berlaku di unit tujuan dilewati dan
+ * dilaporkan. Mengosongkan sel hanya menghapus mapel yang sama dengan yang
+ * dikosongkan di grid asal. Gurunya dari penugasan rombel tujuan bila ada.
+ */
+export function terapkanPerubahan(
+  tujuan: PetaGrid<BarisJadwal>,
+  perubahan: readonly PerubahanSel[],
+  opsi: {
+    mapelBoleh: (idMapel: string) => boolean;
+    guruPenugasan: ReadonlyMap<string, string>;
+  },
+): { sel: Grid; hariBerubah: Set<number>; dilewati: string[] } {
+  const sel: Grid = new Map(tujuan.sel);
+  const hariBerubah = new Set<number>();
+  const dilewati: string[] = [];
+  for (const { kunci, lama, baru } of perubahan) {
+    const ada = sel.get(kunci);
+    if (baru) {
+      if (
+        tujuan.terkunci.has(kunci) ||
+        !opsi.mapelBoleh(baru.id_mapel) ||
+        (ada && ada.id_mapel !== baru.id_mapel)
+      ) {
+        dilewati.push(kunci);
+        continue;
+      }
+      const isi = {
+        id_mapel: baru.id_mapel,
+        id_guru: opsi.guruPenugasan.get(baru.id_mapel) ?? baru.id_guru,
+      };
+      if (ada && samaIsi(ada, isi)) continue;
+      sel.set(kunci, isi);
+    } else {
+      if (!ada || ada.id_mapel !== lama?.id_mapel) continue;
+      sel.delete(kunci);
+    }
+    hariBerubah.add(Number(kunci.slice(0, kunci.indexOf(":"))));
+  }
+  return { sel, hariBerubah, dilewati };
+}
+
+export interface IsiSelGuru {
+  id_mapel: string;
+  rombel: string[];
+}
+
+/**
+ * Jadwal satu guru: per sel, mapel beserta rombel yang diajar pada jam itu.
+ * `jpRombel` menghitung tiap rombel (dasar beban per penugasan), `jpTatapMuka`
+ * menghitung jam nyata, jadi kelas gabungan hanya terhitung sekali.
+ */
+export function petakanPerGuru(
+  rows: readonly (BarisJadwal & { id_rombel: string })[],
+): { sel: Map<string, IsiSelGuru[]>; jpRombel: number; jpTatapMuka: number } {
+  const sel = new Map<string, IsiSelGuru[]>();
+  let jpRombel = 0;
+  for (const row of rows) {
+    if (row.is_aktif !== 1) continue;
+    for (const kunci of selBaris(row) ?? []) {
+      jpRombel++;
+      const isi = sel.get(kunci) ?? [];
+      const mapel = isi.find((item) => item.id_mapel === row.id_mapel);
+      if (mapel) {
+        if (!mapel.rombel.includes(row.id_rombel))
+          mapel.rombel.push(row.id_rombel);
+      } else {
+        isi.push({ id_mapel: row.id_mapel, rombel: [row.id_rombel] });
+      }
+      sel.set(kunci, isi);
+    }
+  }
+  return { sel, jpRombel, jpTatapMuka: sel.size };
+}
