@@ -18,6 +18,7 @@ import {
   type PayrollRecapRow,
 } from "@/lib/gateways/payroll";
 import { useHydrated } from "@/lib/hooks/useHydrated";
+import { bolehLapor } from "@/lib/validations/lapor-pajak";
 
 const IDR = new Intl.NumberFormat("id-ID", {
   style: "currency",
@@ -204,6 +205,15 @@ export default function PayrollDashboardPage() {
                 <Icon name="refresh" className="w-4 h-4" />
                 Rapel Gaji
               </Link>
+              {bolehLapor(user) && (
+                <Link
+                  href="/payroll/pelaporan"
+                  className="px-4 py-2 text-sm font-semibold rounded-lg bg-slate-800 text-slate-200 hover:bg-slate-700 transition flex items-center gap-2 border border-slate-700"
+                >
+                  <Icon name="document" className="w-4 h-4" />
+                  Pelaporan
+                </Link>
+              )}
               {canManageConfig && (
                 <Link
                   href="/payroll/config"

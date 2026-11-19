@@ -271,10 +271,17 @@ export interface LembarXlsx {
   lebar?: readonly number[];
   /** Baris judul dan N kolom pertama tetap terlihat saat digulir. */
   kolomBeku?: number;
+  /**
+   * Tanpa baris judul: `headers` hanya menentukan jumlah kolom dan baris
+   * pertama sudah data (format berkas bank tertentu). `kolomBeku` diabaikan.
+   */
+  tanpaJudul?: boolean;
 }
 
 function lembarXml(lembar: LembarXlsx): string {
-  const { headers, rows, lebar, kolomBeku } = lembar;
+  const { headers, rows, lebar, tanpaJudul } = lembar;
+  const kolomBeku = tanpaJudul ? undefined : lembar.kolomBeku;
+  const awal = tanpaJudul ? 1 : 2;
   let xml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">`;
 
@@ -293,15 +300,18 @@ function lembarXml(lembar: LembarXlsx): string {
       .join("")}</cols>`;
   }
 
-  xml += `<sheetData><row r="1">`;
-  headers.forEach((header, colIdx) => {
-    const cellRef = `${columnLetter(colIdx)}1`;
-    xml += `<c r="${cellRef}" t="inlineStr"><is><t>${escapeXml(header)}</t></is></c>`;
-  });
-  xml += `</row>`;
+  xml += `<sheetData>`;
+  if (!tanpaJudul) {
+    xml += `<row r="1">`;
+    headers.forEach((header, colIdx) => {
+      const cellRef = `${columnLetter(colIdx)}1`;
+      xml += `<c r="${cellRef}" t="inlineStr"><is><t>${escapeXml(header)}</t></is></c>`;
+    });
+    xml += `</row>`;
+  }
 
   rows.forEach((row, rowIdx) => {
-    const rowNum = rowIdx + 2;
+    const rowNum = rowIdx + awal;
     xml += `<row r="${rowNum}">`;
     headers.forEach((_, colIdx) => {
       const cellRef = `${columnLetter(colIdx)}${rowNum}`;

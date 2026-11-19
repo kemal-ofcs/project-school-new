@@ -5,7 +5,7 @@ Bagian §26 dari `prd-hris.md`. Istilah, keputusan pemilik (§5), hak akses umum
 ## 26. Urutan pengerjaan Fase 8
 
 **Rancangan disetujui pemilik** (Q-152 sampai Q-167, §26.10). 8a
-sampai 8c sudah ditulis (§26.11); berikutnya 8d. Isi Fase 8 dipilih pemilik pada 19 Nov 2026 dari daftar
+sampai 8d sudah ditulis (§26.11); tersisa `bun run check` dan uji browser oleh pemilik. Isi Fase 8 dipilih pemilik pada 19 Nov 2026 dari daftar
 §14: **berkas transfer gaji ke bank, laporan PPh 21/BPJS, dan
 reimbursement**. HRIS di Mobile, bagan organisasi, lembur SPL, tukar jam, dan
 Portal Guru tetap di §14 untuk fase berikutnya.
@@ -501,3 +501,44 @@ Penyimpangan, untuk ditinjau:
   pegawainya). `tanpa_nota` tidak melihat status.
 - Pegawai keluar tetap bisa diajukan klaim baru (`SIMPAN_KLAIM_SQL` hanya
   memakai `PEGAWAI_SQL`), bukan hanya klaim lama.
+
+**8d (20 Nov 2026), belum di-commit, `bun run check` dan uji browser belum oleh pemilik.**
+
+- Layar §26.5 (Web/Desktop): tombol **Berkas transfer** di rincian run
+  `APPROVED`/`PAID` untuk `bolehUnduh` (`components/payroll/DialogBerkasTransfer.tsx`:
+  rekening debet, format, tanggal efektif, pratinjau 5 baris + ringkasan
+  tanda, peringatan `PAID` dan unduhan sebelumnya; Unduh baru aktif sesudah
+  Pratinjau); halaman `/payroll/pelaporan` (tab PPh 21/BPJS/A1, ekspor Excel,
+  tautan di `/payroll` untuk `bolehLapor`, halaman lain dialihkan ke
+  `/payroll`); tab Pengaturan **Gaji & Pajak** (`payroll.config.manage`)
+  berisi `BankTransferCard` dan `DataPemotongCard`, dimuat hanya saat tab
+  dibuka; isian bank profil keuangan `PilihCari` (nama yang tidak ada di
+  daftar tetap tampil sebagai pilihan, gagal muat = isian teks); tab
+  Kepegawaian **Reimbursement** (`TabReimburse.tsx`: daftar per bulan +
+  saringan status/bayar, ajukan klaim lalu langsung ke rincian untuk nota,
+  Setujui/Tolak/Batal, dialog Pembayaran per pegawai untuk `hr.reimburse.pay`)
+  dan bagian **Jenis reimbursement** di Organisasi (`hr.reimburse.config`).
+- `client/transfer-excel.ts` (Excel umum Transfer / Perlu dibayar manual /
+  Ringkasan; CSV/TXT `renderTeks`; XLSX `selFormat`) dan opsi `tanpaJudul` di
+  `client/xlsx.ts`. Tes: `transfer-excel.test.ts`, satu kasus di
+  `xlsx.test.ts`.
+- Akun bawaan `akun-beban-reimburse` (5-1800, Beban, bukan akun sistem) di
+  `akun-bawaan.json` (Q-163); hitungan akun di tes TS dan `accounting.rs`
+  27 → 28. Kode 5-1700 tidak dipakai karena tes membuat akun pengguna dengan
+  kode itu.
+- `sync-frontend-lib.ts` dan `sync-rust-modules.ts` dijalankan; paragraf v73
+  di `references/18`.
+- Cek: `tsc` dan Biome bersih, `audit:a11y|ui-guard|page-guard|contract`
+  lulus (command 464/469, izin 141, tanpa perubahan), `cargo test accounting`
+  14 lulus, tes TS berkas yang diubah lulus (`services/accounting.test.ts`
+  butuh `--timeout` lebih panjang bila dijalankan bersama berkas lain).
+
+Penyimpangan, untuk ditinjau:
+
+- **Format kustom tidak memuat baris "Perlu dibayar manual"**; layar
+  menyarankan unduh Excel umum untuk daftarnya (dua unduhan = dua jejak
+  `TRANSFER_EXPORT`).
+- **Tombol keputusan di layar adalah perkiraan dari sesi** (`sesi.unit`,
+  `lingkup_semua`, `id_karyawan`); backend tetap penentu.
+- Peringatan data pemotong di Pelaporan hanya NPWP (PPh/A1) atau kedua nomor
+  BPJS kosong; isian lain tidak diperiksa layar.

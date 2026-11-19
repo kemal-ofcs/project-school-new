@@ -9,6 +9,7 @@ import {
   useState,
 } from "react";
 import { Modal } from "@/components/ui/Modal";
+import { PilihCari } from "@/components/ui/PilihCari";
 import { hasPermission } from "@/lib/auth/access";
 import { useAuth } from "@/lib/context/AuthContext";
 import {
@@ -21,7 +22,9 @@ import {
   simpanDataKeuangan,
   simpanDataPribadi,
 } from "@/lib/gateways/hris";
+import { muatBankAktif } from "@/lib/gateways/payroll";
 import { AGAMA, STATUS_NIKAH } from "@/lib/validations/hris";
+import type { BankTampil } from "@/lib/validations/transfer";
 import { CutiPegawai } from "./CutiPegawai";
 import type { PermintaanSurat } from "./DialogCetakSurat";
 import { DokumenPegawai } from "./DokumenPegawai";
@@ -53,7 +56,8 @@ type TabRincian =
 interface Isian {
   kunci: string;
   label: string;
-  jenis?: "date" | "area" | "pilih";
+  /** `bank` = `PilihCari` dari `app_bank` aktif; yang disimpan tetap nama bank. */
+  jenis?: "date" | "area" | "pilih" | "bank";
   pilihan?: readonly string[];
   inputMode?: HTMLAttributes<HTMLInputElement>["inputMode"];
 }
@@ -79,7 +83,7 @@ const ISIAN_PRIBADI: Isian[] = [
 ];
 
 const ISIAN_KEUANGAN: Isian[] = [
-  { kunci: "bank", label: "Nama bank" },
+  { kunci: "bank", label: "Nama bank", jenis: "bank" },
   { kunci: "no_rekening", label: "Nomor rekening", inputMode: "numeric" },
   { kunci: "nama_rekening", label: "Nama pemilik rekening" },
   { kunci: "npwp", label: "NPWP", inputMode: "numeric" },
@@ -421,6 +425,22 @@ function FormProfil({
   const [galat, setGalat] = useState<string | null>(null);
   const isSubmittingRef = useRef(false);
   const [menyimpan, setMenyimpan] = useState(false);
+  // Gagal dimuat = isian teks biasa, supaya profil tetap bisa disimpan.
+  const [bank, setBank] = useState<BankTampil[] | null>(null);
+  const pakaiBank = isian.some((i) => i.jenis === "bank");
+
+  useEffect(() => {
+    if (!pakaiBank) return;
+    let batal = false;
+    void muatBankAktif()
+      .then((hasil) => {
+        if (!batal) setBank(hasil.bank);
+      })
+      .catch(() => undefined);
+    return () => {
+      batal = true;
+    };
+  }, [pakaiBank]);
 
   const kirim = async (event: FormEvent) => {
     event.preventDefault();
@@ -463,7 +483,25 @@ function FormProfil({
               <label htmlFor={idKontrol} className={LABEL}>
                 {i.label}
               </label>
-              {i.jenis === "pilih" ? (
+              {i.jenis === "bank" && bank ? (
+                <PilihCari
+                  id={idKontrol}
+                  {...umum}
+                  onChange={(e) => ubah(e.target.value)}
+                >
+                  <option value="">Pilih bank</option>
+                  {umum.value && !bank.some((b) => b.nama === umum.value) ? (
+                    <option value={umum.value}>
+                      {`${umum.value} (tidak ada di daftar bank)`}
+                    </option>
+                  ) : null}
+                  {bank.map((b) => (
+                    <option key={b.id_bank} value={b.nama}>
+                      {b.kode ? `${b.nama} (${b.kode})` : b.nama}
+                    </option>
+                  ))}
+                </PilihCari>
+              ) : i.jenis === "pilih" ? (
                 <select
                   id={idKontrol}
                   {...umum}

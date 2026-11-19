@@ -19,6 +19,7 @@ import {
 import { masaKerja } from "@/components/kepegawaian/gaya";
 import { JenisDokumenOrganisasi } from "@/components/kepegawaian/JenisDokumenOrganisasi";
 import { JenisPengajuanOrganisasi } from "@/components/kepegawaian/JenisPengajuanOrganisasi";
+import { JenisReimburseOrganisasi } from "@/components/kepegawaian/JenisReimburseOrganisasi";
 import { OrganisasiTugasKontrak } from "@/components/kepegawaian/OrganisasiTugasKontrak";
 import { PengaturanSurat } from "@/components/kepegawaian/PengaturanSurat";
 import { PerluPerhatianCard } from "@/components/kepegawaian/PerluPerhatianCard";
@@ -29,6 +30,7 @@ import { TabKinerja } from "@/components/kepegawaian/TabKinerja";
 import { TabKontrak } from "@/components/kepegawaian/TabKontrak";
 import { TabLaporanPtk } from "@/components/kepegawaian/TabLaporanPtk";
 import { TabPelatihan } from "@/components/kepegawaian/TabPelatihan";
+import { TabReimburse } from "@/components/kepegawaian/TabReimburse";
 import { TabRekrutmen } from "@/components/kepegawaian/TabRekrutmen";
 import { TabSurat } from "@/components/kepegawaian/TabSurat";
 import { TabTugas } from "@/components/kepegawaian/TabTugas";
@@ -50,6 +52,7 @@ import {
   simpanBagian,
   simpanJabatan,
 } from "@/lib/gateways/hris";
+import { IZIN_LIHAT_REIMBURSE } from "@/lib/validations/hr-reimburse";
 
 type Tab =
   | "daftar"
@@ -63,7 +66,8 @@ type Tab =
   | "keluar"
   | "kinerja"
   | "rekrutmen"
-  | "pelatihan";
+  | "pelatihan"
+  | "reimburse";
 
 const TAB: { kunci: Tab; label: string }[] = [
   { kunci: "daftar", label: "Daftar" },
@@ -78,6 +82,7 @@ const TAB: { kunci: Tab; label: string }[] = [
   { kunci: "kinerja", label: "Kinerja" },
   { kunci: "rekrutmen", label: "Rekrutmen" },
   { kunci: "pelatihan", label: "Pelatihan" },
+  { kunci: "reimburse", label: "Reimbursement" },
 ];
 
 /** Tab yang hanya untuk pemegang `teachers.view` (area juga lolos lewat `employees.view`). */
@@ -140,6 +145,9 @@ export default function KepegawaianPage() {
   const lihatPelatihan =
     hasPermission(user, "hr.training.view") ||
     hasPermission(user, "hr.training.manage");
+  const lihatReimburse = (
+    [...IZIN_LIHAT_REIMBURSE, "hr.reimburse.submit"] as const
+  ).some((izin) => hasPermission(user, izin));
 
   return (
     <AppShell contentClassName="mx-auto w-full max-w-6xl space-y-6 px-4 py-6 sm:px-6 md:py-8 lg:px-8">
@@ -173,7 +181,8 @@ export default function KepegawaianPage() {
             (kunci !== "keluar" || lihatKeluar) &&
             (kunci !== "kinerja" || lihatKinerja) &&
             (kunci !== "rekrutmen" || lihatRekrutmen) &&
-            (kunci !== "pelatihan" || lihatPelatihan),
+            (kunci !== "pelatihan" || lihatPelatihan) &&
+            (kunci !== "reimburse" || lihatReimburse),
         ).map(({ kunci, label }) => (
           <button
             key={kunci}
@@ -259,6 +268,8 @@ export default function KepegawaianPage() {
             onPesan={setPesan}
             onGalat={setGalat}
           />
+        ) : tab === "reimburse" ? (
+          <TabReimburse org={org} onPesan={setPesan} />
         ) : tab === "kinerja" ? (
           <TabKinerja
             bolehAtur={hasPermission(user, "hr.performance.config")}
@@ -275,6 +286,7 @@ export default function KepegawaianPage() {
             jenisDokumen={bolehUbah || hasPermission(user, "hr.document.view")}
             aturanCuti={bolehUbah || hasPermission(user, "hr.request.view")}
             pengaturanSurat={hasPermission(user, "hr.duty.manage")}
+            jenisReimburse={hasPermission(user, "hr.reimburse.config")}
             onPesan={setPesan}
             onBerhasil={async (teks) => {
               setPesan(teks);
@@ -582,6 +594,7 @@ function TabOrganisasi({
   jenisDokumen,
   aturanCuti,
   pengaturanSurat,
+  jenisReimburse,
   onPesan,
   onBerhasil,
   onGalat,
@@ -591,6 +604,7 @@ function TabOrganisasi({
   jenisDokumen: boolean;
   aturanCuti: boolean;
   pengaturanSurat: boolean;
+  jenisReimburse: boolean;
   onPesan: (pesan: string) => void;
   onBerhasil: (pesan: string) => Promise<void>;
   onGalat: (pesan: string) => void;
@@ -845,6 +859,10 @@ function TabOrganisasi({
           onPesan={onPesan}
           onGalat={onGalat}
         />
+      ) : null}
+
+      {jenisReimburse ? (
+        <JenisReimburseOrganisasi bolehUbah onPesan={onPesan} />
       ) : null}
 
       {sunting?.jenis === "bagian" || sunting?.jenis === "jabatan" ? (

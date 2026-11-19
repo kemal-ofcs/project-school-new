@@ -208,6 +208,14 @@
     "sistem": false
   },
   {
+    "id_akun": "akun-beban-reimburse",
+    "kode": "5-1800",
+    "nama": "Beban Reimbursement",
+    "kelompok": "Beban",
+    "saldo_normal": "Debit",
+    "sistem": false
+  },
+  {
     "id_akun": "akun-beban-lain",
     "kode": "5-1900",
     "nama": "Beban Lain-lain",

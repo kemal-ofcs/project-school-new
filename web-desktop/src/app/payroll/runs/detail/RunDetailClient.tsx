@@ -7,6 +7,7 @@ import { AppShell } from "@/components/AppShell";
 import { INPUT, LABEL } from "@/components/inventory/gaya";
 import { PilihAkunBayar } from "@/components/keuangan/PilihAkunBayar";
 import { AuditTrailTimeline } from "@/components/payroll/AuditTrailTimeline";
+import { DialogBerkasTransfer } from "@/components/payroll/DialogBerkasTransfer";
 import { RunStatusBadge } from "@/components/payroll/RunStatusBadge";
 import { SlipGajiPrintView } from "@/components/payroll/SlipGajiPrintView";
 import { FeedbackBanner } from "@/components/ui/FeedbackBanner";
@@ -24,6 +25,7 @@ import {
 import { useHydrated } from "@/lib/hooks/useHydrated";
 import { catatanPajakRun, keteranganPph } from "@/lib/validations/pajak";
 import { penyetujuSah } from "@/lib/validations/payroll-policy";
+import { bolehUnduh, STATUS_RUN_TRANSFER } from "@/lib/validations/transfer";
 
 const IDR = new Intl.NumberFormat("id-ID", {
   style: "currency",
@@ -48,6 +50,7 @@ export default function RunDetailClient() {
   const [statusNotes, setStatusNotes] = useState<string>("");
   const [akunBayar, setAkunBayar] = useState("akun-kas");
   const [transitioning, setTransitioning] = useState(false);
+  const [transferOpen, setTransferOpen] = useState(false);
 
   const [feedback, setFeedback] = useState<{
     type: "success" | "error";
@@ -156,6 +159,10 @@ export default function RunDetailClient() {
   const canReject =
     hasPermission(user, "payroll.run.review") &&
     (currentStatus === "SUBMITTED" || currentStatus === "REVIEWED");
+  // Berkas membuka rekening semua pegawai: kedua izin `IZIN_UNDUH`.
+  const canTransfer =
+    bolehUnduh(user) &&
+    (STATUS_RUN_TRANSFER as readonly string[]).includes(currentStatus);
 
   return (
     <AppShell contentClassName="mx-auto w-full max-w-7xl space-y-6 px-4 py-6 sm:px-6 md:py-8 lg:px-8">
@@ -217,6 +224,16 @@ export default function RunDetailClient() {
                 >
                   <Icon name="check" className="w-4 h-4" />
                   Tandai Dibayar & Kunci Slip
+                </button>
+              )}
+              {canTransfer && (
+                <button
+                  type="button"
+                  onClick={() => setTransferOpen(true)}
+                  className="px-4 py-2 text-sm font-semibold rounded-lg bg-slate-800 text-slate-200 hover:bg-slate-700 transition flex items-center gap-2 border border-slate-700"
+                >
+                  <Icon name="download" className="w-4 h-4" />
+                  Berkas transfer
                 </button>
               )}
               {canReject && (
@@ -479,6 +496,13 @@ export default function RunDetailClient() {
               </div>
             </div>
           </Modal>
+        ) : null}
+
+        {transferOpen && run ? (
+          <DialogBerkasTransfer
+            runId={runId}
+            onClose={() => setTransferOpen(false)}
+          />
         ) : null}
 
         {/* Modal Slip Gaji Preview & Print */}

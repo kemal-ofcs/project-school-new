@@ -9,6 +9,8 @@ import { DatabaseBackupCard } from "@/components/DatabaseBackupCard";
 import { LicenseCard } from "@/components/license/LicenseCard";
 import { MailSettingsCard } from "@/components/MailSettingsCard";
 import { PasswordRecoveryCard } from "@/components/PasswordRecoveryCard";
+import { BankTransferCard } from "@/components/settings/BankTransferCard";
+import { DataPemotongCard } from "@/components/settings/DataPemotongCard";
 import { GeofencingCard } from "@/components/settings/GeofencingCard";
 import { KeamananAbsensiCard } from "@/components/settings/KeamananAbsensiCard";
 import { KeamananPemindaiCard } from "@/components/settings/KeamananPemindaiCard";
@@ -150,6 +152,7 @@ const SETTINGS_TABS = [
   { id: "notifikasi", icon: "whatsapp", label: "Email & WhatsApp" },
   { id: "data", icon: "database", label: "Data & Sinkronisasi" },
   { id: "lisensi", icon: "document", label: "Lisensi" },
+  { id: "gaji", icon: "download", label: "Gaji & Pajak" },
 ] as const;
 
 type SettingsTab = (typeof SETTINGS_TABS)[number]["id"];
@@ -1213,6 +1216,7 @@ export default function SettingsPage() {
     if (id === "data") return isSuperadmin || showSyncCard;
     // LicenseCard tidak merender apa pun pada build Web tanpa penegakan lisensi.
     if (id === "lisensi") return isSuperadmin && Boolean(licenseStatus);
+    if (id === "gaji") return hasPermission(user, "payroll.config.manage");
     return true;
   });
   const activeTab = visibleTabs.some(({ id }) => id === selectedTab)
@@ -1477,6 +1481,14 @@ export default function SettingsPage() {
           <div hidden={activeTab !== "lisensi"}>
             <LicenseCard />
           </div>
+
+          {/* Khusus cloud: dimuat hanya saat tab dibuka. */}
+          {activeTab === "gaji" ? (
+            <div className="flex flex-col gap-7">
+              <BankTransferCard />
+              <DataPemotongCard />
+            </div>
+          ) : null}
         </div>
       </div>
 

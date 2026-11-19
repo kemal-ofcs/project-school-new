@@ -52,4 +52,23 @@ describe("createXlsxWorkbook", () => {
     expect(xml).toContain('<pane xSplit="2" ySplit="1" topLeftCell="C2"');
     expect(xml).toContain('<col min="2" max="2" width="30" customWidth="1"/>');
   });
+
+  test("tanpaJudul: baris pertama sudah data, tanpa pane beku", () => {
+    const xml = new TextDecoder().decode(
+      createXlsxWorkbook([
+        {
+          nama: "Transfer",
+          headers: ["Rekening", "Nominal"],
+          rows: [["0012", new AngkaExcel(5000)]],
+          kolomBeku: 1,
+          tanpaJudul: true,
+        },
+      ]),
+    );
+    expect(xml).not.toContain("<t>Rekening</t>");
+    expect(xml).not.toContain("<pane");
+    expect(xml).toContain(
+      '<row r="1"><c r="A1" t="inlineStr"><is><t>0012</t></is></c><c r="B1"><v>5000</v></c></row>',
+    );
+  });
 });
