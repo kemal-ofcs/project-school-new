@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-desktop-report-setting-save"
+description = "Enables the desktop_report_setting_save command without any pre-configured scope."
+commands.allow = ["desktop_report_setting_save"]
+
+[[permission]]
+identifier = "deny-desktop-report-setting-save"
+description = "Denies the desktop_report_setting_save command without any pre-configured scope."
+commands.deny = ["desktop_report_setting_save"]

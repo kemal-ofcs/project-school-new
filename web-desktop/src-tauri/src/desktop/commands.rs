@@ -11,7 +11,7 @@ use super::{
         CommandError, DesktopLoginResult, DesktopRuntimeStatus, DesktopSession, DesktopSyncStatus,
         OperatorUser, SessionMode,
     },
-    hr_beban, hr_keluar, hr_kinerja, hr_pelatihan, hr_pengajuan, hr_pengingat, hr_rekrutmen, hris, hris_cloud, lapor_pajak,
+    hr_beban, hr_keluar, hr_kinerja, hr_pelatihan, hr_pengajuan, hr_pengingat, hr_reimburse, hr_rekrutmen, hris, hris_cloud, lapor_pajak,
     operational, portability, rapel,
     scanner, secrets, storage, sync, teaching_journal, transfer, turso, uks, wa_notification,
 };
@@ -3974,6 +3974,121 @@ pub async fn desktop_report_setting_save(
 ) -> Result<Value, CommandError> {
     let operator = require_permission(&state, lapor_pajak::IZIN_PEMOTONG)?;
     lapor_pajak::simpan_pemotong(&klien_cloud(&state)?, &operator.username, &draft)
+        .await
+        .map_err(hris_cloud::luring)
+}
+
+/// Jenis reimbursement (HRIS Fase 8c, cloud-only). Cukup sesi: dipakai isian
+/// klaim dan tidak memuat data pegawai.
+#[tauri::command]
+pub async fn desktop_hr_reimburse_types(state: State<'_, DesktopState>) -> Result<Value, CommandError> {
+    require_session(&state)?;
+    hr_reimburse::jenis_reimburse(&klien_cloud(&state)?)
+        .await
+        .map_err(hris_cloud::luring)
+}
+
+/// Buat atau ubah satu jenis reimbursement.
+#[tauri::command]
+pub async fn desktop_hr_reimburse_types_save(
+    state: State<'_, DesktopState>,
+    draft: Value,
+) -> Result<Value, CommandError> {
+    let operator = require_permission(&state, "hr.reimburse.config")?;
+    hr_reimburse::simpan_jenis(&klien_cloud(&state)?, &operator.username, &draft)
+        .await
+        .map_err(hris_cloud::luring)
+}
+
+/// Klaim per bulan, per pegawai, atau rincian satu klaim. Pemegang
+/// `hr.reimburse.submit` saja hanya melihat klaim yang ia ajukan.
+#[tauri::command]
+pub async fn desktop_hr_reimburse_list(
+    state: State<'_, DesktopState>,
+    query: Value,
+) -> Result<Value, CommandError> {
+    let operator = require_any_permission(
+        &state,
+        &["hr.reimburse.view", "hr.reimburse.submit", "hr.reimburse.decide", "hr.reimburse.pay"],
+    )?;
+    hr_reimburse::daftar_klaim(&klien_cloud(&state)?, &operator, &query)
+        .await
+        .map_err(hris_cloud::luring)
+}
+
+/// Catat klaim atas nama personil; klaim tidak pernah diubah sesudahnya.
+#[tauri::command]
+pub async fn desktop_hr_reimburse_save(
+    state: State<'_, DesktopState>,
+    draft: Value,
+) -> Result<Value, CommandError> {
+    let operator = require_permission(&state, "hr.reimburse.submit")?;
+    hr_reimburse::simpan_klaim(&klien_cloud(&state)?, &operator.username, &draft)
+        .await
+        .map_err(hris_cloud::luring)
+}
+
+/// Setujui, Tolak, atau Batal. Pengaju boleh membatalkan klaim yang belum
+/// diputus; selebihnya wewenang, cakupan unit, dan "bukan diri sendiri"
+/// diperiksa `putus_klaim` dari sesi.
+#[tauri::command]
+pub async fn desktop_hr_reimburse_decide(
+    state: State<'_, DesktopState>,
+    draft: Value,
+) -> Result<Value, CommandError> {
+    let operator = require_any_permission(&state, &["hr.reimburse.decide", "hr.reimburse.submit"])?;
+    hr_reimburse::putus_klaim(&klien_cloud(&state)?, &operator, &draft)
+        .await
+        .map_err(hris_cloud::luring)
+}
+
+/// Isi satu nota klaim.
+#[tauri::command]
+pub async fn desktop_hr_reimburse_file(
+    state: State<'_, DesktopState>,
+    id_berkas: String,
+) -> Result<Value, CommandError> {
+    let operator = require_any_permission(
+        &state,
+        &["hr.reimburse.view", "hr.reimburse.submit", "hr.reimburse.decide", "hr.reimburse.pay"],
+    )?;
+    hr_reimburse::ambil_nota(&klien_cloud(&state)?, &operator, &id_berkas)
+        .await
+        .map_err(hris_cloud::luring)
+}
+
+/// Tambah atau hapus nota selama klaim belum diputus, hanya oleh pengajunya.
+#[tauri::command]
+pub async fn desktop_hr_reimburse_file_save(
+    state: State<'_, DesktopState>,
+    draft: Value,
+) -> Result<Value, CommandError> {
+    let operator = require_permission(&state, "hr.reimburse.submit")?;
+    hr_reimburse::simpan_nota(&klien_cloud(&state)?, &operator, &draft)
+        .await
+        .map_err(hris_cloud::luring)
+}
+
+/// Catat pembayaran klaim Disetujui satu pegawai (dibayar terpisah dari gaji).
+#[tauri::command]
+pub async fn desktop_hr_reimburse_pay(
+    state: State<'_, DesktopState>,
+    draft: Value,
+) -> Result<Value, CommandError> {
+    let operator = require_permission(&state, "hr.reimburse.pay")?;
+    hr_reimburse::bayar_klaim(&klien_cloud(&state)?, &operator.username, &draft)
+        .await
+        .map_err(hris_cloud::luring)
+}
+
+/// Batalkan satu pembayaran lewat baris `batal-<id>` beralasan.
+#[tauri::command]
+pub async fn desktop_hr_reimburse_pay_cancel(
+    state: State<'_, DesktopState>,
+    draft: Value,
+) -> Result<Value, CommandError> {
+    let operator = require_permission(&state, "hr.reimburse.pay")?;
+    hr_reimburse::batal_bayar(&klien_cloud(&state)?, &operator.username, &draft)
         .await
         .map_err(hris_cloud::luring)
 }

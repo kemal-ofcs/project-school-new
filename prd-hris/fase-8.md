@@ -4,8 +4,8 @@ Bagian §26 dari `prd-hris.md`. Istilah, keputusan pemilik (§5), hak akses umum
 
 ## 26. Urutan pengerjaan Fase 8
 
-**Rancangan disetujui pemilik** (Q-152 sampai Q-167, §26.10). 8a dan 8b
-sudah ditulis (§26.11); berikutnya 8c. Isi Fase 8 dipilih pemilik pada 19 Nov 2026 dari daftar
+**Rancangan disetujui pemilik** (Q-152 sampai Q-167, §26.10). 8a
+sampai 8c sudah ditulis (§26.11); berikutnya 8d. Isi Fase 8 dipilih pemilik pada 19 Nov 2026 dari daftar
 §14: **berkas transfer gaji ke bank, laporan PPh 21/BPJS, dan
 reimbursement**. HRIS di Mobile, bagan organisasi, lembur SPL, tukar jam, dan
 Portal Guru tetap di §14 untuk fase berikutnya.
@@ -458,3 +458,46 @@ Penyimpangan, untuk ditinjau:
   Dibaca hanya `payroll.config.manage`; laporan menyertakannya.
 - `objek_ketat`/`rapikan` di `transfer.rs` dan `objekKetat`/`rapikan` di
   `transfer.ts` kini dibuka untuk dipakai ulang modul ini.
+
+**8c (19 Nov 2026), belum di-commit, `bun run check` belum oleh pemilik.**
+
+- Modul `desktop/hr_reimburse.rs` ↔ `validations/hr-reimburse.ts` +
+  `services/hr-reimburse.ts`: `validasi_jenis`, `validasi_klaim`,
+  `status_klaim`, `status_bayar`, `periksa_keputusan` (+ `pemutus_sah`),
+  `lewat_batas`, `tanda_klaim`, `validasi_bayar`, `periksa_bayar`,
+  `periksa_batal_bayar`, SQL kembar harfiah. Command
+  `desktop_hr_reimburse_types|types_save|list|save|decide|file|file_save|pay|pay_cancel`,
+  rute `POST /api/kepegawaian/reimburse/{types/query,types/save,query,save,decide,file/query,file,pay,pay/cancel}`,
+  gateway `gateways/hris.ts` (`muatJenisReimburse`, `simpanJenisReimburse`,
+  `muatKlaimBulan|Pegawai`, `muatRincianKlaim`, `simpanKlaim`, `putusKlaim`,
+  `simpanNotaKlaim`, `ambilNotaKlaim`, `bayarKlaim`, `batalBayarKlaim`).
+- `audit:contract`: command Desktop 455 → 464, Mobile 460 → 469, izin tetap
+  141, tanpa tabel atau rute sync baru.
+- Tes: `validations/hr-reimburse.test.ts` (vektor, SQL/pesan/konstanta
+  harfiah terhadap kedua `hr_reimburse.rs`), `services/hr-reimburse.test.ts`,
+  `cargo test hr_reimburse` 3 lulus. Data uji bersama
+  `services/hr-reimburse.uji.sql`.
+
+Penyimpangan, untuk ditinjau:
+
+- **Klaim tidak bisa disunting sama sekali**, juga sebelum diputus: koreksi =
+  Batal lalu ajukan ulang. Tabel `hr_reimburse` tidak punya kolom
+  `diubah_*`, dan nota tetap bisa ditambah/dihapus selama Menunggu.
+- **Pengaju boleh membatalkan klaim yang belum diputus** tanpa
+  `hr.reimburse.decide` (pengaju = `diajukan_oleh`, akun yang mencatat).
+  Batal sesudah Disetujui hanya pemutus dalam cakupan, bukan diri sendiri.
+  Alasan wajib untuk Tolak, Batal, dan Setujui sebagian.
+- **Pembaca**: `hr.reimburse.view`, `decide`, atau `pay` melihat semua klaim
+  dan pembayaran; pemegang `submit` saja hanya klaim yang ia ajukan (tanpa
+  daftar pembayaran). Nota hanya diubah pengajunya (atau Superadmin).
+- **Bayar ganda ditahan di transaksi**: `BAYAR_SQL` menulis kepala pembayaran
+  hanya bila setiap klaim (larik JSON, `json_each`) masih Disetujui, tidak
+  dibatalkan, dan tanpa pembayaran aktif; baris menyalin `nominal_disetujui`
+  dari keputusan. Tanda `dibayar_ganda` tetap ada untuk data yang lolos dari
+  luar jalur ini. Tanggal bayar boleh mundur, tidak boleh sesudah hari ini.
+- **`lewat_batas`** = Σ klaim Menunggu + Disetujui (Disetujui memakai nominal
+  disetujui) per pegawai, jenis, dan bulan tanggal biaya, dinilai atas daftar
+  yang dimuat (mode bulan, pegawai, atau rincian yang memuat riwayat
+  pegawainya). `tanpa_nota` tidak melihat status.
+- Pegawai keluar tetap bisa diajukan klaim baru (`SIMPAN_KLAIM_SQL` hanya
+  memakai `PEGAWAI_SQL`), bukan hanya klaim lama.

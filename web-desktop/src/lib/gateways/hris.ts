@@ -40,6 +40,20 @@ import type {
 } from "@/lib/validations/hr-pelatihan";
 import type { PerluPerhatian } from "@/lib/validations/hr-pengingat";
 import type {
+  BatalBayarDraft,
+  BayarDraft,
+  IsiNota,
+  JenisReimburse,
+  JenisReimburseDraft,
+  KeputusanDraft,
+  KlaimBulan,
+  KlaimDraft,
+  KlaimPegawai,
+  NotaDraft,
+  RincianKlaim,
+  StatusKlaim,
+} from "@/lib/validations/hr-reimburse";
+import type {
   BerkasPelamarDraft,
   DaftarLowongan,
   HasilHire,
@@ -897,5 +911,127 @@ export function ambilBerkasSertifikat(
     { idBerkas: id },
     "/api/kepegawaian/training/certificate/file/query",
     { id },
+  );
+}
+
+// HRIS Fase 8c: reimbursement, cloud-only.
+
+export function muatJenisReimburse(): Promise<{ jenis: JenisReimburse[] }> {
+  return cloud(
+    "desktop_hr_reimburse_types",
+    {},
+    "/api/kepegawaian/reimburse/types/query",
+    {},
+  );
+}
+
+export function simpanJenisReimburse(
+  draft: JenisReimburseDraft,
+): Promise<{ sukses: true; id_jenis: string }> {
+  return cloud(
+    "desktop_hr_reimburse_types_save",
+    { draft },
+    "/api/kepegawaian/reimburse/types/save",
+    draft,
+  );
+}
+
+/** Klaim satu bulan (`YYYY-MM`, kosong = bulan ini WIB). */
+export function muatKlaimBulan(bulan: string): Promise<KlaimBulan> {
+  const query = { mode: "bulan", bulan } as const;
+  return cloud(
+    "desktop_hr_reimburse_list",
+    { query },
+    "/api/kepegawaian/reimburse/query",
+    query,
+  );
+}
+
+/** Riwayat klaim satu pegawai + pembayarannya. */
+export function muatKlaimPegawai(idKaryawan: string): Promise<KlaimPegawai> {
+  const query = { mode: "pegawai", id_karyawan: idKaryawan } as const;
+  return cloud(
+    "desktop_hr_reimburse_list",
+    { query },
+    "/api/kepegawaian/reimburse/query",
+    query,
+  );
+}
+
+export function muatRincianKlaim(idKlaim: string): Promise<RincianKlaim> {
+  const query = { mode: "rincian", id_klaim: idKlaim } as const;
+  return cloud(
+    "desktop_hr_reimburse_list",
+    { query },
+    "/api/kepegawaian/reimburse/query",
+    query,
+  );
+}
+
+export function simpanKlaim(
+  draft: KlaimDraft,
+): Promise<{ sukses: true; id_klaim: string }> {
+  return cloud(
+    "desktop_hr_reimburse_save",
+    { draft },
+    "/api/kepegawaian/reimburse/save",
+    draft,
+  );
+}
+
+/** Setujui (nominal opsional), Tolak, atau Batal; alasan sesuai aturan. */
+export function putusKlaim(draft: KeputusanDraft): Promise<{
+  sukses: true;
+  id_keputusan: string;
+  status: StatusKlaim;
+}> {
+  return cloud(
+    "desktop_hr_reimburse_decide",
+    { draft },
+    "/api/kepegawaian/reimburse/decide",
+    draft,
+  );
+}
+
+/** Aksi `tambah` (berkas) atau `hapus` (`id_berkas`). */
+export function simpanNotaKlaim(
+  draft: NotaDraft,
+): Promise<{ sukses: true; id_berkas?: string }> {
+  return cloud(
+    "desktop_hr_reimburse_file_save",
+    { draft },
+    "/api/kepegawaian/reimburse/file",
+    draft,
+  );
+}
+
+export function ambilNotaKlaim(id: string): Promise<IsiNota> {
+  return cloud(
+    "desktop_hr_reimburse_file",
+    { idBerkas: id },
+    "/api/kepegawaian/reimburse/file/query",
+    { id },
+  );
+}
+
+export function bayarKlaim(
+  draft: BayarDraft,
+): Promise<{ sukses: true; id_bayar: string; total: number }> {
+  return cloud(
+    "desktop_hr_reimburse_pay",
+    { draft },
+    "/api/kepegawaian/reimburse/pay",
+    draft,
+  );
+}
+
+export function batalBayarKlaim(
+  draft: BatalBayarDraft,
+): Promise<{ sukses: true; id_bayar: string }> {
+  return cloud(
+    "desktop_hr_reimburse_pay_cancel",
+    { draft },
+    "/api/kepegawaian/reimburse/pay/cancel",
+    draft,
   );
 }

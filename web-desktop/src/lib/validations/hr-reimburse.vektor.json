@@ -1,0 +1,802 @@
+{
+  "jenis": [
+    {
+      "nama": "jenis baru lengkap, nama dirapikan",
+      "draft": {
+        "nama": " Transport ",
+        "wajib_nota": true,
+        "batas_bulanan": 500000
+      },
+      "hasil": {
+        "id_jenis": null,
+        "nama": "Transport",
+        "wajib_nota": true,
+        "batas_bulanan": 500000,
+        "is_aktif": true
+      }
+    },
+    {
+      "nama": "ubah jadi nonaktif tanpa batas",
+      "draft": {
+        "id_jenis": "rmj-x",
+        "nama": "Lain",
+        "is_aktif": false,
+        "batas_bulanan": null
+      },
+      "hasil": {
+        "id_jenis": "rmj-x",
+        "nama": "Lain",
+        "wajib_nota": false,
+        "batas_bulanan": null,
+        "is_aktif": false
+      }
+    },
+    {
+      "nama": "nama kosong ditolak",
+      "draft": { "nama": "  " },
+      "galat": "Nama jenis wajib diisi."
+    },
+    {
+      "nama": "nama terlalu panjang ditolak",
+      "draft": {
+        "nama": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+      },
+      "galat": "Nama jenis maksimal 100 karakter."
+    },
+    {
+      "nama": "batas nol ditolak",
+      "draft": { "nama": "A", "batas_bulanan": 0 },
+      "galat": "Batas bulanan harus bilangan bulat 1 sampai 1000000000."
+    },
+    {
+      "nama": "batas pecahan ditolak",
+      "draft": { "nama": "A", "batas_bulanan": 1.5 },
+      "galat": "Batas bulanan harus bilangan bulat 1 sampai 1000000000."
+    }
+  ],
+  "klaim": [
+    {
+      "nama": "klaim sah hari ini, keperluan dirapikan",
+      "hari_ini": "2026-11-19",
+      "draft": {
+        "id_karyawan": "G1",
+        "id_jenis": "rmj-transport",
+        "tanggal": "2026-11-19",
+        "nominal": 150000,
+        "keperluan": " Taksi rapat dinas "
+      },
+      "hasil": {
+        "id_karyawan": "G1",
+        "id_jenis": "rmj-transport",
+        "tanggal": "2026-11-19",
+        "nominal": 150000,
+        "keperluan": "Taksi rapat dinas"
+      }
+    },
+    {
+      "nama": "tanggal masa depan ditolak",
+      "hari_ini": "2026-11-19",
+      "draft": {
+        "id_karyawan": "G1",
+        "id_jenis": "rmj-transport",
+        "tanggal": "2026-11-20",
+        "nominal": 150000,
+        "keperluan": "Taksi"
+      },
+      "galat": "Tanggal biaya tidak boleh sesudah hari ini."
+    },
+    {
+      "nama": "tanggal tidak ada di kalender ditolak",
+      "hari_ini": "2026-11-19",
+      "draft": {
+        "id_karyawan": "G1",
+        "id_jenis": "rmj-transport",
+        "tanggal": "2026-02-30",
+        "nominal": 150000,
+        "keperluan": "Taksi"
+      },
+      "galat": "Tanggal biaya tidak valid."
+    },
+    {
+      "nama": "tanpa pegawai ditolak",
+      "hari_ini": "2026-11-19",
+      "draft": {
+        "id_jenis": "rmj-transport",
+        "tanggal": "2026-11-19",
+        "nominal": 150000,
+        "keperluan": "Taksi"
+      },
+      "galat": "Pegawai wajib dipilih."
+    },
+    {
+      "nama": "tanpa jenis ditolak",
+      "hari_ini": "2026-11-19",
+      "draft": {
+        "id_karyawan": "G1",
+        "tanggal": "2026-11-19",
+        "nominal": 150000,
+        "keperluan": "Taksi"
+      },
+      "galat": "Jenis reimbursement wajib dipilih."
+    },
+    {
+      "nama": "nominal nol ditolak",
+      "hari_ini": "2026-11-19",
+      "draft": {
+        "id_karyawan": "G1",
+        "id_jenis": "rmj-transport",
+        "tanggal": "2026-11-19",
+        "nominal": 0,
+        "keperluan": "Taksi"
+      },
+      "galat": "Nominal harus bilangan bulat 1 sampai 1000000000."
+    },
+    {
+      "nama": "nominal pecahan ditolak",
+      "hari_ini": "2026-11-19",
+      "draft": {
+        "id_karyawan": "G1",
+        "id_jenis": "rmj-transport",
+        "tanggal": "2026-11-19",
+        "nominal": 1500.5,
+        "keperluan": "Taksi"
+      },
+      "galat": "Nominal harus bilangan bulat 1 sampai 1000000000."
+    },
+    {
+      "nama": "nominal di atas batas ditolak",
+      "hari_ini": "2026-11-19",
+      "draft": {
+        "id_karyawan": "G1",
+        "id_jenis": "rmj-transport",
+        "tanggal": "2026-11-19",
+        "nominal": 1000000001,
+        "keperluan": "Taksi"
+      },
+      "galat": "Nominal harus bilangan bulat 1 sampai 1000000000."
+    },
+    {
+      "nama": "keperluan kosong ditolak",
+      "hari_ini": "2026-11-19",
+      "draft": {
+        "id_karyawan": "G1",
+        "id_jenis": "rmj-transport",
+        "tanggal": "2026-11-19",
+        "nominal": 150000,
+        "keperluan": " "
+      },
+      "galat": "Keperluan wajib diisi."
+    }
+  ],
+  "status": [
+    { "nama": "belum diputus", "aksi": [], "hasil": "Menunggu" },
+    { "nama": "disetujui", "aksi": ["Setujui"], "hasil": "Disetujui" },
+    { "nama": "ditolak", "aksi": ["Tolak"], "hasil": "Ditolak" },
+    {
+      "nama": "disetujui lalu dibatalkan",
+      "aksi": ["Setujui", "Batal"],
+      "hasil": "Dibatalkan"
+    },
+    {
+      "nama": "urutan terbalik tetap dibatalkan",
+      "aksi": ["Batal", "Setujui"],
+      "hasil": "Dibatalkan"
+    },
+    {
+      "nama": "dibatalkan pengaju sebelum diputus",
+      "aksi": ["Batal"],
+      "hasil": "Dibatalkan"
+    }
+  ],
+  "status_bayar": [
+    {
+      "nama": "belum ada pembayaran aktif",
+      "jumlah": 0,
+      "hasil": "Belum dibayar"
+    },
+    { "nama": "satu pembayaran aktif", "jumlah": 1, "hasil": "Dibayar" },
+    {
+      "nama": "dua pembayaran aktif tetap Dibayar",
+      "jumlah": 2,
+      "hasil": "Dibayar"
+    }
+  ],
+  "keputusan": [
+    {
+      "nama": "setujui tanpa nominal = nominal pengajuan",
+      "draft": { "aksi": "Setujui" },
+      "keadaan": {
+        "status": "Menunggu",
+        "dibayar": false,
+        "nominal": 150000,
+        "boleh_putus": true,
+        "sendiri": false,
+        "dalam_cakupan": true,
+        "pengaju_sendiri": false
+      },
+      "hasil": {
+        "aksi": "Setujui",
+        "nominal_disetujui": 150000,
+        "alasan": null
+      }
+    },
+    {
+      "nama": "setujui sebagian tanpa alasan ditolak",
+      "draft": { "aksi": "Setujui", "nominal_disetujui": 100000 },
+      "keadaan": {
+        "status": "Menunggu",
+        "dibayar": false,
+        "nominal": 150000,
+        "boleh_putus": true,
+        "sendiri": false,
+        "dalam_cakupan": true,
+        "pengaju_sendiri": false
+      },
+      "galat": "Nominal disetujui lebih kecil dari pengajuan; alasannya wajib diisi."
+    },
+    {
+      "nama": "setujui sebagian beralasan",
+      "draft": {
+        "aksi": "Setujui",
+        "nominal_disetujui": 100000,
+        "alasan": " Batas tarif taksi "
+      },
+      "keadaan": {
+        "status": "Menunggu",
+        "dibayar": false,
+        "nominal": 150000,
+        "boleh_putus": true,
+        "sendiri": false,
+        "dalam_cakupan": true,
+        "pengaju_sendiri": false
+      },
+      "hasil": {
+        "aksi": "Setujui",
+        "nominal_disetujui": 100000,
+        "alasan": "Batas tarif taksi"
+      }
+    },
+    {
+      "nama": "nominal disetujui lebih dari pengajuan ditolak",
+      "draft": {
+        "aksi": "Setujui",
+        "nominal_disetujui": 200000,
+        "alasan": "x"
+      },
+      "keadaan": {
+        "status": "Menunggu",
+        "dibayar": false,
+        "nominal": 150000,
+        "boleh_putus": true,
+        "sendiri": false,
+        "dalam_cakupan": true,
+        "pengaju_sendiri": false
+      },
+      "galat": "Nominal disetujui harus 1 sampai 150000."
+    },
+    {
+      "nama": "nominal disetujui pecahan ditolak",
+      "draft": { "aksi": "Setujui", "nominal_disetujui": 100.5, "alasan": "x" },
+      "keadaan": {
+        "status": "Menunggu",
+        "dibayar": false,
+        "nominal": 150000,
+        "boleh_putus": true,
+        "sendiri": false,
+        "dalam_cakupan": true,
+        "pengaju_sendiri": false
+      },
+      "galat": "Nominal disetujui harus 1 sampai 150000."
+    },
+    {
+      "nama": "tolak tanpa alasan ditolak",
+      "draft": { "aksi": "Tolak" },
+      "keadaan": {
+        "status": "Menunggu",
+        "dibayar": false,
+        "nominal": 150000,
+        "boleh_putus": true,
+        "sendiri": false,
+        "dalam_cakupan": true,
+        "pengaju_sendiri": false
+      },
+      "galat": "Alasan penolakan wajib diisi."
+    },
+    {
+      "nama": "tolak beralasan, nominal kiriman diabaikan",
+      "draft": {
+        "aksi": "Tolak",
+        "nominal_disetujui": 5000,
+        "alasan": "Bukan biaya dinas"
+      },
+      "keadaan": {
+        "status": "Menunggu",
+        "dibayar": false,
+        "nominal": 150000,
+        "boleh_putus": true,
+        "sendiri": false,
+        "dalam_cakupan": true,
+        "pengaju_sendiri": false
+      },
+      "hasil": {
+        "aksi": "Tolak",
+        "nominal_disetujui": null,
+        "alasan": "Bukan biaya dinas"
+      }
+    },
+    {
+      "nama": "klaim terkunci sesudah disetujui",
+      "draft": { "aksi": "Setujui" },
+      "keadaan": {
+        "status": "Disetujui",
+        "dibayar": false,
+        "nominal": 150000,
+        "boleh_putus": true,
+        "sendiri": false,
+        "dalam_cakupan": true,
+        "pengaju_sendiri": false
+      },
+      "galat": "Klaim ini sudah diputus. Batalkan lalu ajukan ulang bila perlu dikoreksi."
+    },
+    {
+      "nama": "klaim terkunci sesudah ditolak",
+      "draft": { "aksi": "Tolak", "alasan": "x" },
+      "keadaan": {
+        "status": "Ditolak",
+        "dibayar": false,
+        "nominal": 150000,
+        "boleh_putus": true,
+        "sendiri": false,
+        "dalam_cakupan": true,
+        "pengaju_sendiri": false
+      },
+      "galat": "Klaim ini sudah diputus. Batalkan lalu ajukan ulang bila perlu dikoreksi."
+    },
+    {
+      "nama": "batal klaim terbayar ditolak",
+      "draft": { "aksi": "Batal", "alasan": "Salah nominal" },
+      "keadaan": {
+        "status": "Disetujui",
+        "dibayar": true,
+        "nominal": 150000,
+        "boleh_putus": true,
+        "sendiri": false,
+        "dalam_cakupan": true,
+        "pengaju_sendiri": false
+      },
+      "galat": "Klaim ini sudah dibayar. Batalkan pembayarannya dulu."
+    },
+    {
+      "nama": "batal klaim disetujui yang belum dibayar",
+      "draft": { "aksi": "Batal", "alasan": "Salah nominal" },
+      "keadaan": {
+        "status": "Disetujui",
+        "dibayar": false,
+        "nominal": 150000,
+        "boleh_putus": true,
+        "sendiri": false,
+        "dalam_cakupan": true,
+        "pengaju_sendiri": false
+      },
+      "hasil": {
+        "aksi": "Batal",
+        "nominal_disetujui": null,
+        "alasan": "Salah nominal"
+      }
+    },
+    {
+      "nama": "batal klaim ditolak ditolak",
+      "draft": { "aksi": "Batal", "alasan": "x" },
+      "keadaan": {
+        "status": "Ditolak",
+        "dibayar": false,
+        "nominal": 150000,
+        "boleh_putus": true,
+        "sendiri": false,
+        "dalam_cakupan": true,
+        "pengaju_sendiri": false
+      },
+      "galat": "Klaim ini sudah ditolak atau dibatalkan."
+    },
+    {
+      "nama": "batal tanpa alasan ditolak",
+      "draft": { "aksi": "Batal" },
+      "keadaan": {
+        "status": "Menunggu",
+        "dibayar": false,
+        "nominal": 150000,
+        "boleh_putus": true,
+        "sendiri": false,
+        "dalam_cakupan": true,
+        "pengaju_sendiri": false
+      },
+      "galat": "Alasan pembatalan wajib diisi."
+    },
+    {
+      "nama": "pemutus atas klaim diri sendiri ditolak",
+      "draft": { "aksi": "Setujui" },
+      "keadaan": {
+        "status": "Menunggu",
+        "dibayar": false,
+        "nominal": 150000,
+        "boleh_putus": true,
+        "sendiri": true,
+        "dalam_cakupan": true,
+        "pengaju_sendiri": false
+      },
+      "galat": "Klaim atas diri sendiri tidak bisa Anda putus."
+    },
+    {
+      "nama": "pemutus beda unit ditolak",
+      "draft": { "aksi": "Setujui" },
+      "keadaan": {
+        "status": "Menunggu",
+        "dibayar": false,
+        "nominal": 150000,
+        "boleh_putus": true,
+        "sendiri": false,
+        "dalam_cakupan": false,
+        "pengaju_sendiri": false
+      },
+      "galat": "Klaim ini di luar unit Anda."
+    },
+    {
+      "nama": "tanpa izin memutus ditolak",
+      "draft": { "aksi": "Setujui" },
+      "keadaan": {
+        "status": "Menunggu",
+        "dibayar": false,
+        "nominal": 150000,
+        "boleh_putus": false,
+        "sendiri": false,
+        "dalam_cakupan": true,
+        "pengaju_sendiri": true
+      },
+      "galat": "Hanya pemutus reimbursement yang bisa melakukan ini."
+    },
+    {
+      "nama": "pengaju membatalkan klaim yang belum diputus",
+      "draft": { "aksi": "Batal", "alasan": "Salah jenis" },
+      "keadaan": {
+        "status": "Menunggu",
+        "dibayar": false,
+        "nominal": 150000,
+        "boleh_putus": false,
+        "sendiri": true,
+        "dalam_cakupan": false,
+        "pengaju_sendiri": true
+      },
+      "hasil": {
+        "aksi": "Batal",
+        "nominal_disetujui": null,
+        "alasan": "Salah jenis"
+      }
+    },
+    {
+      "nama": "pengaju tidak bisa membatalkan klaim yang sudah disetujui",
+      "draft": { "aksi": "Batal", "alasan": "Salah jenis" },
+      "keadaan": {
+        "status": "Disetujui",
+        "dibayar": false,
+        "nominal": 150000,
+        "boleh_putus": false,
+        "sendiri": false,
+        "dalam_cakupan": true,
+        "pengaju_sendiri": true
+      },
+      "galat": "Hanya pemutus reimbursement yang bisa melakukan ini."
+    },
+    {
+      "nama": "aksi asing ditolak",
+      "draft": { "aksi": "Revisi" },
+      "keadaan": {
+        "status": "Menunggu",
+        "dibayar": false,
+        "nominal": 150000,
+        "boleh_putus": true,
+        "sendiri": false,
+        "dalam_cakupan": true,
+        "pengaju_sendiri": false
+      },
+      "galat": "Aksi keputusan harus Setujui, Tolak, atau Batal."
+    }
+  ],
+  "tanda": [
+    {
+      "nama": "batas bulanan hanya tanda, per pegawai, jenis, dan bulan",
+      "klaim": [
+        {
+          "id_karyawan": "G1",
+          "id_jenis": "rmj-transport",
+          "tanggal": "2026-11-03",
+          "status": "Disetujui",
+          "nominal": 150000,
+          "nominal_disetujui": 120000,
+          "wajib_nota": true,
+          "batas_bulanan": 200000,
+          "jumlah_nota": 0,
+          "jumlah_bayar": 0
+        },
+        {
+          "id_karyawan": "G1",
+          "id_jenis": "rmj-transport",
+          "tanggal": "2026-11-10",
+          "status": "Menunggu",
+          "nominal": 100000,
+          "nominal_disetujui": null,
+          "wajib_nota": true,
+          "batas_bulanan": 200000,
+          "jumlah_nota": 1,
+          "jumlah_bayar": 0
+        },
+        {
+          "id_karyawan": "G1",
+          "id_jenis": "rmj-transport",
+          "tanggal": "2026-11-12",
+          "status": "Ditolak",
+          "nominal": 500000,
+          "nominal_disetujui": null,
+          "wajib_nota": true,
+          "batas_bulanan": 200000,
+          "jumlah_nota": 1,
+          "jumlah_bayar": 0
+        },
+        {
+          "id_karyawan": "G1",
+          "id_jenis": "rmj-transport",
+          "tanggal": "2026-10-30",
+          "status": "Menunggu",
+          "nominal": 150000,
+          "nominal_disetujui": null,
+          "wajib_nota": true,
+          "batas_bulanan": 200000,
+          "jumlah_nota": 1,
+          "jumlah_bayar": 0
+        },
+        {
+          "id_karyawan": "T1",
+          "id_jenis": "rmj-transport",
+          "tanggal": "2026-11-05",
+          "status": "Menunggu",
+          "nominal": 150000,
+          "nominal_disetujui": null,
+          "wajib_nota": true,
+          "batas_bulanan": 200000,
+          "jumlah_nota": 1,
+          "jumlah_bayar": 0
+        }
+      ],
+      "hasil": [["tanpa_nota", "lewat_batas"], ["lewat_batas"], [], [], []]
+    },
+    {
+      "nama": "sama dengan batas tidak ditandai, tanpa batas tidak ditandai",
+      "klaim": [
+        {
+          "id_karyawan": "G1",
+          "id_jenis": "rmj-kesehatan",
+          "tanggal": "2026-11-03",
+          "status": "Menunggu",
+          "nominal": 200000,
+          "nominal_disetujui": null,
+          "wajib_nota": false,
+          "batas_bulanan": 200000,
+          "jumlah_nota": 0,
+          "jumlah_bayar": 0
+        },
+        {
+          "id_karyawan": "G1",
+          "id_jenis": "rmj-lainnya",
+          "tanggal": "2026-11-03",
+          "status": "Menunggu",
+          "nominal": 900000000,
+          "nominal_disetujui": null,
+          "wajib_nota": false,
+          "batas_bulanan": null,
+          "jumlah_nota": 0,
+          "jumlah_bayar": 0
+        }
+      ],
+      "hasil": [[], []]
+    },
+    {
+      "nama": "dibayar ganda ditandai, tidak ditolak",
+      "klaim": [
+        {
+          "id_karyawan": "G1",
+          "id_jenis": "rmj-transport",
+          "tanggal": "2026-11-03",
+          "status": "Disetujui",
+          "nominal": 150000,
+          "nominal_disetujui": 150000,
+          "wajib_nota": false,
+          "batas_bulanan": null,
+          "jumlah_nota": 0,
+          "jumlah_bayar": 2
+        }
+      ],
+      "hasil": [["dibayar_ganda"]]
+    }
+  ],
+  "validasi_bayar": [
+    {
+      "nama": "tanpa tanggal = hari ini, id dirapikan",
+      "hari_ini": "2026-11-19",
+      "draft": {
+        "id_karyawan": "G1",
+        "id_klaim": [" rmb-1 ", "rmb-2", ""],
+        "keterangan": " Tunai "
+      },
+      "hasil": {
+        "id_karyawan": "G1",
+        "id_klaim": ["rmb-1", "rmb-2"],
+        "tanggal": "2026-11-19",
+        "keterangan": "Tunai"
+      }
+    },
+    {
+      "nama": "tanggal kemarin boleh",
+      "hari_ini": "2026-11-19",
+      "draft": {
+        "id_karyawan": "G1",
+        "id_klaim": ["rmb-1"],
+        "tanggal": "2026-11-18"
+      },
+      "hasil": {
+        "id_karyawan": "G1",
+        "id_klaim": ["rmb-1"],
+        "tanggal": "2026-11-18",
+        "keterangan": null
+      }
+    },
+    {
+      "nama": "tanggal bayar masa depan ditolak",
+      "hari_ini": "2026-11-19",
+      "draft": {
+        "id_karyawan": "G1",
+        "id_klaim": ["rmb-1"],
+        "tanggal": "2026-11-20"
+      },
+      "galat": "Tanggal bayar tidak boleh sesudah hari ini."
+    },
+    {
+      "nama": "tanpa pegawai ditolak",
+      "hari_ini": "2026-11-19",
+      "draft": { "id_klaim": ["rmb-1"] },
+      "galat": "Pegawai wajib dipilih."
+    }
+  ],
+  "bayar": [
+    {
+      "nama": "total = jumlah nominal disetujui",
+      "id_karyawan": "G1",
+      "id_klaim": ["rmb-1", "rmb-2"],
+      "klaim": [
+        {
+          "id_klaim": "rmb-1",
+          "id_karyawan": "G1",
+          "status": "Disetujui",
+          "nominal_disetujui": 120000,
+          "jumlah_bayar": 0
+        },
+        {
+          "id_klaim": "rmb-2",
+          "id_karyawan": "G1",
+          "status": "Disetujui",
+          "nominal_disetujui": 80000,
+          "jumlah_bayar": 0
+        },
+        {
+          "id_klaim": "rmb-3",
+          "id_karyawan": "G1",
+          "status": "Menunggu",
+          "nominal_disetujui": null,
+          "jumlah_bayar": 0
+        }
+      ],
+      "hasil": 200000
+    },
+    {
+      "nama": "tanpa klaim ditolak",
+      "id_karyawan": "G1",
+      "id_klaim": [],
+      "klaim": [],
+      "galat": "Pilih minimal satu klaim."
+    },
+    {
+      "nama": "klaim menunggu ditolak",
+      "id_karyawan": "G1",
+      "id_klaim": ["rmb-3"],
+      "klaim": [
+        {
+          "id_klaim": "rmb-3",
+          "id_karyawan": "G1",
+          "status": "Menunggu",
+          "nominal_disetujui": null,
+          "jumlah_bayar": 0
+        }
+      ],
+      "galat": "Hanya klaim Disetujui yang belum dibayar milik pegawai yang sama yang bisa dibayar."
+    },
+    {
+      "nama": "klaim pegawai lain ditolak",
+      "id_karyawan": "G1",
+      "id_klaim": ["rmb-4"],
+      "klaim": [
+        {
+          "id_klaim": "rmb-4",
+          "id_karyawan": "T1",
+          "status": "Disetujui",
+          "nominal_disetujui": 5000,
+          "jumlah_bayar": 0
+        }
+      ],
+      "galat": "Hanya klaim Disetujui yang belum dibayar milik pegawai yang sama yang bisa dibayar."
+    },
+    {
+      "nama": "klaim yang sudah dibayar ditolak",
+      "id_karyawan": "G1",
+      "id_klaim": ["rmb-1"],
+      "klaim": [
+        {
+          "id_klaim": "rmb-1",
+          "id_karyawan": "G1",
+          "status": "Disetujui",
+          "nominal_disetujui": 120000,
+          "jumlah_bayar": 1
+        }
+      ],
+      "galat": "Hanya klaim Disetujui yang belum dibayar milik pegawai yang sama yang bisa dibayar."
+    },
+    {
+      "nama": "klaim tidak dikenal ditolak",
+      "id_karyawan": "G1",
+      "id_klaim": ["rmb-9"],
+      "klaim": [],
+      "galat": "Hanya klaim Disetujui yang belum dibayar milik pegawai yang sama yang bisa dibayar."
+    },
+    {
+      "nama": "klaim dipilih dua kali ditolak",
+      "id_karyawan": "G1",
+      "id_klaim": ["rmb-1", "rmb-1"],
+      "klaim": [
+        {
+          "id_klaim": "rmb-1",
+          "id_karyawan": "G1",
+          "status": "Disetujui",
+          "nominal_disetujui": 120000,
+          "jumlah_bayar": 0
+        }
+      ],
+      "galat": "Klaim yang sama dipilih dua kali."
+    }
+  ],
+  "batal_bayar": [
+    {
+      "nama": "pembayaran aktif beralasan",
+      "jenis": "Bayar",
+      "sudah_dibatalkan": false,
+      "alasan": "Salah transfer"
+    },
+    {
+      "nama": "tanpa alasan ditolak",
+      "jenis": "Bayar",
+      "sudah_dibatalkan": false,
+      "alasan": null,
+      "galat": "Alasan pembatalan wajib diisi."
+    },
+    {
+      "nama": "sudah dibatalkan ditolak",
+      "jenis": "Bayar",
+      "sudah_dibatalkan": true,
+      "alasan": "x",
+      "galat": "Pembayaran ini sudah dibatalkan."
+    },
+    {
+      "nama": "baris pembatalan tidak bisa dibatalkan",
+      "jenis": "Pembatalan",
+      "sudah_dibatalkan": false,
+      "alasan": "x",
+      "galat": "Pembayaran tidak ditemukan."
+    }
+  ]
+}
