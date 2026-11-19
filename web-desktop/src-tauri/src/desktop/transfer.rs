@@ -140,7 +140,7 @@ fn panjang(t: &str) -> usize {
     t.chars().count()
 }
 
-fn rapikan(t: &str) -> String {
+pub(super) fn rapikan(t: &str) -> String {
     t.split_whitespace().collect::<Vec<_>>().join(" ")
 }
 
@@ -150,7 +150,7 @@ fn ada_kendali(t: &str) -> bool {
 }
 
 /// Cermin `objekKetat`: objek dengan kunci dari `kolom` saja.
-fn objek_ketat<'a>(draft: &'a Value, kolom: &[&str]) -> Result<&'a Map<String, Value>, String> {
+pub(super) fn objek_ketat<'a>(draft: &'a Value, kolom: &[&str]) -> Result<&'a Map<String, Value>, String> {
     let objek = draft.as_object().ok_or("Isian tidak valid.")?;
     if let Some(kunci) = objek.keys().find(|k| !kolom.contains(&k.as_str())) {
         return Err(format!("Isian '{kunci}' tidak dikenal."));

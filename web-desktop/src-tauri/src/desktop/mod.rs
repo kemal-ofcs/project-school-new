@@ -33,6 +33,7 @@ pub mod hr_reimburse;
 pub mod hris;
 pub mod hris_cloud;
 pub mod inventory;
+pub mod lapor_pajak;
 pub mod cicilan;
 pub mod inventory_pengajuan;
 pub mod konten_gambar;

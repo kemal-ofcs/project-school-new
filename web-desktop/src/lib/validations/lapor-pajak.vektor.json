@@ -1,0 +1,932 @@
+{
+  "masa": [
+    {
+      "nama": "masa sah dipangkas",
+      "draft": {
+        "masa": " 2026-11 "
+      },
+      "hasil": "2026-11"
+    },
+    {
+      "nama": "bulan 13 ditolak",
+      "draft": {
+        "masa": "2026-13"
+      },
+      "galat": "Masa wajib berformat YYYY-MM."
+    },
+    {
+      "nama": "bulan 00 ditolak",
+      "draft": {
+        "masa": "2026-00"
+      },
+      "galat": "Masa wajib berformat YYYY-MM."
+    },
+    {
+      "nama": "bulan satu digit ditolak",
+      "draft": {
+        "masa": "2026-1"
+      },
+      "galat": "Masa wajib berformat YYYY-MM."
+    },
+    {
+      "nama": "masa kosong ditolak",
+      "draft": {},
+      "galat": "Masa wajib berformat YYYY-MM."
+    },
+    {
+      "nama": "kunci asing ditolak",
+      "draft": {
+        "masa": "2026-11",
+        "unit": "a"
+      },
+      "galat": "Isian 'unit' tidak dikenal."
+    },
+    {
+      "nama": "bukan objek ditolak",
+      "draft": null,
+      "galat": "Isian tidak valid."
+    }
+  ],
+  "tahun": [
+    {
+      "nama": "tahun sah",
+      "draft": {
+        "tahun": "2026"
+      },
+      "hasil": "2026"
+    },
+    {
+      "nama": "tahun dua digit ditolak",
+      "draft": {
+        "tahun": "26"
+      },
+      "galat": "Tahun wajib 4 digit."
+    },
+    {
+      "nama": "tahun huruf ditolak",
+      "draft": {
+        "tahun": "20a6"
+      },
+      "galat": "Tahun wajib 4 digit."
+    }
+  ],
+  "pemotong": [
+    {
+      "nama": "lengkap, tanda baca dibuang, nomor BPJS huruf besar",
+      "draft": {
+        "npwp": "0123.4567.8901.2345",
+        "nitku": "0123456789012345 000000",
+        "nama_penandatangan": "  Siti   Kepala ",
+        "nik_penandatangan": "3201-0101-0101-0001",
+        "no_bpjs_ketenagakerjaan": "ab-12345",
+        "no_bpjs_kesehatan": "0012 3456"
+      },
+      "hasil": {
+        "npwp": "0123456789012345",
+        "nitku": "0123456789012345000000",
+        "nama_penandatangan": "Siti Kepala",
+        "nik_penandatangan": "3201010101010001",
+        "no_bpjs_ketenagakerjaan": "AB12345",
+        "no_bpjs_kesehatan": "00123456"
+      }
+    },
+    {
+      "nama": "kosong semua sah",
+      "draft": {},
+      "hasil": {
+        "npwp": "",
+        "nitku": "",
+        "nama_penandatangan": "",
+        "nik_penandatangan": "",
+        "no_bpjs_ketenagakerjaan": "",
+        "no_bpjs_kesehatan": ""
+      }
+    },
+    {
+      "nama": "NPWP 15 digit ditolak",
+      "draft": {
+        "npwp": "012345678901234"
+      },
+      "galat": "NPWP pemotong harus 16 digit."
+    },
+    {
+      "nama": "NPWP berhuruf ditolak",
+      "draft": {
+        "npwp": "01234567890123AB"
+      },
+      "galat": "NPWP pemotong hanya boleh berisi angka."
+    },
+    {
+      "nama": "NITKU tidak diawali NPWP",
+      "draft": {
+        "npwp": "0123456789012345",
+        "nitku": "9999999999999999000000"
+      },
+      "galat": "NITKU harus diawali NPWP pemotong."
+    },
+    {
+      "nama": "NITKU tanpa NPWP",
+      "draft": {
+        "nitku": "0123456789012345000000"
+      },
+      "galat": "NITKU harus diawali NPWP pemotong."
+    },
+    {
+      "nama": "NITKU 16 digit ditolak",
+      "draft": {
+        "npwp": "0123456789012345",
+        "nitku": "0123456789012345"
+      },
+      "galat": "NITKU harus 22 digit."
+    },
+    {
+      "nama": "NIK penandatangan 15 digit",
+      "draft": {
+        "nik_penandatangan": "320101010101000"
+      },
+      "galat": "NIK penandatangan harus 16 digit."
+    },
+    {
+      "nama": "nomor BPJS terlalu pendek",
+      "draft": {
+        "no_bpjs_kesehatan": "ab1"
+      },
+      "galat": "Nomor pendaftaran BPJS Kesehatan harus 5 sampai 20 huruf atau angka."
+    },
+    {
+      "nama": "jenis isian salah dicek lebih dulu",
+      "draft": {
+        "npwp": "1",
+        "no_bpjs_kesehatan": 5
+      },
+      "galat": "Isian 'no_bpjs_kesehatan' tidak valid."
+    },
+    {
+      "nama": "nama terlalu panjang",
+      "draft": {
+        "nama_penandatangan": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+      },
+      "galat": "Nama penandatangan maksimal 100 karakter."
+    },
+    {
+      "nama": "kunci asing ditolak",
+      "draft": {
+        "npwp_lama": "1"
+      },
+      "galat": "Isian 'npwp_lama' tidak dikenal."
+    }
+  ],
+  "slip": [
+    {
+      "run_id": "run-2025",
+      "status_run": "PAID",
+      "period_start": "2025-12-01",
+      "id_karyawan": "p1",
+      "nama_karyawan": "Ani Guru",
+      "kode_karyawan": "K001",
+      "ptkp_status": "K/1",
+      "gross_salary": 5000000,
+      "pph21_amount": 0,
+      "nik": "3201010101010001",
+      "npwp": "3201010101010001",
+      "bpjs_ketenagakerjaan": "11111111111",
+      "bpjs_kesehatan": "0001111111111",
+      "breakdown_snapshot": {
+        "pajak": {
+          "status": "tetap",
+          "metode": "PASAL_17_TERAKHIR",
+          "kategori": "TER_A",
+          "bruto_pajak": 5000000,
+          "pph_setahun": 0,
+          "tanda": []
+        },
+        "bpjs": [],
+        "bpjs_masa": {
+          "dasar_run": 5000000,
+          "tanda": []
+        }
+      }
+    },
+    {
+      "run_id": "run-a",
+      "status_run": "PAID",
+      "period_start": "2026-11-01",
+      "id_karyawan": "p1",
+      "nama_karyawan": "Ani Guru",
+      "kode_karyawan": "K001",
+      "ptkp_status": "K/1",
+      "gross_salary": 2880000,
+      "pph21_amount": 45000,
+      "nik": " 3201010101010001 ",
+      "npwp": "3201010101010001",
+      "bpjs_ketenagakerjaan": "11111111111",
+      "bpjs_kesehatan": "0001111111111",
+      "breakdown_snapshot": {
+        "pajak": {
+          "status": "tetap",
+          "metode": "TER_BULANAN",
+          "kategori": "TER_A",
+          "tarif": 150,
+          "bruto_pajak": 3000000,
+          "pph": 45000,
+          "tanda": []
+        },
+        "tax": {
+          "ptkp_status": "K/0"
+        },
+        "bpjs": [
+          {
+            "code": "JHT_EMP",
+            "name": "JHT Pekerja",
+            "nominal": 60000,
+            "is_employee": true
+          },
+          {
+            "code": "JHT_CO",
+            "name": "JHT Sekolah",
+            "nominal": 111000,
+            "is_employee": false
+          },
+          {
+            "code": "BPJS_KES_EMP",
+            "name": "Kesehatan Pekerja",
+            "nominal": 30000,
+            "is_employee": true
+          },
+          {
+            "code": "BPJS_KES_CO",
+            "name": "Kesehatan Sekolah",
+            "nominal": 120000,
+            "is_employee": false
+          }
+        ],
+        "bpjs_masa": {
+          "dasar_run": 3000000,
+          "dasar_masa": 3000000,
+          "tanda": []
+        }
+      }
+    },
+    {
+      "run_id": "run-b",
+      "status_run": "PAID",
+      "period_start": "2026-11-16",
+      "id_karyawan": "p1",
+      "nama_karyawan": "Ani Guru",
+      "kode_karyawan": "K001",
+      "ptkp_status": "K/1",
+      "gross_salary": 1920000,
+      "pph21_amount": 105000,
+      "nik": "3201010101010001",
+      "npwp": "3201010101010001",
+      "bpjs_ketenagakerjaan": "11111111111",
+      "bpjs_kesehatan": "0001111111111",
+      "breakdown_snapshot": {
+        "pajak": {
+          "status": "tetap",
+          "metode": "TER_BULANAN",
+          "kategori": "TER_A",
+          "tarif": 300,
+          "bruto_pajak": 2000000,
+          "pph": 105000,
+          "tanda": ["komponen_per_run"]
+        },
+        "tax": {
+          "ptkp_status": "K/0"
+        },
+        "bpjs": [
+          {
+            "code": "JHT_EMP",
+            "name": "JHT Pekerja",
+            "nominal": 40000,
+            "is_employee": true
+          },
+          {
+            "code": "JHT_CO",
+            "name": "JHT Sekolah",
+            "nominal": 74000,
+            "is_employee": false
+          },
+          {
+            "code": "BPJS_KES_EMP",
+            "name": "Kesehatan Pekerja",
+            "nominal": 20000,
+            "is_employee": true
+          },
+          {
+            "code": "BPJS_KES_CO",
+            "name": "Kesehatan Sekolah",
+            "nominal": 80000,
+            "is_employee": false
+          }
+        ],
+        "bpjs_masa": {
+          "dasar_run": 2000000,
+          "dasar_masa": 5000000,
+          "tanda": []
+        }
+      }
+    },
+    {
+      "run_id": "run-x",
+      "status_run": "REJECTED",
+      "period_start": "2026-11-16",
+      "id_karyawan": "p1",
+      "nama_karyawan": "Ani Guru",
+      "kode_karyawan": "K001",
+      "ptkp_status": "K/1",
+      "gross_salary": 9999999,
+      "pph21_amount": 999999,
+      "nik": "3201010101010001",
+      "npwp": "3201010101010001",
+      "breakdown_snapshot": {
+        "pajak": {
+          "status": "tetap",
+          "metode": "TER_BULANAN",
+          "bruto_pajak": 9999999,
+          "tanda": []
+        }
+      }
+    },
+    {
+      "run_id": "run-c",
+      "status_run": "PAID",
+      "period_start": "2026-12-01",
+      "id_karyawan": "p1",
+      "nama_karyawan": "Ani Guru",
+      "kode_karyawan": "K001",
+      "ptkp_status": "K/1",
+      "gross_salary": 4800000,
+      "pph21_amount": 180000,
+      "nik": "3201010101010001",
+      "npwp": "3201010101010001",
+      "bpjs_ketenagakerjaan": "11111111111",
+      "bpjs_kesehatan": "0001111111111",
+      "breakdown_snapshot": {
+        "pajak": {
+          "status": "tetap",
+          "metode": "PASAL_17_TERAKHIR",
+          "kategori": "TER_A",
+          "tarif": null,
+          "bruto_pajak": 5000000,
+          "bruto_tahun": 70000000,
+          "biaya_jabatan": 3500000,
+          "iuran_pensiun": 1400000,
+          "ptkp": 58500000,
+          "pkp": 6600000,
+          "pph_setahun": 330000,
+          "sudah_dipotong": 150000,
+          "pph": 180000,
+          "tanda": []
+        },
+        "tax": {
+          "ptkp_status": "K/0"
+        },
+        "bpjs": [
+          {
+            "code": "JHT_EMP",
+            "name": "JHT Pekerja",
+            "nominal": 100000,
+            "is_employee": true
+          },
+          {
+            "code": "BPJS_KES_EMP",
+            "name": "Kesehatan Pekerja",
+            "nominal": 50000,
+            "is_employee": true
+          }
+        ],
+        "bpjs_masa": {
+          "dasar_run": 5000000,
+          "dasar_masa": 5000000,
+          "tanda": []
+        }
+      }
+    },
+    {
+      "run_id": "run-e",
+      "status_run": "PAID",
+      "period_start": "2026-10-26",
+      "id_karyawan": "p2",
+      "nama_karyawan": "Budi Staf",
+      "kode_karyawan": "K002",
+      "ptkp_status": "TK/0",
+      "gross_salary": 4000000,
+      "pph21_amount": 20000,
+      "nik": "3201010101010002",
+      "npwp": "",
+      "breakdown_snapshot": {
+        "pajak": {
+          "status": "tetap",
+          "metode": "TER_BULANAN",
+          "kategori": "TER_A",
+          "bruto_pajak": 4000000,
+          "pph": 20000,
+          "tanda": ["lintas_bulan"]
+        },
+        "tax": {
+          "ptkp_status": "TK/0"
+        },
+        "bpjs": [
+          {
+            "code": "JHT_EMP",
+            "name": "JHT Pekerja",
+            "nominal": 80000,
+            "is_employee": true
+          }
+        ],
+        "bpjs_masa": {
+          "dasar_run": 4000000,
+          "tanda": []
+        }
+      }
+    },
+    {
+      "run_id": "run-a",
+      "status_run": "PAID",
+      "period_start": "2026-11-01",
+      "id_karyawan": "p2",
+      "nama_karyawan": "Budi Staf",
+      "kode_karyawan": "K002",
+      "ptkp_status": "TK/0",
+      "gross_salary": 4000000,
+      "pph21_amount": 20000,
+      "nik": "3201010101010002",
+      "npwp": "",
+      "breakdown_snapshot": {
+        "pajak": {
+          "status": "tetap",
+          "metode": "TER_BULANAN",
+          "kategori": "TER_A",
+          "bruto_pajak": 4000000,
+          "pph": 20000,
+          "tanda": []
+        },
+        "tax": {
+          "ptkp_status": "TK/0"
+        },
+        "bpjs": [
+          {
+            "code": "JHT_EMP",
+            "name": "JHT Pekerja",
+            "nominal": 80000,
+            "is_employee": true
+          },
+          {
+            "code": "JHT_CO",
+            "name": "JHT Sekolah",
+            "nominal": 148000,
+            "is_employee": false
+          }
+        ],
+        "bpjs_masa": {
+          "dasar_run": 4000000,
+          "tanda": ["tarif_tidak_sah"]
+        }
+      }
+    },
+    {
+      "run_id": "run-c",
+      "status_run": "PAID",
+      "period_start": "2026-12-01",
+      "id_karyawan": "p2",
+      "nama_karyawan": "Budi Staf",
+      "kode_karyawan": "K002",
+      "ptkp_status": "TK/0",
+      "gross_salary": 4000000,
+      "pph21_amount": -40000,
+      "nik": "3201010101010002",
+      "npwp": "",
+      "breakdown_snapshot": {
+        "pajak": {
+          "status": "tetap",
+          "metode": "PASAL_17_TERAKHIR",
+          "kategori": "TER_A",
+          "bruto_pajak": 4000000,
+          "bruto_tahun": 48000000,
+          "biaya_jabatan": 2400000,
+          "iuran_pensiun": 960000,
+          "ptkp": 54000000,
+          "pkp": 0,
+          "pph_setahun": 0,
+          "sudah_dipotong": 40000,
+          "pph": -40000,
+          "tanda": []
+        },
+        "tax": {
+          "ptkp_status": "TK/0"
+        },
+        "bpjs": [],
+        "bpjs_masa": {
+          "dasar_run": 4000000,
+          "tanda": []
+        }
+      }
+    },
+    {
+      "run_id": "run-a",
+      "status_run": "PAID",
+      "period_start": "2026-11-01",
+      "id_karyawan": "p3",
+      "nama_karyawan": "Cici Honorer",
+      "kode_karyawan": "K003",
+      "ptkp_status": "TK/0",
+      "gross_salary": 1000000,
+      "pph21_amount": 5000,
+      "nik": "",
+      "npwp": "",
+      "bpjs_ketenagakerjaan": "22222222222",
+      "bpjs_kesehatan": "",
+      "breakdown_snapshot": {
+        "pajak": {
+          "status": "tidak_tetap",
+          "metode": "TER_HARIAN",
+          "kategori": null,
+          "tarif": 50,
+          "bruto_pajak": 1000000,
+          "hari": 20,
+          "pph": 5000,
+          "tanda": []
+        },
+        "tax": {
+          "ptkp_status": "TK/0"
+        },
+        "bpjs": [],
+        "bpjs_masa": {
+          "dasar_run": 0,
+          "tanda": []
+        }
+      }
+    },
+    {
+      "run_id": "run-d",
+      "status_run": "APPROVED",
+      "period_start": "2026-12-01",
+      "id_karyawan": "p3",
+      "nama_karyawan": "Cici Honorer",
+      "kode_karyawan": "K003",
+      "ptkp_status": "TK/0",
+      "gross_salary": 1000000,
+      "pph21_amount": 5000,
+      "nik": "",
+      "npwp": "",
+      "breakdown_snapshot": "{}"
+    },
+    {
+      "run_id": "run-a",
+      "status_run": "PAID",
+      "period_start": "2026-11-01",
+      "id_karyawan": "p4",
+      "nama_karyawan": "Dedi Lama",
+      "kode_karyawan": "K004",
+      "ptkp_status": "TK/0",
+      "gross_salary": 1500000,
+      "pph21_amount": 0,
+      "nik": "3201010101010004",
+      "npwp": "3201010101010004",
+      "breakdown_snapshot": "{\"bpjs\":[{\"code\":\"JHT_EMP\",\"name\":\"JHT\",\"nominal\":10000,\"is_employee\":true}]}"
+    }
+  ],
+  "pph": [
+    {
+      "nama": "November: dua run dijumlah, REJECTED dilewati, masa = bulan period_start, tidak tetap, slip lama",
+      "masa": "2026-11",
+      "hasil": {
+        "masa": "2026-11",
+        "jumlah_run": 2,
+        "run_belum_dibayar": [],
+        "total_bruto": 11500000,
+        "total_pph": 175000,
+        "baris": [
+          {
+            "id_karyawan": "p1",
+            "nama_karyawan": "Ani Guru",
+            "kode_karyawan": "K001",
+            "nik": "3201010101010001",
+            "npwp": "3201010101010001",
+            "ptkp_status": "K/0",
+            "status": "tetap",
+            "metode": "TER_BULANAN",
+            "kategori": "TER_A",
+            "bruto": 5000000,
+            "pph": 150000,
+            "jumlah_run": 2,
+            "tanda": ["komponen_per_run"]
+          },
+          {
+            "id_karyawan": "p2",
+            "nama_karyawan": "Budi Staf",
+            "kode_karyawan": "K002",
+            "nik": "3201010101010002",
+            "npwp": "",
+            "ptkp_status": "TK/0",
+            "status": "tetap",
+            "metode": "TER_BULANAN",
+            "kategori": "TER_A",
+            "bruto": 4000000,
+            "pph": 20000,
+            "jumlah_run": 1,
+            "tanda": ["tanpa_npwp"]
+          },
+          {
+            "id_karyawan": "p3",
+            "nama_karyawan": "Cici Honorer",
+            "kode_karyawan": "K003",
+            "nik": "",
+            "npwp": "",
+            "ptkp_status": "TK/0",
+            "status": "tidak_tetap",
+            "metode": "TER_HARIAN",
+            "kategori": null,
+            "bruto": 1000000,
+            "pph": 5000,
+            "jumlah_run": 1,
+            "tanda": ["tanpa_nik", "tanpa_npwp"]
+          },
+          {
+            "id_karyawan": "p4",
+            "nama_karyawan": "Dedi Lama",
+            "kode_karyawan": "K004",
+            "nik": "3201010101010004",
+            "npwp": "3201010101010004",
+            "ptkp_status": "TK/0",
+            "status": "tetap",
+            "metode": null,
+            "kategori": null,
+            "bruto": 1500000,
+            "pph": 0,
+            "jumlah_run": 1,
+            "tanda": ["slip_lama"]
+          }
+        ]
+      }
+    },
+    {
+      "nama": "Desember: PPh negatif di masa terakhir, run APPROVED diperingatkan",
+      "masa": "2026-12",
+      "hasil": {
+        "masa": "2026-12",
+        "jumlah_run": 1,
+        "run_belum_dibayar": [
+          {
+            "id": "run-d",
+            "status": "APPROVED",
+            "period_start": "2026-12-01"
+          }
+        ],
+        "total_bruto": 9000000,
+        "total_pph": 140000,
+        "baris": [
+          {
+            "id_karyawan": "p1",
+            "nama_karyawan": "Ani Guru",
+            "kode_karyawan": "K001",
+            "nik": "3201010101010001",
+            "npwp": "3201010101010001",
+            "ptkp_status": "K/0",
+            "status": "tetap",
+            "metode": "PASAL_17_TERAKHIR",
+            "kategori": "TER_A",
+            "bruto": 5000000,
+            "pph": 180000,
+            "jumlah_run": 1,
+            "tanda": []
+          },
+          {
+            "id_karyawan": "p2",
+            "nama_karyawan": "Budi Staf",
+            "kode_karyawan": "K002",
+            "nik": "3201010101010002",
+            "npwp": "",
+            "ptkp_status": "TK/0",
+            "status": "tetap",
+            "metode": "PASAL_17_TERAKHIR",
+            "kategori": "TER_A",
+            "bruto": 4000000,
+            "pph": -40000,
+            "jumlah_run": 1,
+            "tanda": ["tanpa_npwp", "pph_negatif"]
+          }
+        ]
+      }
+    }
+  ],
+  "bpjs": [
+    {
+      "nama": "November: iuran per kode, nomor kepesertaan per program, slip lama",
+      "masa": "2026-11",
+      "hasil": {
+        "masa": "2026-11",
+        "jumlah_run": 2,
+        "run_belum_dibayar": [],
+        "total_dasar": 9000000,
+        "total_pekerja": 240000,
+        "total_perusahaan": 533000,
+        "kode": [
+          {
+            "code": "BPJS_KES_CO",
+            "name": "Kesehatan Sekolah",
+            "is_employee": false,
+            "total": 200000
+          },
+          {
+            "code": "BPJS_KES_EMP",
+            "name": "Kesehatan Pekerja",
+            "is_employee": true,
+            "total": 50000
+          },
+          {
+            "code": "JHT_CO",
+            "name": "JHT Sekolah",
+            "is_employee": false,
+            "total": 333000
+          },
+          {
+            "code": "JHT_EMP",
+            "name": "JHT Pekerja",
+            "is_employee": true,
+            "total": 190000
+          }
+        ],
+        "baris": [
+          {
+            "id_karyawan": "p1",
+            "nama_karyawan": "Ani Guru",
+            "kode_karyawan": "K001",
+            "nik": "3201010101010001",
+            "no_bpjs_ketenagakerjaan": "11111111111",
+            "no_bpjs_kesehatan": "0001111111111",
+            "dasar": 5000000,
+            "iuran": {
+              "BPJS_KES_CO": 200000,
+              "BPJS_KES_EMP": 50000,
+              "JHT_CO": 185000,
+              "JHT_EMP": 100000
+            },
+            "pekerja": 150000,
+            "perusahaan": 385000,
+            "jumlah_run": 2,
+            "tanda": []
+          },
+          {
+            "id_karyawan": "p2",
+            "nama_karyawan": "Budi Staf",
+            "kode_karyawan": "K002",
+            "nik": "3201010101010002",
+            "no_bpjs_ketenagakerjaan": "",
+            "no_bpjs_kesehatan": "",
+            "dasar": 4000000,
+            "iuran": {
+              "JHT_CO": 148000,
+              "JHT_EMP": 80000
+            },
+            "pekerja": 80000,
+            "perusahaan": 148000,
+            "jumlah_run": 1,
+            "tanda": ["dipotong_tanpa_nomor", "tarif_tidak_sah"]
+          },
+          {
+            "id_karyawan": "p3",
+            "nama_karyawan": "Cici Honorer",
+            "kode_karyawan": "K003",
+            "nik": "",
+            "no_bpjs_ketenagakerjaan": "22222222222",
+            "no_bpjs_kesehatan": "",
+            "dasar": 0,
+            "iuran": {},
+            "pekerja": 0,
+            "perusahaan": 0,
+            "jumlah_run": 1,
+            "tanda": ["bernomor_tanpa_potongan"]
+          },
+          {
+            "id_karyawan": "p4",
+            "nama_karyawan": "Dedi Lama",
+            "kode_karyawan": "K004",
+            "nik": "3201010101010004",
+            "no_bpjs_ketenagakerjaan": "",
+            "no_bpjs_kesehatan": "",
+            "dasar": 0,
+            "iuran": {
+              "JHT_EMP": 10000
+            },
+            "pekerja": 10000,
+            "perusahaan": 0,
+            "jumlah_run": 1,
+            "tanda": ["dipotong_tanpa_nomor", "slip_lama"]
+          }
+        ]
+      }
+    }
+  ],
+  "a1": [
+    {
+      "nama": "2026: A1 dari Pasal 17 masa terakhir, tidak tetap tanpa A1, slip lama belum masa terakhir",
+      "tahun": "2026",
+      "hasil": {
+        "tahun": "2026",
+        "jumlah_run": 4,
+        "run_belum_dibayar": [
+          {
+            "id": "run-d",
+            "status": "APPROVED",
+            "period_start": "2026-12-01"
+          }
+        ],
+        "jumlah_a1": 3,
+        "total_bruto": 24500000,
+        "total_pph": 335000,
+        "baris": [
+          {
+            "id_karyawan": "p1",
+            "nama_karyawan": "Ani Guru",
+            "kode_karyawan": "K001",
+            "nik": "3201010101010001",
+            "npwp": "3201010101010001",
+            "ptkp_status": "K/0",
+            "status": "tetap",
+            "masa_awal": "2026-11",
+            "masa_akhir": "2026-12",
+            "jumlah_masa": 2,
+            "bruto": 10000000,
+            "pph_dipotong": 330000,
+            "a1": true,
+            "bruto_tahun": 70000000,
+            "biaya_jabatan": 3500000,
+            "iuran_pensiun": 1400000,
+            "ptkp": 58500000,
+            "pkp": 6600000,
+            "pph_setahun": 330000,
+            "tanda": []
+          },
+          {
+            "id_karyawan": "p2",
+            "nama_karyawan": "Budi Staf",
+            "kode_karyawan": "K002",
+            "nik": "3201010101010002",
+            "npwp": "",
+            "ptkp_status": "TK/0",
+            "status": "tetap",
+            "masa_awal": "2026-10",
+            "masa_akhir": "2026-12",
+            "jumlah_masa": 3,
+            "bruto": 12000000,
+            "pph_dipotong": 0,
+            "a1": true,
+            "bruto_tahun": 48000000,
+            "biaya_jabatan": 2400000,
+            "iuran_pensiun": 960000,
+            "ptkp": 54000000,
+            "pkp": 0,
+            "pph_setahun": 0,
+            "tanda": ["tanpa_npwp"]
+          },
+          {
+            "id_karyawan": "p3",
+            "nama_karyawan": "Cici Honorer",
+            "kode_karyawan": "K003",
+            "nik": "",
+            "npwp": "",
+            "ptkp_status": "TK/0",
+            "status": "tidak_tetap",
+            "masa_awal": "2026-11",
+            "masa_akhir": "2026-11",
+            "jumlah_masa": 1,
+            "bruto": 1000000,
+            "pph_dipotong": 5000,
+            "a1": false,
+            "bruto_tahun": null,
+            "biaya_jabatan": null,
+            "iuran_pensiun": null,
+            "ptkp": null,
+            "pkp": null,
+            "pph_setahun": null,
+            "tanda": ["tanpa_nik", "tanpa_npwp"]
+          },
+          {
+            "id_karyawan": "p4",
+            "nama_karyawan": "Dedi Lama",
+            "kode_karyawan": "K004",
+            "nik": "3201010101010004",
+            "npwp": "3201010101010004",
+            "ptkp_status": "TK/0",
+            "status": "tetap",
+            "masa_awal": "2026-11",
+            "masa_akhir": "2026-11",
+            "jumlah_masa": 1,
+            "bruto": 1500000,
+            "pph_dipotong": 0,
+            "a1": true,
+            "bruto_tahun": null,
+            "biaya_jabatan": null,
+            "iuran_pensiun": null,
+            "ptkp": null,
+            "pkp": null,
+            "pph_setahun": null,
+            "tanda": ["slip_lama", "belum_masa_terakhir"]
+          }
+        ]
+      }
+    }
+  ]
+}

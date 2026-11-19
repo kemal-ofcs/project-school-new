@@ -66,6 +66,8 @@ pub mod share;
 pub mod teaching_journal;
 // Berkas transfer gaji (HRIS Fase 8a): SALINAN `desktop/transfer.rs`.
 pub mod transfer;
+// Rekap PPh 21/BPJS/A1 (HRIS Fase 8b): SALINAN `desktop/lapor_pajak.rs`.
+pub mod lapor_pajak;
 // Notifikasi grup Telegram (v66): SALINAN `desktop/telegram.rs` oleh sync-rust-modules.ts.
 pub mod telegram;
 // Buku Kunjungan UKS: SALINAN `desktop/uks.rs` oleh sync-rust-modules.ts.

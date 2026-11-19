@@ -177,14 +177,17 @@ const gagal = <T = never>(galat: string): Hasil<T> => ({ ok: false, galat });
 type Draft = Record<string, unknown>;
 
 const panjang = (t: string) => [...t].length;
-const rapikan = (t: string) => t.split(/\s+/).filter(Boolean).join(" ");
+export const rapikan = (t: string) => t.split(/\s+/).filter(Boolean).join(" ");
 /** Cermin `ada_kendali`: karakter di bawah spasi (tab, baris baru). */
 const adaKendali = (t: string) => [...t].some((c) => c < " ");
 /** Cermin `payload_text`: teks dipangkas, kosong = null. */
 const isian = (v: unknown) => (typeof v === "string" ? v.trim() || null : null);
 
 /** Cermin `objek_ketat`: objek dengan kunci dari `kolom` saja. */
-function objekKetat(draft: unknown, kolom: readonly string[]): Hasil<Draft> {
+export function objekKetat(
+  draft: unknown,
+  kolom: readonly string[],
+): Hasil<Draft> {
   if (!draft || typeof draft !== "object" || Array.isArray(draft)) {
     return gagal("Isian tidak valid.");
   }

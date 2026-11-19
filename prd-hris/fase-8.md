@@ -4,8 +4,8 @@ Bagian §26 dari `prd-hris.md`. Istilah, keputusan pemilik (§5), hak akses umum
 
 ## 26. Urutan pengerjaan Fase 8
 
-**Rancangan disetujui pemilik** (Q-152 sampai Q-167, §26.10). 8a sudah
-ditulis (§26.11); berikutnya 8b. Isi Fase 8 dipilih pemilik pada 19 Nov 2026 dari daftar
+**Rancangan disetujui pemilik** (Q-152 sampai Q-167, §26.10). 8a dan 8b
+sudah ditulis (§26.11); berikutnya 8c. Isi Fase 8 dipilih pemilik pada 19 Nov 2026 dari daftar
 §14: **berkas transfer gaji ke bank, laporan PPh 21/BPJS, dan
 reimbursement**. HRIS di Mobile, bagan organisasi, lembur SPL, tukar jam, dan
 Portal Guru tetap di §14 untuk fase berikutnya.
@@ -415,3 +415,46 @@ Penyimpangan, untuk ditinjau:
   pemakai selain tesnya, dan tabel tersinkron (mis. `siswa_data`, `keu_*`,
   `hr_pengajuan`) juga belum terdaftar; melengkapinya baru berguna bila skrip
   promosi benar-benar dibangun.
+
+**8b (19 Nov 2026), belum di-commit, `bun run check` belum oleh pemilik.**
+
+- Modul `desktop/lapor_pajak.rs` ↔ `validations/lapor-pajak.ts` +
+  `services/lapor-pajak.ts`: `rekap_pph`, `rekap_bpjs`, `rekap_a1`,
+  `validasi_masa|tahun|pemotong`, satu `SLIP_LAPOR_SQL` (`period_start LIKE
+  ?1 || '-%'`, masa atau tahun). Command
+  `desktop_report_pph_monthly|bpjs_monthly|a1_yearly|setting|setting_save`,
+  rute `POST /api/payroll/reports/{pph,bpjs,a1}/query` dan
+  `/reports/setting/{query,save}`, gateway `muatLaporanPph|Bpjs|A1`,
+  `muatDataPemotong`, `simpanDataPemotong`. Lembar Excel rekap di
+  `client/lapor-pajak-excel.ts` (dipasang layar di 8d).
+- `audit:contract`: command Desktop 450 → 455, Mobile 455 → 460, izin tetap
+  141, tanpa tabel atau rute sync baru.
+- Tes: `lapor-pajak.test.ts` (vektor, SQL/pesan/tanda harfiah terhadap
+  kedua `lapor_pajak.rs`, `TANDA_PPH` ekor = `TANDA_PAJAK`),
+  `services/lapor-pajak.test.ts`, `client/lapor-pajak-excel.test.ts`,
+  `cargo test lapor_pajak` 3 lulus. Data uji bersama
+  `services/lapor-pajak.uji.sql`.
+
+Penyimpangan, untuk ditinjau:
+
+- **Isi `bpjs_masa` di slip hanya `dasar_run`, `dasar_masa`, `tanda`**, tidak
+  seperti §26.1. Iuran per kode dibaca dari `breakdown_snapshot.bpjs`, dasar
+  dari Σ `bpjs_masa.dasar_run` run `PAID`.
+- **PPh = `payroll_items.pph21_amount`** (sama dengan `pajak.pph`, dan ada
+  juga di slip lama); bruto = `pajak.bruto_pajak`, slip lama memakai
+  `gross_salary` beku + tanda `slip_lama`. PTKP = `tax.ptkp_status` (status
+  awal tahun yang dipakai menghitung), slip lama memakai kolom
+  `ptkp_status`.
+- **Program BPJS dibedakan dari kode**: berisi `KES` = Kesehatan, sisanya
+  Ketenagakerjaan; `dipotong_tanpa_nomor`/`bernomor_tanpa_potongan` dinilai
+  per program dari total iuran pekerja + sekolah.
+- **Tanda tambahan A1**: `belum_masa_terakhir` (pegawai tetap tanpa slip
+  `PASAL_17_TERAKHIR` di tahun itu) dan `pph_tidak_cocok` (PPh setahun ≠ Σ
+  dipotong slip `PAID`, mis. ada run pembanding yang belum dibayar).
+- **`run_belum_dibayar`** di setiap rekap: run selain `PAID`/`REJECTED` di
+  periode itu, supaya layar memperingatkan laporan yang belum lengkap.
+- **Data pemotong**: NPWP 16 digit, NITKU 22 digit dan wajib diawali NPWP,
+  NIK penandatangan 16 digit, nomor pendaftaran BPJS 5–20 huruf/angka.
+  Dibaca hanya `payroll.config.manage`; laporan menyertakannya.
+- `objek_ketat`/`rapikan` di `transfer.rs` dan `objekKetat`/`rapikan` di
+  `transfer.ts` kini dibuka untuk dipakai ulang modul ini.

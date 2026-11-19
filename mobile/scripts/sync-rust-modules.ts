@@ -61,9 +61,11 @@ const filesToSync = [
   "hr_pengingat.rs",
   // HRIS Fase 7: rekrutmen (cloud-only), kembar `validations/hr-rekrutmen.ts`.
   "hr_rekrutmen.rs",
-  // HRIS Fase 8: transfer gaji (cloud-only) dan reimbursement, kembar
-  // `validations/transfer.ts` dan `validations/hr-reimburse.ts`.
+  // HRIS Fase 8: transfer gaji, laporan PPh 21/BPJS/A1 (cloud-only), dan
+  // reimbursement, kembar `validations/transfer.ts`, `lapor-pajak.ts`, dan
+  // `hr-reimburse.ts`.
   "transfer.rs",
+  "lapor_pajak.rs",
   "hr_reimburse.rs",
   // HRIS Fase 7b: pelatihan (cloud-only), kembar `validations/hr-pelatihan.ts`.
   "hr_pelatihan.rs",

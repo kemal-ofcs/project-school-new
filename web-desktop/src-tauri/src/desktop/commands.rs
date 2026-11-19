@@ -11,8 +11,8 @@ use super::{
         CommandError, DesktopLoginResult, DesktopRuntimeStatus, DesktopSession, DesktopSyncStatus,
         OperatorUser, SessionMode,
     },
-    hr_beban, hr_keluar, hr_kinerja, hr_pelatihan, hr_pengajuan, hr_pengingat, hr_rekrutmen, hris, hris_cloud, operational,
-    portability, rapel,
+    hr_beban, hr_keluar, hr_kinerja, hr_pelatihan, hr_pengajuan, hr_pengingat, hr_rekrutmen, hris, hris_cloud, lapor_pajak,
+    operational, portability, rapel,
     scanner, secrets, storage, sync, teaching_journal, transfer, turso, uks, wa_notification,
 };
 
@@ -3909,6 +3909,71 @@ pub async fn desktop_transfer_export(
     let operator = require_permission(&state, transfer::IZIN_UNDUH[0])?;
     require_permission(&state, transfer::IZIN_UNDUH[1])?;
     transfer::berkas_transfer(&klien_cloud(&state)?, &operator.username, &draft, true)
+        .await
+        .map_err(hris_cloud::luring)
+}
+
+/// Laporan membuka NIK, NPWP, dan gaji semua pegawai: wajib kedua izin.
+fn izin_lapor(state: &State<'_, DesktopState>) -> Result<(), CommandError> {
+    require_permission(state, lapor_pajak::IZIN_LAPOR[0])?;
+    require_permission(state, lapor_pajak::IZIN_LAPOR[1])?;
+    Ok(())
+}
+
+/// Rekap PPh 21 satu masa dari slip run PAID (HRIS Fase 8b, cloud-only).
+#[tauri::command]
+pub async fn desktop_report_pph_monthly(
+    state: State<'_, DesktopState>,
+    draft: Value,
+) -> Result<Value, CommandError> {
+    izin_lapor(&state)?;
+    lapor_pajak::laporan_pph(&klien_cloud(&state)?, &draft)
+        .await
+        .map_err(hris_cloud::luring)
+}
+
+/// Rekap iuran BPJS satu masa dari slip run PAID.
+#[tauri::command]
+pub async fn desktop_report_bpjs_monthly(
+    state: State<'_, DesktopState>,
+    draft: Value,
+) -> Result<Value, CommandError> {
+    izin_lapor(&state)?;
+    lapor_pajak::laporan_bpjs(&klien_cloud(&state)?, &draft)
+        .await
+        .map_err(hris_cloud::luring)
+}
+
+/// Rekap A1 satu tahun dari slip run PAID (bahan, bukan formulir resmi).
+#[tauri::command]
+pub async fn desktop_report_a1_yearly(
+    state: State<'_, DesktopState>,
+    draft: Value,
+) -> Result<Value, CommandError> {
+    izin_lapor(&state)?;
+    lapor_pajak::laporan_a1(&klien_cloud(&state)?, &draft)
+        .await
+        .map_err(hris_cloud::luring)
+}
+
+/// Data pemotong (NPWP, NITKU, penandatangan, nomor BPJS sekolah).
+#[tauri::command]
+pub async fn desktop_report_setting(state: State<'_, DesktopState>) -> Result<Value, CommandError> {
+    require_permission(&state, lapor_pajak::IZIN_PEMOTONG)?;
+    let data = lapor_pajak::data_pemotong(&klien_cloud(&state)?)
+        .await
+        .map_err(hris_cloud::luring)?;
+    Ok(serde_json::json!(data))
+}
+
+/// Simpan data pemotong; semua kunci ditulis sekaligus.
+#[tauri::command]
+pub async fn desktop_report_setting_save(
+    state: State<'_, DesktopState>,
+    draft: Value,
+) -> Result<Value, CommandError> {
+    let operator = require_permission(&state, lapor_pajak::IZIN_PEMOTONG)?;
+    lapor_pajak::simpan_pemotong(&klien_cloud(&state)?, &operator.username, &draft)
         .await
         .map_err(hris_cloud::luring)
 }

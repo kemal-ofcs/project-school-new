@@ -4,6 +4,13 @@ import { requestWebApi } from "@/lib/client/api-client";
 import { requestSyncNow, syncNow } from "@/lib/gateways/sync-status";
 import { isDesktopRuntime, isMobileRuntime } from "@/lib/runtime/app-runtime";
 import { invokeDesktop } from "@/lib/runtime/desktop-commands";
+import type {
+  DataPemotong,
+  HasilLaporan,
+  RekapA1,
+  RekapBpjs,
+  RekapPph,
+} from "@/lib/validations/lapor-pajak";
 import type { HasilPph } from "@/lib/validations/pajak";
 import type { PayrollCalcType } from "@/lib/validations/payroll-policy";
 import type {
@@ -974,6 +981,66 @@ export function unduhTransfer(
     "desktop_transfer_export",
     { draft },
     "/api/payroll/transfer/export",
+    draft,
+  );
+}
+
+// HRIS Fase 8b: rekap PPh 21, BPJS, dan A1 dari slip run PAID, cloud-only
+// seperti berkas transfer.
+
+/** Rekap PPh 21 satu masa (`YYYY-MM`). */
+export function muatLaporanPph(masa: string): Promise<HasilLaporan<RekapPph>> {
+  const draft = { masa };
+  return cloudTransfer(
+    "desktop_report_pph_monthly",
+    { draft },
+    "/api/payroll/reports/pph/query",
+    draft,
+  );
+}
+
+/** Rekap iuran BPJS satu masa (`YYYY-MM`). */
+export function muatLaporanBpjs(
+  masa: string,
+): Promise<HasilLaporan<RekapBpjs>> {
+  const draft = { masa };
+  return cloudTransfer(
+    "desktop_report_bpjs_monthly",
+    { draft },
+    "/api/payroll/reports/bpjs/query",
+    draft,
+  );
+}
+
+/** Rekap A1 satu tahun (`YYYY`). */
+export function muatLaporanA1(tahun: string): Promise<HasilLaporan<RekapA1>> {
+  const draft = { tahun };
+  return cloudTransfer(
+    "desktop_report_a1_yearly",
+    { draft },
+    "/api/payroll/reports/a1/query",
+    draft,
+  );
+}
+
+/** Data pemotong untuk Pengaturan (Superadmin). */
+export function muatDataPemotong(): Promise<DataPemotong> {
+  return cloudTransfer(
+    "desktop_report_setting",
+    {},
+    "/api/payroll/reports/setting/query",
+    {},
+  );
+}
+
+/** Simpan data pemotong; isian kosong = belum diisi. */
+export function simpanDataPemotong(
+  draft: Partial<DataPemotong>,
+): Promise<{ sukses: true; pemotong: DataPemotong }> {
+  return cloudTransfer(
+    "desktop_report_setting_save",
+    { draft },
+    "/api/payroll/reports/setting/save",
     draft,
   );
 }
