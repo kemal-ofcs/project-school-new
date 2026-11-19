@@ -69,7 +69,7 @@ function hasil(format: FormatTampil | null): HasilBerkasTransfer {
         },
       ],
       debet,
-      format,
+      format: format?.kolom ? { ...format, kolom: format.kolom } : null,
       tanggal_efektif: "2026-11-25",
     }),
   };
