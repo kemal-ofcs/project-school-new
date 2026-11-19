@@ -5,6 +5,7 @@ import { hasPermission } from "@/lib/auth/access";
 import { useAuth } from "@/lib/context/AuthContext";
 import { jalankanPemberitahuanTutupBuku } from "@/lib/gateways/accounting";
 import { jalankanPengingatOtomatis } from "@/lib/gateways/billing";
+import { bersihkanPelamar } from "@/lib/gateways/hris";
 
 const INTERVAL_MS = 30 * 60 * 1000;
 
@@ -75,5 +76,8 @@ export function AutoPemberitahuanRunner() {
     isAuthenticated && hasPermission(user, "accounting.view"),
     jalankanPemberitahuanTutupBuku,
   );
+  // Retensi pelamar (UU PDP, §25.2.4): cukup sesi; backend hanya menghapus
+  // pelamar yang lowongannya tutup lebih dari 12 bulan.
+  useKetukBerkala("Retensi pelamar", isAuthenticated, bersihkanPelamar);
   return null;
 }

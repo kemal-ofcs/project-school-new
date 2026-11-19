@@ -36,6 +36,7 @@ import {
 import { PendidikPegawai } from "./PendidikPegawai";
 import { KinerjaPegawai } from "./PenilaianKinerja";
 import { SuratPeringatanPegawai } from "./SuratPeringatanPegawai";
+import { RiwayatPelatihanPegawai } from "./TabPelatihan";
 
 type TabRincian =
   | "kinerja"
@@ -46,7 +47,8 @@ type TabRincian =
   | "kontrak"
   | "cuti"
   | "sp"
-  | "dokumen";
+  | "dokumen"
+  | "pelatihan";
 
 interface Isian {
   kunci: string;
@@ -142,6 +144,9 @@ export function RincianPegawai({
       : []),
     ...(boleh("hr.document.view")
       ? [{ kunci: "dokumen" as const, label: "Dokumen" }]
+      : []),
+    ...(boleh("hr.training.view") || boleh("hr.training.manage")
+      ? [{ kunci: "pelatihan" as const, label: "Pelatihan" }]
       : []),
     ...(boleh("hr.performance.view")
       ? [{ kunci: "kinerja" as const, label: "Kinerja" }]
@@ -281,6 +286,8 @@ export function RincianPegawai({
               idKaryawan={id}
               bolehUbah={boleh("hr.document.manage")}
             />
+          ) : tab === "pelatihan" ? (
+            <RiwayatPelatihanPegawai idKaryawan={id} />
           ) : tab === "kinerja" ? (
             <KinerjaPegawai idKaryawan={id} />
           ) : (

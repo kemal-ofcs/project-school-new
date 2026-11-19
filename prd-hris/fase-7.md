@@ -902,3 +902,78 @@ peringatan baru; `audit:contract`, `audit:sql`, `audit:list-bound`. Tes kontrak
 `simpan_kontrak`, dan `simpan_kontrak_id` diuji lewat tes hire. Belum: `bun run
 check` penuh, suite Rust penuh, tes salinan Mobile, `cargo test` dan `tsc`
 Mobile, `audit:schema`.
+
+**Sudah dibangun: sub-fase 7c** (19 Nov 2026). Tanpa command, rute, tabel,
+izin, atau perubahan Rust; kontrak data 7a/7b dipakai apa adanya.
+
+- **Langkah 10, layar** (Web/Desktop, Q-150). `/kepegawaian` mendapat tab
+  **Rekrutmen** (`components/kepegawaian/TabRekrutmen.tsx`, tampil untuk
+  `hr.recruit.view|manage`) dan **Pelatihan** (`TabPelatihan.tsx`,
+  `hr.training.view|manage`). Rekrutmen: daftar lowongan (status, hitungan
+  per status, Diterima dibanding kebutuhan + tanda `lewat_kuota`,
+  `pelamar_dihapus`, tanggal hapus yang ditonjolkan 30 hari sebelumnya),
+  tambah/ubah, Tutup (dialog konfirmasi), Buka lagi (tanggal tutup baru
+  opsional); rincian lowongan berisi pelamar per status dengan tanda
+  `mungkin_ganda` dan peringatan pelamar yang masih di tahap proses pada
+  lowongan Ditutup; rincian pelamar berisi data, riwayat tahap (yang dibatalkan
+  dicoret), Catat tahap (Microteaching hanya untuk lowongan Guru, catatan wajib
+  untuk Ditolak/Mundur), Batalkan tahap terakhir (`ModalBatal` dari
+  `TabKontrak.tsx`), CV maks 3 (unggah, lihat, hapus), Ubah data, dan Hapus
+  permanen (`hr.recruit.delete` + ketik `KONFIRMASI_HAPUS_PERMANEN`). Pelatihan:
+  daftar per tahun, tambah/ubah/batalkan, rincian dengan biaya per peserta
+  (hanya tampil), tambah peserta lewat `PilihCari` (pegawai aktif yang belum
+  ikut), hasil, lepas, sertifikat (simpan, hapus, unggah/lihat/hapus berkas);
+  sub-tampilan Rekap jam dengan saringan kelompok dan unit dan ekspor
+  `exportToExcel`. `RincianPegawai` mendapat tab **Pelatihan**
+  (`RiwayatPelatihanPegawai`, baca saja). Tombol tulis disembunyikan tanpa izin
+  `manage`. `DEFAULT_ROLE_PERMISSIONS` tidak berubah (§25.4 sudah memeriksa).
+- **Jadikan personil** (`DialogJadikanPersonil.tsx`). Isian form Guru dan
+  Karyawan dipindah apa adanya dari `app/guru/page.tsx` dan
+  `app/karyawan/page.tsx` ke `components/personnel/IsianGuru.tsx` dan
+  `IsianKaryawan.tsx`; kedua halaman memakainya tanpa perubahan perilaku, dan
+  dialog memakai komponen yang sama dengan isian awal (nama, HP, L/P dari
+  pelamar; unit, bagian, jabatan dari lowongan) ditambah `IsianKontrak`
+  (dipecah dari `ModalKontrak` di `TabKontrak.tsx`, pilihan GTY/GTT untuk Guru,
+  PTY/PTT untuk Tendik). Tidak ada form ketiga.
+- **Langkah 11.** `AutoPemberitahuanRunner` mengetuk `bersihkanPelamar()` lewat
+  `useKetukBerkala` ketiga untuk setiap sesi yang login; galat hanya ke konsol.
+  Komponen itu identik byte dan ikut `filesToCopy`, jadi Mobile ikut mengetuk
+  (command-nya sudah terdaftar di Mobile sejak 7a).
+- **Langkah 12.** `sync-frontend-lib.ts` dan `sync-rust-modules.ts` dijalankan;
+  yang berubah di Mobile hanya `AutoPemberitahuanRunner.tsx` dan
+  `services/hr-pelatihan.test.ts` (salinan yang tertinggal dari 7b). Paragraf
+  "HRIS rekrutmen dan pelatihan (schema v72)" di `references/18`, judulnya kini
+  v68–v72.
+
+**Keputusan kecil yang diambil saat membangun** (tinjau bila tidak sesuai):
+
+- "Diterima, data personil belum lengkap" diturunkan di layar: `id_karyawan`
+  terisi tetapi pegawai itu belum ada di daftar Kepegawaian perangkat ini ATAU
+  kontrak `kon-<hex>`-nya belum ada di `muatKontrak()`. Di Desktop, personil
+  yang dibuat perangkat lain dan belum tersinkron ikut tampil "belum lengkap";
+  Lanjutkan lalu berhenti dengan `PESAN_SINKRONKAN_DULU`.
+- "Sudah menjadi personil" membuka `RincianPegawai` dari tab Rekrutmen
+  (dialog rincian pelamar ditutup dulu, karena Escape menutup setiap `Modal`).
+  Dengan alasan yang sama, setiap sub-dialog rekrutmen/pelatihan menggantikan
+  dialog induknya, tidak menumpuk.
+- Galat simpan ditampilkan di dalam dialog, karena banner halaman tertutup
+  latar dialog. `ModalBatal` mendapat prop `galat` opsional (pemakai lama tidak
+  berubah).
+- Mode `rekrutmen` di `IsianKaryawan` menyembunyikan jenis personil, tanggal
+  daftar, dan tanggal selesai aktif, karena `hireDraftSchema` Web tidak
+  membawanya. Status kepegawaian guru di dialog terkunci dan mengikuti status
+  kontrak pertama.
+- Jenis dokumen sertifikat hanya bisa dipilih oleh pemegang `hr.document.view`
+  atau `hr.org.manage` (`muatDokumen()` tanpa pegawai); selain itu jenis bawaan
+  `dok-pelatihan` yang dipakai.
+- Email pelamar tidak diisikan ke form personil (tidak disebut §25.2.3, dan
+  email personil diperiksa keunikannya).
+- Pratinjau berkas CV dan sertifikat memakai `PratinjauBerkas.tsx` baru; tab
+  Dokumen pegawai tidak disentuh.
+
+**Gerbang yang dijalankan:** `tsc` Desktop; Biome berkas yang diubah (termasuk
+salinan Mobile `AutoPemberitahuanRunner.tsx`); `audit:a11y`, `audit:ui-guard`,
+`audit:page-guard`, `audit:contract` (445 command Desktop / 450 Mobile, 136
+permission, 145 rute kanonik, 81 tabel snapshot); 335 `route.ts`. Belum: `bun
+run check` penuh (termasuk tes salinan Mobile, `tsc` Mobile, `cargo test`
+Mobile), uji browser.

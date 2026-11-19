@@ -5,6 +5,7 @@ import { join } from "node:path";
 import { type Client, createClient } from "@libsql/client";
 import { initDatabaseSchema } from "@/lib/db-schema";
 import {
+  type DaftarPelatihan,
   JENIS_SERTIFIKAT_BAWAAN,
   PESAN_LEPAS_BERSERTIFIKAT,
   PESAN_PESERTA_DITOLAK,
@@ -156,10 +157,10 @@ describe("hr-pelatihan: alur di database Web", () => {
       status: "Selesai",
       jumlah_peserta: 2,
     });
-    const daftar = await S.daftarPelatihan(client, { tahun: "2999" });
-    expect("pelatihan" in daftar && daftar.pelatihan[0]?.status).toBe(
-      "Dijadwalkan",
-    );
+    const daftar = (await S.daftarPelatihan(client, {
+      tahun: "2999",
+    })) as DaftarPelatihan;
+    expect(daftar.pelatihan[0]?.status).toBe("Dijadwalkan");
 
     // Sertifikat: dokumen + tautan, tampil di tab Dokumen pegawai.
     const pesertaG1 = `${kkg}:G1`;

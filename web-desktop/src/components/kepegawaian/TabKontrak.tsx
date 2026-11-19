@@ -305,123 +305,26 @@ function ModalKontrak({
     catatan: string;
   }) => void;
 }) {
-  const pilihan = pegawai.kelompok === "Guru" ? STATUS_GURU : STATUS_TENDIK;
-  const [status, setStatus] = useState(pilihan[0]);
-  const [nomor, setNomor] = useState("");
-  const [mulai, setMulai] = useState(hariIni);
-  const [selesai, setSelesai] = useState("");
-  const [percobaan, setPercobaan] = useState("");
-  const [catatan, setCatatan] = useState("");
-  const bolehPercobaan = status === "GTY" || status === "PTY";
-  const wajibSelesai = status === "GTT" || status === "PTT";
+  const [nilai, setNilai] = useState(() =>
+    kontrakAwal(pegawai.kelompok, hariIni),
+  );
   const kirim = (event: FormEvent) => {
     event.preventDefault();
-    onSimpan({
-      id_karyawan: pegawai.id_unik,
-      status,
-      nomor,
-      tanggal_mulai: mulai,
-      tanggal_selesai: selesai,
-      percobaan_selesai: bolehPercobaan ? percobaan : "",
-      catatan,
-    });
+    onSimpan({ id_karyawan: pegawai.id_unik, ...rapikanKontrak(nilai) });
   };
   return (
     <Modal title={`Kontrak ${pegawai.nama}`} onClose={onClose} hideFooter>
       <form className="space-y-4" onSubmit={kirim}>
-        <div>
-          <label htmlFor="kontrak-status" className={LABEL}>
-            Status
-          </label>
-          <select
-            id="kontrak-status"
-            value={status}
-            onChange={(e) => setStatus(e.target.value)}
-            className={INPUT}
-          >
-            {pilihan
-              .filter((s) => (STATUS_KONTRAK as readonly string[]).includes(s))
-              .map((s) => (
-                <option key={s} value={s}>
-                  {s}
-                </option>
-              ))}
-          </select>
-        </div>
-        <div>
-          <label htmlFor="kontrak-nomor" className={LABEL}>
-            Nomor SK/kontrak
-          </label>
-          <input
-            id="kontrak-nomor"
-            maxLength={80}
-            value={nomor}
-            onChange={(e) => setNomor(e.target.value)}
-            className={INPUT}
-          />
-        </div>
-        <div className="grid gap-4 sm:grid-cols-2">
-          <div>
-            <label htmlFor="kontrak-mulai" className={LABEL}>
-              Tanggal mulai
-            </label>
-            <input
-              id="kontrak-mulai"
-              type="date"
-              required
-              value={mulai}
-              onChange={(e) => setMulai(e.target.value)}
-              className={INPUT}
-            />
-          </div>
-          <div>
-            <label htmlFor="kontrak-selesai" className={LABEL}>
-              Tanggal selesai{wajibSelesai ? "" : " (opsional)"}
-            </label>
-            <input
-              id="kontrak-selesai"
-              type="date"
-              required={wajibSelesai}
-              min={mulai}
-              value={selesai}
-              onChange={(e) => setSelesai(e.target.value)}
-              className={INPUT}
-            />
-          </div>
-        </div>
-        {bolehPercobaan ? (
-          <div>
-            <label htmlFor="kontrak-percobaan" className={LABEL}>
-              Akhir masa percobaan (opsional)
-            </label>
-            <input
-              id="kontrak-percobaan"
-              type="date"
-              min={mulai}
-              value={percobaan}
-              onChange={(e) => setPercobaan(e.target.value)}
-              className={INPUT}
-            />
-          </div>
-        ) : null}
-        <div>
-          <label htmlFor="kontrak-catatan" className={LABEL}>
-            Catatan (opsional)
-          </label>
-          <textarea
-            id="kontrak-catatan"
-            maxLength={500}
-            rows={2}
-            value={catatan}
-            onChange={(e) => setCatatan(e.target.value)}
-            className={`${INPUT} py-2`}
-          />
-        </div>
-        {tanpaKontrakSah && mulai > hariIni ? (
+        <IsianKontrak
+          kelompok={pegawai.kelompok}
+          nilai={nilai}
+          onChange={setNilai}
+        />
+        {tanpaKontrakSah && nilai.tanggal_mulai > hariIni ? (
           <p className={PERINGATAN}>
             Ini kontrak pertama dan baru berlaku nanti. Status sebelum tanggal
-            mulainya ikut menjadi {status} untuk gaji. Catat dulu kontrak yang
-            sedang berjalan bila statusnya berbeda.
+            mulainya ikut menjadi {nilai.status} untuk gaji. Catat dulu kontrak
+            yang sedang berjalan bila statusnya berbeda.
           </p>
         ) : null}
         {pegawai.kelompok === "Guru" ? (
@@ -443,14 +346,161 @@ function ModalKontrak({
   );
 }
 
+export interface NilaiKontrak {
+  status: string;
+  nomor: string;
+  tanggal_mulai: string;
+  tanggal_selesai: string;
+  percobaan_selesai: string;
+  catatan: string;
+}
+
+export function kontrakAwal(
+  kelompok: "Guru" | "Tendik",
+  hariIni: string,
+): NilaiKontrak {
+  return {
+    status: kelompok === "Guru" ? STATUS_GURU[0] : STATUS_TENDIK[0],
+    nomor: "",
+    tanggal_mulai: hariIni,
+    tanggal_selesai: "",
+    percobaan_selesai: "",
+    catatan: "",
+  };
+}
+
+/** Masa percobaan hanya untuk GTY/PTY; isian lain dibuang saat dikirim. */
+export function rapikanKontrak(nilai: NilaiKontrak): NilaiKontrak {
+  const percobaan = nilai.status === "GTY" || nilai.status === "PTY";
+  return {
+    ...nilai,
+    percobaan_selesai: percobaan ? nilai.percobaan_selesai : "",
+  };
+}
+
+/**
+ * Isian satu kontrak: tab Kontrak dan kontrak pertama Jadikan personil
+ * (HRIS Fase 7c). GTY/GTT hanya ditawarkan untuk Guru, PTY/PTT untuk Tendik.
+ */
+export function IsianKontrak({
+  kelompok,
+  nilai,
+  onChange,
+}: {
+  kelompok: "Guru" | "Tendik";
+  nilai: NilaiKontrak;
+  onChange: (nilai: NilaiKontrak) => void;
+}) {
+  const pilihan = kelompok === "Guru" ? STATUS_GURU : STATUS_TENDIK;
+  const ubah = (kunci: keyof NilaiKontrak, v: string) =>
+    onChange({ ...nilai, [kunci]: v });
+  const bolehPercobaan = nilai.status === "GTY" || nilai.status === "PTY";
+  const wajibSelesai = nilai.status === "GTT" || nilai.status === "PTT";
+  return (
+    <>
+      <div>
+        <label htmlFor="kontrak-status" className={LABEL}>
+          Status
+        </label>
+        <select
+          id="kontrak-status"
+          value={nilai.status}
+          onChange={(e) => ubah("status", e.target.value)}
+          className={INPUT}
+        >
+          {pilihan
+            .filter((s) => (STATUS_KONTRAK as readonly string[]).includes(s))
+            .map((s) => (
+              <option key={s} value={s}>
+                {s}
+              </option>
+            ))}
+        </select>
+      </div>
+      <div>
+        <label htmlFor="kontrak-nomor" className={LABEL}>
+          Nomor SK/kontrak
+        </label>
+        <input
+          id="kontrak-nomor"
+          maxLength={80}
+          value={nilai.nomor}
+          onChange={(e) => ubah("nomor", e.target.value)}
+          className={INPUT}
+        />
+      </div>
+      <div className="grid gap-4 sm:grid-cols-2">
+        <div>
+          <label htmlFor="kontrak-mulai" className={LABEL}>
+            Tanggal mulai
+          </label>
+          <input
+            id="kontrak-mulai"
+            type="date"
+            required
+            value={nilai.tanggal_mulai}
+            onChange={(e) => ubah("tanggal_mulai", e.target.value)}
+            className={INPUT}
+          />
+        </div>
+        <div>
+          <label htmlFor="kontrak-selesai" className={LABEL}>
+            Tanggal selesai{wajibSelesai ? "" : " (opsional)"}
+          </label>
+          <input
+            id="kontrak-selesai"
+            type="date"
+            required={wajibSelesai}
+            min={nilai.tanggal_mulai}
+            value={nilai.tanggal_selesai}
+            onChange={(e) => ubah("tanggal_selesai", e.target.value)}
+            className={INPUT}
+          />
+        </div>
+      </div>
+      {bolehPercobaan ? (
+        <div>
+          <label htmlFor="kontrak-percobaan" className={LABEL}>
+            Akhir masa percobaan (opsional)
+          </label>
+          <input
+            id="kontrak-percobaan"
+            type="date"
+            min={nilai.tanggal_mulai}
+            value={nilai.percobaan_selesai}
+            onChange={(e) => ubah("percobaan_selesai", e.target.value)}
+            className={INPUT}
+          />
+        </div>
+      ) : null}
+      <div>
+        <label htmlFor="kontrak-catatan" className={LABEL}>
+          Catatan (opsional)
+        </label>
+        <textarea
+          id="kontrak-catatan"
+          maxLength={500}
+          rows={2}
+          value={nilai.catatan}
+          onChange={(e) => ubah("catatan", e.target.value)}
+          className={`${INPUT} py-2`}
+        />
+      </div>
+    </>
+  );
+}
+
 export function ModalBatal({
   judul,
   menyimpan,
+  galat,
   onClose,
   onBatal,
 }: {
   judul: string;
   menyimpan: boolean;
+  /** Galat simpan, ditampilkan di dialog (banner halaman tertutup latarnya). */
+  galat?: string | null;
   onClose: () => void;
   onBatal: (alasan: string) => void;
 }) {
@@ -480,6 +530,11 @@ export function ModalBatal({
           Pembatalan tidak bisa ditarik kembali; datanya tetap tercatat sebagai
           dibatalkan.
         </p>
+        {galat ? (
+          <p className="text-sm text-rose-300" role="alert">
+            {galat}
+          </p>
+        ) : null}
         <div className="flex justify-end gap-2">
           <button type="button" className={TOMBOL} onClick={onClose}>
             Kembali
