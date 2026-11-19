@@ -181,6 +181,18 @@ export const PROMOTION_PLAN: readonly PromotionTable[] = [
     uniqueColumns: [],
     dependsOn: ["hr_kinerja_penilaian"],
   },
+
+  // Lapisan 8 — rekrutmen dan pelatihan (v72, cloud-only).
+  { table: "hr_lowongan", uniqueColumns: [], dependsOn: [] },
+  { table: "hr_pelamar", uniqueColumns: [], dependsOn: ["hr_lowongan"] },
+  { table: "hr_pelamar_tahap", uniqueColumns: [], dependsOn: ["hr_pelamar"] },
+  { table: "hr_pelamar_berkas", uniqueColumns: [], dependsOn: ["hr_pelamar"] },
+  { table: "hr_pelatihan", uniqueColumns: [], dependsOn: [] },
+  {
+    table: "hr_pelatihan_peserta",
+    uniqueColumns: [],
+    dependsOn: ["hr_pelatihan", "master_data", "hr_dokumen"],
+  },
 ];
 
 /**

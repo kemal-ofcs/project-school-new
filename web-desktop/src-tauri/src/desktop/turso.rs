@@ -703,8 +703,10 @@ pub const ADMIN_DEFAULT_EXCLUDED_PERMISSIONS: &[&str] = &[
     // SENSITIVE_MUTATION_PERMISSIONS HRIS Fase 5 (§23.4)
     "hr.performance.finalize",
     "hr.performance.config",
+    // SENSITIVE_MUTATION_PERMISSIONS HRIS Fase 7 (§25.4)
+    "hr.recruit.delete",
     // CONFIDENTIAL_PERMISSIONS (data rahasia pegawai, Q-33; SP dan keluar §22.4;
-    // kinerja §23.4)
+    // kinerja §23.4; pelamar §25.4)
     "hr.personal.view",
     "hr.personal.manage",
     "hr.finance.view",
@@ -716,6 +718,8 @@ pub const ADMIN_DEFAULT_EXCLUDED_PERMISSIONS: &[&str] = &[
     "hr.offboard.manage",
     "hr.performance.view",
     "hr.performance.assess",
+    "hr.recruit.view",
+    "hr.recruit.manage",
 ];
 
 /// Paket role bawaan HRIS (Q-34). WAJIB sama dengan
@@ -747,6 +751,8 @@ pub const ROLE_HRIS_BAWAAN: &[(&str, &[&str])] = &[
             "hr.performance.assess",
             "hr.performance.finalize",
             "hr.performance.config",
+            "hr.recruit.view",
+            "hr.training.view",
         ],
     ),
     (
@@ -765,6 +771,7 @@ pub const ROLE_HRIS_BAWAAN: &[(&str, &[&str])] = &[
             "hr.warning.manage",
             "hr.performance.view",
             "hr.performance.assess",
+            "hr.training.view",
         ],
     ),
     (
@@ -793,6 +800,11 @@ pub const ROLE_HRIS_BAWAAN: &[(&str, &[&str])] = &[
             "hr.offboard.manage",
             "hr.performance.view",
             "hr.performance.config",
+            "hr.recruit.view",
+            "hr.recruit.manage",
+            "hr.recruit.delete",
+            "hr.training.view",
+            "hr.training.manage",
         ],
     ),
     (
@@ -3514,7 +3526,12 @@ impl TursoClient {
                 ('hr.performance.view', 'Lihat Penilaian Kinerja', 'Kepegawaian', 'Melihat penilaian kinerja guru dan tendik beserta nilainya.', 1, 1424),
                 ('hr.performance.assess', 'Nilai Kinerja Pegawai', 'Kepegawaian', 'Membuat, mengisi, dan mengajukan penilaian kinerja pegawai di unitnya.', 1, 1425),
                 ('hr.performance.finalize', 'Finalkan Penilaian Kinerja', 'Kepegawaian', 'Mengembalikan, memfinalkan, dan mengoreksi penilaian kinerja.', 1, 1426),
-                ('hr.performance.config', 'Atur Template Kinerja', 'Kepegawaian', 'Mengatur template, aspek, bobot, ambang, dan predikat penilaian kinerja.', 1, 1427);"#,
+                ('hr.performance.config', 'Atur Template Kinerja', 'Kepegawaian', 'Mengatur template, aspek, bobot, ambang, dan predikat penilaian kinerja.', 1, 1427),
+                ('hr.recruit.view', 'Lihat Rekrutmen', 'Kepegawaian', 'Melihat lowongan, pelamar, tahap seleksi, dan CV pelamar.', 1, 1428),
+                ('hr.recruit.manage', 'Kelola Rekrutmen', 'Kepegawaian', 'Membuat lowongan, mencatat pelamar, tahap seleksi, dan CV pelamar.', 1, 1429),
+                ('hr.recruit.delete', 'Hapus Data Pelamar', 'Kepegawaian', 'Menghapus permanen data pelamar beserta tahap dan berkasnya.', 1, 1430),
+                ('hr.training.view', 'Lihat Pelatihan', 'Kepegawaian', 'Melihat pelatihan, peserta, sertifikat, dan rekap jam pelatihan pegawai.', 1, 1431),
+                ('hr.training.manage', 'Kelola Pelatihan', 'Kepegawaian', 'Mencatat pelatihan, peserta, hasil, dan sertifikat pelatihan pegawai.', 1, 1432);"#,
                 vec![],
             ),
             // Seed Default Role Permissions untuk Role Superadmin (Role 1)
@@ -4913,6 +4930,131 @@ impl TursoClient {
                 );"#,
                 vec![],
             ),
+            // ── v72: rekrutmen dan pelatihan (HRIS Fase 7, `prd-hris/fase-7.md`
+            // §25.3). Keenamnya cloud-only, tanpa UNIQUE selain PK; status
+            // lowongan, pelamar, dan pelatihan diturunkan, tidak disimpan.
+            // Kembar blok v72 `db-migrations.ts`.
+            Statement::new(
+                r#"CREATE TABLE IF NOT EXISTS hr_lowongan (
+                  id_lowongan TEXT PRIMARY KEY,
+                  judul TEXT NOT NULL,
+                  kelompok TEXT NOT NULL CHECK (kelompok IN ('Guru', 'Tendik')),
+                  unit TEXT,
+                  id_bagian TEXT,
+                  id_jabatan TEXT,
+                  jumlah INTEGER NOT NULL CHECK (jumlah BETWEEN 1 AND 99),
+                  tanggal_buka TEXT NOT NULL,
+                  tanggal_tutup TEXT,
+                  keterangan TEXT,
+                  ditutup_pada TEXT,
+                  ditutup_oleh TEXT,
+                  pelamar_dihapus INTEGER NOT NULL DEFAULT 0 CHECK (pelamar_dihapus >= 0),
+                  dicatat_oleh TEXT NOT NULL,
+                  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+                  diubah_oleh TEXT,
+                  diubah_pada TEXT,
+                  CHECK (tanggal_tutup IS NULL OR tanggal_tutup >= tanggal_buka)
+                );"#,
+                vec![],
+            ),
+            Statement::new(
+                r#"CREATE TABLE IF NOT EXISTS hr_pelamar (
+                  id_pelamar TEXT PRIMARY KEY,
+                  id_lowongan TEXT NOT NULL,
+                  nama TEXT NOT NULL,
+                  no_hp TEXT,
+                  email TEXT,
+                  lp TEXT CHECK (lp IS NULL OR lp IN ('L', 'P')),
+                  tanggal_lahir TEXT,
+                  alamat TEXT,
+                  pendidikan TEXT CHECK (pendidikan IS NULL OR pendidikan IN ('SD', 'SMP', 'SMA/SMK', 'D1', 'D2', 'D3', 'D4', 'S1', 'S2', 'S3')),
+                  prodi TEXT,
+                  sumber TEXT,
+                  tanggal_lamaran TEXT NOT NULL,
+                  catatan TEXT,
+                  id_karyawan TEXT,
+                  dijadikan_oleh TEXT,
+                  dijadikan_pada TEXT,
+                  dicatat_oleh TEXT NOT NULL,
+                  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+                  diubah_oleh TEXT,
+                  diubah_pada TEXT
+                );"#,
+                vec![],
+            ),
+            Statement::new(
+                r#"CREATE TABLE IF NOT EXISTS hr_pelamar_tahap (
+                  id_tahap TEXT PRIMARY KEY,
+                  id_pelamar TEXT NOT NULL,
+                  urutan INTEGER NOT NULL CHECK (urutan >= 1),
+                  tahap TEXT NOT NULL CHECK (tahap IN ('Lamaran', 'Seleksi Berkas', 'Wawancara', 'Microteaching', 'Penawaran', 'Diterima', 'Ditolak', 'Mundur')),
+                  tanggal TEXT NOT NULL,
+                  catatan TEXT,
+                  oleh TEXT NOT NULL,
+                  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+                  dibatalkan_oleh TEXT,
+                  dibatalkan_pada TEXT,
+                  alasan_batal TEXT
+                );"#,
+                vec![],
+            ),
+            Statement::new(
+                r#"CREATE TABLE IF NOT EXISTS hr_pelamar_berkas (
+                  id_berkas TEXT PRIMARY KEY,
+                  id_pelamar TEXT NOT NULL,
+                  urutan INTEGER NOT NULL CHECK (urutan BETWEEN 1 AND 3),
+                  nama_berkas TEXT,
+                  mime_type TEXT NOT NULL CHECK (mime_type IN ('image/jpeg', 'image/png', 'image/webp', 'application/pdf')),
+                  data_base64 TEXT NOT NULL,
+                  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+                );"#,
+                vec![],
+            ),
+            Statement::new(
+                r#"CREATE TABLE IF NOT EXISTS hr_pelatihan (
+                  id_pelatihan TEXT PRIMARY KEY,
+                  nama TEXT NOT NULL,
+                  jenis_penyelenggara TEXT NOT NULL CHECK (jenis_penyelenggara IN ('KKG', 'MGMP', 'Dinas', 'Internal', 'Lainnya')),
+                  penyelenggara TEXT,
+                  tanggal_mulai TEXT NOT NULL,
+                  tanggal_selesai TEXT NOT NULL,
+                  lokasi TEXT,
+                  jumlah_jam INTEGER NOT NULL CHECK (jumlah_jam BETWEEN 1 AND 1000),
+                  biaya INTEGER NOT NULL DEFAULT 0 CHECK (biaya >= 0),
+                  keterangan TEXT,
+                  dicatat_oleh TEXT NOT NULL,
+                  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+                  diubah_oleh TEXT,
+                  diubah_pada TEXT,
+                  dibatalkan_oleh TEXT,
+                  dibatalkan_pada TEXT,
+                  alasan_batal TEXT,
+                  CHECK (tanggal_selesai >= tanggal_mulai)
+                );"#,
+                vec![],
+            ),
+            Statement::new(
+                r#"CREATE TABLE IF NOT EXISTS hr_pelatihan_peserta (
+                  id_peserta TEXT PRIMARY KEY,
+                  id_pelatihan TEXT NOT NULL,
+                  id_karyawan TEXT NOT NULL,
+                  hasil TEXT CHECK (hasil IS NULL OR hasil IN ('Lulus', 'Tidak Lulus', 'Tidak Hadir')),
+                  id_dokumen TEXT,
+                  catatan TEXT,
+                  dicatat_oleh TEXT NOT NULL,
+                  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+                );"#,
+                vec![],
+            ),
+            Statement::new("CREATE INDEX IF NOT EXISTS idx_hr_lowongan_buka ON hr_lowongan(tanggal_buka);", vec![]),
+            Statement::new("CREATE INDEX IF NOT EXISTS idx_hr_pelamar_lowongan ON hr_pelamar(id_lowongan);", vec![]),
+            Statement::new("CREATE INDEX IF NOT EXISTS idx_hr_pelamar_karyawan ON hr_pelamar(id_karyawan);", vec![]),
+            Statement::new("CREATE INDEX IF NOT EXISTS idx_hr_pelamar_tahap_pelamar ON hr_pelamar_tahap(id_pelamar);", vec![]),
+            Statement::new("CREATE INDEX IF NOT EXISTS idx_hr_pelamar_berkas_pelamar ON hr_pelamar_berkas(id_pelamar);", vec![]),
+            Statement::new("CREATE INDEX IF NOT EXISTS idx_hr_pelatihan_mulai ON hr_pelatihan(tanggal_mulai);", vec![]),
+            Statement::new("CREATE INDEX IF NOT EXISTS idx_hr_pelatihan_peserta_pelatihan ON hr_pelatihan_peserta(id_pelatihan);", vec![]),
+            Statement::new("CREATE INDEX IF NOT EXISTS idx_hr_pelatihan_peserta_karyawan ON hr_pelatihan_peserta(id_karyawan);", vec![]),
+            Statement::new("CREATE INDEX IF NOT EXISTS idx_hr_pelatihan_peserta_dokumen ON hr_pelatihan_peserta(id_dokumen);", vec![]),
             Statement::new("CREATE INDEX IF NOT EXISTS idx_hr_kinerja_template_kelompok ON hr_kinerja_template(kelompok);", vec![]),
             Statement::new("CREATE INDEX IF NOT EXISTS idx_hr_kinerja_aspek_template ON hr_kinerja_aspek(id_template);", vec![]),
             Statement::new("CREATE INDEX IF NOT EXISTS idx_hr_kinerja_penilaian_karyawan ON hr_kinerja_penilaian(id_karyawan, periode_mulai);", vec![]),
@@ -5689,6 +5831,17 @@ impl TursoClient {
             vec![],
         )
         .await?;
+        // Rekrutmen dan pelatihan (v72): enam tabel cloud-only di atas + lima izin.
+        self.query_one(
+            "INSERT OR IGNORE INTO schema_migration (version, name, applied_at) VALUES (72, 'hris-rekrutmen-pelatihan', datetime('now'));",
+            vec![],
+        )
+        .await?;
+        self.query_one(
+            "INSERT OR IGNORE INTO schema_migration (version, name, applied_at) VALUES (-2048, 'hris-rekrutmen-pelatihan-v1', datetime('now'));",
+            vec![],
+        )
+        .await?;
 
         Ok(())
     }
@@ -6140,7 +6293,7 @@ impl TursoClient {
                 // Sentinel WAJIB dinaikkan setiap kali ensure_schema menambah
                 // tabel atau kolom — nilainya di sini dan pada INSERT di atas
                 // harus selalu sama.
-                "SELECT COUNT(*) AS total FROM schema_migration WHERE version = -2047;",
+                "SELECT COUNT(*) AS total FROM schema_migration WHERE version = -2048;",
                 vec![],
             )
             .await
@@ -18851,7 +19004,7 @@ mod tests {
             connection
                 .execute_batch(
                     "DROP TABLE riwayat_identitas_karyawan;
-                     DELETE FROM schema_migration WHERE version IN (-2017, -2018, -2019, -2020, -2021, -2022, -2023, -2024, -2025, -2026, -2027, -2028, -2029, -2030, -2031, -2032, -2033, -2034, -2035, -2036, -2037, -2038, -2039, -2040, -2041, -2042, -2043, -2044, -2045, -2046, -2047);",
+                     DELETE FROM schema_migration WHERE version IN (-2017, -2018, -2019, -2020, -2021, -2022, -2023, -2024, -2025, -2026, -2027, -2028, -2029, -2030, -2031, -2032, -2033, -2034, -2035, -2036, -2037, -2038, -2039, -2040, -2041, -2042, -2043, -2044, -2045, -2046, -2047, -2048);",
                 )
                 .expect("siapkan database lama");
 
@@ -18887,7 +19040,7 @@ mod tests {
             connection
                 .execute_batch(
                     "DROP TABLE inventory_unit;
-                     DELETE FROM schema_migration WHERE version IN (-2018, -2019, -2020, -2021, -2022, -2023, -2024, -2025, -2026, -2027, -2028, -2029, -2030, -2031, -2032, -2033, -2034, -2035, -2036, -2037, -2038, -2039, -2040, -2041, -2042, -2043, -2044, -2045, -2046, -2047);",
+                     DELETE FROM schema_migration WHERE version IN (-2018, -2019, -2020, -2021, -2022, -2023, -2024, -2025, -2026, -2027, -2028, -2029, -2030, -2031, -2032, -2033, -2034, -2035, -2036, -2037, -2038, -2039, -2040, -2041, -2042, -2043, -2044, -2045, -2046, -2047, -2048);",
                 )
                 .expect("siapkan database lama");
 
@@ -18924,7 +19077,7 @@ mod tests {
                 .execute_batch(
                     "DROP TABLE personil_wajah;
                      ALTER TABLE absensi_foto DROP COLUMN wajah_vonis;
-                     DELETE FROM schema_migration WHERE version IN (-2019, -2020, -2021, -2022, -2023, -2024, -2025, -2026, -2027, -2028, -2029, -2030, -2031, -2032, -2033, -2034, -2035, -2036, -2037, -2038, -2039, -2040, -2041, -2042, -2043, -2044, -2045, -2046, -2047);",
+                     DELETE FROM schema_migration WHERE version IN (-2019, -2020, -2021, -2022, -2023, -2024, -2025, -2026, -2027, -2028, -2029, -2030, -2031, -2032, -2033, -2034, -2035, -2036, -2037, -2038, -2039, -2040, -2041, -2042, -2043, -2044, -2045, -2046, -2047, -2048);",
                 )
                 .expect("siapkan database lama");
 
@@ -18963,7 +19116,7 @@ mod tests {
                     "DROP TABLE keu_akun;
                      DROP TABLE keu_jurnal;
                      DROP TABLE keu_jurnal_baris;
-                     DELETE FROM schema_migration WHERE version IN (-2020, -2021, -2022, -2023, -2024, -2025, -2026, -2027, -2028, -2029, -2030, -2031, -2032, -2033, -2034, -2035, -2036, -2037, -2038, -2039, -2040, -2041, -2042, -2043, -2044, -2045, -2046, -2047);",
+                     DELETE FROM schema_migration WHERE version IN (-2020, -2021, -2022, -2023, -2024, -2025, -2026, -2027, -2028, -2029, -2030, -2031, -2032, -2033, -2034, -2035, -2036, -2037, -2038, -2039, -2040, -2041, -2042, -2043, -2044, -2045, -2046, -2047, -2048);",
                 )
                 .expect("siapkan database lama");
 
@@ -19076,7 +19229,7 @@ mod tests {
                     "DROP TABLE keu_pinjaman;
                      DROP TABLE keu_pinjaman_mutasi;
                      DROP TABLE keu_pinjaman_tunda;
-                     DELETE FROM schema_migration WHERE version IN (-2021, -2022, -2023, -2024, -2025, -2026, -2027, -2028, -2029, -2030, -2031, -2032, -2033, -2034, -2035, -2036, -2037, -2038, -2039, -2040, -2041, -2042, -2043, -2044, -2045, -2046, -2047);",
+                     DELETE FROM schema_migration WHERE version IN (-2021, -2022, -2023, -2024, -2025, -2026, -2027, -2028, -2029, -2030, -2031, -2032, -2033, -2034, -2035, -2036, -2037, -2038, -2039, -2040, -2041, -2042, -2043, -2044, -2045, -2046, -2047, -2048);",
                 )
                 .expect("siapkan database lama");
 
@@ -19113,7 +19266,7 @@ mod tests {
                 .execute_batch(
                     "DROP TABLE keu_tagihan;
                      DROP TABLE keu_tagihan_batal;
-                     DELETE FROM schema_migration WHERE version IN (-2022, -2023, -2024, -2025, -2026, -2027, -2028, -2029, -2030, -2031, -2032, -2033, -2034, -2035, -2036, -2037, -2038, -2039, -2040, -2041, -2042, -2043, -2044, -2045, -2046, -2047);",
+                     DELETE FROM schema_migration WHERE version IN (-2022, -2023, -2024, -2025, -2026, -2027, -2028, -2029, -2030, -2031, -2032, -2033, -2034, -2035, -2036, -2037, -2038, -2039, -2040, -2041, -2042, -2043, -2044, -2045, -2046, -2047, -2048);",
                 )
                 .expect("siapkan database lama");
             client.ensure_schema_current().await.expect("skema mutakhir");
@@ -19151,7 +19304,7 @@ mod tests {
                      DROP TABLE keu_pembayaran;
                      DROP TABLE keu_pembayaran_alokasi;
                      DROP TABLE keu_pembayaran_batal;
-                     DELETE FROM schema_migration WHERE version IN (-2023, -2024, -2025, -2026, -2027, -2028, -2029, -2030, -2031, -2032, -2033, -2034, -2035, -2036, -2037, -2038, -2039, -2040, -2041, -2042, -2043, -2044, -2045, -2046, -2047);",
+                     DELETE FROM schema_migration WHERE version IN (-2023, -2024, -2025, -2026, -2027, -2028, -2029, -2030, -2031, -2032, -2033, -2034, -2035, -2036, -2037, -2038, -2039, -2040, -2041, -2042, -2043, -2044, -2045, -2046, -2047, -2048);",
                 )
                 .expect("siapkan database lama");
             client.ensure_schema_current().await.expect("skema mutakhir");
@@ -19187,7 +19340,7 @@ mod tests {
                 .execute_batch(
                     "DROP TABLE nilai_jenis;
                      ALTER TABLE nilai_penilaian DROP COLUMN id_jenis;
-                     DELETE FROM schema_migration WHERE version IN (-2024, -2025, -2026, -2027, -2028, -2029, -2030, -2031, -2032, -2033, -2034, -2035, -2036, -2037, -2038, -2039, -2040, -2041, -2042, -2043, -2044, -2045, -2046, -2047);",
+                     DELETE FROM schema_migration WHERE version IN (-2024, -2025, -2026, -2027, -2028, -2029, -2030, -2031, -2032, -2033, -2034, -2035, -2036, -2037, -2038, -2039, -2040, -2041, -2042, -2043, -2044, -2045, -2046, -2047, -2048);",
                 )
                 .expect("siapkan database lama");
             client.ensure_schema_current().await.expect("skema mutakhir");
@@ -19236,7 +19389,7 @@ mod tests {
                      INSERT INTO payroll_components (id, name, category, calc_type, default_value, applies_to) VALUES ('c1', 'Tunjangan TU', 'ALLOWANCE', 'FIXED', 100000, 'DIVISI:Tata Usaha');
                      INSERT INTO hari_libur_whitelist (id, scope_type, scope_value) VALUES ('w1', 'DIVISI', 'Tata Usaha');
                      DELETE FROM hr_bagian; DELETE FROM hr_bagian_nama; DELETE FROM hr_jabatan;
-                     DELETE FROM schema_migration WHERE version IN (68, -2044, -2045, -2046, -2047);",
+                     DELETE FROM schema_migration WHERE version IN (68, -2044, -2045, -2046, -2047, -2048);",
                 )
                 .expect("siapkan database v67");
             client.ensure_schema_current().await.expect("skema mutakhir");
@@ -19464,7 +19617,7 @@ mod tests {
                      UPDATE bpjs_rules SET wage_cap = 10042300, effective_date = '2026-01-01' WHERE component_code = 'JP_EMP';
                      UPDATE bpjs_rules SET wage_cap = 9999999, effective_date = '2026-01-01' WHERE component_code = 'JP_CO';
                      ALTER TABLE payroll_components DROP COLUMN dasar_bpjs;
-                     DELETE FROM schema_migration WHERE version IN (67, -2043, -2044, -2045, -2046, -2047);",
+                     DELETE FROM schema_migration WHERE version IN (67, -2043, -2044, -2045, -2046, -2047, -2048);",
                 )
                 .expect("siapkan database lama");
 

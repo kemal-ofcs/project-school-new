@@ -29,6 +29,16 @@ import type {
 } from "@/lib/validations/hr-kinerja";
 import type { PerluPerhatian } from "@/lib/validations/hr-pengingat";
 import type {
+  BerkasPelamarDraft,
+  DaftarLowongan,
+  IsiBerkasPelamar,
+  LowonganDraft,
+  PelamarBaris,
+  PelamarDraft,
+  RincianPelamar,
+  TahapDraft,
+} from "@/lib/validations/hr-rekrutmen";
+import type {
   BerkasDokumenDraft,
   DaftarDokumen,
   DaftarKontrak,
@@ -654,5 +664,117 @@ export function batalkanKeluar(idKeluar: string, alasan: string) {
     { idKeluar, alasan },
     "/api/kepegawaian/offboarding/cancel",
     { id_keluar: idKeluar, alasan },
+  );
+}
+
+// HRIS Fase 7a: rekrutmen, cloud-only.
+
+export function muatLowongan(): Promise<DaftarLowongan> {
+  return cloud(
+    "desktop_hr_vacancies",
+    {},
+    "/api/kepegawaian/recruitment/vacancies/query",
+    {},
+  );
+}
+
+/** Aksi `simpan` (buat/ubah), `tutup`, atau `buka`. */
+export function simpanLowongan(
+  draft: LowonganDraft,
+): Promise<{ sukses: true; id_lowongan: string }> {
+  return cloud(
+    "desktop_hr_vacancy_save",
+    { draft },
+    "/api/kepegawaian/recruitment/vacancies/save",
+    draft,
+  );
+}
+
+export function muatPelamar(
+  idLowongan: string,
+): Promise<{ pelamar: PelamarBaris[] }> {
+  return cloud(
+    "desktop_hr_applicants",
+    { idLowongan },
+    "/api/kepegawaian/recruitment/applicants/query",
+    { id_lowongan: idLowongan, id_pelamar: "" },
+  );
+}
+
+export function muatRincianPelamar(idPelamar: string): Promise<RincianPelamar> {
+  return cloud(
+    "desktop_hr_applicants",
+    { idPelamar },
+    "/api/kepegawaian/recruitment/applicants/query",
+    { id_lowongan: "", id_pelamar: idPelamar },
+  );
+}
+
+export function simpanPelamar(
+  draft: PelamarDraft,
+): Promise<{ sukses: true; id_pelamar: string; mungkin_ganda: boolean }> {
+  return cloud(
+    "desktop_hr_applicant_save",
+    { draft },
+    "/api/kepegawaian/recruitment/applicants/save",
+    draft,
+  );
+}
+
+/** Aksi `catat` atau `batal` (tahap terakhir, alasan wajib). */
+export function simpanTahapPelamar(draft: TahapDraft) {
+  return cloud<{ sukses: true }>(
+    "desktop_hr_applicant_stage",
+    { draft },
+    "/api/kepegawaian/recruitment/applicants/stage",
+    draft,
+  );
+}
+
+export function ambilBerkasPelamar(id: string): Promise<IsiBerkasPelamar> {
+  return cloud(
+    "desktop_hr_applicant_file",
+    { idBerkas: id },
+    "/api/kepegawaian/recruitment/applicants/file/query",
+    { id },
+  );
+}
+
+export function tambahBerkasPelamar(draft: BerkasPelamarDraft) {
+  return cloud<{ id_berkas: string }>(
+    "desktop_hr_applicant_file_save",
+    { draft: { aksi: "tambah", ...draft } },
+    "/api/kepegawaian/recruitment/applicants/file",
+    draft,
+  );
+}
+
+export function hapusBerkasPelamar(id: string) {
+  return cloud<{ sukses: true }>(
+    "desktop_hr_applicant_file_save",
+    { draft: { aksi: "hapus", id_berkas: id } },
+    "/api/kepegawaian/recruitment/applicants/file",
+    { id },
+    "DELETE",
+  );
+}
+
+export function hapusPelamar(idPelamar: string) {
+  return cloud<{ sukses: true }>(
+    "desktop_hr_applicant_delete",
+    { idPelamar },
+    "/api/kepegawaian/recruitment/applicants/delete",
+    { id: idPelamar },
+    "DELETE",
+  );
+}
+
+/** Retensi pelamar; dijalankan runner setiap sesi (7c). */
+export function bersihkanPelamar(): Promise<{ dihapus: number }> {
+  return cloud(
+    "desktop_hr_recruit_cleanup",
+    {},
+    "/api/kepegawaian/recruitment/cleanup",
+    {},
   );
 }

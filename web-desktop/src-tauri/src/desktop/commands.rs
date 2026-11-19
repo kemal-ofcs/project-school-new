@@ -11,7 +11,7 @@ use super::{
         CommandError, DesktopLoginResult, DesktopRuntimeStatus, DesktopSession, DesktopSyncStatus,
         OperatorUser, SessionMode,
     },
-    hr_beban, hr_keluar, hr_kinerja, hr_pengajuan, hr_pengingat, hris, hris_cloud, operational, portability, rapel,
+    hr_beban, hr_keluar, hr_kinerja, hr_pengajuan, hr_pengingat, hr_rekrutmen, hris, hris_cloud, operational, portability, rapel,
     scanner, secrets, storage, sync, teaching_journal, turso, uks, wa_notification,
 };
 
@@ -3746,6 +3746,115 @@ pub async fn desktop_hr_offboarding_cancel(
 ) -> Result<Value, CommandError> {
     let operator = require_permission(&state, "hr.offboard.decide")?;
     hr_keluar::batalkan_keluar(&klien_cloud(&state)?, &operator, &id_keluar, &alasan)
+        .await
+        .map_err(hris_cloud::luring)
+}
+
+/// Daftar lowongan (cloud-only, HRIS Fase 7a) dengan status turunan, hitungan
+/// pelamar per status, dan tanggal hapus data pelamar.
+#[tauri::command]
+pub async fn desktop_hr_vacancies(state: State<'_, DesktopState>) -> Result<Value, CommandError> {
+    require_any_permission(&state, &["hr.recruit.view", "hr.recruit.manage"])?;
+    hr_rekrutmen::daftar_lowongan(&klien_cloud(&state)?)
+        .await
+        .map_err(hris_cloud::luring)
+}
+
+/// Buat, ubah, tutup, atau buka lagi lowongan.
+#[tauri::command]
+pub async fn desktop_hr_vacancy_save(
+    state: State<'_, DesktopState>,
+    draft: Value,
+) -> Result<Value, CommandError> {
+    let operator = require_permission(&state, "hr.recruit.manage")?;
+    hr_rekrutmen::simpan_lowongan(&klien_cloud(&state)?, &operator.username, &draft)
+        .await
+        .map_err(hris_cloud::luring)
+}
+
+/// Pelamar satu lowongan, atau rincian satu pelamar + tahap + daftar berkas.
+#[tauri::command]
+pub async fn desktop_hr_applicants(
+    state: State<'_, DesktopState>,
+    id_lowongan: Option<String>,
+    id_pelamar: Option<String>,
+) -> Result<Value, CommandError> {
+    require_any_permission(&state, &["hr.recruit.view", "hr.recruit.manage"])?;
+    hr_rekrutmen::daftar_pelamar(
+        &klien_cloud(&state)?,
+        id_lowongan.as_deref().unwrap_or(""),
+        id_pelamar.as_deref().unwrap_or(""),
+    )
+    .await
+    .map_err(hris_cloud::luring)
+}
+
+/// Pelamar baru (+ tahap Lamaran) atau ubah data pelamar.
+#[tauri::command]
+pub async fn desktop_hr_applicant_save(
+    state: State<'_, DesktopState>,
+    draft: Value,
+) -> Result<Value, CommandError> {
+    let operator = require_permission(&state, "hr.recruit.manage")?;
+    hr_rekrutmen::simpan_pelamar(&klien_cloud(&state)?, &operator.username, &draft)
+        .await
+        .map_err(hris_cloud::luring)
+}
+
+/// Catat tahap seleksi, atau batalkan tahap terakhir.
+#[tauri::command]
+pub async fn desktop_hr_applicant_stage(
+    state: State<'_, DesktopState>,
+    draft: Value,
+) -> Result<Value, CommandError> {
+    let operator = require_permission(&state, "hr.recruit.manage")?;
+    hr_rekrutmen::tahap_pelamar(&klien_cloud(&state)?, &operator.username, &draft)
+        .await
+        .map_err(hris_cloud::luring)
+}
+
+/// Isi satu berkas pelamar.
+#[tauri::command]
+pub async fn desktop_hr_applicant_file(
+    state: State<'_, DesktopState>,
+    id_berkas: String,
+) -> Result<Value, CommandError> {
+    require_any_permission(&state, &["hr.recruit.view", "hr.recruit.manage"])?;
+    hr_rekrutmen::berkas_pelamar(&klien_cloud(&state)?, &id_berkas)
+        .await
+        .map_err(hris_cloud::luring)
+}
+
+/// Tambah (maks 3) atau hapus berkas pelamar.
+#[tauri::command]
+pub async fn desktop_hr_applicant_file_save(
+    state: State<'_, DesktopState>,
+    draft: Value,
+) -> Result<Value, CommandError> {
+    require_permission(&state, "hr.recruit.manage")?;
+    hr_rekrutmen::simpan_berkas_pelamar(&klien_cloud(&state)?, &draft)
+        .await
+        .map_err(hris_cloud::luring)
+}
+
+/// Hapus permanen satu pelamar beserta tahap dan berkasnya.
+#[tauri::command]
+pub async fn desktop_hr_applicant_delete(
+    state: State<'_, DesktopState>,
+    id_pelamar: String,
+) -> Result<Value, CommandError> {
+    require_permission(&state, "hr.recruit.delete")?;
+    hr_rekrutmen::hapus_pelamar(&klien_cloud(&state)?, &id_pelamar)
+        .await
+        .map_err(hris_cloud::luring)
+}
+
+/// Retensi pelamar 12 bulan sesudah lowongan ditutup. Aturan tetap tanpa
+/// pilihan dan hasilnya hanya hitungan, jadi cukup sesi.
+#[tauri::command]
+pub async fn desktop_hr_recruit_cleanup(state: State<'_, DesktopState>) -> Result<Value, CommandError> {
+    require_session(&state)?;
+    hr_rekrutmen::bersihkan_pelamar(&klien_cloud(&state)?)
         .await
         .map_err(hris_cloud::luring)
 }

@@ -33,6 +33,8 @@ pub mod hr_kinerja;
 pub mod hr_pengajuan;
 // Pengingat kepegawaian (HRIS Fase 6): SALINAN `desktop/hr_pengingat.rs`.
 pub mod hr_pengingat;
+// Rekrutmen (HRIS Fase 7a): SALINAN `desktop/hr_rekrutmen.rs`.
+pub mod hr_rekrutmen;
 pub mod hris;
 pub mod hris_cloud;
 // Inventaris: SALINAN `desktop/inventory.rs` oleh sync-rust-modules.ts.

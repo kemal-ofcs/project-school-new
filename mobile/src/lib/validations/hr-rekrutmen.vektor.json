@@ -1,0 +1,634 @@
+{
+  "lowongan": [
+    {
+      "nama": "lowongan guru lengkap",
+      "draft": {
+        "judul": " Guru Matematika SMP ",
+        "kelompok": "Guru",
+        "unit": "SMP",
+        "id_bagian": "",
+        "id_jabatan": "jab-guru",
+        "jumlah": 2,
+        "tanggal_buka": "2026-07-01",
+        "tanggal_tutup": "2026-07-31",
+        "keterangan": ""
+      },
+      "hasil": {
+        "id_lowongan": null,
+        "judul": "Guru Matematika SMP",
+        "kelompok": "Guru",
+        "unit": "SMP",
+        "id_bagian": null,
+        "id_jabatan": "jab-guru",
+        "jumlah": 2,
+        "tanggal_buka": "2026-07-01",
+        "tanggal_tutup": "2026-07-31",
+        "keterangan": null
+      }
+    },
+    {
+      "nama": "lowongan yayasan tanpa unit dan tanpa tanggal tutup",
+      "draft": {
+        "id_lowongan": "low-1",
+        "judul": "Staf TU",
+        "kelompok": "Tendik",
+        "jumlah": 1,
+        "tanggal_buka": "2026-07-01"
+      },
+      "hasil": {
+        "id_lowongan": "low-1",
+        "judul": "Staf TU",
+        "kelompok": "Tendik",
+        "unit": null,
+        "id_bagian": null,
+        "id_jabatan": null,
+        "jumlah": 1,
+        "tanggal_buka": "2026-07-01",
+        "tanggal_tutup": null,
+        "keterangan": null
+      }
+    },
+    {
+      "nama": "judul kosong",
+      "draft": {
+        "judul": "  ",
+        "kelompok": "Guru",
+        "jumlah": 1,
+        "tanggal_buka": "2026-07-01"
+      },
+      "galat": "Judul lowongan wajib diisi."
+    },
+    {
+      "nama": "kelompok asing",
+      "draft": {
+        "judul": "Satpam",
+        "kelompok": "Pegawai",
+        "jumlah": 1,
+        "tanggal_buka": "2026-07-01"
+      },
+      "galat": "Kelompok lowongan wajib Guru atau Tendik."
+    },
+    {
+      "nama": "jumlah nol",
+      "draft": {
+        "judul": "Satpam",
+        "kelompok": "Tendik",
+        "jumlah": 0,
+        "tanggal_buka": "2026-07-01"
+      },
+      "galat": "Jumlah yang dibutuhkan harus 1 sampai 99."
+    },
+    {
+      "nama": "jumlah seratus",
+      "draft": {
+        "judul": "Satpam",
+        "kelompok": "Tendik",
+        "jumlah": 100,
+        "tanggal_buka": "2026-07-01"
+      },
+      "galat": "Jumlah yang dibutuhkan harus 1 sampai 99."
+    },
+    {
+      "nama": "tanggal buka tidak valid",
+      "draft": {
+        "judul": "Satpam",
+        "kelompok": "Tendik",
+        "jumlah": 1,
+        "tanggal_buka": "2026-02-30"
+      },
+      "galat": "Tanggal buka tidak valid."
+    },
+    {
+      "nama": "tanggal tutup sebelum buka",
+      "draft": {
+        "judul": "Satpam",
+        "kelompok": "Tendik",
+        "jumlah": 1,
+        "tanggal_buka": "2026-07-01",
+        "tanggal_tutup": "2026-06-30"
+      },
+      "galat": "Tanggal tutup tidak boleh sebelum tanggal buka."
+    }
+  ],
+  "status_lowongan": [
+    {
+      "nama": "dibuka",
+      "tanggal_buka": "2026-07-01",
+      "tanggal_tutup": "2026-07-31",
+      "ditutup": false,
+      "hari_ini": "2026-07-31",
+      "hasil": "Dibuka"
+    },
+    {
+      "nama": "dijadwalkan",
+      "tanggal_buka": "2026-08-01",
+      "tanggal_tutup": "",
+      "ditutup": false,
+      "hari_ini": "2026-07-31",
+      "hasil": "Dijadwalkan"
+    },
+    {
+      "nama": "ditutup otomatis sesudah tanggal tutup",
+      "tanggal_buka": "2026-07-01",
+      "tanggal_tutup": "2026-07-30",
+      "ditutup": false,
+      "hari_ini": "2026-07-31",
+      "hasil": "Ditutup"
+    },
+    {
+      "nama": "ditutup lewat tombol",
+      "tanggal_buka": "2026-07-01",
+      "tanggal_tutup": "",
+      "ditutup": true,
+      "hari_ini": "2026-07-02",
+      "hasil": "Ditutup"
+    },
+    {
+      "nama": "tombol tutup menang atas dijadwalkan",
+      "tanggal_buka": "2026-08-01",
+      "tanggal_tutup": "",
+      "ditutup": true,
+      "hari_ini": "2026-07-02",
+      "hasil": "Ditutup"
+    }
+  ],
+  "buka_lagi": [
+    {
+      "nama": "tanggal tutup dikosongkan",
+      "tanggal_tutup": null,
+      "tanggal_buka": "2026-07-01",
+      "hari_ini": "2026-09-01"
+    },
+    {
+      "nama": "tanggal tutup dimundurkan ke hari ini",
+      "tanggal_tutup": "2026-09-01",
+      "tanggal_buka": "2026-07-01",
+      "hari_ini": "2026-09-01"
+    },
+    {
+      "nama": "tanggal tutup masih lewat",
+      "tanggal_tutup": "2026-08-31",
+      "tanggal_buka": "2026-07-01",
+      "hari_ini": "2026-09-01",
+      "galat": "Tanggal tutup baru harus hari ini atau sesudahnya, atau dikosongkan."
+    },
+    {
+      "nama": "tanggal tutup sebelum tanggal buka",
+      "tanggal_tutup": "2026-09-02",
+      "tanggal_buka": "2026-09-10",
+      "hari_ini": "2026-09-01",
+      "galat": "Tanggal tutup tidak boleh sebelum tanggal buka."
+    }
+  ],
+  "pelamar": [
+    {
+      "nama": "pelamar lengkap, nomor HP dan email dinormalkan",
+      "hari_ini": "2026-07-10",
+      "draft": {
+        "id_lowongan": "low-1",
+        "nama": " Ani Lestari ",
+        "no_hp": "0812-3456-7890",
+        "email": " Ani@Contoh.ID ",
+        "lp": "P",
+        "tanggal_lahir": "1998-05-01",
+        "alamat": "Jl. Melati 1",
+        "pendidikan": "S1",
+        "prodi": "Pendidikan Matematika",
+        "sumber": "Media Sosial",
+        "tanggal_lamaran": "2026-07-10",
+        "catatan": ""
+      },
+      "hasil": {
+        "id_pelamar": null,
+        "id_lowongan": "low-1",
+        "nama": "Ani Lestari",
+        "no_hp": "+6281234567890",
+        "email": "ani@contoh.id",
+        "lp": "P",
+        "tanggal_lahir": "1998-05-01",
+        "alamat": "Jl. Melati 1",
+        "pendidikan": "S1",
+        "prodi": "Pendidikan Matematika",
+        "sumber": "Media Sosial",
+        "tanggal_lamaran": "2026-07-10",
+        "catatan": null
+      }
+    },
+    {
+      "nama": "pelamar minimal",
+      "hari_ini": "2026-07-10",
+      "draft": {
+        "id_pelamar": "plm-1",
+        "id_lowongan": "low-1",
+        "nama": "Bu",
+        "tanggal_lamaran": "2026-07-01"
+      },
+      "hasil": {
+        "id_pelamar": "plm-1",
+        "id_lowongan": "low-1",
+        "nama": "Bu",
+        "no_hp": null,
+        "email": null,
+        "lp": null,
+        "tanggal_lahir": null,
+        "alamat": null,
+        "pendidikan": null,
+        "prodi": null,
+        "sumber": null,
+        "tanggal_lamaran": "2026-07-01",
+        "catatan": null
+      }
+    },
+    {
+      "nama": "tanpa lowongan",
+      "hari_ini": "2026-07-10",
+      "draft": { "nama": "Budi", "tanggal_lamaran": "2026-07-01" },
+      "galat": "Lowongan wajib dipilih."
+    },
+    {
+      "nama": "nama satu huruf",
+      "hari_ini": "2026-07-10",
+      "draft": {
+        "id_lowongan": "low-1",
+        "nama": "B",
+        "tanggal_lamaran": "2026-07-01"
+      },
+      "galat": "Nama pelamar minimal 2 karakter."
+    },
+    {
+      "nama": "nomor HP terlalu pendek",
+      "hari_ini": "2026-07-10",
+      "draft": {
+        "id_lowongan": "low-1",
+        "nama": "Budi",
+        "no_hp": "0812",
+        "tanggal_lamaran": "2026-07-01"
+      },
+      "galat": "Nomor HP tidak valid."
+    },
+    {
+      "nama": "email tanpa domain",
+      "hari_ini": "2026-07-10",
+      "draft": {
+        "id_lowongan": "low-1",
+        "nama": "Budi",
+        "email": "budi@",
+        "tanggal_lamaran": "2026-07-01"
+      },
+      "galat": "Format email tidak valid."
+    },
+    {
+      "nama": "jenis kelamin asing",
+      "hari_ini": "2026-07-10",
+      "draft": {
+        "id_lowongan": "low-1",
+        "nama": "Budi",
+        "lp": "X",
+        "tanggal_lamaran": "2026-07-01"
+      },
+      "galat": "Jenis kelamin harus L atau P."
+    },
+    {
+      "nama": "tanggal lahir di masa depan",
+      "hari_ini": "2026-07-10",
+      "draft": {
+        "id_lowongan": "low-1",
+        "nama": "Budi",
+        "tanggal_lahir": "2026-07-11",
+        "tanggal_lamaran": "2026-07-01"
+      },
+      "galat": "Tanggal lahir tidak valid."
+    },
+    {
+      "nama": "pendidikan asing",
+      "hari_ini": "2026-07-10",
+      "draft": {
+        "id_lowongan": "low-1",
+        "nama": "Budi",
+        "pendidikan": "S4",
+        "tanggal_lamaran": "2026-07-01"
+      },
+      "galat": "Pendidikan tidak dikenal."
+    },
+    {
+      "nama": "tanggal lamaran di masa depan",
+      "hari_ini": "2026-07-10",
+      "draft": {
+        "id_lowongan": "low-1",
+        "nama": "Budi",
+        "tanggal_lamaran": "2026-07-11"
+      },
+      "galat": "Tanggal lamaran tidak boleh di masa depan."
+    }
+  ],
+  "tahap": [
+    {
+      "nama": "lompat dari Lamaran ke Wawancara",
+      "kelompok": "Tendik",
+      "status": "Lamaran",
+      "tanggal_lamaran": "2026-07-01",
+      "hari_ini": "2026-07-10",
+      "draft": { "tahap": "Wawancara", "tanggal": "2026-07-05", "catatan": "" },
+      "hasil": {
+        "tahap": "Wawancara",
+        "tanggal": "2026-07-05",
+        "catatan": null
+      }
+    },
+    {
+      "nama": "ulang Wawancara",
+      "kelompok": "Guru",
+      "status": "Wawancara",
+      "tanggal_lamaran": "2026-07-01",
+      "hari_ini": "2026-07-10",
+      "draft": {
+        "tahap": "Wawancara",
+        "tanggal": "2026-07-10",
+        "catatan": "Wawancara kedua"
+      },
+      "hasil": {
+        "tahap": "Wawancara",
+        "tanggal": "2026-07-10",
+        "catatan": "Wawancara kedua"
+      }
+    },
+    {
+      "nama": "mundur dari Penawaran ke Seleksi Berkas",
+      "kelompok": "Guru",
+      "status": "Penawaran",
+      "tanggal_lamaran": "2026-07-01",
+      "hari_ini": "2026-07-10",
+      "draft": { "tahap": "Seleksi Berkas", "tanggal": "2026-07-10" },
+      "hasil": {
+        "tahap": "Seleksi Berkas",
+        "tanggal": "2026-07-10",
+        "catatan": null
+      }
+    },
+    {
+      "nama": "Microteaching di lowongan Guru",
+      "kelompok": "Guru",
+      "status": "Wawancara",
+      "tanggal_lamaran": "2026-07-01",
+      "hari_ini": "2026-07-10",
+      "draft": { "tahap": "Microteaching", "tanggal": "2026-07-08" },
+      "hasil": {
+        "tahap": "Microteaching",
+        "tanggal": "2026-07-08",
+        "catatan": null
+      }
+    },
+    {
+      "nama": "Microteaching di lowongan Tendik ditolak",
+      "kelompok": "Tendik",
+      "status": "Wawancara",
+      "tanggal_lamaran": "2026-07-01",
+      "hari_ini": "2026-07-10",
+      "draft": { "tahap": "Microteaching", "tanggal": "2026-07-08" },
+      "galat": "Microteaching hanya untuk lowongan Guru."
+    },
+    {
+      "nama": "tahap sesudah Diterima ditolak",
+      "kelompok": "Guru",
+      "status": "Diterima",
+      "tanggal_lamaran": "2026-07-01",
+      "hari_ini": "2026-07-10",
+      "draft": { "tahap": "Penawaran", "tanggal": "2026-07-08" },
+      "galat": "Pelamar sudah di tahap akhir. Batalkan tahap terakhir dulu bila keliru."
+    },
+    {
+      "nama": "tahap sesudah Mundur ditolak",
+      "kelompok": "Tendik",
+      "status": "Mundur",
+      "tanggal_lamaran": "2026-07-01",
+      "hari_ini": "2026-07-10",
+      "draft": { "tahap": "Ditolak", "tanggal": "2026-07-08", "catatan": "x" },
+      "galat": "Pelamar sudah di tahap akhir. Batalkan tahap terakhir dulu bila keliru."
+    },
+    {
+      "nama": "tahap asing",
+      "kelompok": "Guru",
+      "status": "Lamaran",
+      "tanggal_lamaran": "2026-07-01",
+      "hari_ini": "2026-07-10",
+      "draft": { "tahap": "Psikotes", "tanggal": "2026-07-08" },
+      "galat": "Tahap tidak dikenal."
+    },
+    {
+      "nama": "tanggal di masa depan",
+      "kelompok": "Guru",
+      "status": "Lamaran",
+      "tanggal_lamaran": "2026-07-01",
+      "hari_ini": "2026-07-10",
+      "draft": { "tahap": "Wawancara", "tanggal": "2026-07-11" },
+      "galat": "Tanggal tahap tidak boleh di masa depan."
+    },
+    {
+      "nama": "tanggal sebelum lamaran",
+      "kelompok": "Guru",
+      "status": "Lamaran",
+      "tanggal_lamaran": "2026-07-01",
+      "hari_ini": "2026-07-10",
+      "draft": { "tahap": "Wawancara", "tanggal": "2026-06-30" },
+      "galat": "Tanggal tahap tidak boleh sebelum tanggal lamaran."
+    },
+    {
+      "nama": "Ditolak tanpa catatan",
+      "kelompok": "Guru",
+      "status": "Wawancara",
+      "tanggal_lamaran": "2026-07-01",
+      "hari_ini": "2026-07-10",
+      "draft": { "tahap": "Ditolak", "tanggal": "2026-07-08", "catatan": " " },
+      "galat": "Catatan wajib diisi untuk Ditolak dan Mundur."
+    },
+    {
+      "nama": "Mundur bercatatan",
+      "kelompok": "Tendik",
+      "status": "Penawaran",
+      "tanggal_lamaran": "2026-07-01",
+      "hari_ini": "2026-07-10",
+      "draft": {
+        "tahap": "Mundur",
+        "tanggal": "2026-07-08",
+        "catatan": "Diterima di sekolah lain"
+      },
+      "hasil": {
+        "tahap": "Mundur",
+        "tanggal": "2026-07-08",
+        "catatan": "Diterima di sekolah lain"
+      }
+    }
+  ],
+  "status_pelamar": [
+    { "nama": "tanpa tahap", "tahap": [], "hasil": "Lamaran" },
+    {
+      "nama": "tahap terbesar yang belum dibatalkan",
+      "tahap": [
+        {
+          "id_tahap": "p:1",
+          "urutan": 1,
+          "tahap": "Lamaran",
+          "dibatalkan": false
+        },
+        {
+          "id_tahap": "p:2",
+          "urutan": 2,
+          "tahap": "Wawancara",
+          "dibatalkan": false
+        },
+        {
+          "id_tahap": "p:3",
+          "urutan": 3,
+          "tahap": "Diterima",
+          "dibatalkan": true
+        }
+      ],
+      "hasil": "Wawancara"
+    },
+    {
+      "nama": "urutan tidak berurut di masukan",
+      "tahap": [
+        {
+          "id_tahap": "p:3",
+          "urutan": 3,
+          "tahap": "Ditolak",
+          "dibatalkan": false
+        },
+        {
+          "id_tahap": "p:1",
+          "urutan": 1,
+          "tahap": "Lamaran",
+          "dibatalkan": false
+        }
+      ],
+      "hasil": "Ditolak"
+    }
+  ],
+  "batal_tahap": [
+    {
+      "nama": "batalkan tahap terakhir",
+      "tahap": [
+        {
+          "id_tahap": "p:1",
+          "urutan": 1,
+          "tahap": "Lamaran",
+          "dibatalkan": false
+        },
+        {
+          "id_tahap": "p:2",
+          "urutan": 2,
+          "tahap": "Ditolak",
+          "dibatalkan": false
+        }
+      ],
+      "id_tahap": "p:2",
+      "dijadikan": false
+    },
+    {
+      "nama": "Lamaran urutan 1 tidak bisa dibatalkan",
+      "tahap": [
+        {
+          "id_tahap": "p:1",
+          "urutan": 1,
+          "tahap": "Lamaran",
+          "dibatalkan": false
+        },
+        {
+          "id_tahap": "p:2",
+          "urutan": 2,
+          "tahap": "Wawancara",
+          "dibatalkan": true
+        }
+      ],
+      "id_tahap": "p:1",
+      "dijadikan": false,
+      "galat": "Tahap Lamaran pertama tidak bisa dibatalkan."
+    },
+    {
+      "nama": "bukan tahap terakhir",
+      "tahap": [
+        {
+          "id_tahap": "p:1",
+          "urutan": 1,
+          "tahap": "Lamaran",
+          "dibatalkan": false
+        },
+        {
+          "id_tahap": "p:2",
+          "urutan": 2,
+          "tahap": "Wawancara",
+          "dibatalkan": false
+        },
+        {
+          "id_tahap": "p:3",
+          "urutan": 3,
+          "tahap": "Penawaran",
+          "dibatalkan": false
+        }
+      ],
+      "id_tahap": "p:2",
+      "dijadikan": false,
+      "galat": "Hanya tahap terakhir yang bisa dibatalkan."
+    },
+    {
+      "nama": "pelamar sudah personil",
+      "tahap": [
+        {
+          "id_tahap": "p:1",
+          "urutan": 1,
+          "tahap": "Lamaran",
+          "dibatalkan": false
+        },
+        {
+          "id_tahap": "p:2",
+          "urutan": 2,
+          "tahap": "Diterima",
+          "dibatalkan": false
+        }
+      ],
+      "id_tahap": "p:2",
+      "dijadikan": true,
+      "galat": "Pelamar ini sudah menjadi personil; datanya tidak bisa diubah atau dihapus."
+    }
+  ],
+  "id_personil": [
+    {
+      "nama": "guru",
+      "id_pelamar": "plm-0123456789abcdef0123456789abcdef",
+      "kelompok": "Guru",
+      "hasil": {
+        "id_unik": "ptk_0123456789abcdef0123456789abcdef",
+        "kode_karyawan": "",
+        "id_kontrak": "kon-0123456789abcdef0123456789abcdef"
+      }
+    },
+    {
+      "nama": "tendik",
+      "id_pelamar": "plm-0123456789abcdef0123456789abcdef",
+      "kelompok": "Tendik",
+      "hasil": {
+        "id_unik": "EMP_0123456789AB",
+        "kode_karyawan": "K89ABCDEF",
+        "id_kontrak": "kon-0123456789abcdef0123456789abcdef"
+      }
+    },
+    {
+      "nama": "id pelamar huruf besar ditolak",
+      "id_pelamar": "plm-0123456789ABCDEF0123456789ABCDEF",
+      "kelompok": "Guru",
+      "galat": "Id pelamar tidak dikenal."
+    },
+    {
+      "nama": "id pelamar pendek ditolak",
+      "id_pelamar": "plm-0123",
+      "kelompok": "Guru",
+      "galat": "Id pelamar tidak dikenal."
+    },
+    {
+      "nama": "kelompok asing",
+      "id_pelamar": "plm-0123456789abcdef0123456789abcdef",
+      "kelompok": "Pegawai",
+      "galat": "Kelompok lowongan wajib Guru atau Tendik."
+    }
+  ]
+}

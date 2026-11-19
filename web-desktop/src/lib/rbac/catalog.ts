@@ -588,6 +588,32 @@ export const PERMISSION_CATALOG = [
     name: "Atur Template Kinerja",
     group: "Kepegawaian",
   },
+  // HRIS Fase 7 (`prd-hris/fase-7.md` §25.4).
+  {
+    key: "hr.recruit.view",
+    name: "Lihat Rekrutmen",
+    group: "Kepegawaian",
+  },
+  {
+    key: "hr.recruit.manage",
+    name: "Kelola Rekrutmen",
+    group: "Kepegawaian",
+  },
+  {
+    key: "hr.recruit.delete",
+    name: "Hapus Data Pelamar",
+    group: "Kepegawaian",
+  },
+  {
+    key: "hr.training.view",
+    name: "Lihat Pelatihan",
+    group: "Kepegawaian",
+  },
+  {
+    key: "hr.training.manage",
+    name: "Kelola Pelatihan",
+    group: "Kepegawaian",
+  },
 ] as const;
 
 export type PermissionKey = (typeof PERMISSION_CATALOG)[number]["key"];
@@ -708,6 +734,8 @@ export const SENSITIVE_MUTATION_PERMISSIONS = new Set<PermissionKey>([
   // predikat menentukan nilai setiap penilaian yang belum Final (Q-104).
   "hr.performance.finalize",
   "hr.performance.config",
+  // HRIS Fase 7 (§25.4): menghapus pelamar permanen tidak bisa dibatalkan.
+  "hr.recruit.delete",
 ]);
 
 /**
@@ -731,6 +759,9 @@ export const CONFIDENTIAL_PERMISSIONS = new Set<PermissionKey>([
   // Nilai dan catatan penilai kinerja (§23.4).
   "hr.performance.view",
   "hr.performance.assess",
+  // Data pribadi pelamar (§25.4).
+  "hr.recruit.view",
+  "hr.recruit.manage",
 ]);
 
 export const SYSTEM_ROLE_KEYS = [
@@ -806,6 +837,8 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<
     "hr.performance.assess",
     "hr.performance.finalize",
     "hr.performance.config",
+    "hr.recruit.view",
+    "hr.training.view",
   ],
   "kepala-sekolah": [
     "home.view",
@@ -821,6 +854,7 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<
     "hr.warning.manage",
     "hr.performance.view",
     "hr.performance.assess",
+    "hr.training.view",
   ],
   kepegawaian: [
     "home.view",
@@ -846,6 +880,11 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<
     "hr.offboard.manage",
     "hr.performance.view",
     "hr.performance.config",
+    "hr.recruit.view",
+    "hr.recruit.manage",
+    "hr.recruit.delete",
+    "hr.training.view",
+    "hr.training.manage",
   ],
   "kepala-tu": [
     "home.view",

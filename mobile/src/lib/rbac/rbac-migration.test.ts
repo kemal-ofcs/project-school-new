@@ -201,6 +201,8 @@ describe("dynamic RBAC migration", () => {
       70,
       // v71 — penilaian kinerja (HRIS Fase 5, `hr_kinerja_*`).
       71,
+      // v72 — rekrutmen dan pelatihan (HRIS Fase 7, `hr_lowongan`, `hr_pelamar*`, `hr_pelatihan*`).
+      72,
     ]);
 
     const sessionColumns = await client.execute(
