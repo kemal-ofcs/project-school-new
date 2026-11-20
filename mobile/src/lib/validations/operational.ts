@@ -98,6 +98,12 @@ export function validasiKoreksi(
 /**
  * Baris bukan Hadir tidak divalidasi jamnya: jamnya dibuang saat disimpan
  * supaya hari Sakit/Alfa tidak menghasilkan `jam_kerja` yang ikut digaji.
+ *
+ * Jam masuk hari ini yang belum lewat ditolak. Kasus nyatanya shift malam yang
+ * diimpor pagi hari dengan tanggal pagi itu: sesi terbuka bertanggal hari ini
+ * tidak pernah cocok dengan scan pulang (tanggal kerjanya kemarin), sehingga
+ * scan pulang dinilai sebagai scan masuk yang terlambat dan ditolak.
+ * `jamSekarang` berformat HH:mm WIB.
  */
 export function validasiBarisImport(
   row: {
@@ -109,6 +115,7 @@ export function validasiBarisImport(
     status_absen: string;
   },
   hariIni: string,
+  jamSekarang: string,
 ): string | null {
   if (!isValidDate(row.tanggal) || !row.id_unik) {
     return "Tanggal atau ID tidak valid.";
@@ -132,6 +139,9 @@ export function validasiBarisImport(
     return "Jam masuk/pulang tidak valid.";
   }
   if (row.tanggal > hariIni) return pesanMasaDepan(row.tanggal);
+  if (row.tanggal === hariIni && row.jam_masuk.slice(0, 5) > jamSekarang) {
+    return `Jam masuk ${row.jam_masuk.slice(0, 5)} pada ${row.tanggal} belum terjadi. Untuk shift malam, isi tanggal hari shift dimulai.`;
+  }
   return null;
 }
 

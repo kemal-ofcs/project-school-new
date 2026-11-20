@@ -2182,6 +2182,57 @@ impl TursoClient {
         Ok(())
     }
 
+    /// 'Import Manual' baru masuk CHECK `sumber`/`sumber_data` pada
+    /// 2026-09-10; cloud yang lebih tua menolak setiap import manual. DDL lama
+    /// disalin apa adanya dan hanya daftarnya yang diperluas, supaya kolom
+    /// hasil ALTER ikut. Cermin blok yang sama di `db-migrations.ts`.
+    async fn ensure_import_manual_source(&self) -> Result<(), CommandError> {
+        const LAMA: &str = "'Import Offline', 'Generate Sistem'";
+        const BARU: &str = "'Import Offline', 'Import Manual', 'Generate Sistem'";
+        for tabel in ["absensi_harian", "log_scan"] {
+            let ddl = self
+                .query_one(
+                    "SELECT sql FROM sqlite_master WHERE type = 'table' AND name = ?;",
+                    vec![Value::String(tabel.to_owned())],
+                )
+                .await?
+                .to_objects()
+                .first()
+                .and_then(|row| row.get("sql").and_then(Value::as_str).map(str::to_owned))
+                .unwrap_or_default();
+            if !ddl.contains(LAMA) {
+                continue;
+            }
+            let turunan: Vec<String> = self
+                .query_one(
+                    "SELECT sql FROM sqlite_master WHERE tbl_name = ? AND type IN ('index', 'trigger') AND sql IS NOT NULL ORDER BY type, name;",
+                    vec![Value::String(tabel.to_owned())],
+                )
+                .await?
+                .to_objects()
+                .iter()
+                .filter_map(|row| row.get("sql").and_then(Value::as_str).map(str::to_owned))
+                .collect();
+            let staging = format!("{tabel}{}", "__rebuild");
+            let mut statements = vec![
+                Statement::new(format!("DROP TABLE IF EXISTS {staging};"), vec![]),
+                Statement::new(
+                    ddl.replacen(tabel, &staging, 1).replacen(LAMA, BARU, 1),
+                    vec![],
+                ),
+                Statement::new(
+                    format!("INSERT INTO {staging} SELECT * FROM {tabel};"),
+                    vec![],
+                ),
+                Statement::new(format!("DROP TABLE {tabel};"), vec![]),
+                Statement::new(format!("ALTER TABLE {staging} RENAME TO {tabel};"), vec![]),
+            ];
+            statements.extend(turunan.into_iter().map(|sql| Statement::new(sql, vec![])));
+            self.execute_atomic(statements).await?;
+        }
+        Ok(())
+    }
+
     async fn ensure_column(
         &self,
         table: &str,
@@ -5679,6 +5730,7 @@ impl TursoClient {
         // `ensure_sync_pulse` — karena membangun ulang tabel ikut membuang
         // trigger pulse-nya, dan pemasangan ulangnya terjadi di sana.
         self.ensure_payroll_calc_type_values().await?;
+        self.ensure_import_manual_source().await?;
         self.ensure_wa_notification_kind_values().await?;
         // v62: sumber jurnal `Inventaris`. Juga sebelum `ensure_sync_pulse`.
         self.ensure_journal_source_values().await?;

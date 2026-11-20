@@ -9,7 +9,6 @@ import {
 } from "react";
 import { Modal } from "@/components/ui/Modal";
 import { PilihCari } from "@/components/ui/PilihCari";
-import { formatTanggalOperasional } from "@/lib/attendance/time-policy";
 import { siapkanBerkas } from "@/lib/client/siapkan-berkas";
 import { getDaftarUnit } from "@/lib/gateways/academic";
 import {
@@ -54,6 +53,7 @@ import {
   pesanGalat,
   TOMBOL,
   TOMBOL_UTAMA,
+  tgl,
 } from "./gaya";
 import { PratinjauBerkas } from "./PratinjauBerkas";
 import { RincianPegawai } from "./RincianPegawai";
@@ -79,7 +79,6 @@ const WARNA_STATUS: Record<string, string> = {
   Mundur: "text-amber-200",
 };
 
-const tgl = (t: string) => (t ? formatTanggalOperasional(t) : "-");
 const kb = (byte: number) => Math.ceil(byte / 1024);
 const tambahHari = (tanggal: string, hari: number) => {
   const d = new Date(`${tanggal}T00:00:00Z`);

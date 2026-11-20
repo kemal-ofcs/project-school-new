@@ -9,7 +9,6 @@ import {
 } from "react";
 import { Modal } from "@/components/ui/Modal";
 import { PilihCari } from "@/components/ui/PilihCari";
-import { formatTanggalOperasional } from "@/lib/attendance/time-policy";
 import {
   batalTugas,
   type DaftarTugas,
@@ -25,10 +24,8 @@ import {
   type PermintaanSurat,
   permintaanTugasTambahan,
 } from "./DialogCetakSurat";
-import { INPUT, LABEL, pesanGalat, TOMBOL, TOMBOL_UTAMA } from "./gaya";
+import { INPUT, LABEL, pesanGalat, TOMBOL, TOMBOL_UTAMA, tgl } from "./gaya";
 import { ModalBatal } from "./TabKontrak";
-
-const tgl = (t: string) => (t ? formatTanggalOperasional(t) : "-");
 
 export function TabTugas({
   org,

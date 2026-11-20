@@ -164,6 +164,8 @@ export function PilihPersonil({
       LABEL_JENIS[jenisPersonil(row)],
       String(row.id_unik ?? ""),
       String(row.divisi ?? ""),
+      // Diisi pemanggil lewat `denganShift`; shift master yang aktif sekarang.
+      String(row.shift_tampil ?? ""),
     ]
       .filter(Boolean)
       .join(" · ");

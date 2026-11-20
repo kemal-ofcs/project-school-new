@@ -17,6 +17,7 @@ import {
   permintaanKeteranganAktif,
 } from "@/components/kepegawaian/DialogCetakSurat";
 import { masaKerja } from "@/components/kepegawaian/gaya";
+import { ImporDataDiri } from "@/components/kepegawaian/ImporDataDiri";
 import { JenisDokumenOrganisasi } from "@/components/kepegawaian/JenisDokumenOrganisasi";
 import { JenisPengajuanOrganisasi } from "@/components/kepegawaian/JenisPengajuanOrganisasi";
 import { JenisReimburseOrganisasi } from "@/components/kepegawaian/JenisReimburseOrganisasi";
@@ -213,6 +214,7 @@ export default function KepegawaianPage() {
           <TabDaftar
             org={org}
             onGalat={setGalat}
+            onPesan={setPesan}
             onMulaiKeluar={(awal) => {
               setAwalKeluar(awal);
               setTab("keluar");
@@ -303,14 +305,20 @@ export default function KepegawaianPage() {
 function TabDaftar({
   org,
   onGalat,
+  onPesan,
   onMulaiKeluar,
 }: {
   org: OrgKepegawaian;
   onGalat: (pesan: string) => void;
+  onPesan: (pesan: string) => void;
   onMulaiKeluar: (awal: AwalKeluar) => void;
 }) {
   const { user } = useAuth();
   const [cetak, setCetak] = useState<PermintaanSurat | null>(null);
+  const [impor, setImpor] = useState(false);
+  const bolehImpor =
+    hasPermission(user, "hr.personal.manage") ||
+    hasPermission(user, "hr.finance.manage");
   const [cari, setCari] = useState("");
   const [unit, setUnit] = useState("");
   const [bagian, setBagian] = useState("");
@@ -399,9 +407,30 @@ function TabDaftar({
           <option value="Tendik">Tendik</option>
         </select>
       </form>
-      <p className="text-sm text-slate-400">
-        {terlihat.length} dari {org.pegawai.length} pegawai
-      </p>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <p className="text-sm text-slate-400">
+          {terlihat.length} dari {org.pegawai.length} pegawai
+        </p>
+        {bolehImpor ? (
+          <button
+            type="button"
+            className={TOMBOL}
+            onClick={() => setImpor(true)}
+          >
+            Impor data diri
+          </button>
+        ) : null}
+      </div>
+      {impor ? (
+        <ImporDataDiri
+          pegawai={org.pegawai}
+          onClose={() => setImpor(false)}
+          onSelesai={(pesan) => {
+            setImpor(false);
+            onPesan(pesan);
+          }}
+        />
+      ) : null}
       <div className="overflow-x-auto rounded-2xl border border-white/10">
         <table className="w-full min-w-[720px] text-left text-sm">
           <thead className="bg-slate-900 text-xs uppercase text-slate-400">

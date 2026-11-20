@@ -148,6 +148,12 @@ fn validasi_koreksi(
 
 /// Baris bukan Hadir tidak divalidasi jamnya: jamnya dibuang saat disimpan
 /// supaya hari Sakit/Alfa tidak menghasilkan `jam_kerja` yang ikut digaji.
+///
+/// Jam masuk hari ini yang belum lewat ditolak: shift malam yang diimpor pagi
+/// hari dengan tanggal pagi itu membuat sesi terbuka yang tidak pernah cocok
+/// dengan scan pulang. `jam_sekarang` berformat HH:mm WIB. Kembar
+/// `validasiBarisImport`.
+#[allow(clippy::too_many_arguments)]
 fn validasi_baris_import(
     tanggal: &str,
     id_unik: &str,
@@ -156,6 +162,7 @@ fn validasi_baris_import(
     status_kehadiran: &str,
     status_absen: &str,
     hari_ini: &str,
+    jam_sekarang: &str,
 ) -> Result<(), String> {
     if !super::inventory::is_valid_date(tanggal) || id_unik.is_empty() {
         return Err("Tanggal atau ID tidak valid.".to_owned());
@@ -183,11 +190,23 @@ fn validasi_baris_import(
     if tanggal > hari_ini {
         return Err(pesan_masa_depan(tanggal));
     }
+    // `jam_sah` sudah menjamin ASCII HH:mm[:ss], jadi `get(..5)` aman.
+    let masuk = jam_masuk.get(..5).unwrap_or("");
+    if tanggal == hari_ini && masuk > jam_sekarang {
+        return Err(format!(
+            "Jam masuk {masuk} pada {tanggal} belum terjadi. Untuk shift malam, isi tanggal hari shift dimulai."
+        ));
+    }
     Ok(())
 }
 
 fn hari_ini_wib() -> String {
     super::time_policy::wib_date_from_epoch(storage::now_epoch_seconds())
+}
+
+fn jam_sekarang_wib() -> String {
+    let detik = (storage::now_epoch_seconds() + 7 * 3600).rem_euclid(86_400);
+    format!("{:02}:{:02}", detik / 3600, detik % 3600 / 60)
 }
 
 /// Log koreksi mode pengganti merujuk ID backup, bukan ID koreksi, sehingga
@@ -1731,6 +1750,7 @@ pub fn import_offline(
     let mut notif_diantre: usize = 0;
     let mut notif_dibatasi = false;
     let hari_ini = hari_ini_wib();
+    let jam_sekarang = jam_sekarang_wib();
     for row in rows {
         let date_raw = text(row, "tanggal");
         let date = normalize_date(&date_raw);
@@ -1755,6 +1775,7 @@ pub fn import_offline(
                 text(row, "status_kehadiran"),
                 text(row, "status_absen"),
                 &hari_ini,
+                &jam_sekarang,
             )
             .map_err(|pesan| CommandError::new("OPERATIONAL_VALIDATION_FAILED", pesan))?;
             let employee = transaction
@@ -4333,6 +4354,7 @@ INSERT INTO hari_libur_whitelist (id, scope_type, scope_value, tanggal_libur, ke
     #[test]
     fn validasi_operasional_vektor_kembar() {
         const HARI_INI: &str = "2026-10-23";
+        const JAM_SEKARANG: &str = "06:30";
         let masa_depan = "Tanggal 2026-10-24 belum terjadi; absensi berjam hanya boleh untuk hari ini atau sebelumnya.";
         let koreksi = |tanggal: &str, jenis: &str, jam: &str| {
             super::validasi_koreksi(tanggal, "K001", jenis, jam, HARI_INI).err()
@@ -4363,7 +4385,7 @@ INSERT INTO hari_libur_whitelist (id, scope_type, scope_value, tanggal_libur, ke
         assert_eq!(koreksi("2026-10-24", "Sakit", ""), None);
 
         let baris = |tanggal: &str, id: &str, masuk: &str, pulang: &str, status: &str, absen: &str| {
-            super::validasi_baris_import(tanggal, id, masuk, pulang, status, absen, HARI_INI).err()
+            super::validasi_baris_import(tanggal, id, masuk, pulang, status, absen, HARI_INI, JAM_SEKARANG).err()
         };
         assert_eq!(baris("2026-10-20", "K001", "07:00", "15:00:00", "Hadir", ""), None);
         assert_eq!(
@@ -4391,6 +4413,13 @@ INSERT INTO hari_libur_whitelist (id, scope_type, scope_value, tanggal_libur, ke
         );
         assert_eq!(baris("2026-10-20", "K001", "garbage", "", "Sakit", ""), None);
         assert_eq!(baris("2026-10-24", "K001", "07:00", "15:00:00", "Izin", ""), None);
+        // Shift malam diimpor pagi hari dengan tanggal pagi itu.
+        assert_eq!(
+            baris(HARI_INI, "K001", "22:00", "", "Hadir", "").as_deref(),
+            Some("Jam masuk 22:00 pada 2026-10-23 belum terjadi. Untuk shift malam, isi tanggal hari shift dimulai.")
+        );
+        assert_eq!(baris(HARI_INI, "K001", "06:30:00", "", "Hadir", ""), None);
+        assert_eq!(baris(HARI_INI, "K001", "", "23:00", "Hadir", ""), None);
     }
 
     #[test]

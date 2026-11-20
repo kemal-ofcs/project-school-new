@@ -1,11 +1,12 @@
 "use client";
 
 import { redirect } from "next/navigation";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AppShell } from "@/components/AppShell";
 import {
   BATAS_IMPORT_MASSAL,
   BATAS_KOREKSI_MASSAL,
+  denganShift,
   jalankanBerurutan,
   jenisPersonil,
   ringkasHasil,
@@ -271,7 +272,12 @@ export default function OperationalPage() {
     hasPermission(user, "academic.view") &&
     hasPermission(user, "students.view");
   // Backup adalah delegasi shift staf; siswa tidak pernah menggantikan siapa pun.
-  const personilBackup = employees.filter(
+  // Nama dan jam shift master tampil di samping divisi pada pemilih personil.
+  const personilShift = useMemo(
+    () => denganShift(employees, shifts),
+    [employees, shifts],
+  );
+  const personilBackup = personilShift.filter(
     (row) => jenisPersonil(row) !== "siswa",
   );
 
@@ -636,7 +642,7 @@ export default function OperationalPage() {
               <PilihPersonil
                 id="koreksi-personil"
                 label="Pilih personil (bisa lebih dari satu)"
-                personil={employees}
+                personil={personilShift}
                 terpilih={correction.idPersonil}
                 onChange={(ids) =>
                   setCorrection((prev) => ({ ...prev, idPersonil: ids }))
@@ -935,7 +941,7 @@ export default function OperationalPage() {
               <PilihPersonil
                 id="manual-personil"
                 label="Pilih personil (bisa lebih dari satu)"
-                personil={employees}
+                personil={personilShift}
                 terpilih={manualEntry.idPersonil}
                 onChange={(ids) =>
                   setManualEntry((prev) => ({ ...prev, idPersonil: ids }))

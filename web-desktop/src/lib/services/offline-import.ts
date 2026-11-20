@@ -122,6 +122,8 @@ async function processRow(
       status_absen: input.status_absen?.trim() ?? "",
     },
     formatTanggalOperasional(Date.now()),
+    // WIB tanpa DST: geser +7 jam lalu baca jam UTC-nya.
+    new Date(Date.now() + 7 * 3_600_000).toISOString().slice(11, 16),
   );
   if (salah) return fail(salah);
   const employeeResult = await transaction.execute({

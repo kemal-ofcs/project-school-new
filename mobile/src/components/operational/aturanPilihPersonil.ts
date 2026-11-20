@@ -93,6 +93,27 @@ export async function jalankanBerurutan(
   return hasil;
 }
 
+/**
+ * Tambahkan `shift_tampil` ("Pagi (07:00 - 15:00)") dari shift master tiap
+ * baris, untuk ditampilkan `PilihPersonil`. Baris tanpa shift dikenal dibiarkan.
+ */
+export function denganShift(
+  personil: readonly Record<string, unknown>[],
+  shifts: readonly Record<string, unknown>[],
+): Record<string, unknown>[] {
+  const jam = (v: unknown) => String(v ?? "").slice(0, 5);
+  const label = new Map(
+    shifts.map((s) => [
+      String(s.id_shift ?? ""),
+      `${String(s.nama_shift ?? "")} (${jam(s.jam_masuk)} - ${jam(s.jam_pulang)})`,
+    ]),
+  );
+  return personil.map((row) => {
+    const shift = label.get(String(row.id_shift ?? ""));
+    return shift ? { ...row, shift_tampil: shift } : row;
+  });
+}
+
 /** "18 berhasil, 2 gagal: Budi (alasan); Ani (alasan)" */
 export function ringkasHasil(
   hasil: HasilBerurutan,

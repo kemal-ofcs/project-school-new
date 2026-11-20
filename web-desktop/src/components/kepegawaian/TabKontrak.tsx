@@ -8,7 +8,6 @@ import {
   useState,
 } from "react";
 import { Modal } from "@/components/ui/Modal";
-import { formatTanggalOperasional } from "@/lib/attendance/time-policy";
 import {
   batalKontrak,
   type DaftarKontrak,
@@ -31,12 +30,11 @@ import {
   pesanGalat,
   TOMBOL,
   TOMBOL_UTAMA,
+  tgl,
 } from "./gaya";
 
 const STATUS_GURU = ["GTY", "GTT", "Honorer", "PNS", "PPPK"];
 const STATUS_TENDIK = ["PTY", "PTT", "Honorer", "PNS", "PPPK"];
-
-const tgl = (t: string) => (t ? formatTanggalOperasional(t) : "-");
 
 export function TabKontrak({
   org,

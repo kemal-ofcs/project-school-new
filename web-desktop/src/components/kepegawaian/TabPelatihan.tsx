@@ -9,7 +9,6 @@ import {
 } from "react";
 import { Modal } from "@/components/ui/Modal";
 import { PilihCari } from "@/components/ui/PilihCari";
-import { formatTanggalOperasional } from "@/lib/attendance/time-policy";
 import { exportToExcel } from "@/lib/client/excel-export";
 import { siapkanBerkas } from "@/lib/client/siapkan-berkas";
 import {
@@ -41,7 +40,7 @@ import {
   type RiwayatPelatihan,
 } from "@/lib/validations/hr-pelatihan";
 import { MAKS_BERKAS_DOKUMEN, MAKS_BYTE_DOKUMEN } from "@/lib/validations/hris";
-import { INPUT, LABEL, pesanGalat, TOMBOL, TOMBOL_UTAMA } from "./gaya";
+import { INPUT, LABEL, pesanGalat, TOMBOL, TOMBOL_UTAMA, tgl } from "./gaya";
 import { PratinjauBerkas } from "./PratinjauBerkas";
 import { ModalBatal } from "./TabKontrak";
 
@@ -52,7 +51,6 @@ const WARNA_STATUS: Record<string, string> = {
   Selesai: "text-emerald-300",
   Dibatalkan: "text-rose-300",
 };
-const tgl = (t: string) => (t ? formatTanggalOperasional(t) : "-");
 const kb = (byte: number) => Math.ceil(byte / 1024);
 const rupiah = (n: number) => `Rp${n.toLocaleString("id-ID")}`;
 const rentang = (mulai: string, selesai: string) =>

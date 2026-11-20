@@ -452,7 +452,9 @@ fn ensure_attendance_source_check(connection: &Connection) -> Result<(), String>
     let Some(existing) = existing else {
         return Ok(());
     };
-    if existing.contains("CHECK (sumber IN (") {
+    // CHECK yang terpasang sebelum 2026-09-10 belum memuat 'Import Manual' dan
+    // menolak setiap import manual, jadi ikut dibangun ulang.
+    if existing.contains("CHECK (sumber IN (") && existing.contains("'Import Manual'") {
         return Ok(());
     }
 
@@ -3630,5 +3632,46 @@ mod tests_journal_source_values {
                 [],
             )
             .is_err());
+    }
+
+    #[test]
+    fn check_sumber_absensi_lama_diperluas_dengan_import_manual() {
+        let connection = rusqlite::Connection::open_in_memory().expect("database memori");
+        // Bentuk CHECK sebelum 2026-09-10, tanpa 'Import Manual'.
+        connection
+            .execute_batch(&format!(
+                "CREATE TABLE absensi_harian (
+                    id_absensi INTEGER PRIMARY KEY AUTOINCREMENT, tanggal TEXT NOT NULL,
+                    id_karyawan TEXT NOT NULL, nama TEXT NOT NULL, kelas_divisi TEXT NOT NULL,
+                    jam_masuk TEXT, jam_pulang TEXT, status_kehadiran TEXT NOT NULL,
+                    status_absen TEXT NOT NULL, keterangan TEXT,
+                    sumber TEXT NOT NULL CHECK (sumber IN ('Scanner', 'Koreksi Admin', 'Import Offline', 'Generate Sistem')),
+                    update_terakhir TEXT NOT NULL, menit_terlambat INTEGER DEFAULT 0,
+                    menit_datang_awal INTEGER DEFAULT 0, jam_kerja INTEGER DEFAULT 0,
+                    lembur INTEGER DEFAULT 0, jam_kerja_kurang INTEGER DEFAULT 0,
+                    id_shift INTEGER NOT NULL, bulan TEXT NOT NULL, tahun INTEGER NOT NULL,
+                    id_sesi TEXT UNIQUE NOT NULL, mode_tugas TEXT DEFAULT 'NORMAL',
+                    id_backup TEXT, id_karyawan_asal TEXT, tanggal_tugas TEXT
+                );
+                INSERT INTO absensi_harian (tanggal, id_karyawan, nama, kelas_divisi, status_kehadiran, status_absen, sumber, update_terakhir, id_shift, bulan, tahun, id_sesi)
+                VALUES ('2026-08-01', 'K1', 'A', 'D', 'Hadir', 'Lengkap', 'Scanner', '{0}', 1, 'Agustus', 2026, 'S1');",
+                "2026-08-01 07:00:00"
+            ))
+            .expect("tabel lama");
+
+        super::ensure_attendance_source_check(&connection).expect("bangun ulang");
+        super::ensure_attendance_source_check(&connection).expect("idempoten");
+
+        connection
+            .execute(
+                "INSERT INTO absensi_harian (tanggal, id_karyawan, nama, kelas_divisi, status_kehadiran, status_absen, sumber, update_terakhir, id_shift, bulan, tahun, id_sesi)
+                 VALUES ('2026-08-02', 'K1', 'A', 'D', 'Hadir', 'Lengkap', 'Import Manual', '2026-08-02 07:00:00', 1, 'Agustus', 2026, 'S2');",
+                [],
+            )
+            .expect("sumber Import Manual diterima CHECK baru");
+        let jumlah: i64 = connection
+            .query_row("SELECT COUNT(*) FROM absensi_harian;", [], |row| row.get(0))
+            .expect("hitung");
+        assert_eq!(jumlah, 2, "baris lama ikut tersalin");
     }
 }

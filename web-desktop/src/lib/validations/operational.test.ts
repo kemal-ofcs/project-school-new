@@ -7,6 +7,7 @@ import {
 
 // Vektor yang sama dengan `validasi_operasional_vektor_kembar` di administration.rs.
 const HARI_INI = "2026-10-23";
+const JAM_SEKARANG = "06:30";
 
 describe("validasiKoreksi", () => {
   const dasar = {
@@ -60,12 +61,19 @@ describe("validasiBarisImport", () => {
     ],
     [{ status_kehadiran: "Sakit", jam_masuk: "garbage", jam_pulang: "" }, null],
     [{ status_kehadiran: "Izin", tanggal: "2026-10-24" }, null],
+    // Shift malam diimpor pagi hari dengan tanggal pagi itu.
+    [
+      { tanggal: HARI_INI, jam_masuk: "22:00", jam_pulang: "" },
+      "Jam masuk 22:00 pada 2026-10-23 belum terjadi. Untuk shift malam, isi tanggal hari shift dimulai.",
+    ],
+    [{ tanggal: HARI_INI, jam_masuk: "06:30:00", jam_pulang: "" }, null],
+    [{ tanggal: HARI_INI, jam_masuk: "", jam_pulang: "23:00" }, null],
   ];
   for (const [ubah, harapan] of kasus) {
     test(JSON.stringify(ubah), () => {
-      expect(validasiBarisImport({ ...dasar, ...ubah }, HARI_INI)).toBe(
-        harapan,
-      );
+      expect(
+        validasiBarisImport({ ...dasar, ...ubah }, HARI_INI, JAM_SEKARANG),
+      ).toBe(harapan);
     });
   }
 });

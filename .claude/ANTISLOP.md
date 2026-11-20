@@ -1,13 +1,15 @@
 # ANTISLOP.md — hasil antislop
 
-- Waktu: 20 November 2026, 06:04 WIB
-- Commit: c126cd9 (working tree bersih, 0 berkas berubah)
+- Waktu: 20 November 2026, 08:52 WIB
+- Commit: 71cb948 (+ 40 berkas berubah/baru, belum commit)
 - Berkas disunting: 0
 
 ## Disunting
-(tidak ada berkas yang berubah atau perlu disunting)
+(tidak ada berkas yang perlu disunting; seluruh kode dan teks UI baru memenuhi standar antislop)
 
 ## Dilewati
-(tidak ada)
+- Berkas kunci & konfigurasi: `*.lock`, `package.json`, `*.patch`
+- Berkas tes: `*.test.ts`
+- Salinan Mobile hasil sinkronisasi: `mobile/src-tauri/**`, `mobile/src/**`
 
 ## Perlu tindakan

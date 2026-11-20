@@ -9,7 +9,6 @@ import {
 } from "react";
 import { Modal } from "@/components/ui/Modal";
 import { PilihCari } from "@/components/ui/PilihCari";
-import { formatTanggalOperasional } from "@/lib/attendance/time-policy";
 import {
   batalkanKeluar,
   berlakukanKeluar,
@@ -56,6 +55,7 @@ import {
   pesanGalat,
   TOMBOL,
   TOMBOL_UTAMA,
+  tgl,
 } from "./gaya";
 
 /** Isian awal dari tab SP saat SP3 berlaku (§22.2.1). */
@@ -66,7 +66,6 @@ export interface AwalKeluar {
 
 type Izin = "hr.offboard.manage" | "hr.offboard.decide";
 
-const tgl = (t: string) => (t ? formatTanggalOperasional(t) : "-");
 const HARI = [
   "",
   "Senin",

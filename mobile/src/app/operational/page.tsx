@@ -2,11 +2,12 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { MobileAppShell } from "@/components/MobileAppShell";
 import {
   BATAS_IMPORT_MASSAL,
   BATAS_KOREKSI_MASSAL,
+  denganShift,
   jalankanBerurutan,
   jenisPersonil,
   ringkasHasil,
@@ -251,7 +252,12 @@ export default function OperationalPage() {
     hasPermission(user, "academic.view") &&
     hasPermission(user, "students.view");
   // Backup adalah delegasi shift staf; siswa tidak pernah menggantikan siapa pun.
-  const personilBackup = employees.filter(
+  // Nama dan jam shift master tampil di samping divisi pada pemilih personil.
+  const personilShift = useMemo(
+    () => denganShift(employees, shifts),
+    [employees, shifts],
+  );
+  const personilBackup = personilShift.filter(
     (row) => jenisPersonil(row) !== "siswa",
   );
 
@@ -792,7 +798,7 @@ export default function OperationalPage() {
               <PilihPersonil
                 id="kor-personil"
                 label="Pilih personil (bisa lebih dari satu)"
-                personil={employees}
+                personil={personilShift}
                 terpilih={korIds}
                 onChange={setKorIds}
                 batas={BATAS_KOREKSI_MASSAL}
@@ -1107,7 +1113,7 @@ export default function OperationalPage() {
               <PilihPersonil
                 id="man-personil"
                 label="Pilih personil (bisa lebih dari satu)"
-                personil={employees}
+                personil={personilShift}
                 terpilih={manIds}
                 onChange={setManIds}
                 batas={BATAS_IMPORT_MASSAL}

@@ -10,6 +10,15 @@ export const LABEL = "mb-1 block text-sm font-semibold text-slate-300";
 export const PERINGATAN =
   "rounded-xl border border-amber-300/25 bg-amber-300/10 px-3 py-2 text-sm text-amber-100";
 
+/**
+ * Tanggal kalender HRIS (`YYYY-MM-DD`) apa adanya. Bukan instant, jadi tidak
+ * lewat `formatTanggalOperasional`, yang menolak teks tanpa offset zona dan
+ * dulu membuat seluruh halaman gagal dimuat begitu ada satu baris data.
+ */
+export function tgl(t: string) {
+  return t ? t.slice(0, 10) : "-";
+}
+
 export function pesanGalat(error: unknown) {
   return error instanceof Error ? error.message : "Permintaan gagal.";
 }

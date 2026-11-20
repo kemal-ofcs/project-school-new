@@ -36,10 +36,8 @@ import {
   permintaanTugasLuar,
   permintaanTugasTambahan,
 } from "./DialogCetakSurat";
-import { INPUT, LABEL, pesanGalat, TOMBOL_UTAMA } from "./gaya";
+import { INPUT, LABEL, pesanGalat, TOMBOL_UTAMA, tgl } from "./gaya";
 import { NAMA_SURAT } from "./suratKepegawaian";
-
-const tgl = (t: string) => (t ? formatTanggalOperasional(t) : "-");
 
 type Sumber =
   | { jenis: "ptm"; data: DataBeban }

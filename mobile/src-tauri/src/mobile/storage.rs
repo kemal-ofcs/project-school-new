@@ -452,7 +452,9 @@ fn ensure_attendance_source_check(connection: &Connection) -> Result<(), String>
     let Some(existing) = existing else {
         return Ok(());
     };
-    if existing.contains("CHECK (sumber IN (") {
+    // CHECK yang terpasang sebelum 2026-09-10 belum memuat 'Import Manual' dan
+    // menolak setiap import manual, jadi ikut dibangun ulang.
+    if existing.contains("CHECK (sumber IN (") && existing.contains("'Import Manual'") {
         return Ok(());
     }
 

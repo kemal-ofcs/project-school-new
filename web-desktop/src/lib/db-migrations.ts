@@ -256,6 +256,10 @@ const SYSTEM_ROLES = [
   },
 ] as const;
 
+const SUMBER_ABSENSI_LAMA = "'Import Offline', 'Generate Sistem'";
+const SUMBER_ABSENSI_BARU =
+  "'Import Offline', 'Import Manual', 'Generate Sistem'";
+
 async function hasTable(client: Client, table: string) {
   const result = await client.execute({
     sql: "SELECT COUNT(*) as cnt FROM sqlite_master WHERE type = 'table' AND name = ?;",
@@ -3256,6 +3260,39 @@ export async function runDatabaseMigrations(client: Client) {
           VALUES (?, 'journal-source-inventory', ?);`,
     args: [JOURNAL_SOURCE_INVENTORY_MIGRATION_VERSION, now],
   });
+  // 'Import Manual' baru masuk CHECK `sumber`/`sumber_data` pada 2026-09-10;
+  // cloud yang lebih tua menolak setiap import manual. DDL lama disalin apa
+  // adanya dan hanya daftarnya yang diperluas, supaya kolom hasil ALTER ikut.
+  // Cermin `ensure_import_manual_source` di `turso.rs`.
+  for (const tabel of ["absensi_harian", "log_scan"]) {
+    const ddl = String(
+      (
+        await client.execute({
+          sql: "SELECT sql FROM sqlite_master WHERE type = 'table' AND name = ?;",
+          args: [tabel],
+        })
+      ).rows[0]?.sql ?? "",
+    );
+    if (!ddl.includes(SUMBER_ABSENSI_LAMA)) continue;
+    const turunan = await client.execute({
+      sql: "SELECT sql FROM sqlite_master WHERE tbl_name = ? AND type IN ('index', 'trigger') AND sql IS NOT NULL ORDER BY type, name;",
+      args: [tabel],
+    });
+    const staging = `${tabel}__rebuild`;
+    await client.batch(
+      [
+        `DROP TABLE IF EXISTS ${staging};`,
+        ddl
+          .replace(tabel, staging)
+          .replace(SUMBER_ABSENSI_LAMA, SUMBER_ABSENSI_BARU),
+        `INSERT INTO ${staging} SELECT * FROM ${tabel};`,
+        `DROP TABLE ${tabel};`,
+        `ALTER TABLE ${staging} RENAME TO ${tabel};`,
+        ...turunan.rows.map((row) => String(row.sql)),
+      ],
+      "write",
+    );
+  }
   // v63: servis aset (DDL-nya di blok v37 di atas, bersama `inventory_unit`).
   await client.execute({
     sql: `INSERT OR IGNORE INTO schema_migration (version, name, applied_at)
