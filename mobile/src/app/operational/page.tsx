@@ -78,6 +78,13 @@ export default function OperationalPage() {
   // Data Masters
   const [employees, setEmployees] = useState<Record<string, unknown>[]>([]);
   const [shifts, setShifts] = useState<Record<string, unknown>[]>([]);
+  // Nama dan jam shift master tampil di samping divisi pada pemilih personil.
+  // Di sini, bukan di dekat `personilBackup`: hook wajib di atas setiap
+  // `return` awal (penjaga akses di bawah).
+  const personilShift = useMemo(
+    () => denganShift(employees, shifts),
+    [employees, shifts],
+  );
   const [loadingMaster, setLoadingMaster] = useState<boolean>(true);
 
   // Lists for selected date
@@ -252,11 +259,6 @@ export default function OperationalPage() {
     hasPermission(user, "academic.view") &&
     hasPermission(user, "students.view");
   // Backup adalah delegasi shift staf; siswa tidak pernah menggantikan siapa pun.
-  // Nama dan jam shift master tampil di samping divisi pada pemilih personil.
-  const personilShift = useMemo(
-    () => denganShift(employees, shifts),
-    [employees, shifts],
-  );
   const personilBackup = personilShift.filter(
     (row) => jenisPersonil(row) !== "siswa",
   );

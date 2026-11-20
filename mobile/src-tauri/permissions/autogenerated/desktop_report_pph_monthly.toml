@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-desktop-report-pph-monthly"
+description = "Enables the desktop_report_pph_monthly command without any pre-configured scope."
+commands.allow = ["desktop_report_pph_monthly"]
+
+[[permission]]
+identifier = "deny-desktop-report-pph-monthly"
+description = "Denies the desktop_report_pph_monthly command without any pre-configured scope."
+commands.deny = ["desktop_report_pph_monthly"]
