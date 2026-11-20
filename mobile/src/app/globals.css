@@ -605,3 +605,9 @@ html.light .status-hero-card .hero-badge {
   color: #065f46 !important;
   border: 1px solid #a7f3d0 !important;
 }
+
+/* Lintasan sakelar (input.peer + div.peer) saat mati; slate-800 terang terlalu pucat di atas kartu putih. */
+html[data-theme="light"] input.peer:not(:checked) ~ div.bg-slate-800,
+html.light input.peer:not(:checked) ~ div.bg-slate-800 {
+  background-color: #64748b;
+}

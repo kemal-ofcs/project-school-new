@@ -714,12 +714,18 @@ html.light label.bg-slate-800 svg {
 
 /* Neutral status badges & Nonaktif indicators */
 html[data-theme="light"] span.bg-slate-800,
-html[data-theme="light"] div.bg-slate-800:not(button),
+html[data-theme="light"] div.bg-slate-800:not(button):not(.peer),
 html.light span.bg-slate-800,
-html.light div.bg-slate-800:not(button) {
+html.light div.bg-slate-800:not(button):not(.peer) {
   background-color: #f1f5f9 !important;
   color: #64748b !important;
   border-color: #cbd5e1 !important;
+}
+
+/* Lintasan sakelar (input.peer + div.peer) saat mati; saat nyala warna peer-checked:bg-* yang berlaku. */
+html[data-theme="light"] input.peer:not(:checked) ~ div.bg-slate-800,
+html.light input.peer:not(:checked) ~ div.bg-slate-800 {
+  background-color: #64748b;
 }
 
 /* Excel Export Button */
