@@ -41,6 +41,7 @@ Dipindahkan APA ADANYA dari CLAUDE.md pada pemadatan 2026-11-18. CLAUDE.md memua
 - Leger Kehadiran Dual Mode (Pratinjau Langsung vs Leger Beku Rapor): Pratinjau langsung dihitung on-the-fly dari `absensi_harian` via `GATE_SUMMARY_SUBQUERY` dan `presensi_mapel_detail` tanpa tabel perantara. Nilai resmi rapor dikunci ke tabel tersinkronisasi `leger_kehadiran` (pembekuan ulang rombel wajib me-reuse `id_leger` lama demi idempotensi offline-first).
 - Multi-Template ID Card & Backfill Otomatis Siswa/Guru: Pembuatan guru dan siswa otomatis mendaftarkan baris `id_card` (`WHERE NOT EXISTS`). Sistem mendukung multi-template (`default_template`, `template_guru`, `template_siswa`) yang dipetakan dinamis via `normalizePersonnelRole`, dengan command/service backfill untuk entitas lama.
 - Proteksi Izin Sensitif Fase 3: Aksi penghapusan `teaching_journal.delete` dan `attendance_ledger.delete` WAJIB terdaftar dalam `SENSITIVE_MUTATION_PERMISSIONS` agar tidak diberikan secara otomatis ke peran selain Superadmin.
+- Kartu beranda "Belum Absen" (2026-11-21): `wajibAbsenHariIni`, `belumAbsenHariIni` (= `belumScanMasuk + menungguJamAbsen`), dan `liburHariIni` diambil dari audit kualitas absensi hari ini (`auditKualitasAbsensi` ↔ `get_attendance_audit`) di `getDashboardMetrics` ↔ `dashboard_metrics`, bukan `aktif − hadir`; persentase dibagi wajib absen. Jangan menyalin aturan jadwal ke dasbor; ubah di audit.
 
 ## Immersive 3D / motion UI
 

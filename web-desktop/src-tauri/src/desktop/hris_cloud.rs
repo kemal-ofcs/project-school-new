@@ -77,7 +77,7 @@ pub const HAPUS_DOKUMEN_SQL: [&str; 3] = [
 ];
 /// ?1 id, ?2 dokumen, ?3 nama, ?4 MIME, ?5 isi. Urutan = slot kosong terkecil
 /// 1–5; tanpa slot kosong atau tanpa dokumen, tidak ada baris yang ditulis.
-pub const TAMBAH_BERKAS_SQL: &str = "WITH slot(n) AS (VALUES (1), (2), (3), (4), (5)) INSERT INTO hr_dokumen_berkas (id_berkas, id_dokumen, urutan, nama_berkas, mime_type, data_base64, created_at) SELECT ?1, ?2, MIN(slot.n), ?3, ?4, ?5, datetime('now') FROM slot WHERE slot.n NOT IN (SELECT urutan FROM hr_dokumen_berkas WHERE id_dokumen = ?2) AND EXISTS (SELECT 1 FROM hr_dokumen WHERE id_dokumen = ?2) HAVING MIN(slot.n) IS NOT NULL;";
+pub const TAMBAH_BERKAS_SQL: &str = "WITH slot(n) AS (VALUES (1), (2), (3), (4), (5)) INSERT INTO hr_dokumen_berkas (id_berkas, id_dokumen, urutan, nama_berkas, mime_type, data_base64, created_at) SELECT ?1, ?2, slot.n, ?3, ?4, ?5, datetime('now') FROM slot WHERE slot.n NOT IN (SELECT urutan FROM hr_dokumen_berkas WHERE id_dokumen = ?2) AND EXISTS (SELECT 1 FROM hr_dokumen WHERE id_dokumen = ?2) ORDER BY slot.n LIMIT 1;";
 pub const HAPUS_BERKAS_SQL: &str = "DELETE FROM hr_dokumen_berkas WHERE id_berkas = ?1;";
 
 // Lampiran pengajuan (HRIS Fase 2 §20.3, Q-51): `hr_pengajuan_berkas`, aturan
@@ -89,7 +89,7 @@ pub const AMBIL_LAMPIRAN_SQL: &str = "SELECT id_berkas, id_pengajuan, COALESCE(n
 pub const PEMILIK_LAMPIRAN_SQL: &str = "SELECT p.diajukan_oleh, p.izin_pemutus FROM hr_pengajuan_berkas b JOIN hr_pengajuan p ON p.id_pengajuan = b.id_pengajuan WHERE b.id_berkas = ?1 LIMIT 1;";
 /// ?1 id, ?2 pengajuan, ?3 nama, ?4 MIME, ?5 isi, ?6 pengunggah. Slot 1–5
 /// seperti `TAMBAH_BERKAS_SQL`.
-pub const TAMBAH_LAMPIRAN_SQL: &str = "WITH slot(n) AS (VALUES (1), (2), (3), (4), (5)) INSERT INTO hr_pengajuan_berkas (id_berkas, id_pengajuan, urutan, nama_berkas, mime_type, data_base64, diunggah_oleh, created_at) SELECT ?1, ?2, MIN(slot.n), ?3, ?4, ?5, ?6, datetime('now') FROM slot WHERE slot.n NOT IN (SELECT urutan FROM hr_pengajuan_berkas WHERE id_pengajuan = ?2) AND EXISTS (SELECT 1 FROM hr_pengajuan WHERE id_pengajuan = ?2) HAVING MIN(slot.n) IS NOT NULL;";
+pub const TAMBAH_LAMPIRAN_SQL: &str = "WITH slot(n) AS (VALUES (1), (2), (3), (4), (5)) INSERT INTO hr_pengajuan_berkas (id_berkas, id_pengajuan, urutan, nama_berkas, mime_type, data_base64, diunggah_oleh, created_at) SELECT ?1, ?2, slot.n, ?3, ?4, ?5, ?6, datetime('now') FROM slot WHERE slot.n NOT IN (SELECT urutan FROM hr_pengajuan_berkas WHERE id_pengajuan = ?2) AND EXISTS (SELECT 1 FROM hr_pengajuan WHERE id_pengajuan = ?2) ORDER BY slot.n LIMIT 1;";
 pub const HAPUS_LAMPIRAN_SQL: &str = "DELETE FROM hr_pengajuan_berkas WHERE id_berkas = ?1;";
 
 pub const PESAN_PENGAJUAN_BELUM_DI_CLOUD: &str =

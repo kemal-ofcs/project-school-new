@@ -127,6 +127,13 @@ export function polaSurat(setup: SetupSurat, jenis: JenisSurat): string {
   return setup.pengaturan[`hr_surat_pola:${jenis}`]?.trim() || POLA_BAWAAN;
 }
 
+/** Kode tersimpan jenis itu (isi token `{kode}`), kosong = `KODE_SURAT`. */
+export function kodeSurat(setup: SetupSurat, jenis: JenisSurat): string {
+  return (
+    setup.pengaturan[`hr_surat_kode:${jenis}`]?.trim() || KODE_SURAT[jenis]
+  );
+}
+
 /** Menimbang dan Mengingat: dua bagian dipisah baris `---`, satu butir per baris. */
 export function uraiDasar(teks: string): {
   menimbang: string[];

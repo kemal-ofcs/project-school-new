@@ -548,7 +548,9 @@ function RincianPelatihanModal({
   const [kabar, setKabar] = useState<string | null>(null);
   const [galat, setGalat] = useState<string | null>(null);
   const [proses, setProses] = useState<string | null>(null);
-  const [calon, setCalon] = useState("");
+  const [calon, setCalon] = useState<Set<string>>(() => new Set());
+  const [cariCalon, setCariCalon] = useState("");
+  const [dipilih, setDipilih] = useState<Set<string>>(() => new Set());
   const [sub, setSub] = useState<SubPeserta | null>(null);
   const [dibuka, setDibuka] = useState<IsiBerkasSertifikat | null>(null);
   const isSubmittingRef = useRef(false);
@@ -675,6 +677,53 @@ function RincianPelatihanModal({
     (x) => x.status_aktif === "Aktif" && !sudah.has(x.id_unik),
   );
   const jumlahPeserta = data?.peserta.length ?? 0;
+  const kata = cariCalon.trim().toLowerCase();
+  const calonTampil = kata
+    ? calonPeserta.filter((x) =>
+        `${x.nama} ${x.unit ?? ""}`.toLowerCase().includes(kata),
+      )
+    : calonPeserta;
+  const pesertaDipilih = (data?.peserta ?? []).filter((x) =>
+    dipilih.has(x.id_peserta),
+  );
+  const ubahPilihan = (
+    set: (fn: (lama: Set<string>) => Set<string>) => void,
+    ids: string[],
+    pilih: boolean,
+  ) =>
+    set((lama) => {
+      const baru = new Set(lama);
+      for (const id of ids) {
+        if (pilih) baru.add(id);
+        else baru.delete(id);
+      }
+      return baru;
+    });
+
+  // Aksi peserta yang sudah ada dipanggil satu per satu: tanpa SQL baru, dan
+  // yang gagal (mis. bersertifikat) dilaporkan per nama tanpa menahan sisanya.
+  const massal = (
+    kunci: string,
+    daftar: { id: string; nama: string }[],
+    satu: (id: string) => Promise<unknown>,
+    kataKerja: string,
+  ) =>
+    jalankan(kunci, async () => {
+      const gagal: string[] = [];
+      for (const x of daftar) {
+        try {
+          await satu(x.id);
+        } catch (error) {
+          gagal.push(`${x.nama}: ${pesanGalat(error)}`);
+        }
+      }
+      setCalon(new Set());
+      setDipilih(new Set());
+      if (gagal.length > 0)
+        setGalat(`Gagal ${gagal.length}. ${gagal.join("; ")}`);
+      const berhasil = daftar.length - gagal.length;
+      return berhasil > 0 ? `${berhasil} peserta ${kataKerja}.` : null;
+    });
 
   const unggah = (peserta: PesertaBaris, masukan: HTMLInputElement) => {
     const file = masukan.files?.[0];
@@ -805,51 +854,162 @@ function RincianPelatihanModal({
                 Peserta ({jumlahPeserta})
               </h3>
               {bolehUbah ? (
-                <form
-                  className="flex flex-wrap items-end gap-2"
-                  onSubmit={(e) => {
-                    e.preventDefault();
-                    const nama =
-                      calonPeserta.find((x) => x.id_unik === calon)?.nama ?? "";
-                    void jalankan("tambah", async () => {
-                      await simpanPeserta({
-                        aksi: "tambah",
-                        id_pelatihan: idPelatihan,
-                        id_karyawan: calon,
-                      });
-                      setCalon("");
-                      return `${nama} ditambahkan.`;
-                    });
-                  }}
-                >
-                  <div className="min-w-56 flex-1">
-                    <label htmlFor="peserta-baru" className={LABEL}>
-                      Tambah peserta (pegawai aktif)
-                    </label>
-                    <PilihCari
-                      id="peserta-baru"
-                      required
-                      value={calon}
-                      onChange={(e) => setCalon(e.target.value)}
-                      className={INPUT}
+                <fieldset className="space-y-2">
+                  <legend className={LABEL}>
+                    Tambah peserta (pegawai aktif)
+                  </legend>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <input
+                      type="search"
+                      aria-label="Cari calon peserta"
+                      placeholder="Cari nama atau unit"
+                      value={cariCalon}
+                      onChange={(e) => setCariCalon(e.target.value)}
+                      className={`${INPUT} min-w-48 flex-1`}
+                    />
+                    <button
+                      type="button"
+                      className={TOMBOL}
+                      disabled={calonTampil.length === 0}
+                      onClick={() =>
+                        ubahPilihan(
+                          setCalon,
+                          calonTampil.map((x) => x.id_unik),
+                          !calonTampil.every((x) => calon.has(x.id_unik)),
+                        )
+                      }
                     >
-                      <option value="">Pilih pegawai</option>
-                      {calonPeserta.map((x) => (
-                        <option key={x.id_unik} value={x.id_unik}>
-                          {x.nama}
-                          {x.unit ? ` · ${x.unit}` : ""}
-                        </option>
-                      ))}
-                    </PilihCari>
+                      {calonTampil.length > 0 &&
+                      calonTampil.every((x) => calon.has(x.id_unik))
+                        ? "Batal pilih semua"
+                        : "Pilih semua"}
+                    </button>
                   </div>
+                  <ul className="max-h-56 space-y-1 overflow-y-auto rounded-xl border border-white/10 bg-slate-950 p-2">
+                    {calonTampil.length === 0 ? (
+                      <li className="text-slate-400">
+                        {calonPeserta.length === 0
+                          ? "Semua pegawai aktif sudah menjadi peserta."
+                          : "Tidak ada pegawai yang cocok."}
+                      </li>
+                    ) : null}
+                    {calonTampil.map((x) => (
+                      <li key={x.id_unik}>
+                        <label className="flex items-center gap-2">
+                          <input
+                            type="checkbox"
+                            checked={calon.has(x.id_unik)}
+                            onChange={(e) =>
+                              ubahPilihan(
+                                setCalon,
+                                [x.id_unik],
+                                e.target.checked,
+                              )
+                            }
+                          />
+                          <span className="text-white">{x.nama}</span>
+                          {x.unit ? (
+                            <span className="text-slate-400">· {x.unit}</span>
+                          ) : null}
+                        </label>
+                      </li>
+                    ))}
+                  </ul>
                   <button
-                    type="submit"
+                    type="button"
+                    data-konfirmasi
                     className={TOMBOL_UTAMA}
-                    disabled={proses !== null || !calon}
+                    disabled={proses !== null || calon.size === 0}
+                    onClick={() =>
+                      void massal(
+                        "tambah",
+                        calonPeserta
+                          .filter((x) => calon.has(x.id_unik))
+                          .map((x) => ({ id: x.id_unik, nama: x.nama })),
+                        (id) =>
+                          simpanPeserta({
+                            aksi: "tambah",
+                            id_pelatihan: idPelatihan,
+                            id_karyawan: id,
+                          }),
+                        "ditambahkan",
+                      )
+                    }
                   >
-                    Tambah
+                    Tambah {calon.size > 0 ? `${calon.size} ` : ""}peserta
                   </button>
-                </form>
+                </fieldset>
+              ) : null}
+              {bolehKelola && jumlahPeserta > 0 ? (
+                <div className="flex flex-wrap items-center gap-2">
+                  <label className="flex items-center gap-2 text-slate-300">
+                    <input
+                      type="checkbox"
+                      checked={pesertaDipilih.length === jumlahPeserta}
+                      onChange={(e) =>
+                        ubahPilihan(
+                          setDipilih,
+                          data.peserta.map((x) => x.id_peserta),
+                          e.target.checked,
+                        )
+                      }
+                    />
+                    Pilih semua peserta
+                  </label>
+                  <button
+                    type="button"
+                    data-konfirmasi
+                    className={TOMBOL}
+                    disabled={proses !== null || pesertaDipilih.length === 0}
+                    onClick={() =>
+                      void massal(
+                        "lulus",
+                        pesertaDipilih.map((x) => ({
+                          id: x.id_peserta,
+                          nama: x.nama,
+                        })),
+                        (id) =>
+                          simpanPeserta({
+                            aksi: "hasil",
+                            id_peserta: id,
+                            hasil: "Lulus",
+                            // Catatan lama dipertahankan; aksi `hasil` menimpanya.
+                            catatan:
+                              data.peserta.find((x) => x.id_peserta === id)
+                                ?.catatan ?? "",
+                          }),
+                        "ditandai Lulus",
+                      )
+                    }
+                  >
+                    Lulus ({pesertaDipilih.length})
+                  </button>
+                  <button
+                    type="button"
+                    className={TOMBOL}
+                    disabled={proses !== null || pesertaDipilih.length === 0}
+                    onClick={async () => {
+                      const bisa = pesertaDipilih.filter((x) => !x.id_dokumen);
+                      const bersertifikat = pesertaDipilih.length - bisa.length;
+                      const setuju = await konfirmasi({
+                        title: `Keluarkan ${bisa.length} peserta dari pelatihan?`,
+                        description: `Baris pesertanya dihapus; riwayat pelatihan pegawainya ikut hilang.${bersertifikat > 0 ? ` ${bersertifikat} peserta bersertifikat dilewati; hapus sertifikatnya dulu bila memang harus keluar.` : ""}`,
+                        confirmLabel: "Keluarkan",
+                        tone: "danger",
+                      });
+                      if (!setuju || bisa.length === 0) return;
+                      await massal(
+                        "keluarkan",
+                        bisa.map((x) => ({ id: x.id_peserta, nama: x.nama })),
+                        (id) =>
+                          simpanPeserta({ aksi: "lepas", id_peserta: id }),
+                        "dikeluarkan",
+                      );
+                    }}
+                  >
+                    Keluarkan ({pesertaDipilih.length})
+                  </button>
+                </div>
               ) : null}
               <ul className="space-y-2">
                 {data.peserta.map((x) => {
@@ -863,6 +1023,21 @@ function RincianPelatihanModal({
                     >
                       <div className="flex flex-wrap items-start justify-between gap-2">
                         <span>
+                          {bolehKelola ? (
+                            <input
+                              type="checkbox"
+                              aria-label={`Pilih ${x.nama}`}
+                              className="mr-2 align-middle"
+                              checked={dipilih.has(x.id_peserta)}
+                              onChange={(e) =>
+                                ubahPilihan(
+                                  setDipilih,
+                                  [x.id_peserta],
+                                  e.target.checked,
+                                )
+                              }
+                            />
+                          ) : null}
                           <span className="font-semibold text-white">
                             {x.nama}
                           </span>

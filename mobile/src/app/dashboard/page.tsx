@@ -104,7 +104,9 @@ export default function DashboardPage() {
         {canViewMetrics ? (
           <StatusHeroCard
             hadir={metrics?.hadirHariIni ?? 0}
-            total={metrics?.totalKaryawan ?? 0}
+            total={metrics?.wajibAbsenHariIni ?? metrics?.totalKaryawan ?? 0}
+            belumAbsen={metrics?.belumAbsenHariIni}
+            libur={metrics?.liburHariIni}
             terlambat={metrics?.terlambatHariIni ?? 0}
             persentase={metrics?.persentaseKehadiran ?? 0}
             isLoading={isLoading}

@@ -380,7 +380,7 @@ export const KUNCI_YAYASAN_NAMA = "hr_surat_yayasan_nama";
 export const KUNCI_YAYASAN_KETUA = "hr_surat_yayasan_ketua";
 export const KUNCI_YAYASAN_JABATAN = "hr_surat_yayasan_jabatan";
 
-/** Lima belas kunci dalam urutan tetap; cermin `kunci_pengaturan_surat`. */
+/** Dua puluh tiga kunci dalam urutan tetap (kode surat di akhir); cermin `kunci_pengaturan_surat`. */
 export function kunciPengaturanSurat(): string[] {
   return [
     ...JENIS_SURAT.map((j) => `hr_surat_pola:${j}`),
@@ -389,6 +389,7 @@ export function kunciPengaturanSurat(): string[] {
     KUNCI_YAYASAN_NAMA,
     KUNCI_YAYASAN_KETUA,
     KUNCI_YAYASAN_JABATAN,
+    ...JENIS_SURAT.map((j) => `hr_surat_kode:${j}`),
   ];
 }
 
@@ -427,6 +428,11 @@ export function validasiSettingSurat(
     }
     return { ok: true, nilai: isi };
   }
+  // Kode pengganti `{kode}` di pola nomor; "" = kode bawaan `KODE_SURAT`.
+  if (kunci.startsWith("hr_surat_kode:")) {
+    if (!termasuk(JENIS_SURAT, kunci.slice(14))) return asing;
+    return batas("Kode surat", 30);
+  }
   if (kunci.startsWith("hr_surat_dasar:")) {
     if (!termasuk(JENIS_SK, kunci.slice(15))) return asing;
     return batas("Menimbang dan Mengingat", 4000);
@@ -446,7 +452,7 @@ export function validasiSettingSurat(
 }
 
 /**
- * Draft layar: SEMUA lima belas kunci wajib ada, kunci asing ditolak lebih
+ * Draft layar: SEMUA dua puluh tiga kunci wajib ada, kunci asing ditolak lebih
  * dulu (urut nama kunci). Cermin `validasi_pengaturan_surat`.
  */
 export function validasiPengaturanSurat(
@@ -472,7 +478,7 @@ export const suratSetupSchema = z
   .object({ tanggal: z.string().trim().max(10) })
   .strict();
 
-/** Body rute `letters/settings`: kelima belas kunci; isinya diperiksa `validasiPengaturanSurat`. */
+/** Body rute `letters/settings`: kedua puluh tiga kunci; isinya diperiksa `validasiPengaturanSurat`. */
 export const pengaturanSuratSchema = z
   .object(
     Object.fromEntries(

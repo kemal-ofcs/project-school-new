@@ -444,7 +444,7 @@ export const LAMARAN_PERTAMA_SQL =
 export const UBAH_PELAMAR_SQL =
   "UPDATE hr_pelamar SET nama = ?2, no_hp = ?3, email = ?4, lp = ?5, tanggal_lahir = ?6, alamat = ?7, pendidikan = ?8, prodi = ?9, sumber = ?10, catatan = ?11, diubah_oleh = ?12, diubah_pada = datetime('now') WHERE id_pelamar = ?1 AND id_karyawan IS NULL;";
 export const CATAT_TAHAP_SQL =
-  "INSERT INTO hr_pelamar_tahap (id_tahap, id_pelamar, urutan, tahap, tanggal, catatan, oleh, created_at) SELECT ?1 || ':' || (COALESCE(MAX(t.urutan), 0) + 1), ?1, COALESCE(MAX(t.urutan), 0) + 1, ?2, ?3, ?4, ?5, datetime('now') FROM hr_pelamar_tahap t WHERE t.id_pelamar = ?1 AND EXISTS (SELECT 1 FROM hr_pelamar p WHERE p.id_pelamar = ?1 AND p.id_karyawan IS NULL) HAVING COALESCE(MAX(t.urutan), 0) = ?6;";
+  "INSERT INTO hr_pelamar_tahap (id_tahap, id_pelamar, urutan, tahap, tanggal, catatan, oleh, created_at) SELECT ?1 || ':' || (x.n + 1), ?1, x.n + 1, ?2, ?3, ?4, ?5, datetime('now') FROM (SELECT COALESCE(MAX(t.urutan), 0) AS n FROM hr_pelamar_tahap t WHERE t.id_pelamar = ?1) x WHERE x.n = ?6 AND EXISTS (SELECT 1 FROM hr_pelamar p WHERE p.id_pelamar = ?1 AND p.id_karyawan IS NULL);";
 export const BATAL_TAHAP_SQL =
   "UPDATE hr_pelamar_tahap SET dibatalkan_oleh = ?2, dibatalkan_pada = datetime('now'), alasan_batal = ?3 WHERE id_tahap = ?1 AND urutan > 1 AND dibatalkan_pada IS NULL AND urutan = (SELECT MAX(t.urutan) FROM hr_pelamar_tahap t WHERE t.id_pelamar = hr_pelamar_tahap.id_pelamar AND t.dibatalkan_pada IS NULL) AND EXISTS (SELECT 1 FROM hr_pelamar p WHERE p.id_pelamar = hr_pelamar_tahap.id_pelamar AND p.id_karyawan IS NULL);";
 export const BERKAS_PELAMAR_SQL =
@@ -452,7 +452,7 @@ export const BERKAS_PELAMAR_SQL =
 export const AMBIL_BERKAS_PELAMAR_SQL =
   "SELECT id_berkas, id_pelamar, COALESCE(nama_berkas, '') AS nama_berkas, mime_type, data_base64 FROM hr_pelamar_berkas WHERE id_berkas = ?1 LIMIT 1;";
 export const TAMBAH_BERKAS_PELAMAR_SQL =
-  "WITH slot(n) AS (VALUES (1), (2), (3)) INSERT INTO hr_pelamar_berkas (id_berkas, id_pelamar, urutan, nama_berkas, mime_type, data_base64, created_at) SELECT ?1, ?2, MIN(slot.n), ?3, ?4, ?5, datetime('now') FROM slot WHERE slot.n NOT IN (SELECT urutan FROM hr_pelamar_berkas WHERE id_pelamar = ?2) AND EXISTS (SELECT 1 FROM hr_pelamar WHERE id_pelamar = ?2 AND id_karyawan IS NULL) HAVING MIN(slot.n) IS NOT NULL;";
+  "WITH slot(n) AS (VALUES (1), (2), (3)) INSERT INTO hr_pelamar_berkas (id_berkas, id_pelamar, urutan, nama_berkas, mime_type, data_base64, created_at) SELECT ?1, ?2, slot.n, ?3, ?4, ?5, datetime('now') FROM slot WHERE slot.n NOT IN (SELECT urutan FROM hr_pelamar_berkas WHERE id_pelamar = ?2) AND EXISTS (SELECT 1 FROM hr_pelamar WHERE id_pelamar = ?2 AND id_karyawan IS NULL) ORDER BY slot.n LIMIT 1;";
 export const HAPUS_BERKAS_PELAMAR_SQL =
   "DELETE FROM hr_pelamar_berkas WHERE id_berkas = ?1 AND EXISTS (SELECT 1 FROM hr_pelamar p WHERE p.id_pelamar = hr_pelamar_berkas.id_pelamar AND p.id_karyawan IS NULL);";
 export const KLAIM_PELAMAR_SQL =

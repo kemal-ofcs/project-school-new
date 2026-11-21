@@ -30,7 +30,7 @@ import {
   cetakSurat,
   type DasarCetak,
   identitas,
-  KODE_SURAT,
+  kodeSurat,
   NAMA_SURAT,
   nomorSurat,
   polaSurat,
@@ -120,7 +120,7 @@ export function DialogCetakSurat({
     if (!setup || urutBaru.trim() === "") return;
     const hasil = nomorSurat(polaSurat(setup, jenis), {
       urut: urutBaru,
-      kode: KODE_SURAT[jenis],
+      kode: kodeSurat(setup, jenis),
       unit: permintaanRef.current.unit(setup),
       tanggal: tanggalBaru,
     });

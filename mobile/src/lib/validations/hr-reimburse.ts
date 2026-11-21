@@ -415,7 +415,7 @@ export const AMBIL_NOTA_SQL =
 export const PEMILIK_NOTA_SQL =
   "SELECT f.id_klaim, r.diajukan_oleh FROM hr_reimburse_berkas f JOIN hr_reimburse r ON r.id_klaim = f.id_klaim WHERE f.id_berkas = ?1 LIMIT 1;";
 export const TAMBAH_NOTA_SQL =
-  "WITH slot(n) AS (VALUES (1), (2), (3), (4), (5)) INSERT INTO hr_reimburse_berkas (id_berkas, id_klaim, urutan, nama_berkas, mime_type, data_base64, diunggah_oleh, created_at) SELECT ?1, ?2, MIN(slot.n), ?3, ?4, ?5, ?6, datetime('now') FROM slot WHERE slot.n NOT IN (SELECT urutan FROM hr_reimburse_berkas WHERE id_klaim = ?2) AND EXISTS (SELECT 1 FROM hr_reimburse WHERE id_klaim = ?2) AND NOT EXISTS (SELECT 1 FROM hr_reimburse_keputusan WHERE id_klaim = ?2) HAVING MIN(slot.n) IS NOT NULL;";
+  "WITH slot(n) AS (VALUES (1), (2), (3), (4), (5)) INSERT INTO hr_reimburse_berkas (id_berkas, id_klaim, urutan, nama_berkas, mime_type, data_base64, diunggah_oleh, created_at) SELECT ?1, ?2, slot.n, ?3, ?4, ?5, ?6, datetime('now') FROM slot WHERE slot.n NOT IN (SELECT urutan FROM hr_reimburse_berkas WHERE id_klaim = ?2) AND EXISTS (SELECT 1 FROM hr_reimburse WHERE id_klaim = ?2) AND NOT EXISTS (SELECT 1 FROM hr_reimburse_keputusan WHERE id_klaim = ?2) ORDER BY slot.n LIMIT 1;";
 export const HAPUS_NOTA_SQL =
   "DELETE FROM hr_reimburse_berkas WHERE id_berkas = ?1 AND NOT EXISTS (SELECT 1 FROM hr_reimburse_keputusan k WHERE k.id_klaim = hr_reimburse_berkas.id_klaim);";
 export const PEMBAYARAN_SQL =

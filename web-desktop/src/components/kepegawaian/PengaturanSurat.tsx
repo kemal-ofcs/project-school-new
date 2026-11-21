@@ -116,14 +116,45 @@ export function PengaturanSurat({
           )}
         </div>
         <div className="grid gap-4 sm:grid-cols-2">
-          {JENIS_SURAT.map((j) =>
-            teks(
-              `hr_surat_pola:${j}`,
-              `Pola nomor ${NAMA_SURAT[j]} ({kode} = ${KODE_SURAT[j]})`,
-              80,
-              POLA_BAWAAN,
-            ),
-          )}
+          {JENIS_SURAT.map((j) => {
+            const pola = `hr_surat_pola:${j}`;
+            const kode = `hr_surat_kode:${j}`;
+            return (
+              <div key={j}>
+                <div className="flex flex-wrap items-center gap-1">
+                  <label htmlFor={`surat-${pola}`} className={LABEL}>
+                    Pola nomor {NAMA_SURAT[j]}
+                  </label>
+                  <label
+                    htmlFor={`surat-${kode}`}
+                    className="text-xs text-slate-400"
+                  >
+                    ({"{kode}"} =
+                  </label>
+                  <input
+                    id={`surat-${kode}`}
+                    aria-label={`Kode ${NAMA_SURAT[j]}`}
+                    value={nilai[kode]}
+                    maxLength={30}
+                    placeholder={KODE_SURAT[j]}
+                    disabled={!bolehUbah}
+                    onChange={(e) => ubah(kode, e.target.value)}
+                    className={`${INPUT} w-36`}
+                  />
+                  <span className="text-xs text-slate-400">)</span>
+                </div>
+                <input
+                  id={`surat-${pola}`}
+                  value={nilai[pola]}
+                  maxLength={80}
+                  placeholder={POLA_BAWAAN}
+                  disabled={!bolehUbah}
+                  onChange={(e) => ubah(pola, e.target.value)}
+                  className={`${INPUT} mt-1`}
+                />
+              </div>
+            );
+          })}
         </div>
         {JENIS_SK.map((j) => {
           const kunci = `hr_surat_dasar:${j}`;

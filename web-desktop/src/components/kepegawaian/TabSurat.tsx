@@ -74,6 +74,9 @@ export function TabSurat({
   const [sumber, setSumber] = useState<Sumber | null>(null);
   const [pilihan, setPilihan] = useState("");
   const [pilihanDua, setPilihanDua] = useState("");
+  // Opsional untuk SK kolektif (PTM, Tugas Tambahan): kosong = semua pegawai
+  // dalam satu SK, terisi = SK perorangan.
+  const [pegawai, setPegawai] = useState("");
   const [permintaan, setPermintaan] = useState<PermintaanSurat | null>(null);
   const [menyiapkan, setMenyiapkan] = useState(false);
 
@@ -82,6 +85,7 @@ export function TabSurat({
     setSumber(null);
     setPilihan("");
     setPilihanDua("");
+    setPegawai("");
     const muat = async (): Promise<Sumber> => {
       if (jenis === "ptm") return { jenis, data: await muatBebanMengajar("") };
       if (jenis === "tugas") return { jenis, data: await muatTugas() };
@@ -111,22 +115,36 @@ export function TabSurat({
   }, [jenis, onGalat]);
 
   const nama = new Map(org.pegawai.map((p) => [p.id_unik, p.nama]));
+  const rekapPtm =
+    sumber?.jenis === "ptm"
+      ? susunBebanMengajar(sumber.data, null).filter((r) =>
+          dalamUnitBeban(r, pilihan),
+        )
+      : [];
+  const barisTugas =
+    sumber?.jenis === "tugas"
+      ? sumber.data.tugas.filter(
+          (t) =>
+            t.status !== "Dibatalkan" &&
+            t.tahun_ajaran === pilihan &&
+            t.id_jenis === pilihanDua,
+        )
+      : [];
 
   const siapkan = async () => {
     if (!sumber || menyiapkan) return;
     setMenyiapkan(true);
     try {
       if (sumber.jenis === "ptm") {
-        const rekap = susunBebanMengajar(sumber.data, null).filter((r) =>
-          dalamUnitBeban(r, pilihan),
-        );
+        const rekap = rekapPtm.filter((r) => !pegawai || r.id_unik === pegawai);
+        if (rekap.length === 0) {
+          onGalat("Pegawai itu tidak punya beban mengajar di unit ini.");
+          return;
+        }
         setPermintaan(permintaanPembagianTugas(sumber.data, rekap, pilihan));
       } else if (sumber.jenis === "tugas") {
-        const baris = sumber.data.tugas.filter(
-          (t) =>
-            t.status !== "Dibatalkan" &&
-            t.tahun_ajaran === pilihan &&
-            t.id_jenis === pilihanDua,
+        const baris = barisTugas.filter(
+          (t) => !pegawai || t.id_karyawan === pegawai,
         );
         if (baris.length === 0) {
           onGalat("Tidak ada tugas jenis itu di tahun ajaran ini.");
@@ -186,6 +204,19 @@ export function TabSurat({
     </div>
   );
 
+  const pilihPegawai = (daftar: { id: string; nama: string }[]) =>
+    pilih(
+      "surat-pegawai-sk",
+      "Pegawai (opsional)",
+      pegawai,
+      setPegawai,
+      [...new Map(daftar.map((d) => [d.id, d.nama]))].map(([id, n]) => ({
+        value: id,
+        label: n,
+      })),
+      "Semua pegawai (satu SK kolektif)",
+    );
+
   const isian = () => {
     if (!sumber) return <p className="text-sm text-slate-400">Memuat…</p>;
     if (sumber.jenis === "ptm") {
@@ -199,10 +230,14 @@ export function TabSurat({
             "surat-unit",
             "Unit rombel",
             pilihan,
-            setPilihan,
+            (v) => {
+              setPilihan(v);
+              setPegawai("");
+            },
             daftarUnitBeban(rekap).map((u) => ({ value: u, label: u })),
             "Semua unit",
           )}
+          {pilihPegawai(rekapPtm.map((r) => ({ id: r.id_unik, nama: r.nama })))}
         </>
       );
     }
@@ -216,24 +251,35 @@ export function TabSurat({
             "surat-tahun",
             "Tahun ajaran",
             pilihan,
-            setPilihan,
+            (v) => {
+              setPilihan(v);
+              setPegawai("");
+            },
             tahun.map((t) => ({ value: t, label: t })),
             "Pilih tahun ajaran",
           )}
           {pilih(
             "surat-jenis-tugas",
-            "Jenis tugas (semua pegawai dalam satu SK)",
+            "Jenis tugas",
             pilihanDua,
-            setPilihanDua,
+            (v) => {
+              setPilihanDua(v);
+              setPegawai("");
+            },
             sumber.data.jenis.map((j) => ({
               value: j.id_jenis,
               label: j.nama,
             })),
             "Pilih jenis tugas",
           )}
-          <p className="text-sm text-slate-400">
-            SK untuk satu orang dicetak dari baris di tab Tugas Tambahan.
-          </p>
+          {pilihan && pilihanDua
+            ? pilihPegawai(
+                barisTugas.map((t) => ({
+                  id: t.id_karyawan,
+                  nama: nama.get(t.id_karyawan) ?? t.id_karyawan,
+                })),
+              )
+            : null}
         </>
       );
     }

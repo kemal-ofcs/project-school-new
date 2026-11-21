@@ -276,6 +276,17 @@ function periksaBerkas(
     for (const statement of pecahStatement(sql)) {
       if (!AWALAN_QUERY.test(statement)) continue;
       hasil.diperiksa++;
+      // SQLite >= 3.39 menerima HAVING tanpa GROUP BY, parser Turso/sqld
+      // menolaknya ("near HAVING"), jadi `prepare` di atas tidak menangkapnya.
+      // ponytail: per statement, GROUP BY di subkueri ikut meloloskan HAVING luar.
+      if (/\bHAVING\b/i.test(statement) && !/\bGROUP\s+BY\b/i.test(statement)) {
+        hasil.temuan.push({
+          berkas,
+          pesan: "HAVING tanpa GROUP BY ditolak Turso/sqld (SQL_PARSE_ERROR).",
+          sql: statement,
+        });
+        continue;
+      }
       try {
         db.prepare(statement).finalize();
       } catch (error) {

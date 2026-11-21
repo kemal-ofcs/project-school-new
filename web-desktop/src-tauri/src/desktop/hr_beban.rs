@@ -53,7 +53,8 @@ pub const KUNCI_YAYASAN_NAMA: &str = "hr_surat_yayasan_nama";
 pub const KUNCI_YAYASAN_KETUA: &str = "hr_surat_yayasan_ketua";
 pub const KUNCI_YAYASAN_JABATAN: &str = "hr_surat_yayasan_jabatan";
 
-/// Lima belas kunci pengaturan surat dalam urutan tetap; cermin `kunciPengaturanSurat`.
+/// Dua puluh tiga kunci pengaturan surat dalam urutan tetap (kode surat di
+/// akhir); cermin `kunciPengaturanSurat`.
 pub fn kunci_pengaturan_surat() -> Vec<String> {
     let mut kunci: Vec<String> = JENIS_SURAT.iter().map(|j| format!("hr_surat_pola:{j}")).collect();
     kunci.extend(JENIS_SK.iter().map(|j| format!("hr_surat_dasar:{j}")));
@@ -62,6 +63,7 @@ pub fn kunci_pengaturan_surat() -> Vec<String> {
             .iter()
             .map(|k| (*k).to_owned()),
     );
+    kunci.extend(JENIS_SURAT.iter().map(|j| format!("hr_surat_kode:{j}")));
     kunci
 }
 
@@ -113,6 +115,13 @@ pub fn validasi_setting_surat(kunci: &str, nilai: &str) -> Result<String, String
         }
         return Ok(isi.to_owned());
     }
+    // Kode pengganti `{kode}` di pola nomor; "" = kode bawaan `KODE_SURAT` (TS).
+    if let Some(jenis) = kunci.strip_prefix("hr_surat_kode:") {
+        if !JENIS_SURAT.contains(&jenis) {
+            return Err(format!("Kunci pengaturan surat tidak dikenal: {kunci}."));
+        }
+        return batas("Kode surat", 30);
+    }
     if let Some(jenis) = kunci.strip_prefix("hr_surat_dasar:") {
         if !JENIS_SK.contains(&jenis) {
             return Err(format!("Kunci pengaturan surat tidak dikenal: {kunci}."));
@@ -128,7 +137,7 @@ pub fn validasi_setting_surat(kunci: &str, nilai: &str) -> Result<String, String
     }
 }
 
-/// Draft layar: SEMUA lima belas kunci wajib ada (draft yang lupa satu kunci
+/// Draft layar: SEMUA dua puluh tiga kunci wajib ada (draft yang lupa satu kunci
 /// tidak boleh mengosongkannya diam-diam). Cermin `validasiPengaturanSurat`.
 pub fn validasi_pengaturan_surat(draft: &Value) -> Result<Vec<(String, String)>, String> {
     let peta = draft.as_object().ok_or_else(|| "Pengaturan surat tidak valid.".to_owned())?;
@@ -472,7 +481,7 @@ mod tests {
                 |r| r.get(0),
             )
             .unwrap();
-        assert_eq!(antre, 15, "satu event outbox per kunci");
+        assert_eq!(antre, kunci_pengaturan_surat().len() as i64, "satu event outbox per kunci");
         draft.remove(KUNCI_YAYASAN_KETUA);
         assert!(letter_settings_save(&st, Value::Object(draft)).is_err());
     }

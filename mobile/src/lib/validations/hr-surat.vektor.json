@@ -14,7 +14,15 @@
     "hr_surat_kota",
     "hr_surat_yayasan_nama",
     "hr_surat_yayasan_ketua",
-    "hr_surat_yayasan_jabatan"
+    "hr_surat_yayasan_jabatan",
+    "hr_surat_kode:ptm",
+    "hr_surat_kode:tugas",
+    "hr_surat_kode:angkat",
+    "hr_surat_kode:tugas_luar",
+    "hr_surat_kode:aktif",
+    "hr_surat_kode:sp",
+    "hr_surat_kode:berhenti",
+    "hr_surat_kode:pengalaman"
   ],
   "setting": [
     {
@@ -148,6 +156,30 @@
       "nilai": "x",
       "hasil": null,
       "galat": "Kunci pengaturan surat tidak dikenal: hr_surat_dasar:berhenti."
+    },
+    {
+      "kunci": "hr_surat_kode:tugas",
+      "nilai": " SK/TT ",
+      "hasil": "SK/TT",
+      "galat": null
+    },
+    {
+      "kunci": "hr_surat_kode:aktif",
+      "nilai": "",
+      "hasil": "",
+      "galat": null
+    },
+    {
+      "kunci": "hr_surat_kode:ptm",
+      "nilai": "KKKKKKKKKKKKKKKKKKKKKKKKKKKKKKK",
+      "hasil": null,
+      "galat": "Kode surat paling banyak 30 karakter."
+    },
+    {
+      "kunci": "hr_surat_kode:lain",
+      "nilai": "X",
+      "hasil": null,
+      "galat": "Kunci pengaturan surat tidak dikenal: hr_surat_kode:lain."
     }
   ],
   "pengaturan": [
@@ -168,7 +200,15 @@
         "hr_surat_kota": "",
         "hr_surat_yayasan_nama": "",
         "hr_surat_yayasan_ketua": "",
-        "hr_surat_yayasan_jabatan": ""
+        "hr_surat_yayasan_jabatan": "",
+        "hr_surat_kode:ptm": "",
+        "hr_surat_kode:tugas": "",
+        "hr_surat_kode:angkat": "",
+        "hr_surat_kode:tugas_luar": "",
+        "hr_surat_kode:aktif": "",
+        "hr_surat_kode:sp": "",
+        "hr_surat_kode:berhenti": "",
+        "hr_surat_kode:pengalaman": ""
       },
       "nilai": [
         ["hr_surat_pola:ptm", ""],
@@ -185,7 +225,15 @@
         ["hr_surat_kota", ""],
         ["hr_surat_yayasan_nama", ""],
         ["hr_surat_yayasan_ketua", ""],
-        ["hr_surat_yayasan_jabatan", ""]
+        ["hr_surat_yayasan_jabatan", ""],
+        ["hr_surat_kode:ptm", ""],
+        ["hr_surat_kode:tugas", ""],
+        ["hr_surat_kode:angkat", ""],
+        ["hr_surat_kode:tugas_luar", ""],
+        ["hr_surat_kode:aktif", ""],
+        ["hr_surat_kode:sp", ""],
+        ["hr_surat_kode:berhenti", ""],
+        ["hr_surat_kode:pengalaman", ""]
       ],
       "galat": null
     },
@@ -294,7 +342,15 @@
         "hr_surat_kota": " Bandung ",
         "hr_surat_yayasan_nama": "",
         "hr_surat_yayasan_ketua": "",
-        "hr_surat_yayasan_jabatan": ""
+        "hr_surat_yayasan_jabatan": "",
+        "hr_surat_kode:ptm": "  SK-PBM  ",
+        "hr_surat_kode:tugas": "",
+        "hr_surat_kode:angkat": "",
+        "hr_surat_kode:tugas_luar": "",
+        "hr_surat_kode:aktif": "",
+        "hr_surat_kode:sp": "",
+        "hr_surat_kode:berhenti": "",
+        "hr_surat_kode:pengalaman": ""
       },
       "nilai": [
         ["hr_surat_pola:ptm", ""],
@@ -311,7 +367,15 @@
         ["hr_surat_kota", "Bandung"],
         ["hr_surat_yayasan_nama", ""],
         ["hr_surat_yayasan_ketua", ""],
-        ["hr_surat_yayasan_jabatan", ""]
+        ["hr_surat_yayasan_jabatan", ""],
+        ["hr_surat_kode:ptm", "SK-PBM"],
+        ["hr_surat_kode:tugas", ""],
+        ["hr_surat_kode:angkat", ""],
+        ["hr_surat_kode:tugas_luar", ""],
+        ["hr_surat_kode:aktif", ""],
+        ["hr_surat_kode:sp", ""],
+        ["hr_surat_kode:berhenti", ""],
+        ["hr_surat_kode:pengalaman", ""]
       ],
       "galat": null
     }

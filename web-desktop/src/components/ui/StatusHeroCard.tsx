@@ -10,6 +10,10 @@ interface StatusHeroCardProps {
   total: number;
   terlambat: number;
   persentase: number;
+  /** Dari jadwal masuk (shift, Hari Sekolah, libur, pengajuan); tanpa ini = total − hadir. */
+  belumAbsen?: number;
+  /** Personil aktif yang tidak dijadwalkan masuk hari ini. */
+  libur?: number;
   isLoading?: boolean;
   onRefresh?: () => void;
   shiftName?: string;
@@ -21,6 +25,8 @@ export function StatusHeroCard({
   total,
   terlambat,
   persentase,
+  belumAbsen: belumAbsenJadwal,
+  libur,
   isLoading = false,
   onRefresh,
   shiftName = "Shift Pagi",
@@ -29,7 +35,7 @@ export function StatusHeroCard({
   const isOnline = useOnlineStatus();
   const [isSyncing, setIsSyncing] = useState(false);
 
-  const belumAbsen = Math.max(0, total - hadir);
+  const belumAbsen = belumAbsenJadwal ?? Math.max(0, total - hadir);
   const tepatWaktu = Math.max(0, hadir - terlambat);
 
   const todayDateFormatted = new Intl.DateTimeFormat("id-ID", {
@@ -173,6 +179,11 @@ export function StatusHeroCard({
               }}
             />
           </div>
+          {libur !== undefined ? (
+            <p className="text-[11px] font-medium text-blue-900/80 dark:text-sky-200/80">
+              Dijadwalkan masuk {total} orang · libur hari ini {libur} orang
+            </p>
+          ) : null}
         </div>
       </div>
 

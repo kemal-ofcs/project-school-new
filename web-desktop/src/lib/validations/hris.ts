@@ -1759,7 +1759,7 @@ export const SIMPAN_DOKUMEN_SQL =
   "INSERT INTO hr_dokumen (id_dokumen, id_karyawan, id_jenis, nomor, tanggal_terbit, tanggal_kedaluwarsa, catatan, dicatat_oleh, created_at, updated_at) SELECT ?1, ?2, ?3, NULLIF(?4, ''), ?5, NULLIF(?6, ''), NULLIF(?7, ''), ?8, datetime('now'), datetime('now') FROM master_data m WHERE m.id_unik = ?2 AND LOWER(TRIM(COALESCE(m.jenis_personil, ''))) <> 'siswa' AND NOT EXISTS (SELECT 1 FROM siswa_data sd WHERE sd.id_siswa = m.id_unik) AND EXISTS (SELECT 1 FROM hr_dokumen_jenis WHERE id_jenis = ?3) ON CONFLICT(id_dokumen) DO UPDATE SET id_jenis = excluded.id_jenis, nomor = excluded.nomor, tanggal_terbit = excluded.tanggal_terbit, tanggal_kedaluwarsa = excluded.tanggal_kedaluwarsa, catatan = excluded.catatan, updated_at = excluded.updated_at WHERE hr_dokumen.id_karyawan = excluded.id_karyawan;";
 
 export const TAMBAH_BERKAS_SQL =
-  "WITH slot(n) AS (VALUES (1), (2), (3), (4), (5)) INSERT INTO hr_dokumen_berkas (id_berkas, id_dokumen, urutan, nama_berkas, mime_type, data_base64, created_at) SELECT ?1, ?2, MIN(slot.n), ?3, ?4, ?5, datetime('now') FROM slot WHERE slot.n NOT IN (SELECT urutan FROM hr_dokumen_berkas WHERE id_dokumen = ?2) AND EXISTS (SELECT 1 FROM hr_dokumen WHERE id_dokumen = ?2) HAVING MIN(slot.n) IS NOT NULL;";
+  "WITH slot(n) AS (VALUES (1), (2), (3), (4), (5)) INSERT INTO hr_dokumen_berkas (id_berkas, id_dokumen, urutan, nama_berkas, mime_type, data_base64, created_at) SELECT ?1, ?2, slot.n, ?3, ?4, ?5, datetime('now') FROM slot WHERE slot.n NOT IN (SELECT urutan FROM hr_dokumen_berkas WHERE id_dokumen = ?2) AND EXISTS (SELECT 1 FROM hr_dokumen WHERE id_dokumen = ?2) ORDER BY slot.n LIMIT 1;";
 
 export const HAPUS_BERKAS_SQL =
   "DELETE FROM hr_dokumen_berkas WHERE id_berkas = ?1;";
@@ -1774,7 +1774,7 @@ export const AMBIL_LAMPIRAN_SQL =
 export const PEMILIK_LAMPIRAN_SQL =
   "SELECT p.diajukan_oleh, p.izin_pemutus FROM hr_pengajuan_berkas b JOIN hr_pengajuan p ON p.id_pengajuan = b.id_pengajuan WHERE b.id_berkas = ?1 LIMIT 1;";
 export const TAMBAH_LAMPIRAN_SQL =
-  "WITH slot(n) AS (VALUES (1), (2), (3), (4), (5)) INSERT INTO hr_pengajuan_berkas (id_berkas, id_pengajuan, urutan, nama_berkas, mime_type, data_base64, diunggah_oleh, created_at) SELECT ?1, ?2, MIN(slot.n), ?3, ?4, ?5, ?6, datetime('now') FROM slot WHERE slot.n NOT IN (SELECT urutan FROM hr_pengajuan_berkas WHERE id_pengajuan = ?2) AND EXISTS (SELECT 1 FROM hr_pengajuan WHERE id_pengajuan = ?2) HAVING MIN(slot.n) IS NOT NULL;";
+  "WITH slot(n) AS (VALUES (1), (2), (3), (4), (5)) INSERT INTO hr_pengajuan_berkas (id_berkas, id_pengajuan, urutan, nama_berkas, mime_type, data_base64, diunggah_oleh, created_at) SELECT ?1, ?2, slot.n, ?3, ?4, ?5, ?6, datetime('now') FROM slot WHERE slot.n NOT IN (SELECT urutan FROM hr_pengajuan_berkas WHERE id_pengajuan = ?2) AND EXISTS (SELECT 1 FROM hr_pengajuan WHERE id_pengajuan = ?2) ORDER BY slot.n LIMIT 1;";
 export const HAPUS_LAMPIRAN_SQL =
   "DELETE FROM hr_pengajuan_berkas WHERE id_berkas = ?1;";
 
