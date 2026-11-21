@@ -8,6 +8,7 @@ import { initDatabaseSchema } from "@/lib/db-schema";
 import type { PermissionKey } from "@/lib/rbac/catalog";
 import {
   type KlaimPegawai,
+  PESAN_AKUN_BAYAR,
   PESAN_BATAL_TERBAYAR,
   PESAN_BAYAR_SUDAH_BATAL,
   PESAN_BAYAR_TIDAK_SAH,
@@ -201,10 +202,36 @@ describe("hr-reimburse: alur cloud", () => {
       id_klaim: [k1, k2],
       tanggal: "2026-11-05",
     };
+    // Akun bayar wajib Aset aktif; ditolak sebelum apa pun ditulis.
+    expect(
+      await galat(
+        S.bayarKlaim(client, "bendahara", {
+          ...bayar,
+          id_akun_bayar: "akun-beban-reimburse",
+        }),
+      ),
+    ).toBe(PESAN_AKUN_BAYAR);
     const dibayar = await S.bayarKlaim(client, "bendahara", bayar);
     expect(dibayar.total).toBe(180000);
     expect(
       await hitung("SELECT SUM(nominal) FROM hr_reimburse_bayar_baris"),
+    ).toBe(180000);
+    // Jurnal otomatis (v75): Beban Reimbursement D / Kas K, seri Web.
+    const jurnal = `jrn-reimb-${dibayar.id_bayar}`;
+    expect(
+      await hitung(
+        `SELECT COUNT(*) FROM keu_jurnal WHERE id_jurnal = '${jurnal}' AND sumber = 'Reimburse' AND id_sumber = '${dibayar.id_bayar}' AND seri = 'WEB' AND nomor LIKE 'JU/2026/WEB/%'`,
+      ),
+    ).toBe(1);
+    expect(
+      await hitung(
+        `SELECT SUM(debit) FROM keu_jurnal_baris WHERE id_jurnal = '${jurnal}' AND id_akun = 'akun-beban-reimburse'`,
+      ),
+    ).toBe(180000);
+    expect(
+      await hitung(
+        `SELECT SUM(kredit) FROM keu_jurnal_baris WHERE id_jurnal = '${jurnal}' AND id_akun = 'akun-kas'`,
+      ),
     ).toBe(180000);
     expect(await galat(S.bayarKlaim(client, "bendahara", bayar))).toBe(
       PESAN_BAYAR_TIDAK_SAH,
@@ -216,6 +243,16 @@ describe("hr-reimburse: alur cloud", () => {
     // Batal bayar sekali, lalu klaim bisa dibatalkan.
     const batalB = { id_bayar: dibayar.id_bayar, alasan: "Salah transfer" };
     await S.batalBayar(client, "bendahara", batalB);
+    expect(
+      await hitung(
+        `SELECT SUM(debit) FROM keu_jurnal_baris WHERE id_jurnal = 'batal-${jurnal}' AND id_akun = 'akun-kas'`,
+      ),
+    ).toBe(180000);
+    expect(
+      await hitung(
+        `SELECT COUNT(*) FROM keu_jurnal WHERE id_jurnal = 'batal-${jurnal}' AND sumber = 'Pembatalan' AND id_jurnal_batal = '${jurnal}'`,
+      ),
+    ).toBe(1);
     expect(await galat(S.batalBayar(client, "bendahara", batalB))).toBe(
       PESAN_BAYAR_SUDAH_BATAL,
     );

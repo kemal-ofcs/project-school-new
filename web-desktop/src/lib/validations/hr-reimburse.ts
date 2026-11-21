@@ -427,6 +427,33 @@ export const BAYAR_BARIS_SQL =
 export const BATAL_BAYAR_SQL =
   "INSERT INTO hr_reimburse_bayar (id_bayar, jenis, id_ref, id_karyawan, tanggal, total, keterangan, dicatat_oleh, created_at) SELECT 'batal-' || b.id_bayar, 'Pembatalan', b.id_bayar, b.id_karyawan, ?2, b.total, ?3, ?4, datetime('now') FROM hr_reimburse_bayar b WHERE b.id_bayar = ?1 AND b.jenis = 'Bayar' AND NOT EXISTS (SELECT 1 FROM hr_reimburse_bayar x WHERE x.id_bayar = 'batal-' || b.id_bayar);";
 
+// Jurnal otomatis pembayaran reimbursement (v75, membalik Q-163). Ditulis di
+// cloud dalam batch yang SAMA dengan `BAYAR_SQL`/`BATAL_BAYAR_SQL`, bernomor
+// seri Web yang dihitung di statement itu sendiri, id `jrn-reimb-<id_bayar>`
+// dan pembaliknya `batal-jrn-reimb-<id_bayar>`. ?1 = id_bayar.
+export const AKUN_BEBAN_REIMBURSE = "akun-beban-reimburse";
+export const AKUN_BAYAR_BAWAAN = "akun-kas";
+export const PESAN_AKUN_BAYAR = "Akun pembayaran harus akun aset yang aktif.";
+export const AKUN_BAYAR_SQL =
+  "SELECT 1 AS sah FROM keu_akun WHERE id_akun = ?1 AND kelompok = 'Aset' AND is_aktif = 1 AND dihapus_pada IS NULL LIMIT 1;";
+export const BATAS_TUTUP_SQL =
+  "SELECT MAX(sampai_tanggal) AS batas FROM keu_tutup_buku WHERE status = 'Aktif';";
+/** Header: ?2 = dicatat oleh; baris kredit: ?2 = akun bayar (Aset aktif, diperiksa sebelumnya). */
+export const JURNAL_BAYAR_SQL = [
+  "INSERT INTO keu_jurnal (id_jurnal, tanggal, seri, nomor_urut, nomor, keterangan, sumber, id_sumber, id_jurnal_batal, dibuat_oleh, created_at) SELECT 'jrn-reimb-' || b.id_bayar, b.tanggal, 'WEB', n.urut, 'JU/' || substr(b.tanggal, 1, 4) || '/WEB/' || printf('%04d', n.urut), 'Pembayaran reimbursement ' || COALESCE(m.nama, b.id_karyawan), 'Reimburse', b.id_bayar, NULL, ?2, datetime('now') FROM hr_reimburse_bayar b LEFT JOIN master_data m ON m.id_unik = b.id_karyawan, (SELECT COALESCE(MAX(j.nomor_urut), 0) + 1 AS urut FROM keu_jurnal j WHERE j.seri = 'WEB' AND substr(j.tanggal, 1, 4) = (SELECT substr(x.tanggal, 1, 4) FROM hr_reimburse_bayar x WHERE x.id_bayar = ?1)) n WHERE b.id_bayar = ?1 AND b.jenis = 'Bayar' AND b.total > 0 ON CONFLICT(id_jurnal) DO NOTHING;",
+  "INSERT INTO keu_jurnal_baris (id_baris, id_jurnal, id_akun, debit, kredit, keterangan, urutan) SELECT 'jrn-reimb-' || b.id_bayar || ':1', 'jrn-reimb-' || b.id_bayar, 'akun-beban-reimburse', b.total, 0, NULL, 1 FROM hr_reimburse_bayar b WHERE b.id_bayar = ?1 AND b.jenis = 'Bayar' AND b.total > 0 AND EXISTS (SELECT 1 FROM keu_jurnal j WHERE j.id_jurnal = 'jrn-reimb-' || b.id_bayar) ON CONFLICT(id_baris) DO NOTHING;",
+  "INSERT INTO keu_jurnal_baris (id_baris, id_jurnal, id_akun, debit, kredit, keterangan, urutan) SELECT 'jrn-reimb-' || b.id_bayar || ':2', 'jrn-reimb-' || b.id_bayar, ?2, 0, b.total, NULL, 2 FROM hr_reimburse_bayar b WHERE b.id_bayar = ?1 AND b.jenis = 'Bayar' AND b.total > 0 AND EXISTS (SELECT 1 FROM keu_jurnal j WHERE j.id_jurnal = 'jrn-reimb-' || b.id_bayar) ON CONFLICT(id_baris) DO NOTHING;",
+] as const;
+/**
+ * Pembalik, hanya bila baris `batal-<id_bayar>` ada dan jurnal aslinya ada
+ * (pembayaran sebelum v75 tidak berjurnal). ?2 = tanggal hari ini WIB,
+ * ?3 = dicatat oleh.
+ */
+export const JURNAL_BATAL_BAYAR_SQL = [
+  "INSERT INTO keu_jurnal (id_jurnal, tanggal, seri, nomor_urut, nomor, keterangan, sumber, id_sumber, id_jurnal_batal, dibuat_oleh, created_at) SELECT 'batal-' || j.id_jurnal, ?2, 'WEB', n.urut, 'JU/' || substr(?2, 1, 4) || '/WEB/' || printf('%04d', n.urut), 'Pembatalan ' || j.keterangan, 'Pembatalan', NULL, j.id_jurnal, ?3, datetime('now') FROM keu_jurnal j, (SELECT COALESCE(MAX(x.nomor_urut), 0) + 1 AS urut FROM keu_jurnal x WHERE x.seri = 'WEB' AND substr(x.tanggal, 1, 4) = substr(?2, 1, 4)) n WHERE j.id_jurnal = 'jrn-reimb-' || ?1 AND EXISTS (SELECT 1 FROM hr_reimburse_bayar c WHERE c.id_bayar = 'batal-' || ?1) ON CONFLICT(id_jurnal) DO NOTHING;",
+  "INSERT INTO keu_jurnal_baris (id_baris, id_jurnal, id_akun, debit, kredit, keterangan, urutan) SELECT 'batal-' || g.id_baris, 'batal-' || g.id_jurnal, g.id_akun, g.kredit, g.debit, g.keterangan, g.urutan FROM keu_jurnal_baris g WHERE g.id_jurnal = 'jrn-reimb-' || ?1 AND EXISTS (SELECT 1 FROM keu_jurnal p WHERE p.id_jurnal = 'batal-jrn-reimb-' || ?1) ON CONFLICT(id_baris) DO NOTHING;",
+] as const;
+
 // Bentuk rute dan command
 
 const teksBebas = (maks: number) => z.string().max(maks).default("");
@@ -503,6 +530,8 @@ export const bayarDraftSchema = z
     id_klaim: z.array(z.string().max(80)).max(MAKS_KLAIM_BAYAR + 1),
     tanggal: teksBebas(20),
     keterangan: teksBebas(MAKS_KETERANGAN_BAYAR + 100),
+    /** Akun Aset pembayaran untuk jurnal (v75); kosong = `AKUN_BAYAR_BAWAAN`. */
+    id_akun_bayar: teksBebas(80).optional(),
   })
   .strict();
 export type BayarDraft = z.input<typeof bayarDraftSchema>;

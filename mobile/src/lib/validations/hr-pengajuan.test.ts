@@ -165,6 +165,22 @@ describe("hr-pengajuan: aturan kembar", () => {
         ),
       ).toEqual(k.hasil);
     }
+    for (const k of vektor.aturan_cuti_pegawai) {
+      expect(
+        P.aturanCutiPegawai(
+          new Map(Object.entries(k.peta as Record<string, string>)),
+          k.kelompok,
+          k.id_jabatan,
+        ),
+      ).toEqual(k.hasil);
+    }
+    for (const k of vektor.aturan_jabatan) {
+      expect(
+        P.aturanJabatan(
+          new Map(Object.entries(k.peta as Record<string, string>)),
+        ),
+      ).toEqual(k.hasil as Record<string, P.AturanCuti>);
+    }
     for (const k of vektor.validasi_aturan_cuti) {
       const hasil = P.validasiAturanCuti(k.masuk as Record<string, unknown>);
       expect(galat(hasil)).toBe(k.galat);

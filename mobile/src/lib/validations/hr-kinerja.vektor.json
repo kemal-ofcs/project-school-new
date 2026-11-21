@@ -3395,7 +3395,7 @@
           "tanggal_selesai": "2024-07-01"
         }
       ],
-      "galat": "Jenis periode harus Semester atau Tahun Ajaran."
+      "galat": "Jenis periode harus Semester, Tahun Ajaran, atau Rentang Tanggal."
     },
     {
       "nama": "kunci tidak ada",
@@ -3483,6 +3483,256 @@
         }
       ],
       "galat": "Tanggal 2024/2025 Semester Ganjil tidak valid."
+    },
+    {
+      "nama": "rentang tanggal",
+      "jenis": "Rentang Tanggal",
+      "kunci": " 2026-01-01_2026-03-31 ",
+      "tahun": [
+        {
+          "id_tahun_ajaran": "ta-1",
+          "nama_tahun": "2023/2024",
+          "semester": "Ganjil",
+          "tanggal_mulai": "2023-07-17",
+          "tanggal_selesai": "2023-12-22"
+        },
+        {
+          "id_tahun_ajaran": "ta-2",
+          "nama_tahun": "2023/2024",
+          "semester": "Genap",
+          "tanggal_mulai": "2024-01-08",
+          "tanggal_selesai": "2024-06-21"
+        },
+        {
+          "id_tahun_ajaran": "ta-3",
+          "nama_tahun": "2024/2025",
+          "semester": "Ganjil",
+          "tanggal_mulai": "2024-07-15",
+          "tanggal_selesai": "2024-07-01"
+        }
+      ],
+      "hasil": {
+        "jenis": "Rentang Tanggal",
+        "kunci": "2026-01-01_2026-03-31",
+        "nama": "2026-01-01 s.d. 2026-03-31",
+        "mulai": "2026-01-01",
+        "selesai": "2026-03-31"
+      }
+    },
+    {
+      "nama": "rentang satu hari",
+      "jenis": "Rentang Tanggal",
+      "kunci": "2026-02-28_2026-02-28",
+      "tahun": [
+        {
+          "id_tahun_ajaran": "ta-1",
+          "nama_tahun": "2023/2024",
+          "semester": "Ganjil",
+          "tanggal_mulai": "2023-07-17",
+          "tanggal_selesai": "2023-12-22"
+        },
+        {
+          "id_tahun_ajaran": "ta-2",
+          "nama_tahun": "2023/2024",
+          "semester": "Genap",
+          "tanggal_mulai": "2024-01-08",
+          "tanggal_selesai": "2024-06-21"
+        },
+        {
+          "id_tahun_ajaran": "ta-3",
+          "nama_tahun": "2024/2025",
+          "semester": "Ganjil",
+          "tanggal_mulai": "2024-07-15",
+          "tanggal_selesai": "2024-07-01"
+        }
+      ],
+      "hasil": {
+        "jenis": "Rentang Tanggal",
+        "kunci": "2026-02-28_2026-02-28",
+        "nama": "2026-02-28 s.d. 2026-02-28",
+        "mulai": "2026-02-28",
+        "selesai": "2026-02-28"
+      }
+    },
+    {
+      "nama": "rentang 366 hari",
+      "jenis": "Rentang Tanggal",
+      "kunci": "2024-01-01_2024-12-31",
+      "tahun": [
+        {
+          "id_tahun_ajaran": "ta-1",
+          "nama_tahun": "2023/2024",
+          "semester": "Ganjil",
+          "tanggal_mulai": "2023-07-17",
+          "tanggal_selesai": "2023-12-22"
+        },
+        {
+          "id_tahun_ajaran": "ta-2",
+          "nama_tahun": "2023/2024",
+          "semester": "Genap",
+          "tanggal_mulai": "2024-01-08",
+          "tanggal_selesai": "2024-06-21"
+        },
+        {
+          "id_tahun_ajaran": "ta-3",
+          "nama_tahun": "2024/2025",
+          "semester": "Ganjil",
+          "tanggal_mulai": "2024-07-15",
+          "tanggal_selesai": "2024-07-01"
+        }
+      ],
+      "hasil": {
+        "jenis": "Rentang Tanggal",
+        "kunci": "2024-01-01_2024-12-31",
+        "nama": "2024-01-01 s.d. 2024-12-31",
+        "mulai": "2024-01-01",
+        "selesai": "2024-12-31"
+      }
+    },
+    {
+      "nama": "rentang 367 hari",
+      "jenis": "Rentang Tanggal",
+      "kunci": "2024-01-01_2025-01-01",
+      "tahun": [
+        {
+          "id_tahun_ajaran": "ta-1",
+          "nama_tahun": "2023/2024",
+          "semester": "Ganjil",
+          "tanggal_mulai": "2023-07-17",
+          "tanggal_selesai": "2023-12-22"
+        },
+        {
+          "id_tahun_ajaran": "ta-2",
+          "nama_tahun": "2023/2024",
+          "semester": "Genap",
+          "tanggal_mulai": "2024-01-08",
+          "tanggal_selesai": "2024-06-21"
+        },
+        {
+          "id_tahun_ajaran": "ta-3",
+          "nama_tahun": "2024/2025",
+          "semester": "Ganjil",
+          "tanggal_mulai": "2024-07-15",
+          "tanggal_selesai": "2024-07-01"
+        }
+      ],
+      "galat": "Periode paling panjang 366 hari."
+    },
+    {
+      "nama": "rentang terbalik",
+      "jenis": "Rentang Tanggal",
+      "kunci": "2026-03-31_2026-01-01",
+      "tahun": [
+        {
+          "id_tahun_ajaran": "ta-1",
+          "nama_tahun": "2023/2024",
+          "semester": "Ganjil",
+          "tanggal_mulai": "2023-07-17",
+          "tanggal_selesai": "2023-12-22"
+        },
+        {
+          "id_tahun_ajaran": "ta-2",
+          "nama_tahun": "2023/2024",
+          "semester": "Genap",
+          "tanggal_mulai": "2024-01-08",
+          "tanggal_selesai": "2024-06-21"
+        },
+        {
+          "id_tahun_ajaran": "ta-3",
+          "nama_tahun": "2024/2025",
+          "semester": "Ganjil",
+          "tanggal_mulai": "2024-07-15",
+          "tanggal_selesai": "2024-07-01"
+        }
+      ],
+      "galat": "Tanggal selesai periode sebelum tanggal mulai."
+    },
+    {
+      "nama": "tanggal mustahil",
+      "jenis": "Rentang Tanggal",
+      "kunci": "2026-02-30_2026-03-31",
+      "tahun": [
+        {
+          "id_tahun_ajaran": "ta-1",
+          "nama_tahun": "2023/2024",
+          "semester": "Ganjil",
+          "tanggal_mulai": "2023-07-17",
+          "tanggal_selesai": "2023-12-22"
+        },
+        {
+          "id_tahun_ajaran": "ta-2",
+          "nama_tahun": "2023/2024",
+          "semester": "Genap",
+          "tanggal_mulai": "2024-01-08",
+          "tanggal_selesai": "2024-06-21"
+        },
+        {
+          "id_tahun_ajaran": "ta-3",
+          "nama_tahun": "2024/2025",
+          "semester": "Ganjil",
+          "tanggal_mulai": "2024-07-15",
+          "tanggal_selesai": "2024-07-01"
+        }
+      ],
+      "galat": "Rentang tanggal periode tidak valid."
+    },
+    {
+      "nama": "format salah",
+      "jenis": "Rentang Tanggal",
+      "kunci": "2026-01-01..2026-03-31",
+      "tahun": [
+        {
+          "id_tahun_ajaran": "ta-1",
+          "nama_tahun": "2023/2024",
+          "semester": "Ganjil",
+          "tanggal_mulai": "2023-07-17",
+          "tanggal_selesai": "2023-12-22"
+        },
+        {
+          "id_tahun_ajaran": "ta-2",
+          "nama_tahun": "2023/2024",
+          "semester": "Genap",
+          "tanggal_mulai": "2024-01-08",
+          "tanggal_selesai": "2024-06-21"
+        },
+        {
+          "id_tahun_ajaran": "ta-3",
+          "nama_tahun": "2024/2025",
+          "semester": "Ganjil",
+          "tanggal_mulai": "2024-07-15",
+          "tanggal_selesai": "2024-07-01"
+        }
+      ],
+      "galat": "Rentang tanggal periode tidak valid."
+    },
+    {
+      "nama": "kosong",
+      "jenis": "Rentang Tanggal",
+      "kunci": "",
+      "tahun": [
+        {
+          "id_tahun_ajaran": "ta-1",
+          "nama_tahun": "2023/2024",
+          "semester": "Ganjil",
+          "tanggal_mulai": "2023-07-17",
+          "tanggal_selesai": "2023-12-22"
+        },
+        {
+          "id_tahun_ajaran": "ta-2",
+          "nama_tahun": "2023/2024",
+          "semester": "Genap",
+          "tanggal_mulai": "2024-01-08",
+          "tanggal_selesai": "2024-06-21"
+        },
+        {
+          "id_tahun_ajaran": "ta-3",
+          "nama_tahun": "2024/2025",
+          "semester": "Ganjil",
+          "tanggal_mulai": "2024-07-15",
+          "tanggal_selesai": "2024-07-01"
+        }
+      ],
+      "galat": "Rentang tanggal periode tidak valid."
     }
   ],
   "rentang_aktif": [
@@ -3717,7 +3967,7 @@
         "periode_jenis": "Bulanan",
         "periode_kunci": "ta-2"
       },
-      "galat": "Jenis periode harus Semester atau Tahun Ajaran."
+      "galat": "Jenis periode harus Semester, Tahun Ajaran, atau Rentang Tanggal."
     },
     {
       "nama": "buat tanpa periode",

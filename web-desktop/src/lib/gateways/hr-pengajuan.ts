@@ -4,7 +4,6 @@ import { requestWebApi } from "@/lib/client/api-client";
 import { isDesktopRuntime } from "@/lib/runtime/app-runtime";
 import { invokeDesktop, kickDesktopSync } from "@/lib/runtime/desktop-commands";
 import type {
-  AturanCuti,
   AturanCutiDraft,
   DaftarJp,
   DaftarPengajuan,
@@ -128,7 +127,7 @@ export async function muatSaldoCuti(
 }
 
 export function simpanAturanCuti(draft: AturanCutiDraft) {
-  return mutasi<{ guru: AturanCuti; tendik: AturanCuti }>(
+  return mutasi<SaldoCuti["aturan"]>(
     "desktop_hr_leave_settings_save",
     { draft },
     "/api/pengajuan/leave/settings",

@@ -289,6 +289,7 @@ const MOBILE_COMMANDS: &[&str] = &[
     "desktop_hr_section_save",
     "desktop_hr_section_merge",
     "desktop_hr_position_save",
+    "desktop_hr_master_delete",
     "desktop_hr_settings_save",
     "desktop_hr_duty_types_save",
     "desktop_hr_duties",

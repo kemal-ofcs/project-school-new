@@ -748,7 +748,7 @@ export const HARI_ABSEN_SQL =
 export const JADWAL_PEGAWAI_SQL =
   "SELECT m.id_unik, COALESCE(m.divisi, '') AS divisi, s.hari_kerja, s.kode_shift, COALESCE(s.jam_kerja_normal_menit, 0) AS jam_normal FROM master_data m LEFT JOIN tbl_shift s ON s.id_shift = m.id_shift WHERE m.id_unik IN (SELECT value FROM json_each(?1));";
 export const JATAH_PEGAWAI_SQL =
-  "SELECT m.id_unik, m.nama, COALESCE(m.unit, '') AS unit, COALESCE(m.tanggal_mulai_aktif, '') AS tmt, CASE WHEN EXISTS (SELECT 1 FROM guru_data g WHERE g.id_guru = m.id_unik) THEN 1 ELSE 0 END AS guru, COALESCE(m.divisi, '') AS divisi, s.hari_kerja, s.kode_shift FROM master_data m LEFT JOIN tbl_shift s ON s.id_shift = m.id_shift WHERE m.id_unik = ?1 AND LOWER(TRIM(COALESCE(m.jenis_personil, ''))) <> 'siswa' AND NOT EXISTS (SELECT 1 FROM siswa_data sd WHERE sd.id_siswa = m.id_unik);";
+  "SELECT m.id_unik, m.nama, COALESCE(m.unit, '') AS unit, COALESCE(m.tanggal_mulai_aktif, '') AS tmt, CASE WHEN EXISTS (SELECT 1 FROM guru_data g WHERE g.id_guru = m.id_unik) THEN 1 ELSE 0 END AS guru, COALESCE(m.divisi, '') AS divisi, COALESCE(m.id_jabatan, '') AS id_jabatan, s.hari_kerja, s.kode_shift FROM master_data m LEFT JOIN tbl_shift s ON s.id_shift = m.id_shift WHERE m.id_unik = ?1 AND LOWER(TRIM(COALESCE(m.jenis_personil, ''))) <> 'siswa' AND NOT EXISTS (SELECT 1 FROM siswa_data sd WHERE sd.id_siswa = m.id_unik);";
 export const JATAH_TERPAKAI_SQL = `SELECT p.tanggal_mulai, p.tanggal_selesai FROM hr_pengajuan p WHERE p.id_karyawan = ?1 AND p.potong_jatah = 1 AND ${PENGAJUAN_BERLAKU_SQL} ORDER BY p.tanggal_mulai, p.id_pengajuan;`;
 export const HADIR_ORANG_SQL =
   "SELECT tanggal FROM absensi_harian WHERE id_karyawan = ?1 AND tanggal >= ?2 AND tanggal <= ?3 AND status_kehadiran IN ('Hadir', 'PRESENT') GROUP BY tanggal;";
@@ -913,25 +913,99 @@ export function aturanCuti(
   };
 }
 
+/** Isian aturan cuti dalam urutan simpan; cermin `ISIAN_CUTI`. */
+export const ISIAN_CUTI = [
+  "periode",
+  "hak",
+  "bulan_awal",
+  "syarat_bulan",
+  "sisa",
+  "bawa_maks",
+  "bawa_bulan",
+] as const;
+
+/** Kelompok kunci aturan cuti satu jabatan: `hr_cuti_<isian>:jab:<id>`. */
+export const kelompokJabatan = (idJabatan: string) => `jab:${idJabatan}`;
+
+/**
+ * Cermin `aturan_cuti_pegawai` (2026-11-21): aturan kelompok, lalu setiap
+ * isian jabatan yang sah menimpanya. Isian jabatan kosong = ikut kelompok.
+ */
+export function aturanCutiPegawai(
+  peta: ReadonlyMap<string, string>,
+  kelompok: string,
+  idJabatan: string,
+): AturanCuti {
+  const dasar = aturanCuti(peta, kelompok);
+  const id = idJabatan.trim();
+  if (id === "") return dasar;
+  const k = kelompokJabatan(id);
+  const nilai = (isian: string) => peta.get(kunciCuti(isian, k))?.trim();
+  const angka = (i: number, cadangan: number) => {
+    const [isian, , min, maks] = BATAS_CUTI[i];
+    const t = nilai(isian);
+    const n = t !== undefined && /^[+-]?\d+$/.test(t) ? Number(t) : Number.NaN;
+    return n >= min && n <= maks ? n : cadangan;
+  };
+  const pilih = (
+    isian: string,
+    daftar: readonly string[],
+    cadangan: string,
+  ) => {
+    const v = nilai(isian);
+    return v !== undefined && daftar.includes(v) ? v : cadangan;
+  };
+  return {
+    periode: pilih("periode", PERIODE_CUTI, dasar.periode),
+    hak: angka(0, dasar.hak),
+    bulan_awal: angka(1, dasar.bulan_awal),
+    syarat_bulan: angka(2, dasar.syarat_bulan),
+    sisa: pilih("sisa", SISA_CUTI, dasar.sisa),
+    bawa_maks: angka(3, dasar.bawa_maks),
+    bawa_bulan: angka(4, dasar.bawa_bulan),
+  };
+}
+
+/**
+ * Cermin `aturan_jabatan`: jabatan dengan minimal satu isian terisi, urut id.
+ * Isian yang kosong tampil sebagai nilai bawaan tendik.
+ */
+export function aturanJabatan(
+  peta: ReadonlyMap<string, string>,
+): Record<string, AturanCuti> {
+  const ids = new Set<string>();
+  for (const [kunci, nilai] of peta) {
+    const m = /^hr_cuti_([a-z_]+):jab:(.+)$/.exec(kunci);
+    if (
+      m &&
+      (ISIAN_CUTI as readonly string[]).includes(m[1]) &&
+      nilai.trim() !== ""
+    )
+      ids.add(m[2]);
+  }
+  return Object.fromEntries(
+    [...ids].sort().map((id) => [id, aturanCutiPegawai(peta, "tendik", id)]),
+  );
+}
+
 /** Cermin `validasi_aturan_cuti`: pasangan kunci-nilai, urutan tetap. */
 export function validasiAturanCuti(draft: Draft): Hasil<[string, string][]> {
   const hasil: [string, string][] = [];
-  for (const k of KELOMPOK_CUTI) {
-    const a = draft[k];
+  const satu = (a: unknown, label: string, k: string): string | null => {
     if (typeof a !== "object" || a === null || Array.isArray(a)) {
-      return gagal(`Aturan cuti ${k} tidak lengkap.`);
+      return `Aturan cuti ${label} tidak lengkap.`;
     }
     const isian = a as Draft;
     const periode = teks(isian, "periode");
     if (!termasuk(PERIODE_CUTI, periode)) {
-      return gagal(`Periode cuti ${k} harus tahunan atau ulang tahun kerja.`);
+      return `Periode cuti ${label} harus tahunan atau ulang tahun kerja.`;
     }
     const sisa = teks(isian, "sisa");
     if (!termasuk(SISA_CUTI, sisa)) {
-      return gagal(`Sisa cuti ${k} harus hangus atau dibawa.`);
+      return `Sisa cuti ${label} harus hangus atau dibawa.`;
     }
     hasil.push([kunciCuti("periode", k), periode]);
-    for (const [nama, label, min, maks] of BATAS_CUTI) {
+    for (const [nama, labelIsian, min, maks] of BATAS_CUTI) {
       const n = isian[nama];
       if (
         typeof n !== "number" ||
@@ -939,10 +1013,40 @@ export function validasiAturanCuti(draft: Draft): Hasil<[string, string][]> {
         n < min ||
         n > maks
       ) {
-        return gagal(`${label} ${k} harus ${min} sampai ${maks}.`);
+        return `${labelIsian} ${label} harus ${min} sampai ${maks}.`;
       }
       hasil.push([kunciCuti(nama, k), String(n)]);
       if (nama === "syarat_bulan") hasil.push([kunciCuti("sisa", k), sisa]);
+    }
+    return null;
+  };
+  for (const k of KELOMPOK_CUTI) {
+    const g = satu(draft[k], k, k);
+    if (g) return gagal(g);
+  }
+  // `jabatan` opsional: { id: aturan } = aturan sendiri, { id: null } =
+  // kosongkan ketujuh kunci (ikut Guru/Tendik lagi).
+  const jabatan = draft.jabatan;
+  if (jabatan !== undefined) {
+    if (
+      typeof jabatan !== "object" ||
+      jabatan === null ||
+      Array.isArray(jabatan)
+    ) {
+      return gagal("Aturan cuti jabatan tidak valid.");
+    }
+    for (const id of Object.keys(jabatan).sort()) {
+      if (!/^[A-Za-z0-9_-]{1,80}$/.test(id)) {
+        return gagal("Aturan cuti jabatan tidak valid.");
+      }
+      const k = kelompokJabatan(id);
+      const a = (jabatan as Draft)[id];
+      if (a === null) {
+        for (const isian of ISIAN_CUTI) hasil.push([kunciCuti(isian, k), ""]);
+        continue;
+      }
+      const g = satu(a, "jabatan", k);
+      if (g) return gagal(g);
     }
   }
   return ok(hasil);
@@ -1114,9 +1218,20 @@ export const aturanCutiDraftSchema = z
   .object({
     guru: z.record(z.string(), z.unknown()),
     tendik: z.record(z.string(), z.unknown()),
+    jabatan: z
+      .record(
+        z.string().max(80),
+        z.union([z.record(z.string(), z.unknown()), z.null()]),
+      )
+      .optional(),
   })
   .strict();
-export type AturanCutiDraft = { guru: AturanCuti; tendik: AturanCuti };
+export type AturanCutiDraft = {
+  guru: AturanCuti;
+  tendik: AturanCuti;
+  /** Hanya pada simpan: `null` = kosongkan, ikut Guru/Tendik lagi. */
+  jabatan?: Record<string, AturanCuti | null>;
+};
 
 export const penyesuaianDraftSchema = z
   .object({
@@ -1152,7 +1267,12 @@ export interface BarisPenyesuaian {
 
 /** Bentuk jawaban `desktop_hr_leave_balance` / `POST /api/pengajuan/leave/query`. */
 export interface SaldoCuti {
-  aturan: { guru: AturanCuti; tendik: AturanCuti };
+  aturan: {
+    guru: AturanCuti;
+    tendik: AturanCuti;
+    /** Jabatan beraturan sendiri (`aturanJabatan`). */
+    jabatan: Record<string, AturanCuti>;
+  };
   hari_ini: string;
   pegawai: {
     id_karyawan: string;

@@ -3,11 +3,13 @@
 import { type FormEvent, useRef, useState } from "react";
 import { Modal } from "@/components/ui/Modal";
 import {
+  hapusMasterOrganisasi,
   type JenisTugas,
   type OrgKepegawaian,
   simpanJenisTugas,
   simpanPengaturanKontrak,
 } from "@/lib/gateways/hris";
+import { useConfirmDialog } from "@/lib/hooks/useConfirmDialog";
 import {
   ATURAN_BEBAN_MAKS,
   ATURAN_BEBAN_MIN,
@@ -16,6 +18,7 @@ import {
   ATURAN_PERCOBAAN,
   ATURAN_PKWT,
   ATURAN_SP_MASA,
+  JENIS_TUGAS_BAWAAN,
 } from "@/lib/validations/hris";
 import { INPUT, LABEL, pesanGalat, TOMBOL, TOMBOL_UTAMA } from "./gaya";
 
@@ -43,6 +46,7 @@ export function OrganisasiTugasKontrak({
   const [pensiun, setPensiun] = useState(org.pengaturan.pensiun_usia);
   const isSubmittingRef = useRef(false);
   const [menyimpan, setMenyimpan] = useState(false);
+  const { konfirmasi, dialogKonfirmasi } = useConfirmDialog();
 
   const jalankan = async (aksi: () => Promise<unknown>, berhasil: string) => {
     if (isSubmittingRef.current) return;
@@ -102,6 +106,7 @@ export function OrganisasiTugasKontrak({
           tambahan". Ekuivalen JP mengikuti Permendikbud 15/2018; periksa ulang
           angkanya.
         </p>
+        {dialogKonfirmasi}
         <ul className="space-y-2">
           {org.jenis_tugas.map((j) => (
             <li
@@ -146,6 +151,32 @@ export function OrganisasiTugasKontrak({
                   >
                     {j.is_aktif === 1 ? "Nonaktifkan" : "Aktifkan"}
                   </button>
+                  {(JENIS_TUGAS_BAWAAN as readonly string[]).includes(
+                    j.id_jenis,
+                  ) ? null : (
+                    <button
+                      type="button"
+                      className={TOMBOL}
+                      disabled={menyimpan}
+                      onClick={async () => {
+                        const setuju = await konfirmasi({
+                          title: `Hapus "${j.nama}"?`,
+                          description:
+                            "Hanya bisa bila belum pernah dipakai tugas tambahan mana pun, termasuk riwayat. Tidak bisa dibatalkan.",
+                          confirmLabel: "Hapus",
+                          tone: "danger",
+                        });
+                        if (setuju)
+                          await jalankan(
+                            () =>
+                              hapusMasterOrganisasi("jenis_tugas", j.id_jenis),
+                            `"${j.nama}" dihapus.`,
+                          );
+                      }}
+                    >
+                      Hapus
+                    </button>
+                  )}
                 </div>
               ) : null}
             </li>

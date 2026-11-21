@@ -163,6 +163,25 @@ export async function gabungBagian(idAsal: string, idTujuan: string) {
   });
 }
 
+/** Hapus master yang tidak pernah dipakai; galat berisi alasan bila ditolak. */
+export async function hapusMasterOrganisasi(
+  jenis: "bagian" | "jabatan" | "jenis_tugas" | "jenis_pengajuan",
+  id: string,
+) {
+  if (isDesktopRuntime()) {
+    const hasil = await invokeDesktop("desktop_hr_master_delete", {
+      jenis,
+      id,
+    });
+    kickDesktopSync();
+    return hasil;
+  }
+  return requestWebApi("/api/kepegawaian/master/delete", "POST", {
+    jenis,
+    id,
+  });
+}
+
 export async function simpanJabatan(draft: MasterDraft) {
   if (isDesktopRuntime()) {
     const hasil = await invokeDesktop<{ id_jabatan: string }>(

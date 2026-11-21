@@ -88,6 +88,122 @@ pub const BENTROK_BAGIAN_SQL: &str = "SELECT 1 FROM hr_bagian b WHERE b.id_bagia
 /// ?1 = nama, ?2 = id jabatan yang disimpan.
 pub const BENTROK_JABATAN_SQL: &str = "SELECT 1 FROM hr_jabatan WHERE id_jabatan <> ?2 AND is_aktif = 1 AND lower(trim(nama)) = lower(trim(?1)) LIMIT 1;";
 
+// Hapus master organisasi (2026-11-21), cermin `validations/hris.ts`. Hanya
+// baris yang bukan bawaan dan tidak pernah dirujuk (termasuk pegawai nonaktif
+// dan riwayat); selain itu nonaktifkan. Penjaga rujukan ada di statement DELETE
+// itu sendiri, jadi cloud yang tahu rujukan lain cukup tidak menghapus dan
+// tarikan berikutnya mengembalikan barisnya. `_CLOUD_` menambah `hr_lowongan`.
+pub const JENIS_MASTER_HAPUS: [&str; 4] = ["bagian", "jabatan", "jenis_tugas", "jenis_pengajuan"];
+/// Seed `MIGRASI_ORGANISASI_SQL` + `tgs-ka-tu` (kinerja v71); dirujuk kode.
+pub const JENIS_TUGAS_BAWAAN: [&str; 11] = [
+    "tgs-kepsek",
+    "tgs-wakasek",
+    "tgs-kaprog",
+    "tgs-kaperpus",
+    "tgs-kalab",
+    "tgs-wali-kelas",
+    "tgs-pembina-osis",
+    "tgs-pembina-ekskul",
+    "tgs-piket",
+    "tgs-bendahara-bos",
+    "tgs-ka-tu",
+];
+pub const HAPUS_BAGIAN_SQL: [&str; 2] = [
+    "DELETE FROM hr_bagian_nama WHERE id_bagian = ?1 AND NOT EXISTS (SELECT 1 FROM master_data m WHERE m.id_bagian = ?1);",
+    "DELETE FROM hr_bagian WHERE id_bagian = ?1 AND NOT EXISTS (SELECT 1 FROM master_data m WHERE m.id_bagian = ?1);",
+];
+pub const HAPUS_BAGIAN_CLOUD_SQL: [&str; 2] = [
+    "DELETE FROM hr_bagian_nama WHERE id_bagian = ?1 AND NOT EXISTS (SELECT 1 FROM master_data m WHERE m.id_bagian = ?1) AND NOT EXISTS (SELECT 1 FROM hr_lowongan l WHERE l.id_bagian = ?1);",
+    "DELETE FROM hr_bagian WHERE id_bagian = ?1 AND NOT EXISTS (SELECT 1 FROM master_data m WHERE m.id_bagian = ?1) AND NOT EXISTS (SELECT 1 FROM hr_lowongan l WHERE l.id_bagian = ?1);",
+];
+pub const HAPUS_JABATAN_SQL: &str = "DELETE FROM hr_jabatan WHERE id_jabatan = ?1 AND NOT EXISTS (SELECT 1 FROM master_data m WHERE m.id_jabatan = ?1);";
+pub const HAPUS_JABATAN_CLOUD_SQL: &str = "DELETE FROM hr_jabatan WHERE id_jabatan = ?1 AND NOT EXISTS (SELECT 1 FROM master_data m WHERE m.id_jabatan = ?1) AND NOT EXISTS (SELECT 1 FROM hr_lowongan l WHERE l.id_jabatan = ?1);";
+pub const HAPUS_JENIS_TUGAS_SQL: &str = "DELETE FROM hr_tugas_jenis WHERE id_jenis = ?1 AND id_jenis NOT IN ('tgs-kepsek', 'tgs-wakasek', 'tgs-kaprog', 'tgs-kaperpus', 'tgs-kalab', 'tgs-wali-kelas', 'tgs-pembina-osis', 'tgs-pembina-ekskul', 'tgs-piket', 'tgs-bendahara-bos', 'tgs-ka-tu') AND NOT EXISTS (SELECT 1 FROM hr_tugas_tambahan t WHERE t.id_jenis = ?1);";
+pub const HAPUS_JENIS_PENGAJUAN_SQL: &str = "DELETE FROM hr_jenis_pengajuan WHERE id_jenis = ?1 AND id_jenis NOT IN ('jns-cuti-tahunan', 'jns-cuti-menikah', 'jns-cuti-duka', 'jns-cuti-istri-melahirkan', 'jns-cuti-melahirkan', 'jns-cuti-luar-tanggungan', 'jns-izin-dibayar', 'jns-izin-tidak-dibayar', 'jns-sakit', 'jns-dinas-luar') AND NOT EXISTS (SELECT 1 FROM hr_pengajuan p WHERE p.id_jenis = ?1);";
+pub const DIPAKAI_BAGIAN_SQL: &str = "SELECT COUNT(*) AS n FROM master_data WHERE id_bagian = ?1;";
+pub const DIPAKAI_BAGIAN_CLOUD_SQL: &str = "SELECT (SELECT COUNT(*) FROM master_data WHERE id_bagian = ?1) + (SELECT COUNT(*) FROM hr_lowongan WHERE id_bagian = ?1) AS n;";
+pub const DIPAKAI_JABATAN_SQL: &str = "SELECT COUNT(*) AS n FROM master_data WHERE id_jabatan = ?1;";
+pub const DIPAKAI_JABATAN_CLOUD_SQL: &str = "SELECT (SELECT COUNT(*) FROM master_data WHERE id_jabatan = ?1) + (SELECT COUNT(*) FROM hr_lowongan WHERE id_jabatan = ?1) AS n;";
+pub const DIPAKAI_JENIS_TUGAS_SQL: &str = "SELECT COUNT(*) AS n FROM hr_tugas_tambahan WHERE id_jenis = ?1;";
+pub const DIPAKAI_JENIS_PENGAJUAN_SQL: &str = "SELECT COUNT(*) AS n FROM hr_pengajuan WHERE id_jenis = ?1;";
+
+/// Alasan penolakan hapus, `None` = boleh. Cermin `pesanHapusMaster`.
+pub fn pesan_hapus_master(jenis: &str, bawaan: bool, dipakai: i64) -> Option<String> {
+    if bawaan {
+        return Some("Data bawaan tidak bisa dihapus; nonaktifkan saja.".to_owned());
+    }
+    if dipakai <= 0 {
+        return None;
+    }
+    Some(match jenis {
+        "bagian" => format!("Bagian masih dipakai {dipakai} pegawai (termasuk yang nonaktif) atau lowongan. Gabungkan ke bagian lain atau nonaktifkan saja."),
+        "jabatan" => format!("Jabatan masih dipakai {dipakai} pegawai (termasuk yang nonaktif) atau lowongan. Nonaktifkan saja."),
+        "jenis_tugas" => format!("Jenis tugas masih dipakai {dipakai} tugas tambahan, termasuk riwayat. Nonaktifkan saja."),
+        _ => format!("Jenis pengajuan masih dipakai {dipakai} pengajuan, termasuk riwayat. Nonaktifkan saja."),
+    })
+}
+
+/// Tabel, domain sync, dan SQL per jenis master yang boleh dihapus.
+struct MasterHapus {
+    label: &'static str,
+    domain: &'static str,
+    kolom: &'static str,
+    ada_sql: &'static str,
+    dipakai_sql: &'static str,
+    hapus_sql: &'static [&'static str],
+    hapus_cloud_sql: &'static [&'static str],
+}
+
+fn master_hapus(jenis: &str) -> Option<MasterHapus> {
+    Some(match jenis {
+        "bagian" => MasterHapus {
+            label: "Bagian",
+            domain: "hr-section",
+            kolom: "id_bagian",
+            ada_sql: "SELECT 1 FROM hr_bagian WHERE id_bagian = ?1;",
+            dipakai_sql: DIPAKAI_BAGIAN_SQL,
+            hapus_sql: &HAPUS_BAGIAN_SQL,
+            hapus_cloud_sql: &HAPUS_BAGIAN_CLOUD_SQL,
+        },
+        "jabatan" => MasterHapus {
+            label: "Jabatan",
+            domain: "hr-position",
+            kolom: "id_jabatan",
+            ada_sql: "SELECT 1 FROM hr_jabatan WHERE id_jabatan = ?1;",
+            dipakai_sql: DIPAKAI_JABATAN_SQL,
+            hapus_sql: &[HAPUS_JABATAN_SQL],
+            hapus_cloud_sql: &[HAPUS_JABATAN_CLOUD_SQL],
+        },
+        "jenis_tugas" => MasterHapus {
+            label: "Jenis tugas",
+            domain: "hr-duty-type",
+            kolom: "id_jenis",
+            ada_sql: "SELECT 1 FROM hr_tugas_jenis WHERE id_jenis = ?1;",
+            dipakai_sql: DIPAKAI_JENIS_TUGAS_SQL,
+            hapus_sql: &[HAPUS_JENIS_TUGAS_SQL],
+            hapus_cloud_sql: &[HAPUS_JENIS_TUGAS_SQL],
+        },
+        "jenis_pengajuan" => MasterHapus {
+            label: "Jenis pengajuan",
+            domain: "hr-request-type",
+            kolom: "id_jenis",
+            ada_sql: "SELECT 1 FROM hr_jenis_pengajuan WHERE id_jenis = ?1;",
+            dipakai_sql: DIPAKAI_JENIS_PENGAJUAN_SQL,
+            hapus_sql: &[HAPUS_JENIS_PENGAJUAN_SQL],
+            hapus_cloud_sql: &[HAPUS_JENIS_PENGAJUAN_SQL],
+        },
+        _ => return None,
+    })
+}
+
+fn master_bawaan(jenis: &str, id: &str) -> bool {
+    match jenis {
+        "jenis_tugas" => JENIS_TUGAS_BAWAAN.contains(&id),
+        "jenis_pengajuan" => super::hr_pengajuan::jenis_bawaan().iter().any(|j| j.id_jenis == id),
+        _ => false,
+    }
+}
+
 /// Pegawai untuk halaman Kepegawaian dan pemilih atasan.
 pub const ORG_PEGAWAI_SQL: &str = "SELECT m.id_unik, COALESCE(m.kode_karyawan, '') AS kode_karyawan, m.nama, COALESCE(m.unit, '') AS unit, COALESCE(m.divisi, '') AS divisi, COALESCE(m.jabatan_status, '') AS jabatan_status, COALESCE(m.id_bagian, '') AS id_bagian, COALESCE(m.id_jabatan, '') AS id_jabatan, COALESCE(m.id_atasan, '') AS id_atasan, COALESCE(m.status_aktif, 'Aktif') AS status_aktif, COALESCE(m.tanggal_mulai_aktif, '') AS tmt, CASE WHEN g.id_guru IS NOT NULL OR LOWER(TRIM(COALESCE(m.jenis_personil, ''))) = 'guru' THEN 'Guru' ELSE 'Tendik' END AS kelompok, COALESCE(g.status_kepegawaian, '') AS status_kepegawaian FROM master_data m LEFT JOIN guru_data g ON g.id_guru = m.id_unik WHERE LOWER(TRIM(COALESCE(m.jenis_personil, ''))) <> 'siswa' AND NOT EXISTS (SELECT 1 FROM siswa_data sd WHERE sd.id_siswa = m.id_unik) ORDER BY m.nama, m.id_unik\n-- batas: pegawai sekolah (guru dan tendik), dibatasi jumlah personil lembaga\n;";
 pub const ORG_BAGIAN_SQL: &str = "SELECT id_bagian, nama, is_aktif FROM hr_bagian ORDER BY nama, id_bagian\n-- batas: daftar bagian sekolah, tidak tumbuh per hari\n;";
@@ -830,6 +946,32 @@ pub fn cloud_jabatan_statements(payload: &Value, entity_key: &str) -> Vec<(Strin
         (SIMPAN_JABATAN_SQL.to_owned(), vec![json!(id), json!(nama), json!(aktif(payload))]),
         (TULIS_ULANG_JABATAN_SQL.to_owned(), vec![json!(id)]),
     ]
+}
+
+/// `hr-section|hr-position|hr-duty-type|hr-request-type/delete`. Tidak pernah
+/// menolak: penjaga rujukan cloud (termasuk `hr_lowongan`) ada di DELETE-nya.
+pub fn cloud_hapus_master_statements(domain: &str, payload: &Value, entity_key: &str) -> Vec<(String, Vec<Value>)> {
+    let jenis = match domain {
+        "hr-section" => "bagian",
+        "hr-position" => "jabatan",
+        "hr-duty-type" => "jenis_tugas",
+        "hr-request-type" => "jenis_pengajuan",
+        _ => return Vec::new(),
+    };
+    let Some(master) = master_hapus(jenis) else {
+        return Vec::new();
+    };
+    let id = Some(teks(payload, master.kolom))
+        .filter(|id| !id.is_empty())
+        .unwrap_or_else(|| entity_key.trim().to_owned());
+    if id.is_empty() {
+        return Vec::new();
+    }
+    master
+        .hapus_cloud_sql
+        .iter()
+        .map(|sql| ((*sql).to_owned(), vec![json!(id)]))
+        .collect()
 }
 
 /// `hr-contract/create` (kontrak dan pembatalan): insert append-only lalu
@@ -1609,6 +1751,36 @@ pub fn gabung_bagian(state: &DesktopState, id_asal: &str, id_tujuan: &str) -> Re
     Ok(payload)
 }
 
+/// `desktop_hr_master_delete`: hapus bagian, jabatan, jenis tugas, atau jenis
+/// pengajuan yang bukan bawaan dan tidak pernah dipakai. Cermin
+/// `hapusMasterOrganisasi`.
+pub fn hapus_master(state: &DesktopState, jenis: &str, id: &str) -> Result<Value, CommandError> {
+    let master = master_hapus(jenis).ok_or_else(|| invalid("Jenis data tidak dikenal."))?;
+    let id = id.trim();
+    if id.is_empty() {
+        return Err(invalid(format!("{} tidak ditemukan.", master.label)));
+    }
+    let client_id = sync::ensure_client_id(state)?;
+    let mut connection = storage::database(&state.data_dir)?;
+    let transaction = connection.transaction().map_err(db_error)?;
+    if !ada(&transaction, master.ada_sql, params![id])? {
+        return Err(invalid(format!("{} tidak ditemukan.", master.label)));
+    }
+    let dipakai: i64 = transaction
+        .query_row(master.dipakai_sql, params![id], |row| row.get(0))
+        .map_err(db_error)?;
+    if let Some(pesan) = pesan_hapus_master(jenis, master_bawaan(jenis, id), dipakai) {
+        return Err(invalid(pesan));
+    }
+    for sql in master.hapus_sql {
+        transaction.execute(sql, params![id]).map_err(db_error)?;
+    }
+    let payload = json!({ master.kolom: id });
+    sync::enqueue(&transaction, &client_id, master.domain, "delete", id, &payload, None)?;
+    transaction.commit().map_err(db_error)?;
+    Ok(json!({ "sukses": true, "jenis": jenis, "id": id }))
+}
+
 /// `desktop_hr_position_save`.
 pub fn simpan_jabatan(state: &DesktopState, draft: Value) -> Result<Value, CommandError> {
     let draft: MasterDraft =
@@ -1763,6 +1935,76 @@ mod tests {
 
     fn vektor() -> Value {
         serde_json::from_str(VEKTOR).expect("vektor hris")
+    }
+
+    #[test]
+    fn hris_hapus_master_vektor_dan_penjaga() {
+        for k in vektor()["hapus_master"].as_array().expect("hapus_master") {
+            let harap = k["pesan"].as_str().map(str::to_owned);
+            let jenis = k["jenis"].as_str().unwrap();
+            assert_eq!(
+                pesan_hapus_master(jenis, k["bawaan"].as_bool().unwrap(), k["dipakai"].as_i64().unwrap()),
+                harap,
+                "{k}"
+            );
+        }
+        assert!(JENIS_MASTER_HAPUS.iter().all(|j| master_hapus(j).is_some()));
+        for id in JENIS_TUGAS_BAWAAN {
+            assert!(HAPUS_JENIS_TUGAS_SQL.contains(&format!("'{id}'")), "{id}");
+        }
+        for j in super::super::hr_pengajuan::jenis_bawaan() {
+            assert!(HAPUS_JENIS_PENGAJUAN_SQL.contains(&format!("'{}'", j.id_jenis)), "{}", j.id_jenis);
+        }
+
+        let dir = tempfile::tempdir().expect("tempdir");
+        storage::initialize(dir.path()).expect("schema");
+        let c = storage::database(dir.path()).expect("db");
+        c.execute_batch(
+            "INSERT INTO hr_bagian (id_bagian, nama) VALUES ('bag-a', 'Kosong'), ('bag-b', 'Terisi');
+             INSERT INTO hr_bagian_nama (id_nama, id_bagian, nama) VALUES ('bag-a:1', 'bag-a', 'Kosong Lama');
+             INSERT INTO hr_jabatan (id_jabatan, nama) VALUES ('jab-a', 'Staf'), ('jab-b', 'Lepas');
+             INSERT INTO master_data (id_unik, nama, divisi, id_shift, status_aktif, id_bagian, id_jabatan)
+               VALUES ('K1', 'Pegawai', 'Terisi', 1, 'Nonaktif', 'bag-b', 'jab-a');
+             INSERT OR IGNORE INTO hr_tugas_jenis (id_jenis, nama, ekuivalen_jp) VALUES ('tgs-x', 'Koordinator', 2), ('tgs-kepsek', 'Kepala Sekolah', 24);",
+        )
+        .expect("fixture");
+        drop(c);
+        let st = DesktopState {
+            server_origin: std::sync::RwLock::new("http://localhost:3000".to_string()),
+            offline_max_age_hours: 24,
+            data_dir: dir.path().to_path_buf(),
+            http: reqwest::Client::new(),
+            turso_config: std::sync::RwLock::new(None),
+            session: std::sync::Mutex::new(None),
+            vault_lock: std::sync::Mutex::new(()),
+        };
+
+        hapus_master(&st, "bagian", "bag-a").expect("bagian kosong terhapus");
+        hapus_master(&st, "jabatan", "jab-b").expect("jabatan kosong terhapus");
+        hapus_master(&st, "jenis_tugas", "tgs-x").expect("jenis tugas buatan sekolah terhapus");
+        assert!(hapus_master(&st, "bagian", "bag-b").is_err(), "dipakai pegawai nonaktif");
+        assert!(hapus_master(&st, "jabatan", "jab-a").is_err(), "dipakai pegawai nonaktif");
+        assert!(hapus_master(&st, "jenis_tugas", "tgs-kepsek").is_err(), "bawaan");
+        assert!(hapus_master(&st, "bagian", "bag-a").is_err(), "sudah tidak ada");
+        assert!(hapus_master(&st, "lain", "x").is_err());
+
+        let c = storage::database(dir.path()).expect("db");
+        let hitung = |sql: &str| c.query_row(sql, [], |r| r.get::<_, i64>(0)).expect(sql);
+        assert_eq!(hitung("SELECT COUNT(*) FROM hr_bagian WHERE id_bagian = 'bag-a';"), 0);
+        assert_eq!(hitung("SELECT COUNT(*) FROM hr_bagian_nama WHERE id_bagian = 'bag-a';"), 0, "nama lama ikut terhapus");
+        assert_eq!(hitung("SELECT COUNT(*) FROM hr_bagian WHERE id_bagian = 'bag-b';"), 1);
+        assert_eq!(
+            hitung("SELECT COUNT(*) FROM desktop_sync_outbox WHERE operation = 'delete' AND ((domain = 'hr-section' AND entity_key = 'bag-a') OR (domain = 'hr-position' AND entity_key = 'jab-b') OR (domain = 'hr-duty-type' AND entity_key = 'tgs-x'));"),
+            3
+        );
+        for rute in ["hr-section", "hr-position", "hr-duty-type", "hr-request-type"] {
+            assert!(sync::CANONICAL_SYNC_ROUTES.contains(&(rute, "delete")), "{rute}");
+        }
+
+        let cloud = cloud_hapus_master_statements("hr-position", &json!({ "id_jabatan": "jab-z" }), "");
+        assert_eq!(cloud, vec![(HAPUS_JABATAN_CLOUD_SQL.to_owned(), vec![json!("jab-z")])]);
+        assert_eq!(cloud_hapus_master_statements("hr-section", &json!({}), "bag-z").len(), 2);
+        assert!(cloud_hapus_master_statements("hr-duty", &json!({}), "x").is_empty());
     }
 
     fn peta(nilai: &Value) -> HashMap<String, String> {

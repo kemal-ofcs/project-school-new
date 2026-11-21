@@ -29,6 +29,7 @@ import {
   type JenisPeriode,
   kalimatRincian,
   nilaiAkhir,
+  PERIODE_RENTANG,
   PESAN_OTOMATIS_BERUBAH,
   type RincianKinerja,
   type RiwayatKinerja,
@@ -124,6 +125,10 @@ function DaftarTanda({ tanda }: { tanda: TandaKinerja[] }) {
 const nilaiTampil = (nilai: number | null, predikat: string | null) =>
   nilai === null ? "-" : `${formatNilai(nilai)} ${predikat ?? ""}`.trim();
 
+/** Kunci periode `Rentang Tanggal`; kosong sampai keduanya terisi dan urut. */
+const kunciRentang = (r: { mulai: string; selesai: string }) =>
+  r.mulai && r.selesai && r.mulai <= r.selesai ? `${r.mulai}_${r.selesai}` : "";
+
 /** Bagian Penilaian di tab Kinerja `/kepegawaian`. */
 export function DaftarPenilaianKinerja({
   template,
@@ -141,6 +146,8 @@ export function DaftarPenilaianKinerja({
   const [tahun, setTahun] = useState<TahunPilihan[]>([]);
   const [jenis, setJenis] = useState<JenisPeriode>("Semester");
   const [kunci, setKunci] = useState("");
+  // Hanya untuk `Rentang Tanggal`; kunci = `mulai_selesai` begitu keduanya sah.
+  const [rentang, setRentang] = useState({ mulai: "", selesai: "" });
   const [data, setData] = useState<DaftarKinerja | null>(null);
   const [saring, setSaring] = useState<Saringan>("Semua");
   const [perluSaya, setPerluSaya] = useState(false);
@@ -182,9 +189,19 @@ export function DaftarPenilaianKinerja({
 
   const gantiJenis = (baru: JenisPeriode) => {
     setJenis(baru);
+    if (baru === PERIODE_RENTANG) {
+      setKunci(kunciRentang(rentang));
+      return;
+    }
     const aktif = tahun.find((t) => t.aktif) ?? tahun[0];
     if (!aktif) return;
     setKunci(baru === "Semester" ? aktif.id_tahun_ajaran : aktif.nama_tahun);
+  };
+
+  const ubahRentang = (sebagian: Partial<typeof rentang>) => {
+    const baru = { ...rentang, ...sebagian };
+    setRentang(baru);
+    setKunci(kunciRentang(baru));
   };
 
   const muat = useCallback(async () => {
@@ -272,23 +289,54 @@ export function DaftarPenilaianKinerja({
             ))}
           </select>
         </div>
-        <div>
-          <label htmlFor="kinerja-kunci-periode" className={LABEL}>
-            {jenis === "Semester" ? "Semester" : "Tahun ajaran"}
-          </label>
-          <select
-            id="kinerja-kunci-periode"
-            value={kunci}
-            onChange={(e) => setKunci(e.target.value)}
-            className={INPUT}
-          >
-            {pilihan.map((p) => (
-              <option key={p.nilai} value={p.nilai}>
-                {p.label}
-              </option>
-            ))}
-          </select>
-        </div>
+        {jenis === PERIODE_RENTANG ? (
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <label htmlFor="kinerja-rentang-mulai" className={LABEL}>
+                Dari tanggal
+              </label>
+              <input
+                id="kinerja-rentang-mulai"
+                type="date"
+                value={rentang.mulai}
+                max={rentang.selesai || undefined}
+                onChange={(e) => ubahRentang({ mulai: e.target.value })}
+                className={INPUT}
+              />
+            </div>
+            <div>
+              <label htmlFor="kinerja-rentang-selesai" className={LABEL}>
+                Sampai tanggal
+              </label>
+              <input
+                id="kinerja-rentang-selesai"
+                type="date"
+                value={rentang.selesai}
+                min={rentang.mulai || undefined}
+                onChange={(e) => ubahRentang({ selesai: e.target.value })}
+                className={INPUT}
+              />
+            </div>
+          </div>
+        ) : (
+          <div>
+            <label htmlFor="kinerja-kunci-periode" className={LABEL}>
+              {jenis === "Semester" ? "Semester" : "Tahun ajaran"}
+            </label>
+            <select
+              id="kinerja-kunci-periode"
+              value={kunci}
+              onChange={(e) => setKunci(e.target.value)}
+              className={INPUT}
+            >
+              {pilihan.map((p) => (
+                <option key={p.nilai} value={p.nilai}>
+                  {p.label}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
         <div>
           <label htmlFor="kinerja-saring" className={LABEL}>
             Status
@@ -315,9 +363,13 @@ export function DaftarPenilaianKinerja({
         />
         Hanya yang perlu saya nilai
       </label>
-      {tahun.length === 0 ? (
+      {jenis !== PERIODE_RENTANG && tahun.length === 0 ? (
         <p className="text-sm text-slate-400">
           Belum ada tahun ajaran. Tambahkan dulu di menu Akademik.
+        </p>
+      ) : jenis === PERIODE_RENTANG && !kunci ? (
+        <p className="text-sm text-slate-400">
+          Isi tanggal mulai dan selesai periode (paling panjang 366 hari).
         </p>
       ) : !data ? (
         <p className="text-sm text-slate-400">Memuat penilaian…</p>

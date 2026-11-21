@@ -248,6 +248,7 @@ pub fn run() {
             desktop::commands::desktop_hr_section_save,
             desktop::commands::desktop_hr_section_merge,
             desktop::commands::desktop_hr_position_save,
+            desktop::commands::desktop_hr_master_delete,
             desktop::commands::desktop_hr_settings_save,
             desktop::commands::desktop_hr_duty_types_save,
             desktop::commands::desktop_hr_duties,

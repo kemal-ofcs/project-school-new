@@ -236,6 +236,7 @@
     "allow-desktop-hr-section-save",
     "allow-desktop-hr-section-merge",
     "allow-desktop-hr-position-save",
+    "allow-desktop-hr-master-delete",
     "allow-desktop-hr-settings-save",
     "allow-desktop-hr-duty-types-save",
     "allow-desktop-hr-duties",

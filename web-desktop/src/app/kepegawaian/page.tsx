@@ -45,6 +45,7 @@ import { useAuth } from "@/lib/context/AuthContext";
 import {
   type BagianOrg,
   gabungBagian,
+  hapusMasterOrganisasi,
   type JabatanOrg,
   type MasterDraft,
   muatOrgKepegawaian,
@@ -53,6 +54,7 @@ import {
   simpanBagian,
   simpanJabatan,
 } from "@/lib/gateways/hris";
+import { useConfirmDialog } from "@/lib/hooks/useConfirmDialog";
 import { IZIN_LIHAT_REIMBURSE } from "@/lib/validations/hr-reimburse";
 
 type Tab =
@@ -641,6 +643,7 @@ function TabOrganisasi({
   const [sunting, setSunting] = useState<Sunting | null>(null);
   const isSubmittingRef = useRef(false);
   const [menyimpan, setMenyimpan] = useState(false);
+  const { konfirmasi, dialogKonfirmasi } = useConfirmDialog();
 
   const jalankan = async (aksi: () => Promise<unknown>, berhasil: string) => {
     if (isSubmittingRef.current) return;
@@ -670,8 +673,28 @@ function TabOrganisasi({
         : `"${b.nama}" diaktifkan.`,
     );
 
+  const hapus = async (
+    jenis: "bagian" | "jabatan",
+    id: string,
+    nama: string,
+  ) => {
+    const setuju = await konfirmasi({
+      title: `Hapus "${nama}"?`,
+      description:
+        "Hanya bisa bila belum pernah dipakai pegawai mana pun, termasuk yang nonaktif. Tidak bisa dibatalkan.",
+      confirmLabel: "Hapus",
+      tone: "danger",
+    });
+    if (!setuju) return;
+    await jalankan(
+      () => hapusMasterOrganisasi(jenis, id),
+      `"${nama}" dihapus.`,
+    );
+  };
+
   return (
     <div className="space-y-8">
+      {dialogKonfirmasi}
       {!bolehUbah ? (
         <p className="text-sm text-slate-400">
           Mengubah organisasi butuh izin Kelola Organisasi Kepegawaian.
@@ -742,6 +765,14 @@ function TabOrganisasi({
                     onClick={() => ubahAktif(b, simpanBagian, b.id_bagian)}
                   >
                     {b.is_aktif === 1 ? "Nonaktifkan" : "Aktifkan"}
+                  </button>
+                  <button
+                    type="button"
+                    className={TOMBOL}
+                    disabled={menyimpan}
+                    onClick={() => void hapus("bagian", b.id_bagian, b.nama)}
+                  >
+                    Hapus
                   </button>
                 </div>
               ) : null}
@@ -846,6 +877,14 @@ function TabOrganisasi({
                   >
                     {j.is_aktif === 1 ? "Nonaktifkan" : "Aktifkan"}
                   </button>
+                  <button
+                    type="button"
+                    className={TOMBOL}
+                    disabled={menyimpan}
+                    onClick={() => void hapus("jabatan", j.id_jabatan, j.nama)}
+                  >
+                    Hapus
+                  </button>
                 </div>
               ) : null}
             </li>
@@ -873,6 +912,7 @@ function TabOrganisasi({
       {aturanCuti ? (
         <AturanCutiOrganisasi
           bolehUbah={bolehUbah}
+          jabatan={org.jabatan}
           onBerhasil={onBerhasil}
           onGalat={onGalat}
         />

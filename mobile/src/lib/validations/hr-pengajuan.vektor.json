@@ -2222,6 +2222,193 @@
       },
       "galat": "Bulan awal periode tendik harus 1 sampai 12.",
       "hasil": null
+    },
+    {
+      "masuk": {
+        "guru": {
+          "periode": "tahunan",
+          "hak": 12,
+          "bulan_awal": 7,
+          "syarat_bulan": 12,
+          "sisa": "dibawa",
+          "bawa_maks": 6,
+          "bawa_bulan": 3
+        },
+        "tendik": {
+          "periode": "ulang_tahun_kerja",
+          "hak": 10,
+          "bulan_awal": 1,
+          "syarat_bulan": 0,
+          "sisa": "hangus",
+          "bawa_maks": 0,
+          "bawa_bulan": 12
+        },
+        "jabatan": {
+          "jab-b": null,
+          "jab-a": {
+            "periode": "ulang_tahun_kerja",
+            "hak": 15,
+            "bulan_awal": 1,
+            "syarat_bulan": 0,
+            "sisa": "dibawa",
+            "bawa_maks": 3,
+            "bawa_bulan": 6
+          }
+        }
+      },
+      "galat": null,
+      "hasil": [
+        ["hr_cuti_periode:guru", "tahunan"],
+        ["hr_cuti_hak:guru", "12"],
+        ["hr_cuti_bulan_awal:guru", "7"],
+        ["hr_cuti_syarat_bulan:guru", "12"],
+        ["hr_cuti_sisa:guru", "dibawa"],
+        ["hr_cuti_bawa_maks:guru", "6"],
+        ["hr_cuti_bawa_bulan:guru", "3"],
+        ["hr_cuti_periode:tendik", "ulang_tahun_kerja"],
+        ["hr_cuti_hak:tendik", "10"],
+        ["hr_cuti_bulan_awal:tendik", "1"],
+        ["hr_cuti_syarat_bulan:tendik", "0"],
+        ["hr_cuti_sisa:tendik", "hangus"],
+        ["hr_cuti_bawa_maks:tendik", "0"],
+        ["hr_cuti_bawa_bulan:tendik", "12"],
+        ["hr_cuti_periode:jab:jab-a", "ulang_tahun_kerja"],
+        ["hr_cuti_hak:jab:jab-a", "15"],
+        ["hr_cuti_bulan_awal:jab:jab-a", "1"],
+        ["hr_cuti_syarat_bulan:jab:jab-a", "0"],
+        ["hr_cuti_sisa:jab:jab-a", "dibawa"],
+        ["hr_cuti_bawa_maks:jab:jab-a", "3"],
+        ["hr_cuti_bawa_bulan:jab:jab-a", "6"],
+        ["hr_cuti_periode:jab:jab-b", ""],
+        ["hr_cuti_hak:jab:jab-b", ""],
+        ["hr_cuti_bulan_awal:jab:jab-b", ""],
+        ["hr_cuti_syarat_bulan:jab:jab-b", ""],
+        ["hr_cuti_sisa:jab:jab-b", ""],
+        ["hr_cuti_bawa_maks:jab:jab-b", ""],
+        ["hr_cuti_bawa_bulan:jab:jab-b", ""]
+      ]
+    },
+    {
+      "masuk": {
+        "guru": {
+          "periode": "tahunan",
+          "hak": 12,
+          "bulan_awal": 7,
+          "syarat_bulan": 12,
+          "sisa": "dibawa",
+          "bawa_maks": 6,
+          "bawa_bulan": 3
+        },
+        "tendik": {
+          "periode": "ulang_tahun_kerja",
+          "hak": 10,
+          "bulan_awal": 1,
+          "syarat_bulan": 0,
+          "sisa": "hangus",
+          "bawa_maks": 0,
+          "bawa_bulan": 12
+        },
+        "jabatan": {
+          "jab a": null
+        }
+      },
+      "galat": "Aturan cuti jabatan tidak valid.",
+      "hasil": null
+    },
+    {
+      "masuk": {
+        "guru": {
+          "periode": "tahunan",
+          "hak": 12,
+          "bulan_awal": 7,
+          "syarat_bulan": 12,
+          "sisa": "dibawa",
+          "bawa_maks": 6,
+          "bawa_bulan": 3
+        },
+        "tendik": {
+          "periode": "ulang_tahun_kerja",
+          "hak": 10,
+          "bulan_awal": 1,
+          "syarat_bulan": 0,
+          "sisa": "hangus",
+          "bawa_maks": 0,
+          "bawa_bulan": 12
+        },
+        "jabatan": []
+      },
+      "galat": "Aturan cuti jabatan tidak valid.",
+      "hasil": null
+    },
+    {
+      "masuk": {
+        "guru": {
+          "periode": "tahunan",
+          "hak": 12,
+          "bulan_awal": 7,
+          "syarat_bulan": 12,
+          "sisa": "dibawa",
+          "bawa_maks": 6,
+          "bawa_bulan": 3
+        },
+        "tendik": {
+          "periode": "ulang_tahun_kerja",
+          "hak": 10,
+          "bulan_awal": 1,
+          "syarat_bulan": 0,
+          "sisa": "hangus",
+          "bawa_maks": 0,
+          "bawa_bulan": 12
+        },
+        "jabatan": {
+          "jab-a": {
+            "periode": "ulang_tahun_kerja",
+            "hak": 99,
+            "bulan_awal": 1,
+            "syarat_bulan": 0,
+            "sisa": "dibawa",
+            "bawa_maks": 3,
+            "bawa_bulan": 6
+          }
+        }
+      },
+      "galat": "Hak cuti jabatan harus 0 sampai 60.",
+      "hasil": null
+    },
+    {
+      "masuk": {
+        "guru": {
+          "periode": "tahunan",
+          "hak": 12,
+          "bulan_awal": 7,
+          "syarat_bulan": 12,
+          "sisa": "dibawa",
+          "bawa_maks": 6,
+          "bawa_bulan": 3
+        },
+        "tendik": {
+          "periode": "ulang_tahun_kerja",
+          "hak": 10,
+          "bulan_awal": 1,
+          "syarat_bulan": 0,
+          "sisa": "hangus",
+          "bawa_maks": 0,
+          "bawa_bulan": 12
+        },
+        "jabatan": {
+          "jab-a": {
+            "periode": "ulang_tahun_kerja",
+            "hak": 15,
+            "bulan_awal": 1,
+            "syarat_bulan": 0,
+            "sisa": "x",
+            "bawa_maks": 3,
+            "bawa_bulan": 6
+          }
+        }
+      },
+      "galat": "Sisa cuti jabatan harus hangus atau dibawa.",
+      "hasil": null
     }
   ],
   "jatah_cuti": [
@@ -3226,5 +3413,136 @@
     ],
     [["G1", "", "G5", true], null],
     [["G1", "G2", "", true], null]
+  ],
+  "aturan_cuti_pegawai": [
+    {
+      "peta": {},
+      "kelompok": "guru",
+      "id_jabatan": "",
+      "hasil": {
+        "periode": "tahunan",
+        "hak": 12,
+        "bulan_awal": 7,
+        "syarat_bulan": 12,
+        "sisa": "hangus",
+        "bawa_maks": 6,
+        "bawa_bulan": 3
+      }
+    },
+    {
+      "peta": {
+        "hr_cuti_hak:guru": "14",
+        "hr_cuti_hak:jab:jab-a": "20",
+        "hr_cuti_sisa:jab:jab-a": "dibawa",
+        "hr_cuti_bulan_awal:jab:jab-a": "x",
+        "hr_cuti_bawa_maks:jab:jab-a": "99"
+      },
+      "kelompok": "guru",
+      "id_jabatan": "",
+      "hasil": {
+        "periode": "tahunan",
+        "hak": 14,
+        "bulan_awal": 7,
+        "syarat_bulan": 12,
+        "sisa": "hangus",
+        "bawa_maks": 6,
+        "bawa_bulan": 3
+      }
+    },
+    {
+      "peta": {
+        "hr_cuti_hak:guru": "14",
+        "hr_cuti_hak:jab:jab-a": "20",
+        "hr_cuti_sisa:jab:jab-a": "dibawa",
+        "hr_cuti_bulan_awal:jab:jab-a": "x",
+        "hr_cuti_bawa_maks:jab:jab-a": "99"
+      },
+      "kelompok": "guru",
+      "id_jabatan": " jab-a ",
+      "hasil": {
+        "periode": "tahunan",
+        "hak": 20,
+        "bulan_awal": 7,
+        "syarat_bulan": 12,
+        "sisa": "dibawa",
+        "bawa_maks": 6,
+        "bawa_bulan": 3
+      }
+    },
+    {
+      "peta": {
+        "hr_cuti_hak:guru": "14",
+        "hr_cuti_hak:jab:jab-a": "20",
+        "hr_cuti_sisa:jab:jab-a": "dibawa",
+        "hr_cuti_bulan_awal:jab:jab-a": "x",
+        "hr_cuti_bawa_maks:jab:jab-a": "99"
+      },
+      "kelompok": "tendik",
+      "id_jabatan": "jab-a",
+      "hasil": {
+        "periode": "tahunan",
+        "hak": 20,
+        "bulan_awal": 1,
+        "syarat_bulan": 12,
+        "sisa": "dibawa",
+        "bawa_maks": 6,
+        "bawa_bulan": 3
+      }
+    },
+    {
+      "peta": {
+        "hr_cuti_hak:guru": "14",
+        "hr_cuti_hak:jab:jab-a": "20",
+        "hr_cuti_sisa:jab:jab-a": "dibawa",
+        "hr_cuti_bulan_awal:jab:jab-a": "x",
+        "hr_cuti_bawa_maks:jab:jab-a": "99"
+      },
+      "kelompok": "guru",
+      "id_jabatan": "jab-b",
+      "hasil": {
+        "periode": "tahunan",
+        "hak": 14,
+        "bulan_awal": 7,
+        "syarat_bulan": 12,
+        "sisa": "hangus",
+        "bawa_maks": 6,
+        "bawa_bulan": 3
+      }
+    }
+  ],
+  "aturan_jabatan": [
+    {
+      "peta": {},
+      "hasil": {}
+    },
+    {
+      "peta": {
+        "hr_cuti_hak:jab:jab-b": "5",
+        "hr_cuti_periode:jab:jab-a": "ulang_tahun_kerja",
+        "hr_cuti_hak:jab:jab-c": "  ",
+        "hr_cuti_lain:jab:jab-d": "1",
+        "hr_cuti_hak:guru": "9"
+      },
+      "hasil": {
+        "jab-a": {
+          "periode": "ulang_tahun_kerja",
+          "hak": 12,
+          "bulan_awal": 1,
+          "syarat_bulan": 12,
+          "sisa": "hangus",
+          "bawa_maks": 6,
+          "bawa_bulan": 3
+        },
+        "jab-b": {
+          "periode": "tahunan",
+          "hak": 5,
+          "bulan_awal": 1,
+          "syarat_bulan": 12,
+          "sisa": "hangus",
+          "bawa_maks": 6,
+          "bawa_bulan": 3
+        }
+      }
+    }
   ]
 }

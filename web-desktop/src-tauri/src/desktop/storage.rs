@@ -320,7 +320,7 @@ fn ensure_journal_source_values(connection: &Connection) -> Result<(), String> {
     let Some(existing) = existing else {
         return Ok(());
     };
-    if existing.contains("'Cicilan'") {
+    if existing.contains("'Reimburse'") {
         return Ok(());
     }
 
@@ -341,7 +341,7 @@ fn ensure_journal_source_values(connection: &Connection) -> Result<(), String> {
           nomor_urut INTEGER NOT NULL CHECK (nomor_urut > 0),
           nomor TEXT NOT NULL,
           keterangan TEXT NOT NULL,
-          sumber TEXT NOT NULL CHECK (sumber IN ('Manual', 'Kasbon', 'Payroll', 'Pembayaran', 'Tagihan', 'Inventaris', 'Cicilan', 'Pembatalan')),
+          sumber TEXT NOT NULL CHECK (sumber IN ('Manual', 'Kasbon', 'Payroll', 'Pembayaran', 'Tagihan', 'Inventaris', 'Cicilan', 'Reimburse', 'Pembatalan')),
           id_sumber TEXT,
           id_jurnal_batal TEXT,
           dibuat_oleh TEXT NOT NULL,
@@ -1084,7 +1084,7 @@ pub fn initialize(path: &Path) -> Result<(), String> {
         nomor_urut INTEGER NOT NULL CHECK (nomor_urut > 0),
         nomor TEXT NOT NULL,
         keterangan TEXT NOT NULL,
-        sumber TEXT NOT NULL CHECK (sumber IN ('Manual', 'Kasbon', 'Payroll', 'Pembayaran', 'Tagihan', 'Inventaris', 'Cicilan', 'Pembatalan')),
+        sumber TEXT NOT NULL CHECK (sumber IN ('Manual', 'Kasbon', 'Payroll', 'Pembayaran', 'Tagihan', 'Inventaris', 'Cicilan', 'Reimburse', 'Pembatalan')),
         id_sumber TEXT,
         id_jurnal_batal TEXT,
         dibuat_oleh TEXT NOT NULL,

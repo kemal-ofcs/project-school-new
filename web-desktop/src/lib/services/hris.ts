@@ -8,6 +8,7 @@ import type { PermissionKey } from "@/lib/rbac/catalog";
 import { ApiRequestError } from "@/lib/server/http/api-response";
 import {
   type BarisJenis,
+  JENIS_BAWAAN,
   JENIS_SQL,
   samaOrang,
 } from "@/lib/validations/hr-pengajuan";
@@ -37,19 +38,29 @@ import {
   type DaftarKontrak,
   type DaftarLampiran,
   type DaftarTugas,
+  DIPAKAI_BAGIAN_CLOUD_SQL,
+  DIPAKAI_JABATAN_CLOUD_SQL,
+  DIPAKAI_JENIS_PENGAJUAN_SQL,
+  DIPAKAI_JENIS_TUGAS_SQL,
   DOKUMEN_SQL,
   type DokumenBaris,
   type dokumenDraftSchema,
   GABUNG_BAGIAN_SQL,
+  HAPUS_BAGIAN_CLOUD_SQL,
   HAPUS_DOKUMEN_SQL,
+  HAPUS_JABATAN_CLOUD_SQL,
+  HAPUS_JENIS_PENGAJUAN_SQL,
+  HAPUS_JENIS_TUGAS_SQL,
   HAPUS_LAMPIRAN_SQL,
   HARI_INI_SQL,
   ID_WALI_KELAS,
   type IsiBerkasDokumen,
   idNamaBagian,
   JENIS_DOKUMEN_SQL,
+  JENIS_TUGAS_BAWAAN,
   JENIS_TUGAS_SQL,
   type JenisDokumen,
+  type JenisMasterHapus,
   type JenisTugas,
   type JenisTugasDraft,
   type jenisDokumenDraftSchema,
@@ -96,6 +107,7 @@ import {
   PTK_SQL,
   type pendidikanDraftSchema,
   periksaAtasan,
+  pesanHapusMaster,
   type pribadiDraftSchema,
   SERTIFIKASI_SQL,
   type SertifikasiBaris,
@@ -797,6 +809,75 @@ export async function simpanJabatan(client: Client, draft: MasterDraft) {
     await tx.execute({ sql: TULIS_ULANG_JABATAN_SQL, args: [id] });
     await tx.commit();
     return { id_jabatan: id, nama: valid.nama, is_aktif: isAktif };
+  } finally {
+    tx.close();
+  }
+}
+
+const MASTER_HAPUS: Record<
+  JenisMasterHapus,
+  {
+    label: string;
+    ada: string;
+    dipakai: string;
+    hapus: readonly string[];
+    bawaan: readonly string[];
+  }
+> = {
+  bagian: {
+    label: "Bagian",
+    ada: "SELECT 1 FROM hr_bagian WHERE id_bagian = ?1;",
+    dipakai: DIPAKAI_BAGIAN_CLOUD_SQL,
+    hapus: HAPUS_BAGIAN_CLOUD_SQL,
+    bawaan: [],
+  },
+  jabatan: {
+    label: "Jabatan",
+    ada: "SELECT 1 FROM hr_jabatan WHERE id_jabatan = ?1;",
+    dipakai: DIPAKAI_JABATAN_CLOUD_SQL,
+    hapus: [HAPUS_JABATAN_CLOUD_SQL],
+    bawaan: [],
+  },
+  jenis_tugas: {
+    label: "Jenis tugas",
+    ada: "SELECT 1 FROM hr_tugas_jenis WHERE id_jenis = ?1;",
+    dipakai: DIPAKAI_JENIS_TUGAS_SQL,
+    hapus: [HAPUS_JENIS_TUGAS_SQL],
+    bawaan: JENIS_TUGAS_BAWAAN,
+  },
+  jenis_pengajuan: {
+    label: "Jenis pengajuan",
+    ada: "SELECT 1 FROM hr_jenis_pengajuan WHERE id_jenis = ?1;",
+    dipakai: DIPAKAI_JENIS_PENGAJUAN_SQL,
+    hapus: [HAPUS_JENIS_PENGAJUAN_SQL],
+    bawaan: JENIS_BAWAAN.map((j) => j.id_jenis),
+  },
+};
+
+/**
+ * Hapus master organisasi yang bukan bawaan dan tidak pernah dipakai. Cermin
+ * `hapus_master`; Web menulis cloud langsung dengan SQL `_CLOUD_` (penjaga
+ * `hr_lowongan`), tombstone cloud menyebarkannya ke perangkat.
+ */
+export async function hapusMasterOrganisasi(
+  client: Client,
+  jenis: JenisMasterHapus,
+  idMentah: string,
+) {
+  const m = MASTER_HAPUS[jenis];
+  const id = idMentah.trim();
+  const tx = await client.transaction("write");
+  try {
+    if (!id || !(await ada(tx, m.ada, [id])))
+      galat(`${m.label} tidak ditemukan.`);
+    const dipakai = Number(
+      (await tx.execute({ sql: m.dipakai, args: [id] })).rows[0]?.n ?? 0,
+    );
+    const pesan = pesanHapusMaster(jenis, m.bawaan.includes(id), dipakai);
+    if (pesan) galat(pesan);
+    for (const sql of m.hapus) await tx.execute({ sql, args: [id] });
+    await tx.commit();
+    return { sukses: true, jenis, id };
   } finally {
     tx.close();
   }

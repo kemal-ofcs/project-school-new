@@ -679,7 +679,11 @@ export const KEPUTUSAN_TERBUKA_SQL = `${KEPUTUSAN_KOLOM} ${TERBUKA_SQL};`;
 
 // Penilaian: aturan murni (5b, §23.2.2–23.2.6)
 
-export const JENIS_PERIODE = ["Semester", "Tahun Ajaran"] as const;
+export const JENIS_PERIODE = [
+  "Semester",
+  "Tahun Ajaran",
+  "Rentang Tanggal",
+] as const;
 export type JenisPeriode = (typeof JENIS_PERIODE)[number];
 export const AKSI_SIMPAN = ["Buat", "Simpan", "Muat ulang", "Koreksi"] as const;
 export type AksiSimpan = (typeof AKSI_SIMPAN)[number];
@@ -738,6 +742,44 @@ export interface Periode {
   selesai: string;
 }
 
+/** Jenis periode bebas (2026-11-21): kunci `YYYY-MM-DD_YYYY-MM-DD`. */
+export const PERIODE_RENTANG = "Rentang Tanggal";
+export const MAKS_HARI_PERIODE = 366;
+
+/** Cermin `periode_rentang`: rentang sendiri, paling panjang 366 hari. */
+export function periodeRentang(kunciMasuk: string): Hasil<Periode> {
+  const kunci = kunciMasuk.trim();
+  const m = /^(\d{4}-\d{2}-\d{2})_(\d{4}-\d{2}-\d{2})$/.exec(kunci);
+  const mulai = m?.[1] ?? "";
+  const selesai = m?.[2] ?? "";
+  if (!tanggalValid(mulai) || !tanggalValid(selesai)) {
+    return { ok: false, galat: "Rentang tanggal periode tidak valid." };
+  }
+  const hari = selisihHari(mulai, selesai);
+  if (hari < 0) {
+    return {
+      ok: false,
+      galat: "Tanggal selesai periode sebelum tanggal mulai.",
+    };
+  }
+  if (hari + 1 > MAKS_HARI_PERIODE) {
+    return {
+      ok: false,
+      galat: `Periode paling panjang ${MAKS_HARI_PERIODE} hari.`,
+    };
+  }
+  return {
+    ok: true,
+    nilai: {
+      jenis: PERIODE_RENTANG,
+      kunci,
+      nama: `${mulai} s.d. ${selesai}`,
+      mulai,
+      selesai,
+    },
+  };
+}
+
 /** Cermin `periode_dari_tahun_ajaran` (Q-94). */
 export function periodeDariTahunAjaran(
   jenis: string,
@@ -747,9 +789,11 @@ export function periodeDariTahunAjaran(
   if (!(JENIS_PERIODE as readonly string[]).includes(jenis)) {
     return {
       ok: false,
-      galat: "Jenis periode harus Semester atau Tahun Ajaran.",
+      galat:
+        "Jenis periode harus Semester, Tahun Ajaran, atau Rentang Tanggal.",
     };
   }
+  if (jenis === PERIODE_RENTANG) return periodeRentang(kunciMasuk);
   const kunci = kunciMasuk.trim();
   const semester = jenis === "Semester";
   const dipilih = baris.filter((t) =>
@@ -897,7 +941,8 @@ export function validasiPenilaian(draft: PenilaianDraft): Hasil<PenilaianSah> {
     if (!(JENIS_PERIODE as readonly string[]).includes(periodeJenis)) {
       return {
         ok: false,
-        galat: "Jenis periode harus Semester atau Tahun Ajaran.",
+        galat:
+          "Jenis periode harus Semester, Tahun Ajaran, atau Rentang Tanggal.",
       };
     }
     periodeKunci = kosongJadiNull(teksDraft(draft.periode_kunci));

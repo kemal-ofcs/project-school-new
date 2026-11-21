@@ -3212,6 +3212,18 @@ pub fn desktop_hr_position_save(
     hris::simpan_jabatan(&state, draft)
 }
 
+/// Hapus bagian, jabatan, jenis tugas, atau jenis pengajuan yang bukan bawaan
+/// dan tidak pernah dipakai; selain itu ditolak dengan saran menonaktifkan.
+#[tauri::command]
+pub fn desktop_hr_master_delete(
+    state: State<'_, DesktopState>,
+    jenis: String,
+    id: String,
+) -> Result<Value, CommandError> {
+    require_permission(&state, "hr.org.manage")?;
+    hris::hapus_master(&state, &jenis, &id)
+}
+
 /// Angka kontrak (masa percobaan, batas GTT/PTT berturut-turut); kosong = bawaan.
 #[tauri::command]
 pub fn desktop_hr_settings_save(

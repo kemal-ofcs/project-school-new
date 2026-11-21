@@ -12,7 +12,12 @@
       "kunci": "kurikulum smp",
       "galat": null
     },
-    { "masuk": "TU", "normal": "TU", "kunci": "tu", "galat": null },
+    {
+      "masuk": "TU",
+      "normal": "TU",
+      "kunci": "tu",
+      "galat": null
+    },
     {
       "masuk": "A",
       "normal": "A",
@@ -33,11 +38,24 @@
     }
   ],
   "id_nama": [
-    { "id_bagian": "bag-1", "nama": "TU SMP", "hasil": "bag-1:747520736d70" },
-    { "id_bagian": "bag-2", "nama": "Élan", "hasil": "bag-2:c3896c616e" }
+    {
+      "id_bagian": "bag-1",
+      "nama": "TU SMP",
+      "hasil": "bag-1:747520736d70"
+    },
+    {
+      "id_bagian": "bag-2",
+      "nama": "Élan",
+      "hasil": "bag-2:c3896c616e"
+    }
   ],
   "atasan": [
-    { "id": "a", "atasan_baru": "", "peta": {}, "galat": null },
+    {
+      "id": "a",
+      "atasan_baru": "",
+      "peta": {},
+      "galat": null
+    },
     {
       "id": "a",
       "atasan_baru": "a",
@@ -47,32 +65,61 @@
     {
       "id": "a",
       "atasan_baru": "b",
-      "peta": { "b": "c", "c": "a" },
+      "peta": {
+        "b": "c",
+        "c": "a"
+      },
       "galat": "Atasan ini membuat rantai atasan yang berputar."
     },
     {
       "id": "a",
       "atasan_baru": "b",
-      "peta": { "b": "c", "c": "d" },
+      "peta": {
+        "b": "c",
+        "c": "d"
+      },
       "galat": null
     },
     {
       "id": "a",
       "atasan_baru": "b",
-      "peta": { "b": "c", "c": "b" },
+      "peta": {
+        "b": "c",
+        "c": "b"
+      },
       "galat": null
     },
     {
       "id": "a",
       "atasan_baru": "b",
-      "peta": { "b": "", "a": "x" },
+      "peta": {
+        "b": "",
+        "a": "x"
+      },
       "galat": null
     }
   ],
   "siklus": [
-    { "peta": { "a": "b", "b": "a", "c": "a", "d": "" }, "hasil": ["a", "b"] },
-    { "peta": { "x": "x", "y": "z" }, "hasil": ["x"] },
-    { "peta": {}, "hasil": [] }
+    {
+      "peta": {
+        "a": "b",
+        "b": "a",
+        "c": "a",
+        "d": ""
+      },
+      "hasil": ["a", "b"]
+    },
+    {
+      "peta": {
+        "x": "x",
+        "y": "z"
+      },
+      "hasil": ["x"]
+    },
+    {
+      "peta": {},
+      "hasil": []
+    }
   ],
   "susun": [
     {
@@ -114,15 +161,39 @@
         }
       ],
       "bagian": [
-        { "id": "b1", "nama": "Tata Usaha", "is_aktif": 1 },
-        { "id": "b2", "nama": "tata  usaha", "is_aktif": 1 },
-        { "id": "b3", "nama": "Gudang", "is_aktif": 0 }
+        {
+          "id": "b1",
+          "nama": "Tata Usaha",
+          "is_aktif": 1
+        },
+        {
+          "id": "b2",
+          "nama": "tata  usaha",
+          "is_aktif": 1
+        },
+        {
+          "id": "b3",
+          "nama": "Gudang",
+          "is_aktif": 0
+        }
       ],
       "nama_lama": [
-        { "id_bagian": "b1", "nama": "TU" },
-        { "id_bagian": "b1", "nama": "Tata Usaha" }
+        {
+          "id_bagian": "b1",
+          "nama": "TU"
+        },
+        {
+          "id_bagian": "b1",
+          "nama": "Tata Usaha"
+        }
       ],
-      "jabatan": [{ "id": "j1", "nama": "Staf", "is_aktif": 1 }],
+      "jabatan": [
+        {
+          "id": "j1",
+          "nama": "Staf",
+          "is_aktif": 1
+        }
+      ],
       "hasil": {
         "bagian": [
           {
@@ -160,8 +231,14 @@
           }
         ],
         "tanpa_master": [
-          { "divisi": "Dapur", "jumlah": 1 },
-          { "divisi": "Satpam", "jumlah": 2 }
+          {
+            "divisi": "Dapur",
+            "jumlah": 1
+          },
+          {
+            "divisi": "Satpam",
+            "jumlah": 2
+          }
         ],
         "atasan_siklus": ["p3", "p4"]
       }
@@ -195,47 +272,70 @@
       }
     },
     {
-      "ubah": { "status": "Kontrak" },
+      "ubah": {
+        "status": "Kontrak"
+      },
       "guru": true,
       "galat": "Status kontrak tidak dikenal."
     },
     {
-      "ubah": { "tanggal_mulai": "2026-02-30" },
+      "ubah": {
+        "tanggal_mulai": "2026-02-30"
+      },
       "guru": true,
       "galat": "Tanggal mulai kontrak tidak valid."
     },
     {
-      "ubah": { "tanggal_selesai": "31-12-2026" },
+      "ubah": {
+        "tanggal_selesai": "31-12-2026"
+      },
       "guru": true,
       "galat": "Tanggal selesai kontrak tidak valid."
     },
     {
-      "ubah": { "status": "GTT", "tanggal_selesai": "2027-06-30" },
+      "ubah": {
+        "status": "GTT",
+        "tanggal_selesai": "2027-06-30"
+      },
       "guru": false,
       "galat": "Status GTY dan GTT hanya untuk guru."
     },
     {
-      "ubah": { "status": "PTT", "tanggal_selesai": "2027-06-30" },
+      "ubah": {
+        "status": "PTT",
+        "tanggal_selesai": "2027-06-30"
+      },
       "guru": true,
       "galat": "Status PTY dan PTT hanya untuk tenaga kependidikan."
     },
     {
-      "ubah": { "status": "GTT" },
+      "ubah": {
+        "status": "GTT"
+      },
       "guru": true,
       "galat": "Kontrak GTT dan PTT wajib punya tanggal selesai."
     },
     {
-      "ubah": { "status": "PTT", "tanggal_selesai": "2026-06-30" },
+      "ubah": {
+        "status": "PTT",
+        "tanggal_selesai": "2026-06-30"
+      },
       "guru": false,
       "galat": "Tanggal selesai tidak boleh sebelum tanggal mulai."
     },
     {
-      "ubah": { "status": "Honorer", "percobaan_selesai": "2026-09-30" },
+      "ubah": {
+        "status": "Honorer",
+        "percobaan_selesai": "2026-09-30"
+      },
       "guru": false,
       "galat": "Masa percobaan hanya untuk GTY dan PTY."
     },
     {
-      "ubah": { "status": "PTY", "percobaan_selesai": "2026-06-01" },
+      "ubah": {
+        "status": "PTY",
+        "percobaan_selesai": "2026-06-01"
+      },
       "guru": false,
       "galat": "Akhir masa percobaan tidak boleh sebelum tanggal mulai."
     },
@@ -257,7 +357,10 @@
       "galat": "Nomor SK/kontrak maksimal 80 karakter."
     },
     {
-      "ubah": { "status": "Honorer", "tanggal_selesai": "2026-12-31" },
+      "ubah": {
+        "status": "Honorer",
+        "tanggal_selesai": "2026-12-31"
+      },
       "guru": false,
       "galat": null,
       "hasil": {
@@ -377,12 +480,18 @@
   "tanda": [
     {
       "kontrak": [["k1", "p1", "GTY", "", "2026-01-31", "", "2026-05-01"]],
-      "aturan": { "percobaan_maks_bulan": 3, "pkwt_maks_bulan": 60 },
+      "aturan": {
+        "percobaan_maks_bulan": 3,
+        "pkwt_maks_bulan": 60
+      },
       "hasil": ["percobaan_lewat"]
     },
     {
       "kontrak": [["k1", "p1", "GTY", "", "2026-01-31", "", "2026-04-30"]],
-      "aturan": { "percobaan_maks_bulan": 3, "pkwt_maks_bulan": 60 },
+      "aturan": {
+        "percobaan_maks_bulan": 3,
+        "pkwt_maks_bulan": 60
+      },
       "hasil": []
     },
     {
@@ -391,7 +500,10 @@
         ["k2", "p1", "PTT", "", "2020-01-01", "2022-12-31", ""],
         ["k3", "p1", "PTT", "", "2023-01-01", "2025-01-02", ""]
       ],
-      "aturan": { "percobaan_maks_bulan": 3, "pkwt_maks_bulan": 60 },
+      "aturan": {
+        "percobaan_maks_bulan": 3,
+        "pkwt_maks_bulan": 60
+      },
       "hasil": ["pkwt_lewat"]
     },
     {
@@ -400,7 +512,10 @@
         ["k2", "p1", "Honorer", "", "2020-01-01", "2020-12-31", ""],
         ["k3", "p1", "GTT", "", "2021-01-01", "2021-12-31", ""]
       ],
-      "aturan": { "percobaan_maks_bulan": 3, "pkwt_maks_bulan": 60 },
+      "aturan": {
+        "percobaan_maks_bulan": 3,
+        "pkwt_maks_bulan": 60
+      },
       "hasil": []
     },
     {
@@ -408,12 +523,18 @@
         ["k1", "p1", "PTT", "", "2015-01-01", "2025-12-31", ""],
         ["batal-k1", "p1", "Pembatalan", "k1", "2015-01-01", "", ""]
       ],
-      "aturan": { "percobaan_maks_bulan": 3, "pkwt_maks_bulan": 60 },
+      "aturan": {
+        "percobaan_maks_bulan": 3,
+        "pkwt_maks_bulan": 60
+      },
       "hasil": []
     },
     {
       "kontrak": [["k1", "p1", "PTT", "", "2026-01-01", "2027-01-02", ""]],
-      "aturan": { "percobaan_maks_bulan": 3, "pkwt_maks_bulan": 12 },
+      "aturan": {
+        "percobaan_maks_bulan": 3,
+        "pkwt_maks_bulan": 12
+      },
       "hasil": ["pkwt_lewat"]
     }
   ],
@@ -425,7 +546,10 @@
         ["batal-k9", "p2", "Pembatalan", "k9", "2026-01-01", "", ""]
       ],
       "hari_ini": "2026-03-01",
-      "aturan": { "percobaan_maks_bulan": 3, "pkwt_maks_bulan": 60 },
+      "aturan": {
+        "percobaan_maks_bulan": 3,
+        "pkwt_maks_bulan": 60
+      },
       "hasil": {
         "ringkas": [
           {
@@ -575,7 +699,10 @@
       }
     },
     {
-      "ubah": { "id_jenis": "tgs-wali-kelas", "ekuivalen_jp": 3 },
+      "ubah": {
+        "id_jenis": "tgs-wali-kelas",
+        "ekuivalen_jp": 3
+      },
       "galat": null,
       "hasil": {
         "id_karyawan": "p1",
@@ -591,26 +718,52 @@
       }
     },
     {
-      "ubah": { "id_jenis": "tgs-wali-kelas", "id_rombel": " " },
+      "ubah": {
+        "id_jenis": "tgs-wali-kelas",
+        "id_rombel": " "
+      },
       "galat": "Tugas wali kelas wajib memilih rombel."
     },
     {
-      "ubah": { "ekuivalen_jp": 41 },
+      "ubah": {
+        "ekuivalen_jp": 41
+      },
       "galat": "Ekuivalen JP harus 0 sampai 40."
     },
     {
-      "ubah": { "tanggal_selesai": "2026-07-01" },
+      "ubah": {
+        "tanggal_selesai": "2026-07-01"
+      },
       "galat": "Tanggal selesai tidak boleh sebelum tanggal mulai."
     },
-    { "ubah": { "id_karyawan": "" }, "galat": "Pilih pegawai." },
-    { "ubah": { "id_jenis": " " }, "galat": "Pilih jenis tugas." },
-    { "ubah": { "tahun_ajaran": "" }, "galat": "Tahun ajaran wajib dipilih." },
     {
-      "ubah": { "tanggal_mulai": "2026-7-13" },
+      "ubah": {
+        "id_karyawan": ""
+      },
+      "galat": "Pilih pegawai."
+    },
+    {
+      "ubah": {
+        "id_jenis": " "
+      },
+      "galat": "Pilih jenis tugas."
+    },
+    {
+      "ubah": {
+        "tahun_ajaran": ""
+      },
+      "galat": "Tahun ajaran wajib dipilih."
+    },
+    {
+      "ubah": {
+        "tanggal_mulai": "2026-7-13"
+      },
       "galat": "Tanggal mulai tugas tidak valid."
     },
     {
-      "ubah": { "tanggal_sk": "2026-13-01" },
+      "ubah": {
+        "tanggal_sk": "2026-13-01"
+      },
       "galat": "Tanggal SK tidak valid."
     }
   ],
@@ -1115,5 +1268,55 @@
     [true, 0, ["tanpa_dokumen"]],
     [true, 2, []],
     [false, 0, []]
+  ],
+  "hapus_master": [
+    {
+      "jenis": "bagian",
+      "bawaan": false,
+      "dipakai": 0,
+      "pesan": null
+    },
+    {
+      "jenis": "jenis_tugas",
+      "bawaan": true,
+      "dipakai": 0,
+      "pesan": "Data bawaan tidak bisa dihapus; nonaktifkan saja."
+    },
+    {
+      "jenis": "jenis_pengajuan",
+      "bawaan": true,
+      "dipakai": 4,
+      "pesan": "Data bawaan tidak bisa dihapus; nonaktifkan saja."
+    },
+    {
+      "jenis": "bagian",
+      "bawaan": false,
+      "dipakai": 3,
+      "pesan": "Bagian masih dipakai 3 pegawai (termasuk yang nonaktif) atau lowongan. Gabungkan ke bagian lain atau nonaktifkan saja."
+    },
+    {
+      "jenis": "jabatan",
+      "bawaan": false,
+      "dipakai": 1,
+      "pesan": "Jabatan masih dipakai 1 pegawai (termasuk yang nonaktif) atau lowongan. Nonaktifkan saja."
+    },
+    {
+      "jenis": "jenis_tugas",
+      "bawaan": false,
+      "dipakai": 2,
+      "pesan": "Jenis tugas masih dipakai 2 tugas tambahan, termasuk riwayat. Nonaktifkan saja."
+    },
+    {
+      "jenis": "jenis_pengajuan",
+      "bawaan": false,
+      "dipakai": 5,
+      "pesan": "Jenis pengajuan masih dipakai 5 pengajuan, termasuk riwayat. Nonaktifkan saja."
+    },
+    {
+      "jenis": "jabatan",
+      "bawaan": false,
+      "dipakai": -1,
+      "pesan": null
+    }
   ]
 }

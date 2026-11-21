@@ -318,6 +318,92 @@ export const BENTROK_BAGIAN_SQL =
 export const BENTROK_JABATAN_SQL =
   "SELECT 1 FROM hr_jabatan WHERE id_jabatan <> ?2 AND is_aktif = 1 AND lower(trim(nama)) = lower(trim(?1)) LIMIT 1;";
 
+// Hapus master organisasi (2026-11-21), cermin `hapus_master` di hris.rs.
+// Hanya baris yang bukan bawaan dan tidak pernah dirujuk (termasuk pegawai
+// nonaktif dan riwayat); selain itu nonaktifkan. Penjaga rujukan ada di
+// statement DELETE itu sendiri, jadi cloud yang tahu rujukan lain cukup tidak
+// menghapus, dan tarikan berikutnya mengembalikan barisnya ke perangkat. Versi
+// `_CLOUD_` menambah `hr_lowongan` yang hanya ada di cloud.
+export const JENIS_MASTER_HAPUS = [
+  "bagian",
+  "jabatan",
+  "jenis_tugas",
+  "jenis_pengajuan",
+] as const;
+export type JenisMasterHapus = (typeof JENIS_MASTER_HAPUS)[number];
+
+/** Seed `MIGRASI_ORGANISASI_SQL` + `tgs-ka-tu` (kinerja v71); dirujuk kode. */
+export const JENIS_TUGAS_BAWAAN = [
+  "tgs-kepsek",
+  "tgs-wakasek",
+  "tgs-kaprog",
+  "tgs-kaperpus",
+  "tgs-kalab",
+  "tgs-wali-kelas",
+  "tgs-pembina-osis",
+  "tgs-pembina-ekskul",
+  "tgs-piket",
+  "tgs-bendahara-bos",
+  "tgs-ka-tu",
+] as const;
+
+export const HAPUS_BAGIAN_SQL = [
+  "DELETE FROM hr_bagian_nama WHERE id_bagian = ?1 AND NOT EXISTS (SELECT 1 FROM master_data m WHERE m.id_bagian = ?1);",
+  "DELETE FROM hr_bagian WHERE id_bagian = ?1 AND NOT EXISTS (SELECT 1 FROM master_data m WHERE m.id_bagian = ?1);",
+] as const;
+export const HAPUS_BAGIAN_CLOUD_SQL = [
+  "DELETE FROM hr_bagian_nama WHERE id_bagian = ?1 AND NOT EXISTS (SELECT 1 FROM master_data m WHERE m.id_bagian = ?1) AND NOT EXISTS (SELECT 1 FROM hr_lowongan l WHERE l.id_bagian = ?1);",
+  "DELETE FROM hr_bagian WHERE id_bagian = ?1 AND NOT EXISTS (SELECT 1 FROM master_data m WHERE m.id_bagian = ?1) AND NOT EXISTS (SELECT 1 FROM hr_lowongan l WHERE l.id_bagian = ?1);",
+] as const;
+export const HAPUS_JABATAN_SQL =
+  "DELETE FROM hr_jabatan WHERE id_jabatan = ?1 AND NOT EXISTS (SELECT 1 FROM master_data m WHERE m.id_jabatan = ?1);";
+export const HAPUS_JABATAN_CLOUD_SQL =
+  "DELETE FROM hr_jabatan WHERE id_jabatan = ?1 AND NOT EXISTS (SELECT 1 FROM master_data m WHERE m.id_jabatan = ?1) AND NOT EXISTS (SELECT 1 FROM hr_lowongan l WHERE l.id_jabatan = ?1);";
+export const HAPUS_JENIS_TUGAS_SQL =
+  "DELETE FROM hr_tugas_jenis WHERE id_jenis = ?1 AND id_jenis NOT IN ('tgs-kepsek', 'tgs-wakasek', 'tgs-kaprog', 'tgs-kaperpus', 'tgs-kalab', 'tgs-wali-kelas', 'tgs-pembina-osis', 'tgs-pembina-ekskul', 'tgs-piket', 'tgs-bendahara-bos', 'tgs-ka-tu') AND NOT EXISTS (SELECT 1 FROM hr_tugas_tambahan t WHERE t.id_jenis = ?1);";
+export const HAPUS_JENIS_PENGAJUAN_SQL =
+  "DELETE FROM hr_jenis_pengajuan WHERE id_jenis = ?1 AND id_jenis NOT IN ('jns-cuti-tahunan', 'jns-cuti-menikah', 'jns-cuti-duka', 'jns-cuti-istri-melahirkan', 'jns-cuti-melahirkan', 'jns-cuti-luar-tanggungan', 'jns-izin-dibayar', 'jns-izin-tidak-dibayar', 'jns-sakit', 'jns-dinas-luar') AND NOT EXISTS (SELECT 1 FROM hr_pengajuan p WHERE p.id_jenis = ?1);";
+
+export const DIPAKAI_BAGIAN_SQL =
+  "SELECT COUNT(*) AS n FROM master_data WHERE id_bagian = ?1;";
+export const DIPAKAI_BAGIAN_CLOUD_SQL =
+  "SELECT (SELECT COUNT(*) FROM master_data WHERE id_bagian = ?1) + (SELECT COUNT(*) FROM hr_lowongan WHERE id_bagian = ?1) AS n;";
+export const DIPAKAI_JABATAN_SQL =
+  "SELECT COUNT(*) AS n FROM master_data WHERE id_jabatan = ?1;";
+export const DIPAKAI_JABATAN_CLOUD_SQL =
+  "SELECT (SELECT COUNT(*) FROM master_data WHERE id_jabatan = ?1) + (SELECT COUNT(*) FROM hr_lowongan WHERE id_jabatan = ?1) AS n;";
+export const DIPAKAI_JENIS_TUGAS_SQL =
+  "SELECT COUNT(*) AS n FROM hr_tugas_tambahan WHERE id_jenis = ?1;";
+export const DIPAKAI_JENIS_PENGAJUAN_SQL =
+  "SELECT COUNT(*) AS n FROM hr_pengajuan WHERE id_jenis = ?1;";
+
+/** Alasan penolakan hapus, `null` = boleh. Cermin `pesan_hapus_master`. */
+export function pesanHapusMaster(
+  jenis: JenisMasterHapus,
+  bawaan: boolean,
+  dipakai: number,
+): string | null {
+  if (bawaan) return "Data bawaan tidak bisa dihapus; nonaktifkan saja.";
+  if (dipakai <= 0) return null;
+  switch (jenis) {
+    case "bagian":
+      return `Bagian masih dipakai ${dipakai} pegawai (termasuk yang nonaktif) atau lowongan. Gabungkan ke bagian lain atau nonaktifkan saja.`;
+    case "jabatan":
+      return `Jabatan masih dipakai ${dipakai} pegawai (termasuk yang nonaktif) atau lowongan. Nonaktifkan saja.`;
+    case "jenis_tugas":
+      return `Jenis tugas masih dipakai ${dipakai} tugas tambahan, termasuk riwayat. Nonaktifkan saja.`;
+    case "jenis_pengajuan":
+      return `Jenis pengajuan masih dipakai ${dipakai} pengajuan, termasuk riwayat. Nonaktifkan saja.`;
+  }
+}
+
+export const hapusMasterSchema = z
+  .object({
+    jenis: z.enum(JENIS_MASTER_HAPUS),
+    id: z.string().trim().min(1).max(80),
+  })
+  .strict();
+
 export const ORG_PEGAWAI_SQL =
   "SELECT m.id_unik, COALESCE(m.kode_karyawan, '') AS kode_karyawan, m.nama, COALESCE(m.unit, '') AS unit, COALESCE(m.divisi, '') AS divisi, COALESCE(m.jabatan_status, '') AS jabatan_status, COALESCE(m.id_bagian, '') AS id_bagian, COALESCE(m.id_jabatan, '') AS id_jabatan, COALESCE(m.id_atasan, '') AS id_atasan, COALESCE(m.status_aktif, 'Aktif') AS status_aktif, COALESCE(m.tanggal_mulai_aktif, '') AS tmt, CASE WHEN g.id_guru IS NOT NULL OR LOWER(TRIM(COALESCE(m.jenis_personil, ''))) = 'guru' THEN 'Guru' ELSE 'Tendik' END AS kelompok, COALESCE(g.status_kepegawaian, '') AS status_kepegawaian FROM master_data m LEFT JOIN guru_data g ON g.id_guru = m.id_unik WHERE LOWER(TRIM(COALESCE(m.jenis_personil, ''))) <> 'siswa' AND NOT EXISTS (SELECT 1 FROM siswa_data sd WHERE sd.id_siswa = m.id_unik) ORDER BY m.nama, m.id_unik\n-- batas: pegawai sekolah (guru dan tendik), dibatasi jumlah personil lembaga\n;";
 

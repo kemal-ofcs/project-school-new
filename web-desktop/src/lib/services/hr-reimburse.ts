@@ -12,8 +12,11 @@ import {
   UNIT_PERSONIL_SQL,
 } from "@/lib/validations/hr-pengajuan";
 import {
+  AKUN_BAYAR_BAWAAN,
+  AKUN_BAYAR_SQL,
   AMBIL_NOTA_SQL,
   BATAL_BAYAR_SQL,
+  BATAS_TUTUP_SQL,
   BAYAR_BARIS_SQL,
   BAYAR_SQL,
   type BatalBayarDraft,
@@ -25,6 +28,8 @@ import {
   JENIS_REIMBURSE_SQL,
   type JenisReimburse,
   type JenisReimburseDraft,
+  JURNAL_BATAL_BAYAR_SQL,
+  JURNAL_BAYAR_SQL,
   KEPUTUSAN_SQL,
   type KeadaanKeputusan,
   type KeputusanBaris,
@@ -41,6 +46,7 @@ import {
   type NotaDraft,
   PEMBAYARAN_SQL,
   PEMILIK_NOTA_SQL,
+  PESAN_AKUN_BAYAR,
   PESAN_BAYAR_SUDAH_BATAL,
   PESAN_BAYAR_TIDAK_ADA,
   PESAN_JENIS_GANDA,
@@ -69,6 +75,7 @@ import {
   validasiKlaim,
 } from "@/lib/validations/hr-reimburse";
 import { uraiBerkasDokumen } from "@/lib/validations/hris";
+import { cekPeriodeTerbuka } from "@/lib/validations/tutup-buku";
 import {
   ambil,
   angka,
@@ -392,6 +399,17 @@ export async function bayarKlaim(
       await klaimPegawai(client, sah.id_karyawan),
     ),
   );
+  // Jurnal otomatis (v75): akun bayar dan periode diperiksa SEBELUM batch,
+  // cermin `bayar_klaim`.
+  const akunBayar =
+    (typeof draft.id_akun_bayar === "string"
+      ? draft.id_akun_bayar.trim()
+      : "") || AKUN_BAYAR_BAWAAN;
+  if (!(await satu(client, AKUN_BAYAR_SQL, [akunBayar])))
+    galat(PESAN_AKUN_BAYAR);
+  const batas = teks((await satu(client, BATAS_TUTUP_SQL)) ?? {}, "batas");
+  const periode = cekPeriodeTerbuka(sah.tanggal, batas || null);
+  if (!periode.ok) galat(periode.error);
   const id = idBaru("rbb-");
   const daftar = JSON.stringify(sah.id_klaim);
   await client.batch(
@@ -409,6 +427,9 @@ export async function bayarKlaim(
         ],
       },
       { sql: BAYAR_BARIS_SQL, args: [id, daftar] },
+      { sql: JURNAL_BAYAR_SQL[0], args: [id, oleh] },
+      { sql: JURNAL_BAYAR_SQL[1], args: [id] },
+      { sql: JURNAL_BAYAR_SQL[2], args: [id, akunBayar] },
     ],
     "write",
   );
@@ -431,12 +452,16 @@ export async function batalBayar(
   const [bayar] = await pembayaran(client, "", id);
   if (!bayar) galat(PESAN_BAYAR_TIDAK_ADA);
   ambil(periksaBatalBayar(bayar.jenis, bayar.dibatalkan, alasan));
-  const n = await tulis(client, BATAL_BAYAR_SQL, [
-    id,
-    await hariIni(client),
-    alasan,
-    oleh,
-  ]);
-  if (n === 0) galat(PESAN_BAYAR_SUDAH_BATAL);
+  // Pembalik jurnal di batch yang sama; dijaga baris `batal-<id>` (v75).
+  const hari = await hariIni(client);
+  const [hasil] = await client.batch(
+    [
+      { sql: BATAL_BAYAR_SQL, args: [id, hari, alasan, oleh] },
+      { sql: JURNAL_BATAL_BAYAR_SQL[0], args: [id, hari, oleh] },
+      { sql: JURNAL_BATAL_BAYAR_SQL[1], args: [id] },
+    ],
+    "write",
+  );
+  if (hasil.rowsAffected === 0) galat(PESAN_BAYAR_SUDAH_BATAL);
   return { sukses: true, id_bayar: `batal-${id}` };
 }

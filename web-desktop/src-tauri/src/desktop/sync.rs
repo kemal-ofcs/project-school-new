@@ -20,7 +20,7 @@ use super::{
 /// `CURRENT_SCHEMA_VERSION` di `web-desktop/src/lib/db-schema.ts` setiap kali
 /// migrasi baru ditambahkan, karena keduanya membaca tabel `schema_migration`
 /// yang sama di Turso.
-pub const CLIENT_SCHEMA_VERSION: i64 = 74;
+pub const CLIENT_SCHEMA_VERSION: i64 = 75;
 
 /// Hanya `cloud > client` yang berbahaya; `cloud <= client` adalah kondisi normal.
 fn is_client_schema_outdated(cloud_version: i64) -> bool {
@@ -1606,9 +1606,10 @@ const SNAPSHOT_TABLES: &[SnapshotTable] = &[
         entity_column: "id_pembayaran",
         delete_missing: false,
     },
-    // v68: organisasi, tugas tambahan, dan kontrak (HRIS Fase 1). Baris
-    // tidak pernah dihapus: master dinonaktifkan, tugas dibatalkan, kontrak
-    // append-only (pembatalan = baris `Pembatalan`).
+    // v68: organisasi, tugas tambahan, dan kontrak (HRIS Fase 1). Tugas
+    // dibatalkan, kontrak append-only (pembatalan = baris `Pembatalan`). Master
+    // yang tidak pernah dipakai boleh dihapus (2026-11-21, `hapus_master`);
+    // penghapusannya menyebar lewat tombstone cloud.
     SnapshotTable {
         payload_key: "hrBagian",
         domain: "hr-section",
@@ -1936,8 +1937,11 @@ pub(crate) const CANONICAL_SYNC_ROUTES: &[(&str, &str)] = &[
     ("hr-contract", "create"),
     ("hr-duty", "cancel"),
     ("hr-duty", "save"),
+    ("hr-duty-type", "delete"),
     ("hr-duty-type", "save"),
+    ("hr-position", "delete"),
     ("hr-position", "save"),
+    ("hr-section", "delete"),
     ("hr-section", "merge"),
     ("hr-section", "save"),
     // v69: pengajuan cuti/izin dan keputusannya (HRIS Fase 2a); jatah (2b) dan
@@ -1945,6 +1949,7 @@ pub(crate) const CANONICAL_SYNC_ROUTES: &[(&str, &str)] = &[
     ("hr-leave-adjustment", "create"),
     ("hr-request", "save"),
     ("hr-request-decision", "create"),
+    ("hr-request-type", "delete"),
     ("hr-request-type", "save"),
     ("hr-substitute", "save"),
     ("uks-visit", "delete"),

@@ -342,6 +342,7 @@ pub fn run() {
             mobile::commands::desktop_hr_section_save,
             mobile::commands::desktop_hr_section_merge,
             mobile::commands::desktop_hr_position_save,
+            mobile::commands::desktop_hr_master_delete,
             mobile::commands::desktop_hr_settings_save,
             mobile::commands::desktop_hr_duty_types_save,
             mobile::commands::desktop_hr_duties,

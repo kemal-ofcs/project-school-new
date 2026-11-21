@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
+import jenisPengajuanBawaan from "./hr-jenis-bawaan.json";
 import * as H from "./hris";
 import vektor from "./hris.vektor.json";
 
@@ -41,6 +42,19 @@ describe("hris: aturan kembar", () => {
         k.hasil,
       );
     }
+  });
+
+  test("hapus master: pesan dan seed bawaan", () => {
+    for (const k of vektor.hapus_master) {
+      expect(
+        H.pesanHapusMaster(k.jenis as H.JenisMasterHapus, k.bawaan, k.dipakai),
+      ).toBe(k.pesan);
+    }
+    for (const id of H.JENIS_TUGAS_BAWAAN)
+      expect(H.HAPUS_JENIS_TUGAS_SQL).toContain(`'${id}'`);
+    for (const j of jenisPengajuanBawaan)
+      expect(H.HAPUS_JENIS_PENGAJUAN_SQL).toContain(`'${j.id_jenis}'`);
+    expect(H.MIGRASI_ORGANISASI_SQL.join(" ")).toContain("'tgs-kepsek'");
   });
 
   test("SQL disalin harfiah ke hris.rs (Desktop dan Mobile)", () => {
@@ -84,6 +98,20 @@ describe("hris: aturan kembar", () => {
       H.KUNCI_KGB_TAHUN,
       H.KUNCI_PENSIUN_USIA,
       H.ID_WALI_KELAS,
+      ...H.HAPUS_BAGIAN_SQL,
+      ...H.HAPUS_BAGIAN_CLOUD_SQL,
+      H.HAPUS_JABATAN_SQL,
+      H.HAPUS_JABATAN_CLOUD_SQL,
+      H.HAPUS_JENIS_TUGAS_SQL,
+      H.HAPUS_JENIS_PENGAJUAN_SQL,
+      H.DIPAKAI_BAGIAN_SQL,
+      H.DIPAKAI_BAGIAN_CLOUD_SQL,
+      H.DIPAKAI_JABATAN_SQL,
+      H.DIPAKAI_JABATAN_CLOUD_SQL,
+      H.DIPAKAI_JENIS_TUGAS_SQL,
+      H.DIPAKAI_JENIS_PENGAJUAN_SQL,
+      ...H.JENIS_TUGAS_BAWAAN,
+      ...H.JENIS_MASTER_HAPUS,
     ];
     let diperiksa = 0;
     for (const dir of ["desktop", "mobile"]) {

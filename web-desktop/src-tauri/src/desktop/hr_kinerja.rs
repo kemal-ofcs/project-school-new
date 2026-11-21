@@ -597,7 +597,7 @@ pub fn skor_ambang(permil: i64, ambang: &[i64; 4]) -> i64 {
 
 // Penilaian: aturan murni (5b, §23.2.2–23.2.6)
 
-pub const JENIS_PERIODE: [&str; 2] = ["Semester", "Tahun Ajaran"];
+pub const JENIS_PERIODE: [&str; 3] = ["Semester", "Tahun Ajaran", "Rentang Tanggal"];
 pub const AKSI_SIMPAN: [&str; 4] = ["Buat", "Simpan", "Muat ulang", "Koreksi"];
 pub const JENIS_KEPUTUSAN: [&str; 4] = ["Ajukan", "Kembalikan", "Final", "Batal"];
 pub const STATUS_DRAF: &str = "Draf";
@@ -638,12 +638,42 @@ pub struct Periode {
     pub selesai: String,
 }
 
+/// Jenis periode bebas (2026-11-21): kunci `YYYY-MM-DD_YYYY-MM-DD`.
+pub const PERIODE_RENTANG: &str = "Rentang Tanggal";
+pub const MAKS_HARI_PERIODE: i64 = 366;
+
+/// Cermin `periodeRentang`: rentang sendiri, paling panjang 366 hari.
+pub fn periode_rentang(kunci: &str) -> Result<Periode, String> {
+    let kunci = kunci.trim();
+    let (mulai, selesai) = kunci
+        .split_once('_')
+        .filter(|(a, b)| a.len() == 10 && b.len() == 10 && tanggal_valid(a) && tanggal_valid(b))
+        .ok_or_else(|| "Rentang tanggal periode tidak valid.".to_owned())?;
+    let hari = days_between(mulai, selesai)?;
+    if hari < 0 {
+        return Err("Tanggal selesai periode sebelum tanggal mulai.".into());
+    }
+    if hari + 1 > MAKS_HARI_PERIODE {
+        return Err(format!("Periode paling panjang {MAKS_HARI_PERIODE} hari."));
+    }
+    Ok(Periode {
+        jenis: PERIODE_RENTANG.to_owned(),
+        kunci: kunci.to_owned(),
+        nama: format!("{mulai} s.d. {selesai}"),
+        mulai: mulai.to_owned(),
+        selesai: selesai.to_owned(),
+    })
+}
+
 /// Cermin `periodeDariTahunAjaran` (Q-94): `Semester` = satu baris
 /// (`kunci` = `id_tahun_ajaran`), `Tahun Ajaran` = semua baris ber-`nama_tahun`
 /// sama (`kunci` = `nama_tahun`), rentang MIN mulai..MAX selesai.
 pub fn periode_dari_tahun_ajaran(jenis: &str, kunci: &str, baris: &[TahunAjaran]) -> Result<Periode, String> {
     if !JENIS_PERIODE.contains(&jenis) {
-        return Err("Jenis periode harus Semester atau Tahun Ajaran.".into());
+        return Err("Jenis periode harus Semester, Tahun Ajaran, atau Rentang Tanggal.".into());
+    }
+    if jenis == PERIODE_RENTANG {
+        return periode_rentang(kunci);
     }
     let kunci = kunci.trim();
     let semester = jenis == "Semester";
@@ -765,7 +795,7 @@ pub fn validasi_penilaian(draft: &Value) -> Result<PenilaianSah, String> {
         id_karyawan = Some(kosong_jadi_none(&teks_draft(draft, "id_karyawan")).ok_or("Pilih pegawai yang dinilai.")?);
         let jenis = teks_draft(draft, "periode_jenis");
         if !JENIS_PERIODE.contains(&jenis.as_str()) {
-            return Err("Jenis periode harus Semester atau Tahun Ajaran.".into());
+            return Err("Jenis periode harus Semester, Tahun Ajaran, atau Rentang Tanggal.".into());
         }
         periode_jenis = Some(jenis);
         periode_kunci = Some(kosong_jadi_none(&teks_draft(draft, "periode_kunci")).ok_or("Pilih periode penilaian.")?);

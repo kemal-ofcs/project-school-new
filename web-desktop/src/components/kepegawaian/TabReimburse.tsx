@@ -7,6 +7,7 @@ import {
   useRef,
   useState,
 } from "react";
+import { PilihAkunBayar } from "@/components/keuangan/PilihAkunBayar";
 import { Modal } from "@/components/ui/Modal";
 import { PilihCari } from "@/components/ui/PilihCari";
 import { hasPermission } from "@/lib/auth/access";
@@ -29,6 +30,7 @@ import {
 import { useConfirmDialog } from "@/lib/hooks/useConfirmDialog";
 import { MIME_BERKAS_SEKOLAH } from "@/lib/validations/berkas-sekolah";
 import {
+  AKUN_BAYAR_BAWAAN,
   type AksiKeputusan,
   type IsiNota,
   type JenisReimburse,
@@ -969,6 +971,7 @@ function ModalBayar({
   const [pilih, setPilih] = useState<string[]>([]);
   const [tanggal, setTanggal] = useState(hariIni);
   const [keterangan, setKeterangan] = useState("");
+  const [akunBayar, setAkunBayar] = useState(AKUN_BAYAR_BAWAAN);
   const [batal, setBatal] = useState<string | null>(null);
   const [alasan, setAlasan] = useState("");
   const [kabar, setKabar] = useState<string | null>(null);
@@ -1013,6 +1016,7 @@ function ModalBayar({
         id_klaim: pilih,
         tanggal,
         keterangan,
+        id_akun_bayar: akunBayar,
       });
       setKeterangan("");
       await segarkan(`Pembayaran ${IDR.format(hasil.total)} dicatat.`);
@@ -1125,6 +1129,19 @@ function ModalBayar({
                         onChange={(e) => setKeterangan(e.target.value)}
                         className={INPUT}
                       />
+                    </div>
+                    <div className="sm:col-span-2">
+                      <PilihAkunBayar
+                        id="bayar-akun"
+                        label="Dibayar dari akun"
+                        value={akunBayar}
+                        onChange={setAkunBayar}
+                        bawaan={AKUN_BAYAR_BAWAAN}
+                      />
+                      <p className="mt-1 text-xs text-slate-400">
+                        Jurnal otomatis: Beban Reimbursement (debit) dan akun
+                        ini (kredit).
+                      </p>
                     </div>
                   </div>
                   <div className="flex flex-wrap items-center justify-end gap-3">

@@ -1269,7 +1269,7 @@ mod tests {
                  DROP TABLE hr_reimburse_berkas; DROP TABLE hr_reimburse_bayar; DROP TABLE hr_reimburse_bayar_baris;
                  DELETE FROM role_permission WHERE permission_key LIKE 'hr.reimburse.%';
                  DELETE FROM app_permission WHERE permission_key LIKE 'hr.reimburse.%';
-                 DELETE FROM schema_migration WHERE version IN (73, -2049);",
+                 DELETE FROM schema_migration WHERE version IN (73, -2049, -2050, -2051);",
             )
             .expect("siapkan database v72");
             client.ensure_schema_current().await.expect("skema mutakhir");
@@ -1289,7 +1289,7 @@ mod tests {
             // Seed kedua kali: bank yang disunting tetap.
             c.execute_batch(
                 "UPDATE app_bank SET nama = 'BCA Sekolah' WHERE id_bank = 'bnk-014';
-                 DELETE FROM schema_migration WHERE version IN (73, -2049);",
+                 DELETE FROM schema_migration WHERE version IN (73, -2049, -2050, -2051);",
             )
             .expect("sunting bank");
             client.ensure_schema_current().await.expect("skema mutakhir lagi");

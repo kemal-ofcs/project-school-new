@@ -31,6 +31,7 @@ export const SUMBER_JURNAL = [
   "Tagihan",
   "Inventaris",
   "Cicilan",
+  "Reimburse",
   "Pembatalan",
 ] as const;
 
@@ -544,6 +545,8 @@ export function labelSumberKas(sumber: string): string {
       return "Pembelian barang dan servis";
     case "Cicilan":
       return "Pembayaran cicilan pembelian";
+    case "Reimburse":
+      return "Pembayaran reimbursement";
     case "Manual":
       return "Jurnal umum";
     default:

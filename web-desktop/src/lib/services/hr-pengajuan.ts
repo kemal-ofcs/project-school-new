@@ -12,6 +12,8 @@ import type { HolidayWhitelistEntry } from "@/lib/validations/holiday-whitelist"
 import {
   ATURAN_CUTI_SQL,
   aturanCuti,
+  aturanCutiPegawai,
+  aturanJabatan,
   type BarisJenis,
   type BarisKeputusan,
   type BarisPengajuan,
@@ -779,6 +781,7 @@ async function petaAturan(db: Db): Promise<Map<string, string>> {
 const aturanKeduanya = (peta: Map<string, string>) => ({
   guru: aturanCuti(peta, "guru"),
   tendik: aturanCuti(peta, "tendik"),
+  jabatan: aturanJabatan(peta),
 });
 
 /** Cermin `tanggal_terpakai`: tanggal wajib Cuti `potong_jatah`, tanpa Hadir. */
@@ -845,7 +848,7 @@ async function jatahPegawai(
   const tmt = teks(p, "tmt");
   const periode = jatahCuti(
     tmt === "" ? null : tmt,
-    aturanCuti(peta, kelompok),
+    aturanCutiPegawai(peta, kelompok, teks(p, "id_jabatan")),
     await tanggalTerpakai(db, id, jadwal),
     aktif,
     hariIni,

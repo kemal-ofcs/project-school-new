@@ -207,6 +207,8 @@ describe("dynamic RBAC migration", () => {
       73,
       // v74 — hapus permanen akun (`keu_akun.dihapus_pada`).
       74,
+      // v75 — periode kinerja `Rentang Tanggal`, sumber jurnal `Reimburse`.
+      75,
     ]);
 
     const sessionColumns = await client.execute(

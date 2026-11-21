@@ -12,7 +12,7 @@
 //! `validations/hr-pengajuan.vektor.json`, teks SQL dibandingkan harfiah oleh
 //! `hr-pengajuan.test.ts`.
 
-use std::collections::{BTreeMap, HashMap, HashSet};
+use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 
 use rusqlite::{params, OptionalExtension, Transaction};
 use serde::{Deserialize, Serialize};
@@ -754,7 +754,7 @@ pub const HARI_ABSEN_SQL: &str = "SELECT id_karyawan, tanggal, MAX(CASE WHEN sta
 /// Jadwal kini pegawai di larik JSON `?1` (shift `master_data.id_shift`).
 pub const JADWAL_PEGAWAI_SQL: &str = "SELECT m.id_unik, COALESCE(m.divisi, '') AS divisi, s.hari_kerja, s.kode_shift, COALESCE(s.jam_kerja_normal_menit, 0) AS jam_normal FROM master_data m LEFT JOIN tbl_shift s ON s.id_shift = m.id_shift WHERE m.id_unik IN (SELECT value FROM json_each(?1));";
 /// Satu pegawai untuk jatah cuti: TMT, kelompok guru/tendik, dan jadwal.
-pub const JATAH_PEGAWAI_SQL: &str = "SELECT m.id_unik, m.nama, COALESCE(m.unit, '') AS unit, COALESCE(m.tanggal_mulai_aktif, '') AS tmt, CASE WHEN EXISTS (SELECT 1 FROM guru_data g WHERE g.id_guru = m.id_unik) THEN 1 ELSE 0 END AS guru, COALESCE(m.divisi, '') AS divisi, s.hari_kerja, s.kode_shift FROM master_data m LEFT JOIN tbl_shift s ON s.id_shift = m.id_shift WHERE m.id_unik = ?1 AND LOWER(TRIM(COALESCE(m.jenis_personil, ''))) <> 'siswa' AND NOT EXISTS (SELECT 1 FROM siswa_data sd WHERE sd.id_siswa = m.id_unik);";
+pub const JATAH_PEGAWAI_SQL: &str = "SELECT m.id_unik, m.nama, COALESCE(m.unit, '') AS unit, COALESCE(m.tanggal_mulai_aktif, '') AS tmt, CASE WHEN EXISTS (SELECT 1 FROM guru_data g WHERE g.id_guru = m.id_unik) THEN 1 ELSE 0 END AS guru, COALESCE(m.divisi, '') AS divisi, COALESCE(m.id_jabatan, '') AS id_jabatan, s.hari_kerja, s.kode_shift FROM master_data m LEFT JOIN tbl_shift s ON s.id_shift = m.id_shift WHERE m.id_unik = ?1 AND LOWER(TRIM(COALESCE(m.jenis_personil, ''))) <> 'siswa' AND NOT EXISTS (SELECT 1 FROM siswa_data sd WHERE sd.id_siswa = m.id_unik);";
 /// Rentang pengajuan Cuti ber-`potong_jatah` yang berlaku milik `?1`.
 pub const JATAH_TERPAKAI_SQL: &str = "SELECT p.tanggal_mulai, p.tanggal_selesai FROM hr_pengajuan p WHERE p.id_karyawan = ?1 AND p.potong_jatah = 1 AND NOT EXISTS (SELECT 1 FROM hr_pengajuan_keputusan b WHERE b.id_pengajuan = p.id_pengajuan AND b.jenis = 'Batal') AND (SELECT k.jenis FROM hr_pengajuan_keputusan k WHERE k.id_pengajuan = p.id_pengajuan AND k.sidik = p.sidik AND k.jenis IN ('Setujui', 'Tolak', 'Setujui Urgent') ORDER BY k.diterima_cloud IS NULL, k.diterima_cloud, k.waktu_perangkat, k.id_keputusan LIMIT 1) IN ('Setujui', 'Setujui Urgent') ORDER BY p.tanggal_mulai, p.id_pengajuan;";
 /// Tanggal scan Hadir milik `?1` dalam `?2`..`?3`.
@@ -908,35 +908,126 @@ pub fn aturan_cuti(peta: &HashMap<String, String>, kelompok: &str) -> AturanCuti
     }
 }
 
-/// Cermin `validasiAturanCuti`: `{ guru: {…}, tendik: {…} }` → pasangan
-/// kunci-nilai siap disimpan, urutan tetap.
+/// Isian aturan cuti dalam urutan simpan; cermin `ISIAN_CUTI`.
+pub const ISIAN_CUTI: [&str; 7] = ["periode", "hak", "bulan_awal", "syarat_bulan", "sisa", "bawa_maks", "bawa_bulan"];
+
+/// Kelompok kunci aturan cuti satu jabatan: `hr_cuti_<isian>:jab:<id>`.
+pub fn kelompok_jabatan(id_jabatan: &str) -> String {
+    format!("jab:{id_jabatan}")
+}
+
+/// Cermin `aturanCutiPegawai` (2026-11-21): aturan kelompok, lalu setiap
+/// isian jabatan yang sah menimpanya. Isian jabatan kosong = ikut kelompok.
+pub fn aturan_cuti_pegawai(peta: &HashMap<String, String>, kelompok: &str, id_jabatan: &str) -> AturanCuti {
+    let dasar = aturan_cuti(peta, kelompok);
+    let id = id_jabatan.trim();
+    if id.is_empty() {
+        return dasar;
+    }
+    let k = kelompok_jabatan(id);
+    let nilai = |isian: &str| peta.get(&kunci_cuti(isian, &k)).map(|v| v.trim());
+    let angka = |i: usize, cadangan: i64| {
+        let (isian, _, min, maks, _, _) = BATAS_CUTI[i];
+        nilai(isian)
+            .and_then(|v| v.parse::<i64>().ok())
+            .filter(|n| (min..=maks).contains(n))
+            .unwrap_or(cadangan)
+    };
+    let pilih = |isian: &str, daftar: &[&str], cadangan: &str| {
+        nilai(isian)
+            .filter(|v| daftar.contains(v))
+            .unwrap_or(cadangan)
+            .to_owned()
+    };
+    AturanCuti {
+        periode: pilih("periode", &PERIODE_CUTI, &dasar.periode),
+        hak: angka(0, dasar.hak),
+        bulan_awal: angka(1, dasar.bulan_awal),
+        syarat_bulan: angka(2, dasar.syarat_bulan),
+        sisa: pilih("sisa", &SISA_CUTI, &dasar.sisa),
+        bawa_maks: angka(3, dasar.bawa_maks),
+        bawa_bulan: angka(4, dasar.bawa_bulan),
+    }
+}
+
+/// Cermin `aturanJabatan`: jabatan dengan minimal satu isian terisi, urut id.
+/// Isian yang kosong tampil sebagai nilai bawaan tendik.
+pub fn aturan_jabatan(peta: &HashMap<String, String>) -> BTreeMap<String, AturanCuti> {
+    let ids: BTreeSet<String> = peta
+        .iter()
+        .filter(|(_, nilai)| !nilai.trim().is_empty())
+        .filter_map(|(kunci, _)| {
+            let (isian, id) = kunci.strip_prefix("hr_cuti_")?.split_once(":jab:")?;
+            (ISIAN_CUTI.contains(&isian) && !id.is_empty()).then(|| id.to_owned())
+        })
+        .collect();
+    ids.into_iter()
+        .map(|id| {
+            let aturan = aturan_cuti_pegawai(peta, "tendik", &id);
+            (id, aturan)
+        })
+        .collect()
+}
+
+/// Satu aturan (kelompok atau jabatan) → pasangan kunci-nilai di `hasil`.
+fn validasi_satu_aturan_cuti(
+    a: Option<&Value>,
+    label: &str,
+    k: &str,
+    hasil: &mut Vec<(String, String)>,
+) -> Result<(), String> {
+    let a = a
+        .filter(|a| a.is_object())
+        .ok_or_else(|| format!("Aturan cuti {label} tidak lengkap."))?;
+    let periode = teks(a, "periode");
+    if !PERIODE_CUTI.contains(&periode.as_str()) {
+        return Err(format!("Periode cuti {label} harus tahunan atau ulang tahun kerja."));
+    }
+    let sisa = teks(a, "sisa");
+    if !SISA_CUTI.contains(&sisa.as_str()) {
+        return Err(format!("Sisa cuti {label} harus hangus atau dibawa."));
+    }
+    hasil.push((kunci_cuti("periode", k), periode));
+    for (isian, label_isian, min, maks, _, _) in BATAS_CUTI {
+        match a.get(isian).and_then(Value::as_i64) {
+            Some(n) if (min..=maks).contains(&n) => hasil.push((kunci_cuti(isian, k), n.to_string())),
+            _ => return Err(format!("{label_isian} {label} harus {min} sampai {maks}.")),
+        }
+        if isian == "syarat_bulan" {
+            hasil.push((kunci_cuti("sisa", k), sisa.clone()));
+        }
+    }
+    Ok(())
+}
+
+/// Cermin `validasiAturanCuti`: `{ guru: {…}, tendik: {…}, jabatan?: { id:
+/// {…} | null } }` → pasangan kunci-nilai siap disimpan, urutan tetap.
+/// `null` mengosongkan ketujuh kunci jabatan itu (ikut Guru/Tendik lagi).
 pub fn validasi_aturan_cuti(draft: &Value) -> Result<Vec<(String, String)>, String> {
     let mut hasil = Vec::new();
     for k in KELOMPOK_CUTI {
-        let a = draft
-            .get(k)
-            .filter(|a| a.is_object())
-            .ok_or_else(|| format!("Aturan cuti {k} tidak lengkap."))?;
-        let periode = teks(a, "periode");
-        if !PERIODE_CUTI.contains(&periode.as_str()) {
-            return Err(format!(
-                "Periode cuti {k} harus tahunan atau ulang tahun kerja."
-            ));
-        }
-        let sisa = teks(a, "sisa");
-        if !SISA_CUTI.contains(&sisa.as_str()) {
-            return Err(format!("Sisa cuti {k} harus hangus atau dibawa."));
-        }
-        hasil.push((kunci_cuti("periode", k), periode));
-        for (isian, label, min, maks, _, _) in BATAS_CUTI {
-            match a.get(isian).and_then(Value::as_i64) {
-                Some(n) if (min..=maks).contains(&n) => {
-                    hasil.push((kunci_cuti(isian, k), n.to_string()))
-                }
-                _ => return Err(format!("{label} {k} harus {min} sampai {maks}.")),
+        validasi_satu_aturan_cuti(draft.get(k), k, k, &mut hasil)?;
+    }
+    if let Some(jabatan) = draft.get("jabatan") {
+        let peta = jabatan
+            .as_object()
+            .ok_or_else(|| "Aturan cuti jabatan tidak valid.".to_owned())?;
+        let mut ids: Vec<&String> = peta.keys().collect();
+        ids.sort();
+        for id in ids {
+            let id_sah = (1..=80).contains(&id.chars().count())
+                && id.chars().all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '-');
+            if !id_sah {
+                return Err("Aturan cuti jabatan tidak valid.".to_owned());
             }
-            if isian == "syarat_bulan" {
-                hasil.push((kunci_cuti("sisa", k), sisa.clone()));
+            let k = kelompok_jabatan(id);
+            match &peta[id] {
+                Value::Null => {
+                    for isian in ISIAN_CUTI {
+                        hasil.push((kunci_cuti(isian, &k), String::new()));
+                    }
+                }
+                a => validasi_satu_aturan_cuti(Some(a), "jabatan", &k, &mut hasil)?,
             }
         }
     }
@@ -2109,7 +2200,11 @@ fn peta_aturan(connection: &rusqlite::Connection) -> Result<HashMap<String, Stri
 }
 
 fn aturan_json(peta: &HashMap<String, String>) -> Value {
-    json!({ "guru": aturan_cuti(peta, "guru"), "tendik": aturan_cuti(peta, "tendik") })
+    json!({
+        "guru": aturan_cuti(peta, "guru"),
+        "tendik": aturan_cuti(peta, "tendik"),
+        "jabatan": aturan_jabatan(peta),
+    })
 }
 
 /// Tanggal terpakai jatah satu pegawai: tanggal wajib Cuti `potong_jatah`
@@ -2176,7 +2271,7 @@ fn jatah_pegawai(
     let terpakai = tanggal_terpakai(connection, id, &jadwal)?;
     let periode = jatah_cuti(
         Some(tmt.as_str()).filter(|t| !t.is_empty()),
-        &aturan_cuti(peta, kelompok),
+        &aturan_cuti_pegawai(peta, kelompok, &teks(&p, "id_jabatan")),
         &terpakai,
         &aktif,
         hari_ini,
@@ -3366,6 +3461,19 @@ mod tests {
                 serde_json::from_value(k["peta"].clone()).expect("peta");
             let hasil = aturan_cuti(&peta, k["kelompok"].as_str().expect("kelompok"));
             assert_eq!(json!(hasil), k["hasil"], "{k}");
+        }
+        for k in v["aturan_cuti_pegawai"].as_array().expect("aturan_cuti_pegawai") {
+            let peta: HashMap<String, String> = serde_json::from_value(k["peta"].clone()).expect("peta");
+            let hasil = aturan_cuti_pegawai(
+                &peta,
+                k["kelompok"].as_str().expect("kelompok"),
+                k["id_jabatan"].as_str().expect("id_jabatan"),
+            );
+            assert_eq!(json!(hasil), k["hasil"], "{k}");
+        }
+        for k in v["aturan_jabatan"].as_array().expect("aturan_jabatan") {
+            let peta: HashMap<String, String> = serde_json::from_value(k["peta"].clone()).expect("peta");
+            assert_eq!(json!(aturan_jabatan(&peta)), k["hasil"], "{k}");
         }
         for k in v["validasi_aturan_cuti"].as_array().expect("validasi") {
             let hasil = validasi_aturan_cuti(&k["masuk"]);

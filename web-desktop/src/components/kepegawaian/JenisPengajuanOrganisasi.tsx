@@ -7,9 +7,14 @@ import {
   type JenisDraft,
   simpanJenisPengajuan,
 } from "@/lib/gateways/hr-pengajuan";
-import type { OrgKepegawaian } from "@/lib/gateways/hris";
+import {
+  hapusMasterOrganisasi,
+  type OrgKepegawaian,
+} from "@/lib/gateways/hris";
+import { useConfirmDialog } from "@/lib/hooks/useConfirmDialog";
 import {
   DAMPAK_GAJI,
+  JENIS_BAWAAN,
   KELOMPOK,
   SATUAN_MAKS,
 } from "@/lib/validations/hr-pengajuan";
@@ -77,13 +82,14 @@ export function JenisPengajuanOrganisasi({
   const [sunting, setSunting] = useState<JenisDraft | null>(null);
   const isSubmittingRef = useRef(false);
   const [menyimpan, setMenyimpan] = useState(false);
+  const { konfirmasi, dialogKonfirmasi } = useConfirmDialog();
 
-  const simpan = async (draft: JenisDraft, berhasil: string) => {
+  const jalankan = async (aksi: () => Promise<unknown>, berhasil: string) => {
     if (isSubmittingRef.current) return;
     isSubmittingRef.current = true;
     setMenyimpan(true);
     try {
-      await simpanJenisPengajuan(draft);
+      await aksi();
       setSunting(null);
       await onBerhasil(berhasil);
     } catch (error) {
@@ -93,9 +99,12 @@ export function JenisPengajuanOrganisasi({
       setMenyimpan(false);
     }
   };
+  const simpan = (draft: JenisDraft, berhasil: string) =>
+    jalankan(() => simpanJenisPengajuan(draft), berhasil);
 
   return (
     <section aria-labelledby="judul-jenis-pengajuan" className="space-y-3">
+      {dialogKonfirmasi}
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h2
           id="judul-jenis-pengajuan"
@@ -154,6 +163,33 @@ export function JenisPengajuanOrganisasi({
                 >
                   {j.is_aktif === 1 ? "Nonaktifkan" : "Aktifkan"}
                 </button>
+                {JENIS_BAWAAN.some((b) => b.id_jenis === j.id_jenis) ? null : (
+                  <button
+                    type="button"
+                    className={TOMBOL}
+                    disabled={menyimpan}
+                    onClick={async () => {
+                      const setuju = await konfirmasi({
+                        title: `Hapus "${j.nama}"?`,
+                        description:
+                          "Hanya bisa bila belum pernah dipakai pengajuan mana pun, termasuk riwayat. Tidak bisa dibatalkan.",
+                        confirmLabel: "Hapus",
+                        tone: "danger",
+                      });
+                      if (setuju)
+                        await jalankan(
+                          () =>
+                            hapusMasterOrganisasi(
+                              "jenis_pengajuan",
+                              j.id_jenis,
+                            ),
+                          `"${j.nama}" dihapus.`,
+                        );
+                    }}
+                  >
+                    Hapus
+                  </button>
+                )}
               </div>
             ) : null}
           </li>

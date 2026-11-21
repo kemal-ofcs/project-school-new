@@ -1068,7 +1068,7 @@ mod tests {
                  DROP TABLE hr_pelamar_berkas; DROP TABLE hr_pelatihan; DROP TABLE hr_pelatihan_peserta;
                  DELETE FROM role_permission WHERE permission_key LIKE 'hr.recruit.%' OR permission_key LIKE 'hr.training.%';
                  DELETE FROM app_permission WHERE permission_key LIKE 'hr.recruit.%' OR permission_key LIKE 'hr.training.%';
-                 DELETE FROM schema_migration WHERE version IN (72, -2048, -2049);",
+                 DELETE FROM schema_migration WHERE version IN (72, -2048, -2049, -2050, -2051);",
             )
             .expect("siapkan database v71");
             client.ensure_schema_current().await.expect("skema mutakhir");
