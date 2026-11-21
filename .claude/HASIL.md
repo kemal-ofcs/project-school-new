@@ -1,7 +1,7 @@
 # HASIL.md — hasil `bun run check`
 
-- Waktu: 20 November 2026, 10:41 WIB
-- Commit: a14b22f (+ 38 berkas berubah/baru, belum commit)
+- Waktu: 21 November 2026, 16:47 WIB
+- Commit: 1ca4bcc (+ 2 berkas berubah, belum commit)
 - Perintah: `bun run check` (root)
 - Exit code: 0
 - Status: **LULUS**
@@ -16,7 +16,7 @@
 | web-public (lint, typecheck, bun test) | Lulus |
 
 ## Galat (maks 10, urutan kemunculan)
-Tidak ada galat. Seluruh gerbang kualitas dan pengujian lulus 100%.
+Tidak ada galat. Seluruh pengujian dan gerbang kualitas lulus 100%.
 
 ## Catatan
-Seluruh pengujian unit TypeScript/Rust (mencakup cargo test kedua workspace), audit skema dan kontrak sinkronisasi, serta linting lulus dengan kode keluar 0.
+Semua pengujian unit TypeScript/Rust (termasuk cargo test kedua workspace), audit integritas skema dan kontrak sinkronisasi, serta linting lulus dengan kode keluar 0.
