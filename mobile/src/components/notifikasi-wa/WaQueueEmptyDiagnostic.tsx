@@ -27,8 +27,7 @@ export function WaQueueEmptyDiagnostic({
     !config.koreksiAdminEnabled &&
     !config.importManualEnabled &&
     !config.uksEnabled &&
-    !config.tagihanEnabled &&
-    !config.tutupBukuEnabled;
+    !config.tagihanEnabled;
 
   return (
     <div className="rounded-3xl border border-white/10 bg-slate-900/80 p-4">

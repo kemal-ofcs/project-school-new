@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { type ItemPengingat, KEJADIAN_PENGINGAT } from "./hr-pengingat";
 import {
   antreanKepegawaian,
+  antreanTutupBerubah,
   type BarisStokMenipis,
   BIDANG_KEJADIAN,
   galatTelegram,
@@ -261,6 +262,46 @@ describe("aturan murni Telegram", () => {
     expect(pesanBukaBuku("2026-09-30", "Kepala TU", " ")).toBe(
       "🔓 Buku dibuka kembali (tutup sampai 30/09/2026)\nOleh: Kepala TU",
     );
+  });
+
+  // Kembar `tutup_berubah_kembar` di `desktop/telegram.rs`.
+  test("saldo tutup buku berubah", () => {
+    const riwayat = [
+      {
+        id_tutup: "tb-1",
+        status: "Menunggu",
+        sampai_tanggal: "2026-09-30",
+        dibuat_oleh: "bendahara",
+        perlu_ditinjau: false,
+      },
+      {
+        id_tutup: "tb-2",
+        status: "Aktif",
+        sampai_tanggal: "2026-08-31",
+        dibuat_oleh: "kepala",
+        perlu_ditinjau: true,
+      },
+      {
+        id_tutup: "tb-3",
+        status: "Aktif",
+        sampai_tanggal: "2026-07-31",
+        dibuat_oleh: "kepala",
+        perlu_ditinjau: false,
+      },
+      {
+        id_tutup: "tb-4",
+        status: "Dibuka",
+        sampai_tanggal: "2026-06-30",
+        dibuat_oleh: "kepala",
+        perlu_ditinjau: true,
+      },
+    ];
+    expect(antreanTutupBerubah(riwayat)).toEqual([
+      [
+        "tutup-berubah:tb-2",
+        "⚠️ Saldo berubah sesudah tutup buku sampai 31/08/2026\nDitutup oleh: kepala\nAda transaksi baru di periode yang sudah ditutup. Tinjau di Keuangan, tab Tutup Buku.",
+      ],
+    ]);
   });
 
   test("isi pesan gaji", () => {

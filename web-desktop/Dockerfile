@@ -19,6 +19,8 @@ FROM oven/bun:1.3-alpine AS deps
 WORKDIR /app
 
 COPY package.json bun.lock ./
+# `patchedDependencies` di package.json dibaca saat install.
+COPY patches ./patches
 # `postinstall` (salin model wajah) butuh `scripts/`, yang belum ada di tahap
 # ini; ia dijalankan di tahap build setelah `COPY . .`.
 RUN bun install --frozen-lockfile --ignore-scripts

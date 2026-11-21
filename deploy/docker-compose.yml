@@ -11,7 +11,8 @@ services:
   # Database. Datanya tersimpan di ./data/database, dan folder itulah yang
   # perlu dicadangkan.
   database:
-    image: ghcr.io/tursodatabase/libsql-server:latest
+    # Versi dikunci: `latest` bisa berganti isi di setiap pull tanpa diuji.
+    image: ghcr.io/tursodatabase/libsql-server:v0.24.33
     container_name: sekolah-database
     restart: unless-stopped
     volumes:
@@ -26,11 +27,14 @@ services:
     # database, melewati login dan hak akses aplikasi.
     #
     # Buka hanya bila aplikasi Desktop atau Mobile ikut memakai database ini,
-    # dan pasang autentikasinya lebih dulu:
+    # dan pasang autentikasinya lebih dulu. Langkahnya: README.md, bagian
+    # "Aplikasi Desktop dan Mobile". Port diikat ke IP server di jaringan
+    # sekolah, bukan "8080:8080": di Linux, Docker melewati aturan firewall
+    # `ufw`, sehingga port tanpa IP ikut terbuka di antarmuka publik.
     # environment:
-    #   - SQLD_AUTH_JWT_KEY=<kunci publik Ed25519>
+    #   - SQLD_AUTH_JWT_KEY=${KOS_DATABASE_JWT_KEY:?Isi KOS_DATABASE_JWT_KEY di berkas .env}
     # ports:
-    #   - "8080:8080"
+    #   - "192.168.1.10:8080:8080"
 
   # Aplikasi admin. Tidak membuka port sendiri: semua akses lewat proxy di bawah.
   web:

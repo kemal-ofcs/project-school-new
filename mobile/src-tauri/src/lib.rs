@@ -310,6 +310,7 @@ pub fn run() {
             mobile::commands::desktop_delete_teaching_journal,
             mobile::commands::desktop_accounting_accounts,
             mobile::commands::desktop_accounting_save_account,
+            mobile::commands::desktop_accounting_delete_account,
             mobile::commands::desktop_accounting_journals,
             mobile::commands::desktop_accounting_journal,
             mobile::commands::desktop_accounting_post_journal,

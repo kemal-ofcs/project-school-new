@@ -60,6 +60,18 @@ export async function simpanAkun(
   return requestWebApi("/api/accounting/accounts/save", "POST", draft);
 }
 
+export async function hapusAkun(idAkun: string): Promise<{ sukses: boolean }> {
+  if (isDesktopRuntime()) {
+    const result = await invokeDesktop<{ sukses: boolean }>(
+      "desktop_accounting_delete_account",
+      { idAkun },
+    );
+    kickDesktopSync();
+    return result;
+  }
+  return requestWebApi("/api/accounting/accounts/delete", "POST", { idAkun });
+}
+
 export async function daftarJurnal(
   dari: string,
   sampai: string,
@@ -270,7 +282,7 @@ export async function tutupUlangBuku(
   });
 }
 
-/** Pemberitahuan WhatsApp tutup buku; dipanggil komponen latar. */
+/** Saldo tutup buku berubah ke antrean Telegram; dipanggil komponen latar. */
 export async function jalankanPemberitahuanTutupBuku(): Promise<{
   diantre: number;
   alasan: string | null;

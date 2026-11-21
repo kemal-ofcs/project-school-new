@@ -152,7 +152,12 @@ function utama() {
   const arsip = path.join(folder, `${PRODUCT}-${versi}.tar`);
   jalankan("docker", ["save", "-o", arsip, ...tags, ...pendukung], rootDir);
 
-  for (const berkas of ["docker-compose.yml", "Caddyfile", "README.md"]) {
+  for (const berkas of [
+    "docker-compose.yml",
+    "Caddyfile",
+    "README.md",
+    "buat-token-database.mjs",
+  ]) {
     copyFileSync(path.join(deploy, berkas), path.join(folder, berkas));
   }
   writeFileSync(
@@ -175,7 +180,9 @@ function utama() {
   console.log(`  ${folder}`);
   console.log(`    ${PRODUCT}-${versi}.tar (${ukuranMb} MB)`);
   for (const image of [...tags, ...pendukung]) console.log(`      ${image}`);
-  console.log("    docker-compose.yml, Caddyfile, .env.example, README.md");
+  console.log(
+    "    docker-compose.yml, Caddyfile, .env.example, README.md, buat-token-database.mjs",
+  );
   console.log(
     "\nLisensi diterbitkan terpisah, setelah pembeli mengirim kode server dari halaman /setup.",
   );

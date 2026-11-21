@@ -198,6 +198,7 @@ const DESKTOP_COMMANDS: &[&str] = &[
     "desktop_delete_teaching_journal",
     "desktop_accounting_accounts",
     "desktop_accounting_save_account",
+    "desktop_accounting_delete_account",
     "desktop_accounting_journals",
     "desktop_accounting_journal",
     "desktop_accounting_post_journal",

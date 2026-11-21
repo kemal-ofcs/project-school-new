@@ -185,6 +185,41 @@ Data tidak tersentuh: ia ada di folder `data/`, di luar image.
 
 ## Aplikasi Desktop dan Mobile
 
-Port database tidak dibuka secara bawaan. Bila Desktop atau Mobile perlu
-menyambung ke database ini, ikuti catatan pada layanan `database` di
-`docker-compose.yml`, dan pasang autentikasinya sebelum membuka port.
+Port database tidak dibuka secara bawaan. Bila hanya versi Web yang dipakai,
+biarkan tertutup. Bila Desktop atau Mobile perlu menyambung ke database ini,
+pasang autentikasinya lebih dulu, baru buka port-nya:
+
+1. Buat kunci dan token database. Jalankan di folder ini, setelah
+   `KOS_WEB_IMAGE` di `.env` terisi:
+
+   ```
+   docker compose run --rm --no-deps --entrypoint node \
+     -v "$PWD/buat-token-database.mjs:/buat-token-database.mjs:ro" \
+     web /buat-token-database.mjs
+   ```
+
+   Keluarannya dua baris, `KOS_DATABASE_JWT_KEY=...` dan
+   `KOS_DATABASE_AUTH_TOKEN=...`. Ganti dua baris yang masih kosong di `.env`
+   dengan keduanya.
+2. Di `docker-compose.yml`, pada layanan `database`, hapus tanda `#` di depan
+   baris `environment:`, `ports:`, dan baris di bawah masing-masing. Ganti
+   `192.168.1.10` dengan alamat IP server.
+3. Jalankan `docker compose up -d`.
+4. Di Desktop atau Mobile, pilih server libSQL sendiri dengan alamat
+   `http://<IP server>:8080`, lalu isi tokennya dengan nilai
+   `KOS_DATABASE_AUTH_TOKEN`.
+
+Sebelum membuka port, perhatikan hal berikut:
+
+- **Token memberi akses penuh ke seluruh data**, melewati login dan hak akses
+  aplikasi. Simpan seperti password Superadmin dan pasang hanya di perangkat
+  milik sekolah.
+- **Lalu lintas ke port 8080 tidak dienkripsi.** Siapa pun di jaringan yang
+  sama bisa menyadap token dan data. Letakkan server dan perangkat staf di
+  jaringan yang terpisah dari WiFi siswa dan tamu.
+- **Jangan buka port 8080 ke internet.** Perangkat yang dipakai di luar sekolah
+  menyambung lewat VPN (misalnya WireGuard atau Tailscale), atau pakai Turso
+  Cloud.
+- **Bila perangkat hilang atau staf keluar**, ulangi langkah 1 dan 3, lalu isi
+  token baru di setiap perangkat yang masih dipakai. Kunci baru langsung
+  mematikan semua token lama.

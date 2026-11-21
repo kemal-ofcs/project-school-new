@@ -158,75 +158,8 @@ export function bandingSaldo(
     .filter(([, x, y]) => x !== y);
 }
 
-// ── Tahap 3: pemberitahuan WhatsApp ke pemegang izin Tutup Buku ─────────────
+// ── Tahap 3: pemberitahuan saldo berubah ke grup Telegram Keuangan ─────────
 
-/** Cermin `KEJADIAN_TUTUP`. */
-export const KEJADIAN_TUTUP = ["menunggu", "berubah"] as const;
-export type JenisKejadianTutup = (typeof KEJADIAN_TUTUP)[number];
 /** Cermin `ALASAN_PEMBERITAHUAN_MATI`. */
 export const ALASAN_PEMBERITAHUAN_MATI =
-  "Pemberitahuan tutup buku belum dinyalakan.";
-
-/** Cermin `KejadianTutup`. */
-export interface KejadianTutup {
-  id_tutup: string;
-  kejadian: JenisKejadianTutup;
-  sampai: string;
-  dibuat_oleh: string;
-}
-
-/** Cermin `kunci_pemberitahuan`. */
-export function kunciPemberitahuan(
-  idTutup: string,
-  kejadian: string,
-  idOperator: string,
-): string {
-  return `tutup_buku:${idTutup}:${kejadian}:${idOperator}`;
-}
-
-/** Isian template `tutup_buku`. Cermin `isian_pemberitahuan`. */
-export function isianPemberitahuan(
-  kejadian: KejadianTutup,
-  nama: string,
-): Record<string, string> {
-  const menunggu = kejadian.kejadian === "menunggu";
-  return {
-    nama: nama.trim() || "Bapak/Ibu",
-    tanggal: tanggalTampil(kejadian.sampai),
-    kejadian: menunggu
-      ? "ada versi lain yang menunggu keputusan"
-      : "saldonya berubah sesudah ditutup",
-    rincian: menunggu
-      ? `Versi itu ditutup oleh ${kejadian.dibuat_oleh}.`
-      : `Ada transaksi baru di periode yang ditutup oleh ${kejadian.dibuat_oleh}.`,
-  };
-}
-
-/** Cermin `kejadian_dari_riwayat`. */
-export function kejadianDariRiwayat(
-  riwayat: ReadonlyArray<{
-    id_tutup: string;
-    status: string;
-    sampai_tanggal: string;
-    dibuat_oleh: string;
-    perlu_ditinjau?: boolean;
-  }>,
-): KejadianTutup[] {
-  const hasil: KejadianTutup[] = [];
-  for (const baris of riwayat) {
-    const kejadian =
-      baris.status === "Menunggu"
-        ? "menunggu"
-        : baris.status === "Aktif" && baris.perlu_ditinjau === true
-          ? "berubah"
-          : null;
-    if (!kejadian) continue;
-    hasil.push({
-      id_tutup: baris.id_tutup,
-      kejadian,
-      sampai: baris.sampai_tanggal,
-      dibuat_oleh: baris.dibuat_oleh,
-    });
-  }
-  return hasil;
-}
+  "Notifikasi Telegram tutup buku belum dinyalakan atau grup Keuangan belum diatur.";

@@ -207,7 +207,9 @@ pub fn parse_wa_switches(draft: &Value) -> WaSwitches {
         import_manual: flag(draft, "importManualEnabled"),
         uks: flag(draft, "uksEnabled"),
         tagihan: flag(draft, "tagihanEnabled"),
-        tutup_buku: flag(draft, "tutupBukuEnabled"),
+        // Pindah ke Telegram. Selalu 0 (kolom cloud dan cerminannya) supaya
+        // perangkat versi lama ikut berhenti mengantre dan mengirim jenis ini.
+        tutup_buku: 0,
         pengingat_otomatis: flag(draft, "pengingatOtomatis"),
         pengingat_hari_sebelum: clamp_pengingat_hari_sebelum(
             draft

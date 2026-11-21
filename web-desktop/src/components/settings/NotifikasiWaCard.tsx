@@ -49,7 +49,6 @@ export function NotifikasiWaCard({
   const [importManual, setImportManual] = useState(false);
   const [uks, setUks] = useState(false);
   const [tagihan, setTagihan] = useState(false);
-  const [tutupBuku, setTutupBuku] = useState(false);
   const [pengingatOtomatis, setPengingatOtomatis] = useState(false);
   const [hariSebelum, setHariSebelum] = useState(3);
   const [hariLewat, setHariLewat] = useState(1);
@@ -67,7 +66,6 @@ export function NotifikasiWaCard({
       setImportManual(config.importManualEnabled);
       setUks(config.uksEnabled);
       setTagihan(config.tagihanEnabled);
-      setTutupBuku(config.tutupBukuEnabled);
       setPengingatOtomatis(config.pengingatOtomatis ?? false);
       setHariSebelum(config.pengingatHariSebelum ?? 3);
       setHariLewat(config.pengingatHariLewat ?? 1);
@@ -94,7 +92,6 @@ export function NotifikasiWaCard({
       importManualEnabled: importManual,
       uksEnabled: uks,
       tagihanEnabled: tagihan,
-      tutupBukuEnabled: tutupBuku,
       pengingatOtomatis,
       pengingatHariSebelum: hariSebelum,
       pengingatHariLewat: hariLewat,
@@ -468,45 +465,6 @@ export function NotifikasiWaCard({
           ) : (
             <span className="text-xs font-semibold text-slate-400">
               {tagihan ? "Aktif" : "Nonaktif"}
-            </span>
-          )}
-        </div>
-
-        {/* Pemberitahuan tutup buku */}
-        <div className="flex flex-col gap-3 rounded-2xl border border-white/10 bg-slate-950/60 p-4 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <span className="text-sm font-bold text-white">
-              Pemberitahuan Tutup Buku
-            </span>
-            <p className="text-xs text-slate-400">
-              Mengirim WhatsApp ke pemegang izin Tutup Buku saat ada versi tutup
-              buku yang menunggu keputusan, atau saat saldo periode yang sudah
-              ditutup berubah. Satu pesan per kejadian per orang. Penerimanya
-              Superadmin dan pemegang izin Tutup Buku yang nomor HP-nya terisi
-              di Master Operator. Diperiksa tiap 30 menit selama aplikasi
-              terbuka oleh pemegang izin lihat pembukuan; di Desktop dan Mobile
-              hanya bila sinkronisasi terakhir paling lama 15 menit.
-            </p>
-          </div>
-          {canManage ? (
-            <label className="relative inline-flex cursor-pointer items-center">
-              <input
-                type="checkbox"
-                checked={tutupBuku}
-                disabled={busy}
-                onChange={(e) => {
-                  setTutupBuku(e.target.checked);
-                  setIsDirty(true);
-                }}
-                className="sr-only peer"
-                id="toggle-wa-tutup-buku"
-                aria-label="Pemberitahuan tutup buku"
-              />
-              <div className="h-6 w-11 rounded-full bg-slate-800 peer peer-checked:bg-emerald-500 peer-focus:outline-none after:absolute after:top-0.5 after:left-[2px] after:h-5 after:w-5 after:rounded-full after:border after:border-slate-300 after:bg-white after:transition-all after:content-[''] peer-checked:after:translate-x-full peer-checked:after:border-white disabled:opacity-50" />
-            </label>
-          ) : (
-            <span className="text-xs font-semibold text-slate-400">
-              {tutupBuku ? "Aktif" : "Nonaktif"}
             </span>
           )}
         </div>

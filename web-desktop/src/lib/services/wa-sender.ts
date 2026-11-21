@@ -246,7 +246,8 @@ export async function drainWaQueue(
         import_manual: config.importManualEnabled,
         uks: config.uksEnabled,
         tagihan: config.tagihanEnabled,
-        tutup_buku: config.tutupBukuEnabled,
+        // Pindah ke Telegram: sisa antrean lama dibatalkan, tidak dikirim.
+        tutup_buku: false,
       },
       seenDedupeKeys,
       String(row.dedupe_key),

@@ -161,34 +161,40 @@ describe("tutup buku Web: Tahap 2", () => {
   });
 });
 
-// Cermin `pemberitahuan_diantre_sekali_per_penerima` di `desktop/tutup_buku.rs`.
-describe("tutup buku Web: pemberitahuan WhatsApp", () => {
-  test("hanya pemegang izin aktif, sekali per kejadian", async () => {
+describe("tutup buku Web: saldo berubah ke Telegram", () => {
+  test("hanya bila Telegram siap, sekali per tutup buku", async () => {
+    // Saldo yang dibekukan sengaja tidak sama dengan saldo sekarang.
+    await client.execute(
+      "INSERT INTO keu_tutup_buku (id_tutup, sampai_tanggal, dibuat_oleh, kode_perangkat, waktu_perangkat, diterima_cloud, saldo_json, status, created_at, updated_at) VALUES ('tb-uji-tg', '2019-06-30', 'bendahara', 'A9F3', '2019-07-01 07:00:00', '2019-07-02 08:00:00', '[[\"akun-kas\",1,0]]', 'Aktif', datetime('now'), datetime('now'));",
+    );
     expect((await notify(client)).alasan).toBe(
-      "Pemberitahuan tutup buku belum dinyalakan.",
+      "Notifikasi Telegram tutup buku belum dinyalakan atau grup Keuangan belum diatur.",
     );
     await client.batch(
       [
-        "INSERT INTO setting_gex_system (key, value) VALUES ('wa_notify_tutup_buku', 'true') ON CONFLICT(key) DO UPDATE SET value = excluded.value;",
-        "INSERT INTO app_role (id, role_key, nama_role, created_at, updated_at) VALUES (901, 'uji-bendahara', 'Uji Bendahara', datetime('now'), datetime('now')), (902, 'uji-tu', 'Uji TU', datetime('now'), datetime('now'));",
-        "INSERT INTO role_permission (role_id, permission_key, is_allowed, updated_at) VALUES (901, 'accounting.close', 1, datetime('now')), (902, 'accounting.close', 0, datetime('now'));",
-        `INSERT INTO master_operator (id, kode_operator, nama_operator, username, password_hash, role_id, no_hp, status) VALUES
-           (901, 'U901', 'Bu Sari', 'uji-sari', 'x', 901, '081234567890', 'Aktif'),
-           (902, 'U902', 'Pak Tu', 'uji-tu', 'x', 902, '081234567891', 'Aktif'),
-           (903, 'U903', 'Mantan', 'uji-mantan', 'x', 901, '081234567892', 'Nonaktif');`,
-        "INSERT INTO keu_tutup_buku (id_tutup, sampai_tanggal, dibuat_oleh, kode_perangkat, waktu_perangkat, diterima_cloud, saldo_json, status, created_at, updated_at) VALUES ('tb-uji-wa', '2019-06-30', 'bendahara', 'A9F3', '2019-07-01 07:00:00', '2019-07-02 08:00:00', '[]', 'Menunggu', datetime('now'), datetime('now'));",
+        "INSERT INTO app_telegram_setting (kunci, nilai, updated_at) VALUES ('aktif', '1', datetime('now')), ('bot_token', '123456789:AAHdqTcvCH1vGWJxfSeofSAs0K5PALDsaw0', datetime('now')), ('kirim:tutup_buku', '1', datetime('now'));",
       ],
       "write",
+    );
+    // Grup Keuangan belum diatur: belum siap.
+    expect((await notify(client)).alasan).not.toBeNull();
+    await client.execute(
+      "INSERT INTO app_telegram_setting (kunci, nilai, updated_at) VALUES ('grup:keuangan', '-1001234567890', datetime('now'));",
     );
     const baris = async () =>
       (
         await client.execute(
-          "SELECT tujuan_nomor, jenis FROM notifikasi_wa WHERE dedupe_key LIKE 'tutup_buku:tb-uji-wa:%' LIMIT 10;",
+          "SELECT kejadian, isi_pesan FROM notifikasi_telegram WHERE id_notifikasi = 'tutup-berubah:tb-uji-tg';",
         )
-      ).rows.map((row) => [String(row.tujuan_nomor), String(row.jenis)]);
-    await notify(client);
-    expect(await baris()).toEqual([["+6281234567890", "tutup_buku"]]);
-    await notify(client);
-    expect(await baris()).toEqual([["+6281234567890", "tutup_buku"]]);
+      ).rows.map((row) => [String(row.kejadian), String(row.isi_pesan)]);
+    expect((await notify(client)).diantre).toBeGreaterThan(0);
+    expect(await baris()).toEqual([
+      [
+        "tutup_buku",
+        "⚠️ Saldo berubah sesudah tutup buku sampai 30/06/2019\nDitutup oleh: bendahara\nAda transaksi baru di periode yang sudah ditutup. Tinjau di Keuangan, tab Tutup Buku.",
+      ],
+    ]);
+    expect(await notify(client)).toEqual({ diantre: 0, alasan: null });
+    expect(await baris()).toHaveLength(1);
   });
 });

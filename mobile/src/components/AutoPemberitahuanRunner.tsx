@@ -57,12 +57,11 @@ function useKetukBerkala(
 }
 
 /**
- * Pemberitahuan WhatsApp latar selama aplikasi terbuka: pengingat tagihan
- * otomatis (sesi pemegang `billing.manage`; sakelar, H-n, dan sekali sehari
- * diputuskan backend) dan pemberitahuan tutup buku ke pemegang izin Tutup
- * Buku (sesi pemegang `accounting.view`; satu pesan per kejadian per orang).
- * Pesannya masuk antrean WhatsApp biasa dan terkirim lewat pengirim yang sama
- * dengan pesan lain.
+ * Pemberitahuan latar selama aplikasi terbuka: pengingat tagihan otomatis ke
+ * wali lewat antrean WhatsApp (sesi pemegang `billing.manage`; sakelar, H-n,
+ * dan sekali sehari diputuskan backend) dan saldo tutup buku yang berubah ke
+ * grup Telegram Keuangan (sesi pemegang `accounting.view`; satu pesan per
+ * tutup buku, dikirim pengirim Telegram).
  */
 export function AutoPemberitahuanRunner() {
   const { isAuthenticated, user } = useAuth();

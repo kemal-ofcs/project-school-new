@@ -205,6 +205,8 @@ describe("dynamic RBAC migration", () => {
       72,
       // v73 — transfer gaji, pelaporan, reimbursement (HRIS Fase 8, `app_bank*`, `hr_reimburse*`).
       73,
+      // v74 — hapus permanen akun (`keu_akun.dihapus_pada`).
+      74,
     ]);
 
     const sessionColumns = await client.execute(

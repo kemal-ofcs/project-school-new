@@ -107,6 +107,7 @@ const HRIS_KELUAR_MIGRATION_VERSION = 70;
 const HRIS_KINERJA_MIGRATION_VERSION = 71;
 const HRIS_REKRUTMEN_MIGRATION_VERSION = 72;
 const HRIS_TRANSFER_MIGRATION_VERSION = 73;
+const ACCOUNT_DELETE_MIGRATION_VERSION = 74;
 
 /**
  * Bentuk `akademik_jam_pelajaran` sejak v60: jenis `Pulang`, cakupan unit +
@@ -762,6 +763,12 @@ export async function runDatabaseMigrations(client: Client) {
       "inventory_barang",
       "dihapus_pada",
       "ALTER TABLE inventory_barang ADD COLUMN dihapus_pada TEXT;",
+    ],
+    // Hapus permanen akun yang belum dipakai (v74). NULL = belum dihapus.
+    [
+      "keu_akun",
+      "dihapus_pada",
+      "ALTER TABLE keu_akun ADD COLUMN dihapus_pada TEXT;",
     ],
   ] as const) {
     if (
@@ -1896,7 +1903,8 @@ export async function runDatabaseMigrations(client: Client) {
       saldo_normal TEXT NOT NULL CHECK (saldo_normal IN ('Debit', 'Kredit')),
       is_aktif INTEGER NOT NULL DEFAULT 1 CHECK (is_aktif IN (0, 1)),
       created_at TEXT NOT NULL DEFAULT (datetime('now')),
-      updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+      updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+      dihapus_pada TEXT
     );
   `);
   await client.execute(`
@@ -3215,6 +3223,12 @@ export async function runDatabaseMigrations(client: Client) {
     sql: `INSERT OR IGNORE INTO schema_migration (version, name, applied_at)
           VALUES (?, 'inventory-item-delete', ?);`,
     args: [INVENTORY_ITEM_DELETE_MIGRATION_VERSION, now],
+  });
+  // v74: hapus permanen akun (ALTER-nya ada di daftar kolom di atas).
+  await client.execute({
+    sql: `INSERT OR IGNORE INTO schema_migration (version, name, applied_at)
+          VALUES (?, 'accounting-account-delete', ?);`,
+    args: [ACCOUNT_DELETE_MIGRATION_VERSION, now],
   });
   // v62: sumber jurnal `Inventaris`, lalu v65: `Cicilan`. Cermin `ensure_journal_source_values` di
   // `storage.rs`/`turso.rs`. Indeks dan trigger cloud dipasang ulang dari

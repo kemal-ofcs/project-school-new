@@ -216,6 +216,7 @@ pub fn run() {
             desktop::commands::desktop_delete_teaching_journal,
             desktop::commands::desktop_accounting_accounts,
             desktop::commands::desktop_accounting_save_account,
+            desktop::commands::desktop_accounting_delete_account,
             desktop::commands::desktop_accounting_journals,
             desktop::commands::desktop_accounting_journal,
             desktop::commands::desktop_accounting_post_journal,

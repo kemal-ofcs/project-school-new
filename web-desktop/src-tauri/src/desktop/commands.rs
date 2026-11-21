@@ -2860,6 +2860,16 @@ pub fn desktop_accounting_save_account(
     accounting::save_account(&state, draft)
 }
 
+/// Hapus permanen akun yang belum pernah dipakai jurnal atau transaksi.
+#[tauri::command]
+pub fn desktop_accounting_delete_account(
+    state: State<'_, DesktopState>,
+    id_akun: String,
+) -> Result<Value, CommandError> {
+    require_permission(&state, "accounting.account.delete")?;
+    accounting::delete_account(&state, &id_akun)
+}
+
 #[tauri::command]
 pub fn desktop_accounting_journals(
     state: State<'_, DesktopState>,

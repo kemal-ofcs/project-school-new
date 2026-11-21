@@ -44,6 +44,7 @@
     },
   },
   "patchedDependencies": {
+    "jspdf@4.2.1": "patches/jspdf@4.2.1.patch",
     "@vladmandic/human@3.3.6": "patches/@vladmandic%2Fhuman@3.3.6.patch",
   },
   "overrides": {

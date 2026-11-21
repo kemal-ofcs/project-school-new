@@ -20,7 +20,7 @@ use super::{
 /// `CURRENT_SCHEMA_VERSION` di `web-desktop/src/lib/db-schema.ts` setiap kali
 /// migrasi baru ditambahkan, karena keduanya membaca tabel `schema_migration`
 /// yang sama di Turso.
-pub const CLIENT_SCHEMA_VERSION: i64 = 73;
+pub const CLIENT_SCHEMA_VERSION: i64 = 74;
 
 /// Hanya `cloud > client` yang berbahaya; `cloud <= client` adalah kondisi normal.
 fn is_client_schema_outdated(cloud_version: i64) -> bool {
@@ -1283,9 +1283,9 @@ const SNAPSHOT_TABLES: &[SnapshotTable] = &[
     },
     // ── v39: Akuntansi ──
     //
-    // Ketiganya `delete_missing: false`: akun hanya dinonaktifkan dan jurnal
-    // append-only (koreksi = jurnal pembalik), jadi ketiadaan baris di
-    // snapshot tidak pernah berarti "dihapus".
+    // Ketiganya `delete_missing: false`: akun yang dihapus tetap ada barisnya
+    // bertanda `dihapus_pada` (v74) dan jurnal append-only (koreksi = jurnal
+    // pembalik), jadi ketiadaan baris di snapshot tidak pernah berarti "dihapus".
     SnapshotTable {
         payload_key: "accountingAccounts",
         domain: "accounting-account",
@@ -1299,6 +1299,7 @@ const SNAPSHOT_TABLES: &[SnapshotTable] = &[
             "is_aktif",
             "created_at",
             "updated_at",
+            "dihapus_pada",
         ],
         conflict_column: "id_akun",
         entity_column: "id_akun",

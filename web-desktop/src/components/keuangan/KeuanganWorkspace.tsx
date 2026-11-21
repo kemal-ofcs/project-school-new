@@ -44,6 +44,7 @@ import {
   getJurnal,
   getNeracaSaldo,
   getStatusTutupBuku,
+  hapusAkun,
   type JurnalDetail,
   type JurnalItem,
   type NeracaSaldo,
@@ -64,6 +65,7 @@ import {
   saldoNormalBawaan,
 } from "@/lib/validations/accounting";
 import { jumlahPerhatianCicilan } from "@/lib/validations/cicilan";
+import { KONFIRMASI_HAPUS_PERMANEN } from "@/lib/validations/inventory";
 
 /**
  * Seluruh UI pembukuan, dipakai apa adanya oleh halaman Web/Desktop dan
@@ -113,6 +115,7 @@ export function KeuanganWorkspace() {
   const bolehKelola = hasPermission(user, "accounting.manage");
   const bolehBatal = hasPermission(user, "accounting.reverse");
   const bolehTutup = hasPermission(user, "accounting.close");
+  const bolehHapusAkun = hasPermission(user, "accounting.account.delete");
   const bolehBatalCicilan = hasPermission(user, "installment.cancel");
 
   const [tab, setTab] = useState<Tab>("jurnal");
@@ -334,6 +337,7 @@ export function KeuanganWorkspace() {
           <PanelAkun
             akun={akun}
             bolehKelola={bolehKelola}
+            bolehHapus={bolehHapusAkun}
             onTersimpan={async (pesan) => {
               info(pesan);
               await muatAkun();
@@ -1202,20 +1206,37 @@ function PanelNeracaSaldo() {
   useEffect(() => subscribeSyncCompleted(() => void muat()), [muat]);
 
   const seimbang = data !== null && data.total_debit === data.total_kredit;
+  // Jumlah tetap dari seluruh akun; akun nol hanya disembunyikan dari baris.
+  const [hanyaBersaldo, setHanyaBersaldo] = useState(true);
+  const barisTampil = !data
+    ? []
+    : hanyaBersaldo
+      ? data.items.filter((item) => item.debit || item.kredit)
+      : data.items;
 
   return (
     <div className="space-y-4">
-      <div className="max-w-xs">
-        <label className={LABEL} htmlFor="neraca-sampai">
-          Per tanggal
+      <div className="flex flex-wrap items-end gap-x-6 gap-y-2">
+        <div className="w-full max-w-xs">
+          <label className={LABEL} htmlFor="neraca-sampai">
+            Per tanggal
+          </label>
+          <input
+            id="neraca-sampai"
+            type="date"
+            className={INPUT}
+            value={sampai}
+            onChange={(e) => setSampai(e.target.value)}
+          />
+        </div>
+        <label className="flex min-h-11 items-center gap-2 text-sm text-slate-100">
+          <input
+            type="checkbox"
+            checked={hanyaBersaldo}
+            onChange={(e) => setHanyaBersaldo(e.target.checked)}
+          />
+          Hanya akun bersaldo
         </label>
-        <input
-          id="neraca-sampai"
-          type="date"
-          className={INPUT}
-          value={sampai}
-          onChange={(e) => setSampai(e.target.value)}
-        />
       </div>
 
       {galatMuat ? (
@@ -1256,7 +1277,7 @@ function PanelNeracaSaldo() {
                 </tr>
               </thead>
               <tbody>
-                {data.items.map((item) => (
+                {barisTampil.map((item) => (
                   <tr key={item.id_akun} className="border-t border-slate-800">
                     <td className="px-3 py-2 text-slate-400 whitespace-nowrap">
                       {item.kode}
@@ -1290,7 +1311,8 @@ function PanelNeracaSaldo() {
               {
                 label: "Ekspor Excel",
                 jenis: "Excel",
-                kerja: () => eksporNeracaSaldo(data, sampai),
+                kerja: () =>
+                  eksporNeracaSaldo({ ...data, items: barisTampil }, sampai),
               },
             ]}
           />
@@ -1314,10 +1336,12 @@ interface DraftAkun {
 function PanelAkun({
   akun,
   bolehKelola,
+  bolehHapus,
   onTersimpan,
 }: {
   akun: AkunItem[];
   bolehKelola: boolean;
+  bolehHapus: boolean;
   onTersimpan: (pesan: string) => Promise<void>;
 }) {
   const [draft, setDraft] = useState<DraftAkun | null>(null);
@@ -1325,6 +1349,34 @@ function PanelAkun({
   const [menyimpan, setMenyimpan] = useState(false);
   const [galatSimpan, setGalatSimpan] = useState<string | null>(null);
   const isSubmittingRef = useRef(false);
+  const [tampilNonaktif, setTampilNonaktif] = useState(false);
+  const [hapus, setHapus] = useState<AkunItem | null>(null);
+  const [ketikan, setKetikan] = useState("");
+  const [menghapus, setMenghapus] = useState(false);
+  const [galatHapus, setGalatHapus] = useState<string | null>(null);
+  const jumlahNonaktif = akun.filter((item) => !item.is_aktif).length;
+
+  function bukaHapus(item: AkunItem | null) {
+    setHapus(item);
+    setKetikan("");
+    setGalatHapus(null);
+  }
+
+  async function hapusPermanen() {
+    if (!hapus || isSubmittingRef.current) return;
+    isSubmittingRef.current = true;
+    setMenghapus(true);
+    try {
+      await hapusAkun(hapus.id_akun);
+      bukaHapus(null);
+      await onTersimpan(`Akun ${hapus.kode} ${hapus.nama} dihapus.`);
+    } catch (error) {
+      setGalatHapus(pesanGalat(error, "Akun tidak bisa dihapus."));
+    } finally {
+      isSubmittingRef.current = false;
+      setMenghapus(false);
+    }
+  }
 
   function bukaBaru() {
     setGalatSimpan(null);
@@ -1373,14 +1425,29 @@ function PanelAkun({
 
   return (
     <div className="space-y-4">
-      {bolehKelola ? (
-        <button type="button" className={TOMBOL_UTAMA} onClick={bukaBaru}>
-          Tambah akun
-        </button>
-      ) : null}
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        {bolehKelola ? (
+          <button type="button" className={TOMBOL_UTAMA} onClick={bukaBaru}>
+            Tambah akun
+          </button>
+        ) : null}
+        {jumlahNonaktif > 0 ? (
+          <label className="flex min-h-11 items-center gap-2 text-sm text-slate-100">
+            <input
+              type="checkbox"
+              checked={tampilNonaktif}
+              onChange={(e) => setTampilNonaktif(e.target.checked)}
+            />
+            Tampilkan akun nonaktif ({jumlahNonaktif})
+          </label>
+        ) : null}
+      </div>
 
       {KELOMPOK_AKUN.map((kelompok) => {
-        const anggota = akun.filter((item) => item.kelompok === kelompok);
+        const anggota = akun.filter(
+          (item) =>
+            item.kelompok === kelompok && (tampilNonaktif || item.is_aktif),
+        );
         if (anggota.length === 0) return null;
         return (
           <section key={kelompok} className="space-y-2">
@@ -1407,18 +1474,84 @@ function PanelAkun({
                     <span className="block text-xs text-slate-400">
                       Saldo normal {item.saldo_normal}
                       {item.sistem ? ", dipakai jurnal otomatis" : ""}
-                      {item.is_aktif ? "" : ", nonaktif"}
+                      {item.dihapus
+                        ? ", sudah dihapus tetapi masih dipakai jurnal"
+                        : item.is_aktif
+                          ? ""
+                          : ", nonaktif"}
                     </span>
                   </span>
-                  {bolehKelola ? (
-                    <button
-                      type="button"
-                      className={TOMBOL_KEDUA}
-                      aria-label={`Ubah akun ${item.kode} ${item.nama}`}
-                      onClick={() => bukaUbah(item)}
-                    >
-                      Ubah
-                    </button>
+                  <span className="flex flex-wrap gap-2">
+                    {bolehKelola && !item.dihapus ? (
+                      <button
+                        type="button"
+                        className={TOMBOL_KEDUA}
+                        aria-label={`Ubah akun ${item.kode} ${item.nama}`}
+                        onClick={() => bukaUbah(item)}
+                      >
+                        Ubah
+                      </button>
+                    ) : null}
+                    {bolehHapus &&
+                    item.bisa_dihapus &&
+                    hapus?.id_akun !== item.id_akun ? (
+                      <button
+                        type="button"
+                        className={TOMBOL_BAHAYA}
+                        aria-label={`Hapus akun ${item.kode} ${item.nama}`}
+                        onClick={() => bukaHapus(item)}
+                      >
+                        Hapus
+                      </button>
+                    ) : null}
+                  </span>
+                  {hapus?.id_akun === item.id_akun ? (
+                    <div className="w-full space-y-2 rounded-lg border border-rose-500/30 bg-rose-500/20 p-3 text-sm text-rose-100">
+                      <p className="font-semibold">
+                        Hapus akun {item.kode} {item.nama} permanen?
+                      </p>
+                      <p>
+                        Akun ini belum pernah dipakai jurnal. Setelah dihapus,
+                        akun hilang dari bagan akun di semua perangkat dan
+                        kodenya bisa dipakai akun baru.
+                      </p>
+                      <div>
+                        <label
+                          htmlFor={`hapus-akun-${item.id_akun}`}
+                          className={LABEL}
+                        >
+                          Ketik {KONFIRMASI_HAPUS_PERMANEN} untuk melanjutkan
+                        </label>
+                        <input
+                          id={`hapus-akun-${item.id_akun}`}
+                          value={ketikan}
+                          autoComplete="off"
+                          onChange={(e) => setKetikan(e.target.value)}
+                          className={INPUT}
+                        />
+                      </div>
+                      {galatHapus ? <p role="alert">{galatHapus}</p> : null}
+                      <div className="flex flex-wrap justify-end gap-2">
+                        <button
+                          type="button"
+                          className={TOMBOL_KEDUA}
+                          onClick={() => bukaHapus(null)}
+                        >
+                          Batal
+                        </button>
+                        <button
+                          type="button"
+                          className={TOMBOL_BAHAYA}
+                          disabled={
+                            menghapus ||
+                            ketikan.trim() !== KONFIRMASI_HAPUS_PERMANEN
+                          }
+                          onClick={() => void hapusPermanen()}
+                        >
+                          {menghapus ? "Menghapus..." : "Hapus permanen"}
+                        </button>
+                      </div>
+                    </div>
                   ) : null}
                 </li>
               ))}

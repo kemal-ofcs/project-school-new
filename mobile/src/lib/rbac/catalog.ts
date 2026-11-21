@@ -405,6 +405,11 @@ export const PERMISSION_CATALOG = [
     group: "Keuangan",
   },
   {
+    key: "accounting.account.delete",
+    name: "Hapus Akun",
+    group: "Keuangan",
+  },
+  {
     key: "installment.cancel",
     name: "Batalkan Pembayaran & Tutup Kontrak Cicilan",
     group: "Keuangan",
@@ -736,6 +741,9 @@ export const SENSITIVE_MUTATION_PERMISSIONS = new Set<PermissionKey>([
   // Menutup buku membuat setiap perangkat menolak pencatatan di periode itu,
   // dan memutuskan bentrokan tutup buku menentukan potret saldo resmi.
   "accounting.close",
+  // Menghapus akun mengeluarkannya dari bagan akun di semua perangkat, dan
+  // tidak bisa dikembalikan dari aplikasi.
+  "accounting.account.delete",
   // Menyetujui rapel berarti mengeluarkan uang sekolah di proses gaji berikutnya.
   "payroll.rapel.manage",
   // Membatalkan pembayaran cicilan membalik jurnalnya, dan menutup kontrak

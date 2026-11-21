@@ -79,7 +79,7 @@ export const LABEL_KEJADIAN: Record<KejadianTelegram, string> = {
   stok_menipis: "Ringkasan stok di bawah minimum (sekali sehari)",
   pembayaran_harian: "Rekap pembayaran tagihan kemarin (sekali sehari)",
   kasbon_baru: "Pengajuan kasbon baru (tanpa nama karyawan)",
-  tutup_buku: "Tutup buku dan buka kembali",
+  tutup_buku: "Tutup buku, saldo berubah sesudah ditutup, dan buka kembali",
   gaji_status: "Status proses gaji (hanya jumlah pegawai dan total)",
   buka_buku_pimpinan: "Buku dibuka kembali",
   kontrak_berakhir: "Kontrak GTT/PTT berakhir (30 dan 7 hari sebelumnya)",
@@ -252,6 +252,9 @@ export function idKasbonBaru(idPinjaman: string) {
 }
 export function idTutupBuku(idTutup: string) {
   return `tutup:${idTutup}`;
+}
+export function idTutupBerubah(idTutup: string) {
+  return `tutup-berubah:${idTutup}`;
 }
 export const AWALAN_BUKA = "buka:";
 export const AWALAN_BUKA_PIMPINAN = "buka-pimpinan:";
@@ -427,6 +430,40 @@ export function pesanTutupBuku(
     );
   }
   return baris.join("\n");
+}
+
+/** Cermin `pesan_tutup_berubah`. */
+export function pesanTutupBerubah(sampaiTanggal: string, oleh: string): string {
+  return [
+    `⚠️ Saldo berubah sesudah tutup buku sampai ${tanggalTampil(sampaiTanggal)}`,
+    `Ditutup oleh: ${oleh}`,
+    "Ada transaksi baru di periode yang sudah ditutup. Tinjau di Keuangan, tab Tutup Buku.",
+  ].join("\n");
+}
+
+/**
+ * Tutup buku berlaku yang saldonya berubah sejak ditutup (`perlu_ditinjau`
+ * dari `status`), sebagai pasangan [id antrean, isi]. Satu pesan per tutup
+ * buku: menutup ulang membuat baris tutup buku baru, jadi id baru.
+ * Cermin `antrean_tutup_berubah`.
+ */
+export function antreanTutupBerubah(
+  riwayat: ReadonlyArray<{
+    id_tutup: string;
+    status: string;
+    sampai_tanggal: string;
+    dibuat_oleh: string;
+    perlu_ditinjau?: boolean;
+  }>,
+): Array<[string, string]> {
+  return riwayat
+    .filter(
+      (baris) => baris.status === "Aktif" && baris.perlu_ditinjau === true,
+    )
+    .map((baris) => [
+      idTutupBerubah(baris.id_tutup),
+      pesanTutupBerubah(baris.sampai_tanggal, baris.dibuat_oleh),
+    ]);
 }
 
 /** Cermin `pesan_buka_buku`. */

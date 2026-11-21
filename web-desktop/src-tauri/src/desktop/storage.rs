@@ -1074,7 +1074,8 @@ pub fn initialize(path: &Path) -> Result<(), String> {
         saldo_normal TEXT NOT NULL CHECK (saldo_normal IN ('Debit', 'Kredit')),
         is_aktif INTEGER NOT NULL DEFAULT 1 CHECK (is_aktif IN (0, 1)),
         created_at TEXT NOT NULL DEFAULT (datetime('now')),
-        updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+        updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+        dihapus_pada TEXT
       );
       CREATE TABLE IF NOT EXISTS keu_jurnal (
         id_jurnal TEXT PRIMARY KEY,
@@ -2386,6 +2387,13 @@ pub fn initialize(path: &Path) -> Result<(), String> {
         "inventory_barang",
         "dihapus_pada",
         "ALTER TABLE inventory_barang ADD COLUMN dihapus_pada TEXT;",
+    )?;
+    // Hapus permanen akun yang belum dipakai (v74). NULL = belum dihapus.
+    ensure_column(
+        &connection,
+        "keu_akun",
+        "dihapus_pada",
+        "ALTER TABLE keu_akun ADD COLUMN dihapus_pada TEXT;",
     )?;
     // Unit pemilik jurusan (v58). SETELAH `rebuild_without_unique` di atas,
     // yang menyalin daftar kolom eksplisit; NULL = berlaku di semua unit.

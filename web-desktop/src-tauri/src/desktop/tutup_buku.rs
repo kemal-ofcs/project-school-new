@@ -20,8 +20,8 @@ use rusqlite::{params, Connection};
 use serde_json::{json, Value};
 
 use super::{
-    accounting, config::DesktopState, inventory, license, models::CommandError, storage, sync, uks,
-    wa_notification,
+    accounting, config::DesktopState, inventory, license, models::CommandError, storage, sync,
+    telegram, uks,
 };
 
 /// WAJIB sama dengan CHECK `keu_tutup_buku.status` di ketiga DDL. `Digantikan`
@@ -739,197 +739,35 @@ pub fn cloud_reopen_values(row: &Value) -> Option<Vec<Value>> {
     ])
 }
 
-// ── Tahap 3: pemberitahuan WhatsApp ke pemegang izin Tutup Buku ─────────────
+// ── Tahap 3: pemberitahuan saldo berubah ke grup Telegram Keuangan ─────────
 
-/// Kejadian yang diberitahukan. WAJIB sama dengan `KEJADIAN_TUTUP` di TS.
-pub const KEJADIAN_TUTUP: [&str; 2] = ["menunggu", "berubah"];
-/// Desktop/Mobile menghitung kejadian dari data LOKAL, jadi hanya bila
+/// Desktop/Mobile menghitung "saldo berubah" dari data LOKAL, jadi hanya bila
 /// sinkronisasi terakhir masih segar: perangkat yang belum menarik jurnal
 /// perangkat lain melihat saldo "berubah" padahal tidak, dan pesan yang
 /// terlanjur terkirim tidak bisa ditarik.
 pub const MAKS_DETIK_SINKRON_PEMBERITAHUAN: i64 = 900;
-pub const ALASAN_PEMBERITAHUAN_MATI: &str = "Pemberitahuan tutup buku belum dinyalakan.";
+pub const ALASAN_PEMBERITAHUAN_MATI: &str =
+    "Notifikasi Telegram tutup buku belum dinyalakan atau grup Keuangan belum diatur.";
 const ALASAN_SINKRON_BASI: &str = "Sinkronisasi terakhir lebih dari 15 menit lalu.";
 
-/// Satu kejadian yang perlu diberitahukan. Cermin `KejadianTutup` di TS.
-#[derive(Debug, PartialEq)]
-pub struct KejadianTutup {
-    pub id_tutup: String,
-    pub kejadian: &'static str,
-    pub sampai: String,
-    pub dibuat_oleh: String,
-}
-
-/// Penerima: operator aktif berizin `accounting.close` (atau Superadmin).
-pub struct PenerimaTutup {
-    pub id: String,
-    pub nama: String,
-    pub no_hp: String,
-}
-
-/// Satu pesan per kejadian per tutup buku per penerima. Cermin `kunciPemberitahuan`.
-pub fn kunci_pemberitahuan(id_tutup: &str, kejadian: &str, id_operator: &str) -> String {
-    format!("tutup_buku:{id_tutup}:{kejadian}:{id_operator}")
-}
-
-/// Isian template `tutup_buku`. Cermin `isianPemberitahuan`.
-pub fn isian_pemberitahuan(kejadian: &KejadianTutup, nama: &str) -> Vec<(&'static str, String)> {
-    let (sebab, rincian) = if kejadian.kejadian == "menunggu" {
-        (
-            "ada versi lain yang menunggu keputusan",
-            format!("Versi itu ditutup oleh {}.", kejadian.dibuat_oleh),
-        )
-    } else {
-        (
-            "saldonya berubah sesudah ditutup",
-            format!("Ada transaksi baru di periode yang ditutup oleh {}.", kejadian.dibuat_oleh),
-        )
-    };
-    vec![
-        ("nama", if nama.trim().is_empty() { "Bapak/Ibu".to_owned() } else { nama.trim().to_owned() }),
-        ("tanggal", tanggal_tampil(&kejadian.sampai)),
-        ("kejadian", sebab.to_owned()),
-        ("rincian", rincian),
-    ]
-}
-
-/// Versi `Menunggu` dan tutup buku berlaku yang saldonya berubah, dari
-/// riwayat `status`. Cermin `kejadianDariRiwayat`.
-pub fn kejadian_dari_riwayat(riwayat: &[Value]) -> Vec<KejadianTutup> {
-    riwayat
-        .iter()
-        .filter_map(|baris| {
-            let kejadian = if baris["status"] == "Menunggu" {
-                KEJADIAN_TUTUP[0]
-            } else if baris["status"] == "Aktif" && baris["perlu_ditinjau"] == true {
-                KEJADIAN_TUTUP[1]
-            } else {
-                return None;
-            };
-            Some(KejadianTutup {
-                id_tutup: baris["id_tutup"].as_str()?.to_owned(),
-                kejadian,
-                sampai: baris["sampai_tanggal"].as_str()?.to_owned(),
-                dibuat_oleh: baris["dibuat_oleh"].as_str().unwrap_or("").to_owned(),
-            })
-        })
-        .collect()
-}
-
-/// Kejadian yang perlu diberitahukan, atau alasan tidak berjalan.
-fn kejadian_lokal(state: &DesktopState) -> Result<Result<Vec<KejadianTutup>, &'static str>, CommandError> {
-    use rusqlite::OptionalExtension;
+/// Catat tutup buku yang saldonya berubah ke antrean Telegram (kejadian
+/// `tutup_buku`, grup Keuangan). Versi `Menunggu` tidak di sini: pesannya
+/// sudah dicatat `telegram::drain` saat tutup buku itu masuk cloud.
+/// Cermin `notify` di TS.
+pub async fn notify(state: &DesktopState) -> Result<Value, CommandError> {
     {
         let connection = storage::database(&state.data_dir)?;
-        let aktif: Option<String> = connection
-            .query_row(
-                "SELECT value FROM setting_gex_system WHERE key = ?1 LIMIT 1;",
-                params![wa_notification::WA_NOTIFY_TUTUP_BUKU_KEY],
-                |row| row.get(0),
-            )
-            .optional()
-            .map_err(db_error)?;
-        if !aktif.is_some_and(|value| value.trim().eq_ignore_ascii_case("true")) {
-            return Ok(Err(ALASAN_PEMBERITAHUAN_MATI));
-        }
         if !uks::detik_sejak_sync(&connection).is_some_and(|detik| detik <= MAKS_DETIK_SINKRON_PEMBERITAHUAN) {
-            return Ok(Err(ALASAN_SINKRON_BASI));
+            return Ok(json!({ "diantre": 0, "alasan": ALASAN_SINKRON_BASI }));
         }
+    }
+    let turso = state.get_turso_client()?;
+    if !telegram::tutup_buku_siap(&turso).await? {
+        return Ok(json!({ "diantre": 0, "alasan": ALASAN_PEMBERITAHUAN_MATI }));
     }
     let status = status(state)?;
-    Ok(Ok(kejadian_dari_riwayat(status["riwayat"].as_array().map(Vec::as_slice).unwrap_or(&[]))))
-}
-
-/// Antre pesan yang belum pernah diantre di perangkat ini, dalam satu
-/// transaksi. Kembaran dari perangkat lain ditolak cloud lewat `dedupe_key`.
-fn antre_pemberitahuan(
-    state: &DesktopState,
-    kejadian: &[KejadianTutup],
-    penerima: &[PenerimaTutup],
-) -> Result<usize, CommandError> {
-    use rusqlite::OptionalExtension;
-    let client_id = sync::ensure_client_id(state)?;
-    let mut connection = storage::database(&state.data_dir)?;
-    let tx = connection.transaction().map_err(db_error)?;
-    let mut diantre = 0;
-    for item in kejadian {
-        for orang in penerima {
-            let nomor = wa_notification::normalize_phone_canonical(&orang.no_hp);
-            if !wa_notification::is_valid_phone(&nomor) {
-                continue;
-            }
-            let kunci = kunci_pemberitahuan(&item.id_tutup, item.kejadian, &orang.id);
-            let sudah = tx
-                .query_row("SELECT 1 FROM notifikasi_wa WHERE dedupe_key = ?1 LIMIT 1;", params![kunci], |_| Ok(()))
-                .optional()
-                .map_err(db_error)?
-                .is_some();
-            if sudah {
-                continue;
-            }
-            let isi = wa_notification::compose_wa_message(&tx, "tutup_buku", &isian_pemberitahuan(item, &orang.nama));
-            wa_notification::queue_wa_notification_tx(
-                &tx,
-                &client_id,
-                &json!({
-                    "dedupe_key": kunci,
-                    "jenis": "tutup_buku",
-                    "tujuan_nomor": nomor,
-                    "isi_pesan": isi,
-                }),
-            )?;
-            diantre += 1;
-        }
-    }
-    tx.commit().map_err(db_error)?;
-    Ok(diantre)
-}
-
-fn sel_teks(value: Option<&Value>) -> String {
-    match value {
-        Some(Value::String(teks)) => teks.clone(),
-        Some(Value::Number(angka)) => angka.to_string(),
-        _ => String::new(),
-    }
-}
-
-/// Beri tahu pemegang izin Tutup Buku lewat WhatsApp. Penerima dibaca dari
-/// cloud (akun dan role tidak disalin ke perangkat). Cermin `notify` di TS.
-pub async fn notify(state: &DesktopState) -> Result<Value, CommandError> {
-    let kejadian = match kejadian_lokal(state)? {
-        Ok(kejadian) => kejadian,
-        Err(alasan) => return Ok(json!({ "diantre": 0, "alasan": alasan })),
-    };
-    if kejadian.is_empty() {
-        return Ok(json!({ "diantre": 0, "alasan": null }));
-    }
-    let hasil = state
-        .get_turso_client()?
-        .query_one(
-            "SELECT o.id, o.nama_operator, o.no_hp
-             FROM master_operator o
-             JOIN app_role r ON r.id = o.role_id
-             WHERE o.status = 'Aktif' AND r.status = 'Aktif'
-               AND TRIM(COALESCE(o.no_hp, '')) <> ''
-               AND (r.is_superadmin = 1 OR EXISTS (
-                     SELECT 1 FROM role_permission p
-                     WHERE p.role_id = r.id AND p.permission_key = 'accounting.close'
-                       AND p.is_allowed = 1))
-             ORDER BY o.id
-             LIMIT 100;",
-            vec![],
-        )
-        .await?;
-    let penerima: Vec<PenerimaTutup> = hasil
-        .to_objects()
-        .iter()
-        .map(|baris| PenerimaTutup {
-            id: sel_teks(baris.get("id")),
-            nama: sel_teks(baris.get("nama_operator")),
-            no_hp: sel_teks(baris.get("no_hp")),
-        })
-        .collect();
-    let diantre = antre_pemberitahuan(state, &kejadian, &penerima)?;
+    let antrean = telegram::antrean_tutup_berubah(status["riwayat"].as_array().map(Vec::as_slice).unwrap_or(&[]));
+    let diantre = telegram::antrekan_tutup_berubah(&turso, &antrean).await?;
     Ok(json!({ "diantre": diantre, "alasan": null }))
 }
 
@@ -1192,66 +1030,5 @@ mod tests {
             json!("kepala")
         );
         assert_eq!(status(&state).expect("status")["batas"], json!("2020-01-31"));
-    }
-
-    #[test]
-    fn pemberitahuan_kembar() {
-        let riwayat = vec![
-            json!({"id_tutup": "tb-1", "status": "Menunggu", "sampai_tanggal": "2026-09-30", "dibuat_oleh": "bendahara", "perlu_ditinjau": false}),
-            json!({"id_tutup": "tb-2", "status": "Aktif", "sampai_tanggal": "2026-08-31", "dibuat_oleh": "kepala", "perlu_ditinjau": true}),
-            json!({"id_tutup": "tb-3", "status": "Aktif", "sampai_tanggal": "2026-07-31", "dibuat_oleh": "kepala", "perlu_ditinjau": false}),
-            json!({"id_tutup": "tb-4", "status": "Dibuka", "sampai_tanggal": "2026-06-30", "dibuat_oleh": "kepala", "perlu_ditinjau": false}),
-        ];
-        let kejadian = kejadian_dari_riwayat(&riwayat);
-        assert_eq!(kejadian.len(), 2);
-        assert_eq!((kejadian[0].id_tutup.as_str(), kejadian[0].kejadian), ("tb-1", "menunggu"));
-        assert_eq!((kejadian[1].id_tutup.as_str(), kejadian[1].kejadian), ("tb-2", "berubah"));
-        assert_eq!(kunci_pemberitahuan("tb-1", "menunggu", "7"), "tutup_buku:tb-1:menunggu:7");
-        let teks = |item: &KejadianTutup, nama: &str| {
-            wa_notification::render_wa_template(
-                wa_notification::default_wa_template("tutup_buku").expect("bawaan"),
-                &isian_pemberitahuan(item, nama),
-            )
-        };
-        assert_eq!(
-            teks(&kejadian[0], "Bu Sari"),
-            "Yth. Bu Sari. Tutup buku sampai 30/09/2026 perlu ditinjau karena ada versi lain yang menunggu keputusan. Versi itu ditutup oleh bendahara. Buka halaman Keuangan, tab Tutup Buku, untuk memutuskan."
-        );
-        assert_eq!(
-            teks(&kejadian[1], "  "),
-            "Yth. Bapak/Ibu. Tutup buku sampai 31/08/2026 perlu ditinjau karena saldonya berubah sesudah ditutup. Ada transaksi baru di periode yang ditutup oleh kepala. Buka halaman Keuangan, tab Tutup Buku, untuk memutuskan."
-        );
-    }
-
-    #[test]
-    fn pemberitahuan_diantre_sekali_per_penerima() {
-        let (_dir, state) = state_uji();
-        let connection = storage::database(&state.data_dir).expect("db");
-        connection
-            .execute(
-                "INSERT INTO setting_gex_system (key, value) VALUES (?1, 'true');",
-                params![wa_notification::WA_NOTIFY_TUTUP_BUKU_KEY],
-            )
-            .expect("sakelar");
-        let kejadian = vec![KejadianTutup {
-            id_tutup: "tb-1".into(),
-            kejadian: "menunggu",
-            sampai: "2026-09-30".into(),
-            dibuat_oleh: "bendahara".into(),
-        }];
-        let penerima = vec![
-            PenerimaTutup { id: "1".into(), nama: "Kepala".into(), no_hp: "081234567890".into() },
-            PenerimaTutup { id: "2".into(), nama: "Tanpa nomor".into(), no_hp: "12".into() },
-        ];
-        assert_eq!(antre_pemberitahuan(&state, &kejadian, &penerima).expect("antre"), 1);
-        assert_eq!(antre_pemberitahuan(&state, &kejadian, &penerima).expect("antre ulang"), 0);
-        let (jenis, nomor): (String, String) = connection
-            .query_row(
-                "SELECT jenis, tujuan_nomor FROM notifikasi_wa WHERE dedupe_key = 'tutup_buku:tb-1:menunggu:1';",
-                [],
-                |row| Ok((row.get(0)?, row.get(1)?)),
-            )
-            .expect("baris");
-        assert_eq!((jenis.as_str(), nomor.as_str()), ("tutup_buku", "+6281234567890"));
     }
 }

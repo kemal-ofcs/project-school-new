@@ -27,6 +27,7 @@ import {
   type WaNotificationStatus,
 } from "@/lib/gateways/wa-notification";
 import { useConfirmDialog } from "@/lib/hooks/useConfirmDialog";
+import { WA_TEMPLATE_KINDS_DISUNTING } from "@/lib/validations/wa-notification";
 
 export default function NotifikasiWaPage() {
   const { user, isAuthenticated, isLoading: authLoading } = useAuth();
@@ -252,7 +253,6 @@ export default function NotifikasiWaPage() {
       importManualEnabled: config.importManualEnabled,
       uksEnabled: config.uksEnabled,
       tagihanEnabled: config.tagihanEnabled,
-      tutupBukuEnabled: config.tutupBukuEnabled,
       // Ikut dibawa walau formulir ini tidak menampilkannya: draft yang
       // menghilangkannya menyimpan ulang ambang alfa ke bawaan 3/30.
       ambangAlfaLimit: config.ambangAlfaLimit,
@@ -834,6 +834,7 @@ export default function NotifikasiWaPage() {
           isOpen={templateModalOpen}
           onClose={() => setTemplateModalOpen(false)}
           onSaved={(message) => setFeedback({ tone: "success", message })}
+          kinds={WA_TEMPLATE_KINDS_DISUNTING}
         />
 
         {/* Modal Konfigurasi Gateway */}

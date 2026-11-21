@@ -2,33 +2,24 @@ import "server-only";
 
 import { randomBytes } from "node:crypto";
 import type { Client, Transaction } from "@libsql/client";
-import {
-  isValidOperatorPhone,
-  normalizeOperatorPhone,
-} from "@/lib/operators/contact";
 import { trialBalance } from "@/lib/services/accounting";
-import { generateWaNotificationId } from "@/lib/services/wa-notification";
+import { tutupBukuSiap } from "@/lib/services/telegram";
+import {
+  antreanTutupBerubah,
+  TELEGRAM_INSERT_ANTREAN_SQL,
+} from "@/lib/validations/telegram";
 import {
   ALASAN_PEMBERITAHUAN_MATI,
   bandingSaldo,
   cekPeriodeTerbuka,
-  isianPemberitahuan,
   KEPUTUSAN_TUTUP,
   type KeputusanTutup,
-  kejadianDariRiwayat,
-  kunciPemberitahuan,
   saldoTutupJson,
   tanggalTampil,
   validateAlasanBuka,
   validateCatatanKeputusan,
   validateTutup,
 } from "@/lib/validations/tutup-buku";
-import {
-  composeWaMessage,
-  settingEnabled,
-  WA_NOTIFY_TUTUP_BUKU_KEY,
-  waTemplateKey,
-} from "@/lib/validations/wa-notification";
 import type {
   StatusTutupBuku,
   TinjauanTutupBuku,
@@ -428,76 +419,30 @@ export async function reopen(
   });
 }
 
-// ── Tahap 3: pemberitahuan WhatsApp ke pemegang izin Tutup Buku ─────────────
+// ── Tahap 3: pemberitahuan saldo berubah ke grup Telegram Keuangan ─────────
 
 /**
- * Cermin `notify`. Web membaca cloud langsung, jadi tidak perlu syarat
- * sinkronisasi segar. Setiap baris hanya masuk bila `dedupe_key`-nya belum
- * ada, di dalam satu batch, sehingga dua tab yang mengetuk bersamaan tidak
- * mengantre pesan yang sama dua kali.
+ * Cermin `notify`: catat tutup buku yang saldonya berubah ke antrean Telegram
+ * (kejadian `tutup_buku`). Web membaca cloud langsung, jadi tidak perlu syarat
+ * sinkronisasi segar. Versi `Menunggu` tidak di sini: pesannya sudah dicatat
+ * `drainTelegram` saat tutup buku itu masuk cloud. `INSERT OR IGNORE` atas id
+ * deterministik, jadi dua tab yang mengetuk bersamaan tidak menggandakannya.
  */
 export async function notify(
   client: Client,
 ): Promise<{ diantre: number; alasan: string | null }> {
-  const setelan = await client.execute({
-    sql: "SELECT key, value FROM setting_gex_system WHERE key IN (?, ?);",
-    args: [WA_NOTIFY_TUTUP_BUKU_KEY, waTemplateKey("tutup_buku")],
-  });
-  const nilai = new Map(
-    setelan.rows.map((row) => [String(row.key), text(row.value)]),
-  );
-  if (!settingEnabled(nilai.get(WA_NOTIFY_TUTUP_BUKU_KEY))) {
+  if (!(await tutupBukuSiap(client))) {
     return { diantre: 0, alasan: ALASAN_PEMBERITAHUAN_MATI };
   }
-  const kejadian = kejadianDariRiwayat((await status(client)).riwayat);
-  if (kejadian.length === 0) return { diantre: 0, alasan: null };
-  const penerima = await client.execute(
-    `SELECT o.id, o.nama_operator, o.no_hp
-     FROM master_operator o
-     JOIN app_role r ON r.id = o.role_id
-     WHERE o.status = 'Aktif' AND r.status = 'Aktif'
-       AND TRIM(COALESCE(o.no_hp, '')) <> ''
-       AND (r.is_superadmin = 1 OR EXISTS (
-             SELECT 1 FROM role_permission p
-             WHERE p.role_id = r.id AND p.permission_key = 'accounting.close'
-               AND p.is_allowed = 1))
-     ORDER BY o.id
-     LIMIT 100;`,
+  const antrean = antreanTutupBerubah((await status(client)).riwayat);
+  if (antrean.length === 0) return { diantre: 0, alasan: null };
+  const hasil = await client.batch(
+    antrean.map(([id, isi]) => ({
+      sql: TELEGRAM_INSERT_ANTREAN_SQL,
+      args: [id, "tutup_buku", isi],
+    })),
+    "write",
   );
-  const template = nilai.get(waTemplateKey("tutup_buku")) ?? null;
-  const statements = [];
-  for (const item of kejadian) {
-    for (const orang of penerima.rows) {
-      const nomor = normalizeOperatorPhone(String(orang.no_hp ?? ""));
-      if (!isValidOperatorPhone(nomor)) continue;
-      const kunci = kunciPemberitahuan(
-        item.id_tutup,
-        item.kejadian,
-        String(orang.id),
-      );
-      statements.push({
-        sql: `INSERT INTO notifikasi_wa (
-                id_notifikasi, dedupe_key, jenis, id_siswa, tujuan_nomor,
-                isi_pesan, status, attempt_count, created_at, updated_at
-              )
-              SELECT ?, ?, 'tutup_buku', NULL, ?, ?, 'Menunggu', 0, datetime('now'), datetime('now')
-              WHERE NOT EXISTS (SELECT 1 FROM notifikasi_wa WHERE dedupe_key = ?);`,
-        args: [
-          generateWaNotificationId(),
-          kunci,
-          nomor,
-          composeWaMessage(
-            "tutup_buku",
-            template,
-            isianPemberitahuan(item, String(orang.nama_operator ?? "")),
-          ),
-          kunci,
-        ],
-      });
-    }
-  }
-  if (statements.length === 0) return { diantre: 0, alasan: null };
-  const hasil = await client.batch(statements, "write");
   return {
     diantre: hasil.reduce((jumlah, baris) => jumlah + baris.rowsAffected, 0),
     alasan: null,

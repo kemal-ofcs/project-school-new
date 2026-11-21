@@ -22,6 +22,7 @@ import {
 } from "@/lib/gateways/wa-notification";
 import { useConfirmDialog } from "@/lib/hooks/useConfirmDialog";
 import { tanggalTampil } from "@/lib/validations/tutup-buku";
+import { WA_TEMPLATE_KINDS_DISUNTING } from "@/lib/validations/wa-notification";
 
 /**
  * Tinjauan antrean WhatsApp versi genggam — HANYA BACA, dan dari CLOUD.
@@ -96,7 +97,6 @@ const SAKELAR_JENIS: ReadonlyArray<
       | "importManualEnabled"
       | "uksEnabled"
       | "tagihanEnabled"
-      | "tutupBukuEnabled"
     ),
     string,
   ]
@@ -109,7 +109,6 @@ const SAKELAR_JENIS: ReadonlyArray<
   ["importManualEnabled", "Input manual"],
   ["uksEnabled", "Kunjungan UKS"],
   ["tagihanEnabled", "Pengingat tagihan siswa"],
-  ["tutupBukuEnabled", "Pemberitahuan tutup buku (ke atasan)"],
 ];
 
 function warnaStatus(status: string) {
@@ -556,6 +555,7 @@ export default function NotifikasiWaMobilePage() {
         isOpen={modalTemplate}
         onClose={() => setModalTemplate(false)}
         onSaved={setKabar}
+        kinds={WA_TEMPLATE_KINDS_DISUNTING}
       />
       <Modal
         isOpen={modalConfig}

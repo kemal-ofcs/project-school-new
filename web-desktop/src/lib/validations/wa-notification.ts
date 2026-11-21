@@ -258,6 +258,14 @@ export const WA_TEMPLATE_KINDS = [
 
 export type WaTemplateKind = (typeof WA_TEMPLATE_KINDS)[number];
 
+/**
+ * Jenis yang ditampilkan di dialog teks pesan halaman WhatsApp. `tutup_buku`
+ * disembunyikan karena pemberitahuannya pindah ke grup Telegram Keuangan;
+ * jenisnya tetap ada supaya riwayat antrean lama tetap valid.
+ */
+export const WA_TEMPLATE_KINDS_DISUNTING: readonly WaTemplateKind[] =
+  WA_TEMPLATE_KINDS.filter((jenis) => jenis !== "tutup_buku");
+
 export type WaTemplateMap = Record<WaTemplateKind, string>;
 
 export function isWaTemplateKind(value: string): value is WaTemplateKind {

@@ -323,7 +323,7 @@ export async function getWaConfig(client: Client): Promise<WaConfig> {
       SELECT id, provider, api_key, api_url, sender_number, is_active, daily_limit,
              scan_masuk_enabled, scan_pulang_enabled, bolos_enabled, ambang_alfa_enabled,
       koreksi_admin_enabled, import_manual_enabled, uks_enabled, tagihan_enabled,
-             tutup_buku_enabled, created_at, updated_at
+             created_at, updated_at
       FROM app_wa_config
       WHERE id = 'default'
       LIMIT 1;
@@ -372,7 +372,6 @@ export async function getWaConfig(client: Client): Promise<WaConfig> {
       importManualEnabled: false,
       uksEnabled: false,
       tagihanEnabled: false,
-      tutupBukuEnabled: false,
       ambangAlfaLimit,
       ambangAlfaDays,
       autoSendEnabled: settingEnabled(settingsMap.get(WA_AUTO_SEND_KEY)),
@@ -426,7 +425,6 @@ export async function getWaConfig(client: Client): Promise<WaConfig> {
     importManualEnabled: Number(row.import_manual_enabled ?? 0) === 1,
     uksEnabled: Number(row.uks_enabled ?? 0) === 1,
     tagihanEnabled: Number(row.tagihan_enabled ?? 0) === 1,
-    tutupBukuEnabled: Number(row.tutup_buku_enabled ?? 0) === 1,
     ambangAlfaLimit,
     ambangAlfaDays,
     autoSendEnabled: settingEnabled(settingsMap.get(WA_AUTO_SEND_KEY)),
@@ -508,7 +506,9 @@ export async function saveWaConfig(
       draft.importManualEnabled ? 1 : 0,
       draft.uksEnabled ? 1 : 0,
       draft.tagihanEnabled ? 1 : 0,
-      draft.tutupBukuEnabled ? 1 : 0,
+      // `tutup_buku_enabled`: pindah ke Telegram. Selalu 0 supaya pengirim
+      // versi lama ikut berhenti mengirim jenis ini.
+      0,
     ],
   };
 
@@ -529,7 +529,8 @@ export async function saveWaConfig(
       ],
       [WA_NOTIFY_UKS_KEY, draft.uksEnabled ? "true" : "false"],
       [WA_NOTIFY_TAGIHAN_KEY, draft.tagihanEnabled ? "true" : "false"],
-      [WA_NOTIFY_TUTUP_BUKU_KEY, draft.tutupBukuEnabled ? "true" : "false"],
+      // Pindah ke Telegram; "false" mematikan antrean di perangkat versi lama.
+      [WA_NOTIFY_TUTUP_BUKU_KEY, "false"],
       [
         WA_NOTIFY_AMBANG_ALFA_LIMIT_KEY,
         String(parseAmbangAlfaLimit(draft.ambangAlfaLimit)),
