@@ -11,8 +11,10 @@ import {
 } from "react";
 import { BootstrapPanel } from "@/components/BootstrapPanel";
 import { LicenseActivationPanel } from "@/components/license/LicenseActivationPanel";
+import { ThemeToggle } from "@/components/ThemeToggle";
 import { BrandLogo } from "@/components/ui/BrandLogo";
 import { FeedbackBanner } from "@/components/ui/FeedbackBanner";
+import { Icon } from "@/components/ui/Icon";
 import { triggerHaptic } from "@/lib/client/haptics";
 import { BRANDING } from "@/lib/constants/branding";
 import { useAuth } from "@/lib/context/AuthContext";
@@ -25,6 +27,10 @@ import { useAppName } from "@/lib/hooks/useAppName";
 import { useCompanyName } from "@/lib/hooks/useCompanyName";
 import { useLicenseStatus } from "@/lib/hooks/useLicenseStatus";
 import { useOnlineStatus } from "@/lib/hooks/useOnlineStatus";
+import packageJson from "../../../package.json";
+
+/** Hanya username yang diingat, dan hanya bila pengguna mencentangnya. */
+const REMEMBER_USERNAME_KEY = "sppg_ingat_username";
 
 function parseCooldownSeconds(msg: string): number {
   if (
@@ -49,12 +55,16 @@ export default function LoginPage() {
   const isOnline = useOnlineStatus();
   const appName = useAppName();
   const companyName = useCompanyName();
+  const hasCompany =
+    Boolean(companyName) && companyName !== BRANDING.defaultCompanyName;
 
   const [username, setUsername] = useState("");
   // Kolom kode baru muncul setelah server menyatakan password sudah benar.
   const [totpCode, setTotpCode] = useState<string>("");
   const [needsTotp, setNeedsTotp] = useState<boolean>(false);
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [rememberUsername, setRememberUsername] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
   const [cooldownSeconds, setCooldownSeconds] = useState(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -85,6 +95,18 @@ export default function LoginPage() {
   useEffect(() => {
     refreshBootstrapStatus();
   }, [refreshBootstrapStatus]);
+
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(REMEMBER_USERNAME_KEY);
+      if (saved) {
+        setUsername(saved);
+        setRememberUsername(true);
+      }
+    } catch {
+      // Penyimpanan diblokir: form tetap jalan tanpa username tersimpan.
+    }
+  }, []);
 
   // Dibaca setelah database siap: database yang belum diprovisioning meminta
   // lisensinya di BootstrapPanel.
@@ -146,6 +168,15 @@ export default function LoginPage() {
       );
       if (result.sukses) {
         triggerHaptic("success");
+        try {
+          if (rememberUsername) {
+            localStorage.setItem(REMEMBER_USERNAME_KEY, username.trim());
+          } else {
+            localStorage.removeItem(REMEMBER_USERNAME_KEY);
+          }
+        } catch {
+          // Gagal menyimpan username tidak boleh menggagalkan login.
+        }
         router.replace("/dashboard");
       } else {
         triggerHaptic("error");
@@ -176,10 +207,10 @@ export default function LoginPage() {
 
   if (!isAuthenticated && !bootstrapChecked) {
     return (
-      <div className="min-h-dvh flex items-center justify-center bg-slate-950">
+      <div className="login-shell min-h-dvh flex items-center justify-center">
         <div className="flex flex-col items-center gap-3">
-          <div className="size-10 rounded-full border-3 border-sky-400 border-t-transparent animate-spin" />
-          <span className="text-xs font-semibold text-slate-400">
+          <div className="size-10 rounded-full border-3 border-amber-400 border-t-transparent animate-spin" />
+          <span className="login-muted text-xs font-semibold">
             Memeriksa konfigurasi database...
           </span>
         </div>
@@ -195,7 +226,7 @@ export default function LoginPage() {
     isLicenseBlocking(licenseStatus)
   ) {
     return (
-      <div className="min-h-dvh flex items-center bg-slate-950 p-4 pt-[calc(1.5rem+env(safe-area-inset-top))] pb-[calc(1.5rem+env(safe-area-inset-bottom))]">
+      <div className="login-shell min-h-dvh flex items-center p-4 pt-[calc(1.5rem+env(safe-area-inset-top))] pb-[calc(1.5rem+env(safe-area-inset-bottom))]">
         <div className="w-full max-w-sm mx-auto rounded-3xl border border-white/15 bg-slate-900/90 p-6 shadow-2xl">
           <p className="mb-3 text-[11px] font-bold uppercase tracking-wider text-slate-500">
             Langkah 1 dari 2 · setelah lisensi aktif, lanjut ke pengaturan
@@ -238,7 +269,7 @@ export default function LoginPage() {
 
   if (!isAuthenticated && licenseStatus && isLicenseBlocking(licenseStatus)) {
     return (
-      <div className="min-h-dvh flex items-center bg-slate-950 p-4 pt-[calc(1.5rem+env(safe-area-inset-top))] pb-[calc(1.5rem+env(safe-area-inset-bottom))]">
+      <div className="login-shell min-h-dvh flex items-center p-4 pt-[calc(1.5rem+env(safe-area-inset-top))] pb-[calc(1.5rem+env(safe-area-inset-bottom))]">
         <div className="w-full max-w-sm mx-auto rounded-3xl border border-white/15 bg-slate-900/90 p-6 shadow-2xl">
           <LicenseActivationPanel
             status={licenseStatus}
@@ -260,50 +291,45 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-dvh flex flex-col justify-between bg-slate-950 p-6 pt-[calc(2rem+env(safe-area-inset-top))] pb-[calc(2rem+env(safe-area-inset-bottom))]">
-      <div className="w-full max-w-sm mx-auto my-auto flex flex-col items-center">
-        {/* Brand Banner */}
-        <div className="flex flex-col items-center text-center mb-6">
-          <BrandLogo size={56} className="mb-4 shadow-sky-500/20" />
-          <h1 className="text-2xl font-black tracking-tight text-white">
-            {companyName && companyName !== BRANDING.defaultCompanyName
-              ? `${appName} — ${companyName}`
-              : appName}
-          </h1>
-          <p className="text-xs font-semibold text-slate-400 mt-1">
-            Mobile Edition • Android & iOS
-          </p>
-
-          <div className="mt-3 flex flex-wrap items-center justify-center gap-2">
-            <div className="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs">
+    <div className="login-shell min-h-dvh flex flex-col">
+      {/* Hero selalu navy; `theme-invariant` menjaga isinya tetap palet gelap
+          walau tema terang aktif. */}
+      <header className="login-hero theme-invariant overflow-hidden px-6 pt-[calc(1.25rem+env(safe-area-inset-top))] pb-16">
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex min-w-0 items-center gap-3">
+            <BrandLogo size={44} />
+            {hasCompany ? (
+              <p className="login-hero-name truncate text-sm font-bold leading-tight">
+                {companyName}
+              </p>
+            ) : null}
+          </div>
+          <div className="flex shrink-0 items-center gap-2">
+            <span className="login-chip inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium">
               <span
+                aria-hidden="true"
                 className={`size-2 rounded-full ${
                   isOnline ? "bg-emerald-400" : "bg-amber-400"
                 }`}
               />
-              <span className="text-slate-300 font-medium">
-                {isOnline ? "Online" : "Offline"}
-              </span>
-            </div>
-
-            {/* Perangkat login langsung ke database (Turso, server sendiri,
-                atau lokal). Jalur "URL Server Origin" ke server web sudah
-                dipensiunkan: dispatcher sinkronisasinya tidak mengenal data
-                akademik, sehingga antrean perangkat macet permanen. */}
-            <button
-              type="button"
-              onClick={() => setShowDatabaseSetup(true)}
-              className="inline-flex items-center gap-1.5 rounded-full border border-sky-500/30 bg-sky-500/10 px-3 py-1 text-xs font-semibold text-sky-300 hover:bg-sky-500/20 active:scale-95 transition"
-            >
-              <span>Koneksi Database</span>
-            </button>
+              {isOnline ? "Online" : "Offline"}
+            </span>
+            <ThemeToggle />
           </div>
         </div>
+        <h1 className="login-hero-title mt-7 text-3xl font-black tracking-tight">
+          {appName}
+        </h1>
+        <p className="login-hero-sub mt-1 text-sm">
+          Sistem Absensi & Manajemen Operator
+        </p>
+      </header>
 
+      <main className="relative -mt-10 flex flex-1 flex-col px-4 pb-[calc(1.5rem+env(safe-area-inset-bottom))]">
         {/* Database cloud tersimpan tetapi tidak menjawab: tawarkan konfigurasi
             ulang, jangan biarkan pengguna menebak-nebak di form login. */}
         {bootstrapStatus?.configured && !bootstrapStatus.reachable ? (
-          <div className="mb-4 w-full rounded-2xl border border-amber-500/30 bg-amber-950/50 p-4 text-xs leading-5 text-amber-100">
+          <div className="mb-4 w-full max-w-sm mx-auto rounded-2xl border border-amber-500/30 bg-amber-950/50 p-4 text-xs leading-5 text-amber-100">
             <p className="font-bold text-amber-300">
               Database cloud tidak dapat dihubungi
             </p>
@@ -326,16 +352,22 @@ export default function LoginPage() {
           </div>
         ) : null}
 
-        {/* Login Form Card */}
-        <div className="w-full rounded-3xl border border-white/15 bg-slate-900/90 p-6 shadow-2xl backdrop-blur-2xl">
+        <div className="login-panel w-full max-w-sm mx-auto rounded-3xl p-6 shadow-2xl">
+          <h2 className="login-heading text-2xl font-extrabold tracking-tight">
+            Masuk ke Aplikasi
+          </h2>
+          <p className="login-muted mt-1 mb-5 text-sm">
+            Masukkan username dan kata sandi Anda.
+          </p>
+
           {cooldownSeconds > 0 ? (
-            <div className="mb-4 rounded-2xl border border-amber-500/30 bg-amber-950/50 p-4 text-center text-xs font-medium text-amber-200 backdrop-blur-md">
-              <div className="flex items-center justify-center gap-2 mb-1">
-                <span className="text-base animate-pulse">⏳</span>
-                <span className="font-bold text-amber-300">
-                  Akun Terkunci Sementara
-                </span>
-              </div>
+            <div
+              role="alert"
+              className="mb-4 rounded-2xl border border-amber-500/30 bg-amber-950/50 p-4 text-center text-xs font-medium text-amber-200"
+            >
+              <p className="mb-1 font-bold text-amber-300">
+                Akun Terkunci Sementara
+              </p>
               <p className="text-[11px] text-amber-200/80">
                 Terlalu banyak percobaan gagal. Silakan coba lagi dalam:
               </p>
@@ -361,41 +393,110 @@ export default function LoginPage() {
             <div>
               <label
                 htmlFor="username"
-                className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1.5"
+                className="login-label mb-1.5 block text-sm font-medium"
               >
                 Username / Kode Operator
               </label>
-              <input
-                id="username"
-                type="text"
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
-                placeholder="contoh: super001 atau SPD001"
-                autoComplete="username"
-                required
-                disabled={cooldownSeconds > 0}
-                className="w-full min-h-12 rounded-2xl border border-white/15 bg-slate-950 px-4 text-sm text-white placeholder-slate-500 focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-400/20 transition disabled:opacity-50"
-              />
+              <div className="login-field flex items-center gap-3 rounded-2xl px-4">
+                <Icon
+                  name="user"
+                  className="login-field-icon size-5 shrink-0"
+                />
+                <input
+                  id="username"
+                  type="text"
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
+                  placeholder="contoh: super001"
+                  autoComplete="username"
+                  autoCapitalize="none"
+                  required
+                  disabled={cooldownSeconds > 0}
+                  className="min-h-12 w-full min-w-0 bg-transparent text-base outline-none disabled:opacity-50"
+                />
+              </div>
             </div>
 
             <div>
               <label
                 htmlFor="password"
-                className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1.5"
+                className="login-label mb-1.5 block text-sm font-medium"
               >
-                Password
+                Kata Sandi / PIN
               </label>
-              <input
-                id="password"
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="••••••••"
-                autoComplete="current-password"
-                required
-                disabled={cooldownSeconds > 0}
-                className="w-full min-h-12 rounded-2xl border border-white/15 bg-slate-950 px-4 text-sm text-white placeholder-slate-500 focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-400/20 transition disabled:opacity-50"
-              />
+              <div className="login-field flex items-center gap-3 rounded-2xl pl-4 pr-1">
+                <Icon
+                  name="lock"
+                  className="login-field-icon size-5 shrink-0"
+                />
+                <input
+                  id="password"
+                  type={showPassword ? "text" : "password"}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="kata sandi"
+                  autoComplete="current-password"
+                  required
+                  disabled={cooldownSeconds > 0}
+                  className="min-h-12 w-full min-w-0 bg-transparent text-base outline-none disabled:opacity-50"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  aria-label="Tampilkan kata sandi"
+                  aria-pressed={showPassword}
+                  className="login-field-btn grid size-11 shrink-0 place-items-center rounded-xl transition"
+                >
+                  <Icon
+                    name={showPassword ? "eye-off" : "eye"}
+                    className="size-5"
+                  />
+                </button>
+              </div>
+            </div>
+
+            {needsTotp ? (
+              <div>
+                <label
+                  htmlFor="totp-input"
+                  className="login-label mb-1.5 block text-sm font-medium"
+                >
+                  Kode Verifikasi 2FA
+                </label>
+                <div className="login-field rounded-2xl px-4">
+                  <input
+                    id="totp-input"
+                    inputMode="numeric"
+                    autoComplete="one-time-code"
+                    maxLength={16}
+                    value={totpCode}
+                    onChange={(event) => setTotpCode(event.target.value)}
+                    placeholder="123456 atau kode cadangan"
+                    className="min-h-12 w-full min-w-0 bg-transparent text-base font-mono tracking-[0.25em] outline-none"
+                  />
+                </div>
+                <p className="login-muted mt-1.5 text-xs">
+                  Buka aplikasi autentikator Anda, atau masukkan kode cadangan.
+                </p>
+              </div>
+            ) : null}
+
+            <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1">
+              <label className="login-label inline-flex min-h-11 items-center gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  checked={rememberUsername}
+                  onChange={(e) => setRememberUsername(e.target.checked)}
+                  className="login-check size-5"
+                />
+                Ingat username
+              </label>
+              <Link
+                href="/lupa-password"
+                className="login-link inline-flex min-h-11 items-center rounded text-sm font-semibold"
+              >
+                Lupa Password?
+              </Link>
             </div>
 
             <button
@@ -406,11 +507,11 @@ export default function LoginPage() {
                 !username.trim() ||
                 !password
               }
-              className="mt-2 flex min-h-12 w-full items-center justify-center rounded-2xl bg-gradient-to-r from-sky-400 via-sky-500 to-blue-600 font-black text-sm text-slate-950 shadow-xl shadow-sky-950/60 disabled:opacity-50 active:scale-[0.98] transition-all"
+              className="login-btn flex min-h-12 w-full items-center justify-center rounded-2xl font-bold text-sm disabled:opacity-50 active:scale-[0.98] transition-all"
             >
               {isSubmitting ? (
                 <div className="flex items-center gap-2">
-                  <div className="size-4 rounded-full border-2 border-slate-950 border-t-transparent animate-spin" />
+                  <div className="size-4 rounded-full border-2 border-current border-t-transparent animate-spin" />
                   <span>Memverifikasi...</span>
                 </div>
               ) : cooldownSeconds > 0 ? (
@@ -419,50 +520,30 @@ export default function LoginPage() {
                 <span>Masuk Aplikasi</span>
               )}
             </button>
-
-            {needsTotp ? (
-              <div className="space-y-1.5">
-                <label
-                  htmlFor="totp-input"
-                  className="text-[11px] font-bold text-slate-300"
-                >
-                  Kode Verifikasi 2FA
-                </label>
-                <input
-                  id="totp-input"
-                  inputMode="numeric"
-                  autoComplete="one-time-code"
-                  maxLength={16}
-                  value={totpCode}
-                  onChange={(event) => setTotpCode(event.target.value)}
-                  placeholder="123456 atau kode cadangan"
-                  className="w-full min-h-12 rounded-2xl border border-white/15 bg-slate-950 px-4 text-sm font-mono tracking-[0.25em] text-white placeholder-slate-600 focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-400/20 transition"
-                />
-                <p className="text-[11px] text-slate-500">
-                  Buka aplikasi autentikator Anda, atau masukkan kode cadangan.
-                </p>
-              </div>
-            ) : null}
-
-            <div className="text-center">
-              <Link
-                href="/lupa-password"
-                className="text-xs font-semibold text-slate-400 transition hover:text-sky-300"
-              >
-                Lupa Password?
-              </Link>
-            </div>
           </form>
-        </div>
-      </div>
 
-      {/* Footer Info */}
-      <footer className="text-center text-[11px] text-slate-500 space-y-0.5">
-        {licenseStatus?.license ? (
-          <p>Berlisensi untuk {licenseStatus.license.holder}</p>
-        ) : null}
-        <p>{appName} Mobile v0.1 • 100% Offline-First</p>
-      </footer>
+          {/* Perangkat login langsung ke database (Turso, server sendiri,
+              atau lokal). Jalur "URL Server Origin" ke server web sudah
+              dipensiunkan: dispatcher sinkronisasinya tidak mengenal data
+              akademik, sehingga antrean perangkat macet permanen. */}
+          <button
+            type="button"
+            onClick={() => setShowDatabaseSetup(true)}
+            className="login-link mt-4 inline-flex min-h-11 w-full items-center justify-center rounded text-xs font-semibold"
+          >
+            Koneksi Database
+          </button>
+        </div>
+
+        <footer className="login-muted mt-auto pt-6 text-center text-xs space-y-0.5">
+          {licenseStatus?.license ? (
+            <p>Berlisensi untuk {licenseStatus.license.holder}</p>
+          ) : null}
+          <p>
+            {appName} v{packageJson.version} • KOS
+          </p>
+        </footer>
+      </main>
     </div>
   );
 }
