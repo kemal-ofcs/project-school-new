@@ -1,6 +1,7 @@
 "use client";
 
 import type { Dispatch, SetStateAction } from "react";
+import { Sakelar } from "@/components/ui/Sakelar";
 import {
   buildDefaultFrontSlots,
   computeMirroredBackLayout,
@@ -90,7 +91,7 @@ export function LayoutPanel({
                 onClick={() => setLayoutPreviewPage(p)}
                 className={`rounded-lg px-2.5 py-1 text-[11px] font-bold transition ${
                   layoutPreviewPage === p
-                    ? "bg-violet-500 text-white"
+                    ? "bg-violet-500 text-on-accent"
                     : "text-slate-400 hover:text-white"
                 }`}
               >
@@ -431,7 +432,7 @@ export function LayoutPanel({
                 setNewPresetName("");
                 setMessage("Preset layout berhasil disimpan ke perangkat ini.");
               }}
-              className="rounded-xl bg-violet-500 px-3 py-1 text-xs font-bold text-white hover:bg-violet-400 disabled:opacity-40"
+              className="rounded-xl bg-violet-500 px-3 py-1 text-xs font-bold text-on-accent hover:bg-violet-400 disabled:opacity-40"
             >
               Simpan
             </button>
@@ -650,24 +651,13 @@ export function LayoutPanel({
             <span className="text-xs text-slate-300">
               Tampilkan Garis Potong (Crop Marks)
             </span>
-            <button
-              type="button"
-              onClick={() =>
-                setActiveLayout((prev) => ({
-                  ...prev,
-                  showCropMarks: !prev.showCropMarks,
-                }))
+            <Sakelar
+              checked={activeLayout.showCropMarks}
+              label="Tampilkan Garis Potong (Crop Marks)"
+              onChange={(nilai) =>
+                setActiveLayout((prev) => ({ ...prev, showCropMarks: nilai }))
               }
-              className={`h-6 w-11 rounded-full transition-colors ${
-                activeLayout.showCropMarks ? "bg-violet-500" : "bg-slate-700"
-              }`}
-            >
-              <span
-                className={`block h-4 w-4 rounded-full bg-white shadow transition-transform mx-1 ${
-                  activeLayout.showCropMarks ? "translate-x-5" : "translate-x-0"
-                }`}
-              />
-            </button>
+            />
           </div>
           {activeLayout.showCropMarks ? (
             <div className="grid grid-cols-2 gap-2">
@@ -726,29 +716,19 @@ export function LayoutPanel({
               />
             </label>
             <div className="flex items-center gap-2 pt-5">
-              <button
-                type="button"
-                onClick={() =>
-                  setActiveLayout((prev) => ({
-                    ...prev,
-                    showCardBorder: !prev.showCardBorder,
-                  }))
-                }
-                className={`h-5 w-9 rounded-full transition-colors ${
-                  activeLayout.showCardBorder ? "bg-violet-500" : "bg-slate-700"
-                }`}
-              >
-                <span
-                  className={`block h-3.5 w-3.5 rounded-full bg-white shadow transition-transform mx-0.5 ${
-                    activeLayout.showCardBorder
-                      ? "translate-x-4"
-                      : "translate-x-0"
-                  }`}
-                />
-              </button>
               <span className="text-[11px] text-slate-400">
                 Garis Tepi Kartu
               </span>
+              <Sakelar
+                checked={activeLayout.showCardBorder}
+                label="Garis Tepi Kartu"
+                onChange={(nilai) =>
+                  setActiveLayout((prev) => ({
+                    ...prev,
+                    showCardBorder: nilai,
+                  }))
+                }
+              />
             </div>
           </div>
         </div>
@@ -909,7 +889,7 @@ export function LayoutPanel({
                           matrixEditorPage === p
                             ? p === "front"
                               ? "bg-sky-700 text-white"
-                              : "bg-violet-500 text-white"
+                              : "bg-violet-500 text-on-accent"
                             : "text-slate-400 hover:text-white"
                         }`}
                       >
@@ -1184,7 +1164,7 @@ export function LayoutPanel({
               setIsSavingLayout(false);
             }
           }}
-          className="w-full rounded-2xl bg-violet-500 py-3 text-sm font-black text-white hover:bg-violet-400 disabled:opacity-50 transition shadow-md shadow-violet-950/30"
+          className="w-full rounded-2xl bg-violet-500 py-3 text-sm font-black text-on-accent hover:bg-violet-400 disabled:opacity-50 transition shadow-md shadow-violet-950/30"
         >
           {isSavingLayout
             ? "Menyimpan..."

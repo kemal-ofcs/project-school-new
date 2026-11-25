@@ -3,6 +3,7 @@
 import type { FormEvent } from "react";
 import { useCallback, useEffect, useState } from "react";
 import { Icon } from "@/components/ui/Icon";
+import { Sakelar } from "@/components/ui/Sakelar";
 import { triggerHaptic } from "@/lib/client/haptics";
 import { BRANDING } from "@/lib/constants/branding";
 import {
@@ -273,15 +274,11 @@ export function MailSettingsCard() {
                 Wajib aktif agar fitur Lupa Password berfungsi.
               </p>
             </div>
-            <label className="relative inline-flex shrink-0 cursor-pointer items-center">
-              <input
-                type="checkbox"
-                checked={isActive}
-                onChange={(event) => setIsActive(event.target.checked)}
-                className="peer sr-only"
-              />
-              <div className="peer h-6 w-11 rounded-full bg-slate-800 after:absolute after:top-0.5 after:left-[2px] after:h-5 after:w-5 after:rounded-full after:border after:border-slate-300 after:bg-white after:transition-all after:content-[''] peer-checked:bg-emerald-400 peer-checked:after:translate-x-full peer-checked:after:border-white peer-focus:outline-none" />
-            </label>
+            <Sakelar
+              checked={isActive}
+              label="Aktifkan pengiriman email"
+              onChange={setIsActive}
+            />
           </div>
 
           {testResult ? (

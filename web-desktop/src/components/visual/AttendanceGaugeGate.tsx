@@ -52,7 +52,7 @@ function SvgDonutFallback({
         label: "Tepat Waktu",
         count: tepatWaktu,
         color: "var(--chart-tepat)",
-        textColor: "text-sky-400",
+        textColor: "text-emerald-400",
       },
       {
         key: "terlambat",

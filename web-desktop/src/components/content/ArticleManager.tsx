@@ -300,7 +300,7 @@ export function ArticleManager() {
               id="btn-tambah-artikel"
               type="button"
               onClick={bukaFormTambah}
-              className="flex items-center gap-2 rounded-xl bg-sky-500 px-4 py-2.5 text-sm font-bold text-slate-950 transition hover:bg-sky-400 shadow-lg shadow-sky-500/20"
+              className="flex items-center gap-2 rounded-xl bg-sky-700 px-4 py-2.5 text-sm font-bold text-on-accent transition hover:bg-sky-600 shadow-lg shadow-sky-500/20"
             >
               <Icon name="plus" className="size-4" />
               <span>Tulis Berita</span>
@@ -621,7 +621,7 @@ export function ArticleManager() {
                 type="button"
                 onClick={handleSimpan}
                 disabled={isPending}
-                className="rounded-xl bg-sky-500 px-5 py-2.5 text-sm font-bold text-slate-950 hover:bg-sky-400 disabled:opacity-50 shadow-lg shadow-sky-500/20"
+                className="rounded-xl bg-sky-700 px-5 py-2.5 text-sm font-bold text-on-accent hover:bg-sky-600 disabled:opacity-50 shadow-lg shadow-sky-500/20"
               >
                 {isPending ? "Menyimpan..." : "Simpan Artikel"}
               </button>

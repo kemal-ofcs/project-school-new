@@ -242,7 +242,7 @@ export function AttendanceGauge3D(props: AttendanceGauge3DProps) {
         hadir: {
           label: "Tepat Waktu",
           count: Math.max(0, props.hadir - props.terlambat),
-          color: "text-sky-400",
+          color: "text-emerald-400",
         },
         terlambat: {
           label: "Terlambat",

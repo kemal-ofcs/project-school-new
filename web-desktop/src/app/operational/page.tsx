@@ -595,7 +595,7 @@ export default function OperationalPage() {
             }}
             className={`rounded-xl px-4 py-2.5 font-bold transition ${
               tab === value
-                ? "bg-sky-400 text-slate-950 shadow-md shadow-sky-950"
+                ? "bg-sky-700 text-on-accent shadow-md shadow-sky-950"
                 : "text-slate-400 hover:text-white"
             }`}
           >
@@ -755,7 +755,7 @@ export default function OperationalPage() {
             disabled={busy}
             data-konfirmasi
             onClick={submitCorrection}
-            className="min-h-11 w-full rounded-xl bg-sky-400 font-black text-slate-950 transition hover:bg-sky-300 disabled:opacity-50 disabled:cursor-not-allowed font-mono text-sm shadow-md flex items-center justify-center gap-2"
+            className="min-h-11 w-full rounded-xl bg-sky-700 font-black text-on-accent transition hover:bg-sky-600 disabled:opacity-50 disabled:cursor-not-allowed font-mono text-sm shadow-md flex items-center justify-center gap-2"
           >
             {busy ? (
               <>
@@ -890,7 +890,7 @@ export default function OperationalPage() {
             disabled={busy}
             data-konfirmasi
             onClick={submitBackup}
-            className="min-h-11 w-full rounded-xl bg-sky-400 font-black text-slate-950 transition hover:bg-sky-300 disabled:opacity-50 disabled:cursor-not-allowed font-mono text-sm shadow-md flex items-center justify-center gap-2"
+            className="min-h-11 w-full rounded-xl bg-sky-700 font-black text-on-accent transition hover:bg-sky-600 disabled:opacity-50 disabled:cursor-not-allowed font-mono text-sm shadow-md flex items-center justify-center gap-2"
           >
             {busy ? (
               <>

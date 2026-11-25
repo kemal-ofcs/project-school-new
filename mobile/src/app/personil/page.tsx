@@ -48,7 +48,6 @@ export default function PersonilPage() {
               icon="users"
               title="Karyawan"
               subtitle="Direktori pegawai & barcode absensi"
-              tone="sky"
             />
           )}
           {canSiswa && (
@@ -57,7 +56,6 @@ export default function PersonilPage() {
               icon="users"
               title="Peserta Didik"
               subtitle="Direktori peserta didik, wali murid & barcode"
-              tone="teal"
             />
           )}
           {canGuru && (
@@ -66,7 +64,6 @@ export default function PersonilPage() {
               icon="user"
               title="Guru & PTK"
               subtitle="Direktori pendidik & barcode absensi"
-              tone="indigo"
             />
           )}
           {canIdCards && (
@@ -75,7 +72,6 @@ export default function PersonilPage() {
               icon="id-card"
               title="Cetak ID Card"
               subtitle="Status cetak kartu, pratinjau & simpan gambar"
-              tone="purple"
             />
           )}
         </div>

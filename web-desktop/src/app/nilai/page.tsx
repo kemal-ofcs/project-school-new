@@ -9,6 +9,7 @@ import { FeedbackBanner } from "@/components/ui/FeedbackBanner";
 import { Modal } from "@/components/ui/Modal";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { PilihCari } from "@/components/ui/PilihCari";
+import { TabBar } from "@/components/ui/TabBar";
 import { formatTanggalOperasional } from "@/lib/attendance/time-policy";
 import { canAccessArea, hasPermission } from "@/lib/auth/access";
 import { useAuth } from "@/lib/context/AuthContext";
@@ -462,36 +463,18 @@ export default function NilaiPage() {
           </div>
         </section>
 
-        <div
-          aria-label="Bagian nilai"
-          className="flex gap-1 overflow-x-auto rounded-xl border border-white/10 bg-slate-900/60 p-1"
-          role="tablist"
-        >
-          {(
-            [
-              ["penilaian", "Penilaian"],
-              ["rekap", "Rekap Nilai Akhir"],
-              ["pengaturan", "Pengaturan Nilai"],
-            ] as const
-          ).map(([kunci, label]) => (
-            <button
-              aria-selected={tab === kunci}
-              className={`min-h-11 flex-1 whitespace-nowrap rounded-lg px-4 py-2 font-medium text-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 ${
-                tab === kunci
-                  ? "bg-amber-500 text-slate-950"
-                  : "text-slate-300 hover:bg-slate-800"
-              }`}
-              key={kunci}
-              aria-controls="panel-nilai"
-              id={`tab-nilai-${kunci}`}
-              onClick={() => setTab(kunci)}
-              role="tab"
-              type="button"
-            >
-              {label}
-            </button>
-          ))}
-        </div>
+        <TabBar
+          ariaLabel="Bagian nilai"
+          idPrefix="nilai"
+          panelId="panel-nilai"
+          value={tab}
+          onChange={setTab}
+          tabs={[
+            { id: "penilaian", label: "Penilaian" },
+            { id: "rekap", label: "Rekap Nilai Akhir" },
+            { id: "pengaturan", label: "Pengaturan Nilai" },
+          ]}
+        />
 
         <div
           aria-labelledby={`tab-nilai-${tab}`}

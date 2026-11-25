@@ -357,7 +357,7 @@ export default function NotifikasiWaMobilePage() {
           </div>
           {bolehKirim ? (
             <button
-              className="shrink-0 rounded-xl bg-emerald-600 px-3 py-2 font-bold text-[11px] text-white disabled:opacity-50"
+              className="shrink-0 rounded-xl bg-emerald-600 px-3 py-2 font-bold text-[11px] text-on-accent disabled:opacity-50"
               disabled={loading || totalMenunggu === 0}
               onClick={() => {
                 triggerHaptic("light");
@@ -449,7 +449,7 @@ export default function NotifikasiWaMobilePage() {
                 triggerHaptic("light");
                 void muat();
               }}
-              className="rounded-xl bg-indigo-500 px-4 py-2 text-xs font-black text-white transition hover:bg-indigo-400 active:scale-95"
+              className="rounded-xl bg-indigo-500 px-4 py-2 text-xs font-black text-on-accent transition hover:bg-indigo-400 active:scale-95"
             >
               Muat
             </button>
@@ -522,7 +522,7 @@ export default function NotifikasiWaMobilePage() {
                   {bolehKirim &&
                   (item.status === "Menunggu" || item.status === "Gagal") ? (
                     <button
-                      className="min-h-11 rounded-xl bg-emerald-600 px-3 font-bold text-[11px] text-white"
+                      className="min-h-11 rounded-xl bg-emerald-600 px-3 font-bold text-[11px] text-on-accent"
                       onClick={() => {
                         triggerHaptic("light");
                         void bukaWhatsApp(item);
@@ -794,7 +794,7 @@ export default function NotifikasiWaMobilePage() {
               </p>
             </fieldset>
             <button
-              className="w-full rounded-xl bg-indigo-500 px-4 py-3 font-bold text-sm text-white"
+              className="w-full rounded-xl bg-indigo-500 px-4 py-3 font-bold text-sm text-on-accent"
               type="submit"
             >
               Simpan pengaturan

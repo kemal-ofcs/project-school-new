@@ -55,7 +55,7 @@ export const PERTANYAAN_SIMPAN = {
 const WARNA_TOMBOL = {
   danger: "bg-rose-500 text-white hover:bg-rose-400",
   warning: "bg-amber-400 text-slate-950 hover:bg-amber-300",
-  info: "bg-sky-500 text-slate-950 hover:bg-sky-400",
+  info: "bg-sky-700 text-on-accent hover:bg-sky-600",
 };
 const WARNA_ISI = {
   danger: "border-rose-400/25 bg-rose-400/10 text-rose-100",

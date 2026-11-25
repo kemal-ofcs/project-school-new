@@ -10,6 +10,7 @@ import { Icon } from "@/components/ui/Icon";
 import { Modal } from "@/components/ui/Modal";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { PilihCari } from "@/components/ui/PilihCari";
+import { TabBar } from "@/components/ui/TabBar";
 import { canAccessArea, hasPermission } from "@/lib/auth/access";
 import {
   PRESET_TINGKAT_TEMPLATES,
@@ -738,7 +739,7 @@ export default function AkademikPage() {
                     }
                     setModalType(activeTab);
                   }}
-                  className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-sky-500 px-4 py-2 text-sm font-bold text-slate-950 shadow-lg shadow-sky-500/20 transition hover:bg-sky-400"
+                  className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-sky-700 px-4 py-2 text-sm font-bold text-on-accent shadow-lg shadow-sky-500/20 transition hover:bg-sky-600"
                 >
                   <Icon name="add" className="size-4" />
                   <span>Tambah Data</span>
@@ -757,202 +758,133 @@ export default function AkademikPage() {
           </FeedbackBanner>
         ) : null}
 
-        {/* Tab Navigation */}
-        <div className="flex flex-wrap items-center gap-1 rounded-2xl border border-white/10 bg-slate-900/60 p-1.5 backdrop-blur-xl">
-          <button
-            type="button"
-            onClick={() => setActiveTab("tahun_ajaran")}
-            className={`flex min-h-11 items-center gap-2 rounded-xl px-4 text-xs font-bold transition sm:text-sm ${
-              activeTab === "tahun_ajaran"
-                ? "bg-sky-500 text-slate-950 shadow-md shadow-sky-500/20"
-                : "text-slate-300 hover:bg-white/5 hover:text-white"
-            }`}
-          >
-            <Icon name="calendar" className="size-4" />
-            <span>Tahun Ajaran</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => setActiveTab("unit")}
-            className={`flex min-h-11 items-center gap-2 rounded-xl px-4 text-xs font-bold transition sm:text-sm ${
-              activeTab === "unit"
-                ? "bg-sky-500 text-slate-950 shadow-md shadow-sky-500/20"
-                : "text-slate-300 hover:bg-white/5 hover:text-white"
-            }`}
-          >
-            <Icon name="home" className="size-4" />
-            <span>Unit</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => setActiveTab("jurusan")}
-            className={`flex min-h-11 items-center gap-2 rounded-xl px-4 text-xs font-bold transition sm:text-sm ${
-              activeTab === "jurusan"
-                ? "bg-sky-500 text-slate-950 shadow-md shadow-sky-500/20"
-                : "text-slate-300 hover:bg-white/5 hover:text-white"
-            }`}
-          >
-            <Icon name="tools" className="size-4" />
-            <span>Jurusan</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => setActiveTab("rombel")}
-            className={`flex min-h-11 items-center gap-2 rounded-xl px-4 text-xs font-bold transition sm:text-sm ${
-              activeTab === "rombel"
-                ? "bg-sky-500 text-slate-950 shadow-md shadow-sky-500/20"
-                : "text-slate-300 hover:bg-white/5 hover:text-white"
-            }`}
-          >
-            <Icon name="users" className="size-4" />
-            <span>Rombel / Kelas</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => setActiveTab("mapel")}
-            className={`flex min-h-11 items-center gap-2 rounded-xl px-4 text-xs font-bold transition sm:text-sm ${
-              activeTab === "mapel"
-                ? "bg-sky-500 text-slate-950 shadow-md shadow-sky-500/20"
-                : "text-slate-300 hover:bg-white/5 hover:text-white"
-            }`}
-          >
-            <Icon name="document" className="size-4" />
-            <span>Mata Pelajaran</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => setActiveTab("penugasan")}
-            className={`flex min-h-11 items-center gap-2 rounded-xl px-4 text-xs font-bold transition sm:text-sm ${
-              activeTab === "penugasan"
-                ? "bg-sky-500 text-slate-950 shadow-md shadow-sky-500/20"
-                : "text-slate-300 hover:bg-white/5 hover:text-white"
-            }`}
-          >
-            <Icon name="user" className="size-4" />
-            <span>Penugasan Guru</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => setActiveTab("jadwal")}
-            className={`flex min-h-11 items-center gap-2 rounded-xl px-4 text-xs font-bold transition sm:text-sm ${
-              activeTab === "jadwal"
-                ? "bg-sky-500 text-slate-950 shadow-md shadow-sky-500/20"
-                : "text-slate-300 hover:bg-white/5 hover:text-white"
-            }`}
-          >
-            <Icon name="calendar" className="size-4" />
-            <span>Jadwal Mengajar</span>
-          </button>
-          {canManageJamPelajaran ? (
-            <button
-              type="button"
-              onClick={() => setActiveTab("jam_pelajaran")}
-              className={`flex min-h-11 items-center gap-2 rounded-xl px-4 text-xs font-bold transition sm:text-sm ${
-                activeTab === "jam_pelajaran"
-                  ? "bg-sky-500 text-slate-950 shadow-md shadow-sky-500/20"
-                  : "text-slate-300 hover:bg-white/5 hover:text-white"
-              }`}
-            >
-              <Icon name="tools" className="size-4" />
-              <span>Jam Pelajaran</span>
-            </button>
+        <TabBar
+          ariaLabel="Bagian akademik"
+          idPrefix="akademik"
+          panelId="panel-akademik"
+          value={activeTab}
+          onChange={setActiveTab}
+          tabs={(
+            [
+              ["tahun_ajaran", "Tahun Ajaran", "calendar"],
+              ["unit", "Unit", "home"],
+              ["jurusan", "Jurusan", "tools"],
+              ["rombel", "Rombel / Kelas", "users"],
+              ["mapel", "Mata Pelajaran", "document"],
+              ["penugasan", "Penugasan Guru", "user"],
+              ["jadwal", "Jadwal Mengajar", "calendar"],
+              ["jam_pelajaran", "Jam Pelajaran", "tools"],
+            ] as const
+          )
+            .filter(([id]) => id !== "jam_pelajaran" || canManageJamPelajaran)
+            .map(([id, label, ikon]) => ({
+              id,
+              label,
+              icon: <Icon name={ikon} className="size-4" />,
+            }))}
+        />
+
+        <div
+          id="panel-akademik"
+          role="tabpanel"
+          aria-labelledby={`tab-akademik-${activeTab}`}
+          className="space-y-6"
+        >
+          {/* Tab 1: Tahun Ajaran */}
+          {activeTab === "tahun_ajaran" ? (
+            <TahunAjaranPanel
+              tahunAjaranList={tahunAjaranList}
+              loading={loading}
+              canManage={canManage}
+              setFormTA={setFormTA}
+              setModalType={setModalType}
+              handleSetActiveTA={handleSetActiveTA}
+              handleDeleteItem={handleDeleteItem}
+            />
+          ) : null}
+
+          {/* Tab 1b: Unit satuan pendidikan */}
+          {activeTab === "unit" ? (
+            <UnitPanel
+              unitList={unitList}
+              loading={loading}
+              canManage={canManage}
+              setFormUnit={setFormUnit}
+              setModalType={setModalType}
+              handleDeleteItem={handleDeleteItem}
+            />
+          ) : null}
+
+          {/* Tab 2: Jurusan */}
+          {activeTab === "jurusan" ? (
+            <JurusanPanel
+              jurusanList={jurusanList}
+              loading={loading}
+              canManage={canManage}
+              setFormJurusan={setFormJurusan}
+              setModalType={setModalType}
+              handleDeleteItem={handleDeleteItem}
+            />
+          ) : null}
+
+          {/* Tab 3: Rombel */}
+          {activeTab === "rombel" ? (
+            <RombelPanel
+              rombelList={rombelList}
+              tahunAjaranList={tahunAjaranList}
+              selectedTaForRombel={selectedTaForRombel}
+              unitList={unitList}
+              loading={loading}
+              canManage={canManage}
+              setFormRombel={setFormRombel}
+              setModalType={setModalType}
+              handleTaFilterChange={handleTaFilterChange}
+              handleDeleteItem={handleDeleteItem}
+              handleIsiUnitOtomatis={handleIsiUnitOtomatis}
+            />
+          ) : null}
+
+          {/* Tab 4: Mapel */}
+          {activeTab === "mapel" ? (
+            <MapelPanel
+              mapelList={mapelList}
+              loading={loading}
+              canManage={canManage}
+              setFormMapel={setFormMapel}
+              setModalType={setModalType}
+              handleDeleteItem={handleDeleteItem}
+            />
+          ) : null}
+
+          {/* Tab 5: Penugasan Guru */}
+          {activeTab === "penugasan" ? (
+            <PenugasanPanel
+              penugasanList={penugasanList}
+              rombelList={rombelList}
+              selectedRombelForPenugasan={selectedRombelForPenugasan}
+              loading={loading}
+              canManage={canManage}
+              handleRombelFilterChange={handleRombelFilterChange}
+              handleDeleteItem={handleDeleteItem}
+            />
+          ) : null}
+
+          {activeTab === "jadwal" ? (
+            <JadwalPanel
+              tahunAjaranList={tahunAjaranList}
+              rombelList={rombelList}
+              mapelList={mapelList}
+              guruList={guruList}
+              unitList={unitList}
+              canManage={canManage}
+              onFeedback={(tone, message) => setFeedback({ tone, message })}
+            />
+          ) : null}
+
+          {activeTab === "jam_pelajaran" && canManageJamPelajaran ? (
+            <JamPelajaranCard />
           ) : null}
         </div>
-
-        {/* Tab 1: Tahun Ajaran */}
-        {activeTab === "tahun_ajaran" ? (
-          <TahunAjaranPanel
-            tahunAjaranList={tahunAjaranList}
-            loading={loading}
-            canManage={canManage}
-            setFormTA={setFormTA}
-            setModalType={setModalType}
-            handleSetActiveTA={handleSetActiveTA}
-            handleDeleteItem={handleDeleteItem}
-          />
-        ) : null}
-
-        {/* Tab 1b: Unit satuan pendidikan */}
-        {activeTab === "unit" ? (
-          <UnitPanel
-            unitList={unitList}
-            loading={loading}
-            canManage={canManage}
-            setFormUnit={setFormUnit}
-            setModalType={setModalType}
-            handleDeleteItem={handleDeleteItem}
-          />
-        ) : null}
-
-        {/* Tab 2: Jurusan */}
-        {activeTab === "jurusan" ? (
-          <JurusanPanel
-            jurusanList={jurusanList}
-            loading={loading}
-            canManage={canManage}
-            setFormJurusan={setFormJurusan}
-            setModalType={setModalType}
-            handleDeleteItem={handleDeleteItem}
-          />
-        ) : null}
-
-        {/* Tab 3: Rombel */}
-        {activeTab === "rombel" ? (
-          <RombelPanel
-            rombelList={rombelList}
-            tahunAjaranList={tahunAjaranList}
-            selectedTaForRombel={selectedTaForRombel}
-            unitList={unitList}
-            loading={loading}
-            canManage={canManage}
-            setFormRombel={setFormRombel}
-            setModalType={setModalType}
-            handleTaFilterChange={handleTaFilterChange}
-            handleDeleteItem={handleDeleteItem}
-            handleIsiUnitOtomatis={handleIsiUnitOtomatis}
-          />
-        ) : null}
-
-        {/* Tab 4: Mapel */}
-        {activeTab === "mapel" ? (
-          <MapelPanel
-            mapelList={mapelList}
-            loading={loading}
-            canManage={canManage}
-            setFormMapel={setFormMapel}
-            setModalType={setModalType}
-            handleDeleteItem={handleDeleteItem}
-          />
-        ) : null}
-
-        {/* Tab 5: Penugasan Guru */}
-        {activeTab === "penugasan" ? (
-          <PenugasanPanel
-            penugasanList={penugasanList}
-            rombelList={rombelList}
-            selectedRombelForPenugasan={selectedRombelForPenugasan}
-            loading={loading}
-            canManage={canManage}
-            handleRombelFilterChange={handleRombelFilterChange}
-            handleDeleteItem={handleDeleteItem}
-          />
-        ) : null}
-
-        {activeTab === "jadwal" ? (
-          <JadwalPanel
-            tahunAjaranList={tahunAjaranList}
-            rombelList={rombelList}
-            mapelList={mapelList}
-            guruList={guruList}
-            unitList={unitList}
-            canManage={canManage}
-            onFeedback={(tone, message) => setFeedback({ tone, message })}
-          />
-        ) : null}
-
-        {activeTab === "jam_pelajaran" && canManageJamPelajaran ? (
-          <JamPelajaranCard />
-        ) : null}
 
         {/* Modal Form */}
         {modalType ? (
@@ -2090,7 +2022,7 @@ export default function AkademikPage() {
                 <button
                   type="submit"
                   disabled={saving}
-                  className="rounded-xl bg-sky-500 px-5 py-2 text-sm font-bold text-slate-950 shadow-lg shadow-sky-500/20 hover:bg-sky-400 disabled:opacity-50"
+                  className="rounded-xl bg-sky-700 px-5 py-2 text-sm font-bold text-on-accent shadow-lg shadow-sky-500/20 hover:bg-sky-600 disabled:opacity-50"
                 >
                   {saving ? "Menyimpan..." : "Simpan"}
                 </button>

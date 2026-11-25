@@ -1281,7 +1281,7 @@ export default function IdCardsPage() {
               onClick={() => setActiveTab("cards")}
               className={`rounded-xl px-4 py-2 text-xs font-bold transition ${
                 activeTab === "cards"
-                  ? "bg-sky-400 text-slate-950 shadow-md shadow-sky-950/20"
+                  ? "bg-sky-700 text-on-accent shadow-md shadow-sky-950/20"
                   : "border border-white/10 bg-slate-900 text-slate-300 hover:bg-slate-800"
               }`}
             >
@@ -1295,7 +1295,7 @@ export default function IdCardsPage() {
               onClick={() => setActiveTab("builder")}
               className={`rounded-xl px-4 py-2 text-xs font-bold transition ${
                 activeTab === "builder"
-                  ? "bg-sky-400 text-slate-950 shadow-md shadow-sky-950/20"
+                  ? "bg-sky-700 text-on-accent shadow-md shadow-sky-950/20"
                   : "border border-white/10 bg-slate-900 text-slate-300 hover:bg-slate-800"
               }`}
             >
@@ -1412,7 +1412,7 @@ export default function IdCardsPage() {
                     type="button"
                     onClick={handleOpenPrintBatch}
                     disabled={printBusy}
-                    className="min-h-10 rounded-xl bg-sky-400 px-4 text-xs font-black text-slate-950 shadow-md hover:bg-sky-300 disabled:opacity-50 inline-flex items-center gap-2"
+                    className="min-h-10 rounded-xl bg-sky-700 px-4 text-xs font-black text-on-accent shadow-md hover:bg-sky-600 disabled:opacity-50 inline-flex items-center gap-2"
                   >
                     <Icon name="scanner" className="size-3.5" />
                     <span>Cetak Pilihan ({selectedRows.length})</span>
@@ -1530,7 +1530,7 @@ export default function IdCardsPage() {
                         type="button"
                         disabled={isWorking}
                         onClick={() => handleOpenPrintSingle(row)}
-                        className="rounded-xl bg-sky-400 px-3.5 py-2 text-xs font-black text-slate-950 hover:bg-sky-300 disabled:opacity-50 transition"
+                        className="rounded-xl bg-sky-700 px-3.5 py-2 text-xs font-black text-on-accent hover:bg-sky-600 disabled:opacity-50 transition"
                       >
                         {isWorking ? "..." : "Cetak"}
                       </button>
@@ -1619,7 +1619,7 @@ export default function IdCardsPage() {
                 onClick={() => setPreviewSide("front")}
                 className={`rounded-xl px-4 py-2 text-xs font-bold transition ${
                   previewSide === "front"
-                    ? "bg-sky-400 text-slate-950"
+                    ? "bg-sky-700 text-on-accent"
                     : "bg-slate-800 text-slate-300 hover:bg-slate-700"
                 }`}
               >
@@ -1630,7 +1630,7 @@ export default function IdCardsPage() {
                 onClick={() => setPreviewSide("back")}
                 className={`rounded-xl px-4 py-2 text-xs font-bold transition ${
                   previewSide === "back"
-                    ? "bg-sky-400 text-slate-950"
+                    ? "bg-sky-700 text-on-accent"
                     : "bg-slate-800 text-slate-300 hover:bg-slate-700"
                 }`}
               >
@@ -1736,7 +1736,7 @@ export default function IdCardsPage() {
               <button
                 type="button"
                 onClick={() => handleOpenPrintSingle(previewEmployee)}
-                className="rounded-xl bg-sky-400 px-3 py-2.5 text-xs font-black text-slate-950 hover:bg-sky-300 transition flex items-center justify-center gap-1.5 shadow"
+                className="rounded-xl bg-sky-700 px-3 py-2.5 text-xs font-black text-on-accent hover:bg-sky-600 transition flex items-center justify-center gap-1.5 shadow"
               >
                 <Icon name="scanner" className="size-4" />
                 <span>Cetak Kartu</span>
@@ -1931,7 +1931,7 @@ export default function IdCardsPage() {
                 type="button"
                 disabled={printBusy}
                 onClick={handleExecutePrint}
-                className="flex-1 rounded-xl bg-sky-400 py-2.5 text-xs font-black text-slate-950 hover:bg-sky-300 disabled:opacity-50 transition flex items-center justify-center gap-1.5 shadow"
+                className="flex-1 rounded-xl bg-sky-700 py-2.5 text-xs font-black text-on-accent hover:bg-sky-600 disabled:opacity-50 transition flex items-center justify-center gap-1.5 shadow"
               >
                 <Icon name="scanner" className="size-4" />
                 <span>
@@ -2092,7 +2092,7 @@ export default function IdCardsPage() {
                     newElementStaticVal,
                   )
                 }
-                className="flex-1 rounded-xl bg-sky-400 py-2.5 text-xs font-black text-slate-950 hover:bg-sky-300"
+                className="flex-1 rounded-xl bg-sky-700 py-2.5 text-xs font-black text-on-accent hover:bg-sky-600"
               >
                 Tambahkan ke Sisi{" "}
                 {builderSide === "front" ? "Depan" : "Belakang"}

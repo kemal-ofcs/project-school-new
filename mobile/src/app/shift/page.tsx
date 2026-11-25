@@ -8,6 +8,7 @@ import { PilihHariKerja } from "@/components/shift/PilihHariKerja";
 import { Icon } from "@/components/ui/Icon";
 import { Modal } from "@/components/ui/Modal";
 import { PilihCari } from "@/components/ui/PilihCari";
+import { Sakelar } from "@/components/ui/Sakelar";
 import {
   hitungJamKerjaNormalMenit,
   isShiftFleksibel,
@@ -867,25 +868,14 @@ export default function MobileShiftPage() {
                     tanpa keterlambatan dan tanpa batas jam pulang.
                   </span>
                 </div>
-                <button
-                  type="button"
-                  role="switch"
-                  aria-checked={modeFleksibel}
-                  aria-label="Jadikan shift ini fleksibel"
-                  onClick={() => {
+                <Sakelar
+                  checked={modeFleksibel}
+                  label="Jadikan shift ini fleksibel"
+                  onChange={(nilai) => {
                     triggerHaptic("light");
-                    setModeFleksibel(!modeFleksibel);
+                    setModeFleksibel(nilai);
                   }}
-                  className={`relative h-6 w-11 shrink-0 rounded-full transition ${
-                    modeFleksibel ? "bg-violet-500" : "bg-slate-700"
-                  }`}
-                >
-                  <span
-                    className={`absolute top-0.5 size-5 rounded-full bg-white transition-all ${
-                      modeFleksibel ? "left-[22px]" : "left-0.5"
-                    }`}
-                  />
-                </button>
+                />
               </div>
               {modeFleksibel ? (
                 <p className="mt-2 rounded-xl bg-slate-950/60 p-2 text-[10px] leading-4 text-violet-200">

@@ -48,7 +48,6 @@ export default function StrukturJadwalPage() {
               icon="calendar"
               title="Struktur Akademik"
               subtitle="Tahun ajaran, rombel, mapel & jurusan"
-              tone="amber"
             />
           )}
           {canShift && (
@@ -57,7 +56,6 @@ export default function StrukturJadwalPage() {
               icon="clock"
               title="Shift Kerja & Jadwal"
               subtitle="Jam masuk, jam pulang, toleransi & istirahat"
-              tone="sky"
             />
           )}
           {canHolidays && (
@@ -66,7 +64,6 @@ export default function StrukturJadwalPage() {
               icon="calendar"
               title="Hari Libur & Whitelist"
               subtitle="Kalender libur & Shift/Divisi yang tetap boleh scan"
-              tone="teal"
             />
           )}
         </div>

@@ -71,7 +71,6 @@ export default function OperasionalHubPage() {
                   icon="tools"
                   title="Pusat Operasional"
                   subtitle="Koreksi admin, penugasan backup & entri manual"
-                  tone="sky"
                 />
               )}
               {canHistory && (
@@ -80,7 +79,6 @@ export default function OperasionalHubPage() {
                   icon="history"
                   title="Riwayat"
                   subtitle="Log scan & absensi harian"
-                  tone="neutral"
                 />
               )}
             </div>
@@ -96,7 +94,6 @@ export default function OperasionalHubPage() {
                 icon="dashboard"
                 title="Dasbor Kehadiran"
                 subtitle="Rekap siswa & guru, per rombel, indikasi bolos"
-                tone="indigo"
               />
             </div>
           </section>
@@ -114,7 +111,6 @@ export default function OperasionalHubPage() {
                   icon="whatsapp"
                   title="Notifikasi WhatsApp"
                   subtitle="Antrean pesan wali murid, status kirim & gateway"
-                  tone="emerald"
                 />
               )}
               {canAttendancePhoto && (
@@ -123,7 +119,6 @@ export default function OperasionalHubPage() {
                   icon="scanner"
                   title="Foto Bukti Absensi"
                   subtitle="Foto saat scan, alamat IP perangkat & operatornya"
-                  tone="sky"
                 />
               )}
               {canFaceTemplate && (
@@ -132,7 +127,6 @@ export default function OperasionalHubPage() {
                   icon="user"
                   title="Pendaftaran Wajah"
                   subtitle="Wajah yang dicocokkan dengan pemilik kartu saat scan"
-                  tone="sky"
                 />
               )}
               {canPasswordReset && (
@@ -141,7 +135,6 @@ export default function OperasionalHubPage() {
                   icon="lock"
                   title="Riwayat Reset Password"
                   subtitle="Siapa yang mengajukan, foto wajah & hasil verifikasi"
-                  tone="violet"
                 />
               )}
               {canRiwayatIdentitas && (
@@ -150,7 +143,6 @@ export default function OperasionalHubPage() {
                   icon="history"
                   title="Riwayat Identitas Karyawan"
                   subtitle="ID Unik yang diganti saat konflik sinkronisasi"
-                  tone="amber"
                 />
               )}
               {canOperators && (
@@ -159,7 +151,6 @@ export default function OperasionalHubPage() {
                   icon="users"
                   title="Master Operator"
                   subtitle="Akun operator, role dinamis & permission"
-                  tone="amber"
                 />
               )}
               {canKonten && (
@@ -168,7 +159,6 @@ export default function OperasionalHubPage() {
                   icon="globe"
                   title="Situs Publik & Berita"
                   subtitle="Konten CMS yang tampil di website sekolah"
-                  tone="purple"
                 />
               )}
               {canPmb && (
@@ -177,7 +167,6 @@ export default function OperasionalHubPage() {
                   icon="users"
                   title="PMB (Pendaftaran)"
                   subtitle="Gelombang, verifikasi berkas & kelulusan"
-                  tone="teal"
                 />
               )}
             </div>

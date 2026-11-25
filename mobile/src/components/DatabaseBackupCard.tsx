@@ -234,7 +234,7 @@ export function DatabaseBackupCard({
           disabled={
             busy !== null || confirmation.trim() !== RESTORE_CONFIRMATION
           }
-          className="inline-flex min-h-11 items-center rounded-xl bg-rose-500 px-5 text-xs font-black text-white transition hover:bg-rose-400 disabled:opacity-40"
+          className="inline-flex min-h-11 items-center rounded-xl bg-rose-500 px-5 text-xs font-black text-on-accent transition hover:bg-rose-400 disabled:opacity-40"
         >
           {busy === "restore" ? "Memulihkan..." : "Pulihkan database"}
         </button>

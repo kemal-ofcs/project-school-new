@@ -175,7 +175,7 @@ export function KeamananPemindaiCard({
           <button
             type="submit"
             disabled={scannerSafetyBusy}
-            className="min-h-11 rounded-xl bg-sky-400 px-5 text-xs font-black text-slate-950 shadow-lg shadow-sky-950/20 transition hover:bg-sky-300 disabled:opacity-50"
+            className="min-h-11 rounded-xl bg-sky-700 px-5 text-xs font-black text-on-accent shadow-lg shadow-sky-950/20 transition hover:bg-sky-600 disabled:opacity-50"
           >
             {scannerSafetyBusy ? "Menyimpan..." : "Simpan Pengaturan Scanner"}
           </button>

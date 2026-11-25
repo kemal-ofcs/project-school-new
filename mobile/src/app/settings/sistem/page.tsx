@@ -9,6 +9,7 @@ import { MobileAppShell } from "@/components/MobileAppShell";
 import { CompanyProfileCard } from "@/components/settings/CompanyProfileCard";
 import { BackHeader } from "@/components/ui/HubRow";
 import { Icon } from "@/components/ui/Icon";
+import { Sakelar } from "@/components/ui/Sakelar";
 import { canAccessArea, hasPermission } from "@/lib/auth/access";
 import { triggerHaptic } from "@/lib/client/haptics";
 import { useAuth } from "@/lib/context/AuthContext";
@@ -387,18 +388,14 @@ export default function SistemInfrastrukturPage() {
                     Matikan untuk menangguhkan penandaan Alfa di seluruh sistem.
                   </p>
                 </div>
-                <label className="relative inline-flex shrink-0 cursor-pointer items-center">
-                  <input
-                    type="checkbox"
-                    checked={autoAlfaEnabled}
-                    disabled={autoAlfaBusy || autoAlfaLoading}
-                    onChange={(e) => {
-                      void handleAutoAlfaToggle(e.target.checked);
-                    }}
-                    className="peer sr-only"
-                  />
-                  <div className="peer h-6 w-11 rounded-full bg-slate-800 after:absolute after:top-0.5 after:left-[2px] after:h-5 after:w-5 after:rounded-full after:border after:border-slate-300 after:bg-white after:transition-all after:content-[''] peer-checked:bg-amber-400 peer-checked:after:translate-x-full peer-checked:after:border-white peer-focus:outline-none peer-disabled:opacity-50" />
-                </label>
+                <Sakelar
+                  checked={autoAlfaEnabled}
+                  disabled={autoAlfaBusy || autoAlfaLoading}
+                  label="Status Otomasi Generate Alfa"
+                  onChange={(nilai) => {
+                    void handleAutoAlfaToggle(nilai);
+                  }}
+                />
               </div>
             ) : (
               <p className="mt-3 rounded-2xl border border-white/10 bg-slate-950/40 p-3 text-[11px] font-semibold text-slate-500">

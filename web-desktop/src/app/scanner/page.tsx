@@ -962,7 +962,7 @@ export default function ScannerPage() {
               }}
               className={`flex-1 py-2.5 rounded-lg text-xs font-semibold transition flex items-center justify-center gap-2 ${
                 mode === "camera"
-                  ? "bg-gradient-to-r from-sky-800 to-sky-700 text-white shadow-md font-bold"
+                  ? "bg-gradient-to-r from-sky-800 to-sky-700 text-on-accent shadow-md font-bold"
                   : "text-slate-400 hover:text-white"
               }`}
             >
@@ -976,7 +976,7 @@ export default function ScannerPage() {
               }}
               className={`flex-1 py-2.5 rounded-lg text-xs font-semibold transition flex items-center justify-center gap-2 ${
                 mode === "reader"
-                  ? "bg-gradient-to-r from-sky-800 to-sky-700 text-white shadow-md font-bold"
+                  ? "bg-gradient-to-r from-sky-800 to-sky-700 text-on-accent shadow-md font-bold"
                   : "text-slate-400 hover:text-white"
               }`}
             >
@@ -1029,7 +1029,7 @@ export default function ScannerPage() {
                     className={`min-h-10 rounded-xl px-4 text-xs font-bold transition disabled:opacity-50 ${
                       cameraActive
                         ? "border border-rose-400/30 bg-rose-400/10 text-rose-200 hover:bg-rose-400/20"
-                        : "bg-sky-400 text-slate-950 hover:bg-sky-300 shadow-md shadow-sky-950"
+                        : "bg-sky-700 text-on-accent hover:bg-sky-600 shadow-md shadow-sky-950"
                     }`}
                   >
                     {cameraActive ? "Hentikan kamera" : "Mulai pindai QR"}
@@ -1514,7 +1514,7 @@ export default function ScannerPage() {
                     </div>
                     <span
                       className={`text-[10px] font-semibold ${
-                        item.sukses ? "text-sky-300" : "text-rose-400"
+                        item.sukses ? "text-emerald-300" : "text-rose-400"
                       }`}
                     >
                       {item.jenisScan}

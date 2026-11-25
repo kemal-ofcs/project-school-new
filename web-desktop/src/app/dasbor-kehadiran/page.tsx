@@ -266,7 +266,7 @@ export default function DasborKehadiranPage() {
                     </p>
                   </div>
                   <div className="rounded-xl border border-slate-800 bg-slate-950/40 p-3">
-                    <p className="text-xs text-sky-400 font-medium">Sakit</p>
+                    <p className="text-xs text-cyan-400 font-medium">Sakit</p>
                     <p className="text-xl font-bold text-slate-100">
                       {siswa.sakit}
                     </p>
@@ -346,7 +346,7 @@ export default function DasborKehadiranPage() {
                     </p>
                   </div>
                   <div className="rounded-xl border border-slate-800 bg-slate-950/40 p-3">
-                    <p className="text-xs text-sky-400 font-medium">Sakit</p>
+                    <p className="text-xs text-cyan-400 font-medium">Sakit</p>
                     <p className="text-xl font-bold text-slate-100">
                       {guru.sakit}
                     </p>
@@ -460,7 +460,7 @@ export default function DasborKehadiranPage() {
                               item.status_kehadiran === "Hadir"
                                 ? "bg-emerald-500/10 text-emerald-400"
                                 : item.status_kehadiran === "Sakit"
-                                  ? "bg-sky-500/10 text-sky-400"
+                                  ? "bg-cyan-500/10 text-cyan-400"
                                   : item.status_kehadiran === "Izin"
                                     ? "bg-indigo-500/10 text-indigo-400"
                                     : item.status_kehadiran === "Dispen"
@@ -590,7 +590,7 @@ export default function DasborKehadiranPage() {
                 </div>
                 <Link
                   href="/presensi-kelas"
-                  className="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2 text-xs font-semibold text-white transition hover:bg-indigo-500"
+                  className="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2 text-xs font-semibold text-on-accent transition hover:bg-indigo-500"
                 >
                   <Icon name="chevron-right" className="h-4 w-4" />
                   <span>Buka Modul Rekonsiliasi</span>

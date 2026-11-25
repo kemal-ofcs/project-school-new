@@ -9,6 +9,24 @@
     .dark *
   ));
 
+/* Fase B (PRD UI navy + emas): skala sky dipetakan ke navy, sehingga aksen
+   `sky-*` di JSX menjadi warna identitas. Status yang dulu sky sudah dipindah ke
+   cyan atau emerald. 50-400 tint terang (teks di latar gelap, 400 = 6:1 vs
+   #0f172a), 700 = navy `.login-hero` (putih 11,6:1). */
+@theme {
+  --color-sky-50: #eef2fc;
+  --color-sky-100: #dce4f9;
+  --color-sky-200: #bccbf3;
+  --color-sky-300: #93a9ea;
+  --color-sky-400: #7b93e3;
+  --color-sky-500: #4a68d4;
+  --color-sky-600: #2f4fbf;
+  --color-sky-700: #10308a;
+  --color-sky-800: #0c2470;
+  --color-sky-900: #0a1a4f;
+  --color-sky-950: #061033;
+}
+
 :root {
   color-scheme: dark;
   --app-background: #07111f;
@@ -34,7 +52,14 @@
   --shadow-card: 0 4px 14px -2px rgba(0, 51, 153, 0.08);
   --shadow-floating:
     0 12px 32px -4px rgba(0, 34, 102, 0.18), 0 0 0 1px rgba(0, 51, 153, 0.06);
+  /* Identitas navy + emas (prd-ui-navy-emas.md §3a), sama dengan .login-hero.
+     --app-gold-line untuk garis/border (>= 3:1 terhadap kartu), --app-gold-text
+     untuk teks (>= 4,5:1). Emas tidak pernah dipakai sebagai warna status. */
+  --app-navy: #0a1a4f;
+  --app-navy-strong: #10308a;
   --app-gold: #f6c453;
+  --app-gold-line: #86682a;
+  --app-gold-text: #f6c453;
   --app-text: #f8fafc;
   --app-text-muted: #94a3b8;
   --app-header-bg: rgba(2, 6, 23, 0.92);
@@ -46,7 +71,7 @@
   /* Warna segmen grafik kehadiran (donat SVG, donat 3D, batang tren, titik
      legenda). Di tema terang tiap warna digelapkan sampai minimal 3:1
      terhadap putih, ambang WCAG untuk elemen non-teks. */
-  --chart-tepat: #0ea5e9;
+  --chart-tepat: #10b981;
   --chart-telat: #f59e0b;
   --chart-izin: #8b5cf6;
   --chart-alfa: #f43f5e;
@@ -81,7 +106,10 @@ html.light {
   --shadow-card: 0 4px 14px -2px rgba(0, 51, 153, 0.08);
   --shadow-floating:
     0 12px 32px -4px rgba(0, 34, 102, 0.18), 0 0 0 1px rgba(0, 51, 153, 0.06);
+  /* #d97706 hanya 3,2:1 terhadap putih: cukup untuk garis, tidak untuk teks. */
   --app-gold: #d97706;
+  --app-gold-line: #d97706;
+  --app-gold-text: #92400e;
   --app-text: #0f172a;
   --app-text-muted: #475569;
   --app-header-bg: rgba(255, 255, 255, 0.96);
@@ -90,7 +118,7 @@ html.light {
   --app-input-bg: #ffffff;
   --app-input-border: #cbd5e1;
   --app-input-text: #0f172a;
-  --chart-tepat: #0284c7;
+  --chart-tepat: #059669;
   --chart-telat: #d97706;
   --chart-izin: #7c3aed;
   --chart-alfa: #e11d48;
@@ -116,7 +144,7 @@ body {
   background:
     radial-gradient(
       circle at 12% -10%,
-      rgb(56 189 248 / 14%),
+      rgb(123 147 227 / 14%),
       transparent 32rem
     ),
     radial-gradient(circle at 92% 4%, rgb(246 196 83 / 9%), transparent 28rem),
@@ -131,7 +159,7 @@ html.light body {
   background:
     radial-gradient(
       circle at 12% -10%,
-      rgb(14 165 233 / 10%),
+      rgb(74 104 212 / 10%),
       transparent 32rem
     ),
     radial-gradient(circle at 92% 4%, rgb(245 158 11 / 7%), transparent 28rem),
@@ -166,7 +194,7 @@ a {
 }
 
 ::selection {
-  background: rgb(56 189 248 / 32%);
+  background: rgb(123 147 227 / 32%);
   color: white;
 }
 
@@ -205,8 +233,8 @@ html.light .app-panel {
 }
 
 .app-input:focus {
-  border-color: #38bdf8;
-  box-shadow: 0 0 0 3px rgb(56 189 248 / 20%);
+  border-color: #7b93e3;
+  box-shadow: 0 0 0 3px rgb(123 147 227 / 20%);
 }
 
 .app-input:disabled {
@@ -224,20 +252,6 @@ html.light header.sticky {
   background-color: rgba(255, 255, 255, 0.96) !important;
   border-bottom: 1px solid #e2e8f0 !important;
   box-shadow: 0 4px 20px rgb(15 23 42 / 4%) !important;
-}
-
-/* Page Header Seamless Typography in Light Mode */
-html[data-theme="light"] .page-header-title,
-html.light .page-header-title {
-  color: #0f172a !important;
-}
-html[data-theme="light"] .page-header-eyebrow,
-html.light .page-header-eyebrow {
-  color: #b45309 !important;
-}
-html[data-theme="light"] .page-header-description,
-html.light .page-header-description {
-  color: #475569 !important;
 }
 
 /* Sidebar: kolom tetap (aside) dan laci layar sempit (dialog) memakai kelas
@@ -259,8 +273,8 @@ html.light .app-sidebar button:hover {
 }
 html[data-theme="light"] .app-sidebar nav a[aria-current="page"],
 html.light .app-sidebar nav a[aria-current="page"] {
-  background-color: #e0f2fe !important;
-  color: #075985 !important;
+  background-color: #dce4f9 !important;
+  color: #0c2470 !important;
 }
 html[data-theme="light"] .app-sidebar summary:hover,
 html.light .app-sidebar summary:hover {
@@ -288,7 +302,7 @@ html.light section.bg-gradient-to-br.from-slate-900 {
   background: linear-gradient(
     135deg,
     #ffffff 0%,
-    #f0f9ff 55%,
+    #eef2fc 55%,
     #fffbeb 100%
   ) !important;
   border: 1px solid #e2e8f0 !important;
@@ -300,7 +314,7 @@ html.light section.bg-gradient-to-br.from-slate-900 h1 {
 }
 html[data-theme="light"] section.bg-gradient-to-br.from-slate-900 h1 span,
 html.light section.bg-gradient-to-br.from-slate-900 h1 span {
-  color: #0369a1 !important;
+  color: #10308a !important;
 }
 html[data-theme="light"] section.bg-gradient-to-br.from-slate-900 p,
 html.light section.bg-gradient-to-br.from-slate-900 p {
@@ -310,13 +324,13 @@ html.light section.bg-gradient-to-br.from-slate-900 p {
 /* "Buka QR Scanner" Hero CTA Button */
 html[data-theme="light"] a[href="/scanner"].bg-sky-400,
 html.light a[href="/scanner"].bg-sky-400 {
-  background-color: #0369a1 !important;
+  background-color: #10308a !important;
   color: #ffffff !important;
-  box-shadow: 0 4px 14px rgba(2, 132, 199, 0.3) !important;
+  box-shadow: 0 4px 14px rgba(47, 79, 191, 0.3) !important;
 }
 html[data-theme="light"] a[href="/scanner"].bg-sky-400:hover,
 html.light a[href="/scanner"].bg-sky-400:hover {
-  background-color: #075985 !important;
+  background-color: #0c2470 !important;
 }
 html[data-theme="light"] a[href="/scanner"].bg-sky-400 *,
 html.light a[href="/scanner"].bg-sky-400 * {
@@ -389,7 +403,7 @@ html[data-theme="light"]
 [class*="bg-slate-9"]:is([class^="border-sky-"], [class*=" border-sky-"]),
 html.light
   [class*="bg-slate-9"]:is([class^="border-sky-"], [class*=" border-sky-"]) {
-  border-color: #7dd3fc !important;
+  border-color: #93a9ea !important;
 }
 html[data-theme="light"]
   [class*="bg-slate-9"]:is([class^="border-amber-"], [class*=" border-amber-"]),
@@ -470,9 +484,9 @@ html.light
 html.light
   div.bg-slate-800\/60
   button:is(.bg-sky-500, .bg-sky-700):not(.status-kehadiran-pilihan) {
-  background: linear-gradient(to right, #075985, #0369a1) !important;
+  background: linear-gradient(to right, #0c2470, #10308a) !important;
   color: #ffffff !important;
-  box-shadow: 0 2px 8px rgba(2, 132, 199, 0.25) !important;
+  box-shadow: 0 2px 8px rgba(47, 79, 191, 0.25) !important;
   font-weight: 700 !important;
 }
 html[data-theme="light"]
@@ -709,7 +723,7 @@ html[data-theme="light"] button.bg-slate-800 svg,
 html[data-theme="light"] label.bg-slate-800 svg,
 html.light button.bg-slate-800 svg,
 html.light label.bg-slate-800 svg {
-  color: #0369a1 !important;
+  color: #10308a !important;
 }
 
 /* Neutral status badges & Nonaktif indicators */
@@ -718,14 +732,224 @@ html[data-theme="light"] div.bg-slate-800:not(button):not(.peer),
 html.light span.bg-slate-800,
 html.light div.bg-slate-800:not(button):not(.peer) {
   background-color: #f1f5f9 !important;
-  color: #64748b !important;
+  color: #5b677c !important;
   border-color: #cbd5e1 !important;
 }
 
-/* Lintasan sakelar (input.peer + div.peer) saat mati; saat nyala warna peer-checked:bg-* yang berlaku. */
-html[data-theme="light"] input.peer:not(:checked) ~ div.bg-slate-800,
-html.light input.peer:not(:checked) ~ div.bg-slate-800 {
+/* ==========================================================================
+   Sakelar on/off (components/ui/Sakelar.tsx)
+   --------------------------------------------------------------------------
+   Warna status, bukan warna tema: aktif hijau, nonaktif netral. Nilainya sama
+   di kedua tema dan sengaja tidak memakai utilitas slate/white, karena utilitas
+   itu ditimpa atau dibalik blok tema terang. Kontras lintasan >= 3:1 terhadap
+   kartu gelap #0f172a dan kartu terang #ffffff (WCAG 1.4.11):
+   aktif #059669 = 4,7:1 / 3,8:1, nonaktif #64748b = 3,7:1 / 4,8:1.
+   ========================================================================== */
+.sakelar-wrap {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 0.5rem;
+}
+.sakelar {
+  position: relative;
+  display: inline-block;
+  flex-shrink: 0;
+  width: 2.75rem;
+  height: 1.5rem;
+  padding: 0;
+  border: 1px solid rgb(255 255 255 / 16%);
+  border-radius: 9999px;
   background-color: #64748b;
+  cursor: pointer;
+  transition: background-color 150ms ease;
+}
+/* Area sentuh 44px tanpa memperbesar tampilan. */
+.sakelar::before {
+  content: "";
+  position: absolute;
+  inset: -0.625rem -0.25rem;
+}
+.sakelar[aria-checked="true"] {
+  background-color: #059669;
+}
+.sakelar:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+.sakelar:focus-visible {
+  outline: 2px solid #f6c453;
+  outline-offset: 2px;
+}
+.sakelar-kenop {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 1.125rem;
+  height: 1.125rem;
+  border: 1px solid rgb(15 23 42 / 12%);
+  border-radius: 9999px;
+  background-color: #ffffff;
+  box-shadow: 0 1px 3px rgb(0 0 0 / 40%);
+  transition: transform 150ms ease;
+}
+.sakelar[aria-checked="true"] .sakelar-kenop {
+  transform: translateX(1.25rem);
+}
+.sakelar-status {
+  min-width: 3.75rem;
+  text-align: right;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #94a3b8;
+}
+.sakelar-wrap[data-aktif="true"] .sakelar-status {
+  color: #34d399;
+}
+html[data-theme="light"] .sakelar:focus-visible,
+html.light .sakelar:focus-visible {
+  outline-color: #10308a;
+}
+html[data-theme="light"] .sakelar-status,
+html.light .sakelar-status {
+  color: #475569;
+}
+html[data-theme="light"] .sakelar-wrap[data-aktif="true"] .sakelar-status,
+html.light .sakelar-wrap[data-aktif="true"] .sakelar-status {
+  color: #047857;
+}
+@media (prefers-reduced-motion: reduce) {
+  .sakelar,
+  .sakelar-kenop {
+    transition: none;
+  }
+}
+
+/* ==========================================================================
+   Komponen identitas navy + emas: PageHeader, Akses Cepat, TabBar, layar muat
+   --------------------------------------------------------------------------
+   Kelas semantik, bukan utilitas slate/white, karena utilitas itu ditimpa blok
+   tema terang. Warna dari token --app-navy / --app-gold-* di :root.
+   ========================================================================== */
+.page-header {
+  border-bottom: 1px solid var(--app-gold-line);
+}
+.page-header-dot {
+  background-color: var(--app-gold);
+}
+.page-header-eyebrow {
+  color: var(--app-gold-text);
+}
+.page-header-title {
+  color: var(--app-text);
+}
+.page-header-description {
+  color: var(--app-text-muted);
+}
+
+.aksi-cepat {
+  border: 1px solid var(--app-gold-line);
+  background-color: rgb(15 23 42 / 80%);
+  color: var(--app-text);
+  transition:
+    border-color 150ms ease,
+    box-shadow 150ms ease,
+    transform 150ms ease;
+}
+.aksi-cepat:hover {
+  border-color: var(--app-gold);
+  box-shadow: inset 0 0 0 1px var(--app-gold);
+}
+.aksi-cepat:focus-visible {
+  outline: 2px solid var(--app-gold);
+  outline-offset: 2px;
+}
+.aksi-cepat-ikon {
+  border: 1px solid rgb(246 196 83 / 35%);
+  background: linear-gradient(
+    140deg,
+    var(--app-navy) 0%,
+    var(--app-navy-strong) 100%
+  );
+  color: #f6c453;
+}
+.aksi-cepat-sub {
+  color: var(--app-text-muted);
+}
+html[data-theme="light"] .aksi-cepat,
+html.light .aksi-cepat {
+  background-color: #ffffff;
+}
+
+.tab-bar {
+  display: flex;
+  gap: 0.25rem;
+  overflow-x: auto;
+  padding: 0.25rem;
+  border: 1px solid var(--app-border);
+  border-radius: 0.875rem;
+  background-color: var(--app-surface);
+  scrollbar-width: thin;
+}
+.tab-bar-tab {
+  display: inline-flex;
+  flex: 1 0 auto;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  min-height: 2.75rem;
+  padding: 0.5rem 1rem;
+  border: 1px solid transparent;
+  border-radius: 0.625rem;
+  white-space: nowrap;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--app-text-muted);
+  transition:
+    background-color 150ms ease,
+    color 150ms ease;
+}
+.tab-bar-tab:hover {
+  background-color: rgb(255 255 255 / 6%);
+  color: var(--app-text);
+}
+.tab-bar-tab[aria-selected="true"] {
+  border-color: rgb(246 196 83 / 40%);
+  background: linear-gradient(
+    140deg,
+    var(--app-navy) 0%,
+    var(--app-navy-strong) 100%
+  );
+  box-shadow: inset 0 -2px 0 #f6c453;
+  color: #ffffff;
+}
+/* Offset negatif: wadah overflow-x memotong cincin yang jatuh di luar tombol. */
+.tab-bar-tab:focus-visible {
+  outline: 2px solid var(--app-gold);
+  outline-offset: -2px;
+}
+html[data-theme="light"] .tab-bar-tab:not([aria-selected="true"]):hover,
+html.light .tab-bar-tab:not([aria-selected="true"]):hover {
+  background-color: rgb(15 23 42 / 5%);
+}
+@media (min-width: 1024px) {
+  .tab-bar[data-vertikal-lg] {
+    position: sticky;
+    top: 5rem;
+    flex-direction: column;
+  }
+  .tab-bar[data-vertikal-lg] .tab-bar-tab {
+    justify-content: flex-start;
+  }
+}
+
+.memuat-halaman {
+  background-color: var(--app-background);
+  color: var(--app-text-muted);
+}
+.memuat-halaman-putar {
+  border: 4px solid var(--app-gold-line);
+  border-top-color: transparent;
 }
 
 /* Excel Export Button */
@@ -754,13 +978,13 @@ html.light button.bg-emerald-950\/80 * {
 /* "Mulai pindai QR" Button */
 html[data-theme="light"] button.bg-sky-400,
 html.light button.bg-sky-400 {
-  background-color: #0369a1 !important;
+  background-color: #10308a !important;
   color: #ffffff !important;
-  box-shadow: 0 2px 10px rgba(2, 132, 199, 0.25) !important;
+  box-shadow: 0 2px 10px rgba(47, 79, 191, 0.25) !important;
 }
 html[data-theme="light"] button.bg-sky-400:hover,
 html.light button.bg-sky-400:hover {
-  background-color: #075985 !important;
+  background-color: #0c2470 !important;
 }
 html[data-theme="light"] button.bg-sky-400 *,
 html.light button.bg-sky-400 * {
@@ -891,16 +1115,16 @@ html.light .bg-sky-500\/10,
 html.light .bg-sky-400\/25,
 html.light .bg-sky-400\/10,
 html.light .bg-sky-400\/5 {
-  background-color: #e0f2fe !important;
-  border-color: #bae6fd !important;
-  color: #0369a1 !important;
+  background-color: #dce4f9 !important;
+  border-color: #bccbf3 !important;
+  color: #10308a !important;
 }
 html[data-theme="light"] .bg-sky-950:hover,
 html[data-theme="light"] .bg-sky-950\/80:hover,
 html.light .bg-sky-950:hover,
 html.light .bg-sky-950\/80:hover {
-  background-color: #bae6fd !important;
-  color: #075985 !important;
+  background-color: #bccbf3 !important;
+  color: #0c2470 !important;
 }
 html[data-theme="light"] .bg-sky-950 *,
 html[data-theme="light"] .bg-sky-950\/80 *,
@@ -1037,7 +1261,7 @@ html[data-theme="light"]
 html.light
   .bg-slate-950\/60
   button:is(.bg-sky-500, .bg-sky-700):not(.status-kehadiran-pilihan) {
-  background-color: #0369a1 !important;
+  background-color: #10308a !important;
   color: #ffffff !important;
 }
 html[data-theme="light"]
@@ -1095,6 +1319,98 @@ html[data-theme="light"] .text-white,
 html.light .text-white {
   color: #0f172a !important;
 }
+
+/* Teks di atas latar berwarna solid atau gradien (tombol indigo, chip navy,
+   logo bergradien). Putih di kedua tema; dipakai sebagai ganti `text-white`
+   yang dibalik menjadi tinta gelap oleh aturan di atas. Dijaga
+   `bun run audit:kontras`. */
+.text-on-accent {
+  color: #ffffff !important;
+}
+
+/* Teks aksen pucat (200-400) yang belum digelapkan blok "Status Text Accents"
+   di bawah. Tanpa ini text-blue-400 di kartu terang 2,4:1 dan text-indigo-400
+   3,1:1 (sisir-kontras.mts). Semua nilai >= 4,5:1 di #ffffff, #f1f5f9, #e2e8f0. */
+html[data-theme="light"] .text-blue-200,
+html.light .text-blue-200,
+html[data-theme="light"] .text-blue-300,
+html.light .text-blue-300,
+html[data-theme="light"] .text-blue-400,
+html.light .text-blue-400 {
+  color: #1d4ed8 !important;
+}
+html[data-theme="light"] .text-indigo-200,
+html.light .text-indigo-200,
+html[data-theme="light"] .text-indigo-300,
+html.light .text-indigo-300,
+html[data-theme="light"] .text-indigo-400,
+html.light .text-indigo-400 {
+  color: #4338ca !important;
+}
+html[data-theme="light"] .text-violet-200,
+html.light .text-violet-200,
+html[data-theme="light"] .text-violet-300,
+html.light .text-violet-300,
+html[data-theme="light"] .text-violet-400,
+html.light .text-violet-400 {
+  color: #6d28d9 !important;
+}
+html[data-theme="light"] .text-purple-200,
+html.light .text-purple-200,
+html[data-theme="light"] .text-purple-300,
+html.light .text-purple-300,
+html[data-theme="light"] .text-purple-400,
+html.light .text-purple-400 {
+  color: #7e22ce !important;
+}
+html[data-theme="light"] .text-teal-200,
+html.light .text-teal-200,
+html[data-theme="light"] .text-teal-300,
+html.light .text-teal-300,
+html[data-theme="light"] .text-teal-400,
+html.light .text-teal-400 {
+  color: #115e59 !important;
+}
+html[data-theme="light"] .text-cyan-200,
+html.light .text-cyan-200,
+html[data-theme="light"] .text-cyan-300,
+html.light .text-cyan-300,
+html[data-theme="light"] .text-cyan-400,
+html.light .text-cyan-400 {
+  color: #155e75 !important;
+}
+html[data-theme="light"] .text-orange-200,
+html.light .text-orange-200,
+html[data-theme="light"] .text-orange-300,
+html.light .text-orange-300,
+html[data-theme="light"] .text-orange-400,
+html.light .text-orange-400 {
+  color: #9a3412 !important;
+}
+html[data-theme="light"] .text-fuchsia-200,
+html.light .text-fuchsia-200,
+html[data-theme="light"] .text-fuchsia-300,
+html.light .text-fuchsia-300,
+html[data-theme="light"] .text-fuchsia-400,
+html.light .text-fuchsia-400 {
+  color: #a21caf !important;
+}
+html[data-theme="light"] .text-yellow-200,
+html.light .text-yellow-200,
+html[data-theme="light"] .text-yellow-300,
+html.light .text-yellow-300,
+html[data-theme="light"] .text-yellow-400,
+html.light .text-yellow-400 {
+  color: #854d0e !important;
+}
+html[data-theme="light"] .text-red-200,
+html.light .text-red-200,
+html[data-theme="light"] .text-red-300,
+html.light .text-red-300,
+html[data-theme="light"] .text-red-400,
+html.light .text-red-400 {
+  color: #b91c1c !important;
+}
 html[data-theme="light"] .text-slate-100,
 html[data-theme="light"] .text-slate-200,
 html.light .text-slate-100,
@@ -1109,9 +1425,10 @@ html[data-theme="light"] .text-slate-400,
 html.light .text-slate-400 {
   color: #475569 !important;
 }
+/* #64748b hanya 4,34:1 di atas permukaan #f1f5f9; #5b677c 5,2:1 (4,6:1 di #e2e8f0). */
 html[data-theme="light"] .text-slate-500,
 html.light .text-slate-500 {
-  color: #64748b !important;
+  color: #5b677c !important;
 }
 html[data-theme="light"] label,
 html.light label {
@@ -1167,14 +1484,14 @@ html.light .status-kehadiran-pilihan[aria-pressed="true"] {
   color: #020617 !important;
 }
 
-/* Status Text Accents in Light Mode */
+/* Teks aksen sky (skala navy, Fase B) dan status di tema terang */
 html[data-theme="light"] .text-sky-300,
 html[data-theme="light"] .text-sky-200,
 html[data-theme="light"] .text-sky-400,
 html.light .text-sky-300,
 html.light .text-sky-200,
 html.light .text-sky-400 {
-  color: #0369a1 !important;
+  color: #10308a !important;
 }
 html[data-theme="light"] .text-emerald-300,
 html[data-theme="light"] .text-emerald-200,
@@ -1254,8 +1571,8 @@ html.light .border-white\/20 {
 /* Horizontal Underline Tabs (.border-b-2) */
 html[data-theme="light"] button.border-sky-400,
 html.light button.border-sky-400 {
-  border-color: #0284c7 !important;
-  color: #0369a1 !important;
+  border-color: #2f4fbf !important;
+  color: #10308a !important;
 }
 html[data-theme="light"] button.border-transparent.text-slate-400,
 html.light button.border-transparent.text-slate-400 {
@@ -1341,7 +1658,7 @@ html.light input.bg-transparent {
   background-color: transparent !important;
   border: none !important;
   box-shadow: none !important;
-  color: #0369a1 !important;
+  color: #10308a !important;
 }
 html[data-theme="light"] input::placeholder,
 html[data-theme="light"] textarea::placeholder,
@@ -1357,8 +1674,8 @@ html.light
   input:not([type="checkbox"]):not([type="radio"]):not(.bg-transparent):focus,
 html.light select:focus,
 html.light textarea:focus {
-  border-color: #0284c7 !important;
-  box-shadow: 0 0 0 3px rgb(2 132 199 / 15%) !important;
+  border-color: #2f4fbf !important;
+  box-shadow: 0 0 0 3px rgb(47 79 191 / 15%) !important;
 }
 
 select option {
@@ -1405,8 +1722,8 @@ samp {
    ========================================================================== */
 
 :root {
-  --visual-spotlight: rgb(56 189 248 / 16%);
-  --visual-aurora-primary: rgb(56 189 248 / 26%);
+  --visual-spotlight: rgb(123 147 227 / 16%);
+  --visual-aurora-primary: rgb(123 147 227 / 26%);
   --visual-aurora-accent: rgb(129 140 248 / 20%);
   --visual-aurora-gold: rgb(246 196 83 / 14%);
   --visual-grid-line: rgb(148 163 184 / 7%);
@@ -1416,8 +1733,8 @@ samp {
 
 html[data-theme="light"],
 html.light {
-  --visual-spotlight: rgb(2 132 199 / 12%);
-  --visual-aurora-primary: rgb(2 132 199 / 14%);
+  --visual-spotlight: rgb(47 79 191 / 12%);
+  --visual-aurora-primary: rgb(47 79 191 / 14%);
   --visual-aurora-accent: rgb(99 102 241 / 12%);
   --visual-aurora-gold: rgb(217 119 6 / 10%);
   --visual-grid-line: rgb(15 23 42 / 5%);
@@ -1879,9 +2196,9 @@ html[data-theme="light"] .app-modal-panel textarea:focus,
 html.light .app-modal-panel input:focus,
 html.light .app-modal-panel select:focus,
 html.light .app-modal-panel textarea:focus {
-  border-color: #0284c7 !important;
+  border-color: #2f4fbf !important;
   background-color: #ffffff !important;
-  box-shadow: 0 0 0 3px rgba(2, 132, 199, 0.15) !important;
+  box-shadow: 0 0 0 3px rgba(47, 79, 191, 0.15) !important;
 }
 
 html[data-theme="light"] .app-modal-panel label,
@@ -1921,9 +2238,9 @@ html.light .overtime-tier-row span.text-slate-100 {
 
 html[data-theme="light"] .overtime-multiplier-badge-sky,
 html.light .overtime-multiplier-badge-sky {
-  background-color: #e0f2fe !important;
-  border-color: #bae6fd !important;
-  color: #0369a1 !important;
+  background-color: #dce4f9 !important;
+  border-color: #bccbf3 !important;
+  color: #10308a !important;
 }
 
 html[data-theme="light"] .overtime-multiplier-badge-amber,
@@ -1999,9 +2316,9 @@ html.light .scanner-terminal-clock-date {
 
 html[data-theme="light"] .scanner-terminal-audio.border-sky-500\/40,
 html.light .scanner-terminal-audio.border-sky-500\/40 {
-  background-color: #f0f9ff !important;
-  color: #0369a1 !important;
-  border-color: #bae6fd !important;
+  background-color: #eef2fc !important;
+  color: #10308a !important;
+  border-color: #bccbf3 !important;
 }
 
 html[data-theme="light"] .scanner-terminal-audio.border-slate-700,
@@ -2032,7 +2349,7 @@ html.light .bootstrap-panel-card {
 
 html[data-theme="light"] .bootstrap-panel-eyebrow,
 html.light .bootstrap-panel-eyebrow {
-  color: #0369a1 !important;
+  color: #10308a !important;
 }
 
 html[data-theme="light"] .bootstrap-panel-title,
@@ -2068,7 +2385,7 @@ html[data-theme="light"] .bootstrap-server-origin,
 html.light .bootstrap-server-origin {
   background-color: #f8fafc !important;
   border-color: #e2e8f0 !important;
-  color: #0369a1 !important;
+  color: #10308a !important;
 }
 
 html[data-theme="light"] .bootstrap-btn-toggle,
@@ -2101,16 +2418,16 @@ html.light .bootstrap-provider-option.bootstrap-provider-inactive:hover {
 
 html[data-theme="light"] .bootstrap-provider-option.bootstrap-provider-active,
 html.light .bootstrap-provider-option.bootstrap-provider-active {
-  background-color: #f0f9ff !important;
-  border-color: #0284c7 !important;
-  color: #0369a1 !important;
-  box-shadow: 0 0 0 1px #0284c7 !important;
+  background-color: #eef2fc !important;
+  border-color: #2f4fbf !important;
+  color: #10308a !important;
+  box-shadow: 0 0 0 1px #2f4fbf !important;
 }
 html[data-theme="light"]
   .bootstrap-provider-option.bootstrap-provider-active
   span,
 html.light .bootstrap-provider-option.bootstrap-provider-active span {
-  color: #0369a1 !important;
+  color: #10308a !important;
 }
 html[data-theme="light"]
   .bootstrap-provider-option.bootstrap-provider-active
@@ -2118,29 +2435,29 @@ html[data-theme="light"]
 html.light
   .bootstrap-provider-option.bootstrap-provider-active
   span.font-black {
-  color: #0369a1 !important;
+  color: #10308a !important;
 }
 
 /* Info Callout Box (SQLite info) */
 html[data-theme="light"] .bootstrap-info-box,
 html.light .bootstrap-info-box {
-  background-color: #f0f9ff !important;
-  border-color: #bae6fd !important;
-  color: #0369a1 !important;
+  background-color: #ecfeff !important;
+  border-color: #a5f3fc !important;
+  color: #155e75 !important;
 }
 
 /* Check Database Button */
 html[data-theme="light"] .bootstrap-btn-check,
 html.light .bootstrap-btn-check {
-  background-color: #f0f9ff !important;
-  border-color: #38bdf8 !important;
-  color: #0369a1 !important;
+  background-color: #eef2fc !important;
+  border-color: #7b93e3 !important;
+  color: #10308a !important;
 }
 html[data-theme="light"] .bootstrap-btn-check:hover:not(:disabled),
 html.light .bootstrap-btn-check:hover:not(:disabled) {
-  background-color: #e0f2fe !important;
-  border-color: #0284c7 !important;
-  color: #0369a1 !important;
+  background-color: #dce4f9 !important;
+  border-color: #2f4fbf !important;
+  color: #10308a !important;
 }
 
 /* Bingkai pill status (badge vonis wajah, status pendaftaran, StatusBadge).
@@ -2203,8 +2520,8 @@ html.light .bootstrap-form-input {
 }
 html[data-theme="light"] .bootstrap-form-input:focus,
 html.light .bootstrap-form-input:focus {
-  border-color: #0284c7 !important;
-  outline: 2px solid rgba(2, 132, 199, 0.25) !important;
+  border-color: #2f4fbf !important;
+  outline: 2px solid rgba(47, 79, 191, 0.25) !important;
   outline-offset: 1px !important;
 }
 html[data-theme="light"] .bootstrap-input-readonly,
@@ -2216,20 +2533,20 @@ html.light .bootstrap-input-readonly {
 
 /* Submit & Cancel Buttons */
 /* `button.` wajib ikut: aturan umum `button.bg-sky-400` lebih spesifik daripada
-   kelas saja, sehingga tanpa itu tombol ini tetap #0284c7 (putih di atasnya
-   4,10:1, di bawah 4,5:1). Putih di atas #0369a1 = 5,93:1. */
+   kelas saja, sehingga tanpa itu tombol ini memakai warna aturan umum itu.
+   Putih di atas #10308a = 11,6:1. */
 html[data-theme="light"] .bootstrap-btn-submit,
 html.light .bootstrap-btn-submit,
 html[data-theme="light"] button.bootstrap-btn-submit,
 html.light button.bootstrap-btn-submit {
-  background-color: #0369a1 !important;
+  background-color: #10308a !important;
   color: #ffffff !important;
 }
 html[data-theme="light"] .bootstrap-btn-submit:hover:not(:disabled),
 html.light .bootstrap-btn-submit:hover:not(:disabled),
 html[data-theme="light"] button.bootstrap-btn-submit:hover:not(:disabled),
 html.light button.bootstrap-btn-submit:hover:not(:disabled) {
-  background-color: #075985 !important;
+  background-color: #0c2470 !important;
 }
 html[data-theme="light"] .bootstrap-btn-cancel,
 html.light .bootstrap-btn-cancel {

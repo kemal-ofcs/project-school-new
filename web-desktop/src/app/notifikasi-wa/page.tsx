@@ -464,7 +464,7 @@ export default function NotifikasiWaPage() {
                 type="button"
                 onClick={handleRefresh}
                 disabled={loading}
-                className="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-3.5 py-2 text-xs font-medium text-white shadow-sm transition hover:bg-indigo-500 disabled:opacity-50"
+                className="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-3.5 py-2 text-xs font-medium text-on-accent shadow-sm transition hover:bg-indigo-500 disabled:opacity-50"
               >
                 <Icon
                   name="refresh"
@@ -1110,7 +1110,7 @@ export default function NotifikasiWaPage() {
                 <button
                   type="submit"
                   disabled={savingConfig}
-                  className="rounded-lg bg-indigo-600 px-4 py-2 text-xs font-semibold text-white shadow transition hover:bg-indigo-500 disabled:opacity-50"
+                  className="rounded-lg bg-indigo-600 px-4 py-2 text-xs font-semibold text-on-accent shadow transition hover:bg-indigo-500 disabled:opacity-50"
                 >
                   {savingConfig ? "Menyimpan..." : "Simpan Konfigurasi"}
                 </button>

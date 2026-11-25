@@ -300,7 +300,7 @@ export function PilihCari({
                 item.disabled
                   ? "cursor-not-allowed text-slate-500"
                   : indeks === indeksAktif
-                    ? "bg-sky-700 text-white"
+                    ? "bg-sky-700 text-on-accent"
                     : item.value === value
                       ? "font-semibold text-sky-300"
                       : ""

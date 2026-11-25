@@ -74,7 +74,7 @@ export function ExceptionFilterBar({
             onClick={() => onFilterChange(opt.key)}
             className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold transition-all shrink-0 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 ${
               isActive
-                ? "bg-[#003399] text-white shadow-sm"
+                ? "bg-[#003399] text-on-accent shadow-sm"
                 : "bg-slate-100 dark:bg-slate-800/80 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700"
             }`}
           >

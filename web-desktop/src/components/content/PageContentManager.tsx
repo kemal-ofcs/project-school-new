@@ -188,7 +188,7 @@ export function PageContentManager() {
               onClick={() => setActiveLandingSubTab(sub.id)}
               className={`rounded-xl px-4 py-2 text-xs font-bold transition ${
                 currentLandingSubSection.id === sub.id
-                  ? "bg-sky-500 text-slate-950 shadow-md"
+                  ? "bg-sky-700 text-on-accent shadow-md"
                   : "text-slate-400 hover:bg-white/5 hover:text-white"
               }`}
             >
@@ -304,7 +304,7 @@ export function PageContentManager() {
                   type="button"
                   onClick={handleSimpan}
                   disabled={isPending}
-                  className="rounded-xl bg-sky-500 px-6 py-2.5 text-sm font-bold text-slate-950 transition hover:bg-sky-400 disabled:opacity-50 shadow-lg shadow-sky-500/20"
+                  className="rounded-xl bg-sky-700 px-6 py-2.5 text-sm font-bold text-on-accent transition hover:bg-sky-600 disabled:opacity-50 shadow-lg shadow-sky-500/20"
                 >
                   {isPending ? "Menyimpan..." : "Simpan Perubahan Bagian Ini"}
                 </button>

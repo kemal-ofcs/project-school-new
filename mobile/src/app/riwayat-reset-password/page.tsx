@@ -430,7 +430,7 @@ export default function RiwayatResetPasswordMobilePage() {
                           type="button"
                           disabled={busy}
                           onClick={() => void openPhoto(entry)}
-                          className="flex min-h-11 flex-1 items-center justify-center gap-1.5 rounded-xl bg-violet-500 px-3 text-xs font-black text-white shadow-md transition hover:bg-violet-400 active:scale-95 disabled:opacity-50"
+                          className="flex min-h-11 flex-1 items-center justify-center gap-1.5 rounded-xl bg-violet-500 px-3 text-xs font-black text-on-accent shadow-md transition hover:bg-violet-400 active:scale-95 disabled:opacity-50"
                         >
                           <Icon name="user" className="size-4" />
                           Lihat Foto
@@ -541,7 +541,7 @@ export default function RiwayatResetPasswordMobilePage() {
                 type="button"
                 disabled={busy}
                 onClick={() => void runDelete()}
-                className="min-h-11 flex-1 rounded-xl bg-rose-500 px-3 text-xs font-black text-white active:scale-95 disabled:opacity-50"
+                className="min-h-11 flex-1 rounded-xl bg-rose-500 px-3 text-xs font-black text-on-accent active:scale-95 disabled:opacity-50"
               >
                 {busy ? "Menghapus..." : "Hapus"}
               </button>
@@ -582,7 +582,7 @@ export default function RiwayatResetPasswordMobilePage() {
                 type="button"
                 disabled={busy}
                 onClick={() => void runPurge()}
-                className="min-h-11 flex-1 rounded-xl bg-rose-500 px-3 text-xs font-black text-white active:scale-95 disabled:opacity-50"
+                className="min-h-11 flex-1 rounded-xl bg-rose-500 px-3 text-xs font-black text-on-accent active:scale-95 disabled:opacity-50"
               >
                 {busy ? "Membersihkan..." : "Bersihkan sekarang"}
               </button>

@@ -591,7 +591,7 @@ export default function GuruPage() {
                 <button
                   type="button"
                   onClick={handleOpenAdd}
-                  className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-sky-500 px-4 py-2 text-sm font-bold text-slate-950 shadow-lg shadow-sky-500/20 transition hover:bg-sky-400"
+                  className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-sky-700 px-4 py-2 text-sm font-bold text-on-accent shadow-lg shadow-sky-500/20 transition hover:bg-sky-600"
                 >
                   <Icon name="add" className="size-4" />
                   <span>Tambah Guru</span>
@@ -968,7 +968,7 @@ export default function GuruPage() {
                 <button
                   type="submit"
                   disabled={saving}
-                  className="rounded-xl bg-sky-500 px-5 py-2 text-sm font-bold text-slate-950 shadow-lg shadow-sky-500/20 hover:bg-sky-400 disabled:opacity-50"
+                  className="rounded-xl bg-sky-700 px-5 py-2 text-sm font-bold text-on-accent shadow-lg shadow-sky-500/20 hover:bg-sky-600 disabled:opacity-50"
                 >
                   {saving ? "Menyimpan..." : "Simpan Profil"}
                 </button>

@@ -190,7 +190,7 @@ export default function DasborKehadiranMobilePage() {
                 triggerHaptic("light");
                 void loadData(tanggal);
               }}
-              className="rounded-xl bg-indigo-500 px-4 py-2 text-xs font-black text-white transition hover:bg-indigo-400 active:scale-95"
+              className="rounded-xl bg-indigo-500 px-4 py-2 text-xs font-black text-on-accent transition hover:bg-indigo-400 active:scale-95"
             >
               Muat
             </button>

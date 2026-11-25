@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from "react";
 import { MobileAppShell } from "@/components/MobileAppShell";
 import { ScannerSafetyCard } from "@/components/settings/ScannerSafetyCard";
 import { BackHeader } from "@/components/ui/HubRow";
+import { Sakelar } from "@/components/ui/Sakelar";
 import { hasPermission } from "@/lib/auth/access";
 import {
   calculateDistanceMeters,
@@ -479,20 +480,12 @@ export default function KeamananAbsensiPage() {
               </p>
             </div>
             {canManageGeofence ? (
-              <button
-                type="button"
-                onClick={handleToggleGeofence}
+              <Sakelar
+                checked={geofence.enabled}
                 disabled={geofenceLoading}
-                className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
-                  geofence.enabled ? "bg-sky-500" : "bg-slate-700"
-                }`}
-              >
-                <span
-                  className={`pointer-events-none inline-block size-5 transform rounded-full bg-on-accent shadow-lg ring-0 transition duration-200 ease-in-out ${
-                    geofence.enabled ? "translate-x-5" : "translate-x-0"
-                  }`}
-                />
-              </button>
+                label="Geofencing lokasi scan"
+                onChange={() => handleToggleGeofence()}
+              />
             ) : (
               <span className="rounded-full border border-white/10 bg-slate-950 px-2.5 py-1 text-[10px] font-bold text-slate-500">
                 Hanya Superadmin

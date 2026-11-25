@@ -7,6 +7,7 @@ import { EksporLaporanKehadiran } from "@/components/dashboard/EksporLaporanKeha
 import { PerluPerhatianCard } from "@/components/kepegawaian/PerluPerhatianCard";
 import { Icon } from "@/components/ui/Icon";
 import { PilihCari } from "@/components/ui/PilihCari";
+import { TabBar } from "@/components/ui/TabBar";
 import { AnimatedCounter } from "@/components/visual/AnimatedCounter";
 import { AttendanceGaugeGate } from "@/components/visual/AttendanceGaugeGate";
 import { AttendanceWeeklyTrend } from "@/components/visual/AttendanceWeeklyTrend";
@@ -301,7 +302,7 @@ export default function DashboardPage() {
                   setExportMessage(null);
                   setEksporTerbuka(true);
                 }}
-                className="flex items-center justify-center gap-1.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 px-3.5 py-2 text-xs font-bold text-white shadow-lg shadow-emerald-950/60 transition hover:from-emerald-500 hover:to-teal-500"
+                className="flex items-center justify-center gap-1.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 px-3.5 py-2 text-xs font-bold text-on-accent shadow-lg shadow-emerald-950/60 transition hover:from-emerald-500 hover:to-teal-500"
               >
                 <Icon name="document" className="size-3.5" />
                 <span>Ekspor Laporan Excel</span>
@@ -375,16 +376,16 @@ export default function DashboardPage() {
           <FadeIn className="h-full" delaySeconds={0.06}>
             <TiltCard maxTilt={8} className="h-full">
               <SpotlightCard>
-                <div className="h-full bg-slate-900/80 border border-sky-500/40 rounded-3xl p-5 space-y-2">
+                <div className="h-full bg-slate-900/80 border border-emerald-500/40 rounded-3xl p-5 space-y-2">
                   <div className="flex items-center justify-between">
-                    <span className="text-sky-400 text-xs font-medium uppercase tracking-wider">
+                    <span className="text-emerald-400 text-xs font-medium uppercase tracking-wider">
                       Hadir Hari Ini
                     </span>
-                    <span className="px-2 py-0.5 bg-sky-500/20 text-sky-300 border border-sky-500/40 rounded-full text-[10px] font-mono font-bold">
+                    <span className="px-2 py-0.5 bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 rounded-full text-[10px] font-mono font-bold">
                       {metrics?.persentaseKehadiran || 0}% Rate
                     </span>
                   </div>
-                  <div className="text-2xl font-bold text-sky-300">
+                  <div className="text-2xl font-bold text-emerald-300">
                     {metricsPending ? (
                       <Skeleton className="h-7 w-28" />
                     ) : (
@@ -481,7 +482,7 @@ export default function DashboardPage() {
             </div>
 
             <div className="grid grid-cols-2 gap-2 text-[11px] font-mono border-t border-white/5 pt-3">
-              <div className="flex items-center gap-1.5 text-sky-400">
+              <div className="flex items-center gap-1.5 text-emerald-400">
                 <span className="size-2 rounded-full bg-(--chart-tepat)" />
                 <span>
                   Tepat Waktu:{" "}
@@ -518,37 +519,28 @@ export default function DashboardPage() {
 
         {/* Tab Navigation & Dynamic Filter Controls Bar */}
         <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-4">
-          <div className="bg-slate-900/60 p-1.5 border border-slate-800 rounded-2xl flex items-center gap-1.5 w-full xl:w-auto overflow-x-auto">
-            <button
-              type="button"
-              onClick={() => {
-                setActiveTab("harian");
+          {/* shrink-0 di xl: label tab tidak terpotong, bilah tanggal yang membungkus. */}
+          <div className="w-full xl:w-auto xl:shrink-0">
+            <TabBar
+              tabs={[
+                {
+                  id: "harian",
+                  label:
+                    filterMode === "single" || startDate === endDate
+                      ? `Rekap Kehadiran (${startDate})`
+                      : `Rekap Kehadiran (${startDate} s/d ${endDate})`,
+                },
+                { id: "leaderboard", label: "Papan Peringkat (Leaderboard)" },
+              ]}
+              value={activeTab}
+              onChange={(id) => {
+                setActiveTab(id);
                 setCurrentPage(1);
               }}
-              className={`px-4 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition ${
-                activeTab === "harian"
-                  ? "bg-gradient-to-r from-sky-800 to-sky-700 text-white shadow-md shadow-sky-950"
-                  : "text-slate-400 hover:text-white"
-              }`}
-            >
-              {filterMode === "single" || startDate === endDate
-                ? `Rekap Kehadiran (${startDate})`
-                : `Rekap Kehadiran (${startDate} s/d ${endDate})`}
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setActiveTab("leaderboard");
-                setCurrentPage(1);
-              }}
-              className={`px-4 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition ${
-                activeTab === "leaderboard"
-                  ? "bg-gradient-to-r from-sky-800 to-sky-700 text-white shadow-md shadow-sky-950"
-                  : "text-slate-400 hover:text-white"
-              }`}
-            >
-              Papan Peringkat (Leaderboard)
-            </button>
+              idPrefix="dashboard"
+              ariaLabel="Tampilan laporan kehadiran"
+              panelId="panel-dashboard-laporan"
+            />
           </div>
 
           {/* Date Filter Controls Bar */}
@@ -768,7 +760,12 @@ export default function DashboardPage() {
         ) : null}
 
         {/* Table Data / Leaderboard Container */}
-        <div className="bg-slate-900 border border-slate-800 rounded-3xl overflow-hidden shadow-2xl">
+        <div
+          id="panel-dashboard-laporan"
+          role="tabpanel"
+          aria-labelledby={`tab-dashboard-${activeTab}`}
+          className="bg-slate-900 border border-slate-800 rounded-3xl overflow-hidden shadow-2xl"
+        >
           {isLoading ? (
             <div className="py-20 flex flex-col items-center justify-center space-y-3">
               <div className="w-8 h-8 border-4 border-sky-500 border-t-transparent rounded-full animate-spin"></div>

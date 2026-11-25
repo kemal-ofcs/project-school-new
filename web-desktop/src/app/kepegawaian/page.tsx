@@ -39,6 +39,7 @@ import { FeedbackBanner } from "@/components/ui/FeedbackBanner";
 import { Modal } from "@/components/ui/Modal";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { PilihCari } from "@/components/ui/PilihCari";
+import { TabBar } from "@/components/ui/TabBar";
 import { formatTanggalOperasional } from "@/lib/attendance/time-policy";
 import { canAccessArea, hasPermission } from "@/lib/auth/access";
 import { useAuth } from "@/lib/context/AuthContext";
@@ -98,7 +99,7 @@ const INPUT =
 const TOMBOL =
   "min-h-10 rounded-xl border border-white/10 px-3 text-sm font-semibold text-slate-200 hover:bg-slate-800 disabled:opacity-50";
 const TOMBOL_UTAMA =
-  "min-h-10 rounded-xl bg-sky-500 px-4 text-sm font-semibold text-slate-950 hover:bg-sky-400 disabled:opacity-50";
+  "min-h-10 rounded-xl bg-sky-700 px-4 text-sm font-semibold text-on-accent hover:bg-sky-600 disabled:opacity-50";
 
 function pesanGalat(error: unknown) {
   return error instanceof Error ? error.message : "Permintaan gagal.";
@@ -170,12 +171,13 @@ export default function KepegawaianPage() {
         </FeedbackBanner>
       ) : null}
       <PerluPerhatianCard onBukaTab={(t) => setTab(t as Tab)} />
-      <div
-        role="tablist"
-        aria-label="Bagian halaman Kepegawaian"
-        className="flex flex-wrap gap-2 rounded-2xl border border-white/10 bg-slate-900 p-1"
-      >
-        {TAB.filter(
+      <TabBar
+        ariaLabel="Bagian halaman Kepegawaian"
+        idPrefix="kepegawaian"
+        panelId="panel-kepegawaian"
+        value={tab}
+        onChange={setTab}
+        tabs={TAB.filter(
           ({ kunci }) =>
             (!TAB_GURU.includes(kunci) ||
               hasPermission(user, "teachers.view")) &&
@@ -186,25 +188,8 @@ export default function KepegawaianPage() {
             (kunci !== "rekrutmen" || lihatRekrutmen) &&
             (kunci !== "pelatihan" || lihatPelatihan) &&
             (kunci !== "reimburse" || lihatReimburse),
-        ).map(({ kunci, label }) => (
-          <button
-            key={kunci}
-            id={`tab-kepegawaian-${kunci}`}
-            role="tab"
-            type="button"
-            aria-selected={tab === kunci}
-            aria-controls="panel-kepegawaian"
-            onClick={() => setTab(kunci)}
-            className={`min-h-10 rounded-xl px-4 text-sm font-semibold ${
-              tab === kunci
-                ? "bg-sky-500 text-slate-950"
-                : "text-slate-300 hover:bg-slate-800"
-            }`}
-          >
-            {label}
-          </button>
-        ))}
-      </div>
+        ).map(({ kunci, label }) => ({ id: kunci, label }))}
+      />
       <div
         id="panel-kepegawaian"
         role="tabpanel"

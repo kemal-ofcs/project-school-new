@@ -641,7 +641,7 @@ export default function BimbinganKonselingMobilePage() {
                       void simpanSesi();
                     }}
                     disabled={menyimpan}
-                    className="mt-2 rounded-xl bg-indigo-500 px-4 py-2.5 text-xs font-black text-white transition hover:bg-indigo-400 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50"
+                    className="mt-2 rounded-xl bg-indigo-500 px-4 py-2.5 text-xs font-black text-on-accent transition hover:bg-indigo-400 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     {menyimpan ? "Menyimpan..." : "Simpan Sesi"}
                   </button>
@@ -661,7 +661,7 @@ export default function BimbinganKonselingMobilePage() {
               <button
                 type="button"
                 onClick={() => void bukaBuatKasus()}
-                className="flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl bg-indigo-500 text-sm font-black text-white shadow-lg transition hover:bg-indigo-400 active:scale-95"
+                className="flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl bg-indigo-500 text-sm font-black text-on-accent shadow-lg transition hover:bg-indigo-400 active:scale-95"
               >
                 <Icon name="plus" className="size-5" />
                 Catat Kasus Baru
@@ -708,7 +708,7 @@ export default function BimbinganKonselingMobilePage() {
                     triggerHaptic("light");
                     void muatKasus();
                   }}
-                  className="rounded-xl bg-indigo-500 px-4 py-2 text-xs font-black text-white transition hover:bg-indigo-400 active:scale-95"
+                  className="rounded-xl bg-indigo-500 px-4 py-2 text-xs font-black text-on-accent transition hover:bg-indigo-400 active:scale-95"
                 >
                   Muat
                 </button>
@@ -791,7 +791,7 @@ export default function BimbinganKonselingMobilePage() {
               type="submit"
               form="bk-create-case-form"
               disabled={menyimpan || !activeYearId}
-              className="min-h-11 flex-1 rounded-xl bg-indigo-500 text-xs font-black text-white shadow-lg active:scale-95 disabled:opacity-50"
+              className="min-h-11 flex-1 rounded-xl bg-indigo-500 text-xs font-black text-on-accent shadow-lg active:scale-95 disabled:opacity-50"
             >
               {menyimpan ? "Menyimpan..." : "Simpan Kasus"}
             </button>

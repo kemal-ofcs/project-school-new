@@ -4,6 +4,8 @@
  * Dipakai Dasbor Kehadiran dan Audit Kehadiran. Sebelumnya komponen yang sama
  * ditulis dua kali, sehingga penyesuaian jarak atau ukuran huruf di satu
  * halaman membuat kedua baris metrik itu tidak lagi sejajar.
+ *
+ * Kartu transparan bergaris emas (`.kartu-angka`); `tone` tetap warna status.
  */
 export function StatTile({
   label,
@@ -15,8 +17,8 @@ export function StatTile({
   tone?: string;
 }) {
   return (
-    <div className="rounded-2xl border border-white/10 bg-slate-950/60 p-3">
-      <div className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">
+    <div className="kartu-angka rounded-2xl p-3">
+      <div className="kartu-angka-label text-[10px] font-semibold uppercase tracking-wide">
         {label}
       </div>
       <div className={`mt-0.5 text-xl font-black ${tone}`}>{value}</div>

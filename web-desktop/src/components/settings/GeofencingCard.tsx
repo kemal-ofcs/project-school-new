@@ -127,7 +127,7 @@ export function GeofencingCard({
                 }
                 className={`rounded-lg px-2 py-0.5 text-[11px] font-bold transition-all ${
                   geofence.radiusMeter === preset
-                    ? "bg-sky-400 text-slate-950 shadow-sm"
+                    ? "bg-sky-700 text-on-accent shadow-sm"
                     : "border border-white/10 bg-white/[0.04] text-slate-300 hover:bg-white/[0.08]"
                 }`}
               >
@@ -211,7 +211,7 @@ export function GeofencingCard({
           <button
             type="submit"
             disabled={geofenceBusy}
-            className="min-h-11 rounded-xl bg-sky-400 px-5 text-xs font-black text-slate-950 hover:bg-sky-300 disabled:opacity-50"
+            className="min-h-11 rounded-xl bg-sky-700 px-5 text-xs font-black text-on-accent hover:bg-sky-600 disabled:opacity-50"
           >
             {geofenceBusy ? "Menyimpan..." : "Simpan & Sinkronkan ke Cloud"}
           </button>

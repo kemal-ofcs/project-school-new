@@ -9,68 +9,66 @@ import { useAuth } from "@/lib/context/AuthContext";
 
 export interface QuickActionItem extends QuickActionTileProps {
   area?: AppArea;
+  /** Syarat izin tambahan (mis. `hasPermission`); `false` menyembunyikan kartu. */
+  visible?: boolean;
 }
 
 interface QuickActionGridProps {
   tiles?: QuickActionItem[];
   className?: string;
+  /** Kolom di layar >= 640px; HP selalu 2 kolom supaya label tidak terpotong. */
+  kolom?: 3 | 4;
 }
+
+const KOLOM_SM = { 3: "sm:grid-cols-3", 4: "sm:grid-cols-4" };
 
 const DEFAULT_TILES: QuickActionItem[] = [
   {
     href: "/id-cards",
     icon: "user",
     title: "Cetak ID Card",
-    tone: "purple",
     area: "idcards",
   },
   {
     href: "/jurnal-mengajar",
     icon: "document",
     title: "Jurnal Mengajar",
-    tone: "primary",
     area: "jurnal_mengajar",
   },
   {
     href: "/leger-kehadiran",
     icon: "calendar",
     title: "Leger Kehadiran",
-    tone: "emerald",
     area: "leger_kehadiran",
   },
   {
     href: "/audit-absensi",
     icon: "alert",
     title: "Live Audit Presensi",
-    tone: "amber",
     area: "audit",
   },
   {
     href: "/notifikasi-wa",
     icon: "whatsapp",
     title: "Notifikasi WhatsApp",
-    tone: "emerald",
     area: "notifikasi_wa",
   },
   {
     href: "/payroll",
     icon: "document",
     title: "Penggajian & Slip Gaji",
-    tone: "emerald",
     area: "payroll",
   },
   {
     href: "/presensi-kelas",
     icon: "clock",
     title: "Presensi Mapel & Anomali",
-    tone: "primary",
     area: "presensi_kelas",
   },
   {
     href: "/history",
     icon: "clock",
     title: "Riwayat Presensi",
-    tone: "neutral",
     area: "history",
   },
 ];
@@ -78,15 +76,17 @@ const DEFAULT_TILES: QuickActionItem[] = [
 export function QuickActionGrid({
   tiles = DEFAULT_TILES,
   className = "",
+  kolom = 4,
 }: QuickActionGridProps) {
   const { user } = useAuth();
   const visibleTiles = tiles.filter(
-    (tile) => !tile.area || canAccessArea(user, tile.area),
+    (tile) =>
+      tile.visible !== false && (!tile.area || canAccessArea(user, tile.area)),
   );
 
   return (
     <section aria-label="Aksi Cepat Operasional" className={className}>
-      <div className="grid grid-cols-4 gap-2.5 sm:gap-3.5">
+      <div className={`grid grid-cols-2 gap-2.5 sm:gap-3.5 ${KOLOM_SM[kolom]}`}>
         {visibleTiles.map((tile) => (
           <QuickActionTile key={tile.href} {...tile} />
         ))}

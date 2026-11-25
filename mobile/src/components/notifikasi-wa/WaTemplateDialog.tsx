@@ -165,7 +165,7 @@ export function WaTemplateDialog({
             data-konfirmasi
             onClick={() => void handleSave()}
             disabled={!drafts || saving || invalid.length > 0}
-            className="rounded-lg bg-emerald-600 px-4 py-2 text-xs font-semibold text-white transition hover:bg-emerald-500 disabled:opacity-50"
+            className="rounded-lg bg-emerald-600 px-4 py-2 text-xs font-semibold text-on-accent transition hover:bg-emerald-500 disabled:opacity-50"
           >
             {saving ? "Menyimpan..." : "Simpan Semua"}
           </button>

@@ -407,7 +407,7 @@ function DialogJenis({
             yakinHapus ? (
               <>
                 <button
-                  className="min-h-11 rounded-lg bg-rose-600 px-4 py-2 font-semibold text-sm text-white disabled:opacity-60"
+                  className="min-h-11 rounded-lg bg-rose-600 px-4 py-2 font-semibold text-sm text-on-accent disabled:opacity-60"
                   disabled={sibuk}
                   onClick={() =>
                     void jalankan(

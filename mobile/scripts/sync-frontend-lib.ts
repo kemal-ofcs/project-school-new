@@ -46,6 +46,9 @@ const filesToCopy = [
   "components/KonfirmasiSimpan.tsx",
   // Dropdown berpencarian untuk daftar panjang.
   "components/ui/PilihCari.tsx",
+  "components/ui/Sakelar.tsx",
+  // Baris tab navy + emas; dipakai Inventaris, Keuangan, Tagihan, Libur Massal.
+  "components/ui/TabBar.tsx",
   // Daftar dan kelompok menu sidebar, dipakai ulang halaman Menu Mobile.
   // Ikonnya wajib ada di `Icon` Mobile (komponen itu tidak ikut disalin).
   "components/navigation-items.ts",

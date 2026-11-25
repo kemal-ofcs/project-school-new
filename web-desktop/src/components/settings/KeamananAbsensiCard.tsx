@@ -259,7 +259,7 @@ export function KeamananAbsensiCard({
           <button
             type="submit"
             disabled={ipAllowlistBusy}
-            className="min-h-11 rounded-xl bg-sky-400 px-5 text-sm font-black text-slate-950 disabled:opacity-60"
+            className="min-h-11 rounded-xl bg-sky-700 px-5 text-sm font-black text-on-accent disabled:opacity-60"
           >
             {ipAllowlistBusy ? "Menyimpan..." : "Simpan keamanan absensi"}
           </button>

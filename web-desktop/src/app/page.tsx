@@ -7,6 +7,7 @@ import { AppShell } from "@/components/AppShell";
 import { LicenseHolderLabel } from "@/components/license/LicenseNotice";
 import { FeedbackBanner } from "@/components/ui/FeedbackBanner";
 import { Icon } from "@/components/ui/Icon";
+import { MemuatHalaman } from "@/components/ui/MemuatHalaman";
 import { QuickActionGrid } from "@/components/ui/QuickActionGrid";
 import { StatusBadgePill } from "@/components/ui/StatusBadgePill";
 import { StatusHeroCard } from "@/components/ui/StatusHeroCard";
@@ -118,14 +119,9 @@ export default function Home() {
 
   if (!isHydrated || authLoading) {
     return (
-      <div className="grid min-h-dvh place-items-center bg-slate-950 p-6 text-slate-100">
-        <output className="flex flex-col items-center gap-3">
-          <div className="size-10 animate-spin rounded-full border-4 border-blue-500 border-t-transparent" />
-          <p className="text-xs font-medium text-slate-400">
-            Memuat Pusat Operasional {BRANDING.appDisplayName}...
-          </p>
-        </output>
-      </div>
+      <MemuatHalaman
+        pesan={`Memuat Pusat Operasional ${BRANDING.appDisplayName}…`}
+      />
     );
   }
 

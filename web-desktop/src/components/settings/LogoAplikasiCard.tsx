@@ -61,7 +61,7 @@ export function LogoAplikasiCard({
       <div className="mt-5 flex flex-col gap-3 sm:flex-row">
         <label
           htmlFor="logo-upload-input"
-          className="inline-flex min-h-11 flex-1 cursor-pointer items-center justify-center gap-2 rounded-xl bg-sky-400 px-4 text-sm font-black text-slate-950 shadow-lg shadow-sky-950/20 transition hover:bg-sky-300 focus-within:ring-2 focus-within:ring-sky-200"
+          className="inline-flex min-h-11 flex-1 cursor-pointer items-center justify-center gap-2 rounded-xl bg-sky-700 px-4 text-sm font-black text-on-accent shadow-lg shadow-sky-950/20 transition hover:bg-sky-600 focus-within:ring-2 focus-within:ring-sky-200"
         >
           <Icon name="upload" className="size-4" />
           {logoBusy ? "Menyimpan logo…" : "Pilih logo baru"}

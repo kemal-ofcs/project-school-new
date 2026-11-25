@@ -921,7 +921,7 @@ export default function PresensiKelasPage() {
                       setJamKeSampai(rentang.akhir);
                     }
                   }}
-                  className="min-h-11 rounded-xl bg-sky-500 px-4 text-xs font-bold text-slate-950 transition hover:bg-sky-400"
+                  className="min-h-11 rounded-xl bg-sky-700 px-4 text-xs font-bold text-on-accent transition hover:bg-sky-600"
                 >
                   Pakai sesi ini
                 </button>
@@ -1283,7 +1283,7 @@ export default function PresensiKelasPage() {
                     type="button"
                     onClick={handleLoadRoster}
                     disabled={loading}
-                    className="inline-flex items-center gap-2 rounded-xl bg-sky-500 px-4 py-2 text-xs font-bold text-slate-950 transition hover:bg-sky-400 disabled:opacity-50"
+                    className="inline-flex items-center gap-2 rounded-xl bg-sky-700 px-4 py-2 text-xs font-bold text-on-accent transition hover:bg-sky-600 disabled:opacity-50"
                   >
                     <Icon name="users" className="size-3.5" />
                     <span>{loading ? "Memuat..." : "Muat Roster Siswa"}</span>
@@ -1437,7 +1437,7 @@ export default function PresensiKelasPage() {
                                         ? opt.tone === "emerald"
                                           ? "bg-emerald-500 text-slate-950 shadow"
                                           : opt.tone === "sky"
-                                            ? "bg-sky-500 text-slate-950 shadow"
+                                            ? "bg-sky-700 text-on-accent shadow"
                                             : opt.tone === "amber"
                                               ? "bg-amber-500 text-slate-950 shadow"
                                               : opt.tone === "rose"
@@ -1788,7 +1788,7 @@ export default function PresensiKelasPage() {
                     type="button"
                     onClick={handleLoadHistory}
                     disabled={loadingHistory}
-                    className="inline-flex items-center gap-2 rounded-xl bg-sky-500 px-4 py-2 text-xs font-bold text-slate-950 transition hover:bg-sky-400 disabled:opacity-50"
+                    className="inline-flex items-center gap-2 rounded-xl bg-sky-700 px-4 py-2 text-xs font-bold text-on-accent transition hover:bg-sky-600 disabled:opacity-50"
                   >
                     <Icon name="history" className="size-3.5" />
                     <span>

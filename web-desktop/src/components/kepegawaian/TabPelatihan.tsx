@@ -108,7 +108,7 @@ export function TabPelatihan({
               onClick={() => setTampilan(kunci)}
               className={`min-h-10 rounded-xl px-3 text-sm font-semibold ${
                 tampilan === kunci
-                  ? "bg-sky-500 text-slate-950"
+                  ? "bg-sky-700 text-on-accent"
                   : "border border-white/10 text-slate-300 hover:bg-slate-800"
               }`}
             >

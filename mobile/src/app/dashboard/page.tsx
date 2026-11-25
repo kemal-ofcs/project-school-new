@@ -155,7 +155,6 @@ export default function DashboardPage() {
                   icon="check"
                   title="Presensi Mapel & Anomali"
                   subtitle="Jurnal kelas, rekonsiliasi & deteksi bolos"
-                  tone="teal"
                 />
               )}
               {canAudit && (
@@ -164,7 +163,6 @@ export default function DashboardPage() {
                   icon="alert"
                   title="Live Audit Presensi"
                   subtitle="Belum absen, sesi menggantung & perlu verifikasi"
-                  tone="amber"
                 />
               )}
               {canJurnalMengajar && (
@@ -173,7 +171,6 @@ export default function DashboardPage() {
                   icon="document"
                   title="Jurnal Mengajar"
                   subtitle="Catatan materi, kendala KBM & paraf guru"
-                  tone="sky"
                 />
               )}
               {canLegerKehadiran && (
@@ -182,7 +179,6 @@ export default function DashboardPage() {
                   icon="calendar"
                   title="Leger Kehadiran"
                   subtitle="Rekapitulasi semester & pembekuan rapor"
-                  tone="indigo"
                 />
               )}
               {canInventaris && (
@@ -191,7 +187,6 @@ export default function DashboardPage() {
                   icon="box"
                   title="Inventaris"
                   subtitle="Stok barang, obat UKS & kartu stok"
-                  tone="sky"
                 />
               )}
               {canUks && (
@@ -200,7 +195,6 @@ export default function DashboardPage() {
                   icon="document"
                   title="Kunjungan UKS"
                   subtitle="Catat siswa sakit, obat, dan tindak lanjut"
-                  tone="sky"
                 />
               )}
               {canKeuangan && (
@@ -209,7 +203,6 @@ export default function DashboardPage() {
                   icon="document"
                   title="Pembukuan"
                   subtitle="Jurnal, buku besar & neraca saldo"
-                  tone="emerald"
                 />
               )}
               {canTagihan && (
@@ -218,7 +211,6 @@ export default function DashboardPage() {
                   icon="document"
                   title="Tagihan Siswa"
                   subtitle="SPP, keringanan & tunggakan"
-                  tone="emerald"
                 />
               )}
               {canKasbon && (
@@ -227,7 +219,6 @@ export default function DashboardPage() {
                   icon="document"
                   title="Kasbon Karyawan"
                   subtitle="Pinjaman yang dicicil lewat potong gaji"
-                  tone="emerald"
                 />
               )}
               {canPayroll && (
@@ -236,7 +227,6 @@ export default function DashboardPage() {
                   icon="document"
                   title="Penggajian & Slip Gaji"
                   subtitle="Kalkulasi upah harian & arsip pembayaran"
-                  tone="emerald"
                 />
               )}
             </div>

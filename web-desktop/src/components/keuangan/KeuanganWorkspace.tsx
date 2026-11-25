@@ -31,6 +31,7 @@ import {
 import { TutupBukuPanel } from "@/components/keuangan/TutupBukuPanel";
 import { Modal } from "@/components/ui/Modal";
 import { PilihCari } from "@/components/ui/PilihCari";
+import { TabBar } from "@/components/ui/TabBar";
 import { hasPermission } from "@/lib/auth/access";
 import { useAuth } from "@/lib/context/AuthContext";
 import {
@@ -214,48 +215,33 @@ export function KeuanganWorkspace() {
 
   return (
     <div className="space-y-4">
-      <div
-        role="tablist"
-        aria-label="Bagian pembukuan"
-        className="flex gap-1 p-1 rounded-xl border border-slate-800 bg-slate-900/60 overflow-x-auto"
-      >
-        {(Object.keys(LABEL_TAB) as Tab[]).map((id) => (
-          <button
-            key={id}
-            type="button"
-            role="tab"
-            id={`tab-keuangan-${id}`}
-            aria-selected={tab === id}
-            aria-controls={`panel-keuangan-${id}`}
-            onClick={() => setTab(id)}
-            className={`min-h-11 flex-1 whitespace-nowrap px-4 py-2 text-sm font-medium rounded-lg transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 ${
-              tab === id
-                ? "bg-sky-700 text-white"
-                : "text-slate-300 hover:bg-slate-800"
-            }`}
-          >
-            {LABEL_TAB[id]}
-            {id === "tutup" && perhatian > 0 ? (
-              <span className="ml-2 rounded-full bg-amber-500 px-1.5 text-xs font-semibold text-slate-950">
-                {perhatian}
-                <span className="sr-only"> perlu ditinjau</span>
-              </span>
-            ) : null}
-            {id === "cicilan" && perhatianCicilan > 0 ? (
-              <span className="ml-2 rounded-full bg-amber-500 px-1.5 text-xs font-semibold text-slate-950">
-                {perhatianCicilan}
-                <span className="sr-only"> perlu perhatian</span>
-              </span>
-            ) : null}
-            {id === "inventaris" && belumDijurnal > 0 ? (
-              <span className="ml-2 rounded-full bg-amber-500 px-1.5 text-xs font-semibold text-slate-950">
-                {belumDijurnal}
-                <span className="sr-only"> belum dijurnal</span>
-              </span>
-            ) : null}
-          </button>
-        ))}
-      </div>
+      <TabBar
+        ariaLabel="Bagian pembukuan"
+        idPrefix="keuangan"
+        value={tab}
+        onChange={setTab}
+        tabs={(Object.keys(LABEL_TAB) as Tab[]).map((id) => {
+          const [jumlah, keterangan] =
+            id === "tutup"
+              ? [perhatian, " perlu ditinjau"]
+              : id === "cicilan"
+                ? [perhatianCicilan, " perlu perhatian"]
+                : id === "inventaris"
+                  ? [belumDijurnal, " belum dijurnal"]
+                  : [0, ""];
+          return {
+            id,
+            label: LABEL_TAB[id],
+            badge:
+              jumlah > 0 ? (
+                <span className="rounded-full bg-amber-500 px-1.5 text-xs font-semibold text-slate-950">
+                  {jumlah}
+                  <span className="sr-only">{keterangan}</span>
+                </span>
+              ) : null,
+          };
+        })}
+      />
 
       {feedback ? (
         <output

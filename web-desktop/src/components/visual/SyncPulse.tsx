@@ -35,8 +35,8 @@ const PHASE_STYLE: Record<
     label: "Tersinkron",
   },
   syncing: {
-    dot: "bg-sky-400",
-    pill: "border-sky-400/30 bg-sky-400/10 text-sky-200",
+    dot: "bg-cyan-400",
+    pill: "border-cyan-400/30 bg-cyan-400/10 text-cyan-200",
     label: "Menyinkronkan",
   },
   success: {

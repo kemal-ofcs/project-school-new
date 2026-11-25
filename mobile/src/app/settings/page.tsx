@@ -113,7 +113,6 @@ export default function SettingsPage() {
             icon="lock"
             title="Akun & Keamanan Pribadi"
             subtitle="Tema tampilan, verifikasi 2 langkah, kode pemulihan, lisensi"
-            tone="emerald"
           />
           {canStrukturJadwal && (
             <HubRow
@@ -121,7 +120,6 @@ export default function SettingsPage() {
               icon="calendar"
               title="Struktur & Jadwal Sekolah"
               subtitle="Struktur akademik, jam pelajaran, shift, hari libur"
-              tone="teal"
             />
           )}
           {canKeamananAbsensi && (
@@ -130,7 +128,6 @@ export default function SettingsPage() {
               icon="scanner"
               title="Keamanan Absensi"
               subtitle="Foto bukti, batasan IP, geofencing & keamanan pemindai"
-              tone="amber"
             />
           )}
           {canSistemInfrastruktur && (
@@ -139,7 +136,6 @@ export default function SettingsPage() {
               icon="database"
               title="Sistem & Infrastruktur"
               subtitle="Profil instansi, email, auto alfa, database & sinkronisasi"
-              tone="cyan"
             />
           )}
         </div>

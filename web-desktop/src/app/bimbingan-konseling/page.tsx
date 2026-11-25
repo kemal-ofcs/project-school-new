@@ -519,7 +519,7 @@ export default function BimbinganKonselingPage() {
                 <button
                   type="button"
                   onClick={() => setCreateModalOpen(true)}
-                  className="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-3.5 py-2 text-xs font-medium text-white shadow-sm transition hover:bg-indigo-500"
+                  className="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-3.5 py-2 text-xs font-medium text-on-accent shadow-sm transition hover:bg-indigo-500"
                 >
                   <Icon name="plus" className="h-4 w-4" />
                   Catat Kasus Baru
@@ -953,7 +953,7 @@ export default function BimbinganKonselingPage() {
                 </button>
                 <button
                   type="submit"
-                  className="rounded-lg bg-indigo-600 px-4 py-2 text-xs font-semibold text-white shadow transition hover:bg-indigo-500"
+                  className="rounded-lg bg-indigo-600 px-4 py-2 text-xs font-semibold text-on-accent shadow transition hover:bg-indigo-500"
                 >
                   Simpan Kasus
                 </button>
@@ -1097,7 +1097,7 @@ export default function BimbinganKonselingPage() {
                     <button
                       type="button"
                       onClick={() => setSessionModalOpen(true)}
-                      className="inline-flex items-center gap-1.5 rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-medium text-white shadow transition hover:bg-indigo-500"
+                      className="inline-flex items-center gap-1.5 rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-medium text-on-accent shadow transition hover:bg-indigo-500"
                     >
                       <Icon name="plus" className="h-3.5 w-3.5" />
                       Tambah Sesi Konseling
@@ -1252,7 +1252,7 @@ export default function BimbinganKonselingPage() {
                 </button>
                 <button
                   type="submit"
-                  className="rounded-lg bg-indigo-600 px-4 py-2 font-semibold text-white shadow transition hover:bg-indigo-500"
+                  className="rounded-lg bg-indigo-600 px-4 py-2 font-semibold text-on-accent shadow transition hover:bg-indigo-500"
                 >
                   Simpan Sesi
                 </button>
@@ -1273,7 +1273,7 @@ export default function BimbinganKonselingPage() {
                 <button
                   type="button"
                   onClick={() => window.print()}
-                  className="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-xs font-semibold text-white shadow transition hover:bg-indigo-500"
+                  className="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-xs font-semibold text-on-accent shadow transition hover:bg-indigo-500"
                 >
                   <Icon name="document" className="h-4 w-4" />
                   Cetak Dokumen Surat

@@ -27,6 +27,7 @@ import { PilihAkunBayar } from "@/components/keuangan/PilihAkunBayar";
 import { RekapTagihan } from "@/components/keuangan/RekapTagihan";
 import { Modal } from "@/components/ui/Modal";
 import { PilihCari } from "@/components/ui/PilihCari";
+import { TabBar } from "@/components/ui/TabBar";
 import { hasPermission } from "@/lib/auth/access";
 import { useAuth } from "@/lib/context/AuthContext";
 import {
@@ -147,30 +148,13 @@ export function TagihanWorkspace() {
 
   return (
     <div className="space-y-4">
-      <div
-        role="tablist"
-        aria-label="Bagian tagihan"
-        className="flex gap-1 p-1 rounded-xl border border-slate-800 bg-slate-900/60 overflow-x-auto"
-      >
-        {tabs.map((id) => (
-          <button
-            key={id}
-            type="button"
-            role="tab"
-            id={`tab-tagihan-${id}`}
-            aria-selected={tab === id}
-            aria-controls={`panel-tagihan-${id}`}
-            onClick={() => setTab(id)}
-            className={`min-h-11 flex-1 whitespace-nowrap px-4 py-2 text-sm font-medium rounded-lg transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 ${
-              tab === id
-                ? "bg-sky-700 text-white"
-                : "text-slate-300 hover:bg-slate-800"
-            }`}
-          >
-            {LABEL_TAB[id]}
-          </button>
-        ))}
-      </div>
+      <TabBar
+        ariaLabel="Bagian tagihan"
+        idPrefix="tagihan"
+        value={tab}
+        onChange={setTab}
+        tabs={tabs.map((id) => ({ id, label: LABEL_TAB[id] }))}
+      />
 
       {feedback ? (
         <output

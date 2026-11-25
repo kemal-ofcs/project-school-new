@@ -1392,7 +1392,7 @@ function RincianPelamarModal({
           <>
             <div className="flex flex-wrap items-center gap-2">
               <span
-                className={`${BADGE} ${WARNA_STATUS[p.status] ?? "text-sky-300"}`}
+                className={`${BADGE} ${WARNA_STATUS[p.status] ?? "text-cyan-300"}`}
               >
                 {p.status}
               </span>

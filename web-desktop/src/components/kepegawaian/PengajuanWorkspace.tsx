@@ -11,6 +11,7 @@ import {
 import { FeedbackBanner } from "@/components/ui/FeedbackBanner";
 import { Modal } from "@/components/ui/Modal";
 import { PilihCari } from "@/components/ui/PilihCari";
+import { TabBar } from "@/components/ui/TabBar";
 import { OPERATIONAL_TIME_ZONE } from "@/lib/attendance/time-policy";
 import { hasPermission } from "@/lib/auth/access";
 import type { OperatorUser } from "@/lib/auth/operator-user";
@@ -232,28 +233,14 @@ export function PengajuanWorkspace({ user }: { user: OperatorUser | null }) {
         </div>
       </form>
 
-      <div
-        role="tablist"
-        aria-label="Saring pengajuan"
-        className="flex flex-wrap gap-2"
-      >
-        {SARINGAN.map(([kunci, label]) => (
-          <button
-            key={kunci}
-            type="button"
-            role="tab"
-            aria-selected={saringan === kunci}
-            className={
-              saringan === kunci
-                ? "min-h-10 rounded-xl bg-sky-500 px-3 text-sm font-semibold text-slate-950"
-                : TOMBOL
-            }
-            onClick={() => setSaringan(kunci)}
-          >
-            {label}
-          </button>
-        ))}
-      </div>
+      <TabBar
+        ariaLabel="Saring pengajuan"
+        idPrefix="pengajuan"
+        panelId="daftar-pengajuan"
+        value={saringan}
+        onChange={setSaringan}
+        tabs={SARINGAN.map(([kunci, label]) => ({ id: kunci, label }))}
+      />
 
       {!data && !galat ? (
         <p className="text-sm text-slate-400">Memuat pengajuan…</p>
@@ -263,7 +250,7 @@ export function PengajuanWorkspace({ user }: { user: OperatorUser | null }) {
           Tidak ada pengajuan untuk saringan ini.
         </p>
       ) : null}
-      <ul className="space-y-2">
+      <ul id="daftar-pengajuan" className="space-y-2">
         {tampil.map((p) => (
           <li
             key={p.id_pengajuan}

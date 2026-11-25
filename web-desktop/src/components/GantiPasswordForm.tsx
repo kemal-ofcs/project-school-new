@@ -123,7 +123,7 @@ export function GantiPasswordForm({ onSelesai }: { onSelesai?: () => void }) {
       <button
         type="submit"
         disabled={menyimpan}
-        className="min-h-11 w-full rounded-xl bg-sky-700 px-4 py-2 text-sm font-semibold text-white transition hover:bg-sky-800 disabled:opacity-50"
+        className="min-h-11 w-full rounded-xl bg-sky-700 px-4 py-2 text-sm font-semibold text-on-accent transition hover:bg-sky-800 disabled:opacity-50"
       >
         {menyimpan ? "Menyimpan..." : "Ganti Password"}
       </button>

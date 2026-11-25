@@ -10,6 +10,7 @@ import {
 } from "react";
 import { Modal } from "@/components/ui/Modal";
 import { PilihCari } from "@/components/ui/PilihCari";
+import { TabBar } from "@/components/ui/TabBar";
 import { hasPermission } from "@/lib/auth/access";
 import { useAuth } from "@/lib/context/AuthContext";
 import {
@@ -240,30 +241,14 @@ export function RincianPegawai({
       maxWidth="max-w-3xl"
     >
       <div className="space-y-4">
-        <div
-          role="tablist"
-          aria-label="Bagian rincian pegawai"
-          className="flex flex-wrap gap-2"
-        >
-          {daftarTab.map(({ kunci, label }) => (
-            <button
-              key={kunci}
-              id={`tab-rincian-${kunci}`}
-              role="tab"
-              type="button"
-              aria-selected={tab === kunci}
-              aria-controls="panel-rincian"
-              onClick={() => setTab(kunci)}
-              className={`min-h-10 rounded-xl px-3 text-sm font-semibold ${
-                tab === kunci
-                  ? "bg-sky-500 text-slate-950"
-                  : "text-slate-300 hover:bg-slate-800"
-              }`}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
+        <TabBar
+          ariaLabel="Bagian rincian pegawai"
+          idPrefix="rincian"
+          panelId="panel-rincian"
+          value={tab}
+          onChange={setTab}
+          tabs={daftarTab.map(({ kunci, label }) => ({ id: kunci, label }))}
+        />
         <div
           id="panel-rincian"
           role="tabpanel"

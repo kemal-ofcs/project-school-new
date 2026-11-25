@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { Icon } from "@/components/ui/Icon";
+import { Sakelar } from "@/components/ui/Sakelar";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { hasPermission } from "@/lib/auth/access";
 import type { useAuth } from "@/lib/context/AuthContext";
@@ -155,20 +156,16 @@ export function NotifikasiWaCard({
             </p>
           </div>
           {canManage ? (
-            <label className="relative inline-flex cursor-pointer items-center">
-              <input
-                type="checkbox"
-                checked={scanMasuk}
-                disabled={busy}
-                onChange={(e) => {
-                  setScanMasuk(e.target.checked);
-                  setIsDirty(true);
-                }}
-                className="sr-only peer"
-                id="toggle-wa-scan-masuk"
-              />
-              <div className="h-6 w-11 rounded-full bg-slate-800 peer peer-checked:bg-emerald-500 peer-focus:outline-none after:absolute after:top-0.5 after:left-[2px] after:h-5 after:w-5 after:rounded-full after:border after:border-slate-300 after:bg-white after:transition-all after:content-[''] peer-checked:after:translate-x-full peer-checked:after:border-white disabled:opacity-50" />
-            </label>
+            <Sakelar
+              id="toggle-wa-scan-masuk"
+              checked={scanMasuk}
+              disabled={busy}
+              label="Notifikasi Scan Masuk Sekolah"
+              onChange={(nilai) => {
+                setScanMasuk(nilai);
+                setIsDirty(true);
+              }}
+            />
           ) : (
             <span className="text-xs font-semibold text-slate-400">
               {scanMasuk ? "Aktif" : "Nonaktif"}
@@ -188,20 +185,16 @@ export function NotifikasiWaCard({
             </p>
           </div>
           {canManage ? (
-            <label className="relative inline-flex cursor-pointer items-center">
-              <input
-                type="checkbox"
-                checked={scanPulang}
-                disabled={busy}
-                onChange={(e) => {
-                  setScanPulang(e.target.checked);
-                  setIsDirty(true);
-                }}
-                className="sr-only peer"
-                id="toggle-wa-scan-pulang"
-              />
-              <div className="h-6 w-11 rounded-full bg-slate-800 peer peer-checked:bg-emerald-500 peer-focus:outline-none after:absolute after:top-0.5 after:left-[2px] after:h-5 after:w-5 after:rounded-full after:border after:border-slate-300 after:bg-white after:transition-all after:content-[''] peer-checked:after:translate-x-full peer-checked:after:border-white disabled:opacity-50" />
-            </label>
+            <Sakelar
+              id="toggle-wa-scan-pulang"
+              checked={scanPulang}
+              disabled={busy}
+              label="Notifikasi Scan Pulang Sekolah"
+              onChange={(nilai) => {
+                setScanPulang(nilai);
+                setIsDirty(true);
+              }}
+            />
           ) : (
             <span className="text-xs font-semibold text-slate-400">
               {scanPulang ? "Aktif" : "Nonaktif"}
@@ -221,20 +214,16 @@ export function NotifikasiWaCard({
             </p>
           </div>
           {canManage ? (
-            <label className="relative inline-flex cursor-pointer items-center">
-              <input
-                type="checkbox"
-                checked={bolos}
-                disabled={busy}
-                onChange={(e) => {
-                  setBolos(e.target.checked);
-                  setIsDirty(true);
-                }}
-                className="sr-only peer"
-                id="toggle-wa-bolos"
-              />
-              <div className="h-6 w-11 rounded-full bg-slate-800 peer peer-checked:bg-emerald-500 peer-focus:outline-none after:absolute after:top-0.5 after:left-[2px] after:h-5 after:w-5 after:rounded-full after:border after:border-slate-300 after:bg-white after:transition-all after:content-[''] peer-checked:after:translate-x-full peer-checked:after:border-white disabled:opacity-50" />
-            </label>
+            <Sakelar
+              id="toggle-wa-bolos"
+              checked={bolos}
+              disabled={busy}
+              label="Notifikasi Anomali Bolos Mapel KBM"
+              onChange={(nilai) => {
+                setBolos(nilai);
+                setIsDirty(true);
+              }}
+            />
           ) : (
             <span className="text-xs font-semibold text-slate-400">
               {bolos ? "Aktif" : "Nonaktif"}
@@ -255,20 +244,16 @@ export function NotifikasiWaCard({
               </p>
             </div>
             {canManage ? (
-              <label className="relative inline-flex cursor-pointer items-center">
-                <input
-                  type="checkbox"
-                  checked={ambangAlfa}
-                  disabled={busy}
-                  onChange={(e) => {
-                    setAmbangAlfa(e.target.checked);
-                    setIsDirty(true);
-                  }}
-                  className="sr-only peer"
-                  id="toggle-wa-ambang-alfa"
-                />
-                <div className="h-6 w-11 rounded-full bg-slate-800 peer peer-checked:bg-emerald-500 peer-focus:outline-none after:absolute after:top-0.5 after:left-[2px] after:h-5 after:w-5 after:rounded-full after:border after:border-slate-300 after:bg-white after:transition-all after:content-[''] peer-checked:after:translate-x-full peer-checked:after:border-white disabled:opacity-50" />
-              </label>
+              <Sakelar
+                id="toggle-wa-ambang-alfa"
+                checked={ambangAlfa}
+                disabled={busy}
+                label="Notifikasi Ambang Batas Alfa Kritis"
+                onChange={(nilai) => {
+                  setAmbangAlfa(nilai);
+                  setIsDirty(true);
+                }}
+              />
             ) : (
               <span className="text-xs font-semibold text-slate-400">
                 {ambangAlfa ? "Aktif" : "Nonaktif"}
@@ -344,20 +329,16 @@ export function NotifikasiWaCard({
             </p>
           </div>
           {canManage ? (
-            <label className="relative inline-flex cursor-pointer items-center">
-              <input
-                type="checkbox"
-                checked={koreksiAdmin}
-                disabled={busy}
-                onChange={(e) => {
-                  setKoreksiAdmin(e.target.checked);
-                  setIsDirty(true);
-                }}
-                className="sr-only peer"
-                id="toggle-wa-koreksi-admin"
-              />
-              <div className="h-6 w-11 rounded-full bg-slate-800 peer peer-checked:bg-emerald-500 peer-focus:outline-none after:absolute after:top-0.5 after:left-[2px] after:h-5 after:w-5 after:rounded-full after:border after:border-slate-300 after:bg-white after:transition-all after:content-[''] peer-checked:after:translate-x-full peer-checked:after:border-white disabled:opacity-50" />
-            </label>
+            <Sakelar
+              id="toggle-wa-koreksi-admin"
+              checked={koreksiAdmin}
+              disabled={busy}
+              label="Notifikasi Koreksi Admin"
+              onChange={(nilai) => {
+                setKoreksiAdmin(nilai);
+                setIsDirty(true);
+              }}
+            />
           ) : (
             <span className="text-xs font-semibold text-slate-400">
               {koreksiAdmin ? "Aktif" : "Nonaktif"}
@@ -378,20 +359,16 @@ export function NotifikasiWaCard({
             </p>
           </div>
           {canManage ? (
-            <label className="relative inline-flex cursor-pointer items-center">
-              <input
-                type="checkbox"
-                checked={importManual}
-                disabled={busy}
-                onChange={(e) => {
-                  setImportManual(e.target.checked);
-                  setIsDirty(true);
-                }}
-                className="sr-only peer"
-                id="toggle-wa-import-manual"
-              />
-              <div className="h-6 w-11 rounded-full bg-slate-800 peer peer-checked:bg-emerald-500 peer-focus:outline-none after:absolute after:top-0.5 after:left-[2px] after:h-5 after:w-5 after:rounded-full after:border after:border-slate-300 after:bg-white after:transition-all after:content-[''] peer-checked:after:translate-x-full peer-checked:after:border-white disabled:opacity-50" />
-            </label>
+            <Sakelar
+              id="toggle-wa-import-manual"
+              checked={importManual}
+              disabled={busy}
+              label="Notifikasi Import Manual"
+              onChange={(nilai) => {
+                setImportManual(nilai);
+                setIsDirty(true);
+              }}
+            />
           ) : (
             <span className="text-xs font-semibold text-slate-400">
               {importManual ? "Aktif" : "Nonaktif"}
@@ -412,21 +389,16 @@ export function NotifikasiWaCard({
             </p>
           </div>
           {canManage ? (
-            <label className="relative inline-flex cursor-pointer items-center">
-              <input
-                type="checkbox"
-                checked={uks}
-                disabled={busy}
-                onChange={(e) => {
-                  setUks(e.target.checked);
-                  setIsDirty(true);
-                }}
-                className="sr-only peer"
-                id="toggle-wa-uks"
-                aria-label="Notifikasi kunjungan UKS"
-              />
-              <div className="h-6 w-11 rounded-full bg-slate-800 peer peer-checked:bg-emerald-500 peer-focus:outline-none after:absolute after:top-0.5 after:left-[2px] after:h-5 after:w-5 after:rounded-full after:border after:border-slate-300 after:bg-white after:transition-all after:content-[''] peer-checked:after:translate-x-full peer-checked:after:border-white disabled:opacity-50" />
-            </label>
+            <Sakelar
+              id="toggle-wa-uks"
+              checked={uks}
+              disabled={busy}
+              label="Notifikasi Kunjungan UKS"
+              onChange={(nilai) => {
+                setUks(nilai);
+                setIsDirty(true);
+              }}
+            />
           ) : (
             <span className="text-xs font-semibold text-slate-400">
               {uks ? "Aktif" : "Nonaktif"}
@@ -447,21 +419,16 @@ export function NotifikasiWaCard({
             </p>
           </div>
           {canManage ? (
-            <label className="relative inline-flex cursor-pointer items-center">
-              <input
-                type="checkbox"
-                checked={tagihan}
-                disabled={busy}
-                onChange={(e) => {
-                  setTagihan(e.target.checked);
-                  setIsDirty(true);
-                }}
-                className="sr-only peer"
-                id="toggle-wa-tagihan"
-                aria-label="Pengingat tagihan siswa"
-              />
-              <div className="h-6 w-11 rounded-full bg-slate-800 peer peer-checked:bg-emerald-500 peer-focus:outline-none after:absolute after:top-0.5 after:left-[2px] after:h-5 after:w-5 after:rounded-full after:border after:border-slate-300 after:bg-white after:transition-all after:content-[''] peer-checked:after:translate-x-full peer-checked:after:border-white disabled:opacity-50" />
-            </label>
+            <Sakelar
+              id="toggle-wa-tagihan"
+              checked={tagihan}
+              disabled={busy}
+              label="Pengingat Tagihan Siswa"
+              onChange={(nilai) => {
+                setTagihan(nilai);
+                setIsDirty(true);
+              }}
+            />
           ) : (
             <span className="text-xs font-semibold text-slate-400">
               {tagihan ? "Aktif" : "Nonaktif"}

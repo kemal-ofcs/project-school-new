@@ -203,7 +203,7 @@ export function TwoFactorCard() {
                 type="button"
                 onClick={() => void startSetup()}
                 disabled={busy || password.length === 0}
-                className="flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-violet-500 px-4 text-xs font-black text-white shadow-md transition active:scale-95 disabled:opacity-50"
+                className="flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-violet-500 px-4 text-xs font-black text-on-accent shadow-md transition active:scale-95 disabled:opacity-50"
               >
                 <Icon name="lock" className="size-4" />
                 {busy ? "Menyiapkan..." : "Aktifkan 2FA"}
@@ -260,7 +260,7 @@ export function TwoFactorCard() {
               type="button"
               onClick={() => void confirmSetup()}
               disabled={busy}
-              className="min-h-11 flex-[2] rounded-xl bg-violet-500 px-3 text-xs font-black text-white active:scale-95 transition disabled:opacity-50"
+              className="min-h-11 flex-[2] rounded-xl bg-violet-500 px-3 text-xs font-black text-on-accent active:scale-95 transition disabled:opacity-50"
             >
               {busy ? "Memeriksa..." : "Aktifkan Sekarang"}
             </button>
@@ -325,7 +325,7 @@ export function TwoFactorCard() {
               type="button"
               onClick={() => void turnOff()}
               disabled={busy}
-              className="min-h-11 flex-1 rounded-xl bg-rose-500 px-3 text-xs font-black text-white active:scale-95 transition disabled:opacity-50"
+              className="min-h-11 flex-1 rounded-xl bg-rose-500 px-3 text-xs font-black text-on-accent active:scale-95 transition disabled:opacity-50"
             >
               {busy ? "Memproses..." : "Matikan"}
             </button>

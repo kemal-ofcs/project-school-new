@@ -1329,7 +1329,7 @@ export default function SiswaMobilePage() {
                           }
                         });
                       }}
-                      className="mt-2 min-h-11 w-full rounded-xl bg-emerald-600 px-3 text-xs font-bold text-white"
+                      className="mt-2 min-h-11 w-full rounded-xl bg-emerald-600 px-3 text-xs font-bold text-on-accent"
                     >
                       Kirim ke WhatsApp wali
                     </button>

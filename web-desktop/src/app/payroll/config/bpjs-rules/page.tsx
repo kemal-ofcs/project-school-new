@@ -7,6 +7,7 @@ import { AppShell } from "@/components/AppShell";
 import { CatatanBatasJp } from "@/components/payroll/KonstantaPajak";
 import { FeedbackBanner } from "@/components/ui/FeedbackBanner";
 import { Icon } from "@/components/ui/Icon";
+import { MemuatHalaman } from "@/components/ui/MemuatHalaman";
 import { Modal } from "@/components/ui/Modal";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { formatTanggalOperasional } from "@/lib/attendance/time-policy";
@@ -184,11 +185,7 @@ export default function BpjsRulesPage() {
   };
 
   if (!isHydrated || authLoading) {
-    return (
-      <div className="flex h-screen items-center justify-center bg-slate-950 text-slate-400">
-        Memuat otorisasi...
-      </div>
-    );
+    return <MemuatHalaman />;
   }
 
   return (

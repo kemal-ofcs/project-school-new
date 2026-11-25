@@ -27,6 +27,7 @@ import { Icon } from "@/components/ui/Icon";
 import { Modal } from "@/components/ui/Modal";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { StatusBadge } from "@/components/ui/StatusBadge";
+import { TabBar } from "@/components/ui/TabBar";
 import { canAccessArea, hasPermission } from "@/lib/auth/access";
 import { getCurrentCoordinates } from "@/lib/client/geolocation";
 import { formatBytes, optimizeImageFile } from "@/lib/client/image-optimizer";
@@ -1268,38 +1269,26 @@ export default function SettingsPage() {
       ) : null}
 
       <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-[13rem_minmax(0,1fr)]">
-        <div
-          role="tablist"
-          aria-label="Bagian pengaturan"
-          className="flex gap-1 overflow-x-auto rounded-2xl border border-white/10 bg-slate-950/40 p-1.5 lg:sticky lg:top-20 lg:flex-col"
-        >
-          {visibleTabs.map(({ id, icon, label }) => (
-            <button
-              key={id}
-              type="button"
-              role="tab"
-              id={`settings-tab-${id}`}
-              aria-selected={activeTab === id}
-              aria-controls="settings-panel"
-              onClick={() => selectTab(id)}
-              className={`flex min-h-11 shrink-0 items-center gap-2.5 whitespace-nowrap rounded-xl px-3 text-left text-sm font-bold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300 ${
-                activeTab === id
-                  ? "bg-sky-400 text-slate-950"
-                  : "text-slate-300 hover:bg-white/[0.07] hover:text-white"
-              }`}
-            >
-              <Icon name={icon} className="size-4 shrink-0" />
-              {label}
-            </button>
-          ))}
-        </div>
+        <TabBar
+          ariaLabel="Bagian pengaturan"
+          idPrefix="settings"
+          panelId="settings-panel"
+          vertikalLg
+          value={activeTab}
+          onChange={selectTab}
+          tabs={visibleTabs.map(({ id, icon, label }) => ({
+            id,
+            label,
+            icon: <Icon name={icon} className="size-4 shrink-0" />,
+          }))}
+        />
 
         {/* Panel disembunyikan dengan `hidden`, bukan dilepas: isian yang belum
             disimpan di kartu lain tetap ada saat berpindah bagian. */}
         <div
           role="tabpanel"
           id="settings-panel"
-          aria-labelledby={`settings-tab-${activeTab}`}
+          aria-labelledby={`tab-settings-${activeTab}`}
           className="flex min-w-0 flex-col gap-7"
         >
           <div hidden={activeTab !== "umum"} className="flex flex-col gap-7">

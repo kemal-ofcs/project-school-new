@@ -42,7 +42,7 @@ export function DigitalReceiptCard({
       className={`overflow-hidden rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-card-bca text-slate-900 dark:text-slate-100 ${className}`}
     >
       {/* Header Struk */}
-      <div className="bg-gradient-to-r from-[#003399] to-[#002266] text-white p-3.5 text-center relative">
+      <div className="bg-gradient-to-r from-[#003399] to-[#002266] text-on-accent p-3.5 text-center relative">
         <div className="flex items-center justify-center gap-1.5">
           <div className="size-5 rounded-full bg-white/20 flex items-center justify-center">
             <Icon name="check" className="size-3.5 text-emerald-300" />
@@ -115,7 +115,7 @@ export function DigitalReceiptCard({
                   `Informasi Presensi Sekolah:\nNama: ${data.nama}\nStatus: ${data.status}\nWaktu: ${data.waktu}\nCatatan: Presensi tercatat secara otomatis.`,
                 )
               }
-              className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-bold text-xs transition-all shadow-sm"
+              className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-on-accent font-bold text-xs transition-all shadow-sm"
             >
               <Icon name="whatsapp" className="size-3.5" />
               <span>Kirim ke WA</span>

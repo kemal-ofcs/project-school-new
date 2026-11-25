@@ -144,7 +144,7 @@ export function BuilderPanel({
                 onClick={() => setBuilderSide("front")}
                 className={`rounded-lg px-3 py-1.5 text-xs font-bold transition ${
                   builderSide === "front"
-                    ? "bg-sky-400 text-slate-950"
+                    ? "bg-sky-700 text-on-accent"
                     : "bg-slate-800 text-slate-300 hover:bg-slate-700"
                 }`}
               >
@@ -155,7 +155,7 @@ export function BuilderPanel({
                 onClick={() => setBuilderSide("back")}
                 className={`rounded-lg px-3 py-1.5 text-xs font-bold transition ${
                   builderSide === "back"
-                    ? "bg-sky-400 text-slate-950"
+                    ? "bg-sky-700 text-on-accent"
                     : "bg-slate-800 text-slate-300 hover:bg-slate-700"
                 }`}
               >
@@ -315,7 +315,7 @@ export function BuilderPanel({
             <button
               type="button"
               onClick={() => setAddElementModalOpen(true)}
-              className="rounded-xl bg-sky-400 px-3.5 py-1.5 text-xs font-black text-slate-950 hover:bg-sky-300 inline-flex items-center gap-1.5 shadow"
+              className="rounded-xl bg-sky-700 px-3.5 py-1.5 text-xs font-black text-on-accent hover:bg-sky-600 inline-flex items-center gap-1.5 shadow"
             >
               <Icon name="add" className="size-3.5" />
               <span>Tambah Elemen</span>

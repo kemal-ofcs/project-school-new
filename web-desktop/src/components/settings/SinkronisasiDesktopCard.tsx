@@ -96,7 +96,7 @@ export function SinkronisasiDesktopCard({
             type="button"
             disabled={syncBusy || !isOnline}
             onClick={() => refreshSync(true)}
-            className="min-h-10 rounded-xl bg-sky-400 px-4 text-xs font-black text-slate-950 disabled:opacity-50"
+            className="min-h-10 rounded-xl bg-sky-700 px-4 text-xs font-black text-on-accent disabled:opacity-50"
           >
             Sinkronkan sekarang
           </button>

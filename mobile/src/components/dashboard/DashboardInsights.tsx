@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Icon } from "@/components/ui/Icon";
+import { StatTile } from "@/components/ui/StatTile";
 import { triggerHaptic } from "@/lib/client/haptics";
 import {
   getRekapBulanan,
@@ -187,26 +188,22 @@ export function DashboardInsights() {
           </p>
 
           <div className="grid grid-cols-2 gap-2">
-            <SummaryTile
+            <StatTile
               label="Hari hadir"
               value={summary.hadir}
               tone="text-emerald-400"
             />
-            <SummaryTile
+            <StatTile
               label="Kali terlambat"
               value={summary.telat}
               tone="text-amber-400"
             />
-            <SummaryTile
+            <StatTile
               label="Izin / Sakit / Dispen"
               value={summary.izinSakit}
               tone="text-blue-400"
             />
-            <SummaryTile
-              label="Alfa"
-              value={summary.alfa}
-              tone="text-rose-400"
-            />
+            <StatTile label="Alfa" value={summary.alfa} tone="text-rose-400" />
           </div>
 
           <div className="grid grid-cols-[1fr_auto] gap-2">
@@ -372,25 +369,6 @@ export function DashboardInsights() {
         Dari data lokal perangkat — tarik ke bawah untuk sinkron terbaru.
       </div>
     </section>
-  );
-}
-
-function SummaryTile({
-  label,
-  value,
-  tone,
-}: {
-  label: string;
-  value: number;
-  tone: string;
-}) {
-  return (
-    <div className="rounded-2xl border border-white/10 bg-slate-950/50 p-3">
-      <span className="block text-[10px] font-semibold uppercase tracking-wider text-slate-400">
-        {label}
-      </span>
-      <span className={`text-xl font-black ${tone}`}>{value}</span>
-    </div>
   );
 }
 

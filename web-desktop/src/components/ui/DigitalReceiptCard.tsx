@@ -41,7 +41,7 @@ export function DigitalReceiptCard({
       className={`overflow-hidden rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-card-bca text-slate-900 dark:text-slate-100 ${className}`}
     >
       {/* Header Struk */}
-      <div className="bg-gradient-to-r from-[#003399] to-[#002266] text-white p-4 text-center relative">
+      <div className="bg-gradient-to-r from-[#003399] to-[#002266] text-on-accent p-4 text-center relative">
         <div className="flex items-center justify-center gap-2">
           <div className="size-6 rounded-full bg-white/20 flex items-center justify-center">
             <Icon name="check" className="size-4 text-emerald-300" />

@@ -458,7 +458,7 @@ export default function LegerKehadiranPage() {
                       <td className="px-3 py-2.5 text-center font-semibold text-emerald-400">
                         {s.hadir}
                       </td>
-                      <td className="px-3 py-2.5 text-center text-sky-400">
+                      <td className="px-3 py-2.5 text-center text-cyan-400">
                         {s.izin}
                       </td>
                       <td className="px-3 py-2.5 text-center text-amber-400">
@@ -550,7 +550,7 @@ export default function LegerKehadiranPage() {
                     <td className="px-3 py-2.5 text-center font-semibold text-emerald-400">
                       {s.hadir}
                     </td>
-                    <td className="px-3 py-2.5 text-center text-sky-400">
+                    <td className="px-3 py-2.5 text-center text-cyan-400">
                       {s.izin}
                     </td>
                     <td className="px-3 py-2.5 text-center text-amber-400">

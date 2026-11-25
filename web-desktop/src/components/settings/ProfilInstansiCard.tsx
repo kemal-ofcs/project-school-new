@@ -371,7 +371,7 @@ export function ProfilInstansiCard({
           <button
             type="submit"
             disabled={companyProfileBusy}
-            className="min-h-11 rounded-xl bg-sky-400 px-6 text-xs font-black text-slate-950 shadow-lg shadow-sky-950/20 transition hover:bg-sky-300 disabled:opacity-50 inline-flex items-center gap-2"
+            className="min-h-11 rounded-xl bg-sky-700 px-6 text-xs font-black text-on-accent shadow-lg shadow-sky-950/20 transition hover:bg-sky-600 disabled:opacity-50 inline-flex items-center gap-2"
           >
             <Icon name="check" className="size-4" />
             <span>

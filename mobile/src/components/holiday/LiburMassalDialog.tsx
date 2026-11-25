@@ -2,6 +2,7 @@
 
 import { useId, useMemo, useRef, useState } from "react";
 import { Modal } from "@/components/ui/Modal";
+import { TabBar } from "@/components/ui/TabBar";
 import { formatTanggalOperasional } from "@/lib/attendance/time-policy";
 import {
   type HasilLiburMassal,
@@ -160,39 +161,27 @@ export function LiburMassalDialog({
       onClose={() => !saving && onClose()}
     >
       <div className="space-y-4">
-        <div
-          role="tablist"
-          aria-label="Cara menambah"
-          className="grid grid-cols-2 gap-1 rounded-xl border border-slate-800 bg-slate-950/60 p-1"
-        >
-          {(
-            [
-              ["rentang", "Rentang tanggal"],
-              ["nasional", "Libur nasional"],
-            ] as const
-          ).map(([nilai, label]) => (
-            <button
-              key={nilai}
-              type="button"
-              role="tab"
-              aria-selected={tab === nilai}
-              onClick={() => {
-                setTab(nilai);
-                setGalat(null);
-              }}
-              className={`min-h-11 rounded-lg text-sm font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300 ${
-                tab === nilai
-                  ? "bg-sky-700 text-white"
-                  : "text-slate-300 hover:bg-white/5"
-              }`}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
+        <TabBar
+          ariaLabel="Cara menambah"
+          idPrefix="libur-massal"
+          value={tab}
+          onChange={(nilai) => {
+            setTab(nilai);
+            setGalat(null);
+          }}
+          tabs={[
+            { id: "rentang", label: "Rentang tanggal" },
+            { id: "nasional", label: "Libur nasional" },
+          ]}
+        />
 
         {tab === "rentang" ? (
-          <div className="space-y-3">
+          <div
+            id="panel-libur-massal-rentang"
+            role="tabpanel"
+            aria-labelledby="tab-libur-massal-rentang"
+            className="space-y-3"
+          >
             <p className="text-sm text-slate-400">
               Untuk libur yang berlangsung beberapa hari, misalnya libur
               semester. Setiap tanggal disimpan sebagai satu baris yang bisa
@@ -282,12 +271,22 @@ export function LiburMassalDialog({
             </p>
           </div>
         ) : daftarTahun.length === 0 ? (
-          <p className="text-sm text-slate-400">
+          <p
+            id="panel-libur-massal-nasional"
+            role="tabpanel"
+            aria-labelledby="tab-libur-massal-nasional"
+            className="text-sm text-slate-400"
+          >
             Aplikasi ini belum membawa data libur nasional. Tambahkan libur
             nasional lewat tombol Tambah Hari Libur.
           </p>
         ) : (
-          <div className="space-y-3">
+          <div
+            id="panel-libur-massal-nasional"
+            role="tabpanel"
+            aria-labelledby="tab-libur-massal-nasional"
+            className="space-y-3"
+          >
             <div className="flex flex-wrap items-end justify-between gap-3">
               <div>
                 <label htmlFor={`${idDasar}-tahun`} className={kelasLabel}>
@@ -381,7 +380,7 @@ export function LiburMassalDialog({
             data-konfirmasi
             onClick={simpan}
             disabled={saving || jumlahSimpan === 0}
-            className="min-h-11 rounded-xl bg-sky-700 px-5 text-sm font-bold text-white transition hover:bg-sky-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300 disabled:opacity-50"
+            className="min-h-11 rounded-xl bg-sky-700 px-5 text-sm font-bold text-on-accent transition hover:bg-sky-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300 disabled:opacity-50"
           >
             {saving
               ? "Menyimpan..."

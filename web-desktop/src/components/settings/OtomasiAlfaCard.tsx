@@ -1,6 +1,7 @@
 "use client";
 
 import { Icon } from "@/components/ui/Icon";
+import { Sakelar } from "@/components/ui/Sakelar";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { hasPermission } from "@/lib/auth/access";
 import type { useAuth } from "@/lib/context/AuthContext";
@@ -70,16 +71,14 @@ export function OtomasiAlfaCard({
         </div>
         <div className="flex items-center gap-4">
           {hasPermission(user, "settings.manage") ? (
-            <label className="relative inline-flex cursor-pointer items-center">
-              <input
-                type="checkbox"
-                checked={autoAlfaEnabled}
-                disabled={autoAlfaBusy}
-                onChange={(e) => handleAutoAlfaToggle(e.target.checked)}
-                className="sr-only peer"
-              />
-              <div className="h-6 w-11 rounded-full bg-slate-800 peer peer-checked:bg-amber-400 peer-focus:outline-none after:absolute after:top-0.5 after:left-[2px] after:h-5 after:w-5 after:rounded-full after:border after:border-slate-300 after:bg-white after:transition-all after:content-[''] peer-checked:after:translate-x-full peer-checked:after:border-white disabled:opacity-50" />
-            </label>
+            <Sakelar
+              checked={autoAlfaEnabled}
+              disabled={autoAlfaBusy}
+              label="Status Otomasi Generate Alfa"
+              onChange={(nilai) => {
+                void handleAutoAlfaToggle(nilai);
+              }}
+            />
           ) : null}
         </div>
       </div>

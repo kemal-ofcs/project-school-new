@@ -882,7 +882,7 @@ export default function MobilePresensiKelasPage() {
             }}
             className={`rounded-xl py-2 text-xs font-bold transition relative ${
               activeTab === "reconciliation"
-                ? "bg-rose-500 text-white shadow"
+                ? "bg-rose-500 text-on-accent shadow"
                 : "text-slate-400"
             }`}
           >
@@ -1439,7 +1439,7 @@ export default function MobilePresensiKelasPage() {
                 type="button"
                 onClick={handleLoadReconciliation}
                 disabled={loadingRecon}
-                className="min-h-11 rounded-xl bg-rose-500 px-4 text-xs font-bold text-white shadow"
+                className="min-h-11 rounded-xl bg-rose-500 px-4 text-xs font-bold text-on-accent shadow"
               >
                 {loadingRecon ? "..." : "Analisis"}
               </button>

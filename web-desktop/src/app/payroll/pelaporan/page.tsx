@@ -8,6 +8,7 @@ import { hariIniWib, INPUT, LABEL } from "@/components/inventory/gaya";
 import { FeedbackBanner } from "@/components/ui/FeedbackBanner";
 import { Icon } from "@/components/ui/Icon";
 import { PageHeader } from "@/components/ui/PageHeader";
+import { TabBar } from "@/components/ui/TabBar";
 import { canAccessArea } from "@/lib/auth/access";
 import { saveFileWithPicker } from "@/lib/client/download";
 import {
@@ -166,30 +167,14 @@ export default function PelaporanPage() {
           {galat}
         </FeedbackBanner>
       ) : null}
-      <div
-        role="tablist"
-        aria-label="Jenis laporan"
-        className="flex flex-wrap gap-2 rounded-2xl border border-white/10 bg-slate-900 p-1"
-      >
-        {TAB.map(({ kunci, label }) => (
-          <button
-            key={kunci}
-            id={`tab-lapor-${kunci}`}
-            role="tab"
-            type="button"
-            aria-selected={tab === kunci}
-            aria-controls="panel-lapor"
-            onClick={() => setTab(kunci)}
-            className={`min-h-10 rounded-xl px-4 text-sm font-semibold ${
-              tab === kunci
-                ? "bg-sky-500 text-slate-950"
-                : "text-slate-300 hover:bg-slate-800"
-            }`}
-          >
-            {label}
-          </button>
-        ))}
-      </div>
+      <TabBar
+        ariaLabel="Jenis laporan"
+        idPrefix="lapor"
+        panelId="panel-lapor"
+        value={tab}
+        onChange={setTab}
+        tabs={TAB.map(({ kunci, label }) => ({ id: kunci, label }))}
+      />
       <div
         id="panel-lapor"
         role="tabpanel"
