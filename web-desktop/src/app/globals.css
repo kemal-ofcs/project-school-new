@@ -865,6 +865,27 @@ html[data-theme="light"] .aksi-cepat,
 html.light .aksi-cepat {
   background-color: #ffffff;
 }
+/* Tema terang: kotak ikon navy pucat (ikon 8,25:1), navy pekat + emas saat disorot. */
+html[data-theme="light"] .aksi-cepat-ikon,
+html.light .aksi-cepat-ikon {
+  border-color: #c9d4f2;
+  background: linear-gradient(140deg, #eef2fd 0%, #dfe6fa 100%);
+  color: #1d3a9e;
+  transition:
+    background 150ms ease,
+    color 150ms ease,
+    transform 200ms ease;
+}
+html[data-theme="light"] .aksi-cepat:hover .aksi-cepat-ikon,
+html.light .aksi-cepat:hover .aksi-cepat-ikon {
+  border-color: rgb(246 196 83 / 35%);
+  background: linear-gradient(
+    140deg,
+    var(--app-navy) 0%,
+    var(--app-navy-strong) 100%
+  );
+  color: #f6c453;
+}
 
 .tab-bar {
   display: flex;
