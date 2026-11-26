@@ -891,12 +891,24 @@ html.light .aksi-cepat {
   font-weight: 600;
   color: var(--app-text-muted);
   transition:
+    border-color 150ms ease,
     background-color 150ms ease,
     color 150ms ease;
 }
+/* Tab tidak aktif tetap tampak sebagai tombol: garis lembut, bukan teks lepas. */
+.tab-bar-tab:not([aria-selected="true"]) {
+  border-color: rgb(148 163 184 / 22%);
+  background-color: rgb(255 255 255 / 3%);
+}
 .tab-bar-tab:hover {
+  border-color: rgb(148 163 184 / 40%);
   background-color: rgb(255 255 255 / 6%);
   color: var(--app-text);
+}
+html[data-theme="light"] .tab-bar-tab:not([aria-selected="true"]),
+html.light .tab-bar-tab:not([aria-selected="true"]) {
+  border-color: #c9d1e6;
+  background-color: #ffffff;
 }
 .tab-bar-tab[aria-selected="true"] {
   border-color: rgb(246 196 83 / 40%);
@@ -915,7 +927,8 @@ html.light .aksi-cepat {
 }
 html[data-theme="light"] .tab-bar-tab:not([aria-selected="true"]):hover,
 html.light .tab-bar-tab:not([aria-selected="true"]):hover {
-  background-color: rgb(15 23 42 / 5%);
+  border-color: #8391b5;
+  background-color: #f5f7fc;
 }
 @media (min-width: 1024px) {
   .tab-bar[data-vertikal-lg] {
@@ -1611,15 +1624,18 @@ html.light td.sticky {
   background-color: #f8fafc !important;
 }
 
-/* 12. Form Controls in Light Mode */
+/* 12. Form Controls in Light Mode
+   `:not([hidden]):not([type="hidden"])` pada select/textarea hanya menaikkan
+   spesifisitas: tanpa itu `html.light .border-slate-700` (warna #e2e8f0) dan
+   kombinasi `.bg-slate-950.border-white\/10` menang, garis dropdown pudar. */
 html[data-theme="light"]
 input:not([type="checkbox"]):not([type="radio"]):not(.bg-transparent),
-html[data-theme="light"] select,
-html[data-theme="light"] textarea,
+html[data-theme="light"] select:not([hidden]):not([type="hidden"]),
+html[data-theme="light"] textarea:not([hidden]):not([type="hidden"]),
 html.light
   input:not([type="checkbox"]):not([type="radio"]):not(.bg-transparent),
-html.light select,
-html.light textarea {
+html.light select:not([hidden]):not([type="hidden"]),
+html.light textarea:not([hidden]):not([type="hidden"]) {
   background-color: #ffffff !important;
   color: #0f172a !important;
   border: 1px solid var(--app-input-border) !important;
@@ -1631,14 +1647,18 @@ html[data-theme="light"]
   input:not([type="checkbox"]):not([type="radio"]):not(
     .bg-transparent
   ):hover:not(:focus):not(:disabled),
-html[data-theme="light"] select:hover:not(:focus):not(:disabled),
-html[data-theme="light"] textarea:hover:not(:focus):not(:disabled),
+html[data-theme="light"]
+  select:not([hidden]):not([type="hidden"]):hover:not(:focus):not(:disabled),
+html[data-theme="light"]
+  textarea:not([hidden]):not([type="hidden"]):hover:not(:focus):not(:disabled),
 html.light
   input:not([type="checkbox"]):not([type="radio"]):not(
     .bg-transparent
   ):hover:not(:focus):not(:disabled),
-html.light select:hover:not(:focus):not(:disabled),
-html.light textarea:hover:not(:focus):not(:disabled) {
+html.light
+  select:not([hidden]):not([type="hidden"]):hover:not(:focus):not(:disabled),
+html.light
+  textarea:not([hidden]):not([type="hidden"]):hover:not(:focus):not(:disabled) {
   border-color: #5b6b94 !important;
 }
 html[data-theme="light"] input.bg-transparent,
@@ -1656,12 +1676,12 @@ html.light textarea::placeholder {
 }
 html[data-theme="light"]
   input:not([type="checkbox"]):not([type="radio"]):not(.bg-transparent):focus,
-html[data-theme="light"] select:focus,
-html[data-theme="light"] textarea:focus,
+html[data-theme="light"] select:not([hidden]):not([type="hidden"]):focus,
+html[data-theme="light"] textarea:not([hidden]):not([type="hidden"]):focus,
 html.light
   input:not([type="checkbox"]):not([type="radio"]):not(.bg-transparent):focus,
-html.light select:focus,
-html.light textarea:focus {
+html.light select:not([hidden]):not([type="hidden"]):focus,
+html.light textarea:not([hidden]):not([type="hidden"]):focus {
   border-color: #2f4fbf !important;
   box-shadow: 0 0 0 3px rgb(47 79 191 / 15%) !important;
 }

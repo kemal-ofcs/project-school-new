@@ -19,6 +19,7 @@ import { PilihPersonil } from "@/components/operational/PilihPersonil";
 import { FeedbackBanner } from "@/components/ui/FeedbackBanner";
 import { Modal } from "@/components/ui/Modal";
 import { PageHeader } from "@/components/ui/PageHeader";
+import { TabBar } from "@/components/ui/TabBar";
 import { formatTanggalOperasional } from "@/lib/attendance/time-policy";
 import { canAccessArea, hasPermission } from "@/lib/auth/access";
 import { useAuth } from "@/lib/context/AuthContext";
@@ -46,6 +47,12 @@ import { useHydrated } from "@/lib/hooks/useHydrated";
 import { eventImportKembar } from "@/lib/validations/operational";
 
 type Tab = "correction" | "backup" | "import";
+
+const LABEL_TAB: Record<Tab, string> = {
+  correction: "Koreksi Admin",
+  backup: "Penugasan Backup",
+  import: "Import Manual",
+};
 
 const inputClass =
   "min-h-11 w-full rounded-xl border border-white/10 bg-slate-950 px-3 text-sm text-white outline-none focus:border-sky-400";
@@ -584,31 +591,25 @@ export default function OperationalPage() {
       ) : null}
 
       {/* Tab Switcher */}
-      <div className="flex flex-wrap gap-2 rounded-2xl border border-white/10 bg-slate-900/60 p-2 font-mono text-xs">
-        {tabTersedia.map((value) => (
-          <button
-            key={value}
-            type="button"
-            onClick={() => {
-              setTab(value);
-              setRecords([]);
-            }}
-            className={`rounded-xl px-4 py-2.5 font-bold transition ${
-              tab === value
-                ? "bg-sky-700 text-on-accent shadow-md shadow-sky-950"
-                : "text-slate-400 hover:text-white"
-            }`}
-          >
-            {value === "correction" && "Koreksi Admin"}
-            {value === "backup" && "Penugasan Backup"}
-            {value === "import" && "Import Manual"}
-          </button>
-        ))}
-      </div>
+      <TabBar
+        tabs={tabTersedia.map((id) => ({ id, label: LABEL_TAB[id] }))}
+        value={tab}
+        onChange={(id) => {
+          setTab(id);
+          setRecords([]);
+        }}
+        idPrefix="operasional"
+        ariaLabel="Jenis tindakan operasional"
+      />
 
       {/* TAB 1: KOREKSI ADMIN */}
       {tab === "correction" && hasPermission(user, "corrections.manage") ? (
-        <section className="app-panel rounded-3xl p-5 sm:p-7 space-y-5 bg-slate-900/80 border border-slate-800">
+        <section
+          id="panel-operasional-correction"
+          role="tabpanel"
+          aria-labelledby="tab-operasional-correction"
+          className="app-panel rounded-3xl p-5 sm:p-7 space-y-5 bg-slate-900/80 border border-slate-800"
+        >
           <div className="border-b border-slate-800 pb-3">
             <h2 className="text-base font-bold text-white">
               Formulir Koreksi Absensi (Otoritas Admin)
@@ -771,7 +772,12 @@ export default function OperationalPage() {
 
       {/* TAB 2: BACKUP KARYAWAN */}
       {tab === "backup" && hasPermission(user, "backups.manage") ? (
-        <section className="app-panel rounded-3xl p-5 sm:p-7 space-y-5 bg-slate-900/80 border border-slate-800">
+        <section
+          id="panel-operasional-backup"
+          role="tabpanel"
+          aria-labelledby="tab-operasional-backup"
+          className="app-panel rounded-3xl p-5 sm:p-7 space-y-5 bg-slate-900/80 border border-slate-800"
+        >
           <div className="border-b border-slate-800 pb-3">
             <h2 className="text-base font-bold text-white">
               Penugasan Backup Personil
@@ -906,7 +912,12 @@ export default function OperationalPage() {
 
       {/* TAB 3: IMPORT MANUAL */}
       {tab === "import" && hasPermission(user, "corrections.manage") ? (
-        <section className="app-panel rounded-3xl p-5 sm:p-7 space-y-6 bg-slate-900/80 border border-slate-800">
+        <section
+          id="panel-operasional-import"
+          role="tabpanel"
+          aria-labelledby="tab-operasional-import"
+          className="app-panel rounded-3xl p-5 sm:p-7 space-y-6 bg-slate-900/80 border border-slate-800"
+        >
           <div className="border-b border-slate-800 pb-3">
             <h2 className="text-base font-bold text-white">
               Input Absensi Manual (Per-Kolom)
