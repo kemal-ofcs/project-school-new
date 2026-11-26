@@ -258,7 +258,7 @@ export function PilihCari({
         // yang baru saja dibuka tombol ini.
         onMouseDown={(event) => event.preventDefault()}
         onClick={() => (terbuka ? tutup() : buka())}
-        className="grid w-11 shrink-0 place-items-center rounded-lg border border-slate-700 bg-slate-900 text-slate-300 transition-colors hover:bg-slate-800 focus:outline-none disabled:opacity-60"
+        className="pilih-cari-tombol grid w-11 shrink-0 place-items-center rounded-lg border border-slate-700 bg-slate-900 text-slate-300 transition-colors hover:bg-slate-800 focus:outline-none disabled:opacity-60"
       >
         <svg
           aria-hidden="true"

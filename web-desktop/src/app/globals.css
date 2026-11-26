@@ -66,7 +66,7 @@
   --app-table-header-bg: #020617;
   --app-card-bg: #0f172a;
   --app-input-bg: #020617;
-  --app-input-border: rgba(255, 255, 255, 0.12);
+  --app-input-border: #56658a;
   --app-input-text: #ffffff;
   /* Warna segmen grafik kehadiran (donat SVG, donat 3D, batang tren, titik
      legenda). Di tema terang tiap warna digelapkan sampai minimal 3:1
@@ -116,7 +116,8 @@ html.light {
   --app-table-header-bg: #f8fafc;
   --app-card-bg: #ffffff;
   --app-input-bg: #ffffff;
-  --app-input-border: #cbd5e1;
+  /* Garis kontrol form wajib >= 3:1 terhadap putih (WCAG 1.4.11); #cbd5e1 hanya 1,5:1. */
+  --app-input-border: #8391b5;
   --app-input-text: #0f172a;
   --chart-tepat: #059669;
   --chart-telat: #d97706;
@@ -1621,7 +1622,24 @@ html.light select,
 html.light textarea {
   background-color: #ffffff !important;
   color: #0f172a !important;
-  border: 1px solid #cbd5e1 !important;
+  border: 1px solid var(--app-input-border) !important;
+  transition:
+    border-color 150ms ease,
+    box-shadow 150ms ease;
+}
+html[data-theme="light"]
+  input:not([type="checkbox"]):not([type="radio"]):not(
+    .bg-transparent
+  ):hover:not(:focus):not(:disabled),
+html[data-theme="light"] select:hover:not(:focus):not(:disabled),
+html[data-theme="light"] textarea:hover:not(:focus):not(:disabled),
+html.light
+  input:not([type="checkbox"]):not([type="radio"]):not(
+    .bg-transparent
+  ):hover:not(:focus):not(:disabled),
+html.light select:hover:not(:focus):not(:disabled),
+html.light textarea:hover:not(:focus):not(:disabled) {
+  border-color: #5b6b94 !important;
 }
 html[data-theme="light"] input.bg-transparent,
 html.light input.bg-transparent {
@@ -1646,6 +1664,36 @@ html.light select:focus,
 html.light textarea:focus {
   border-color: #2f4fbf !important;
   box-shadow: 0 0 0 3px rgb(47 79 191 / 15%) !important;
+}
+
+/* Tema gelap: garis netral input (white/10, slate-800/700) hanya ~1,3:1 terhadap
+   slate-950. Diganti ke >= 3:1. Tidak berlapis sehingga menang atas utilitas
+   Tailwind; `:not(:focus)` membiarkan `focus:border-*` tetap berlaku. Tema
+   terang ditimpa aturan di atas yang memakai !important. */
+:is(input, select, textarea):is(
+    .border-white\/10,
+    .border-white\/5,
+    .border-slate-800,
+    .border-slate-700
+  ):not(:focus) {
+  border-color: #56658a;
+}
+:is(input, select, textarea):is(
+    .border-white\/10,
+    .border-white\/5,
+    .border-slate-800,
+    .border-slate-700
+  ):hover:not(:focus):not(:disabled) {
+  border-color: #7584aa;
+}
+.pilih-cari-tombol {
+  border-color: #56658a;
+}
+
+/* Tombol panah PilihCari bergaris sama dengan kotak isiannya. */
+html[data-theme="light"] .pilih-cari-tombol,
+html.light .pilih-cari-tombol {
+  border-color: var(--app-input-border) !important;
 }
 
 select option {
@@ -2156,7 +2204,7 @@ html.light
 html.light .app-modal-panel select,
 html.light .app-modal-panel textarea {
   background-color: #ffffff !important;
-  border-color: #cbd5e1 !important;
+  border-color: var(--app-input-border) !important;
   color: #0f172a !important;
 }
 
