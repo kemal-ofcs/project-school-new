@@ -461,7 +461,7 @@ export default function KeamananAbsensiPage() {
               data-konfirmasi
               onClick={() => void handleSaveScanSecurity()}
               disabled={ipAllowlistBusy}
-              className="mt-3 w-full rounded-xl bg-sky-400 py-2.5 text-xs font-black text-slate-950 transition active:scale-95 disabled:opacity-60"
+              className="mt-3 w-full rounded-xl bg-sky-700 py-2.5 text-xs font-black text-on-accent transition active:scale-95 disabled:opacity-60"
             >
               {ipAllowlistBusy ? "Menyimpan..." : "Simpan keamanan absensi"}
             </button>
@@ -564,7 +564,7 @@ export default function KeamananAbsensiPage() {
                       }}
                       className={`rounded-lg px-2.5 py-1 text-[11px] font-bold transition-all ${
                         geofence.radiusMeter === preset
-                          ? "bg-sky-400 text-slate-950 shadow-sm"
+                          ? "bg-sky-700 text-on-accent shadow-sm"
                           : "border border-white/10 bg-white/[0.04] text-slate-300 hover:bg-white/[0.08]"
                       }`}
                     >
@@ -635,7 +635,7 @@ export default function KeamananAbsensiPage() {
                   disabled={geofenceBusy}
                   data-konfirmasi
                   onClick={handleSaveGeofence}
-                  className="w-full rounded-xl bg-sky-400 py-2.5 text-xs font-black text-slate-950 shadow-md hover:bg-sky-300 active:scale-95 transition disabled:opacity-50"
+                  className="w-full rounded-xl bg-sky-700 py-2.5 text-xs font-black text-on-accent shadow-md hover:bg-sky-600 active:scale-95 transition disabled:opacity-50"
                 >
                   {geofenceBusy
                     ? "Menyimpan..."

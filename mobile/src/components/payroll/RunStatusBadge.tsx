@@ -9,7 +9,7 @@ const STATUS_STYLE: Record<string, { label: string; className: string }> = {
   },
   SUBMITTED: {
     label: "Diajukan",
-    className: "border-sky-500/30 bg-sky-500/10 text-sky-300",
+    className: "border-cyan-500/30 bg-cyan-500/10 text-cyan-300",
   },
   REVIEWED: {
     label: "Direview",

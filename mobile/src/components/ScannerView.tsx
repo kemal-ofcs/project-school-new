@@ -1117,7 +1117,7 @@ export function ScannerView() {
           <button
             type="submit"
             disabled={!manualInput.trim() || isProcessing}
-            className="flex min-h-10 items-center justify-center rounded-xl bg-sky-500 px-4 text-xs font-bold text-slate-950 disabled:opacity-50 active:scale-95 transition"
+            className="flex min-h-10 items-center justify-center rounded-xl bg-sky-700 px-4 text-xs font-bold text-on-accent disabled:opacity-50 active:scale-95 transition"
           >
             Proses
           </button>

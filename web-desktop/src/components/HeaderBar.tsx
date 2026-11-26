@@ -44,20 +44,20 @@ export function HeaderBar() {
           >
             <Icon name="menu" className="size-5" />
           </button>
-          <button
-            type="button"
-            onClick={toggleDesktopSidebar}
-            aria-expanded={desktopOpen}
-            aria-label="Menu samping"
-            title={
-              desktopOpen
-                ? "Sembunyikan menu samping"
-                : "Tampilkan menu samping"
-            }
-            className={`hidden size-10 lg:grid ${MENU_BUTTON_CLASS}`}
-          >
-            <Icon name="menu" className="size-5" />
-          </button>
+          {/* Selama sidebar terbuka, tombolnya ada di kepala sidebar. */}
+          {desktopOpen ? null : (
+            <button
+              type="button"
+              data-menu-samping
+              onClick={toggleDesktopSidebar}
+              aria-expanded={false}
+              aria-label="Tampilkan menu samping"
+              title="Tampilkan menu samping"
+              className={`hidden size-10 lg:grid ${MENU_BUTTON_CLASS}`}
+            >
+              <Icon name="menu" className="size-5" />
+            </button>
+          )}
           {/* Di layar lebar merek sudah ada di kepala sidebar selama ia terbuka. */}
           <div className={`min-w-0 ${desktopOpen ? "lg:hidden" : ""}`}>
             <BrandLink />

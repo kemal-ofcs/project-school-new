@@ -358,7 +358,7 @@ export default function KontenMobilePage() {
             }}
             className={`flex-1 rounded-xl py-2 text-xs font-bold transition ${
               activeTab === "berita"
-                ? "bg-sky-500 text-slate-950 shadow-md"
+                ? "bg-sky-700 text-on-accent shadow-md"
                 : "text-slate-400 hover:text-white"
             }`}
           >
@@ -372,7 +372,7 @@ export default function KontenMobilePage() {
             }}
             className={`flex-1 rounded-xl py-2 text-xs font-bold transition ${
               activeTab === "halaman"
-                ? "bg-sky-500 text-slate-950 shadow-md"
+                ? "bg-sky-700 text-on-accent shadow-md"
                 : "text-slate-400 hover:text-white"
             }`}
           >
@@ -399,7 +399,7 @@ export default function KontenMobilePage() {
                     setStatus("Draft");
                     setArticleFormOpen(true);
                   }}
-                  className="flex items-center gap-1.5 rounded-xl bg-sky-500 px-3 py-1.5 text-xs font-bold text-slate-950 shadow-md"
+                  className="flex items-center gap-1.5 rounded-xl bg-sky-700 px-3 py-1.5 text-xs font-bold text-on-accent shadow-md"
                 >
                   <Icon name="plus" className="size-3.5" />
                   <span>Tulis Berita</span>
@@ -575,7 +575,7 @@ export default function KontenMobilePage() {
                     }}
                     className={`whitespace-nowrap rounded-xl px-2.5 py-1 text-[11px] font-bold transition ${
                       subLandingAktif.id === sub.id
-                        ? "bg-sky-500 text-slate-950 shadow"
+                        ? "bg-sky-700 text-on-accent shadow"
                         : "bg-slate-800 text-slate-400 hover:text-white"
                     }`}
                   >
@@ -745,7 +745,7 @@ export default function KontenMobilePage() {
                     type="button"
                     onClick={handleSimpanHalaman}
                     disabled={isPending}
-                    className="w-full rounded-xl bg-sky-500 py-2.5 text-xs font-bold text-slate-950 shadow-md mt-2"
+                    className="w-full rounded-xl bg-sky-700 py-2.5 text-xs font-bold text-on-accent shadow-md mt-2"
                   >
                     {isPending ? "Menyimpan..." : "Simpan Perubahan Bagian Ini"}
                   </button>
@@ -913,7 +913,7 @@ export default function KontenMobilePage() {
                 type="button"
                 onClick={handleSimpanArtikel}
                 disabled={isPending}
-                className="flex-1 rounded-xl bg-sky-500 py-2.5 text-xs font-bold text-slate-950 disabled:opacity-50"
+                className="flex-1 rounded-xl bg-sky-700 py-2.5 text-xs font-bold text-on-accent disabled:opacity-50"
               >
                 {isPending ? "Menyimpan..." : "Simpan"}
               </button>

@@ -182,7 +182,7 @@ export default function AuditAbsensiMobilePage() {
                 }}
                 disabled={loading}
                 aria-label="Muat ulang audit"
-                className="grid size-10 place-items-center rounded-2xl bg-sky-500 text-on-accent shadow-md transition active:scale-95 disabled:opacity-50"
+                className="grid size-10 place-items-center rounded-2xl bg-sky-700 text-on-accent shadow-md transition active:scale-95 disabled:opacity-50"
               >
                 <Icon
                   name="refresh"

@@ -43,7 +43,7 @@ export default function ScannerPage() {
               triggerHaptic("light");
               router.replace("/dashboard");
             }}
-            className="mt-6 rounded-2xl bg-sky-400 px-6 py-2.5 text-xs font-black text-slate-950 shadow-lg transition active:scale-95 hover:bg-sky-300"
+            className="mt-6 rounded-2xl bg-sky-700 px-6 py-2.5 text-xs font-black text-on-accent shadow-lg transition active:scale-95 hover:bg-sky-600"
           >
             Kembali ke Beranda
           </button>

@@ -321,22 +321,6 @@ html.light section.bg-gradient-to-br.from-slate-900 p {
   color: #475569 !important;
 }
 
-/* "Buka QR Scanner" Hero CTA Button */
-html[data-theme="light"] a[href="/scanner"].bg-sky-400,
-html.light a[href="/scanner"].bg-sky-400 {
-  background-color: #10308a !important;
-  color: #ffffff !important;
-  box-shadow: 0 4px 14px rgba(47, 79, 191, 0.3) !important;
-}
-html[data-theme="light"] a[href="/scanner"].bg-sky-400:hover,
-html.light a[href="/scanner"].bg-sky-400:hover {
-  background-color: #0c2470 !important;
-}
-html[data-theme="light"] a[href="/scanner"].bg-sky-400 *,
-html.light a[href="/scanner"].bg-sky-400 * {
-  color: #ffffff !important;
-}
-
 /* 3. Containers & Panels */
 html[data-theme="light"] .bg-slate-900,
 html[data-theme="light"] .bg-slate-950,
@@ -975,22 +959,6 @@ html.light button.bg-emerald-950\/80 * {
   color: #ffffff !important;
 }
 
-/* "Mulai pindai QR" Button */
-html[data-theme="light"] button.bg-sky-400,
-html.light button.bg-sky-400 {
-  background-color: #10308a !important;
-  color: #ffffff !important;
-  box-shadow: 0 2px 10px rgba(47, 79, 191, 0.25) !important;
-}
-html[data-theme="light"] button.bg-sky-400:hover,
-html.light button.bg-sky-400:hover {
-  background-color: #0c2470 !important;
-}
-html[data-theme="light"] button.bg-sky-400 *,
-html.light button.bg-sky-400 * {
-  color: #ffffff !important;
-}
-
 /* "Hentikan kamera" Button */
 html[data-theme="light"] button.bg-rose-400\/10,
 html.light button.bg-rose-400\/10 {
@@ -1568,9 +1536,11 @@ html.light .border-white\/20 {
   border-color: #e2e8f0 !important;
 }
 
-/* Horizontal Underline Tabs (.border-b-2) */
-html[data-theme="light"] button.border-sky-400,
-html.light button.border-sky-400 {
+/* Horizontal Underline Tabs (.border-b-2). Tombol berlatar navy solid
+   dikecualikan: teks navy di atasnya tak terbaca (chip "Semua" PilihPersonil). */
+html[data-theme="light"]
+button.border-sky-400:not(.bg-sky-500, .bg-sky-600, .bg-sky-700),
+html.light button.border-sky-400:not(.bg-sky-500, .bg-sky-600, .bg-sky-700) {
   border-color: #2f4fbf !important;
   color: #10308a !important;
 }
@@ -2532,9 +2502,8 @@ html.light .bootstrap-input-readonly {
 }
 
 /* Submit & Cancel Buttons */
-/* `button.` wajib ikut: aturan umum `button.bg-sky-400` lebih spesifik daripada
-   kelas saja, sehingga tanpa itu tombol ini memakai warna aturan umum itu.
-   Putih di atas #10308a = 11,6:1. */
+/* `button.` ikut supaya menang atas aturan umum `button.bg-*` di blok tema
+   terang. Putih di atas #10308a = 11,6:1. */
 html[data-theme="light"] .bootstrap-btn-submit,
 html.light .bootstrap-btn-submit,
 html[data-theme="light"] button.bootstrap-btn-submit,

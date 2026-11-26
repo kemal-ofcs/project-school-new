@@ -163,7 +163,7 @@ export function PemilihUnitKonten({
             aria-pressed={u.id === idUnit}
             className={`inline-flex min-h-10 items-center gap-1.5 rounded-xl px-4 text-xs font-bold transition ${
               u.id === idUnit
-                ? "bg-sky-500 text-slate-950 shadow-md"
+                ? "bg-sky-700 text-on-accent shadow-md"
                 : "bg-slate-800 text-slate-300 hover:text-white"
             }`}
             key={u.id || "umum"}

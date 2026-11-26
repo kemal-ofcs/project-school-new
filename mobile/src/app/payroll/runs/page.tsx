@@ -235,7 +235,7 @@ export default function MobilePayrollRunsPage() {
           <button
             type="button"
             onClick={openCreate}
-            className="flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl bg-sky-500 text-sm font-black text-slate-950 shadow-lg transition hover:bg-sky-400 active:scale-95"
+            className="flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl bg-sky-700 text-sm font-black text-on-accent shadow-lg transition hover:bg-sky-600 active:scale-95"
           >
             <Icon name="plus" className="size-5" />
             Buat Batch Payroll
@@ -253,7 +253,7 @@ export default function MobilePayrollRunsPage() {
               }}
               className={`min-h-9 shrink-0 rounded-xl px-3 text-xs font-semibold transition ${
                 statusFilter === item.value
-                  ? "bg-sky-500 font-bold text-slate-950"
+                  ? "bg-sky-700 font-bold text-on-accent"
                   : "bg-white/5 text-slate-400 hover:bg-white/10"
               }`}
             >
@@ -349,7 +349,7 @@ export default function MobilePayrollRunsPage() {
               type="button"
               onClick={() => void handleCreate()}
               disabled={creating || !estimate || estimate.employees === 0}
-              className="min-h-11 flex-1 rounded-xl bg-sky-500 font-black text-slate-950 shadow-lg transition active:scale-95 disabled:opacity-50"
+              className="min-h-11 flex-1 rounded-xl bg-sky-700 font-black text-on-accent shadow-lg transition active:scale-95 disabled:opacity-50"
             >
               {creating ? "Memproses..." : "Buat Batch DRAFT"}
             </button>

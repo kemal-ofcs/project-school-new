@@ -461,7 +461,7 @@ export function DigitalIdCardPreview({
             }}
             className={`rounded-lg px-2.5 py-1 text-[11px] font-bold transition-all ${
               previewMode === "card"
-                ? "bg-sky-500 text-slate-950 shadow"
+                ? "bg-sky-700 text-on-accent shadow"
                 : "text-slate-400 hover:text-slate-200"
             }`}
           >
@@ -475,7 +475,7 @@ export function DigitalIdCardPreview({
             }}
             className={`rounded-lg px-2.5 py-1 text-[11px] font-bold transition-all ${
               previewMode === "qr"
-                ? "bg-sky-500 text-slate-950 shadow"
+                ? "bg-sky-700 text-on-accent shadow"
                 : "text-slate-400 hover:text-slate-200"
             }`}
           >

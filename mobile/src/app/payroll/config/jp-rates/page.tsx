@@ -257,7 +257,7 @@ export default function MobileJpRatesPage() {
         <button
           type="button"
           onClick={openAdd}
-          className="flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl bg-sky-500 text-sm font-black text-slate-950 shadow-lg transition hover:bg-sky-400 active:scale-95"
+          className="flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl bg-sky-700 text-sm font-black text-on-accent shadow-lg transition hover:bg-sky-600 active:scale-95"
         >
           <Icon name="plus" className="size-5" />
           Tambah Tarif JP

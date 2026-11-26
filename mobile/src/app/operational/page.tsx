@@ -241,7 +241,7 @@ export default function OperationalPage() {
           </p>
           <Link
             href="/operasional-hub"
-            className="mt-5 inline-flex items-center gap-2 rounded-2xl bg-sky-500 px-5 py-2.5 text-xs font-bold text-slate-950 shadow-lg active:scale-95 transition"
+            className="mt-5 inline-flex items-center gap-2 rounded-2xl bg-sky-700 px-5 py-2.5 text-xs font-bold text-on-accent shadow-lg active:scale-95 transition"
           >
             <Icon name="home" className="size-4" />
             <span>Kembali ke Operasional</span>
@@ -726,7 +726,7 @@ export default function OperationalPage() {
                   }}
                   className={`rounded-xl py-2 text-[11px] font-bold transition active:scale-95 ${
                     activeTab === "koreksi"
-                      ? "bg-sky-500 text-slate-950 shadow-md"
+                      ? "bg-sky-700 text-on-accent shadow-md"
                       : "text-slate-400 hover:text-white"
                   }`}
                 >
@@ -741,7 +741,7 @@ export default function OperationalPage() {
                   }}
                   className={`rounded-xl py-2 text-[11px] font-bold transition active:scale-95 ${
                     activeTab === "backup"
-                      ? "bg-sky-500 text-slate-950 shadow-md"
+                      ? "bg-sky-700 text-on-accent shadow-md"
                       : "text-slate-400 hover:text-white"
                   }`}
                 >
@@ -756,7 +756,7 @@ export default function OperationalPage() {
                   }}
                   className={`rounded-xl py-2 text-[11px] font-bold transition active:scale-95 ${
                     activeTab === "manual"
-                      ? "bg-sky-500 text-slate-950 shadow-md"
+                      ? "bg-sky-700 text-on-accent shadow-md"
                       : "text-slate-400 hover:text-white"
                   }`}
                 >
@@ -886,7 +886,7 @@ export default function OperationalPage() {
               <button
                 type="submit"
                 disabled={busy}
-                className="w-full rounded-xl bg-sky-400 py-3 text-xs font-black text-slate-950 shadow-lg shadow-sky-950/40 hover:bg-sky-300 disabled:opacity-50 transition active:scale-[0.98]"
+                className="w-full rounded-xl bg-sky-700 py-3 text-xs font-black text-on-accent shadow-lg shadow-sky-950/40 hover:bg-sky-600 disabled:opacity-50 transition active:scale-[0.98]"
               >
                 {busy ? "Menyimpan..." : "Simpan Koreksi Admin"}
               </button>

@@ -80,6 +80,11 @@ export function toggleDesktopSidebar() {
     // ditutup, cukup tidak diingat pada pembukaan berikutnya.
   }
   update({ desktopOpen });
+  // Tombol yang diklik hilang bersama sidebar (di dalamnya, atau di bilah atas
+  // saat sidebar tersembunyi); fokus dipindah ke pasangannya setelah render.
+  requestAnimationFrame(() => {
+    document.querySelector<HTMLElement>("[data-menu-samping]")?.focus();
+  });
 }
 
 export function setDrawerOpen(drawerOpen: boolean) {
@@ -240,8 +245,19 @@ export function AppSidebar() {
     <>
       {desktopOpen ? (
         <aside className="app-sidebar sticky top-0 z-10 hidden h-dvh w-64 shrink-0 flex-col self-start border-r border-white/10 bg-slate-950 lg:flex print:hidden">
-          <div className="px-4 py-3">
+          <div className="flex items-center justify-between gap-2 py-3 pl-4 pr-2">
             <BrandLink />
+            <button
+              type="button"
+              data-menu-samping
+              onClick={toggleDesktopSidebar}
+              aria-expanded
+              aria-label="Sembunyikan menu samping"
+              title="Sembunyikan menu samping"
+              className="grid size-10 shrink-0 place-items-center rounded-xl text-slate-300 transition-colors hover:bg-white/[0.07] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+            >
+              <Icon name="menu" className="size-5" />
+            </button>
           </div>
           <SidebarNav groups={groups} />
         </aside>

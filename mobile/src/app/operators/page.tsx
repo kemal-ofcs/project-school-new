@@ -97,7 +97,7 @@ const INPUT_CLASS =
 
 const PILL_TONES: Record<Tone, string> = {
   success: "border-emerald-500/40 bg-emerald-500/15 text-emerald-300",
-  info: "border-sky-500/40 bg-sky-500/15 text-sky-300",
+  info: "border-cyan-500/40 bg-cyan-500/15 text-cyan-300",
   warning: "border-amber-500/40 bg-amber-500/15 text-amber-300",
   neutral: "border-white/15 bg-slate-500/15 text-slate-300",
   danger: "border-rose-500/40 bg-rose-500/15 text-rose-300",
@@ -455,7 +455,7 @@ export default function MobileMasterOperatorPage() {
                 }}
                 className={`min-h-11 rounded-xl px-2 text-xs font-bold transition active:scale-95 ${
                   activeTab === tab
-                    ? "bg-sky-500 text-slate-950 shadow-md"
+                    ? "bg-sky-700 text-on-accent shadow-md"
                     : "text-slate-400 hover:text-white"
                 }`}
               >
@@ -1261,7 +1261,7 @@ function ModalActions({
       <button
         type="submit"
         disabled={saving}
-        className="min-h-11 flex-1 rounded-xl bg-sky-500 text-xs font-black text-slate-950 shadow-lg transition hover:bg-sky-400 active:scale-95 disabled:opacity-50"
+        className="min-h-11 flex-1 rounded-xl bg-sky-700 text-xs font-black text-on-accent shadow-lg transition hover:bg-sky-600 active:scale-95 disabled:opacity-50"
       >
         {saving ? "Menyimpan..." : "Simpan"}
       </button>

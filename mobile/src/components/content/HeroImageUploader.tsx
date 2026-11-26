@@ -133,7 +133,7 @@ export function HeroImageUploader({
           className={`inline-flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-bold shadow-md cursor-pointer transition ${
             disabled || isProcessing
               ? "bg-slate-700 text-slate-400 cursor-not-allowed opacity-60"
-              : "bg-sky-500 text-slate-950 hover:bg-sky-400 active:scale-95"
+              : "bg-sky-700 text-on-accent hover:bg-sky-600 active:scale-95"
           }`}
         >
           <Icon name="upload" className="size-3.5" />

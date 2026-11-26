@@ -485,7 +485,7 @@ export default function HistoryPage() {
               triggerHaptic("light");
               router.replace("/dashboard");
             }}
-            className="mt-6 rounded-2xl bg-sky-400 px-6 py-2.5 text-xs font-black text-slate-950 shadow-lg transition active:scale-95 hover:bg-sky-300"
+            className="mt-6 rounded-2xl bg-sky-700 px-6 py-2.5 text-xs font-black text-on-accent shadow-lg transition active:scale-95 hover:bg-sky-600"
           >
             Kembali ke Beranda
           </button>
@@ -523,7 +523,7 @@ export default function HistoryPage() {
               onClick={() => handleTabChange("daily")}
               className={`flex items-center justify-center gap-2 rounded-xl py-2 text-xs font-bold transition active:scale-95 ${
                 activeTab === "daily"
-                  ? "bg-sky-500 text-slate-950 shadow-md"
+                  ? "bg-sky-700 text-on-accent shadow-md"
                   : "text-slate-400 hover:text-white"
               }`}
             >
@@ -535,7 +535,7 @@ export default function HistoryPage() {
               onClick={() => handleTabChange("scan-logs")}
               className={`flex items-center justify-center gap-2 rounded-xl py-2 text-xs font-bold transition active:scale-95 ${
                 activeTab === "scan-logs"
-                  ? "bg-sky-500 text-slate-950 shadow-md"
+                  ? "bg-sky-700 text-on-accent shadow-md"
                   : "text-slate-400 hover:text-white"
               }`}
             >
@@ -613,7 +613,7 @@ export default function HistoryPage() {
                 }}
                 className={`shrink-0 rounded-xl px-3 py-1 text-xs font-semibold transition ${
                   statusFilter === s
-                    ? "bg-sky-500 text-slate-950 font-bold"
+                    ? "bg-sky-700 text-on-accent font-bold"
                     : "bg-white/5 text-slate-400 hover:bg-white/10"
                 }`}
               >

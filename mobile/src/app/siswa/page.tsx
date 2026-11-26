@@ -1264,7 +1264,7 @@ export default function SiswaMobilePage() {
               </button>
               <button
                 type="submit"
-                className="flex-1 rounded-xl bg-sky-500 py-2.5 text-sm font-black text-slate-950 active:scale-95"
+                className="flex-1 rounded-xl bg-sky-700 py-2.5 text-sm font-black text-on-accent active:scale-95"
               >
                 Simpan
               </button>

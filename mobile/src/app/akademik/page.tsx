@@ -649,7 +649,7 @@ export default function AkademikMobilePage() {
             }}
             className={`shrink-0 rounded-xl px-3.5 py-2 text-xs font-bold transition ${
               tab === key
-                ? "bg-sky-500 text-slate-950"
+                ? "bg-sky-700 text-on-accent"
                 : "border border-white/10 bg-slate-800/60 text-slate-300"
             }`}
           >
@@ -701,7 +701,7 @@ export default function AkademikMobilePage() {
           type="button"
           onClick={() => openNew(tab)}
           disabled={tab === "penugasan" && rombel.length === 0}
-          className="mb-3 flex min-h-11 w-full items-center justify-center gap-2 rounded-2xl bg-sky-500 text-xs font-black text-slate-950 shadow-lg active:scale-95 disabled:opacity-50"
+          className="mb-3 flex min-h-11 w-full items-center justify-center gap-2 rounded-2xl bg-sky-700 text-xs font-black text-on-accent shadow-lg active:scale-95 disabled:opacity-50"
         >
           <Icon name="plus" className="size-4" />
           Tambah {KIND_LABEL[tab]}
@@ -747,7 +747,7 @@ export default function AkademikMobilePage() {
                               type="button"
                               onClick={() => void handleActivate(item)}
                               disabled={busy}
-                              className="min-h-9 rounded-lg bg-sky-500 px-2.5 text-[11px] font-black text-slate-950 active:scale-95 disabled:opacity-50"
+                              className="min-h-9 rounded-lg bg-sky-700 px-2.5 text-[11px] font-black text-on-accent active:scale-95 disabled:opacity-50"
                             >
                               Aktifkan
                             </button>
@@ -979,7 +979,7 @@ export default function AkademikMobilePage() {
               type="submit"
               form={formId}
               disabled={busy}
-              className="min-h-11 flex-1 rounded-xl bg-sky-500 text-xs font-black text-slate-950 shadow-lg active:scale-95 disabled:opacity-50"
+              className="min-h-11 flex-1 rounded-xl bg-sky-700 text-xs font-black text-on-accent shadow-lg active:scale-95 disabled:opacity-50"
             >
               {busy ? "Menyimpan..." : "Simpan"}
             </button>

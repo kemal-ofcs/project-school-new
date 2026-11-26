@@ -696,7 +696,7 @@ export default function SistemInfrastrukturPage() {
               <Link
                 href="/sync"
                 onClick={() => triggerHaptic("light")}
-                className="rounded-xl bg-sky-400 px-3.5 py-1.5 text-xs font-black text-slate-950 shadow-md hover:bg-sky-300 active:scale-95 transition"
+                className="rounded-xl bg-sky-700 px-3.5 py-1.5 text-xs font-black text-on-accent shadow-md hover:bg-sky-600 active:scale-95 transition"
               >
                 Buka →
               </Link>

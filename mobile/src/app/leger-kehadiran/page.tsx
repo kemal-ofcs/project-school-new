@@ -264,7 +264,7 @@ export default function MobileLegerKehadiranPage() {
             }}
             className={`rounded-xl py-2 text-xs font-bold transition ${
               activeTab === "preview"
-                ? "bg-sky-500 text-slate-950 shadow"
+                ? "bg-sky-700 text-on-accent shadow"
                 : "text-slate-400"
             }`}
           >
@@ -278,7 +278,7 @@ export default function MobileLegerKehadiranPage() {
             }}
             className={`rounded-xl py-2 text-xs font-bold transition ${
               activeTab === "frozen"
-                ? "bg-sky-500 text-slate-950 shadow"
+                ? "bg-sky-700 text-on-accent shadow"
                 : "text-slate-400"
             }`}
           >
@@ -363,7 +363,7 @@ export default function MobileLegerKehadiranPage() {
                     triggerHaptic("light");
                     setShowFreezeConfirm(true);
                   }}
-                  className="rounded-xl bg-sky-500 px-3 py-1.5 text-xs font-bold text-slate-950 active:scale-95 transition shadow"
+                  className="rounded-xl bg-sky-700 px-3 py-1.5 text-xs font-bold text-on-accent active:scale-95 transition shadow"
                 >
                   Bekukan Nilai Leger
                 </button>
@@ -443,11 +443,11 @@ export default function MobileLegerKehadiranPage() {
                           {s.hadir}
                         </span>
                       </div>
-                      <div className="bg-sky-500/10 rounded-lg p-1">
+                      <div className="bg-cyan-500/10 rounded-lg p-1">
                         <span className="block text-[9px] text-slate-400">
                           I
                         </span>
-                        <span className="text-xs font-bold text-sky-400">
+                        <span className="text-xs font-bold text-cyan-400">
                           {s.izin}
                         </span>
                       </div>
@@ -586,11 +586,11 @@ export default function MobileLegerKehadiranPage() {
                           {s.hadir}
                         </span>
                       </div>
-                      <div className="bg-sky-500/10 rounded-lg p-1">
+                      <div className="bg-cyan-500/10 rounded-lg p-1">
                         <span className="block text-[9px] text-slate-400">
                           I
                         </span>
-                        <span className="text-xs font-bold text-sky-400">
+                        <span className="text-xs font-bold text-cyan-400">
                           {s.izin}
                         </span>
                       </div>
@@ -670,7 +670,7 @@ export default function MobileLegerKehadiranPage() {
                   type="button"
                   onClick={() => void handleFreeze()}
                   disabled={isSubmittingRef.current}
-                  className="px-4 py-2 text-xs font-bold rounded-xl bg-sky-500 text-slate-950 shadow active:scale-95 transition disabled:opacity-50"
+                  className="px-4 py-2 text-xs font-bold rounded-xl bg-sky-700 text-on-accent shadow active:scale-95 transition disabled:opacity-50"
                 >
                   Ya, Bekukan Sekarang
                 </button>

@@ -355,7 +355,7 @@ export default function MobileTaxRulesPage() {
               type="button"
               onClick={openAdd}
               aria-label={`Tambah lapisan ${active?.title ?? ""}`}
-              className="grid size-10 shrink-0 place-items-center rounded-xl bg-sky-500 text-slate-950 shadow-lg transition hover:bg-sky-400 active:scale-95"
+              className="grid size-10 shrink-0 place-items-center rounded-xl bg-sky-700 text-on-accent shadow-lg transition hover:bg-sky-600 active:scale-95"
             >
               <Icon name="plus" className="size-5" />
             </button>

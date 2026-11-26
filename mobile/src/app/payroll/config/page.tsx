@@ -521,7 +521,7 @@ export default function MobilePayrollConfigPage() {
             onClick={() => setActiveTab("salary")}
             className={`min-h-10 rounded-xl text-xs font-bold transition ${
               activeTab === "salary"
-                ? "bg-sky-500 text-slate-950"
+                ? "bg-sky-700 text-on-accent"
                 : "text-slate-400 hover:bg-white/5"
             }`}
           >
@@ -532,7 +532,7 @@ export default function MobilePayrollConfigPage() {
             onClick={() => setActiveTab("components")}
             className={`min-h-10 rounded-xl text-xs font-bold transition ${
               activeTab === "components"
-                ? "bg-sky-500 text-slate-950"
+                ? "bg-sky-700 text-on-accent"
                 : "text-slate-400 hover:bg-white/5"
             }`}
           >
@@ -555,7 +555,7 @@ export default function MobilePayrollConfigPage() {
                 type="button"
                 onClick={openNewSalary}
                 aria-label="Atur rate gaji karyawan"
-                className="grid size-11 shrink-0 place-items-center rounded-xl bg-sky-500 text-slate-950 shadow-lg transition hover:bg-sky-400 active:scale-95"
+                className="grid size-11 shrink-0 place-items-center rounded-xl bg-sky-700 text-on-accent shadow-lg transition hover:bg-sky-600 active:scale-95"
               >
                 <Icon name="plus" className="size-5" />
               </button>
@@ -640,7 +640,7 @@ export default function MobilePayrollConfigPage() {
               <button
                 type="button"
                 onClick={openNewComponent}
-                className="flex min-h-10 shrink-0 items-center gap-1.5 rounded-xl bg-sky-500 px-3 text-xs font-black text-slate-950 shadow-lg transition hover:bg-sky-400 active:scale-95"
+                className="flex min-h-10 shrink-0 items-center gap-1.5 rounded-xl bg-sky-700 px-3 text-xs font-black text-on-accent shadow-lg transition hover:bg-sky-600 active:scale-95"
               >
                 <Icon name="plus" className="size-4" />
                 Tambah

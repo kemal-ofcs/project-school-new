@@ -24,7 +24,7 @@ const KUNCI_PEMETAAN = "kos.erapor.pemetaan";
 const TOMBOL =
   "min-h-11 rounded-lg border border-white/15 px-3 py-2 text-white text-sm disabled:opacity-60 focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-500";
 const TOMBOL_UTAMA =
-  "min-h-11 rounded-lg bg-sky-600 px-3 py-2 text-white text-sm font-semibold disabled:opacity-60 focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-500";
+  "min-h-11 rounded-lg bg-sky-700 hover:bg-sky-600 px-3 py-2 text-on-accent text-sm font-semibold disabled:opacity-60 focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-500";
 const ISIAN =
   "mt-1 w-full min-h-11 rounded-lg border border-white/10 bg-slate-950 px-3 py-2 text-white text-sm";
 const LABEL = "block text-xs text-slate-400";

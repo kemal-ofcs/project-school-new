@@ -384,7 +384,7 @@ export default function MobileHolidaysPage() {
             <button
               type="button"
               onClick={handleOpenAdd}
-              className="flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-sky-500 text-xs font-black text-slate-950 shadow-md transition hover:bg-sky-400 active:scale-95"
+              className="flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-sky-700 text-xs font-black text-on-accent shadow-md transition hover:bg-sky-600 active:scale-95"
             >
               <Icon name="plus" className="size-4" />
               Tambah Hari Libur
@@ -672,7 +672,7 @@ export default function MobileHolidaysPage() {
             <button
               type="submit"
               disabled={saving}
-              className="min-h-11 flex-1 rounded-xl bg-sky-500 text-xs font-black text-slate-950 shadow-lg transition hover:bg-sky-400 active:scale-95 disabled:opacity-50"
+              className="min-h-11 flex-1 rounded-xl bg-sky-700 text-xs font-black text-on-accent shadow-lg transition hover:bg-sky-600 active:scale-95 disabled:opacity-50"
             >
               {saving ? "Menyimpan..." : "Simpan Hari Libur"}
             </button>

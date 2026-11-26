@@ -1,6 +1,14 @@
 # PRD: UI halaman dalam navy + emas
 
-Status 2026-11-26: Fase 0, A, C, D, dan B (Web/Desktop) sudah ditulis, menunggu tinjauan pemilik lalu `jalankan-antislop` → `jalankan-check`. B Mobile menyusul setelah B Web disetujui.
+Status 2026-11-26: Fase 0, A, C, D, dan B (Web/Desktop) sudah ditulis dan **disetujui pemilik** (semua saran diterima). B Mobile ditulis 2026-11-26, belum ditinjau. `jalankan-antislop` → `jalankan-check` belum dijalankan pemilik.
+
+**Progres Fase B Mobile (2026-11-26).**
+- **B2.** `@theme` Mobile memakai skala navy yang sama dengan Web. Di tema terang skalanya dicermin: 950/900 → `#eef2fc`/`#dce4f9`, 400/300/200 → `#2f4fbf`/`#10308a`/`#0c2470` (teks terendah 5,7:1 di `#e2e8f0`), 100/50 → 900/950. `.theme-invariant` memakai nilai navy gelap. Aurora, seleksi, dan `--app-primary` terang ikut navy.
+- **B1.** Ke cyan: `RunStatusBadge` Diajukan, `StatusBadge` "Datang Lebih Awal", pil `info` Operator, Cicilan "Menunggu barang", `FeedbackBanner` `info`, angka Izin Leger ×2, tombol Izin Presensi KBM. Tombol Izin Presensi KBM **Web** ikut pindah ke `bg-cyan-500` beserta legenda Izin-nya: di tema terang teksnya dipaksa `#020617` (`.status-kehadiran-pilihan`) di atas `bg-sky-700`, ±1,5:1.
+- **B3.** 71 baris di 32 berkas Mobile: `bg-sky-400|500 … text-slate-950` → `bg-sky-700 text-on-accent`, `hover:bg-sky-300|400|500` → `hover:bg-sky-600`. Tombol audit-absensi `bg-sky-500` → 700. `inventory/gaya.ts` dan `nilai/EksporErapor.tsx` (salinan dari Web) memakai `text-white` di atas sky-600, yang di Mobile terang jadi tinta gelap di atas navy: disunting di Web lalu disinkron. Sinkron ini juga membawa hasil B3 Web ke salinan Mobile yang tertinggal (termasuk `PilihPersonil`).
+- **Web.** Aturan terang `a[href="/scanner"].bg-sky-400` dan `button.bg-sky-400` dihapus. `button.border-sky-400` (tab bergaris bawah, teks navy) kini mengecualikan `bg-sky-500|600|700`: chip "Semua" `PilihPersonil` di `/operational` sebelumnya tertulis navy di atas navy.
+- **Sidebar (permintaan pemilik).** Tombol hamburger layar lebar pindah ke kepala sidebar di samping logo. Saat sidebar disembunyikan, tombol muncul di bilah atas; fokus berpindah ke tombol pasangannya. Tombol laci HP tetap di bilah atas.
+- Cek: `tsc` Web + Mobile, Biome 45 + 5 berkas, `audit:kontras` lulus. **Belum:** tangkapan layar Mobile kedua tema, tombol hamburger di browser.
 
 **Progres Fase B Web/Desktop (2026-11-26).** Keputusan pemilik: status yang dulu `sky` pindah ke **cyan**; Web dulu, Mobile menyusul.
 - **B1. Status keluar dari `sky`.** Ke cyan: Sakit (Dasbor Kehadiran ×3), Izin (Leger ×2), `StatusBadge` `info`, `RunStatusBadge`, `SyncPulse` "Menyinkronkan", Cicilan "Menunggu barang", fallback status Rekrutmen, status tujuan di `RunDetailClient`, `BootstrapPanel` info box (+ override terang `.bootstrap-info-box` ke cyan-800). Ke emerald: kartu "Hadir Hari Ini" dan legenda "Tepat Waktu" (`dashboard`), teks "Tepat Waktu" di `AttendanceGauge3D`/`AttendanceGaugeGate`, `--chart-tepat` (`#10b981` gelap, `#059669` terang), "Akun aktif" (`operators`), hasil scan sukses (`scanner`).

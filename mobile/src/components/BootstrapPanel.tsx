@@ -589,7 +589,7 @@ export function BootstrapPanel({
             <button
               type="submit"
               disabled={submitting}
-              className="min-h-12 rounded-2xl bg-sky-400 px-4 text-sm font-black text-slate-950 disabled:opacity-50"
+              className="min-h-12 rounded-2xl bg-sky-700 px-4 text-sm font-black text-on-accent disabled:opacity-50"
             >
               {submitting ? "Mengamankan database..." : "Aktifkan Superadmin"}
             </button>

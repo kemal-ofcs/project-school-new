@@ -868,7 +868,7 @@ export default function MobilePresensiKelasPage() {
             }}
             className={`rounded-xl py-2 text-xs font-bold transition ${
               activeTab === "input"
-                ? "bg-sky-500 text-slate-950 shadow"
+                ? "bg-sky-700 text-on-accent shadow"
                 : "text-slate-400"
             }`}
           >
@@ -946,7 +946,7 @@ export default function MobilePresensiKelasPage() {
                       setJamKeSampai(rentang.akhir);
                     }
                   }}
-                  className="mt-2 min-h-11 w-full rounded-xl bg-sky-500 px-4 text-xs font-bold text-slate-950"
+                  className="mt-2 min-h-11 w-full rounded-xl bg-sky-700 px-4 text-xs font-bold text-on-accent"
                 >
                   Pakai sesi ini
                 </button>
@@ -1270,7 +1270,7 @@ export default function MobilePresensiKelasPage() {
                   type="button"
                   onClick={handleLoadRoster}
                   disabled={loading}
-                  className="w-full rounded-xl bg-sky-500 py-2.5 text-xs font-black text-slate-950 shadow transition active:scale-[0.98] disabled:opacity-50"
+                  className="w-full rounded-xl bg-sky-700 py-2.5 text-xs font-black text-on-accent shadow transition active:scale-[0.98] disabled:opacity-50"
                 >
                   {loading ? "Memuat..." : "Tampilkan Roster Siswa"}
                 </button>
@@ -1343,7 +1343,7 @@ export default function MobilePresensiKelasPage() {
                         {(
                           [
                             { key: "Hadir", label: "Hadir", tone: "emerald" },
-                            { key: "Izin", label: "Izin", tone: "sky" },
+                            { key: "Izin", label: "Izin", tone: "cyan" },
                             { key: "Sakit", label: "Sakit", tone: "amber" },
                             { key: "Alfa", label: "Alfa", tone: "rose" },
                             {
@@ -1369,8 +1369,8 @@ export default function MobilePresensiKelasPage() {
                                 isActive
                                   ? opt.tone === "emerald"
                                     ? "bg-emerald-500 text-[#020617]"
-                                    : opt.tone === "sky"
-                                      ? "bg-sky-500 text-[#020617]"
+                                    : opt.tone === "cyan"
+                                      ? "bg-cyan-500 text-[#020617]"
                                       : opt.tone === "amber"
                                         ? "bg-amber-500 text-[#020617]"
                                         : opt.tone === "rose"

@@ -14,7 +14,7 @@ const bannerStyles = {
   success: "border-emerald-500/40 bg-emerald-950/50 text-emerald-200",
   error: "border-rose-500/40 bg-rose-950/50 text-rose-200",
   warning: "border-amber-500/40 bg-amber-950/50 text-amber-200",
-  info: "border-sky-500/40 bg-sky-950/50 text-sky-200",
+  info: "border-cyan-500/40 bg-cyan-950/50 text-cyan-200",
 };
 
 const SUCCESS_DISMISS_MS = 5000;

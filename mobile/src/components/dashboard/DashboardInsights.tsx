@@ -156,7 +156,7 @@ export function DashboardInsights() {
             onClick={() => switchTab(value)}
             className={`min-h-11 rounded-xl px-2 text-xs font-bold transition active:scale-95 ${
               tab === value
-                ? "bg-sky-500 text-slate-950 shadow-md"
+                ? "bg-sky-700 text-on-accent shadow-md"
                 : "text-slate-400 hover:text-white"
             }`}
           >

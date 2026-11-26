@@ -128,7 +128,7 @@ export default function RunDetailClient() {
     transitions.push({
       target: "SUBMITTED",
       label: "Ajukan untuk Review",
-      className: "bg-sky-500 text-slate-950",
+      className: "bg-sky-700 text-on-accent",
     });
   }
   if (hasPermission(user, "payroll.run.review") && status === "SUBMITTED") {
@@ -311,7 +311,7 @@ export default function RunDetailClient() {
               }}
               className={`min-h-11 rounded-xl text-xs font-bold transition active:scale-95 ${
                 tab === value
-                  ? "bg-sky-500 text-slate-950 shadow-md"
+                  ? "bg-sky-700 text-on-accent shadow-md"
                   : "text-slate-400 hover:text-white"
               }`}
             >

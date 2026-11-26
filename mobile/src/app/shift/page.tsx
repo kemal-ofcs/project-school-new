@@ -492,7 +492,7 @@ export default function MobileShiftPage() {
               <button
                 type="button"
                 onClick={openAddModal}
-                className="flex items-center gap-1.5 rounded-2xl bg-sky-500 px-3.5 py-2 text-xs font-black text-slate-950 shadow-md hover:bg-sky-400 active:scale-95 transition"
+                className="flex items-center gap-1.5 rounded-2xl bg-sky-700 px-3.5 py-2 text-xs font-black text-on-accent shadow-md hover:bg-sky-600 active:scale-95 transition"
               >
                 <svg
                   className="size-4"
@@ -1232,7 +1232,7 @@ export default function MobileShiftPage() {
               <button
                 type="submit"
                 disabled={saving}
-                className="flex-1 rounded-xl bg-sky-500 py-3 text-xs font-black text-slate-950 shadow-lg hover:bg-sky-400 active:scale-95 transition disabled:opacity-50"
+                className="flex-1 rounded-xl bg-sky-700 py-3 text-xs font-black text-on-accent shadow-lg hover:bg-sky-600 active:scale-95 transition disabled:opacity-50"
               >
                 {saving
                   ? "Menyimpan..."

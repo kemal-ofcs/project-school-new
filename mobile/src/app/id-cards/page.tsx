@@ -329,7 +329,7 @@ export default function MobileIdCardsPage() {
                 }}
                 className={`min-h-9 shrink-0 rounded-xl px-3 text-xs font-semibold transition ${
                   statusFilter === chip.value
-                    ? "bg-sky-500 font-bold text-slate-950"
+                    ? "bg-sky-700 font-bold text-on-accent"
                     : "bg-white/5 text-slate-400 hover:bg-white/10"
                 }`}
               >
@@ -411,7 +411,7 @@ export default function MobileIdCardsPage() {
                     "Ditandai tercetak dari Android",
                   )
                 }
-                className="col-span-2 min-h-11 rounded-xl bg-sky-500 text-xs font-black text-slate-950 shadow-md transition active:scale-95 disabled:opacity-50"
+                className="col-span-2 min-h-11 rounded-xl bg-sky-700 text-xs font-black text-on-accent shadow-md transition active:scale-95 disabled:opacity-50"
               >
                 {busy ? "Menyimpan..." : `Tandai Tercetak (${selected.size})`}
               </button>
@@ -565,7 +565,7 @@ export default function MobileIdCardsPage() {
                         className={`min-h-11 flex-1 rounded-xl text-xs font-bold transition active:scale-95 disabled:opacity-50 ${
                           printed
                             ? "border border-white/10 bg-white/5 text-slate-300"
-                            : "bg-sky-500 text-slate-950"
+                            : "bg-sky-700 text-on-accent"
                         }`}
                       >
                         {printed ? "Tandai belum" : "Tandai tercetak"}

@@ -8,7 +8,7 @@ const statusStyles: Record<string, string> = {
   "Non-Aktif": "bg-rose-500/20 text-rose-300 border-rose-500/40",
   Berhasil: "bg-emerald-500/20 text-emerald-300 border-emerald-500/40",
   Terlambat: "bg-amber-500/20 text-amber-300 border-amber-500/40",
-  "Datang Lebih Awal": "bg-sky-500/20 text-sky-300 border-sky-500/40",
+  "Datang Lebih Awal": "bg-cyan-500/20 text-cyan-300 border-cyan-500/40",
   "Pulang Normal": "bg-emerald-500/20 text-emerald-300 border-emerald-500/40",
   "Pulang Lebih Awal": "bg-amber-500/20 text-amber-300 border-amber-500/40",
   "Pulang Lembur": "bg-indigo-500/20 text-indigo-300 border-indigo-500/40",

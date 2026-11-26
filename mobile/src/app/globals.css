@@ -7,6 +7,22 @@
     .dark *
   ));
 
+/* Fase B (PRD UI navy + emas): skala sky = skala navy, sama dengan @theme Web.
+   Tema terang membalik ujungnya di blok "Skala aksen di tema terang". */
+@theme {
+  --color-sky-50: #eef2fc;
+  --color-sky-100: #dce4f9;
+  --color-sky-200: #bccbf3;
+  --color-sky-300: #93a9ea;
+  --color-sky-400: #7b93e3;
+  --color-sky-500: #4a68d4;
+  --color-sky-600: #2f4fbf;
+  --color-sky-700: #10308a;
+  --color-sky-800: #0c2470;
+  --color-sky-900: #0a1a4f;
+  --color-sky-950: #061033;
+}
+
 :root {
   color-scheme: dark;
   --app-background: #030712;
@@ -72,7 +88,7 @@ body {
   min-width: 320px;
   min-height: 100dvh;
   background:
-    radial-gradient(circle at 50% 0%, rgb(56 189 248 / 15%), transparent 28rem),
+    radial-gradient(circle at 50% 0%, rgb(123 147 227 / 15%), transparent 28rem),
     radial-gradient(
       circle at 100% 100%,
       rgb(59 130 246 / 10%),
@@ -104,7 +120,7 @@ textarea {
 }
 
 ::selection {
-  background: rgb(56 189 248 / 32%);
+  background: rgb(123 147 227 / 32%);
   color: white;
 }
 
@@ -190,8 +206,8 @@ html.light {
   --app-surface: rgba(255, 255, 255, 0.92);
   --app-surface-raised: rgba(241, 245, 249, 0.92);
   --app-border: rgba(15, 23, 42, 0.12);
-  --app-primary: #0284c7;
-  --app-primary-strong: #0369a1;
+  --app-primary: #2f4fbf;
+  --app-primary-strong: #10308a;
   --app-text: #0f172a;
   --app-text-muted: #475569;
   --app-gold: #d97706;
@@ -203,7 +219,7 @@ html.light {
 html[data-theme="light"] body,
 html.light body {
   background:
-    radial-gradient(circle at 50% 0%, rgb(56 189 248 / 12%), transparent 28rem),
+    radial-gradient(circle at 50% 0%, rgb(47 79 191 / 12%), transparent 28rem),
     radial-gradient(
       circle at 100% 100%,
       rgb(59 130 246 / 8%),
@@ -215,7 +231,7 @@ html.light body {
 :root[data-theme="light"] ::selection,
 html[data-theme="light"] ::selection,
 html.light ::selection {
-  background: rgb(2 132 199 / 22%);
+  background: rgb(47 79 191 / 22%);
   color: #0f172a;
 }
 
@@ -262,13 +278,13 @@ body {
 :root[data-theme="light"],
 html[data-theme="light"],
 html.light {
-  --color-sky-950: #f0f9ff;
-  --color-sky-900: #e0f2fe;
-  /* #0284c7 hanya 4.10:1 di atas putih, baik sebagai teks maupun sebagai
-     latar tombol berteks putih; ambang teks normal 4.5:1. */
-  --color-sky-400: #0369a1;
-  --color-sky-300: #0369a1;
-  --color-sky-200: #075985;
+  /* Skala navy dicermin (400<->600, 300<->700, 200<->800). Teks terendah
+     #2f4fbf: 7,0:1 di putih, 5,7:1 di #e2e8f0. */
+  --color-sky-950: #eef2fc;
+  --color-sky-900: #dce4f9;
+  --color-sky-400: #2f4fbf;
+  --color-sky-300: #10308a;
+  --color-sky-200: #0c2470;
 
   --color-blue-950: #eff6ff;
   --color-blue-900: #dbeafe;
@@ -333,8 +349,8 @@ html.light {
 
 /* Nada ujung 50/100 ikut ditukar supaya simetris dengan 900/950 di atas. */
 :root[data-theme="light"] {
-  --color-sky-100: #0c4a6e;
-  --color-sky-50: #082f49;
+  --color-sky-100: #0a1a4f;
+  --color-sky-50: #061033;
   --color-blue-100: #1e3a8a;
   --color-blue-50: #172554;
   --color-indigo-100: #312e81;
@@ -380,13 +396,13 @@ html.light {
   --color-slate-900: #0f172a;
   --color-slate-950: #020617;
 
-  --color-sky-50: #f0f9ff;
-  --color-sky-100: #e0f2fe;
-  --color-sky-200: #bae6fd;
-  --color-sky-300: #7dd3fc;
-  --color-sky-400: #38bdf8;
-  --color-sky-900: #0c4a6e;
-  --color-sky-950: #082f49;
+  --color-sky-50: #eef2fc;
+  --color-sky-100: #dce4f9;
+  --color-sky-200: #bccbf3;
+  --color-sky-300: #93a9ea;
+  --color-sky-400: #7b93e3;
+  --color-sky-900: #0a1a4f;
+  --color-sky-950: #061033;
 
   --color-blue-50: #eff6ff;
   --color-blue-100: #dbeafe;

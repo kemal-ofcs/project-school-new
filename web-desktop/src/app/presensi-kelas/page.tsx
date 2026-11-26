@@ -1306,8 +1306,8 @@ export default function PresensiKelasPage() {
                       <span className="size-2 rounded-full bg-emerald-400"></span>
                       Hadir: <strong>{metrics.hadir}</strong>
                     </span>
-                    <span className="flex items-center gap-1.5 text-sky-400 font-mono">
-                      <span className="size-2 rounded-full bg-sky-400"></span>
+                    <span className="flex items-center gap-1.5 text-cyan-400 font-mono">
+                      <span className="size-2 rounded-full bg-cyan-400"></span>
                       Izin: <strong>{metrics.izin}</strong>
                     </span>
                     <span className="flex items-center gap-1.5 text-amber-400 font-mono">
@@ -1406,7 +1406,7 @@ export default function PresensiKelasPage() {
                               {(
                                 [
                                   { key: "Hadir", label: "H", tone: "emerald" },
-                                  { key: "Izin", label: "I", tone: "sky" },
+                                  { key: "Izin", label: "I", tone: "cyan" },
                                   { key: "Sakit", label: "S", tone: "amber" },
                                   { key: "Alfa", label: "A", tone: "rose" },
                                   {
@@ -1436,8 +1436,8 @@ export default function PresensiKelasPage() {
                                       isActive
                                         ? opt.tone === "emerald"
                                           ? "bg-emerald-500 text-slate-950 shadow"
-                                          : opt.tone === "sky"
-                                            ? "bg-sky-700 text-on-accent shadow"
+                                          : opt.tone === "cyan"
+                                            ? "bg-cyan-500 text-slate-950 shadow"
                                             : opt.tone === "amber"
                                               ? "bg-amber-500 text-slate-950 shadow"
                                               : opt.tone === "rose"

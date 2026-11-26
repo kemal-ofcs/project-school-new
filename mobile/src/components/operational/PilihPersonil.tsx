@@ -231,7 +231,7 @@ export function PilihPersonil({
               onClick={() => setJenis(item.value)}
               className={`${CHIP} ${
                 jenis === item.value
-                  ? "border-sky-400 bg-sky-400 text-slate-950"
+                  ? "border-sky-400 bg-sky-700 text-on-accent"
                   : "border-white/10 text-slate-300 hover:bg-slate-800"
               }`}
             >

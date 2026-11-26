@@ -231,7 +231,7 @@ export function JamPelajaranCard() {
       <button
         type="submit"
         disabled={saving || loading}
-        className="mt-3 flex min-h-11 w-full items-center justify-center rounded-2xl bg-sky-500 text-sm font-black text-slate-950 transition active:scale-95 disabled:opacity-50"
+        className="mt-3 flex min-h-11 w-full items-center justify-center rounded-2xl bg-sky-700 text-sm font-black text-on-accent transition active:scale-95 disabled:opacity-50"
       >
         {saving ? "Menyimpan..." : "Simpan Pengaturan"}
       </button>
