@@ -1686,25 +1686,41 @@ html.light textarea:not([hidden]):not([type="hidden"]):focus {
   box-shadow: 0 0 0 3px rgb(47 79 191 / 15%) !important;
 }
 
-/* Tema gelap: garis netral input (white/10, slate-800/700) hanya ~1,3:1 terhadap
-   slate-950. Diganti ke >= 3:1. Tidak berlapis sehingga menang atas utilitas
-   Tailwind; `:not(:focus)` membiarkan `focus:border-*` tetap berlaku. Tema
-   terang ditimpa aturan di atas yang memakai !important. */
-:is(input, select, textarea):is(
-    .border-white\/10,
-    .border-white\/5,
-    .border-slate-800,
-    .border-slate-700
+/* Tema gelap: garis netral input (border-white/*, border-slate-*) hanya ~1,3:1
+   terhadap slate-950. Diganti ke >= 3:1. Pencocokan diawali spasi/awal kelas
+   supaya `hover:border-*` dan `focus:border-*` tidak ikut. Tidak berlapis
+   sehingga menang atas utilitas Tailwind; `:not(:focus)` membiarkan
+   `focus:border-*` tetap berlaku. Tema terang ditimpa aturan berimportant di atas. */
+:is(input:not([type="checkbox"]):not([type="radio"]), select, textarea):is(
+    [class^="border-white/"],
+    [class*=" border-white/"],
+    [class^="border-slate-"],
+    [class*=" border-slate-"]
   ):not(:focus) {
   border-color: #56658a;
 }
-:is(input, select, textarea):is(
-    .border-white\/10,
-    .border-white\/5,
-    .border-slate-800,
-    .border-slate-700
+:is(input:not([type="checkbox"]):not([type="radio"]), select, textarea):is(
+    [class^="border-white/"],
+    [class*=" border-white/"],
+    [class^="border-slate-"],
+    [class*=" border-slate-"]
   ):hover:not(:focus):not(:disabled) {
   border-color: #7584aa;
+}
+
+/* Panah dropdown: panah bawaan browser menempel ke tepi kanan dan posisinya
+   beda per browser. Diganti panah SVG berjarak tetap 0.875rem dari tepi. */
+select:not([multiple]) {
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none' stroke='%2394a3b8' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m5 7.5 5 5 5-5'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.875rem center;
+  background-size: 1.125rem;
+  padding-right: 2.75rem;
+}
+html[data-theme="light"] select:not([multiple]),
+html.light select:not([multiple]) {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none' stroke='%23475569' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m5 7.5 5 5 5-5'/%3E%3C/svg%3E");
 }
 .pilih-cari-tombol {
   border-color: #56658a;
