@@ -421,6 +421,44 @@ for (const berkas of berkasIkon) {
   }
 }
 
+// 4d. Batas memori dan cache Gradle di gradle.properties
+//
+// Template Tauri memasang `-Xmx4096m` tanpa cache maupun mode paralel, yang
+// memicu swap ke disk saat berjalan berbarengan dengan LLVM di RAM 11 GB.
+const gradleProperties = join(
+  akarMobile,
+  "src-tauri/gen/android/gradle.properties",
+);
+const JVM_ARGS_GRADLE =
+  "org.gradle.jvmargs=-Xmx2048m -XX:MaxMetaspaceSize=512m -Dfile.encoding=UTF-8";
+const setelanGradleWajib: ReadonlyArray<readonly [RegExp, string]> = [
+  [/^[ \t]*#?[ \t]*org\.gradle\.jvmargs[ \t]*=.*$/m, JVM_ARGS_GRADLE],
+  [
+    /^[ \t]*#?[ \t]*org\.gradle\.parallel[ \t]*=.*$/m,
+    "org.gradle.parallel=true",
+  ],
+  [/^[ \t]*#?[ \t]*org\.gradle\.caching[ \t]*=.*$/m, "org.gradle.caching=true"],
+];
+
+const isiPropsAwal = existsSync(gradleProperties)
+  ? readFileSync(gradleProperties, "utf8")
+  : "";
+const akhirBarisProps = isiPropsAwal.includes("\r\n") ? "\r\n" : "\n";
+let isiProps = isiPropsAwal;
+for (const [pola, barisWajib] of setelanGradleWajib) {
+  if (pola.test(isiProps)) {
+    isiProps = isiProps.replace(pola, barisWajib);
+  } else {
+    const pemisah =
+      isiProps.length === 0 || isiProps.endsWith("\n") ? "" : akhirBarisProps;
+    isiProps = `${isiProps}${pemisah}${barisWajib}${akhirBarisProps}`;
+  }
+}
+if (isiProps !== isiPropsAwal) {
+  writeFileSync(gradleProperties, isiProps);
+  berubah = true;
+}
+
 // ── 5. Verifikasi — inilah yang membedakan skrip ini dari sekadar menambal ──
 const gradleAkhir = readFileSync(gradle, "utf8");
 const releaseAkhir = blokRelease.exec(gradleAkhir)?.[2] ?? "";
@@ -428,8 +466,26 @@ const proguardAkhir = readFileSync(proguard, "utf8");
 const manifestAkhir = existsSync(manifest)
   ? readFileSync(manifest, "utf8")
   : "";
+const propsAkhir = existsSync(gradleProperties)
+  ? readFileSync(gradleProperties, "utf8")
+  : "";
 
 const gagal: string[] = [];
+if (
+  !/^org\.gradle\.jvmargs=-Xmx2048m -XX:MaxMetaspaceSize=512m -Dfile\.encoding=UTF-8\r?$/m.test(
+    propsAkhir,
+  )
+) {
+  gagal.push(
+    "gradle.properties: `org.gradle.jvmargs` belum disetel ke -Xmx2048m -XX:MaxMetaspaceSize=512m",
+  );
+}
+if (!/^org\.gradle\.parallel=true\r?$/m.test(propsAkhir)) {
+  gagal.push("gradle.properties: `org.gradle.parallel=true` belum aktif");
+}
+if (!/^org\.gradle\.caching=true\r?$/m.test(propsAkhir)) {
+  gagal.push("gradle.properties: `org.gradle.caching=true` belum aktif");
+}
 for (const baris of deklarasiIzin) {
   if (!sudahDideklarasikan(manifestAkhir, baris)) {
     gagal.push(

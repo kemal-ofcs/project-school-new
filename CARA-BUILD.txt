@@ -1,0 +1,127 @@
+CARA BUILD MANAJEMEN SEKOLAH
+============================
+Semua perintah dijalankan dari folder root repo: C:\dev\sekolah
+kecuali disebut lain.
+
+
+0. PERSIAPAN (sekali per komputer, atau setelah git pull)
+---------------------------------------------------------
+  bun run setup          pasang dependensi ketiga workspace
+  bun run sync:mobile    salin kode bersama web-desktop -> mobile
+                         (WAJIB sebelum build mobile)
+  bun run sync:public    salin modul bersama web-desktop -> web-public
+  bun run check          gerbang kualitas, jalankan sebelum rilis
+
+Naikkan versi sebelum rilis, di tiga tempat dengan angka yang sama:
+  web-desktop/src-tauri/tauri.conf.json   "version"
+  web-desktop/src-tauri/Cargo.toml        version
+  mobile/src-tauri/tauri.conf.json        "version"
+
+Pastikan web-desktop/.env dan mobile/.env memiliki nilai
+SPPG_OFFLINE_AUTH_MAX_AGE_HOURS (1-720 jam) sebelum build rilis Desktop/Mobile.
+
+
+1. WEBSITE (STANDALONE / SELF-HOSTED)
+-------------------------------------
+Ada dua bentuk paket untuk diserahkan ke sekolah. Hasilnya masuk folder rilis/.
+
+a) Paket Windows TANPA Docker (zip, berisi admin + situs + node.exe + caddy.exe)
+     bun run paket:build --versi 1.0.0
+   Hasil : rilis/manajemen-sekolah-1.0.0-windows.zip
+   Syarat: harus dibuild di Windows 64-bit, dan butuh internet (unduh Node
+           dan Caddy).
+   Klien : ekstrak, isi .env, klik Mulai.cmd (panduan deploy/windows/README.md).
+
+b) Image Docker (untuk server Linux / NAS / VPS)
+     bun run image:build --versi 1.0.0
+   Hasil : rilis/manajemen-sekolah-1.0.0/  (berkas .tar kedua aplikasi +
+           docker-compose.yml + Caddyfile + .env.example + README.md)
+   Syarat: Docker Desktop menyala.
+   Klien : docker load -i <berkas>.tar, isi .env, docker compose up -d
+           (panduan: deploy/README.md).
+
+Keduanya MENEGAKKAN lisensi secara otomatis.
+
+c) Vercel (urutan wajib: web-desktop dulu, buat Superadmin di /setup, baru
+   deploy web-public dengan KOS_DATABASE_URL & KOS_DATABASE_AUTH_TOKEN sama).
+
+
+2. DESKTOP (WINDOWS / LINUX / MAC)
+----------------------------------
+Tauri TIDAK bisa cross-compile: installer Windows dibuild di Windows, Linux
+di Linux, Mac di Mac.
+
+  cd web-desktop
+  bun run tauri:build
+
+Perintah ini otomatis menjalankan build frontend (build:desktop) dulu.
+Hasil ada di web-desktop/src-tauri/target/release/bundle/
+
+  Windows : nsis/Manajemen Sekolah_<versi>_x64-setup.exe   <- yang dibagikan
+            (paket .msi dipisah agar build cepat; bila perlu .msi jalankan:
+            bun run tauri:build:msi)
+  Linux   : deb/*.deb, rpm/*.rpm, appimage/*.AppImage
+  Mac     : dmg/*.dmg, macos/*.app
+
+Varian iterasi cepat lokal (lewati tsc & React Compiler saat uji tampilan;
+JANGAN dipakai untuk paket rilis klien, tetap jalankan bun run check):
+  bun run tauri:build:fast
+
+
+3. MOBILE ANDROID
+-----------------
+  bun run sync:mobile                       (dari root, wajib dulu)
+  cd mobile
+  bun run tauri:android:build:arm64         <- yang biasa dipakai (APK ARM64)
+
+Hasil:
+  mobile/src-tauri/gen/android/app/build/outputs/apk/universal/release/app-universal-release.apk
+  (nama foldernya "universal" walau isinya hanya arm64; itu normal)
+
+Varian lain:
+  bun run tauri:android:build:aab           paket .aab ARM64 untuk Play Store
+  bun run tauri:android:build:split         satu APK per arsitektur
+  bun run tauri:android:build               semua arsitektur sekaligus (besar)
+  bun run tauri:android:build:arm64:fast    iterasi cepat lokal (lewati tsc &
+                                            React Compiler; bukan untuk rilis)
+
+Tanda tangan APK memakai mobile/src-tauri/keystore.properties (kunci rilis,
+di-gitignore). Kalau folder mobile/src-tauri/gen/android terhapus:
+  bun run tauri:android:init
+
+
+4. MOBILE iOS
+-------------
+WAJIB di Mac dengan Xcode. Tidak bisa dari Windows sama sekali.
+Sebelum build iOS, tambahkan kembali "staticlib" ke crate-type di
+mobile/src-tauri/Cargo.toml (dihapus di PC agar tidak membuat berkas .a iOS).
+
+  bun run sync:mobile
+  cd mobile
+  bun run tauri:ios:init          (sekali saja, membuat gen/apple)
+  bun run tauri:ios:build
+
+
+5. TUNING MESIN WINDOWS PENGEMBANG (SEKALI SETEL MANUAL DI OS)
+--------------------------------------------------------------
+Agar kompilasi Rust/LLVM dan Gradle tidak terhambat swap HDD atau antivirus:
+
+a) Matikan Pagefile pada partisi HDD mekanik (D: dan E:):
+   Tekan Win+R -> SystemPropertiesAdvanced.exe -> Performance [Settings] ->
+   tab Advanced -> Virtual memory [Change] -> hilangkan centang "Automatically
+   manage paging file size" -> pilih D: dan E: lalu set "No paging file" [Set]
+   -> pastikan C: (SSD) tetap "System managed size" [Set] -> OK lalu restart.
+
+b) Tambahkan Folder Exclusion di Windows Security:
+   Windows Security -> Virus & threat protection -> Manage settings ->
+   Exclusions -> Add or remove exclusions -> tambahkan Folder:
+     C:\dev\sekolah
+     C:\Users\<user>\.cargo
+     C:\Users\<user>\.rustup
+     C:\Users\<user>\.gradle
+
+c) Kebersihan RAM & artefak lama sebelum build rilis penuh:
+   - Tutup browser berat saat menjalankan tauri:build / tauri:android:build:arm64
+     agar sisa RAM cukup untuk rustc + Gradle (-Xmx2048m).
+   - Bila target/release/build/manajemen_sekolah_* menumpuk dari build lama,
+     hapus folder duplikat lama sekali sebelum mengukur baseline baru.

@@ -157,12 +157,11 @@ export default function DasborKehadiranPage() {
           </FeedbackBanner>
         ) : null}
 
-        {/* Tab Navigasi */}
-        <div className="flex border-b border-slate-800">
+        <div className="flex overflow-x-auto border-b border-slate-800">
           <button
             type="button"
             onClick={() => setActiveTab("overview")}
-            className={`border-b-2 px-5 py-3 text-sm font-medium transition ${
+            className={`shrink-0 whitespace-nowrap border-b-2 px-5 py-3 text-sm font-medium transition ${
               activeTab === "overview"
                 ? "border-indigo-500 text-indigo-400"
                 : "border-transparent text-slate-400 hover:border-slate-700 hover:text-slate-200"
@@ -173,7 +172,7 @@ export default function DasborKehadiranPage() {
           <button
             type="button"
             onClick={() => setActiveTab("teachers")}
-            className={`border-b-2 px-5 py-3 text-sm font-medium transition ${
+            className={`shrink-0 whitespace-nowrap border-b-2 px-5 py-3 text-sm font-medium transition ${
               activeTab === "teachers"
                 ? "border-indigo-500 text-indigo-400"
                 : "border-transparent text-slate-400 hover:border-slate-700 hover:text-slate-200"
@@ -184,7 +183,7 @@ export default function DasborKehadiranPage() {
           <button
             type="button"
             onClick={() => setActiveTab("classes")}
-            className={`border-b-2 px-5 py-3 text-sm font-medium transition ${
+            className={`shrink-0 whitespace-nowrap border-b-2 px-5 py-3 text-sm font-medium transition ${
               activeTab === "classes"
                 ? "border-indigo-500 text-indigo-400"
                 : "border-transparent text-slate-400 hover:border-slate-700 hover:text-slate-200"
@@ -195,7 +194,7 @@ export default function DasborKehadiranPage() {
           <button
             type="button"
             onClick={() => setActiveTab("anomalies")}
-            className={`relative border-b-2 px-5 py-3 text-sm font-medium transition ${
+            className={`relative shrink-0 whitespace-nowrap border-b-2 px-5 py-3 text-sm font-medium transition ${
               activeTab === "anomalies"
                 ? "border-indigo-500 text-indigo-400"
                 : "border-transparent text-slate-400 hover:border-slate-700 hover:text-slate-200"

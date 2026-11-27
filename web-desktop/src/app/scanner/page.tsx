@@ -999,8 +999,7 @@ export default function ScannerPage() {
                   </p>
                 </div>
 
-                <div className="flex items-center gap-2">
-                  {/* Camera Device Selector if multiple cameras exist */}
+                <div className="flex flex-wrap items-center gap-2">
                   {cameraDevices.length > 1 ? (
                     <select
                       aria-label="Kamera pemindai"
@@ -1012,7 +1011,7 @@ export default function ScannerPage() {
                           startCamera(e.target.value);
                         }
                       }}
-                      className="bg-slate-950 text-slate-300 text-[11px] border border-slate-700 rounded-lg px-2.5 py-1.5 outline-none font-mono"
+                      className="min-w-0 max-w-full bg-slate-950 text-slate-300 text-[11px] border border-slate-700 rounded-lg px-2.5 py-1.5 outline-none font-mono"
                     >
                       {cameraDevices.map((dev, idx) => (
                         <option key={dev.deviceId} value={dev.deviceId}>
@@ -1026,7 +1025,7 @@ export default function ScannerPage() {
                     type="button"
                     onClick={cameraActive ? stopCamera : () => startCamera()}
                     disabled={isProcessing}
-                    className={`min-h-10 rounded-xl px-4 text-xs font-bold transition disabled:opacity-50 ${
+                    className={`min-h-10 whitespace-nowrap rounded-xl px-4 text-xs font-bold transition disabled:opacity-50 ${
                       cameraActive
                         ? "border border-rose-400/30 bg-rose-400/10 text-rose-200 hover:bg-rose-400/20"
                         : "bg-sky-700 text-on-accent hover:bg-sky-600 shadow-md shadow-sky-950"
@@ -1044,7 +1043,7 @@ export default function ScannerPage() {
                       void setScanFullscreen(true);
                     }}
                     disabled={!cameraActive}
-                    className="min-h-10 rounded-xl border border-sky-400/30 bg-sky-400/10 px-4 text-xs font-bold text-sky-200 transition hover:bg-sky-400/20 disabled:opacity-50"
+                    className="min-h-10 whitespace-nowrap rounded-xl border border-sky-400/30 bg-sky-400/10 px-4 text-xs font-bold text-sky-200 transition hover:bg-sky-400/20 disabled:opacity-50"
                   >
                     Mode scan
                   </button>

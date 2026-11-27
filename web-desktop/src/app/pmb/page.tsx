@@ -487,14 +487,14 @@ export default function PmbPage() {
               <table className="w-full text-left text-sm">
                 <thead className="text-slate-400 text-xs uppercase">
                   <tr>
-                    <th className="py-2">Nomor</th>
-                    <th className="py-2">Nama</th>
-                    <th className="py-2">Gelombang</th>
-                    <th className="py-2">Unit</th>
-                    <th className="py-2">Berkas</th>
-                    <th className="py-2">Status</th>
-                    <th className="py-2">Pembayaran</th>
-                    <th className="py-2">Aksi</th>
+                    <th className="whitespace-nowrap px-3 py-2">Nomor</th>
+                    <th className="whitespace-nowrap px-3 py-2">Nama</th>
+                    <th className="whitespace-nowrap px-3 py-2">Gelombang</th>
+                    <th className="whitespace-nowrap px-3 py-2">Unit</th>
+                    <th className="whitespace-nowrap px-3 py-2">Berkas</th>
+                    <th className="whitespace-nowrap px-3 py-2">Status</th>
+                    <th className="whitespace-nowrap px-3 py-2">Pembayaran</th>
+                    <th className="whitespace-nowrap px-3 py-2">Aksi</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -503,28 +503,32 @@ export default function PmbPage() {
                       className="border-white/5 border-t"
                       key={item.id_pendaftar}
                     >
-                      <td className="py-2 font-mono text-slate-300 text-xs">
+                      <td className="px-3 py-2 font-mono text-slate-300 text-xs">
                         {item.nomor_pendaftaran}
                       </td>
-                      <td className="py-2 text-white">{item.nama_lengkap}</td>
-                      <td className="py-2 text-slate-400">
+                      <td className="px-3 py-2 text-white">
+                        {item.nama_lengkap}
+                      </td>
+                      <td className="px-3 py-2 text-slate-400">
                         {item.nama_gelombang}
                       </td>
-                      <td className="py-2 text-slate-400">
+                      <td className="px-3 py-2 text-slate-400">
                         {item.pilihan_unit || "-"}
                       </td>
-                      <td className="py-2 text-slate-400">
+                      <td className="px-3 py-2 text-slate-400">
                         {item.jumlah_berkas}
                       </td>
-                      <td className="py-2 text-slate-300">{item.status}</td>
-                      <td className="py-2 text-slate-400">
+                      <td className="px-3 py-2 text-slate-300">
+                        {item.status}
+                      </td>
+                      <td className="px-3 py-2 text-slate-400">
                         {item.keadaan_bayar}
                         {item.keadaan_bayar === "Menunggu Pembayaran" &&
                         item.batas_bayar
                           ? ` (s.d. ${item.batas_bayar})`
                           : ""}
                       </td>
-                      <td className="py-2">
+                      <td className="px-3 py-2">
                         <button
                           className="rounded-md border border-white/15 px-2 py-1 text-xs text-white"
                           onClick={() => void bukaDetail(item.id_pendaftar)}

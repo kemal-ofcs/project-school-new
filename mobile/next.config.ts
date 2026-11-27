@@ -27,8 +27,12 @@ const zxingLibraryEntry = path.resolve(
   "node_modules/@zxing/library/es2015/index.js",
 );
 
+// Iterasi lokal cepat (`:fast`): lewati tsc dan React Compiler saat export UI.
+const isFastExport = process.env.SPPG_FAST_EXPORT === "1";
+
 const nextConfig: NextConfig = {
   ...(isMobileBuild ? { output: "export" as const } : {}),
+  ...(isFastExport ? { typescript: { ignoreBuildErrors: true } } : {}),
   devIndicators: false,
   turbopack: {
     root: process.cwd(),
@@ -50,7 +54,7 @@ const nextConfig: NextConfig = {
   images: {
     unoptimized: true,
   },
-  reactCompiler: true,
+  reactCompiler: !isFastExport,
 };
 
 export default nextConfig;

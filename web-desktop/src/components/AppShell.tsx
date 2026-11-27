@@ -42,9 +42,9 @@ export function AppShell({
       </a>
       <div className="flex flex-1">
         <AppSidebar />
-        {/* `min-w-0`: tanpa ini tabel lebar mendorong kolom keluar layar
-            alih-alih menggulir di dalam wadahnya sendiri. */}
-        <div className="flex min-w-0 flex-1 flex-col">
+        {/* `min-w-0` menahan tabel lebar agar menggulir di wadahnya sendiri;
+            `overflow-x-clip` mencegah bocor geser samping di HP tanpa memutus header sticky. */}
+        <div className="flex min-w-0 flex-1 flex-col overflow-x-clip">
           <HeaderBar />
           <LicenseNotice />
           <main

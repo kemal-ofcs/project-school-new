@@ -65,6 +65,9 @@ const buildDateWib = new Intl.DateTimeFormat("en-CA", {
   timeZone: "Asia/Jakarta",
 }).format(new Date());
 
+// Iterasi lokal cepat (`:fast`): lewati tsc dan React Compiler saat export UI.
+const isFastExport = !isStandaloneBuild && process.env.SPPG_FAST_EXPORT === "1";
+
 const nextConfig: NextConfig = {
   env: {
     KOS_LICENSE_ENFORCED: licenseEnforced,
@@ -79,6 +82,7 @@ const nextConfig: NextConfig = {
           return [{ source: "/:path*", headers: SECURITY_HEADERS }];
         },
       }),
+  ...(isFastExport ? { typescript: { ignoreBuildErrors: true } } : {}),
   devIndicators: false,
   turbopack: {
     root: process.cwd(),
@@ -100,7 +104,7 @@ const nextConfig: NextConfig = {
   images: {
     unoptimized: true,
   },
-  reactCompiler: true,
+  reactCompiler: !isFastExport,
 };
 
 export default nextConfig;
