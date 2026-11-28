@@ -29,7 +29,11 @@
   --app-background-soft: #0b1329;
   --app-surface: rgba(15, 23, 42, 0.85);
   --app-surface-raised: rgba(30, 41, 59, 0.75);
-  --app-border: rgba(255, 255, 255, 0.12);
+  --app-group-bg: rgba(9, 16, 32, 0.72);
+  --app-tab-track: rgba(2, 6, 23, 0.55);
+  --app-border: rgba(148, 163, 184, 0.16);
+  --app-input-border: #56658a;
+  --app-input-border-hover: #7584aa;
   --app-primary: #007aff;
   --app-primary-strong: #003399;
   --brand-primary: #003399;
@@ -174,13 +178,13 @@ html[data-theme="light"],
 html.light {
   color-scheme: light;
 
-  /* Skala slate dibalik: 950 jadi paling terang, 50 jadi paling gelap. */
+  /* Skala slate dibalik dengan kanvas teduh #f1f5f9 dan kartu utama #ffffff. */
   --color-slate-950: #ffffff;
-  --color-slate-900: #f1f5f9;
+  --color-slate-900: #ffffff;
   --color-slate-800: #e2e8f0;
   --color-slate-700: #cbd5e1;
   --color-slate-600: #94a3b8;
-  /* #64748b hanya 4,34:1 di atas permukaan #f1f5f9; #5b677c 5,2:1. */
+  /* #64748b hanya 4,34:1 di atas permukaan #f1f5f9; #5b677c >= 4,6:1 di #e2e8f0. */
   --color-slate-500: #5b677c;
   --color-slate-400: #475569;
   --color-slate-300: #334155;
@@ -200,19 +204,23 @@ html.light {
   --color-amber-200: #92400e;
   --color-amber-300: #b45309;
 
-  /* Token aplikasi (dipakai html/body dan ::selection). */
-  --app-background: #f8fafc;
-  --app-background-soft: #eef2f7;
-  --app-surface: rgba(255, 255, 255, 0.92);
-  --app-surface-raised: rgba(241, 245, 249, 0.92);
-  --app-border: rgba(15, 23, 42, 0.12);
+  /* Token aplikasi (dipakai html/body, permukaan tone-on-tone, dan ::selection). */
+  --app-background: #f1f5f9;
+  --app-background-soft: #e8eef6;
+  --app-surface: #ffffff;
+  --app-surface-raised: #ffffff;
+  --app-group-bg: #e5ecf5;
+  --app-tab-track: #dae3ef;
+  --app-border: #cbd5e1;
   --app-primary: #2f4fbf;
   --app-primary-strong: #10308a;
   --app-text: #0f172a;
   --app-text-muted: #475569;
   --app-gold: #d97706;
-  --app-gold-line: #d97706;
+  --app-gold-line: #a38242;
   --app-gold-text: #92400e;
+  --app-input-border: #7584aa;
+  --app-input-border-hover: #5b6b94;
 }
 
 :root[data-theme="light"] body,
@@ -725,7 +733,7 @@ html.light .sakelar-wrap[data-aktif="true"] .sakelar-status {
    HubRow + StatTile (navy + emas). Padanan `.aksi-cepat` Web.
    ========================================================================== */
 .hub-row {
-  border: 1px solid var(--app-gold-line);
+  border: 1px solid var(--app-border);
   background-color: rgb(15 23 42 / 80%);
   backdrop-filter: blur(12px);
   transition:
@@ -734,8 +742,8 @@ html.light .sakelar-wrap[data-aktif="true"] .sakelar-status {
     transform 150ms ease;
 }
 .hub-row:hover {
-  border-color: var(--app-gold);
-  box-shadow: inset 0 0 0 1px var(--app-gold);
+  border-color: rgb(246 196 83 / 50%);
+  box-shadow: 0 6px 18px rgb(2 8 23 / 20%);
 }
 .hub-row:focus-visible {
   outline: 2px solid var(--app-gold);
@@ -772,7 +780,7 @@ html.light .nav-aktif-ikon {
   color: var(--app-gold-text);
 }
 .kartu-angka {
-  border: 1px solid var(--app-gold-line);
+  border: 1px solid var(--app-border);
   background-color: rgb(255 255 255 / 3%);
 }
 .kartu-angka-label {
@@ -781,6 +789,12 @@ html.light .nav-aktif-ikon {
 html[data-theme="light"] .hub-row,
 html.light .hub-row {
   background-color: #ffffff;
+  box-shadow: 0 1px 3px rgb(15 23 42 / 4%);
+}
+html[data-theme="light"] .hub-row:hover,
+html.light .hub-row:hover {
+  border-color: #b89650;
+  box-shadow: 0 6px 18px rgb(15 23 42 / 7%);
 }
 html[data-theme="light"] .hub-row:focus-visible,
 html.light .hub-row:focus-visible {
@@ -788,20 +802,22 @@ html.light .hub-row:focus-visible {
 }
 html[data-theme="light"] .kartu-angka,
 html.light .kartu-angka {
-  background-color: rgb(255 255 255 / 60%);
+  background-color: #ffffff;
+  box-shadow: 0 1px 2px rgb(15 23 42 / 4%);
 }
 
 /* ==========================================================================
-   TabBar (components/ui/TabBar.tsx, salinan Web). Blok ini sama dengan Web.
+   TabBar (components/ui/TabBar.tsx, salinan Web): rel segmen lembut Pas Lebar.
    ========================================================================== */
 .tab-bar {
   display: flex;
+  width: 100%;
   gap: 0.25rem;
+  min-width: 0;
   overflow-x: auto;
   padding: 0.25rem;
-  border: 1px solid var(--app-border);
   border-radius: 0.875rem;
-  background-color: var(--app-surface);
+  background-color: var(--app-tab-track);
   scrollbar-width: thin;
 }
 .tab-bar-tab {
@@ -810,8 +826,8 @@ html.light .kartu-angka {
   align-items: center;
   justify-content: center;
   gap: 0.5rem;
-  min-height: 2.75rem;
-  padding: 0.5rem 1rem;
+  min-height: 2.5rem;
+  padding: 0.4375rem 0.9375rem;
   border: 1px solid transparent;
   border-radius: 0.625rem;
   white-space: nowrap;
@@ -820,20 +836,37 @@ html.light .kartu-angka {
   color: var(--app-text-muted);
   transition:
     background-color 150ms ease,
-    color 150ms ease;
+    color 150ms ease,
+    box-shadow 150ms ease;
 }
-.tab-bar-tab:hover {
+.tab-bar-tab:not([aria-selected="true"]) {
+  border-color: transparent;
+  background-color: transparent;
+}
+.tab-bar-tab:not([aria-selected="true"]):hover {
   background-color: rgb(255 255 255 / 6%);
   color: var(--app-text);
 }
+html[data-theme="light"] .tab-bar-tab:not([aria-selected="true"]),
+html.light .tab-bar-tab:not([aria-selected="true"]) {
+  border-color: transparent;
+  background-color: transparent;
+}
+html[data-theme="light"] .tab-bar-tab:not([aria-selected="true"]):hover,
+html.light .tab-bar-tab:not([aria-selected="true"]):hover {
+  background-color: rgb(255 255 255 / 78%);
+  color: var(--app-text);
+}
 .tab-bar-tab[aria-selected="true"] {
-  border-color: rgb(246 196 83 / 40%);
+  border-color: transparent;
   background: linear-gradient(
     140deg,
     var(--app-navy) 0%,
     var(--app-navy-strong) 100%
   );
-  box-shadow: inset 0 -2px 0 #f6c453;
+  box-shadow:
+    inset 0 -2px 0 #f6c453,
+    0 2px 6px rgb(10 26 79 / 22%);
   color: #ffffff;
 }
 /* Offset negatif: wadah overflow-x memotong cincin yang jatuh di luar tombol. */
@@ -841,19 +874,325 @@ html.light .kartu-angka {
   outline: 2px solid var(--app-gold);
   outline-offset: -2px;
 }
-html[data-theme="light"] .tab-bar-tab:not([aria-selected="true"]):hover,
-html.light .tab-bar-tab:not([aria-selected="true"]):hover {
-  background-color: rgb(15 23 42 / 5%);
-}
 @media (min-width: 1024px) {
   .tab-bar[data-vertikal-lg] {
     position: sticky;
     top: 5rem;
     flex-direction: column;
+    width: 100%;
   }
   .tab-bar[data-vertikal-lg] .tab-bar-tab {
     justify-content: flex-start;
   }
+}
+
+/* Permukaan tone-on-tone tema terang Mobile, PilihCari terpadu, & Kartu Statistik Dinamis */
+.app-panel {
+  border: 1px solid var(--app-border);
+  background: var(--app-surface);
+  box-shadow: 0 18px 50px rgb(2 8 23 / 24%);
+  backdrop-filter: blur(16px);
+}
+:root[data-theme="light"] .app-panel {
+  box-shadow: 0 2px 10px rgb(15 23 42 / 4%);
+}
+.app-group-bar {
+  background-color: var(--app-group-bg);
+  border-color: var(--app-border);
+}
+.app-segment-track {
+  background-color: var(--app-tab-track);
+}
+:root[data-theme="light"]
+  :where(.border-slate-800, .border-white\/10, .border-white\/15):where(
+    :not(
+        input,
+        select,
+        textarea,
+        button,
+        a,
+        .pilih-cari-tombol,
+        .stat-card,
+        .theme-invariant,
+        .theme-invariant *
+      )
+  ) {
+  border-color: var(--app-border);
+}
+:root[data-theme="light"] .app-group-bar,
+:root[data-theme="light"]
+  :is(
+    .app-panel,
+    .bg-slate-900,
+    .bg-slate-900\/95,
+    .bg-slate-900\/90,
+    .bg-slate-900\/80,
+    .bg-slate-900\/70
+  )
+  :where(
+    .bg-slate-950,
+    .bg-slate-950\/80,
+    .bg-slate-950\/60,
+    .bg-slate-950\/50,
+    .bg-white\/\[0\.04\]
+  ):where(
+    :not(
+        input,
+        select,
+        textarea,
+        button,
+        a,
+        .stat-card,
+        .theme-invariant,
+        .theme-invariant *
+      )
+  ) {
+  background-color: var(--app-group-bg);
+  border-color: var(--app-border);
+}
+:is(input:not([type="checkbox"]):not([type="radio"]), select, textarea):is(
+    [class^="border-white/"],
+    [class*=" border-white/"],
+    [class^="border-slate-"],
+    [class*=" border-slate-"]
+  ):not(:focus) {
+  border-color: var(--app-input-border);
+}
+:is(input:not([type="checkbox"]):not([type="radio"]), select, textarea):is(
+    [class^="border-white/"],
+    [class*=" border-white/"],
+    [class^="border-slate-"],
+    [class*=" border-slate-"]
+  ):hover:not(:focus):not(:disabled) {
+  border-color: var(--app-input-border-hover);
+}
+:root[data-theme="light"]
+  :is(
+    input:not([type="checkbox"]):not([type="radio"]):not(.bg-transparent),
+    select,
+    textarea
+  ):not(.theme-invariant):not(.theme-invariant *) {
+  background-color: #ffffff;
+}
+.pilih-cari-input {
+  padding-right: 2.5rem;
+}
+.pilih-cari-tombol {
+  border: none;
+  background: transparent;
+  box-shadow: none;
+  color: #94a3b8;
+}
+.pilih-cari-tombol:hover:not(:disabled) {
+  color: #f8fafc;
+  background-color: rgb(255 255 255 / 6%);
+}
+:root[data-theme="light"] .pilih-cari-tombol {
+  color: #475569;
+}
+:root[data-theme="light"] .pilih-cari-tombol:hover:not(:disabled) {
+  color: #0f172a;
+  background-color: rgb(15 23 42 / 5%);
+}
+select:not([multiple]) {
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none' stroke='%2394a3b8' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m5 7.5 5 5 5-5'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.875rem center;
+  background-size: 1.125rem;
+  padding-right: 2.75rem;
+}
+:root[data-theme="light"] select:not([multiple]) {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none' stroke='%23475569' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m5 7.5 5 5 5-5'/%3E%3C/svg%3E");
+}
+
+.stat-card {
+  border: 1px solid var(--app-border);
+  background-color: rgba(15, 23, 42, 0.85);
+  transition:
+    background-color 160ms ease,
+    border-color 160ms ease,
+    box-shadow 160ms ease;
+}
+.stat-card-label,
+.stat-card-value {
+  color: #94a3b8;
+}
+.stat-card-icon {
+  color: #64748b;
+}
+
+.stat-card[data-tone="sky"] {
+  border-color: rgba(123, 147, 227, 0.3);
+  border-left: 4px solid #4a68d4;
+  background-color: rgba(47, 79, 191, 0.14);
+}
+.stat-card[data-tone="sky"] .stat-card-label {
+  color: #93a9ea;
+}
+.stat-card[data-tone="sky"] .stat-card-value {
+  color: #f8fafc;
+}
+.stat-card[data-tone="sky"] .stat-card-icon {
+  color: #7b93e3;
+}
+
+.stat-card[data-tone="emerald"] {
+  border-color: rgba(16, 185, 129, 0.32);
+  border-left: 4px solid #10b981;
+  background-color: rgba(16, 185, 129, 0.12);
+}
+.stat-card[data-tone="emerald"] .stat-card-label,
+.stat-card[data-tone="emerald"] .stat-card-value {
+  color: #6ee7b7;
+}
+.stat-card[data-tone="emerald"] .stat-card-icon {
+  color: #34d399;
+}
+
+.stat-card[data-tone="amber"] {
+  border-color: rgba(245, 158, 11, 0.34);
+  border-left: 4px solid #f59e0b;
+  background-color: rgba(245, 158, 11, 0.12);
+}
+.stat-card[data-tone="amber"] .stat-card-label,
+.stat-card[data-tone="amber"] .stat-card-value {
+  color: #fcd34d;
+}
+.stat-card[data-tone="amber"] .stat-card-icon {
+  color: #fbbf24;
+}
+
+.stat-card[data-tone="rose"] {
+  border-color: rgba(244, 63, 94, 0.34);
+  border-left: 4px solid #f43f5e;
+  background-color: rgba(244, 63, 94, 0.12);
+}
+.stat-card[data-tone="rose"] .stat-card-label,
+.stat-card[data-tone="rose"] .stat-card-value {
+  color: #fda4af;
+}
+.stat-card[data-tone="rose"] .stat-card-icon {
+  color: #fb7185;
+}
+
+.stat-card[data-tone="cyan"] {
+  border-color: rgba(6, 182, 212, 0.32);
+  border-left: 4px solid #06b6d4;
+  background-color: rgba(6, 182, 212, 0.12);
+}
+.stat-card[data-tone="cyan"] .stat-card-label,
+.stat-card[data-tone="cyan"] .stat-card-value {
+  color: #67e8f9;
+}
+.stat-card[data-tone="cyan"] .stat-card-icon {
+  color: #22d3ee;
+}
+
+.stat-card[data-tone="violet"] {
+  border-color: rgba(139, 92, 246, 0.32);
+  border-left: 4px solid #8b5cf6;
+  background-color: rgba(139, 92, 246, 0.12);
+}
+.stat-card[data-tone="violet"] .stat-card-label,
+.stat-card[data-tone="violet"] .stat-card-value {
+  color: #c4b5fd;
+}
+.stat-card[data-tone="violet"] .stat-card-icon {
+  color: #a78bfa;
+}
+
+:root[data-theme="light"] .stat-card {
+  background-color: #ffffff;
+  border-color: var(--app-border);
+  box-shadow: 0 1px 3px rgb(15 23 42 / 5%);
+}
+:root[data-theme="light"] .stat-card-label,
+:root[data-theme="light"] .stat-card-value {
+  color: #475569;
+}
+:root[data-theme="light"] .stat-card-icon {
+  color: #64748b;
+}
+
+:root[data-theme="light"] .stat-card[data-tone="sky"] {
+  background-color: #e0e8fb;
+  border-color: #bccbf3;
+  border-left: 4px solid #10308a;
+}
+:root[data-theme="light"] .stat-card[data-tone="sky"] .stat-card-label {
+  color: #1d3a9e;
+}
+:root[data-theme="light"] .stat-card[data-tone="sky"] .stat-card-value {
+  color: #0f172a;
+}
+:root[data-theme="light"] .stat-card[data-tone="sky"] .stat-card-icon {
+  color: #2f4fbf;
+}
+
+:root[data-theme="light"] .stat-card[data-tone="emerald"] {
+  background-color: #dcfce7;
+  border-color: #86efac;
+  border-left: 4px solid #10b981;
+}
+:root[data-theme="light"] .stat-card[data-tone="emerald"] .stat-card-label,
+:root[data-theme="light"] .stat-card[data-tone="emerald"] .stat-card-value {
+  color: #166534;
+}
+:root[data-theme="light"] .stat-card[data-tone="emerald"] .stat-card-icon {
+  color: #15803d;
+}
+
+:root[data-theme="light"] .stat-card[data-tone="amber"] {
+  background-color: #fef3c7;
+  border-color: #fde68a;
+  border-left: 4px solid #f59e0b;
+}
+:root[data-theme="light"] .stat-card[data-tone="amber"] .stat-card-label,
+:root[data-theme="light"] .stat-card[data-tone="amber"] .stat-card-value {
+  color: #92400e;
+}
+:root[data-theme="light"] .stat-card[data-tone="amber"] .stat-card-icon {
+  color: #b45309;
+}
+
+:root[data-theme="light"] .stat-card[data-tone="rose"] {
+  background-color: #ffe4e6;
+  border-color: #fecdd3;
+  border-left: 4px solid #f43f5e;
+}
+:root[data-theme="light"] .stat-card[data-tone="rose"] .stat-card-label,
+:root[data-theme="light"] .stat-card[data-tone="rose"] .stat-card-value {
+  color: #9f1239;
+}
+:root[data-theme="light"] .stat-card[data-tone="rose"] .stat-card-icon {
+  color: #be123c;
+}
+
+:root[data-theme="light"] .stat-card[data-tone="cyan"] {
+  background-color: #cffafe;
+  border-color: #67e8f9;
+  border-left: 4px solid #0891b2;
+}
+:root[data-theme="light"] .stat-card[data-tone="cyan"] .stat-card-label,
+:root[data-theme="light"] .stat-card[data-tone="cyan"] .stat-card-value {
+  color: #155e75;
+}
+:root[data-theme="light"] .stat-card[data-tone="cyan"] .stat-card-icon {
+  color: #0e7490;
+}
+
+:root[data-theme="light"] .stat-card[data-tone="violet"] {
+  background-color: #ede9fe;
+  border-color: #c4b5fd;
+  border-left: 4px solid #7c3aed;
+}
+:root[data-theme="light"] .stat-card[data-tone="violet"] .stat-card-label,
+:root[data-theme="light"] .stat-card[data-tone="violet"] .stat-card-value {
+  color: #5b21b6;
+}
+:root[data-theme="light"] .stat-card[data-tone="violet"] .stat-card-icon {
+  color: #6d28d9;
 }
 
 /* ==========================================================================

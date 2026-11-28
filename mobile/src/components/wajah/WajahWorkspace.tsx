@@ -9,6 +9,7 @@ import {
   TOMBOL_KEDUA,
   TOMBOL_UTAMA,
 } from "@/components/inventory/gaya";
+import { Icon, type IconName } from "@/components/ui/Icon";
 import { Modal } from "@/components/ui/Modal";
 import { hasPermission } from "@/lib/auth/access";
 import {
@@ -27,6 +28,7 @@ import {
 } from "@/lib/gateways/face-template";
 import { ambilFotoPersonil } from "@/lib/gateways/personnel-photo";
 import { subscribeSyncCompleted } from "@/lib/gateways/sync-status";
+import { nadaStat, type StatTone } from "@/lib/utils/stat-card";
 import { FACE_MODEL_ID } from "@/lib/validations/face-match";
 
 /**
@@ -159,15 +161,27 @@ export function WajahWorkspace() {
   return (
     <div className="space-y-4">
       <div className="grid grid-cols-3 gap-2">
-        {(["terdaftar", "belum", "ulang"] as const).map((key) => (
+        {(
+          [
+            ["terdaftar", "emerald", "check"],
+            ["belum", "amber", "clock"],
+            ["ulang", "rose", "alert"],
+          ] as [keyof typeof counts, Exclude<StatTone, "clean">, IconName][]
+        ).map(([key, tone, icon]) => (
           <div
             key={key}
-            className="rounded-2xl border border-white/10 bg-slate-900/70 p-3"
+            data-tone={nadaStat(counts[key], tone)}
+            className="stat-card rounded-2xl p-3"
           >
-            <p className="text-[11px] font-semibold text-slate-400">
-              {STATUS_TEXT[key]}
+            <div className="flex items-start justify-between gap-2">
+              <p className="stat-card-label text-[11px] font-bold uppercase">
+                {STATUS_TEXT[key]}
+              </p>
+              <Icon name={icon} className="stat-card-icon size-4 shrink-0" />
+            </div>
+            <p className="stat-card-value mt-1 text-xl font-black">
+              {counts[key]}
             </p>
-            <p className="mt-1 text-xl font-black text-white">{counts[key]}</p>
           </div>
         ))}
       </div>

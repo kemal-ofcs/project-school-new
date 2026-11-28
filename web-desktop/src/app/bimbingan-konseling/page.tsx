@@ -33,6 +33,7 @@ import {
 import { getDaftarSiswa } from "@/lib/gateways/student";
 import { subscribeSyncCompleted, syncNow } from "@/lib/gateways/sync-status";
 import { useConfirmDialog } from "@/lib/hooks/useConfirmDialog";
+import { nadaStat } from "@/lib/utils/stat-card";
 
 export default function BimbinganKonselingPage() {
   const { user, isAuthenticated, isLoading: authLoading } = useAuth();
@@ -552,17 +553,36 @@ export default function BimbinganKonselingPage() {
 
         {/* Ringkasan Statistik */}
         <div className="grid grid-cols-2 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <div className="rounded-xl border border-slate-800 bg-slate-900/60 p-4 backdrop-blur">
-            <p className="text-xs font-medium text-slate-400">Total Kasus</p>
-            <p className="mt-1.5 text-2xl font-bold tracking-tight text-slate-200">
+          <div
+            data-tone={nadaStat(totalKasus, "sky")}
+            className="stat-card rounded-2xl p-4"
+          >
+            <div className="flex items-start justify-between gap-2">
+              <p className="stat-card-label text-xs font-bold uppercase">
+                Total Kasus
+              </p>
+              <Icon
+                name="document"
+                className="stat-card-icon size-4 shrink-0"
+              />
+            </div>
+            <p className="stat-card-value mt-1.5 text-2xl font-black tracking-tight">
               {totalKasus}
             </p>
             <p className="mt-1 text-xs text-slate-500">Tahun ajaran aktif</p>
           </div>
 
-          <div className="rounded-xl border border-slate-800 bg-slate-900/60 p-4 backdrop-blur">
-            <p className="text-xs font-medium text-slate-400">Kasus Terbuka</p>
-            <p className="mt-1.5 text-2xl font-bold tracking-tight text-rose-400">
+          <div
+            data-tone={nadaStat(totalTerbuka, "rose")}
+            className="stat-card rounded-2xl p-4"
+          >
+            <div className="flex items-start justify-between gap-2">
+              <p className="stat-card-label text-xs font-bold uppercase">
+                Kasus Terbuka
+              </p>
+              <Icon name="alert" className="stat-card-icon size-4 shrink-0" />
+            </div>
+            <p className="stat-card-value mt-1.5 text-2xl font-black tracking-tight">
               {totalTerbuka}
             </p>
             <p className="mt-1 text-xs text-slate-500">
@@ -570,11 +590,17 @@ export default function BimbinganKonselingPage() {
             </p>
           </div>
 
-          <div className="rounded-xl border border-slate-800 bg-slate-900/60 p-4 backdrop-blur">
-            <p className="text-xs font-medium text-slate-400">
-              Dalam Bimbingan
-            </p>
-            <p className="mt-1.5 text-2xl font-bold tracking-tight text-amber-400">
+          <div
+            data-tone={nadaStat(totalDalamBimbingan, "amber")}
+            className="stat-card rounded-2xl p-4"
+          >
+            <div className="flex items-start justify-between gap-2">
+              <p className="stat-card-label text-xs font-bold uppercase">
+                Dalam Bimbingan
+              </p>
+              <Icon name="clock" className="stat-card-icon size-4 shrink-0" />
+            </div>
+            <p className="stat-card-value mt-1.5 text-2xl font-black tracking-tight">
               {totalDalamBimbingan}
             </p>
             <p className="mt-1 text-xs text-slate-500">
@@ -582,9 +608,17 @@ export default function BimbinganKonselingPage() {
             </p>
           </div>
 
-          <div className="rounded-xl border border-slate-800 bg-slate-900/60 p-4 backdrop-blur">
-            <p className="text-xs font-medium text-slate-400">Kasus Selesai</p>
-            <p className="mt-1.5 text-2xl font-bold tracking-tight text-emerald-400">
+          <div
+            data-tone={nadaStat(totalSelesai, "emerald")}
+            className="stat-card rounded-2xl p-4"
+          >
+            <div className="flex items-start justify-between gap-2">
+              <p className="stat-card-label text-xs font-bold uppercase">
+                Kasus Selesai
+              </p>
+              <Icon name="check" className="stat-card-icon size-4 shrink-0" />
+            </div>
+            <p className="stat-card-value mt-1.5 text-2xl font-black tracking-tight">
               {totalSelesai}
             </p>
             <p className="mt-1 text-xs text-slate-500">Tuntas terbimbing</p>
@@ -592,7 +626,7 @@ export default function BimbinganKonselingPage() {
         </div>
 
         {/* Filter Panel */}
-        <div className="rounded-xl border border-slate-800 bg-slate-900/60 p-4 backdrop-blur">
+        <div className="app-group-bar rounded-2xl border border-slate-800 bg-slate-900/60 p-4">
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
             <div>
               <label

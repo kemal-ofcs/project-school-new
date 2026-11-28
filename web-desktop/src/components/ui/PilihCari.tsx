@@ -207,7 +207,7 @@ export function PilihCari({
   };
 
   return (
-    <div ref={wadahRef} className={`relative flex gap-1.5 ${kelas.wadah}`}>
+    <div ref={wadahRef} className={`relative flex items-center ${kelas.wadah}`}>
       {name ? <input type="hidden" name={name} value={value} /> : null}
       <input
         id={id}
@@ -246,7 +246,7 @@ export function PilihCari({
           buka();
         }}
         onKeyDown={tekan}
-        className={`${kelas.isian} min-w-0 flex-1`}
+        className={`pilih-cari-input ${kelas.isian} min-w-0 w-full`}
       />
       <button
         type="button"
@@ -258,15 +258,19 @@ export function PilihCari({
         // yang baru saja dibuka tombol ini.
         onMouseDown={(event) => event.preventDefault()}
         onClick={() => (terbuka ? tutup() : buka())}
-        className="pilih-cari-tombol grid w-11 shrink-0 place-items-center rounded-lg border border-slate-700 bg-slate-900 text-slate-300 transition-colors hover:bg-slate-800 focus:outline-none disabled:opacity-60"
+        className="pilih-cari-tombol absolute inset-y-1 right-1.5 grid w-8 place-items-center rounded-md text-slate-400 transition-colors hover:text-slate-200 focus:outline-none disabled:opacity-50"
       >
         <svg
           aria-hidden="true"
           viewBox="0 0 20 20"
-          fill="currentColor"
-          className={`size-5 transition-transform ${terbuka ? "rotate-180" : ""}`}
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.8"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          className={`size-4 transition-transform ${terbuka ? "rotate-180" : ""}`}
         >
-          <path d="M5.2 7.2a.75.75 0 0 1 1.1 0L10 11l3.7-3.8a.75.75 0 1 1 1.1 1l-4.25 4.4a.75.75 0 0 1-1.1 0L5.2 8.2a.75.75 0 0 1 0-1Z" />
+          <path d="m5 7.5 5 5 5-5" />
         </svg>
       </button>
       {terbuka ? (
@@ -278,7 +282,7 @@ export function PilihCari({
           popover="manual"
           data-no-pull-refresh
           onMouseDown={(event) => event.preventDefault()}
-          className="fixed z-[200] m-0 overflow-y-auto overscroll-contain rounded-lg border border-slate-700 bg-slate-900 p-1 text-sm text-slate-100 shadow-xl shadow-black/40"
+          className="fixed z-[200] m-0 overflow-y-auto overscroll-contain rounded-xl border border-slate-700 bg-slate-900 p-1 text-sm text-slate-100 shadow-2xl shadow-black/30"
         >
           {tampil.map((item, indeks) => (
             // biome-ignore lint/a11y/useFocusableInteractive: fokus tetap di kotak pencarian lewat aria-activedescendant.

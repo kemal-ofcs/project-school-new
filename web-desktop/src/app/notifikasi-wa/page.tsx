@@ -27,6 +27,7 @@ import {
   type WaNotificationStatus,
 } from "@/lib/gateways/wa-notification";
 import { useConfirmDialog } from "@/lib/hooks/useConfirmDialog";
+import { nadaStat } from "@/lib/utils/stat-card";
 import { WA_TEMPLATE_KINDS_DISUNTING } from "@/lib/validations/wa-notification";
 
 export default function NotifikasiWaPage() {
@@ -487,11 +488,17 @@ export default function NotifikasiWaPage() {
 
         {/* Metrik Ringkas */}
         <div className="grid grid-cols-2 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <div className="rounded-xl border border-slate-800 bg-slate-900/60 p-4 backdrop-blur">
-            <p className="text-xs font-medium text-slate-400">
-              Antrean Menunggu
-            </p>
-            <p className="mt-1.5 text-2xl font-bold tracking-tight text-amber-400">
+          <div
+            data-tone={nadaStat(totalMenunggu, "amber")}
+            className="stat-card rounded-2xl p-4"
+          >
+            <div className="flex items-start justify-between gap-2">
+              <p className="stat-card-label text-xs font-bold uppercase">
+                Antrean Menunggu
+              </p>
+              <Icon name="clock" className="stat-card-icon size-4 shrink-0" />
+            </div>
+            <p className="stat-card-value mt-1.5 text-2xl font-black tracking-tight">
               {totalMenunggu}
             </p>
             <p className="mt-1 text-xs text-slate-500">
@@ -499,11 +506,17 @@ export default function NotifikasiWaPage() {
             </p>
           </div>
 
-          <div className="rounded-xl border border-slate-800 bg-slate-900/60 p-4 backdrop-blur">
-            <p className="text-xs font-medium text-slate-400">
-              Berhasil Terkirim
-            </p>
-            <p className="mt-1.5 text-2xl font-bold tracking-tight text-emerald-400">
+          <div
+            data-tone={nadaStat(totalTerkirim, "emerald")}
+            className="stat-card rounded-2xl p-4"
+          >
+            <div className="flex items-start justify-between gap-2">
+              <p className="stat-card-label text-xs font-bold uppercase">
+                Berhasil Terkirim
+              </p>
+              <Icon name="check" className="stat-card-icon size-4 shrink-0" />
+            </div>
+            <p className="stat-card-value mt-1.5 text-2xl font-black tracking-tight">
               {totalTerkirim}
             </p>
             <p className="mt-1 text-xs text-slate-500">
@@ -511,11 +524,17 @@ export default function NotifikasiWaPage() {
             </p>
           </div>
 
-          <div className="rounded-xl border border-slate-800 bg-slate-900/60 p-4 backdrop-blur">
-            <p className="text-xs font-medium text-slate-400">
-              Gagal / Dibatalkan
-            </p>
-            <p className="mt-1.5 text-2xl font-bold tracking-tight text-slate-300">
+          <div
+            data-tone={nadaStat(totalGagal + totalDibatalkan, "rose")}
+            className="stat-card rounded-2xl p-4"
+          >
+            <div className="flex items-start justify-between gap-2">
+              <p className="stat-card-label text-xs font-bold uppercase">
+                Gagal / Dibatalkan
+              </p>
+              <Icon name="alert" className="stat-card-icon size-4 shrink-0" />
+            </div>
+            <p className="stat-card-value mt-1.5 text-2xl font-black tracking-tight">
               {totalGagal + totalDibatalkan}
             </p>
             <p className="mt-1 text-xs text-slate-500">
@@ -523,15 +542,26 @@ export default function NotifikasiWaPage() {
             </p>
           </div>
 
-          <div className="rounded-xl border border-slate-800 bg-slate-900/60 p-4 backdrop-blur">
-            <p className="text-xs font-medium text-slate-400">Status Gateway</p>
+          <div
+            data-tone={config?.isActive ? "emerald" : "clean"}
+            className="stat-card rounded-2xl p-4"
+          >
+            <div className="flex items-start justify-between gap-2">
+              <p className="stat-card-label text-xs font-bold uppercase">
+                Status Gateway
+              </p>
+              <Icon
+                name="whatsapp"
+                className="stat-card-icon size-4 shrink-0"
+              />
+            </div>
             <div className="mt-1.5 flex items-center gap-2">
               <span
                 className={`inline-block h-2.5 w-2.5 rounded-full ${
-                  config?.isActive ? "bg-emerald-500" : "bg-slate-600"
+                  config?.isActive ? "bg-emerald-500" : "bg-slate-500"
                 }`}
               />
-              <p className="text-base font-semibold text-slate-200">
+              <p className="stat-card-value text-base font-bold">
                 {config?.isActive ? "Otomatis Aktif" : "Manual / wa.me"}
               </p>
             </div>
@@ -542,7 +572,7 @@ export default function NotifikasiWaPage() {
         </div>
 
         {/* Filter Panel */}
-        <div className="rounded-xl border border-slate-800 bg-slate-900/60 p-4 backdrop-blur">
+        <div className="app-group-bar rounded-2xl border border-slate-800 bg-slate-900/60 p-4">
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
             <div>
               <label

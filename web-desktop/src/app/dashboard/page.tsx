@@ -29,6 +29,7 @@ import {
 import { subscribeSyncCompleted } from "@/lib/gateways/sync-status";
 import { useCompanyName } from "@/lib/hooks/useCompanyName";
 import { useHydrated } from "@/lib/hooks/useHydrated";
+import { nadaStat } from "@/lib/utils/stat-card";
 
 export default function DashboardPage() {
   const isHydrated = useHydrated();
@@ -351,11 +352,20 @@ export default function DashboardPage() {
           <FadeIn className="h-full" delaySeconds={0}>
             <TiltCard maxTilt={8} className="h-full">
               <SpotlightCard>
-                <div className="h-full bg-slate-900/80 border border-slate-800 rounded-3xl p-5 space-y-2">
-                  <span className="text-slate-400 text-xs font-medium uppercase tracking-wider">
-                    Total Karyawan Aktif
-                  </span>
-                  <div className="text-2xl font-bold text-white">
+                <div
+                  data-tone={nadaStat(metrics?.totalKaryawan, "sky")}
+                  className="stat-card h-full rounded-3xl p-5 space-y-2"
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <span className="stat-card-label text-xs font-bold uppercase tracking-wider">
+                      Total Karyawan Aktif
+                    </span>
+                    <Icon
+                      name="users"
+                      className="stat-card-icon size-4 shrink-0"
+                    />
+                  </div>
+                  <div className="stat-card-value text-2xl font-black">
                     {metricsPending ? (
                       <Skeleton className="h-7 w-28" />
                     ) : (
@@ -365,7 +375,7 @@ export default function DashboardPage() {
                       />
                     )}
                   </div>
-                  <p className="text-[11px] text-slate-400 font-mono">
+                  <p className="text-[11px] text-slate-400">
                     Terdaftar di Master Data
                   </p>
                 </div>
@@ -376,16 +386,19 @@ export default function DashboardPage() {
           <FadeIn className="h-full" delaySeconds={0.06}>
             <TiltCard maxTilt={8} className="h-full">
               <SpotlightCard>
-                <div className="h-full bg-slate-900/80 border border-emerald-500/40 rounded-3xl p-5 space-y-2">
-                  <div className="flex items-center justify-between">
-                    <span className="text-emerald-400 text-xs font-medium uppercase tracking-wider">
+                <div
+                  data-tone={nadaStat(metrics?.hadirHariIni, "emerald")}
+                  className="stat-card h-full rounded-3xl p-5 space-y-2"
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="stat-card-label text-xs font-bold uppercase tracking-wider">
                       Hadir Hari Ini
                     </span>
-                    <span className="px-2 py-0.5 bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 rounded-full text-[10px] font-mono font-bold">
+                    <span className="px-2 py-0.5 bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 rounded-full text-[10px] font-bold">
                       {metrics?.persentaseKehadiran || 0}% Rate
                     </span>
                   </div>
-                  <div className="text-2xl font-bold text-emerald-300">
+                  <div className="stat-card-value text-2xl font-black">
                     {metricsPending ? (
                       <Skeleton className="h-7 w-28" />
                     ) : (
@@ -395,7 +408,7 @@ export default function DashboardPage() {
                       />
                     )}
                   </div>
-                  <p className="text-[11px] text-slate-400 font-mono">
+                  <p className="text-[11px] text-slate-400">
                     Status Hadir Berhasil
                   </p>
                 </div>
@@ -406,11 +419,20 @@ export default function DashboardPage() {
           <FadeIn className="h-full" delaySeconds={0.12}>
             <TiltCard maxTilt={8} className="h-full">
               <SpotlightCard>
-                <div className="h-full bg-slate-900/80 border border-amber-500/40 rounded-3xl p-5 space-y-2">
-                  <span className="text-amber-400 text-xs font-medium uppercase tracking-wider">
-                    Terlambat Hari Ini
-                  </span>
-                  <div className="text-2xl font-bold text-amber-300">
+                <div
+                  data-tone={nadaStat(metrics?.terlambatHariIni, "amber")}
+                  className="stat-card h-full rounded-3xl p-5 space-y-2"
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <span className="stat-card-label text-xs font-bold uppercase tracking-wider">
+                      Terlambat Hari Ini
+                    </span>
+                    <Icon
+                      name="clock"
+                      className="stat-card-icon size-4 shrink-0"
+                    />
+                  </div>
+                  <div className="stat-card-value text-2xl font-black">
                     {metricsPending ? (
                       <Skeleton className="h-7 w-28" />
                     ) : (
@@ -420,7 +442,7 @@ export default function DashboardPage() {
                       />
                     )}
                   </div>
-                  <p className="text-[11px] text-slate-400 font-mono">
+                  <p className="text-[11px] text-slate-400">
                     Datang melebihi toleransi
                   </p>
                 </div>
@@ -431,11 +453,26 @@ export default function DashboardPage() {
           <FadeIn className="h-full" delaySeconds={0.18}>
             <TiltCard maxTilt={8} className="h-full">
               <SpotlightCard>
-                <div className="h-full bg-slate-900/80 border border-rose-500/40 rounded-3xl p-5 space-y-2">
-                  <span className="text-rose-400 text-xs font-medium uppercase tracking-wider">
-                    Alfa / Tidak Hadir
-                  </span>
-                  <div className="text-2xl font-bold text-rose-300">
+                <div
+                  data-tone={
+                    (metrics?.alfaHariIni ?? 0) > 0
+                      ? "rose"
+                      : (metrics?.sakitIzinHariIni ?? 0) > 0
+                        ? "amber"
+                        : "clean"
+                  }
+                  className="stat-card h-full rounded-3xl p-5 space-y-2"
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <span className="stat-card-label text-xs font-bold uppercase tracking-wider">
+                      Alfa / Tidak Hadir
+                    </span>
+                    <Icon
+                      name="alert"
+                      className="stat-card-icon size-4 shrink-0"
+                    />
+                  </div>
+                  <div className="stat-card-value text-2xl font-black">
                     {metricsPending ? (
                       <Skeleton className="h-7 w-28" />
                     ) : (
@@ -445,7 +482,7 @@ export default function DashboardPage() {
                       />
                     )}
                   </div>
-                  <p className="text-[11px] text-slate-400 font-mono">
+                  <p className="text-[11px] text-slate-400">
                     Sakit/Izin: {metrics?.sakitIzinHariIni || 0} Orang
                   </p>
                 </div>
@@ -545,14 +582,14 @@ export default function DashboardPage() {
 
           {/* Date Filter Controls Bar */}
           {activeTab === "harian" ? (
-            <div className="flex flex-wrap items-center gap-2 bg-slate-900/60 border border-slate-800 p-1.5 rounded-2xl">
-              <div className="inline-flex rounded-xl border border-white/10 bg-slate-950/60 p-0.5 text-[11px]">
+            <div className="app-group-bar flex flex-wrap items-center gap-2 bg-slate-900/60 border border-slate-800 p-1.5 rounded-2xl">
+              <div className="app-segment-track inline-flex rounded-xl border border-white/10 bg-slate-950/60 p-0.5 text-[11px]">
                 <button
                   type="button"
                   onClick={() => setFilterMode("single")}
                   className={`px-2.5 py-1 rounded-lg font-bold transition ${
                     filterMode === "single"
-                      ? "bg-sky-700 text-white shadow-sm"
+                      ? "bg-sky-700 text-on-accent shadow-sm"
                       : "text-slate-400 hover:text-white"
                   }`}
                 >
@@ -563,7 +600,7 @@ export default function DashboardPage() {
                   onClick={() => setFilterMode("range")}
                   className={`px-2.5 py-1 rounded-lg font-bold transition ${
                     filterMode === "range"
-                      ? "bg-sky-700 text-white shadow-sm"
+                      ? "bg-sky-700 text-on-accent shadow-sm"
                       : "text-slate-400 hover:text-white"
                   }`}
                 >
@@ -655,7 +692,7 @@ export default function DashboardPage() {
 
         {/* Search, Filter & Controls Bar for Tables */}
         {activeTab !== "leaderboard" ? (
-          <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-800 bg-slate-900/80 p-3 shadow-md">
+          <div className="app-group-bar flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-800 bg-slate-900/80 p-3">
             <div className="flex flex-wrap items-center gap-2 flex-1 min-w-[260px]">
               {/* Search Bar */}
               <div className="relative flex-1 min-w-[200px] max-w-md">

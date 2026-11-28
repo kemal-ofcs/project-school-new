@@ -158,7 +158,7 @@ export function PengajuanWorkspace({ user }: { user: OperatorUser | null }) {
 
       <form
         data-tanpa-konfirmasi
-        className="grid gap-3 rounded-2xl border border-white/10 bg-slate-900 p-4 sm:grid-cols-2 lg:grid-cols-5"
+        className="app-group-bar grid gap-3 rounded-2xl border border-white/10 bg-slate-900 p-4 sm:grid-cols-2 lg:grid-cols-5"
         onSubmit={(event) => {
           event.preventDefault();
           setRentang({ dari, sampai });

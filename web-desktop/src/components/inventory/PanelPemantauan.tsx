@@ -8,6 +8,7 @@ import {
   useRef,
   useState,
 } from "react";
+import { Icon, type IconName } from "@/components/ui/Icon";
 import { Modal } from "@/components/ui/Modal";
 import { PilihCari } from "@/components/ui/PilihCari";
 import {
@@ -26,6 +27,7 @@ import {
 } from "@/lib/gateways/inventory";
 import { isMobileRuntime } from "@/lib/runtime/app-runtime";
 import { audioSynth } from "@/lib/utils/audio";
+import type { StatTone } from "@/lib/utils/stat-card";
 import {
   aksiPindaiOpname,
   asciiLower,
@@ -141,75 +143,83 @@ export function PanelRingkasan({
   onGalat: (message: string) => void;
 }) {
   const batch = batchBersaldo(data);
+  const jmlKedaluwarsa = batch.filter(
+    (b) => b.posisi.status_kedaluwarsa === "Kedaluwarsa",
+  ).length;
+  const jmlWaspada = batch.filter(
+    (b) => b.posisi.status_kedaluwarsa === "Waspada",
+  ).length;
+  const jmlMenipis = data.barang.filter(
+    (b) => b.status_aktif && b.stok_menipis,
+  ).length;
+  const jmlMinus = data.barang.filter((b) =>
+    b.posisi.some((p) => p.saldo < 0),
+  ).length;
+  const jmlPinjam = pinjaman ? pinjaman.baris.length : 0;
+  const jmlServis = data.servis.length;
+  const servisLama = data.servis.filter(
+    (s) => s.lama_hari >= HARI_SERVIS_LAMA,
+  ).length;
+
   const kartu: {
     label: string;
     nilai: string;
     keterangan: string;
-    gawat: boolean;
+    nada: StatTone;
+    ikon: IconName;
     tujuan: TujuanRingkasan;
   }[] = [
     {
       label: "Batch kedaluwarsa",
-      nilai: String(
-        batch.filter((b) => b.posisi.status_kedaluwarsa === "Kedaluwarsa")
-          .length,
-      ),
+      nilai: String(jmlKedaluwarsa),
       keterangan: "Masih punya stok. Catat pemusnahannya.",
-      gawat: batch.some((b) => b.posisi.status_kedaluwarsa === "Kedaluwarsa"),
+      nada: jmlKedaluwarsa > 0 ? "rose" : "clean",
+      ikon: "alert",
       tujuan: { tab: "kedaluwarsa", filter: "kedaluwarsa" },
     },
     {
       label: "Batch waspada",
-      nilai: String(
-        batch.filter((b) => b.posisi.status_kedaluwarsa === "Waspada").length,
-      ),
+      nilai: String(jmlWaspada),
       keterangan: "Kedaluwarsa dalam 30 hari.",
-      gawat: false,
+      nada: jmlWaspada > 0 ? "amber" : "clean",
+      ikon: "clock",
       tujuan: { tab: "kedaluwarsa", filter: "perhatian" },
     },
     {
       label: "Stok menipis",
-      nilai: String(
-        data.barang.filter((b) => b.status_aktif && b.stok_menipis).length,
-      ),
+      nilai: String(jmlMenipis),
       keterangan: "Stok baik di bawah stok minimum.",
-      gawat: false,
+      nada: jmlMenipis > 0 ? "amber" : "clean",
+      ikon: "box",
       tujuan: { tab: "barang", filter: "menipis" },
     },
     {
       label: "Stok minus",
-      nilai: String(
-        data.barang.filter((b) => b.posisi.some((p) => p.saldo < 0)).length,
-      ),
+      nilai: String(jmlMinus),
       keterangan: "Catatan tidak cocok. Perlu opname.",
-      gawat: data.barang.some((b) => b.posisi.some((p) => p.saldo < 0)),
+      nada: jmlMinus > 0 ? "rose" : "clean",
+      ikon: "alert",
       tujuan: { tab: "barang", filter: "minus" },
     },
     {
       label: "Belum kembali",
-      nilai: pinjamanGalat
-        ? "?"
-        : pinjaman
-          ? String(pinjaman.baris.length)
-          : "...",
+      nilai: pinjamanGalat ? "?" : pinjaman ? String(jmlPinjam) : "...",
       keterangan: pinjamanGalat
         ? "Daftar peminjaman tidak bisa dimuat."
         : "Peminjaman yang belum kembali penuh.",
-      gawat: false,
+      nada: pinjamanGalat ? "rose" : jmlPinjam > 0 ? "sky" : "clean",
+      ikon: "users",
       tujuan: { tab: "dipinjam" },
     },
     {
       label: "Sedang diservis",
-      nilai: String(data.servis.length),
-      keterangan: (() => {
-        const lama = data.servis.filter(
-          (s) => s.lama_hari >= HARI_SERVIS_LAMA,
-        ).length;
-        return lama > 0
-          ? `${lama} sudah ${HARI_SERVIS_LAMA} hari atau lebih.`
-          : "Barang yang dibawa ke tukang servis.";
-      })(),
-      gawat: data.servis.some((s) => s.lama_hari >= HARI_SERVIS_LAMA),
+      nilai: String(jmlServis),
+      keterangan:
+        servisLama > 0
+          ? `${servisLama} sudah ${HARI_SERVIS_LAMA} hari atau lebih.`
+          : "Barang yang dibawa ke tukang servis.",
+      nada: servisLama > 0 ? "rose" : jmlServis > 0 ? "amber" : "clean",
+      ikon: "tools",
       tujuan: { tab: "servis" },
     },
   ];
@@ -231,23 +241,20 @@ export function PanelRingkasan({
             <button
               type="button"
               onClick={() => onBuka(item.tujuan)}
-              className={`w-full h-full min-h-11 p-4 rounded-xl border text-left transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 ${
-                item.gawat && item.nilai !== "0"
-                  ? "border-rose-500/30 bg-rose-500/20 hover:bg-rose-500/30"
-                  : "border-slate-800 bg-slate-900/60 hover:bg-slate-800"
-              }`}
+              data-tone={item.nada}
+              className="stat-card w-full h-full min-h-11 p-4 rounded-2xl text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-500"
             >
-              <span
-                className={`block text-3xl font-bold ${
-                  item.gawat && item.nilai !== "0"
-                    ? "text-rose-100"
-                    : "text-slate-100"
-                }`}
-              >
+              <div className="flex items-start justify-between gap-2">
+                <span className="stat-card-label block text-xs font-bold uppercase tracking-wide">
+                  {item.label}
+                </span>
+                <Icon
+                  name={item.ikon}
+                  className="stat-card-icon size-4 shrink-0"
+                />
+              </div>
+              <span className="stat-card-value mt-1 block text-3xl font-black">
                 {item.nilai}
-              </span>
-              <span className="block mt-1 text-sm font-semibold text-slate-200">
-                {item.label}
               </span>
               <span className="block mt-1 text-xs text-slate-400">
                 {item.keterangan}

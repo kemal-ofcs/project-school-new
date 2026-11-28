@@ -13,6 +13,7 @@ import {
   type HasilAuditAbsensi,
   type KeparahanTemuan,
 } from "@/lib/gateways/attendance-audit";
+import type { StatTone } from "@/lib/utils/stat-card";
 
 type FilterKeparahan = "semua" | KeparahanTemuan;
 
@@ -53,10 +54,10 @@ function formatTanggalPanjang(value: string) {
   }
 }
 
-function skorTone(skor: number) {
-  if (skor >= 90) return "text-emerald-400";
-  if (skor >= 70) return "text-amber-400";
-  return "text-rose-400";
+function skorNada(skor: number): StatTone {
+  if (skor >= 90) return "emerald";
+  if (skor >= 70) return "amber";
+  return "rose";
 }
 
 export default function AuditAbsensiMobilePage() {
@@ -216,13 +217,20 @@ export default function AuditAbsensiMobilePage() {
                   </div>
                 ) : null}
 
-                <div className="rounded-3xl border border-white/10 bg-gradient-to-br from-slate-900/80 to-slate-900/40 p-4">
-                  <div className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">
-                    Skor Kualitas
+                <div
+                  data-tone={skorNada(ringkasan.skorKualitas)}
+                  className="stat-card rounded-3xl p-4"
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="stat-card-label text-[10px] font-bold uppercase tracking-wide">
+                      Skor Kualitas
+                    </div>
+                    <Icon
+                      name="check"
+                      className="stat-card-icon size-4 shrink-0"
+                    />
                   </div>
-                  <div
-                    className={`text-4xl font-black ${skorTone(ringkasan.skorKualitas)}`}
-                  >
+                  <div className="stat-card-value mt-1 text-4xl font-black">
                     {ringkasan.skorKualitas}%
                   </div>
                   <div className="mt-1 text-[11px] text-slate-400">
@@ -235,37 +243,50 @@ export default function AuditAbsensiMobilePage() {
                   <StatTile
                     label="Belum Scan Masuk"
                     value={ringkasan.belumScanMasuk}
-                    tone="text-rose-400"
+                    activeTone="rose"
+                    icon="clock"
                   />
                   <StatTile
                     label="Belum Scan Pulang"
                     value={ringkasan.belumScanPulang}
-                    tone="text-amber-400"
+                    activeTone="amber"
+                    icon="clock"
                   />
                   <StatTile
                     label="Perlu Verifikasi"
                     value={ringkasan.perluVerifikasi}
-                    tone="text-amber-400"
+                    activeTone="amber"
+                    icon="check"
                   />
                   <StatTile
                     label="Scan Ditolak"
                     value={ringkasan.scanDitolak}
-                    tone="text-amber-400"
+                    activeTone="rose"
+                    icon="alert"
                   />
                   <StatTile
                     label="Alfa"
                     value={ringkasan.alfa}
-                    tone="text-rose-400"
+                    activeTone="rose"
+                    icon="alert"
                   />
                   <StatTile
                     label="Hadir"
                     value={ringkasan.hadir}
-                    tone="text-emerald-400"
+                    activeTone="emerald"
+                    icon="check"
                   />
-                  <StatTile label="Terlambat" value={ringkasan.terlambat} />
+                  <StatTile
+                    label="Terlambat"
+                    value={ringkasan.terlambat}
+                    activeTone="amber"
+                    icon="clock"
+                  />
                   <StatTile
                     label="Jam Kerja Kurang"
                     value={ringkasan.jamKerjaKurang}
+                    activeTone="amber"
+                    icon="clock"
                   />
                 </div>
 

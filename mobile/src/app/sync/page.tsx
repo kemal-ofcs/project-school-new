@@ -20,6 +20,7 @@ import {
   SYNC_FAILED_EVENT,
   syncNow,
 } from "@/lib/gateways/sync-status";
+import { nadaStat } from "@/lib/utils/stat-card";
 
 export default function SyncPage() {
   const { user, isAuthenticated, isLoading: authLoading } = useAuth();
@@ -319,35 +320,59 @@ export default function SyncPage() {
 
         {/* Outbox Metrics Grid */}
         <div className="grid grid-cols-2 gap-3">
-          <div className="rounded-2xl border border-white/10 bg-slate-900/80 p-4">
-            <span className="text-[11px] font-semibold text-slate-400 uppercase">
-              Antrean Outbox
-            </span>
-            <p className="text-2xl font-black text-amber-400 mt-1">
+          <div
+            data-tone={nadaStat(status?.pending ?? 0, "amber")}
+            className="stat-card rounded-2xl p-4"
+          >
+            <div className="flex items-start justify-between gap-2">
+              <span className="stat-card-label text-[11px] font-semibold uppercase">
+                Antrean Outbox
+              </span>
+              <Icon name="clock" className="stat-card-icon size-4 shrink-0" />
+            </div>
+            <p className="stat-card-value text-2xl font-black mt-1">
               {status?.pending ?? 0}
             </p>
           </div>
-          <div className="rounded-2xl border border-white/10 bg-slate-900/80 p-4">
-            <span className="text-[11px] font-semibold text-slate-400 uppercase">
-              Tersinkronisasi
-            </span>
-            <p className="text-2xl font-black text-emerald-400 mt-1">
+          <div
+            data-tone={nadaStat(status?.synced ?? 0, "emerald")}
+            className="stat-card rounded-2xl p-4"
+          >
+            <div className="flex items-start justify-between gap-2">
+              <span className="stat-card-label text-[11px] font-semibold uppercase">
+                Tersinkronisasi
+              </span>
+              <Icon name="check" className="stat-card-icon size-4 shrink-0" />
+            </div>
+            <p className="stat-card-value text-2xl font-black mt-1">
               {status?.synced ?? 0}
             </p>
           </div>
-          <div className="rounded-2xl border border-white/10 bg-slate-900/80 p-4">
-            <span className="text-[11px] font-semibold text-slate-400 uppercase">
-              Gagal
-            </span>
-            <p className="text-2xl font-black text-rose-400 mt-1">
+          <div
+            data-tone={nadaStat(status?.failed ?? 0, "rose")}
+            className="stat-card rounded-2xl p-4"
+          >
+            <div className="flex items-start justify-between gap-2">
+              <span className="stat-card-label text-[11px] font-semibold uppercase">
+                Gagal
+              </span>
+              <Icon name="alert" className="stat-card-icon size-4 shrink-0" />
+            </div>
+            <p className="stat-card-value text-2xl font-black mt-1">
               {status?.failed ?? 0}
             </p>
           </div>
-          <div className="rounded-2xl border border-white/10 bg-slate-900/80 p-4">
-            <span className="text-[11px] font-semibold text-slate-400 uppercase">
-              Konflik Data
-            </span>
-            <p className="text-2xl font-black text-yellow-400 mt-1">
+          <div
+            data-tone={nadaStat(status?.conflict ?? 0, "amber")}
+            className="stat-card rounded-2xl p-4"
+          >
+            <div className="flex items-start justify-between gap-2">
+              <span className="stat-card-label text-[11px] font-semibold uppercase">
+                Konflik Data
+              </span>
+              <Icon name="sync" className="stat-card-icon size-4 shrink-0" />
+            </div>
+            <p className="stat-card-value text-2xl font-black mt-1">
               {status?.conflict ?? 0}
             </p>
           </div>

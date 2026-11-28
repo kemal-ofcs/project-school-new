@@ -4,6 +4,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import { AppShell } from "@/components/AppShell";
+import { PerluPerhatianCard } from "@/components/kepegawaian/PerluPerhatianCard";
 import { LicenseHolderLabel } from "@/components/license/LicenseNotice";
 import { FeedbackBanner } from "@/components/ui/FeedbackBanner";
 import { Icon } from "@/components/ui/Icon";
@@ -183,6 +184,9 @@ export default function Home() {
       {/* 3. Quick Action Hub (Grid 4x2 m-BCA) */}
       <QuickActionGrid />
 
+      {/* 3b. Kartu Perlu Perhatian Kepegawaian */}
+      <PerluPerhatianCard />
+
       {/* 4. Umpan Anomali Kehadiran Segera (Jika Ada) */}
       {(metrics?.alfaHariIni ?? 0) > 0 ||
       (metrics?.terlambatHariIni ?? 0) > 0 ? (
@@ -206,7 +210,7 @@ export default function Home() {
               <div className="flex flex-wrap items-center gap-2 mt-3">
                 <Link
                   href="/dasbor-kehadiran"
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-700 active:scale-95 text-white font-bold text-xs transition-all shadow-sm"
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-700 active:scale-95 text-on-accent font-bold text-xs transition-all shadow-sm"
                 >
                   <Icon name="dashboard" className="size-3.5" />
                   <span>Pantau Anomali</span>
@@ -258,7 +262,7 @@ export default function Home() {
             {canAccessArea(user, "scanner") && (
               <Link
                 href="/scanner"
-                className="mt-2.5 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-sky-700 hover:bg-sky-800 dark:bg-[#003399] dark:hover:bg-[#002266] text-white font-bold text-xs shadow-sm shadow-sky-600/20 dark:shadow-blue-950/30 transition-all"
+                className="mt-2.5 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-sky-700 hover:bg-sky-800 dark:bg-[#003399] dark:hover:bg-[#002266] text-on-accent font-bold text-xs shadow-sm shadow-sky-600/20 dark:shadow-blue-950/30 transition-all"
               >
                 <Icon name="scanner" className="size-3.5" />
                 <span>Mulai Pindai QR</span>

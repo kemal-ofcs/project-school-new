@@ -25,8 +25,7 @@ const statusStyles: Record<string, string> = {
 
 export function StatusBadge({ status, className = "" }: StatusBadgeProps) {
   const style =
-    statusStyles[status] ||
-    "bg-slate-500/20 text-slate-300 border-slate-500/40";
+    statusStyles[status] || "bg-slate-500/15 text-slate-300 border-transparent";
   return (
     <span
       className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold border ${style} ${className}`}

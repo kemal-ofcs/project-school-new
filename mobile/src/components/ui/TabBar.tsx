@@ -26,6 +26,7 @@ interface TabBarProps<T extends string> {
   panelId?: string;
   /** Tersusun tegak di layar >= 1024px (panah atas/bawah ikut aktif). */
   vertikalLg?: boolean;
+  className?: string;
 }
 
 /** Indeks tab tujuan untuk tombol keyboard, atau null bila tombol bukan navigasi. */
@@ -53,6 +54,7 @@ export function TabBar<T extends string>({
   ariaLabel,
   panelId,
   vertikalLg = false,
+  className,
 }: TabBarProps<T>) {
   const aktif = Math.max(
     0,
@@ -75,7 +77,7 @@ export function TabBar<T extends string>({
       aria-label={ariaLabel}
       data-vertikal-lg={vertikalLg ? "" : undefined}
       onKeyDown={onKeyDown}
-      className="tab-bar"
+      className={className ? `tab-bar ${className}` : "tab-bar"}
     >
       {tabs.map((tab, i) => (
         <button

@@ -8,6 +8,7 @@ import { Icon } from "@/components/ui/Icon";
 import { Modal } from "@/components/ui/Modal";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { PilihCari } from "@/components/ui/PilihCari";
+import { TabBar } from "@/components/ui/TabBar";
 import { canAccessArea, hasPermission } from "@/lib/auth/access";
 import { useAuth } from "@/lib/context/AuthContext";
 import { getDaftarRombel, getDaftarTahunAjaran } from "@/lib/gateways/academic";
@@ -253,32 +254,26 @@ export default function LegerKehadiranPage() {
         )}
 
         {/* Tab Selector & Filter Bar */}
-        <div className="p-4 rounded-xl border border-slate-800 bg-slate-900/60 backdrop-blur-sm space-y-4 print:hidden">
+        <div className="app-group-bar p-4 rounded-2xl border border-slate-800 bg-slate-900/60 space-y-4 print:hidden">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-800 pb-3">
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={() => setActiveTab("preview")}
-                className={`px-4 py-2 text-sm font-semibold rounded-lg transition-colors ${
-                  activeTab === "preview"
-                    ? "bg-sky-700 text-white"
-                    : "text-slate-400 hover:text-slate-200 hover:bg-slate-800"
-                }`}
-              >
-                Pratinjau Langsung (Kalkulasi Otomatis)
-              </button>
-              <button
-                type="button"
-                onClick={() => setActiveTab("frozen")}
-                className={`px-4 py-2 text-sm font-semibold rounded-lg transition-colors ${
-                  activeTab === "frozen"
-                    ? "bg-sky-700 text-white"
-                    : "text-slate-400 hover:text-slate-200 hover:bg-slate-800"
-                }`}
-              >
-                Leger Beku (Terkunci untuk Rapor)
-              </button>
-            </div>
+            <TabBar
+              ariaLabel="Mode tampilan leger kehadiran"
+              idPrefix="leger"
+              panelId="panel-leger"
+              className="w-full sm:w-auto"
+              value={activeTab}
+              onChange={setActiveTab}
+              tabs={[
+                {
+                  id: "preview",
+                  label: "Pratinjau Langsung (Kalkulasi Otomatis)",
+                },
+                {
+                  id: "frozen",
+                  label: "Leger Beku (Terkunci untuk Rapor)",
+                },
+              ]}
+            />
 
             {activeTab === "preview" &&
               canManage &&
@@ -286,7 +281,7 @@ export default function LegerKehadiranPage() {
                 <button
                   type="button"
                   onClick={() => setShowFreezeConfirm(true)}
-                  className="inline-flex items-center gap-2 px-4 py-2 text-sm font-semibold rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white transition-colors"
+                  className="inline-flex items-center gap-2 px-4 py-2 text-sm font-semibold rounded-xl bg-emerald-600 hover:bg-emerald-500 text-on-accent transition-colors"
                 >
                   <Icon name="lock" className="w-4 h-4" />
                   Bekukan Leger Semester Ini

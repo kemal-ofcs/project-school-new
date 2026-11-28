@@ -7,6 +7,7 @@ import { AppShell } from "@/components/AppShell";
 import { FeedbackBanner } from "@/components/ui/FeedbackBanner";
 import { Icon } from "@/components/ui/Icon";
 import { PageHeader } from "@/components/ui/PageHeader";
+import { TabBar } from "@/components/ui/TabBar";
 import { formatTanggalOperasional } from "@/lib/attendance/time-policy";
 import { canAccessArea } from "@/lib/auth/access";
 import { useAuth } from "@/lib/context/AuthContext";
@@ -15,6 +16,7 @@ import {
   getAttendanceDashboardMetrics,
 } from "@/lib/gateways/attendance-dashboard";
 import { subscribeSyncCompleted, syncNow } from "@/lib/gateways/sync-status";
+import { nadaStat, type StatTone } from "@/lib/utils/stat-card";
 
 type TabKey = "overview" | "teachers" | "classes" | "anomalies";
 
@@ -157,57 +159,34 @@ export default function DasborKehadiranPage() {
           </FeedbackBanner>
         ) : null}
 
-        <div className="flex overflow-x-auto border-b border-slate-800">
-          <button
-            type="button"
-            onClick={() => setActiveTab("overview")}
-            className={`shrink-0 whitespace-nowrap border-b-2 px-5 py-3 text-sm font-medium transition ${
-              activeTab === "overview"
-                ? "border-indigo-500 text-indigo-400"
-                : "border-transparent text-slate-400 hover:border-slate-700 hover:text-slate-200"
-            }`}
-          >
-            Ringkasan Eksekutif
-          </button>
-          <button
-            type="button"
-            onClick={() => setActiveTab("teachers")}
-            className={`shrink-0 whitespace-nowrap border-b-2 px-5 py-3 text-sm font-medium transition ${
-              activeTab === "teachers"
-                ? "border-indigo-500 text-indigo-400"
-                : "border-transparent text-slate-400 hover:border-slate-700 hover:text-slate-200"
-            }`}
-          >
-            Kehadiran Guru / PTK ({guru.hadir}/{guru.total})
-          </button>
-          <button
-            type="button"
-            onClick={() => setActiveTab("classes")}
-            className={`shrink-0 whitespace-nowrap border-b-2 px-5 py-3 text-sm font-medium transition ${
-              activeTab === "classes"
-                ? "border-indigo-500 text-indigo-400"
-                : "border-transparent text-slate-400 hover:border-slate-700 hover:text-slate-200"
-            }`}
-          >
-            Kehadiran per Kelas ({data?.rekapRombel?.length || 0} Rombel)
-          </button>
-          <button
-            type="button"
-            onClick={() => setActiveTab("anomalies")}
-            className={`relative shrink-0 whitespace-nowrap border-b-2 px-5 py-3 text-sm font-medium transition ${
-              activeTab === "anomalies"
-                ? "border-indigo-500 text-indigo-400"
-                : "border-transparent text-slate-400 hover:border-slate-700 hover:text-slate-200"
-            }`}
-          >
-            Deteksi Anomali
-            {(data?.anomaliBolos || 0) > 0 ? (
-              <span className="ml-2 rounded-full bg-rose-500/20 px-2 py-0.5 text-xs font-semibold text-rose-400">
-                {data?.anomaliBolos}
-              </span>
-            ) : null}
-          </button>
-        </div>
+        <TabBar
+          ariaLabel="Bagian dasbor kehadiran sekolah"
+          idPrefix="dasbor-kehadiran"
+          panelId="panel-dasbor-kehadiran"
+          value={activeTab}
+          onChange={setActiveTab}
+          tabs={[
+            { id: "overview", label: "Ringkasan Eksekutif" },
+            {
+              id: "teachers",
+              label: `Kehadiran Guru / PTK (${guru.hadir}/${guru.total})`,
+            },
+            {
+              id: "classes",
+              label: `Kehadiran per Kelas (${data?.rekapRombel?.length || 0} Rombel)`,
+            },
+            {
+              id: "anomalies",
+              label: "Deteksi Anomali",
+              badge:
+                (data?.anomaliBolos || 0) > 0 ? (
+                  <span className="rounded-full bg-rose-700 px-2 py-0.5 text-xs font-semibold text-on-accent">
+                    {data?.anomaliBolos}
+                  </span>
+                ) : undefined,
+            },
+          ]}
+        />
 
         {/* Tab 1: Ringkasan Eksekutif */}
         {activeTab === "overview" && (
@@ -247,49 +226,30 @@ export default function DasborKehadiranPage() {
                   />
                 </div>
 
-                <div className="mt-6 grid grid-cols-3 gap-3 text-center sm:grid-cols-6">
-                  <div className="rounded-xl border border-slate-800 bg-slate-950/40 p-3">
-                    <p className="text-xs text-emerald-400 font-medium">
-                      Hadir
-                    </p>
-                    <p className="text-xl font-bold text-slate-100">
-                      {siswa.hadir}
-                    </p>
-                  </div>
-                  <div className="rounded-xl border border-slate-800 bg-slate-950/40 p-3">
-                    <p className="text-xs text-amber-400 font-medium">
-                      Terlambat
-                    </p>
-                    <p className="text-xl font-bold text-slate-100">
-                      {siswa.terlambat}
-                    </p>
-                  </div>
-                  <div className="rounded-xl border border-slate-800 bg-slate-950/40 p-3">
-                    <p className="text-xs text-cyan-400 font-medium">Sakit</p>
-                    <p className="text-xl font-bold text-slate-100">
-                      {siswa.sakit}
-                    </p>
-                  </div>
-                  <div className="rounded-xl border border-slate-800 bg-slate-950/40 p-3">
-                    <p className="text-xs text-indigo-400 font-medium">Izin</p>
-                    <p className="text-xl font-bold text-slate-100">
-                      {siswa.izin}
-                    </p>
-                  </div>
-                  <div className="rounded-xl border border-slate-800 bg-slate-950/40 p-3">
-                    <p className="text-xs text-purple-400 font-medium">
-                      Dispen
-                    </p>
-                    <p className="text-xl font-bold text-slate-100">
-                      {siswa.dispen}
-                    </p>
-                  </div>
-                  <div className="rounded-xl border border-slate-800 bg-slate-950/40 p-3">
-                    <p className="text-xs text-rose-400 font-medium">Alfa</p>
-                    <p className="text-xl font-bold text-slate-100">
-                      {siswa.alfa}
-                    </p>
-                  </div>
+                <div className="mt-6 grid grid-cols-3 gap-3 text-left sm:grid-cols-6">
+                  {(
+                    [
+                      ["Hadir", siswa.hadir, "emerald"],
+                      ["Terlambat", siswa.terlambat, "amber"],
+                      ["Sakit", siswa.sakit, "cyan"],
+                      ["Izin", siswa.izin, "sky"],
+                      ["Dispen", siswa.dispen, "violet"],
+                      ["Alfa", siswa.alfa, "rose"],
+                    ] as [string, number, Exclude<StatTone, "clean">][]
+                  ).map(([label, nilai, nada]) => (
+                    <div
+                      key={label}
+                      data-tone={nadaStat(nilai, nada)}
+                      className="stat-card rounded-xl p-3"
+                    >
+                      <p className="stat-card-label text-xs font-semibold">
+                        {label}
+                      </p>
+                      <p className="stat-card-value mt-0.5 text-xl font-black">
+                        {nilai}
+                      </p>
+                    </div>
+                  ))}
                 </div>
               </div>
 
@@ -327,49 +287,30 @@ export default function DasborKehadiranPage() {
                   />
                 </div>
 
-                <div className="mt-6 grid grid-cols-3 gap-3 text-center sm:grid-cols-6">
-                  <div className="rounded-xl border border-slate-800 bg-slate-950/40 p-3">
-                    <p className="text-xs text-emerald-400 font-medium">
-                      Hadir
-                    </p>
-                    <p className="text-xl font-bold text-slate-100">
-                      {guru.hadir}
-                    </p>
-                  </div>
-                  <div className="rounded-xl border border-slate-800 bg-slate-950/40 p-3">
-                    <p className="text-xs text-amber-400 font-medium">
-                      Terlambat
-                    </p>
-                    <p className="text-xl font-bold text-slate-100">
-                      {guru.terlambat}
-                    </p>
-                  </div>
-                  <div className="rounded-xl border border-slate-800 bg-slate-950/40 p-3">
-                    <p className="text-xs text-cyan-400 font-medium">Sakit</p>
-                    <p className="text-xl font-bold text-slate-100">
-                      {guru.sakit}
-                    </p>
-                  </div>
-                  <div className="rounded-xl border border-slate-800 bg-slate-950/40 p-3">
-                    <p className="text-xs text-indigo-400 font-medium">Izin</p>
-                    <p className="text-xl font-bold text-slate-100">
-                      {guru.izin}
-                    </p>
-                  </div>
-                  <div className="rounded-xl border border-slate-800 bg-slate-950/40 p-3">
-                    <p className="text-xs text-purple-400 font-medium">
-                      Dispen
-                    </p>
-                    <p className="text-xl font-bold text-slate-100">
-                      {guru.dispen}
-                    </p>
-                  </div>
-                  <div className="rounded-xl border border-slate-800 bg-slate-950/40 p-3">
-                    <p className="text-xs text-rose-400 font-medium">Alfa</p>
-                    <p className="text-xl font-bold text-slate-100">
-                      {guru.alfa}
-                    </p>
-                  </div>
+                <div className="mt-6 grid grid-cols-3 gap-3 text-left sm:grid-cols-6">
+                  {(
+                    [
+                      ["Hadir", guru.hadir, "emerald"],
+                      ["Terlambat", guru.terlambat, "amber"],
+                      ["Sakit", guru.sakit, "cyan"],
+                      ["Izin", guru.izin, "sky"],
+                      ["Dispen", guru.dispen, "violet"],
+                      ["Alfa", guru.alfa, "rose"],
+                    ] as [string, number, Exclude<StatTone, "clean">][]
+                  ).map(([label, nilai, nada]) => (
+                    <div
+                      key={label}
+                      data-tone={nadaStat(nilai, nada)}
+                      className="stat-card rounded-xl p-3"
+                    >
+                      <p className="stat-card-label text-xs font-semibold">
+                        {label}
+                      </p>
+                      <p className="stat-card-value mt-0.5 text-xl font-black">
+                        {nilai}
+                      </p>
+                    </div>
+                  ))}
                 </div>
               </div>
             </div>
@@ -393,7 +334,7 @@ export default function DasborKehadiranPage() {
                 </div>
                 <Link
                   href="/presensi-kelas"
-                  className="rounded-xl bg-rose-600 px-4 py-2 text-xs font-semibold text-white transition hover:bg-rose-500"
+                  className="rounded-xl bg-rose-600 px-4 py-2 text-xs font-semibold text-on-accent transition hover:bg-rose-500"
                 >
                   Buka Rekonsiliasi
                 </Link>

@@ -1,9 +1,10 @@
 "use client";
 
-import { Icon } from "@/components/ui/Icon";
+import { Icon, type IconName } from "@/components/ui/Icon";
 import { hasPermission } from "@/lib/auth/access";
 import type { useAuth } from "@/lib/context/AuthContext";
 import type { SyncConflict, SyncStatus } from "@/lib/gateways/sync-status";
+import { nadaStat, type StatTone } from "@/lib/utils/stat-card";
 
 const SYNC_TABLE_LABELS = [
   ["employees", "Karyawan"],
@@ -150,18 +151,31 @@ export function SinkronisasiDesktopCard({
       ) : null}
 
       <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-4">
-        {[
-          ["Menunggu", syncStatus?.pending ?? 0],
-          ["Event terkirim (total)", syncStatus?.synced ?? 0],
-          ["Gagal", syncStatus?.failed ?? 0],
-          ["Konflik", syncStatus?.conflict ?? 0],
-        ].map(([label, value]) => (
+        {(
+          [
+            ["Menunggu", syncStatus?.pending ?? 0, "amber", "clock"],
+            [
+              "Event terkirim (total)",
+              syncStatus?.synced ?? 0,
+              "emerald",
+              "check",
+            ],
+            ["Gagal", syncStatus?.failed ?? 0, "rose", "alert"],
+            ["Konflik", syncStatus?.conflict ?? 0, "amber", "sync"],
+          ] as [string, number, Exclude<StatTone, "clean">, IconName][]
+        ).map(([label, value, tone, icon]) => (
           <div
             key={label}
-            className="rounded-2xl border border-white/10 bg-slate-950/50 p-4"
+            data-tone={nadaStat(value, tone)}
+            className="stat-card rounded-2xl p-4"
           >
-            <p className="text-xs text-slate-400">{label}</p>
-            <p className="mt-1 text-2xl font-black text-white">{value}</p>
+            <div className="flex items-start justify-between gap-2">
+              <p className="stat-card-label text-xs font-bold uppercase">
+                {label}
+              </p>
+              <Icon name={icon} className="stat-card-icon size-4 shrink-0" />
+            </div>
+            <p className="stat-card-value mt-1 text-2xl font-black">{value}</p>
           </div>
         ))}
       </div>

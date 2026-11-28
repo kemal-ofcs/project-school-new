@@ -8,6 +8,7 @@ import { Icon } from "@/components/ui/Icon";
 import { Modal } from "@/components/ui/Modal";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { PilihCari } from "@/components/ui/PilihCari";
+import { TabBar } from "@/components/ui/TabBar";
 import { canAccessArea, hasPermission } from "@/lib/auth/access";
 import { exportToCsv, exportToExcel } from "@/lib/client/excel-export";
 import { useAuth } from "@/lib/context/AuthContext";
@@ -22,6 +23,7 @@ import { subscribeSyncCompleted, syncNow } from "@/lib/gateways/sync-status";
 import { useDebounce } from "@/lib/hooks/useDebounce";
 import { useHydrated } from "@/lib/hooks/useHydrated";
 import { formatDisplayDate } from "@/lib/utils/date-display";
+import { nadaStat } from "@/lib/utils/stat-card";
 
 // Satu halaman untuk KEDUA tab. Angka ini soal berapa baris yang dibawa satu
 // balasan, bukan selera tampilan: rekap harian bertambah satu baris per
@@ -682,73 +684,136 @@ export default function HistoryPage() {
       ) : null}
 
       {/* KPI Summary Cards */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 font-mono text-xs">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
         {tab === "scan" ? (
           <>
-            <div className="p-3.5 bg-slate-900/90 border border-slate-800 rounded-2xl">
-              <span className="text-[10px] text-slate-400 block uppercase">
-                Total Log Scan
-              </span>
-              <span className="text-lg font-bold text-white">
+            <div
+              data-tone={nadaStat(metrics.total, "sky")}
+              className="stat-card rounded-2xl p-3.5"
+            >
+              <div className="flex items-start justify-between gap-2">
+                <span className="stat-card-label text-[10px] font-bold block uppercase">
+                  Total Log Scan
+                </span>
+                <Icon
+                  name="scanner"
+                  className="stat-card-icon size-4 shrink-0"
+                />
+              </div>
+              <span className="stat-card-value mt-1 block text-xl font-black">
                 {metrics.total}
               </span>
             </div>
-            <div className="p-3.5 bg-slate-900/90 border border-slate-800 rounded-2xl">
-              <span className="text-[10px] text-emerald-400 block uppercase">
-                Scan Masuk
-              </span>
-              <span className="text-lg font-bold text-emerald-300">
+            <div
+              data-tone={nadaStat(metrics.masuk, "emerald")}
+              className="stat-card rounded-2xl p-3.5"
+            >
+              <div className="flex items-start justify-between gap-2">
+                <span className="stat-card-label text-[10px] font-bold block uppercase">
+                  Scan Masuk
+                </span>
+                <Icon name="check" className="stat-card-icon size-4 shrink-0" />
+              </div>
+              <span className="stat-card-value mt-1 block text-xl font-black">
                 {metrics.masuk}
               </span>
             </div>
-            <div className="p-3.5 bg-slate-900/90 border border-slate-800 rounded-2xl">
-              <span className="text-[10px] text-sky-400 block uppercase">
-                Scan Pulang
-              </span>
-              <span className="text-lg font-bold text-sky-300">
+            <div
+              data-tone={nadaStat(metrics.pulang, "sky")}
+              className="stat-card rounded-2xl p-3.5"
+            >
+              <div className="flex items-start justify-between gap-2">
+                <span className="stat-card-label text-[10px] font-bold block uppercase">
+                  Scan Pulang
+                </span>
+                <Icon name="clock" className="stat-card-icon size-4 shrink-0" />
+              </div>
+              <span className="stat-card-value mt-1 block text-xl font-black">
                 {metrics.pulang}
               </span>
             </div>
-            <div className="p-3.5 bg-slate-900/90 border border-slate-800 rounded-2xl">
-              <span className="text-[10px] text-rose-400 block uppercase">
-                Scan Ditolak
-              </span>
-              <span className="text-lg font-bold text-rose-300">
+            <div
+              data-tone={nadaStat(metrics.ditolak, "rose")}
+              className="stat-card rounded-2xl p-3.5"
+            >
+              <div className="flex items-start justify-between gap-2">
+                <span className="stat-card-label text-[10px] font-bold block uppercase">
+                  Scan Ditolak
+                </span>
+                <Icon name="alert" className="stat-card-icon size-4 shrink-0" />
+              </div>
+              <span className="stat-card-value mt-1 block text-xl font-black">
                 {metrics.ditolak}
               </span>
             </div>
           </>
         ) : (
           <>
-            <div className="p-3.5 bg-slate-900/90 border border-slate-800 rounded-2xl">
-              <span className="text-[10px] text-slate-400 block uppercase">
-                Total Absensi
-              </span>
-              <span className="text-lg font-bold text-white">
+            <div
+              data-tone={nadaStat(metrics.total, "sky")}
+              className="stat-card rounded-2xl p-3.5"
+            >
+              <div className="flex items-start justify-between gap-2">
+                <span className="stat-card-label text-[10px] font-bold block uppercase">
+                  Total Absensi
+                </span>
+                <Icon
+                  name="calendar"
+                  className="stat-card-icon size-4 shrink-0"
+                />
+              </div>
+              <span className="stat-card-value mt-1 block text-xl font-black">
                 {metrics.total}
               </span>
             </div>
-            <div className="p-3.5 bg-slate-900/90 border border-slate-800 rounded-2xl">
-              <span className="text-[10px] text-emerald-400 block uppercase">
-                Hadir Lengkap
-              </span>
-              <span className="text-lg font-bold text-emerald-300">
+            <div
+              data-tone={nadaStat(metrics.lengkap, "emerald")}
+              className="stat-card rounded-2xl p-3.5"
+            >
+              <div className="flex items-start justify-between gap-2">
+                <span className="stat-card-label text-[10px] font-bold block uppercase">
+                  Hadir Lengkap
+                </span>
+                <Icon name="check" className="stat-card-icon size-4 shrink-0" />
+              </div>
+              <span className="stat-card-value mt-1 block text-xl font-black">
                 {metrics.lengkap}
               </span>
             </div>
-            <div className="p-3.5 bg-slate-900/90 border border-slate-800 rounded-2xl">
-              <span className="text-[10px] text-amber-400 block uppercase">
-                Terlambat / Jam Kurang
-              </span>
-              <span className="text-lg font-bold text-amber-300">
+            <div
+              data-tone={nadaStat(
+                (metrics.terlambat || 0) + (metrics.jamKurang || 0),
+                "amber",
+              )}
+              className="stat-card rounded-2xl p-3.5"
+            >
+              <div className="flex items-start justify-between gap-2">
+                <span className="stat-card-label text-[10px] font-bold block uppercase">
+                  Terlambat / Jam Kurang
+                </span>
+                <Icon name="clock" className="stat-card-icon size-4 shrink-0" />
+              </div>
+              <span className="stat-card-value mt-1 block text-xl font-black">
                 {(metrics.terlambat || 0) + (metrics.jamKurang || 0)}
               </span>
             </div>
-            <div className="p-3.5 bg-slate-900/90 border border-slate-800 rounded-2xl">
-              <span className="text-[10px] text-rose-400 block uppercase">
-                Alfa / Izin / Sakit
-              </span>
-              <span className="text-lg font-bold text-rose-300">
+            <div
+              data-tone={
+                (metrics.alfa || 0) > 0
+                  ? "rose"
+                  : (metrics.izinSakit || 0) > 0
+                    ? "amber"
+                    : "clean"
+              }
+              className="stat-card rounded-2xl p-3.5"
+            >
+              <div className="flex items-start justify-between gap-2">
+                <span className="stat-card-label text-[10px] font-bold block uppercase">
+                  Alfa / Izin / Sakit
+                </span>
+                <Icon name="alert" className="stat-card-icon size-4 shrink-0" />
+              </div>
+              <span className="stat-card-value mt-1 block text-xl font-black">
                 {(metrics.alfa || 0) + (metrics.izinSakit || 0)}
               </span>
             </div>
@@ -757,44 +822,36 @@ export default function HistoryPage() {
       </div>
 
       {/* Tab Switcher & Filter Toolbar */}
-      <div className="space-y-4 rounded-3xl border border-slate-800 bg-slate-900/80 p-4 sm:p-5">
+      <div className="app-group-bar space-y-4 rounded-3xl border border-slate-800 bg-slate-900/80 p-4 sm:p-5">
         <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-4">
           {/* Main Tabs */}
-          <div className="flex items-center gap-2 bg-slate-950 p-1.5 rounded-2xl border border-slate-800 self-start">
-            <button
-              type="button"
-              onClick={() => {
-                setTab("scan");
-                setPage(0);
-                setSelectedStatus("all");
-              }}
-              className={`px-4 py-2 rounded-xl text-xs font-mono font-bold transition flex items-center gap-2 ${
-                tab === "scan"
-                  ? "bg-sky-700 text-on-accent shadow-md shadow-sky-950"
-                  : "text-slate-400 hover:text-slate-200"
-              }`}
-            >
-              Log Scan
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setTab("daily");
-                setPage(0);
-                setSelectedStatus("all");
-              }}
-              className={`px-4 py-2 rounded-xl text-xs font-mono font-bold transition flex items-center gap-2 ${
-                tab === "daily"
-                  ? "bg-sky-700 text-on-accent shadow-md shadow-sky-950"
-                  : "text-slate-400 hover:text-slate-200"
-              }`}
-            >
-              Absensi Harian
-            </button>
-          </div>
+          <TabBar
+            ariaLabel="Jenis riwayat absensi"
+            idPrefix="riwayat"
+            panelId="panel-riwayat"
+            className="w-full sm:w-auto"
+            value={tab}
+            onChange={(nextTab) => {
+              setTab(nextTab);
+              setPage(0);
+              setSelectedStatus("all");
+            }}
+            tabs={[
+              {
+                id: "scan",
+                label: "Log Scan",
+                icon: <Icon name="scanner" className="size-4" />,
+              },
+              {
+                id: "daily",
+                label: "Absensi Harian",
+                icon: <Icon name="calendar" className="size-4" />,
+              },
+            ]}
+          />
 
           {/* Quick Date Presets */}
-          <div className="flex flex-wrap items-center gap-2 text-xs font-mono">
+          <div className="flex flex-wrap items-center gap-2 text-xs">
             <button
               type="button"
               onClick={() => {
@@ -802,9 +859,9 @@ export default function HistoryPage() {
                 setTanggalSelesai(today());
                 setPage(0);
               }}
-              className={`px-3 py-1.5 rounded-lg border transition ${
+              className={`px-3 py-1.5 rounded-lg border font-semibold transition ${
                 tanggalMulai === today() && tanggalSelesai === today()
-                  ? "bg-sky-500/20 text-sky-300 border-sky-500/50"
+                  ? "bg-sky-700 text-on-accent border-sky-600"
                   : "bg-slate-950 text-slate-400 border-slate-800 hover:bg-slate-800"
               }`}
             >
@@ -817,10 +874,10 @@ export default function HistoryPage() {
                 setTanggalSelesai(today());
                 setPage(0);
               }}
-              className={`px-3 py-1.5 rounded-lg border transition ${
+              className={`px-3 py-1.5 rounded-lg border font-semibold transition ${
                 tanggalMulai === getRelativeDate(-6) &&
                 tanggalSelesai === today()
-                  ? "bg-sky-500/20 text-sky-300 border-sky-500/50"
+                  ? "bg-sky-700 text-on-accent border-sky-600"
                   : "bg-slate-950 text-slate-400 border-slate-800 hover:bg-slate-800"
               }`}
             >
@@ -833,10 +890,10 @@ export default function HistoryPage() {
                 setTanggalSelesai(today());
                 setPage(0);
               }}
-              className={`px-3 py-1.5 rounded-lg border transition ${
+              className={`px-3 py-1.5 rounded-lg border font-semibold transition ${
                 tanggalMulai === getFirstDayOfMonth() &&
                 tanggalSelesai === today()
-                  ? "bg-sky-500/20 text-sky-300 border-sky-500/50"
+                  ? "bg-sky-700 text-on-accent border-sky-600"
                   : "bg-slate-950 text-slate-400 border-slate-800 hover:bg-slate-800"
               }`}
             >

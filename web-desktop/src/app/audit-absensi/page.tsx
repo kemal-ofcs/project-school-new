@@ -4,7 +4,7 @@ import { redirect } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { AppShell } from "@/components/AppShell";
 import { FeedbackBanner } from "@/components/ui/FeedbackBanner";
-import { Icon } from "@/components/ui/Icon";
+import { Icon, type IconName } from "@/components/ui/Icon";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { canAccessArea } from "@/lib/auth/access";
@@ -16,6 +16,7 @@ import {
 } from "@/lib/gateways/attendance-audit";
 import { subscribeSyncCompleted } from "@/lib/gateways/sync-status";
 import { useHydrated } from "@/lib/hooks/useHydrated";
+import { nadaStat, type StatTone } from "@/lib/utils/stat-card";
 
 type FilterKeparahan = "semua" | KeparahanTemuan;
 
@@ -59,29 +60,34 @@ function formatTanggalPanjang(value: string) {
   }
 }
 
-function skorTone(skor: number) {
-  if (skor >= 90) return "text-emerald-400";
-  if (skor >= 70) return "text-amber-400";
-  return "text-rose-400";
+function skorNada(skor: number): StatTone {
+  if (skor >= 90) return "emerald";
+  if (skor >= 70) return "amber";
+  return "rose";
 }
 
 function StatCard({
   label,
   value,
   hint,
-  tone = "text-white",
+  tone = "clean",
+  icon,
 }: {
   label: string;
   value: number | string;
   hint?: string;
-  tone?: string;
+  tone?: StatTone;
+  icon: IconName;
 }) {
   return (
-    <div className="rounded-2xl border border-white/10 bg-slate-950/60 p-4">
-      <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">
-        {label}
+    <div data-tone={tone} className="stat-card rounded-2xl p-4">
+      <div className="flex items-start justify-between gap-2">
+        <div className="stat-card-label text-[11px] font-bold uppercase tracking-wide">
+          {label}
+        </div>
+        <Icon name={icon} className="stat-card-icon size-4 shrink-0" />
       </div>
-      <div className={`mt-1 text-2xl font-black ${tone}`}>{value}</div>
+      <div className="stat-card-value mt-1 text-2xl font-black">{value}</div>
       {hint ? (
         <div className="mt-0.5 text-[11px] leading-4 text-slate-500">
           {hint}
@@ -200,7 +206,7 @@ export default function AuditAbsensiPage() {
               type="button"
               onClick={() => void loadData(tanggal)}
               disabled={loading}
-              className="inline-flex min-h-10 items-center gap-2 rounded-xl bg-sky-700 px-4 text-sm font-bold text-white shadow-lg shadow-sky-500/20 transition hover:bg-sky-800 disabled:opacity-50"
+              className="inline-flex min-h-10 items-center gap-2 rounded-xl bg-sky-700 px-4 text-sm font-bold text-on-accent shadow-lg shadow-sky-500/20 transition hover:bg-sky-800 disabled:opacity-50"
             >
               <Icon
                 name="refresh"
@@ -249,36 +255,43 @@ export default function AuditAbsensiPage() {
                 label="Skor Kualitas"
                 value={`${ringkasan.skorKualitas}%`}
                 hint={`${ringkasan.wajibAbsen - ringkasan.karyawanBermasalah} dari ${ringkasan.wajibAbsen} karyawan bersih`}
-                tone={skorTone(ringkasan.skorKualitas)}
+                tone={skorNada(ringkasan.skorKualitas)}
+                icon="check"
               />
               <StatCard
                 label="Wajib Absen"
                 value={ringkasan.wajibAbsen}
                 hint={`${ringkasan.totalKaryawanAktif} karyawan aktif`}
+                tone={nadaStat(ringkasan.wajibAbsen, "sky")}
+                icon="users"
               />
               <StatCard
                 label="Belum Scan Masuk"
                 value={ringkasan.belumScanMasuk}
                 hint="Jam absen sudah lewat"
-                tone="text-rose-400"
+                tone={nadaStat(ringkasan.belumScanMasuk, "rose")}
+                icon="clock"
               />
               <StatCard
                 label="Belum Scan Pulang"
                 value={ringkasan.belumScanPulang}
                 hint="Sesi menggantung"
-                tone="text-amber-400"
+                tone={nadaStat(ringkasan.belumScanPulang, "amber")}
+                icon="clock"
               />
               <StatCard
                 label="Perlu Verifikasi"
                 value={ringkasan.perluVerifikasi}
                 hint={`${ringkasan.scanDitolak} scan ditolak`}
-                tone="text-amber-400"
+                tone={nadaStat(ringkasan.perluVerifikasi, "amber")}
+                icon="check"
               />
               <StatCard
                 label="Alfa"
                 value={ringkasan.alfa}
                 hint={`${ringkasan.hadir} hadir, ${ringkasan.izinSakit} izin/sakit`}
-                tone="text-rose-400"
+                tone={nadaStat(ringkasan.alfa, "rose")}
+                icon="alert"
               />
             </div>
 
@@ -305,11 +318,6 @@ export default function AuditAbsensiPage() {
               <StatusBadge tone="info">
                 Cuti &amp; Izin {ringkasan.pengajuan}
               </StatusBadge>
-              {ringkasan.menungguJamAbsen > 0 ? (
-                <StatusBadge tone="neutral">
-                  Menunggu Jam Absen {ringkasan.menungguJamAbsen}
-                </StatusBadge>
-              ) : null}
               {ringkasan.tanpaData > 0 ? (
                 <StatusBadge tone="danger">
                   Tanpa Data {ringkasan.tanpaData}
@@ -324,7 +332,7 @@ export default function AuditAbsensiPage() {
           </section>
 
           <section className="space-y-3">
-            <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="app-group-bar flex flex-wrap items-center justify-between gap-3 rounded-2xl border p-3.5">
               <h2 className="text-sm font-bold uppercase tracking-wide text-slate-400">
                 Daftar Temuan ({temuanTampil.length})
               </h2>
@@ -348,7 +356,7 @@ export default function AuditAbsensiPage() {
                       onClick={() => setFilter(option.value)}
                       className={`min-h-8 rounded-lg border px-2.5 text-[11px] font-bold transition ${
                         filter === option.value
-                          ? "border-sky-400/40 bg-sky-500/20 text-sky-200"
+                          ? "border-sky-600 bg-sky-700 text-on-accent"
                           : "border-slate-800 bg-slate-950 text-slate-400 hover:text-slate-200"
                       }`}
                     >

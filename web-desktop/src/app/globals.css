@@ -33,9 +33,13 @@
   --app-background-soft: #0b1728;
   --app-surface: rgba(15, 23, 42, 0.86);
   --app-surface-raised: rgba(30, 41, 59, 0.72);
-  --app-border: rgba(255, 255, 255, 0.1);
-  --app-primary: #007aff;
-  --app-primary-strong: #003399;
+  --app-group-bg: rgba(9, 16, 32, 0.72);
+  --app-tab-track: rgba(2, 6, 23, 0.55);
+  --app-border: rgba(148, 163, 184, 0.16);
+  --app-border-hover: rgba(148, 163, 184, 0.34);
+  --app-divider: rgba(148, 163, 184, 0.12);
+  --app-primary: #7b93e3;
+  --app-primary-strong: #2f4fbf;
   --brand-primary: #003399;
   --brand-primary-hover: #002266;
   --brand-accent: #007aff;
@@ -52,9 +56,7 @@
   --shadow-card: 0 4px 14px -2px rgba(0, 51, 153, 0.08);
   --shadow-floating:
     0 12px 32px -4px rgba(0, 34, 102, 0.18), 0 0 0 1px rgba(0, 51, 153, 0.06);
-  /* Identitas navy + emas (prd-ui-navy-emas.md §3a), sama dengan .login-hero.
-     --app-gold-line untuk garis/border (>= 3:1 terhadap kartu), --app-gold-text
-     untuk teks (>= 4,5:1). Emas tidak pernah dipakai sebagai warna status. */
+  /* Identitas navy + emas untuk aksen terpilih; kotak umum memakai --app-border netral. */
   --app-navy: #0a1a4f;
   --app-navy-strong: #10308a;
   --app-gold: #f6c453;
@@ -68,9 +70,6 @@
   --app-input-bg: #020617;
   --app-input-border: #56658a;
   --app-input-text: #ffffff;
-  /* Warna segmen grafik kehadiran (donat SVG, donat 3D, batang tren, titik
-     legenda). Di tema terang tiap warna digelapkan sampai minimal 3:1
-     terhadap putih, ambang WCAG untuk elemen non-teks. */
   --chart-tepat: #10b981;
   --chart-telat: #f59e0b;
   --chart-izin: #8b5cf6;
@@ -83,13 +82,17 @@
 html[data-theme="light"],
 html.light {
   color-scheme: light;
-  --app-background: #f8fafc;
-  --app-background-soft: #f1f5f9;
+  --app-background: #f1f5f9;
+  --app-background-soft: #e8eef6;
   --app-surface: #ffffff;
   --app-surface-raised: #ffffff;
-  --app-border: #e2e8f0;
-  --app-primary: #003399;
-  --app-primary-strong: #002266;
+  --app-group-bg: #e5ecf5;
+  --app-tab-track: #dae3ef;
+  --app-border: #cbd5e1;
+  --app-border-hover: #94a3b8;
+  --app-divider: #e2e8f0;
+  --app-primary: #2f4fbf;
+  --app-primary-strong: #10308a;
   --brand-primary: #003399;
   --brand-primary-hover: #002266;
   --brand-accent: #007aff;
@@ -106,9 +109,8 @@ html.light {
   --shadow-card: 0 4px 14px -2px rgba(0, 51, 153, 0.08);
   --shadow-floating:
     0 12px 32px -4px rgba(0, 34, 102, 0.18), 0 0 0 1px rgba(0, 51, 153, 0.06);
-  /* #d97706 hanya 3,2:1 terhadap putih: cukup untuk garis, tidak untuk teks. */
   --app-gold: #d97706;
-  --app-gold-line: #d97706;
+  --app-gold-line: #a38242;
   --app-gold-text: #92400e;
   --app-text: #0f172a;
   --app-text-muted: #475569;
@@ -116,8 +118,8 @@ html.light {
   --app-table-header-bg: #f8fafc;
   --app-card-bg: #ffffff;
   --app-input-bg: #ffffff;
-  /* Garis kontrol form wajib >= 3:1 terhadap putih (WCAG 1.4.11); #cbd5e1 hanya 1,5:1. */
-  --app-input-border: #8391b5;
+  /* >= 3:1 di putih (3,72:1) dan di permukaan grup #e5ecf5 (3,08:1). */
+  --app-input-border: #7584aa;
   --app-input-text: #0f172a;
   --chart-tepat: #059669;
   --chart-telat: #d97706;
@@ -158,13 +160,9 @@ body {
 html[data-theme="light"] body,
 html.light body {
   background:
-    radial-gradient(
-      circle at 12% -10%,
-      rgb(74 104 212 / 10%),
-      transparent 32rem
-    ),
-    radial-gradient(circle at 92% 4%, rgb(245 158 11 / 7%), transparent 28rem),
-    linear-gradient(180deg, #f8fafc, #f1f5f9);
+    radial-gradient(circle at 12% -10%, rgb(74 104 212 / 8%), transparent 32rem),
+    radial-gradient(circle at 92% 4%, rgb(245 158 11 / 5%), transparent 28rem),
+    linear-gradient(180deg, var(--app-background), var(--app-background-soft));
   color: var(--app-text);
 }
 
@@ -216,7 +214,7 @@ a {
 
 html[data-theme="light"] .app-panel,
 html.light .app-panel {
-  box-shadow: 0 12px 40px rgb(15 23 42 / 6%);
+  box-shadow: 0 2px 10px rgb(15 23 42 / 4%);
 }
 
 .app-input {
@@ -251,8 +249,8 @@ html.light .app-panel {
 html[data-theme="light"] header.sticky,
 html.light header.sticky {
   background-color: rgba(255, 255, 255, 0.96) !important;
-  border-bottom: 1px solid #e2e8f0 !important;
-  box-shadow: 0 4px 20px rgb(15 23 42 / 4%) !important;
+  border-bottom: 1px solid var(--app-border) !important;
+  box-shadow: 0 2px 12px rgb(15 23 42 / 4%) !important;
 }
 
 /* Sidebar: kolom tetap (aside) dan laci layar sempit (dialog) memakai kelas
@@ -263,7 +261,7 @@ html:has(dialog.app-sidebar[open]) {
 html[data-theme="light"] .app-sidebar,
 html.light .app-sidebar {
   background-color: #ffffff !important;
-  border-color: #e2e8f0 !important;
+  border-color: var(--app-border) !important;
 }
 html[data-theme="light"] .app-sidebar nav a:not([aria-current="page"]):hover,
 html[data-theme="light"] .app-sidebar button:hover,
@@ -322,68 +320,283 @@ html.light section.bg-gradient-to-br.from-slate-900 p {
   color: #475569 !important;
 }
 
-/* 3. Containers & Panels */
-html[data-theme="light"] .bg-slate-900,
-html[data-theme="light"] .bg-slate-950,
-html[data-theme="light"] .bg-slate-900\/98,
-html[data-theme="light"] .bg-slate-900\/95,
-html[data-theme="light"] .bg-slate-900\/90,
-html[data-theme="light"] .bg-slate-900\/85,
-html[data-theme="light"] .bg-slate-900\/80,
-html[data-theme="light"] .bg-slate-900\/70,
-html[data-theme="light"] .bg-slate-900\/60,
-html[data-theme="light"] .bg-slate-900\/50,
-html[data-theme="light"] .bg-slate-900\/40,
-html[data-theme="light"] .bg-slate-950\/96,
-html[data-theme="light"] .bg-slate-950\/90,
-html[data-theme="light"] .bg-slate-950\/80,
-html[data-theme="light"] .bg-slate-950\/70,
-html[data-theme="light"] .bg-slate-950\/60,
-html[data-theme="light"] .bg-slate-950\/50,
-html[data-theme="light"] .bg-slate-950\/40,
-html[data-theme="light"] .from-slate-900\/90,
-html[data-theme="light"] .to-slate-950,
-html[data-theme="light"] dl.bg-slate-950\/50,
-html[data-theme="light"] .divide-white\/10,
-html[data-theme="light"] .bg-white\/\[0\.02\],
-html[data-theme="light"] .bg-white\/\[0\.03\],
-html[data-theme="light"] .bg-white\/\[0\.04\],
-html[data-theme="light"] .bg-white\/\[0\.05\],
-html.light .bg-slate-900,
-html.light .bg-slate-950,
-html.light .bg-slate-900\/98,
-html.light .bg-slate-900\/95,
-html.light .bg-slate-900\/90,
-html.light .bg-slate-900\/85,
-html.light .bg-slate-900\/80,
-html.light .bg-slate-900\/70,
-html.light .bg-slate-900\/60,
-html.light .bg-slate-900\/50,
-html.light .bg-slate-900\/40,
-html.light .bg-slate-950\/96,
-html.light .bg-slate-950\/90,
-html.light .bg-slate-950\/80,
-html.light .bg-slate-950\/70,
-html.light .bg-slate-950\/60,
-html.light .bg-slate-950\/50,
-html.light .bg-slate-950\/40,
-html.light .from-slate-900\/90,
-html.light .to-slate-950,
-html.light dl.bg-slate-950\/50,
-html.light .divide-white\/10,
-html.light .bg-white\/\[0\.02\],
-html.light .bg-white\/\[0\.03\],
-html.light .bg-white\/\[0\.04\],
-html.light .bg-white\/\[0\.05\] {
-  background-color: #ffffff !important;
-  border-color: #e2e8f0 !important;
+/* 3. Containers & Panels (Tone-on-Tone 3-Tier Surface)
+   Seluruh kartu utama & panel daftar memakai putih bersih (#ffffff) tanpa menimpa
+   border warna semantik (emerald/amber/rose/sky). Spesifisitas :where dijaga rendah
+   agar kelas .app-group-bar, .stat-card, dan sub-kotak bersarang tetap menang. */
+.app-group-bar {
+  background-color: var(--app-group-bg);
+  border-color: var(--app-border);
 }
 
-/* Aturan di atas meratakan SEMUA bingkai kontainer menjadi abu-abu, termasuk
-   bingkai berwarna yang menandai arti kartu (Hadir biru, Terlambat kuning,
-   Alfa merah). Bingkai berwarna menang lagi di sini, satu nada -300 per warna.
-   Spasi di depan `border-` sengaja: `focus:border-sky-500` milik input tidak
-   boleh ikut, nanti setiap input bergaris biru walau tidak sedang difokus. */
+html[data-theme="light"]
+  :where(
+    .bg-slate-900,
+    .bg-slate-950,
+    .bg-slate-900\/98,
+    .bg-slate-900\/95,
+    .bg-slate-900\/90,
+    .bg-slate-900\/85,
+    .bg-slate-900\/80,
+    .bg-slate-900\/70,
+    .bg-slate-900\/60,
+    .bg-slate-900\/50,
+    .bg-slate-900\/40,
+    .bg-slate-900\/30,
+    .bg-slate-950\/96,
+    .bg-slate-950\/90,
+    .bg-slate-950\/85,
+    .bg-slate-950\/80,
+    .bg-slate-950\/70,
+    .bg-slate-950\/60,
+    .bg-slate-950\/50,
+    .bg-slate-950\/40,
+    .bg-slate-950\/30,
+    .from-slate-900\/90,
+    .to-slate-950,
+    .bg-white\/\[0\.02\],
+    .bg-white\/\[0\.03\],
+    .bg-white\/\[0\.04\],
+    .bg-white\/\[0\.05\],
+    .bg-white\/\[0\.06\]
+  ):where(
+    :not(
+        input,
+        select,
+        textarea,
+        button,
+        a,
+        .pilih-cari-tombol,
+        .stat-card,
+        .visual-modal-backdrop
+      )
+  ),
+html.light
+  :where(
+    .bg-slate-900,
+    .bg-slate-950,
+    .bg-slate-900\/98,
+    .bg-slate-900\/95,
+    .bg-slate-900\/90,
+    .bg-slate-900\/85,
+    .bg-slate-900\/80,
+    .bg-slate-900\/70,
+    .bg-slate-900\/60,
+    .bg-slate-900\/50,
+    .bg-slate-900\/40,
+    .bg-slate-900\/30,
+    .bg-slate-950\/96,
+    .bg-slate-950\/90,
+    .bg-slate-950\/85,
+    .bg-slate-950\/80,
+    .bg-slate-950\/70,
+    .bg-slate-950\/60,
+    .bg-slate-950\/50,
+    .bg-slate-950\/40,
+    .bg-slate-950\/30,
+    .from-slate-900\/90,
+    .to-slate-950,
+    .bg-white\/\[0\.02\],
+    .bg-white\/\[0\.03\],
+    .bg-white\/\[0\.04\],
+    .bg-white\/\[0\.05\],
+    .bg-white\/\[0\.06\]
+  ):where(
+    :not(
+        input,
+        select,
+        textarea,
+        button,
+        a,
+        .pilih-cari-tombol,
+        .stat-card,
+        .visual-modal-backdrop
+      )
+  ) {
+  background-color: #ffffff !important;
+}
+
+html[data-theme="light"]
+  :where(
+    .bg-slate-900,
+    .bg-slate-900\/98,
+    .bg-slate-900\/95,
+    .bg-slate-900\/90,
+    .bg-slate-900\/85,
+    .bg-slate-900\/80,
+    .bg-slate-900\/70,
+    .bg-slate-900\/60,
+    .bg-slate-900\/50,
+    .bg-slate-950\/60
+  ):where(
+    :not(
+        input,
+        select,
+        textarea,
+        button,
+        a,
+        tr,
+        td,
+        th,
+        thead,
+        header,
+        nav,
+        .stat-card,
+        .app-modal-panel
+      )
+  ),
+html.light
+  :where(
+    .bg-slate-900,
+    .bg-slate-900\/98,
+    .bg-slate-900\/95,
+    .bg-slate-900\/90,
+    .bg-slate-900\/85,
+    .bg-slate-900\/80,
+    .bg-slate-900\/70,
+    .bg-slate-900\/60,
+    .bg-slate-900\/50,
+    .bg-slate-950\/60
+  ):where(
+    :not(
+        input,
+        select,
+        textarea,
+        button,
+        a,
+        tr,
+        td,
+        th,
+        thead,
+        header,
+        nav,
+        .stat-card,
+        .app-modal-panel
+      )
+  ) {
+  box-shadow:
+    0 1px 3px rgba(15, 23, 42, 0.05),
+    0 1px 2px rgba(15, 23, 42, 0.03) !important;
+}
+
+/* Tier 2: Bilah filter (.app-group-bar), panel slate-800 transparan, & sub-kotak bersarang */
+.app-segment-track {
+  background-color: var(--app-tab-track);
+}
+html[data-theme="light"] .app-segment-track,
+html.light .app-segment-track {
+  background-color: var(--app-tab-track) !important;
+  border-color: transparent !important;
+}
+
+html[data-theme="light"] .app-group-bar,
+html.light .app-group-bar,
+html[data-theme="light"]
+  :where(
+    .bg-slate-800\/30,
+    .bg-slate-800\/40,
+    .bg-slate-800\/50,
+    .bg-slate-800\/60,
+    .bg-slate-800\/70
+  ):where(:not(input, select, textarea, button, a, label, .stat-card)),
+html.light
+  :where(
+    .bg-slate-800\/30,
+    .bg-slate-800\/40,
+    .bg-slate-800\/50,
+    .bg-slate-800\/60,
+    .bg-slate-800\/70
+  ):where(:not(input, select, textarea, button, a, label, .stat-card)),
+html[data-theme="light"]
+  :is(
+    .app-panel,
+    .app-modal-panel,
+    .visual-glass,
+    .bg-slate-900,
+    .bg-slate-900\/95,
+    .bg-slate-900\/90,
+    .bg-slate-900\/85,
+    .bg-slate-900\/80,
+    .bg-slate-900\/70,
+    .bg-slate-900\/60
+  )
+  :where(
+    .bg-slate-950,
+    .bg-slate-950\/85,
+    .bg-slate-950\/80,
+    .bg-slate-950\/70,
+    .bg-slate-950\/60,
+    .bg-slate-950\/50,
+    .bg-slate-950\/40,
+    .bg-slate-950\/30,
+    dl.bg-slate-950\/50,
+    .bg-white\/\[0\.02\],
+    .bg-white\/\[0\.03\],
+    .bg-white\/\[0\.04\]
+  ):where(
+    :not(
+        input,
+        select,
+        textarea,
+        button,
+        a,
+        tr,
+        td,
+        th,
+        thead,
+        table,
+        .stat-card,
+        :has(table)
+      )
+  ),
+html.light
+  :is(
+    .app-panel,
+    .app-modal-panel,
+    .visual-glass,
+    .bg-slate-900,
+    .bg-slate-900\/95,
+    .bg-slate-900\/90,
+    .bg-slate-900\/85,
+    .bg-slate-900\/80,
+    .bg-slate-900\/70,
+    .bg-slate-900\/60
+  )
+  :where(
+    .bg-slate-950,
+    .bg-slate-950\/85,
+    .bg-slate-950\/80,
+    .bg-slate-950\/70,
+    .bg-slate-950\/60,
+    .bg-slate-950\/50,
+    .bg-slate-950\/40,
+    .bg-slate-950\/30,
+    dl.bg-slate-950\/50,
+    .bg-white\/\[0\.02\],
+    .bg-white\/\[0\.03\],
+    .bg-white\/\[0\.04\]
+  ):where(
+    :not(
+        input,
+        select,
+        textarea,
+        button,
+        a,
+        tr,
+        td,
+        th,
+        thead,
+        table,
+        .stat-card,
+        :has(table)
+      )
+  ) {
+  background-color: var(--app-group-bg) !important;
+  border-color: var(--app-border) !important;
+  box-shadow: none !important;
+}
+
+/* Bingkai berwarna semantik tetap menang pada kartu di mode terang */
 html[data-theme="light"]
 [class*="bg-slate-9"]:is([class^="border-sky-"], [class*=" border-sky-"]),
 html.light
@@ -431,20 +644,12 @@ html.light
 }
 
 /* 4. Segmented Tab Switchers (Dashboard, Scanner, Riwayat, CMS Sub-tabs) */
-html[data-theme="light"] .bg-slate-900\/60,
-html[data-theme="light"] .bg-slate-950\/60,
-html[data-theme="light"] .bg-slate-800\/60,
 html[data-theme="light"] div.bg-slate-950.p-1\.5.rounded-2xl,
-html[data-theme="light"] div.rounded-2xl.bg-slate-900\/60,
 html[data-theme="light"] div.rounded-2xl.bg-slate-800\/60,
-html.light .bg-slate-900\/60,
-html.light .bg-slate-950\/60,
-html.light .bg-slate-800\/60,
 html.light div.bg-slate-950.p-1\.5.rounded-2xl,
-html.light div.rounded-2xl.bg-slate-900\/60,
 html.light div.rounded-2xl.bg-slate-800\/60 {
-  background-color: #f1f5f9 !important;
-  border-color: #e2e8f0 !important;
+  background-color: var(--app-tab-track) !important;
+  border-color: transparent !important;
 }
 
 /* Active Segmented Tab with Gradient or Sky-500 */
@@ -645,51 +850,182 @@ html.light .hover\:text-slate-950:hover {
   color: #0f172a !important;
 }
 
-/* 6. Action Buttons (CSV, Excel, Scanner Primary/Stop, Refresh, Labels, Steppers) */
-/* Secondary button & labels (Ekspor CSV, Refresh, Label upload, Pratinjau, Reset logo, Steppers) */
-html[data-theme="light"] button.bg-slate-800,
-html[data-theme="light"] button.bg-slate-800\/90,
-html[data-theme="light"] button.bg-slate-800\/80,
-html[data-theme="light"] .bg-slate-800\/90,
-html[data-theme="light"] .bg-slate-800\/80,
-html[data-theme="light"] label.bg-slate-800,
-html[data-theme="light"] a.bg-slate-800,
-html[data-theme="light"] .bg-slate-800.border-slate-700,
-html[data-theme="light"] button.bg-white\/5,
-html[data-theme="light"] button.bg-white\/\[0\.05\],
-html[data-theme="light"] a.bg-white\/\[0\.05\],
-html.light button.bg-slate-800,
-html.light button.bg-slate-800\/90,
-html.light button.bg-slate-800\/80,
-html.light .bg-slate-800\/90,
-html.light .bg-slate-800\/80,
-html.light label.bg-slate-800,
-html.light a.bg-slate-800,
-html.light .bg-slate-800.border-slate-700,
-html.light button.bg-white\/5,
-html.light button.bg-white\/\[0\.05\],
-html.light a.bg-white\/\[0\.05\] {
+/* 6. Action Buttons, Card Buttons, Links & Labels (CSV, Refresh, Upload, Pilihan Kartu) */
+html[data-theme="light"]
+:is(button, a, label):is(
+  .bg-slate-950,
+  .bg-slate-950\/90,
+  .bg-slate-950\/85,
+  .bg-slate-950\/80,
+  .bg-slate-950\/70,
+  .bg-slate-950\/60,
+  .bg-slate-950\/50,
+  .bg-slate-950\/40,
+  .bg-slate-950\/30,
+  .bg-slate-900,
+  .bg-slate-900\/95,
+  .bg-slate-900\/90,
+  .bg-slate-900\/80,
+  .bg-slate-900\/70,
+  .bg-slate-900\/60,
+  .bg-slate-900\/50,
+  .bg-slate-900\/40,
+  .bg-slate-900\/30,
+  .bg-slate-800,
+  .bg-slate-800\/90,
+  .bg-slate-800\/80,
+  .bg-slate-800\/70,
+  .bg-slate-800\/60,
+  .bg-slate-800\/40,
+  .bg-slate-800\/30,
+  .bg-white\/5,
+  .bg-white\/\[0\.05\],
+  .bg-white\/\[0\.06\]
+):not(.pilih-cari-tombol):not(.tab-bar-tab):not(.stat-card),
+html[data-theme="light"]
+  .bg-slate-800\/90:not(.pilih-cari-tombol):not(.stat-card),
+html[data-theme="light"]
+  .bg-slate-800\/80:not(.pilih-cari-tombol):not(.stat-card),
+html[data-theme="light"]
+  .bg-slate-800.border-slate-700:not(.pilih-cari-tombol):not(.stat-card),
+html[data-theme="light"]
+  button.border-slate-700:not([class^="bg-"]):not([class*=" bg-"]):not(
+    .pilih-cari-tombol
+  ):not(.stat-card),
+html[data-theme="light"]
+  button.border-slate-800:not([class^="bg-"]):not([class*=" bg-"]):not(
+    .pilih-cari-tombol
+  ):not(.stat-card),
+html.light
+  :is(button, a, label):is(
+    .bg-slate-950,
+    .bg-slate-950\/90,
+    .bg-slate-950\/85,
+    .bg-slate-950\/80,
+    .bg-slate-950\/70,
+    .bg-slate-950\/60,
+    .bg-slate-950\/50,
+    .bg-slate-950\/40,
+    .bg-slate-950\/30,
+    .bg-slate-900,
+    .bg-slate-900\/95,
+    .bg-slate-900\/90,
+    .bg-slate-900\/80,
+    .bg-slate-900\/70,
+    .bg-slate-900\/60,
+    .bg-slate-900\/50,
+    .bg-slate-900\/40,
+    .bg-slate-900\/30,
+    .bg-slate-800,
+    .bg-slate-800\/90,
+    .bg-slate-800\/80,
+    .bg-slate-800\/70,
+    .bg-slate-800\/60,
+    .bg-slate-800\/40,
+    .bg-slate-800\/30,
+    .bg-white\/5,
+    .bg-white\/\[0\.05\],
+    .bg-white\/\[0\.06\]
+  ):not(.pilih-cari-tombol):not(.tab-bar-tab):not(.stat-card),
+html.light .bg-slate-800\/90:not(.pilih-cari-tombol):not(.stat-card),
+html.light .bg-slate-800\/80:not(.pilih-cari-tombol):not(.stat-card),
+html.light
+  .bg-slate-800.border-slate-700:not(.pilih-cari-tombol):not(.stat-card),
+html.light
+  button.border-slate-700:not([class^="bg-"]):not([class*=" bg-"]):not(
+    .pilih-cari-tombol
+  ):not(.stat-card),
+html.light
+  button.border-slate-800:not([class^="bg-"]):not([class*=" bg-"]):not(
+    .pilih-cari-tombol
+  ):not(.stat-card),
+html[data-theme="light"] input[type="file"]::file-selector-button,
+html.light input[type="file"]::file-selector-button {
   background-color: #ffffff !important;
-  border-color: #cbd5e1 !important;
+  border: 1px solid #cbd5e1 !important;
   color: #1e293b !important;
-  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.08) !important;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.05) !important;
 }
-html[data-theme="light"] button.bg-slate-800:hover,
-html[data-theme="light"] button.bg-slate-800\/90:hover,
-html[data-theme="light"] button.bg-slate-800\/80:hover,
-html[data-theme="light"] label.bg-slate-800:hover,
-html[data-theme="light"] a.bg-slate-800:hover,
-html[data-theme="light"] button.bg-white\/5:hover,
-html[data-theme="light"] button.bg-white\/\[0\.05\]:hover,
-html[data-theme="light"] a.bg-white\/\[0\.05\]:hover,
-html.light button.bg-slate-800:hover,
-html.light button.bg-slate-800\/90:hover,
-html.light button.bg-slate-800\/80:hover,
-html.light label.bg-slate-800:hover,
-html.light a.bg-slate-800:hover,
-html.light button.bg-white\/5:hover,
-html.light button.bg-white\/\[0\.05\]:hover,
-html.light a.bg-white\/\[0\.05\]:hover {
+html[data-theme="light"]
+  :is(button, a, label):is(
+    .bg-slate-950,
+    .bg-slate-950\/90,
+    .bg-slate-950\/85,
+    .bg-slate-950\/80,
+    .bg-slate-950\/70,
+    .bg-slate-950\/60,
+    .bg-slate-950\/50,
+    .bg-slate-950\/40,
+    .bg-slate-950\/30,
+    .bg-slate-900,
+    .bg-slate-900\/95,
+    .bg-slate-900\/90,
+    .bg-slate-900\/80,
+    .bg-slate-900\/70,
+    .bg-slate-900\/60,
+    .bg-slate-900\/50,
+    .bg-slate-900\/40,
+    .bg-slate-900\/30,
+    .bg-slate-800,
+    .bg-slate-800\/90,
+    .bg-slate-800\/80,
+    .bg-slate-800\/70,
+    .bg-slate-800\/60,
+    .bg-slate-800\/40,
+    .bg-slate-800\/30,
+    .bg-white\/5,
+    .bg-white\/\[0\.05\],
+    .bg-white\/\[0\.06\]
+  ):not(.pilih-cari-tombol):not(.tab-bar-tab):not(.stat-card):hover,
+html[data-theme="light"]
+  button.border-slate-700:not([class^="bg-"]):not([class*=" bg-"]):not(
+    .pilih-cari-tombol
+  ):not(.stat-card):hover,
+html[data-theme="light"]
+  button.border-slate-800:not([class^="bg-"]):not([class*=" bg-"]):not(
+    .pilih-cari-tombol
+  ):not(.stat-card):hover,
+html.light
+  :is(button, a, label):is(
+    .bg-slate-950,
+    .bg-slate-950\/90,
+    .bg-slate-950\/85,
+    .bg-slate-950\/80,
+    .bg-slate-950\/70,
+    .bg-slate-950\/60,
+    .bg-slate-950\/50,
+    .bg-slate-950\/40,
+    .bg-slate-950\/30,
+    .bg-slate-900,
+    .bg-slate-900\/95,
+    .bg-slate-900\/90,
+    .bg-slate-900\/80,
+    .bg-slate-900\/70,
+    .bg-slate-900\/60,
+    .bg-slate-900\/50,
+    .bg-slate-900\/40,
+    .bg-slate-900\/30,
+    .bg-slate-800,
+    .bg-slate-800\/90,
+    .bg-slate-800\/80,
+    .bg-slate-800\/70,
+    .bg-slate-800\/60,
+    .bg-slate-800\/40,
+    .bg-slate-800\/30,
+    .bg-white\/5,
+    .bg-white\/\[0\.05\],
+    .bg-white\/\[0\.06\]
+  ):not(.pilih-cari-tombol):not(.tab-bar-tab):not(.stat-card):hover,
+html.light
+  button.border-slate-700:not([class^="bg-"]):not([class*=" bg-"]):not(
+    .pilih-cari-tombol
+  ):not(.stat-card):hover,
+html.light
+  button.border-slate-800:not([class^="bg-"]):not([class*=" bg-"]):not(
+    .pilih-cari-tombol
+  ):not(.stat-card):hover,
+html[data-theme="light"] input[type="file"]::file-selector-button:hover,
+html.light input[type="file"]::file-selector-button:hover {
   background-color: #f8fafc !important;
   border-color: #94a3b8 !important;
   color: #0f172a !important;
@@ -708,17 +1044,19 @@ html[data-theme="light"] button.bg-slate-800 svg,
 html[data-theme="light"] label.bg-slate-800 svg,
 html.light button.bg-slate-800 svg,
 html.light label.bg-slate-800 svg {
-  color: #10308a !important;
+  color: #2f4fbf !important;
 }
 
-/* Neutral status badges & Nonaktif indicators */
+/* Neutral status badges & Nonaktif indicators (pill lembut tanpa garis keras) */
 html[data-theme="light"] span.bg-slate-800,
+html[data-theme="light"] span.bg-slate-800\/70,
 html[data-theme="light"] div.bg-slate-800:not(button):not(.peer),
 html.light span.bg-slate-800,
+html.light span.bg-slate-800\/70,
 html.light div.bg-slate-800:not(button):not(.peer) {
-  background-color: #f1f5f9 !important;
-  color: #5b677c !important;
-  border-color: #cbd5e1 !important;
+  background-color: #e2e8f0 !important;
+  color: #475569 !important;
+  border-color: transparent !important;
 }
 
 /* ==========================================================================
@@ -817,7 +1155,7 @@ html.light .sakelar-wrap[data-aktif="true"] .sakelar-status {
    tema terang. Warna dari token --app-navy / --app-gold-* di :root.
    ========================================================================== */
 .page-header {
-  border-bottom: 1px solid var(--app-gold-line);
+  border-bottom: 1px solid var(--app-border);
 }
 .page-header-dot {
   background-color: var(--app-gold);
@@ -833,7 +1171,7 @@ html.light .sakelar-wrap[data-aktif="true"] .sakelar-status {
 }
 
 .aksi-cepat {
-  border: 1px solid var(--app-gold-line);
+  border: 1px solid var(--app-border);
   background-color: rgb(15 23 42 / 80%);
   color: var(--app-text);
   transition:
@@ -842,8 +1180,8 @@ html.light .sakelar-wrap[data-aktif="true"] .sakelar-status {
     transform 150ms ease;
 }
 .aksi-cepat:hover {
-  border-color: var(--app-gold);
-  box-shadow: inset 0 0 0 1px var(--app-gold);
+  border-color: rgb(246 196 83 / 50%);
+  box-shadow: 0 6px 18px rgb(2 8 23 / 20%);
 }
 .aksi-cepat:focus-visible {
   outline: 2px solid var(--app-gold);
@@ -864,6 +1202,12 @@ html.light .sakelar-wrap[data-aktif="true"] .sakelar-status {
 html[data-theme="light"] .aksi-cepat,
 html.light .aksi-cepat {
   background-color: #ffffff;
+  box-shadow: 0 1px 3px rgb(15 23 42 / 4%);
+}
+html[data-theme="light"] .aksi-cepat:hover,
+html.light .aksi-cepat:hover {
+  border-color: #b89650;
+  box-shadow: 0 6px 18px rgb(15 23 42 / 7%);
 }
 /* Tema terang: kotak ikon navy pucat (ikon 8,25:1), navy pekat + emas saat disorot. */
 html[data-theme="light"] .aksi-cepat-ikon,
@@ -887,14 +1231,17 @@ html.light .aksi-cepat:hover .aksi-cepat-ikon {
   color: #f6c453;
 }
 
+/* TabBar (components/ui/TabBar.tsx, disalin ke Mobile): rel segmen lembut Pas Lebar
+   (width: 100%) sehingga deretan tab merata dari tepi kiri ke kanan kontainer. */
 .tab-bar {
   display: flex;
+  width: 100%;
   gap: 0.25rem;
+  min-width: 0;
   overflow-x: auto;
   padding: 0.25rem;
-  border: 1px solid var(--app-border);
   border-radius: 0.875rem;
-  background-color: var(--app-surface);
+  background-color: var(--app-tab-track);
   scrollbar-width: thin;
 }
 .tab-bar-tab {
@@ -903,8 +1250,8 @@ html.light .aksi-cepat:hover .aksi-cepat-ikon {
   align-items: center;
   justify-content: center;
   gap: 0.5rem;
-  min-height: 2.75rem;
-  padding: 0.5rem 1rem;
+  min-height: 2.5rem;
+  padding: 0.4375rem 0.9375rem;
   border: 1px solid transparent;
   border-radius: 0.625rem;
   white-space: nowrap;
@@ -912,33 +1259,38 @@ html.light .aksi-cepat:hover .aksi-cepat-ikon {
   font-weight: 600;
   color: var(--app-text-muted);
   transition:
-    border-color 150ms ease,
     background-color 150ms ease,
-    color 150ms ease;
+    color 150ms ease,
+    box-shadow 150ms ease;
 }
-/* Tab tidak aktif tetap tampak sebagai tombol: garis lembut, bukan teks lepas. */
 .tab-bar-tab:not([aria-selected="true"]) {
-  border-color: rgb(148 163 184 / 22%);
-  background-color: rgb(255 255 255 / 3%);
+  border-color: transparent;
+  background-color: transparent;
 }
-.tab-bar-tab:hover {
-  border-color: rgb(148 163 184 / 40%);
+.tab-bar-tab:not([aria-selected="true"]):hover {
   background-color: rgb(255 255 255 / 6%);
   color: var(--app-text);
 }
 html[data-theme="light"] .tab-bar-tab:not([aria-selected="true"]),
 html.light .tab-bar-tab:not([aria-selected="true"]) {
-  border-color: #c9d1e6;
-  background-color: #ffffff;
+  border-color: transparent;
+  background-color: transparent;
+}
+html[data-theme="light"] .tab-bar-tab:not([aria-selected="true"]):hover,
+html.light .tab-bar-tab:not([aria-selected="true"]):hover {
+  background-color: rgb(255 255 255 / 78%);
+  color: var(--app-text);
 }
 .tab-bar-tab[aria-selected="true"] {
-  border-color: rgb(246 196 83 / 40%);
+  border-color: transparent;
   background: linear-gradient(
     140deg,
     var(--app-navy) 0%,
     var(--app-navy-strong) 100%
   );
-  box-shadow: inset 0 -2px 0 #f6c453;
+  box-shadow:
+    inset 0 -2px 0 #f6c453,
+    0 2px 6px rgb(10 26 79 / 22%);
   color: #ffffff;
 }
 /* Offset negatif: wadah overflow-x memotong cincin yang jatuh di luar tombol. */
@@ -946,16 +1298,12 @@ html.light .tab-bar-tab:not([aria-selected="true"]) {
   outline: 2px solid var(--app-gold);
   outline-offset: -2px;
 }
-html[data-theme="light"] .tab-bar-tab:not([aria-selected="true"]):hover,
-html.light .tab-bar-tab:not([aria-selected="true"]):hover {
-  border-color: #8391b5;
-  background-color: #f5f7fc;
-}
 @media (min-width: 1024px) {
   .tab-bar[data-vertikal-lg] {
     position: sticky;
     top: 5rem;
     flex-direction: column;
+    width: 100%;
   }
   .tab-bar[data-vertikal-lg] .tab-bar-tab {
     justify-content: flex-start;
@@ -967,7 +1315,7 @@ html.light .tab-bar-tab:not([aria-selected="true"]):hover {
   color: var(--app-text-muted);
 }
 .memuat-halaman-putar {
-  border: 4px solid var(--app-gold-line);
+  border: 4px solid var(--app-primary);
   border-top-color: transparent;
 }
 
@@ -1253,16 +1601,22 @@ html.light .text-purple-400 {
 }
 
 /* 8. Date Range Switcher & Presets */
-html[data-theme="light"] .bg-slate-950\/60.border-white\/10,
-html.light .bg-slate-950\/60.border-white\/10 {
-  background-color: #ffffff !important;
-  border-color: #cbd5e1 !important;
+html[data-theme="light"] div.inline-flex.bg-slate-950\/60,
+html.light div.inline-flex.bg-slate-950\/60 {
+  background-color: var(--app-tab-track) !important;
+  border-color: transparent !important;
 }
 html[data-theme="light"]
   .bg-slate-950\/60
   button:is(.bg-sky-500, .bg-sky-700):not(.status-kehadiran-pilihan),
+html[data-theme="light"]
+  .app-segment-track
+  button:is(.bg-sky-500, .bg-sky-700):not(.status-kehadiran-pilihan),
 html.light
   .bg-slate-950\/60
+  button:is(.bg-sky-500, .bg-sky-700):not(.status-kehadiran-pilihan),
+html.light
+  .app-segment-track
   button:is(.bg-sky-500, .bg-sky-700):not(.status-kehadiran-pilihan) {
   background-color: #10308a !important;
   color: #ffffff !important;
@@ -1270,18 +1624,31 @@ html.light
 html[data-theme="light"]
   .bg-slate-950\/60
   button:not(.bg-sky-500, .bg-sky-700, .status-kehadiran-pilihan),
+html[data-theme="light"]
+  .app-segment-track
+  button:not(.bg-sky-500, .bg-sky-700, .status-kehadiran-pilihan),
 html.light
   .bg-slate-950\/60
+  button:not(.bg-sky-500, .bg-sky-700, .status-kehadiran-pilihan),
+html.light
+  .app-segment-track
   button:not(.bg-sky-500, .bg-sky-700, .status-kehadiran-pilihan) {
   color: #475569 !important;
 }
 html[data-theme="light"]
   .bg-slate-950\/60
   button:not(.bg-sky-500, .bg-sky-700, .status-kehadiran-pilihan):hover,
+html[data-theme="light"]
+  .app-segment-track
+  button:not(.bg-sky-500, .bg-sky-700, .status-kehadiran-pilihan):hover,
 html.light
   .bg-slate-950\/60
+  button:not(.bg-sky-500, .bg-sky-700, .status-kehadiran-pilihan):hover,
+html.light
+  .app-segment-track
   button:not(.bg-sky-500, .bg-sky-700, .status-kehadiran-pilihan):hover {
   color: #0f172a !important;
+  background-color: rgba(255, 255, 255, 0.78) !important;
 }
 
 /* Presets: "Hari Ini", "7 Hari", "Bulan Ini" */
@@ -1289,8 +1656,8 @@ html[data-theme="light"] button.bg-slate-950.text-slate-400.border-slate-800,
 html[data-theme="light"] .bg-white\/\[0\.04\].border-white\/10,
 html.light button.bg-slate-950.text-slate-400.border-slate-800,
 html.light .bg-white\/\[0\.04\].border-white\/10 {
-  background-color: #ffffff !important;
-  border-color: #cbd5e1 !important;
+  background-color: rgba(255, 255, 255, 0.65) !important;
+  border-color: transparent !important;
   color: #334155 !important;
 }
 html[data-theme="light"]
@@ -1298,7 +1665,8 @@ html[data-theme="light"]
 html[data-theme="light"] .bg-white\/\[0\.04\].border-white\/10:hover,
 html.light button.bg-slate-950.text-slate-400.border-slate-800:hover,
 html.light .bg-white\/\[0\.04\].border-white\/10:hover {
-  background-color: #f1f5f9 !important;
+  background-color: #ffffff !important;
+  border-color: #cbd5e1 !important;
   color: #0f172a !important;
 }
 
@@ -1537,38 +1905,104 @@ html[data-theme="light"] .text-emerald-100,
 html.light .text-emerald-100 {
   color: #065f46 !important;
 }
+html[data-theme="light"] .text-sky-100,
+html.light .text-sky-100 {
+  color: #10308a !important;
+}
+html[data-theme="light"] .text-cyan-100,
+html.light .text-cyan-100 {
+  color: #155e75 !important;
+}
+html[data-theme="light"] .text-violet-100,
+html.light .text-violet-100 {
+  color: #6d28d9 !important;
+}
 
-/* 10. Borders & Dividers
-   Varian beropasitas (`border-slate-800/60`) adalah kelas yang BERBEDA dari
-   `border-slate-800`; tanpa didaftarkan di sini ia tetap abu-abu tua di tema
-   terang. Kelas beropasitas baru di JSX wajib ditambahkan. */
-html[data-theme="light"] .border-slate-800,
-html[data-theme="light"] .border-slate-800\/80,
-html[data-theme="light"] .border-slate-800\/70,
-html[data-theme="light"] .border-slate-800\/60,
-html[data-theme="light"] .border-slate-700,
-html[data-theme="light"] .border-slate-700\/80,
-html[data-theme="light"] .border-slate-700\/60,
-html[data-theme="light"] .border-slate-700\/50,
-html[data-theme="light"] .border-slate-600\/40,
-html[data-theme="light"] .border-white\/5,
-html[data-theme="light"] .border-white\/10,
-html[data-theme="light"] .border-white\/15,
-html[data-theme="light"] .border-white\/20,
-html.light .border-slate-800,
-html.light .border-slate-800\/80,
-html.light .border-slate-800\/70,
-html.light .border-slate-800\/60,
-html.light .border-slate-700,
-html.light .border-slate-700\/80,
-html.light .border-slate-700\/60,
-html.light .border-slate-700\/50,
-html.light .border-slate-600\/40,
-html.light .border-white\/5,
-html.light .border-white\/10,
-html.light .border-white\/15,
-html.light .border-white\/20 {
-  border-color: #e2e8f0 !important;
+/* 10. Borders & Dividers (spesifisitas :where rendah agar tidak mengalahkan tombol/form/.stat-card) */
+html[data-theme="light"]
+:where(
+  .border-slate-800,
+  .border-slate-800\/80,
+  .border-slate-800\/70,
+  .border-slate-800\/60,
+  .border-slate-700,
+  .border-slate-700\/80,
+  .border-slate-700\/60,
+  .border-slate-700\/50,
+  .border-slate-600,
+  .border-slate-600\/40,
+  .border-white\/5,
+  .border-white\/10,
+  .border-white\/15,
+  .border-white\/20
+):where(
+  :not(
+      input,
+      select,
+      textarea,
+      button,
+      a,
+      label,
+      .pilih-cari-tombol,
+      .stat-card,
+      tr,
+      td,
+      .animate-spin
+    )
+),
+html.light
+  :where(
+    .border-slate-800,
+    .border-slate-800\/80,
+    .border-slate-800\/70,
+    .border-slate-800\/60,
+    .border-slate-700,
+    .border-slate-700\/80,
+    .border-slate-700\/60,
+    .border-slate-700\/50,
+    .border-slate-600,
+    .border-slate-600\/40,
+    .border-white\/5,
+    .border-white\/10,
+    .border-white\/15,
+    .border-white\/20
+  ):where(
+    :not(
+        input,
+        select,
+        textarea,
+        button,
+        a,
+        label,
+        .pilih-cari-tombol,
+        .stat-card,
+        tr,
+        td,
+        .animate-spin
+      )
+  ) {
+  border-color: var(--app-border) !important;
+}
+
+html[data-theme="light"]
+  :where(tr, td):where(
+    .border-slate-800,
+    .border-slate-800\/80,
+    .border-slate-800\/60,
+    .border-slate-700,
+    .border-white\/5,
+    .border-white\/10
+  ),
+html.light
+  :where(tr, td):where(
+    .border-slate-800,
+    .border-slate-800\/80,
+    .border-slate-800\/60,
+    .border-slate-700,
+    .border-white\/5,
+    .border-white\/10
+  ) {
+  border-color: var(--app-divider) !important;
 }
 
 /* Horizontal Underline Tabs (.border-b-2). Tombol berlatar navy solid
@@ -1743,14 +2177,30 @@ html[data-theme="light"] select:not([multiple]),
 html.light select:not([multiple]) {
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none' stroke='%23475569' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m5 7.5 5 5 5-5'/%3E%3C/svg%3E");
 }
-.pilih-cari-tombol {
-  border-color: #56658a;
+.pilih-cari-input {
+  padding-right: 2.5rem !important;
 }
-
-/* Tombol panah PilihCari bergaris sama dengan kotak isiannya. */
+.pilih-cari-tombol {
+  border: none !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  color: #94a3b8;
+}
+.pilih-cari-tombol:hover:not(:disabled) {
+  color: #f8fafc;
+  background-color: rgb(255 255 255 / 6%) !important;
+}
 html[data-theme="light"] .pilih-cari-tombol,
 html.light .pilih-cari-tombol {
-  border-color: var(--app-input-border) !important;
+  border: none !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  color: #475569 !important;
+}
+html[data-theme="light"] .pilih-cari-tombol:hover:not(:disabled),
+html.light .pilih-cari-tombol:hover:not(:disabled) {
+  color: #0f172a !important;
+  background-color: rgb(15 23 42 / 5%) !important;
 }
 
 select option {
@@ -2731,7 +3181,7 @@ html.light .approval-code-pill {
     #060b1c;
 }
 .login-frame {
-  border: 1px solid rgb(246 196 83 / 18%);
+  border: 1px solid rgba(148, 163, 184, 0.22);
   box-shadow: 0 40px 90px -40px rgb(0 0 0 / 80%);
 }
 .login-hero {
@@ -2905,4 +3355,241 @@ html[data-theme="light"]
   .login-panel
   :is(.login-btn, .login-link, .login-field-btn):focus-visible {
   outline-color: #1e3a8a;
+}
+
+/* ==========================================================================
+   Kartu Statistik & Perlu Perhatian Dinamis:
+   data-tone="clean" (nilai 0 = putih/netral tenang), sedangkan nilai > 0 menyala
+   dengan aksen tepi kiri 4px sesuai makna (sky, emerald, amber, rose, cyan, violet).
+   ========================================================================== */
+.stat-card {
+  border: 1px solid var(--app-border);
+  background-color: rgba(15, 23, 42, 0.86);
+  transition:
+    background-color 160ms ease,
+    border-color 160ms ease,
+    box-shadow 160ms ease,
+    transform 160ms ease;
+}
+.stat-card-label {
+  color: #94a3b8;
+}
+.stat-card-value {
+  color: #94a3b8;
+}
+.stat-card-icon {
+  color: #64748b;
+}
+
+.stat-card[data-tone="sky"] {
+  border-color: rgba(123, 147, 227, 0.3);
+  border-left: 4px solid #4a68d4;
+  background-color: rgba(47, 79, 191, 0.14);
+}
+.stat-card[data-tone="sky"] .stat-card-label {
+  color: #93a9ea;
+}
+.stat-card[data-tone="sky"] .stat-card-value {
+  color: #f8fafc;
+}
+.stat-card[data-tone="sky"] .stat-card-icon {
+  color: #7b93e3;
+}
+
+.stat-card[data-tone="emerald"] {
+  border-color: rgba(16, 185, 129, 0.32);
+  border-left: 4px solid #10b981;
+  background-color: rgba(16, 185, 129, 0.12);
+}
+.stat-card[data-tone="emerald"] .stat-card-label,
+.stat-card[data-tone="emerald"] .stat-card-value {
+  color: #6ee7b7;
+}
+.stat-card[data-tone="emerald"] .stat-card-icon {
+  color: #34d399;
+}
+
+.stat-card[data-tone="amber"] {
+  border-color: rgba(245, 158, 11, 0.34);
+  border-left: 4px solid #f59e0b;
+  background-color: rgba(245, 158, 11, 0.12);
+}
+.stat-card[data-tone="amber"] .stat-card-label,
+.stat-card[data-tone="amber"] .stat-card-value {
+  color: #fcd34d;
+}
+.stat-card[data-tone="amber"] .stat-card-icon {
+  color: #fbbf24;
+}
+
+.stat-card[data-tone="rose"] {
+  border-color: rgba(244, 63, 94, 0.34);
+  border-left: 4px solid #f43f5e;
+  background-color: rgba(244, 63, 94, 0.12);
+}
+.stat-card[data-tone="rose"] .stat-card-label,
+.stat-card[data-tone="rose"] .stat-card-value {
+  color: #fda4af;
+}
+.stat-card[data-tone="rose"] .stat-card-icon {
+  color: #fb7185;
+}
+
+.stat-card[data-tone="cyan"] {
+  border-color: rgba(6, 182, 212, 0.32);
+  border-left: 4px solid #06b6d4;
+  background-color: rgba(6, 182, 212, 0.12);
+}
+.stat-card[data-tone="cyan"] .stat-card-label,
+.stat-card[data-tone="cyan"] .stat-card-value {
+  color: #67e8f9;
+}
+.stat-card[data-tone="cyan"] .stat-card-icon {
+  color: #22d3ee;
+}
+
+.stat-card[data-tone="violet"] {
+  border-color: rgba(139, 92, 246, 0.32);
+  border-left: 4px solid #8b5cf6;
+  background-color: rgba(139, 92, 246, 0.12);
+}
+.stat-card[data-tone="violet"] .stat-card-label,
+.stat-card[data-tone="violet"] .stat-card-value {
+  color: #c4b5fd;
+}
+.stat-card[data-tone="violet"] .stat-card-icon {
+  color: #a78bfa;
+}
+
+button.stat-card:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 16px rgba(2, 8, 23, 0.22);
+}
+
+html[data-theme="light"] .stat-card,
+html.light .stat-card {
+  background-color: #ffffff !important;
+  border-color: var(--app-border) !important;
+  box-shadow:
+    0 1px 3px rgba(15, 23, 42, 0.05),
+    0 1px 2px rgba(15, 23, 42, 0.03) !important;
+}
+html[data-theme="light"] .stat-card-label,
+html.light .stat-card-label,
+html[data-theme="light"] .stat-card-value,
+html.light .stat-card-value {
+  color: #475569 !important;
+}
+html[data-theme="light"] .stat-card-icon,
+html.light .stat-card-icon {
+  color: #64748b !important;
+}
+
+html[data-theme="light"] .stat-card[data-tone="sky"],
+html.light .stat-card[data-tone="sky"] {
+  background-color: #e0e8fb !important;
+  border-color: #bccbf3 !important;
+  border-left: 4px solid #10308a !important;
+}
+html[data-theme="light"] .stat-card[data-tone="sky"] .stat-card-label,
+html.light .stat-card[data-tone="sky"] .stat-card-label {
+  color: #1d3a9e !important;
+}
+html[data-theme="light"] .stat-card[data-tone="sky"] .stat-card-value,
+html.light .stat-card[data-tone="sky"] .stat-card-value {
+  color: #0f172a !important;
+}
+html[data-theme="light"] .stat-card[data-tone="sky"] .stat-card-icon,
+html.light .stat-card[data-tone="sky"] .stat-card-icon {
+  color: #2f4fbf !important;
+}
+
+html[data-theme="light"] .stat-card[data-tone="emerald"],
+html.light .stat-card[data-tone="emerald"] {
+  background-color: #dcfce7 !important;
+  border-color: #86efac !important;
+  border-left: 4px solid #10b981 !important;
+}
+html[data-theme="light"] .stat-card[data-tone="emerald"] .stat-card-label,
+html.light .stat-card[data-tone="emerald"] .stat-card-label,
+html[data-theme="light"] .stat-card[data-tone="emerald"] .stat-card-value,
+html.light .stat-card[data-tone="emerald"] .stat-card-value {
+  color: #166534 !important;
+}
+html[data-theme="light"] .stat-card[data-tone="emerald"] .stat-card-icon,
+html.light .stat-card[data-tone="emerald"] .stat-card-icon {
+  color: #15803d !important;
+}
+
+html[data-theme="light"] .stat-card[data-tone="amber"],
+html.light .stat-card[data-tone="amber"] {
+  background-color: #fef3c7 !important;
+  border-color: #fde68a !important;
+  border-left: 4px solid #f59e0b !important;
+}
+html[data-theme="light"] .stat-card[data-tone="amber"] .stat-card-label,
+html.light .stat-card[data-tone="amber"] .stat-card-label,
+html[data-theme="light"] .stat-card[data-tone="amber"] .stat-card-value,
+html.light .stat-card[data-tone="amber"] .stat-card-value {
+  color: #92400e !important;
+}
+html[data-theme="light"] .stat-card[data-tone="amber"] .stat-card-icon,
+html.light .stat-card[data-tone="amber"] .stat-card-icon {
+  color: #b45309 !important;
+}
+
+html[data-theme="light"] .stat-card[data-tone="rose"],
+html.light .stat-card[data-tone="rose"] {
+  background-color: #ffe4e6 !important;
+  border-color: #fecdd3 !important;
+  border-left: 4px solid #f43f5e !important;
+}
+html[data-theme="light"] .stat-card[data-tone="rose"] .stat-card-label,
+html.light .stat-card[data-tone="rose"] .stat-card-label,
+html[data-theme="light"] .stat-card[data-tone="rose"] .stat-card-value,
+html.light .stat-card[data-tone="rose"] .stat-card-value {
+  color: #9f1239 !important;
+}
+html[data-theme="light"] .stat-card[data-tone="rose"] .stat-card-icon,
+html.light .stat-card[data-tone="rose"] .stat-card-icon {
+  color: #be123c !important;
+}
+
+html[data-theme="light"] .stat-card[data-tone="cyan"],
+html.light .stat-card[data-tone="cyan"] {
+  background-color: #cffafe !important;
+  border-color: #67e8f9 !important;
+  border-left: 4px solid #0891b2 !important;
+}
+html[data-theme="light"] .stat-card[data-tone="cyan"] .stat-card-label,
+html.light .stat-card[data-tone="cyan"] .stat-card-label,
+html[data-theme="light"] .stat-card[data-tone="cyan"] .stat-card-value,
+html.light .stat-card[data-tone="cyan"] .stat-card-value {
+  color: #155e75 !important;
+}
+html[data-theme="light"] .stat-card[data-tone="cyan"] .stat-card-icon,
+html.light .stat-card[data-tone="cyan"] .stat-card-icon {
+  color: #0e7490 !important;
+}
+
+html[data-theme="light"] .stat-card[data-tone="violet"],
+html.light .stat-card[data-tone="violet"] {
+  background-color: #ede9fe !important;
+  border-color: #c4b5fd !important;
+  border-left: 4px solid #7c3aed !important;
+}
+html[data-theme="light"] .stat-card[data-tone="violet"] .stat-card-label,
+html.light .stat-card[data-tone="violet"] .stat-card-label,
+html[data-theme="light"] .stat-card[data-tone="violet"] .stat-card-value,
+html.light .stat-card[data-tone="violet"] .stat-card-value {
+  color: #5b21b6 !important;
+}
+html[data-theme="light"] .stat-card[data-tone="violet"] .stat-card-icon,
+html.light .stat-card[data-tone="violet"] .stat-card-icon {
+  color: #6d28d9 !important;
+}
+
+html[data-theme="light"] button.stat-card:hover,
+html.light button.stat-card:hover {
+  box-shadow: 0 6px 16px rgba(15, 23, 42, 0.08) !important;
 }

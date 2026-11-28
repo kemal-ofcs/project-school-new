@@ -190,7 +190,13 @@ export function StatusHeroCard({
       {/* 3 Status Counters */}
       <div className="relative z-10 mt-5 grid grid-cols-3 gap-2.5">
         <div className="flex flex-col rounded-xl bg-white/80 dark:bg-white/10 backdrop-blur-md p-3 border border-blue-200/70 dark:border-white/10 shadow-xs dark:shadow-none">
-          <span className="text-[11px] font-semibold text-emerald-700 dark:text-emerald-300 flex items-center gap-1">
+          <span
+            className={`text-[11px] font-semibold flex items-center gap-1 ${
+              tepatWaktu > 0
+                ? "text-emerald-700 dark:text-emerald-300"
+                : "text-slate-600 dark:text-slate-300"
+            }`}
+          >
             <Icon name="check" className="size-3" /> Tepat Waktu
           </span>
           <span className="text-xl md:text-2xl font-bold font-mono-data text-slate-900 dark:text-white mt-0.5">
@@ -199,7 +205,13 @@ export function StatusHeroCard({
         </div>
 
         <div className="flex flex-col rounded-xl bg-white/80 dark:bg-white/10 backdrop-blur-md p-3 border border-blue-200/70 dark:border-white/10 shadow-xs dark:shadow-none">
-          <span className="text-[11px] font-semibold text-amber-700 dark:text-amber-300 flex items-center gap-1">
+          <span
+            className={`text-[11px] font-semibold flex items-center gap-1 ${
+              terlambat > 0
+                ? "text-amber-700 dark:text-amber-300"
+                : "text-slate-600 dark:text-slate-300"
+            }`}
+          >
             <Icon name="clock" className="size-3" /> Terlambat
           </span>
           <span className="text-xl md:text-2xl font-bold font-mono-data text-slate-900 dark:text-white mt-0.5">
@@ -208,7 +220,13 @@ export function StatusHeroCard({
         </div>
 
         <div className="flex flex-col rounded-xl bg-white/80 dark:bg-white/10 backdrop-blur-md p-3 border border-blue-200/70 dark:border-white/10 shadow-xs dark:shadow-none">
-          <span className="text-[11px] font-semibold text-rose-700 dark:text-rose-300 flex items-center gap-1">
+          <span
+            className={`text-[11px] font-semibold flex items-center gap-1 ${
+              belumAbsen > 0
+                ? "text-rose-700 dark:text-rose-300"
+                : "text-slate-600 dark:text-slate-300"
+            }`}
+          >
             <Icon name="alert" className="size-3" /> Belum Absen
           </span>
           <span className="text-xl md:text-2xl font-bold font-mono-data text-slate-900 dark:text-white mt-0.5">

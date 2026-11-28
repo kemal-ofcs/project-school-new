@@ -4,7 +4,7 @@ import { redirect } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { AppShell } from "@/components/AppShell";
 import { FeedbackBanner } from "@/components/ui/FeedbackBanner";
-import { Icon } from "@/components/ui/Icon";
+import { Icon, type IconName } from "@/components/ui/Icon";
 import { Modal } from "@/components/ui/Modal";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { StatusBadge } from "@/components/ui/StatusBadge";
@@ -20,6 +20,7 @@ import {
 } from "@/lib/gateways/attendance-photo";
 import { ambilFotoPersonil } from "@/lib/gateways/personnel-photo";
 import { useHydrated } from "@/lib/hooks/useHydrated";
+import { nadaStat, type StatTone } from "@/lib/utils/stat-card";
 import { FACE_VERDICTS, type FaceVerdict } from "@/lib/validations/face-match";
 
 const VERDICT_TONE: Record<
@@ -255,20 +256,29 @@ export default function FotoAbsensiPage() {
           label="Foto tampil"
           value={String(entries.length)}
           hint="Sesuai filter aktif"
+          tone={nadaStat(entries.length, "sky")}
+          icon="scanner"
         />
         <SummaryTile
           label="Karyawan berbeda"
           value={String(new Set(entries.map((entry) => entry.idKaryawan)).size)}
           hint="Pada rentang tanggal ini"
+          tone={nadaStat(
+            new Set(entries.map((entry) => entry.idKaryawan)).size,
+            "emerald",
+          )}
+          icon="users"
         />
         <SummaryTile
           label="Perkiraan ukuran"
           value={formatSize(totalUkuran)}
           hint="Isi foto hanya diunduh saat dibuka"
+          tone={nadaStat(totalUkuran, "sky")}
+          icon="database"
         />
       </div>
 
-      <div className="flex flex-col gap-3 rounded-2xl border border-white/10 bg-white/[0.04] p-3 lg:flex-row lg:items-end lg:justify-between">
+      <div className="app-group-bar flex flex-col gap-3 rounded-2xl border border-white/10 bg-white/[0.04] p-3 lg:flex-row lg:items-end lg:justify-between">
         <div className="grid flex-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
           <label className="space-y-1.5 text-xs font-bold text-slate-300">
             Dari tanggal
@@ -582,17 +592,24 @@ function SummaryTile({
   label,
   value,
   hint,
+  tone,
+  icon,
 }: {
   label: string;
   value: string;
   hint: string;
+  tone: StatTone;
+  icon: IconName;
 }) {
   return (
-    <div className="app-panel rounded-2xl p-4">
-      <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
-        {label}
-      </p>
-      <p className="mt-1 text-2xl font-black text-white">{value}</p>
+    <div data-tone={tone} className="stat-card rounded-2xl p-4">
+      <div className="flex items-start justify-between gap-2">
+        <p className="stat-card-label text-[11px] font-bold uppercase tracking-wider">
+          {label}
+        </p>
+        <Icon name={icon} className="stat-card-icon size-4 shrink-0" />
+      </div>
+      <p className="stat-card-value mt-1 text-2xl font-black">{value}</p>
       <p className="mt-0.5 text-[11px] text-slate-500">{hint}</p>
     </div>
   );

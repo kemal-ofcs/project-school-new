@@ -129,7 +129,7 @@ export function BuilderPanel({
                 onClick={() => setShowBoundingBoxes(!showBoundingBoxes)}
                 className={`rounded-lg px-2.5 py-1.5 text-xs font-bold transition flex items-center gap-1.5 border ${
                   showBoundingBoxes
-                    ? "border-sky-400 bg-sky-500/15 text-sky-300"
+                    ? "border-sky-600 bg-sky-700 text-on-accent"
                     : "border-white/10 bg-slate-800 text-slate-400 hover:text-white"
                 }`}
                 title="Tampilkan / Sembunyikan garis pembatas kotak elemen di preview"
@@ -186,7 +186,6 @@ export function BuilderPanel({
               />
             </div>
             <div className="mt-2 text-center text-[11px] text-slate-400">
-              💡{" "}
               <span className="font-semibold text-slate-300">
                 Fitur Interaktif:
               </span>{" "}
@@ -204,12 +203,18 @@ export function BuilderPanel({
               }
               className={`rounded-2xl border p-3 text-xs font-bold transition text-left ${
                 template.orientation === "landscape"
-                  ? "border-sky-400 bg-sky-400/10 text-white"
+                  ? "border-sky-600 bg-sky-700 text-on-accent"
                   : "border-white/10 bg-slate-950 text-slate-400 hover:bg-slate-800"
               }`}
             >
               <div className="font-bold">Landscape (Mendatar)</div>
-              <div className="text-[10px] text-slate-500">
+              <div
+                className={`text-[10px] ${
+                  template.orientation === "landscape"
+                    ? "text-on-accent opacity-85"
+                    : "text-slate-500"
+                }`}
+              >
                 Standar CR80 85.6 × 54 mm
               </div>
             </button>
@@ -220,12 +225,18 @@ export function BuilderPanel({
               }
               className={`rounded-2xl border p-3 text-xs font-bold transition text-left ${
                 template.orientation === "portrait"
-                  ? "border-sky-400 bg-sky-400/10 text-white"
+                  ? "border-sky-600 bg-sky-700 text-on-accent"
                   : "border-white/10 bg-slate-950 text-slate-400 hover:bg-slate-800"
               }`}
             >
               <div className="font-bold">Portrait (Tegak)</div>
-              <div className="text-[10px] text-slate-500">
+              <div
+                className={`text-[10px] ${
+                  template.orientation === "portrait"
+                    ? "text-on-accent opacity-85"
+                    : "text-slate-500"
+                }`}
+              >
                 Standar CR80 54 × 85.6 mm
               </div>
             </button>
@@ -917,7 +928,7 @@ export function BuilderPanel({
                     className={`rounded-xl py-1.5 text-xs font-bold transition border flex items-center justify-center gap-1.5 ${
                       selectedElement.fontWeight === "bold" ||
                       selectedElement.fontWeight === "600"
-                        ? "border-sky-400 bg-sky-400/10 text-sky-300"
+                        ? "border-sky-600 bg-sky-700 text-on-accent"
                         : "border-white/5 bg-slate-900 text-slate-400 hover:bg-slate-800"
                     }`}
                   >
@@ -933,7 +944,7 @@ export function BuilderPanel({
                     }
                     className={`rounded-xl py-1.5 text-xs font-bold transition border flex items-center justify-center gap-1.5 ${
                       selectedElement.isItalic
-                        ? "border-sky-400 bg-sky-400/10 text-sky-300"
+                        ? "border-sky-600 bg-sky-700 text-on-accent"
                         : "border-white/5 bg-slate-900 text-slate-400 hover:bg-slate-800"
                     }`}
                   >
@@ -958,7 +969,7 @@ export function BuilderPanel({
                       }
                       className={`rounded-xl py-1.5 text-xs font-bold capitalize transition border ${
                         (selectedElement.textAlign || "left") === align
-                          ? "border-sky-400 bg-sky-400/10 text-sky-300"
+                          ? "border-sky-600 bg-sky-700 text-on-accent"
                           : "border-white/5 bg-slate-900 text-slate-400 hover:bg-slate-800"
                       }`}
                     >
@@ -996,7 +1007,7 @@ export function BuilderPanel({
                       key={el.id}
                       className={`flex items-center justify-between rounded-xl border p-2 text-xs transition ${
                         isSelected
-                          ? "border-sky-400 bg-sky-500/10 text-white"
+                          ? "border-sky-500 bg-sky-500/15 text-sky-300"
                           : "border-white/5 bg-slate-900 text-slate-300 hover:bg-slate-800"
                       }`}
                     >

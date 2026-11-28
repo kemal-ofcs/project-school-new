@@ -66,20 +66,12 @@ function KartuKategori({
         </div>
       </div>
       <div className="mt-3 grid grid-cols-3 gap-2">
-        <StatTile
-          label="Terlambat"
-          value={data.terlambat}
-          tone={data.terlambat > 0 ? "text-amber-300" : "text-white"}
-        />
-        <StatTile label="Sakit" value={data.sakit} />
-        <StatTile label="Izin" value={data.izin} />
-        <StatTile label="Dispen" value={data.dispen} />
-        <StatTile
-          label="Alfa"
-          value={data.alfa}
-          tone={data.alfa > 0 ? "text-rose-400" : "text-white"}
-        />
-        <StatTile label="Total" value={data.total} />
+        <StatTile label="Terlambat" value={data.terlambat} activeTone="amber" />
+        <StatTile label="Sakit" value={data.sakit} activeTone="cyan" />
+        <StatTile label="Izin" value={data.izin} activeTone="sky" />
+        <StatTile label="Dispen" value={data.dispen} activeTone="violet" />
+        <StatTile label="Alfa" value={data.alfa} activeTone="rose" />
+        <StatTile label="Total" value={data.total} activeTone="sky" />
       </div>
     </div>
   );

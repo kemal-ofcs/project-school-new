@@ -19,6 +19,7 @@ import {
   type PayrollRecapRow,
 } from "@/lib/gateways/payroll";
 import { useHydrated } from "@/lib/hooks/useHydrated";
+import { nadaStat } from "@/lib/utils/stat-card";
 import { bolehLapor } from "@/lib/validations/lapor-pajak";
 
 const IDR = new Intl.NumberFormat("id-ID", {
@@ -59,6 +60,9 @@ export default function PayrollDashboardPage() {
   const [periodEnd, setPeriodEnd] = useState(() =>
     formatTanggalOperasional(Date.now()),
   );
+  const [activePreset, setActivePreset] = useState<
+    "today" | "week" | "thisMonth" | "lastMonth" | "last30" | null
+  >("thisMonth");
   const [data, setData] = useState<PayrollRecapRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
@@ -138,6 +142,7 @@ export default function PayrollDashboardPage() {
   const setPresetRange = (
     preset: "today" | "week" | "thisMonth" | "lastMonth" | "last30",
   ) => {
+    setActivePreset(preset);
     const todayStr = formatTanggalOperasional(Date.now());
 
     if (preset === "today") {
@@ -192,7 +197,7 @@ export default function PayrollDashboardPage() {
                 type="button"
                 onClick={() => setModalRunOpen(true)}
                 disabled={loading || data.length === 0}
-                className="px-4 py-2 text-sm font-semibold rounded-lg bg-sky-700 hover:bg-sky-800 text-white transition flex items-center gap-2 disabled:opacity-50 shadow-md shadow-sky-600/20"
+                className="px-4 py-2.5 text-sm font-bold rounded-xl bg-sky-700 hover:bg-sky-600 text-on-accent transition flex items-center gap-2 disabled:opacity-50 shadow-sm"
               >
                 <Icon name="plus" className="w-4 h-4" />
                 Buat Batch Payroll
@@ -202,6 +207,7 @@ export default function PayrollDashboardPage() {
         />
 
         <QuickActionGrid
+          kolom={2}
           tiles={[
             {
               href: "/payroll/runs",
@@ -234,8 +240,8 @@ export default function PayrollDashboardPage() {
         ) : null}
 
         {/* Filter Rentang Tanggal & Preset */}
-        <div className="p-4 bg-slate-900/80 border border-slate-800 rounded-xl flex flex-wrap gap-4 items-center justify-between shadow-sm">
-          <div className="flex flex-wrap items-center gap-3">
+        <div className="app-group-bar p-4 bg-slate-900/80 border border-slate-800 rounded-2xl flex flex-wrap gap-4 items-center justify-between">
+          <div className="flex flex-wrap items-center gap-2.5">
             <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
               Periode Rekap:
             </span>
@@ -243,22 +249,28 @@ export default function PayrollDashboardPage() {
               aria-label="Tanggal mulai periode rekap"
               type="date"
               value={periodStart}
-              onChange={(e) => setPeriodStart(e.target.value)}
-              className="px-3 py-1.5 text-sm bg-slate-800 border border-slate-700 rounded-lg text-slate-200 focus:outline-none focus:border-sky-500"
+              onChange={(e) => {
+                setPeriodStart(e.target.value);
+                setActivePreset(null);
+              }}
+              className="min-h-10 px-3 text-sm bg-slate-950 border border-slate-700 rounded-xl text-slate-200 focus:outline-none focus:border-sky-500"
             />
             <span className="text-slate-500 text-sm">s.d.</span>
             <input
               aria-label="Tanggal selesai periode rekap"
               type="date"
               value={periodEnd}
-              onChange={(e) => setPeriodEnd(e.target.value)}
-              className="px-3 py-1.5 text-sm bg-slate-800 border border-slate-700 rounded-lg text-slate-200 focus:outline-none focus:border-sky-500"
+              onChange={(e) => {
+                setPeriodEnd(e.target.value);
+                setActivePreset(null);
+              }}
+              className="min-h-10 px-3 text-sm bg-slate-950 border border-slate-700 rounded-xl text-slate-200 focus:outline-none focus:border-sky-500"
             />
             <button
               type="button"
               onClick={loadData}
               disabled={loading}
-              className="px-3.5 py-1.5 text-sm bg-sky-700 hover:bg-sky-800 text-white rounded-lg font-medium transition shadow-sm disabled:opacity-50 flex items-center gap-1.5"
+              className="min-h-10 px-4 text-sm bg-sky-700 hover:bg-sky-600 text-on-accent rounded-xl font-bold transition shadow-sm disabled:opacity-50 flex items-center gap-1.5"
             >
               {loading ? (
                 <>
@@ -271,85 +283,99 @@ export default function PayrollDashboardPage() {
             </button>
           </div>
 
-          <div className="flex flex-wrap gap-1.5">
-            <button
-              type="button"
-              onClick={() => setPresetRange("today")}
-              className="px-2.5 py-1 text-xs bg-slate-800 hover:bg-slate-700 text-slate-300 rounded border border-slate-700 transition"
-            >
-              Hari Ini
-            </button>
-            <button
-              type="button"
-              onClick={() => setPresetRange("week")}
-              className="px-2.5 py-1 text-xs bg-slate-800 hover:bg-slate-700 text-slate-300 rounded border border-slate-700 transition"
-            >
-              Minggu Ini
-            </button>
-            <button
-              type="button"
-              onClick={() => setPresetRange("thisMonth")}
-              className="px-2.5 py-1 text-xs bg-slate-800 hover:bg-slate-700 text-slate-300 rounded border border-slate-700 transition font-medium text-sky-400"
-            >
-              Bulan Ini
-            </button>
-            <button
-              type="button"
-              onClick={() => setPresetRange("lastMonth")}
-              className="px-2.5 py-1 text-xs bg-slate-800 hover:bg-slate-700 text-slate-300 rounded border border-slate-700 transition"
-            >
-              Bulan Lalu
-            </button>
-            <button
-              type="button"
-              onClick={() => setPresetRange("last30")}
-              className="px-2.5 py-1 text-xs bg-slate-800 hover:bg-slate-700 text-slate-300 rounded border border-slate-700 transition"
-            >
-              30 Hari Terakhir
-            </button>
+          <div className="app-segment-track flex flex-wrap gap-1 rounded-xl p-1">
+            {(
+              [
+                ["today", "Hari Ini"],
+                ["week", "Minggu Ini"],
+                ["thisMonth", "Bulan Ini"],
+                ["lastMonth", "Bulan Lalu"],
+                ["last30", "30 Hari Terakhir"],
+              ] as const
+            ).map(([key, label]) => (
+              <button
+                key={key}
+                type="button"
+                onClick={() => setPresetRange(key)}
+                className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition ${
+                  activePreset === key
+                    ? "bg-sky-700 text-on-accent shadow-sm"
+                    : "text-slate-400 hover:bg-white/10 hover:text-white"
+                }`}
+              >
+                {label}
+              </button>
+            ))}
           </div>
         </div>
 
         {/* Ringkasan Metrics */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          <div className="p-4 bg-slate-900 border border-slate-800 rounded-xl">
-            <div className="text-xs font-semibold uppercase text-slate-400">
-              Total Karyawan Aktif
+          <div
+            data-tone={nadaStat(data.length, "sky")}
+            className="stat-card rounded-2xl p-4"
+          >
+            <div className="flex items-start justify-between gap-2">
+              <div className="stat-card-label text-xs font-bold uppercase">
+                Total Karyawan Aktif
+              </div>
+              <Icon name="users" className="stat-card-icon size-4 shrink-0" />
             </div>
-            <div className="text-2xl font-bold text-slate-100 mt-1">
+            <div className="stat-card-value text-2xl font-black mt-1">
               {data.length} Personil
             </div>
             <div className="text-xs text-slate-500 mt-1">
               Terjadwal dalam database
             </div>
           </div>
-          <div className="p-4 bg-slate-900 border border-slate-800 rounded-xl">
-            <div className="text-xs font-semibold uppercase text-slate-400">
-              Total Jam Reguler
+          <div
+            data-tone={nadaStat(totalRegular, "sky")}
+            className="stat-card rounded-2xl p-4"
+          >
+            <div className="flex items-start justify-between gap-2">
+              <div className="stat-card-label text-xs font-bold uppercase">
+                Total Jam Reguler
+              </div>
+              <Icon name="clock" className="stat-card-icon size-4 shrink-0" />
             </div>
-            <div className="text-2xl font-bold text-sky-400 mt-1">
+            <div className="stat-card-value text-2xl font-black mt-1">
               {totalRegular.toFixed(1)} Jam
             </div>
             <div className="text-xs text-slate-500 mt-1">
               Akumulasi jam kerja efektif
             </div>
           </div>
-          <div className="p-4 bg-slate-900 border border-slate-800 rounded-xl">
-            <div className="text-xs font-semibold uppercase text-slate-400">
-              Total Jam Lembur
+          <div
+            data-tone={nadaStat(totalLembur, "amber")}
+            className="stat-card rounded-2xl p-4"
+          >
+            <div className="flex items-start justify-between gap-2">
+              <div className="stat-card-label text-xs font-bold uppercase">
+                Total Jam Lembur
+              </div>
+              <Icon name="clock" className="stat-card-icon size-4 shrink-0" />
             </div>
-            <div className="text-2xl font-bold text-amber-400 mt-1">
+            <div className="stat-card-value text-2xl font-black mt-1">
               {totalLembur.toFixed(1)} Jam
             </div>
             <div className="text-xs text-slate-500 mt-1">
               Mengikuti perkalian PP 35/2021
             </div>
           </div>
-          <div className="p-4 bg-slate-900 border border-slate-800 rounded-xl border-emerald-900/40 bg-emerald-950/10">
-            <div className="text-xs font-semibold uppercase text-emerald-400">
-              Estimasi Total Payout
+          <div
+            data-tone={nadaStat(totalTakeHome, "emerald")}
+            className="stat-card rounded-2xl p-4"
+          >
+            <div className="flex items-start justify-between gap-2">
+              <div className="stat-card-label text-xs font-bold uppercase">
+                Estimasi Total Payout
+              </div>
+              <Icon
+                name="document"
+                className="stat-card-icon size-4 shrink-0"
+              />
             </div>
-            <div className="text-2xl font-bold text-emerald-400 mt-1">
+            <div className="stat-card-value text-2xl font-black mt-1">
               {IDR.format(totalTakeHome)}
             </div>
             <div className="text-xs text-slate-500 mt-1">

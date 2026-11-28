@@ -191,19 +191,27 @@ export function DashboardInsights() {
             <StatTile
               label="Hari hadir"
               value={summary.hadir}
-              tone="text-emerald-400"
+              activeTone="emerald"
+              icon="check"
             />
             <StatTile
               label="Kali terlambat"
               value={summary.telat}
-              tone="text-amber-400"
+              activeTone="amber"
+              icon="clock"
             />
             <StatTile
               label="Izin / Sakit / Dispen"
               value={summary.izinSakit}
-              tone="text-blue-400"
+              activeTone="sky"
+              icon="calendar"
             />
-            <StatTile label="Alfa" value={summary.alfa} tone="text-rose-400" />
+            <StatTile
+              label="Alfa"
+              value={summary.alfa}
+              activeTone="rose"
+              icon="alert"
+            />
           </div>
 
           <div className="grid grid-cols-[1fr_auto] gap-2">
