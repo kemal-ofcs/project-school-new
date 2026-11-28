@@ -135,7 +135,13 @@ export function ProfilInstansiCard({
               ) : null}
             </div>
             <div className="flex items-center gap-4">
-              <div className="grid size-20 shrink-0 place-items-center rounded-xl border border-dashed border-white/20 bg-slate-900 overflow-hidden">
+              <div
+                className={`grid size-20 shrink-0 place-items-center rounded-xl overflow-hidden ${
+                  companyProfile.logo_url
+                    ? "brand-logo-frame"
+                    : "border border-dashed border-white/20 bg-slate-900"
+                }`}
+              >
                 {companyProfile.logo_url ? (
                   /* biome-ignore lint/performance/noImgElement: Data URL preview */
                   <img
@@ -188,7 +194,13 @@ export function ProfilInstansiCard({
               ) : null}
             </div>
             <div className="flex items-center gap-4">
-              <div className="grid size-20 shrink-0 place-items-center rounded-xl border border-dashed border-white/20 bg-slate-900 overflow-hidden">
+              <div
+                className={`grid size-20 shrink-0 place-items-center rounded-xl overflow-hidden ${
+                  companyProfile.signature_url
+                    ? "brand-logo-frame"
+                    : "border border-dashed border-white/20 bg-slate-900"
+                }`}
+              >
                 {companyProfile.signature_url ? (
                   /* biome-ignore lint/performance/noImgElement: Data URL preview */
                   <img

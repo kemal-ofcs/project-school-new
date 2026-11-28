@@ -643,37 +643,57 @@ html.light
   border-color: #c4b5fd !important;
 }
 
-/* 4. Segmented Tab Switchers (Dashboard, Scanner, Riwayat, CMS Sub-tabs) */
-html[data-theme="light"] div.bg-slate-950.p-1\.5.rounded-2xl,
-html[data-theme="light"] div.rounded-2xl.bg-slate-800\/60,
-html.light div.bg-slate-950.p-1\.5.rounded-2xl,
-html.light div.rounded-2xl.bg-slate-800\/60 {
+/* 4. Segmented Tab Switchers (Dashboard, Scanner, Riwayat, CMS Sub-tabs — khusus track segmen langsung `> button`, tidak menyentuh kartu `.bg-slate-900/60`) */
+html[data-theme="light"]
+div:is(.p-0\.5, .p-1, .p-1\.5):is(
+  .bg-slate-950,
+  .bg-slate-950\/60,
+  .bg-slate-900\/60,
+  .bg-slate-800\/60
+):not(.app-group-bar),
+html[data-theme="light"] div.rounded-2xl.bg-slate-800\/60:not(.app-group-bar),
+html.light
+  div:is(.p-0\.5, .p-1, .p-1\.5):is(
+    .bg-slate-950,
+    .bg-slate-950\/60,
+    .bg-slate-900\/60,
+    .bg-slate-800\/60
+  ):not(.app-group-bar),
+html.light div.rounded-2xl.bg-slate-800\/60:not(.app-group-bar) {
   background-color: var(--app-tab-track) !important;
   border-color: transparent !important;
 }
 
-/* Active Segmented Tab with Gradient or Sky-500 */
+/* Active Segmented Tab with Gradient or Sky */
 html[data-theme="light"]
 button.bg-gradient-to-r:is(.from-sky-600, .from-sky-800),
 html[data-theme="light"]
-  div.bg-slate-950
-  button:is(.bg-sky-500, .bg-sky-700):not(.status-kehadiran-pilihan),
-html[data-theme="light"]
-  div.bg-slate-900\/60
-  button:is(.bg-sky-500, .bg-sky-700):not(.status-kehadiran-pilihan),
-html[data-theme="light"]
-  div.bg-slate-800\/60
-  button:is(.bg-sky-500, .bg-sky-700):not(.status-kehadiran-pilihan),
+  :is(
+    .app-segment-track,
+    div:is(.p-0\.5, .p-1, .p-1\.5):is(
+        .bg-slate-950,
+        .bg-slate-950\/60,
+        .bg-slate-900\/60,
+        .bg-slate-800\/60
+      ):not(.app-group-bar)
+  )
+  > button:is(.bg-sky-500, .bg-sky-600, .bg-sky-700, .bg-sky-800):not(
+    .status-kehadiran-pilihan
+  ),
 html.light button.bg-gradient-to-r:is(.from-sky-600, .from-sky-800),
 html.light
-  div.bg-slate-950
-  button:is(.bg-sky-500, .bg-sky-700):not(.status-kehadiran-pilihan),
-html.light
-  div.bg-slate-900\/60
-  button:is(.bg-sky-500, .bg-sky-700):not(.status-kehadiran-pilihan),
-html.light
-  div.bg-slate-800\/60
-  button:is(.bg-sky-500, .bg-sky-700):not(.status-kehadiran-pilihan) {
+  :is(
+    .app-segment-track,
+    div:is(.p-0\.5, .p-1, .p-1\.5):is(
+        .bg-slate-950,
+        .bg-slate-950\/60,
+        .bg-slate-900\/60,
+        .bg-slate-800\/60
+      ):not(.app-group-bar)
+  )
+  > button:is(.bg-sky-500, .bg-sky-600, .bg-sky-700, .bg-sky-800):not(
+    .status-kehadiran-pilihan
+  ) {
   background: linear-gradient(to right, #0c2470, #10308a) !important;
   color: #ffffff !important;
   box-shadow: 0 2px 8px rgba(47, 79, 191, 0.25) !important;
@@ -683,142 +703,150 @@ html[data-theme="light"]
   button.bg-gradient-to-r:is(.from-sky-600, .from-sky-800)
   *,
 html[data-theme="light"]
-  div.bg-slate-950
-  button:is(.bg-sky-500, .bg-sky-700):not(.status-kehadiran-pilihan)
-  *,
-html[data-theme="light"]
-  div.bg-slate-900\/60
-  button:is(.bg-sky-500, .bg-sky-700):not(.status-kehadiran-pilihan)
-  *,
-html[data-theme="light"]
-  div.bg-slate-800\/60
-  button:is(.bg-sky-500, .bg-sky-700):not(.status-kehadiran-pilihan)
+  :is(
+    .app-segment-track,
+    div:is(.p-0\.5, .p-1, .p-1\.5):is(
+        .bg-slate-950,
+        .bg-slate-950\/60,
+        .bg-slate-900\/60,
+        .bg-slate-800\/60
+      ):not(.app-group-bar)
+  )
+  > button:is(.bg-sky-500, .bg-sky-600, .bg-sky-700, .bg-sky-800):not(
+    .status-kehadiran-pilihan
+  )
   *,
 html.light button.bg-gradient-to-r:is(.from-sky-600, .from-sky-800) *,
 html.light
-  div.bg-slate-950
-  button:is(.bg-sky-500, .bg-sky-700):not(.status-kehadiran-pilihan)
-  *,
-html.light
-  div.bg-slate-900\/60
-  button:is(.bg-sky-500, .bg-sky-700):not(.status-kehadiran-pilihan)
-  *,
-html.light
-  div.bg-slate-800\/60
-  button:is(.bg-sky-500, .bg-sky-700):not(.status-kehadiran-pilihan)
+  :is(
+    .app-segment-track,
+    div:is(.p-0\.5, .p-1, .p-1\.5):is(
+        .bg-slate-950,
+        .bg-slate-950\/60,
+        .bg-slate-900\/60,
+        .bg-slate-800\/60
+      ):not(.app-group-bar)
+  )
+  > button:is(.bg-sky-500, .bg-sky-600, .bg-sky-700, .bg-sky-800):not(
+    .status-kehadiran-pilihan
+  )
   * {
   color: #ffffff !important;
 }
 
-/* Inactive Segmented Tab Buttons. Tombol utama (`bg-sky-600`) dan bahaya (`bg-rose-600`) di dalam panel tetap berwarna. */
-html[data-theme="light"] .bg-slate-900\/60
-  button:not(.bg-gradient-to-r):not(
+/* Inactive Segmented Tab Buttons */
+html[data-theme="light"] :is(
+    .app-segment-track,
+    div:is(.p-0\.5, .p-1, .p-1\.5):is(
+        .bg-slate-950,
+        .bg-slate-950\/60,
+        .bg-slate-900\/60,
+        .bg-slate-800\/60
+      ):not(.app-group-bar)
+  )
+  > button:not(
+    .bg-gradient-to-r,
     .bg-sky-500,
-    .bg-sky-700,
     .bg-sky-600,
-    .bg-rose-600,
-    .status-kehadiran-pilihan
-  ),
-html[data-theme="light"]
-  .bg-slate-800\/60
-  button:not(.bg-gradient-to-r):not(
-    .bg-sky-500,
     .bg-sky-700,
-    .bg-sky-600,
+    .bg-sky-800,
+    .bg-emerald-500,
+    .bg-emerald-600,
+    .bg-emerald-700,
+    .bg-rose-500,
     .bg-rose-600,
-    .status-kehadiran-pilihan
-  ),
-html[data-theme="light"]
-  div.bg-slate-950
-  button:not(.bg-gradient-to-r):not(
-    .bg-sky-500,
-    .bg-sky-700,
-    .bg-sky-600,
-    .bg-rose-600,
-    .status-kehadiran-pilihan
-  ),
-html.light
-  .bg-slate-900\/60
-  button:not(.bg-gradient-to-r):not(
-    .bg-sky-500,
-    .bg-sky-700,
-    .bg-sky-600,
-    .bg-rose-600,
+    .bg-rose-700,
+    .bg-amber-500,
+    .bg-amber-600,
+    .text-on-accent,
+    .tombol-kedua,
     .status-kehadiran-pilihan
   ),
 html.light
-  .bg-slate-800\/60
-  button:not(.bg-gradient-to-r):not(
+  :is(
+    .app-segment-track,
+    div:is(.p-0\.5, .p-1, .p-1\.5):is(
+        .bg-slate-950,
+        .bg-slate-950\/60,
+        .bg-slate-900\/60,
+        .bg-slate-800\/60
+      ):not(.app-group-bar)
+  )
+  > button:not(
+    .bg-gradient-to-r,
     .bg-sky-500,
-    .bg-sky-700,
     .bg-sky-600,
-    .bg-rose-600,
-    .status-kehadiran-pilihan
-  ),
-html.light
-  div.bg-slate-950
-  button:not(.bg-gradient-to-r):not(
-    .bg-sky-500,
     .bg-sky-700,
-    .bg-sky-600,
+    .bg-sky-800,
+    .bg-emerald-500,
+    .bg-emerald-600,
+    .bg-emerald-700,
+    .bg-rose-500,
     .bg-rose-600,
+    .bg-rose-700,
+    .bg-amber-500,
+    .bg-amber-600,
+    .text-on-accent,
+    .tombol-kedua,
     .status-kehadiran-pilihan
   ) {
   color: #475569 !important;
   background-color: transparent !important;
 }
 html[data-theme="light"]
-  .bg-slate-900\/60
-  button:not(.bg-gradient-to-r):not(
+  :is(
+    .app-segment-track,
+    div:is(.p-0\.5, .p-1, .p-1\.5):is(
+        .bg-slate-950,
+        .bg-slate-950\/60,
+        .bg-slate-900\/60,
+        .bg-slate-800\/60
+      ):not(.app-group-bar)
+  )
+  > button:not(
+    .bg-gradient-to-r,
     .bg-sky-500,
-    .bg-sky-700,
     .bg-sky-600,
-    .bg-rose-600,
-    .status-kehadiran-pilihan
-  ):hover,
-html[data-theme="light"]
-  .bg-slate-800\/60
-  button:not(.bg-gradient-to-r):not(
-    .bg-sky-500,
     .bg-sky-700,
-    .bg-sky-600,
+    .bg-sky-800,
+    .bg-emerald-500,
+    .bg-emerald-600,
+    .bg-emerald-700,
+    .bg-rose-500,
     .bg-rose-600,
-    .status-kehadiran-pilihan
-  ):hover,
-html[data-theme="light"]
-  div.bg-slate-950
-  button:not(.bg-gradient-to-r):not(
-    .bg-sky-500,
-    .bg-sky-700,
-    .bg-sky-600,
-    .bg-rose-600,
-    .status-kehadiran-pilihan
-  ):hover,
-html.light
-  .bg-slate-900\/60
-  button:not(.bg-gradient-to-r):not(
-    .bg-sky-500,
-    .bg-sky-700,
-    .bg-sky-600,
-    .bg-rose-600,
+    .bg-rose-700,
+    .bg-amber-500,
+    .bg-amber-600,
+    .text-on-accent,
+    .tombol-kedua,
     .status-kehadiran-pilihan
   ):hover,
 html.light
-  .bg-slate-800\/60
-  button:not(.bg-gradient-to-r):not(
+  :is(
+    .app-segment-track,
+    div:is(.p-0\.5, .p-1, .p-1\.5):is(
+        .bg-slate-950,
+        .bg-slate-950\/60,
+        .bg-slate-900\/60,
+        .bg-slate-800\/60
+      ):not(.app-group-bar)
+  )
+  > button:not(
+    .bg-gradient-to-r,
     .bg-sky-500,
-    .bg-sky-700,
     .bg-sky-600,
-    .bg-rose-600,
-    .status-kehadiran-pilihan
-  ):hover,
-html.light
-  div.bg-slate-950
-  button:not(.bg-gradient-to-r):not(
-    .bg-sky-500,
     .bg-sky-700,
-    .bg-sky-600,
+    .bg-sky-800,
+    .bg-emerald-500,
+    .bg-emerald-600,
+    .bg-emerald-700,
+    .bg-rose-500,
     .bg-rose-600,
+    .bg-rose-700,
+    .bg-amber-500,
+    .bg-amber-600,
+    .text-on-accent,
+    .tombol-kedua,
     .status-kehadiran-pilihan
   ):hover {
   color: #0f172a !important;
@@ -1045,6 +1073,62 @@ html[data-theme="light"] label.bg-slate-800 svg,
 html.light button.bg-slate-800 svg,
 html.light label.bg-slate-800 svg {
   color: #2f4fbf !important;
+}
+
+/* Tombol aksi sekunder (`.tombol-kedua` dan tombol berbingkai netral di dalam kartu):
+   permukaan taktil terang dengan garis slate-navy tegas agar tidak tampak pudar di atas kartu putih. */
+html[data-theme="light"] .tombol-kedua,
+html[data-theme="light"]
+  button:is(
+    .border-slate-600,
+    .border-slate-700,
+    .border-slate-800,
+    .border-white\/10,
+    .border-white\/15
+  ):not([class^="bg-"]):not([class*=" bg-"]):not(.pilih-cari-tombol):not(
+    .tab-bar-tab
+  ):not(.stat-card):not(.status-kehadiran-pilihan),
+html.light .tombol-kedua,
+html.light
+  button:is(
+    .border-slate-600,
+    .border-slate-700,
+    .border-slate-800,
+    .border-white\/10,
+    .border-white\/15
+  ):not([class^="bg-"]):not([class*=" bg-"]):not(.pilih-cari-tombol):not(
+    .tab-bar-tab
+  ):not(.stat-card):not(.status-kehadiran-pilihan) {
+  background: linear-gradient(180deg, #ffffff 0%, #f1f5f9 100%) !important;
+  border: 1px solid #8494b8 !important;
+  color: #0f172a !important;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.07) !important;
+}
+html[data-theme="light"] .tombol-kedua:hover:not(:disabled),
+html[data-theme="light"]
+  button:is(
+    .border-slate-600,
+    .border-slate-700,
+    .border-slate-800,
+    .border-white\/10,
+    .border-white\/15
+  ):not([class^="bg-"]):not([class*=" bg-"]):not(.pilih-cari-tombol):not(
+    .tab-bar-tab
+  ):not(.stat-card):not(.status-kehadiran-pilihan):hover:not(:disabled),
+html.light .tombol-kedua:hover:not(:disabled),
+html.light
+  button:is(
+    .border-slate-600,
+    .border-slate-700,
+    .border-slate-800,
+    .border-white\/10,
+    .border-white\/15
+  ):not([class^="bg-"]):not([class*=" bg-"]):not(.pilih-cari-tombol):not(
+    .tab-bar-tab
+  ):not(.stat-card):not(.status-kehadiran-pilihan):hover:not(:disabled) {
+  background: #eef2fc !important;
+  border-color: #2f4fbf !important;
+  color: #10308a !important;
 }
 
 /* Neutral status badges & Nonaktif indicators (pill lembut tanpa garis keras) */
@@ -1607,46 +1691,94 @@ html.light div.inline-flex.bg-slate-950\/60 {
   border-color: transparent !important;
 }
 html[data-theme="light"]
-  .bg-slate-950\/60
-  button:is(.bg-sky-500, .bg-sky-700):not(.status-kehadiran-pilihan),
+  div.inline-flex.bg-slate-950\/60
+  > button:is(.bg-sky-500, .bg-sky-700):not(.status-kehadiran-pilihan),
 html[data-theme="light"]
   .app-segment-track
-  button:is(.bg-sky-500, .bg-sky-700):not(.status-kehadiran-pilihan),
+  > button:is(.bg-sky-500, .bg-sky-700):not(.status-kehadiran-pilihan),
 html.light
-  .bg-slate-950\/60
-  button:is(.bg-sky-500, .bg-sky-700):not(.status-kehadiran-pilihan),
+  div.inline-flex.bg-slate-950\/60
+  > button:is(.bg-sky-500, .bg-sky-700):not(.status-kehadiran-pilihan),
 html.light
   .app-segment-track
-  button:is(.bg-sky-500, .bg-sky-700):not(.status-kehadiran-pilihan) {
+  > button:is(.bg-sky-500, .bg-sky-700):not(.status-kehadiran-pilihan) {
   background-color: #10308a !important;
   color: #ffffff !important;
 }
 html[data-theme="light"]
-  .bg-slate-950\/60
-  button:not(.bg-sky-500, .bg-sky-700, .status-kehadiran-pilihan),
+  div.inline-flex.bg-slate-950\/60
+  > button:not(
+    .bg-sky-500,
+    .bg-sky-700,
+    .text-on-accent,
+    .tombol-kedua,
+    .status-kehadiran-pilihan
+  ),
 html[data-theme="light"]
   .app-segment-track
-  button:not(.bg-sky-500, .bg-sky-700, .status-kehadiran-pilihan),
+  > button:not(
+    .bg-sky-500,
+    .bg-sky-700,
+    .text-on-accent,
+    .tombol-kedua,
+    .status-kehadiran-pilihan
+  ),
 html.light
-  .bg-slate-950\/60
-  button:not(.bg-sky-500, .bg-sky-700, .status-kehadiran-pilihan),
+  div.inline-flex.bg-slate-950\/60
+  > button:not(
+    .bg-sky-500,
+    .bg-sky-700,
+    .text-on-accent,
+    .tombol-kedua,
+    .status-kehadiran-pilihan
+  ),
 html.light
   .app-segment-track
-  button:not(.bg-sky-500, .bg-sky-700, .status-kehadiran-pilihan) {
+  > button:not(
+    .bg-sky-500,
+    .bg-sky-700,
+    .text-on-accent,
+    .tombol-kedua,
+    .status-kehadiran-pilihan
+  ) {
   color: #475569 !important;
 }
 html[data-theme="light"]
-  .bg-slate-950\/60
-  button:not(.bg-sky-500, .bg-sky-700, .status-kehadiran-pilihan):hover,
+  div.inline-flex.bg-slate-950\/60
+  > button:not(
+    .bg-sky-500,
+    .bg-sky-700,
+    .text-on-accent,
+    .tombol-kedua,
+    .status-kehadiran-pilihan
+  ):hover,
 html[data-theme="light"]
   .app-segment-track
-  button:not(.bg-sky-500, .bg-sky-700, .status-kehadiran-pilihan):hover,
+  > button:not(
+    .bg-sky-500,
+    .bg-sky-700,
+    .text-on-accent,
+    .tombol-kedua,
+    .status-kehadiran-pilihan
+  ):hover,
 html.light
-  .bg-slate-950\/60
-  button:not(.bg-sky-500, .bg-sky-700, .status-kehadiran-pilihan):hover,
+  div.inline-flex.bg-slate-950\/60
+  > button:not(
+    .bg-sky-500,
+    .bg-sky-700,
+    .text-on-accent,
+    .tombol-kedua,
+    .status-kehadiran-pilihan
+  ):hover,
 html.light
   .app-segment-track
-  button:not(.bg-sky-500, .bg-sky-700, .status-kehadiran-pilihan):hover {
+  > button:not(
+    .bg-sky-500,
+    .bg-sky-700,
+    .text-on-accent,
+    .tombol-kedua,
+    .status-kehadiran-pilihan
+  ):hover {
   color: #0f172a !important;
   background-color: rgba(255, 255, 255, 0.78) !important;
 }
@@ -1697,6 +1829,21 @@ html.light .text-white {
    `bun run audit:kontras`. */
 .text-on-accent {
   color: #ffffff !important;
+}
+
+/* Bingkai logo aplikasi & pratinjau aset transparan (logo/TTD): selalu putih
+   murni (#ffffff) di tema gelap maupun terang agar warna asli logo PNG
+   transparan yang diunggah di Pengaturan tampil apa adanya tanpa menggelap. */
+.brand-logo-frame {
+  background-color: #ffffff;
+  border: 1px solid rgba(148, 163, 184, 0.35);
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.22);
+}
+html[data-theme="light"] .brand-logo-frame,
+html.light .brand-logo-frame {
+  background-color: #ffffff !important;
+  border-color: #cbd5e1 !important;
+  box-shadow: 0 1px 4px rgba(15, 23, 42, 0.08) !important;
 }
 
 /* Teks aksen pucat (200-400) yang belum digelapkan blok "Status Text Accents"
@@ -1807,44 +1954,132 @@ html.light label {
 }
 
 /* Solid colored buttons & gradients retain white text */
-html[data-theme="light"] .bg-sky-500,
-html[data-theme="light"] .bg-sky-600,
-html[data-theme="light"] .bg-sky-700,
-html[data-theme="light"] .bg-blue-600,
-html[data-theme="light"] .bg-emerald-600,
-html[data-theme="light"] .bg-emerald-500,
-html[data-theme="light"] .bg-rose-600,
-html[data-theme="light"] .bg-rose-500,
-html[data-theme="light"] .bg-amber-600,
-html.light .bg-sky-500,
-html.light .bg-sky-600,
-html.light .bg-sky-700,
-html.light .bg-blue-600,
-html.light .bg-emerald-600,
-html.light .bg-emerald-500,
-html.light .bg-rose-600,
-html.light .bg-rose-500,
-html.light .bg-amber-600 {
+html[data-theme="light"]
+:is(
+  .bg-sky-500,
+  .bg-sky-600,
+  .bg-sky-700,
+  .bg-sky-800,
+  .bg-blue-600,
+  .bg-blue-700,
+  .bg-indigo-500,
+  .bg-indigo-600,
+  .bg-indigo-700,
+  .bg-violet-600,
+  .bg-violet-700,
+  .bg-emerald-500,
+  .bg-emerald-600,
+  .bg-emerald-700,
+  .bg-teal-600,
+  .bg-teal-700,
+  .bg-cyan-600,
+  .bg-cyan-700,
+  .bg-rose-500,
+  .bg-rose-600,
+  .bg-rose-700,
+  .bg-red-600,
+  .bg-red-700,
+  .bg-amber-600,
+  .bg-amber-700
+):not(.status-kehadiran-pilihan),
+html.light
+  :is(
+    .bg-sky-500,
+    .bg-sky-600,
+    .bg-sky-700,
+    .bg-sky-800,
+    .bg-blue-600,
+    .bg-blue-700,
+    .bg-indigo-500,
+    .bg-indigo-600,
+    .bg-indigo-700,
+    .bg-violet-600,
+    .bg-violet-700,
+    .bg-emerald-500,
+    .bg-emerald-600,
+    .bg-emerald-700,
+    .bg-teal-600,
+    .bg-teal-700,
+    .bg-cyan-600,
+    .bg-cyan-700,
+    .bg-rose-500,
+    .bg-rose-600,
+    .bg-rose-700,
+    .bg-red-600,
+    .bg-red-700,
+    .bg-amber-600,
+    .bg-amber-700
+  ):not(.status-kehadiran-pilihan) {
   color: #ffffff !important;
 }
-html[data-theme="light"] .bg-sky-500 *,
-html[data-theme="light"] .bg-sky-600 *,
-html[data-theme="light"] .bg-sky-700 *,
-html[data-theme="light"] .bg-blue-600 *,
-html[data-theme="light"] .bg-emerald-600 *,
-html[data-theme="light"] .bg-emerald-500 *,
-html[data-theme="light"] .bg-rose-600 *,
-html[data-theme="light"] .bg-rose-500 *,
-html[data-theme="light"] .bg-amber-600 *,
-html.light .bg-sky-500 *,
-html.light .bg-sky-600 *,
-html.light .bg-sky-700 *,
-html.light .bg-blue-600 *,
-html.light .bg-emerald-600 *,
-html.light .bg-emerald-500 *,
-html.light .bg-rose-600 *,
-html.light .bg-rose-500 *,
-html.light .bg-amber-600 * {
+html[data-theme="light"]
+  :is(
+    .bg-sky-500,
+    .bg-sky-600,
+    .bg-sky-700,
+    .bg-sky-800,
+    .bg-blue-600,
+    .bg-blue-700,
+    .bg-indigo-500,
+    .bg-indigo-600,
+    .bg-indigo-700,
+    .bg-violet-600,
+    .bg-violet-700,
+    .bg-emerald-500,
+    .bg-emerald-600,
+    .bg-emerald-700,
+    .bg-teal-600,
+    .bg-teal-700,
+    .bg-cyan-600,
+    .bg-cyan-700,
+    .bg-rose-500,
+    .bg-rose-600,
+    .bg-rose-700,
+    .bg-red-600,
+    .bg-red-700,
+    .bg-amber-600,
+    .bg-amber-700
+  ):not(.status-kehadiran-pilihan)
+  *,
+html.light
+  :is(
+    .bg-sky-500,
+    .bg-sky-600,
+    .bg-sky-700,
+    .bg-sky-800,
+    .bg-blue-600,
+    .bg-blue-700,
+    .bg-indigo-500,
+    .bg-indigo-600,
+    .bg-indigo-700,
+    .bg-violet-600,
+    .bg-violet-700,
+    .bg-emerald-500,
+    .bg-emerald-600,
+    .bg-emerald-700,
+    .bg-teal-600,
+    .bg-teal-700,
+    .bg-cyan-600,
+    .bg-cyan-700,
+    .bg-rose-500,
+    .bg-rose-600,
+    .bg-rose-700,
+    .bg-red-600,
+    .bg-red-700,
+    .bg-amber-600,
+    .bg-amber-700
+  ):not(.status-kehadiran-pilihan)
+  * {
+  color: #ffffff !important;
+}
+html[data-theme="light"] button.bg-emerald-600:hover:not(:disabled),
+html.light button.bg-emerald-600:hover:not(:disabled) {
+  background-color: #047857 !important;
+  color: #ffffff !important;
+}
+html[data-theme="light"] button.bg-rose-600:hover:not(:disabled),
+html.light button.bg-rose-600:hover:not(:disabled) {
+  background-color: #be123c !important;
   color: #ffffff !important;
 }
 

@@ -228,7 +228,13 @@ export function CompanyProfileCard() {
       ) : null}
 
       <div className="mt-3 flex items-center gap-3 rounded-2xl border border-white/10 bg-slate-950/60 p-3">
-        <div className="grid size-14 shrink-0 place-items-center overflow-hidden rounded-xl border border-dashed border-white/20 bg-slate-900">
+        <div
+          className={`grid size-14 shrink-0 place-items-center overflow-hidden rounded-xl ${
+            profile.logo_url
+              ? "brand-logo-frame"
+              : "border border-dashed border-white/20 bg-slate-900"
+          }`}
+        >
           {profile.logo_url ? (
             /* biome-ignore lint/performance/noImgElement: pratinjau data URI dari database */
             <img
@@ -527,7 +533,13 @@ function ImagePicker({
 }) {
   return (
     <div className="flex items-center gap-3">
-      <div className="grid size-16 shrink-0 place-items-center overflow-hidden rounded-xl border border-dashed border-white/20 bg-slate-900">
+      <div
+        className={`grid size-16 shrink-0 place-items-center overflow-hidden rounded-xl ${
+          value
+            ? "brand-logo-frame"
+            : "border border-dashed border-white/20 bg-slate-900"
+        }`}
+      >
         {value ? (
           /* biome-ignore lint/performance/noImgElement: pratinjau data URI yang baru dipilih */
           <img

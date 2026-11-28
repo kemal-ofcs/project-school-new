@@ -78,6 +78,7 @@ import {
   pesanGalat,
   SUMBER_DANA_UMUM,
   TOMBOL_BAHAYA,
+  TOMBOL_EKSPOR,
   TOMBOL_KEDUA,
   TOMBOL_UTAMA,
 } from "./gaya";
@@ -968,7 +969,7 @@ function DaftarBarang({
         <button
           type="button"
           onClick={() => onEkspor(daftar, tempat)}
-          className={TOMBOL_KEDUA}
+          className={TOMBOL_EKSPOR}
         >
           Ekspor Excel
         </button>
@@ -2941,7 +2942,7 @@ function PanelKartuStok({
                     );
                   }
                 }}
-                className={TOMBOL_KEDUA}
+                className={TOMBOL_EKSPOR}
               >
                 Ekspor Excel
               </button>

@@ -89,7 +89,7 @@ export function RekapTagihan({ master }: { master: MasterTagihan }) {
 
   return (
     <div className="space-y-4">
-      <div className="grid gap-3 sm:grid-cols-3">
+      <div className="app-group-bar grid gap-3 rounded-xl border border-slate-800 bg-slate-900/60 p-3 sm:grid-cols-3">
         <div>
           <label className={LABEL} htmlFor="rekap-laporan">
             Rekap

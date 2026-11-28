@@ -135,7 +135,7 @@ export default function RunDetailClient() {
     transitions.push({
       target: "REVIEWED",
       label: "Tandai Sudah Direview",
-      className: "bg-indigo-500 text-white",
+      className: "bg-indigo-500 text-on-accent",
     });
   }
   // Empat mata: pembuat run tidak boleh menyetujuinya sendiri (kedua backend).
@@ -166,7 +166,7 @@ export default function RunDetailClient() {
     transitions.push({
       target: "REJECTED",
       label: "Tolak Batch",
-      className: "bg-rose-500 text-white",
+      className: "bg-rose-500 text-on-accent",
       warning:
         "Batch yang ditolak berhenti di sini dan tidak ikut dibayarkan. Tulis alasannya di catatan agar pembuat batch tahu apa yang perlu diperbaiki.",
     });
